@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Guardrails;
 using Microsoft.Agents.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 
@@ -30,6 +31,13 @@ public sealed class AgentRunScope : IDisposable
 
     /// <summary>The Glass Box trace for this run, if any.</summary>
     public AgentTrace? Trace { get; }
+
+    /// <summary>
+    /// A stable, opaque identity for THIS run (Phase 3 / F-C), generated when the scope begins — lets gate
+    /// evidence, budgets, and the end-of-run receipt be correlated to one run without depending on object
+    /// identity. A nested sub-agent run gets its OWN id; walk <see cref="Root"/> for the run tree's outermost id.
+    /// </summary>
+    public string RunId { get; } = GateCorrelationId.New();
 
     /// <summary>
     /// The scope of the ENCLOSING run (P2-8) — the scope that was <see cref="Current"/> when this one began,

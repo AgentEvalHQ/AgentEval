@@ -136,12 +136,19 @@ public static class AgentEvalToolGateExtensions
 
         var gateSeq = 0;
 
+        // F-C / P3-6: fingerprint the frozen gate configuration ONCE — every evidence record this pipeline writes
+        // is stamped with it, tying the record to the exact gate list (and order) that produced it.
+        var configFingerprint = GateConfigFingerprint.Compute(frozenGates, frozenResultGates);
+
         return builder.Use(async (agent, context, next, ct) =>
         {
+            // F-C / P3-2: the per-call enrichment context stamped onto every record from this invocation.
+            var evidence = new GateEvidenceContext(agent.Name, context.Function.Name, context.Iteration, configFingerprint);
+
             if (scopeRequiringGateNames.Length > 0 && AgentRunScope.Current is null &&
                 Interlocked.CompareExchange(ref missingScopeWarned, 1, 0) == 0)
             {
-                RecordMissingScopeWarning(trace, Interlocked.Increment(ref gateSeq), scopeRequiringGateNames);
+                RecordMissingScopeWarning(trace, Interlocked.Increment(ref gateSeq), scopeRequiringGateNames, evidence);
             }
 
             var call = new GatedToolCall(
@@ -202,7 +209,8 @@ public static class AgentEvalToolGateExtensions
                         var throwReferenceId = GateReferenceId.New();
                         RecordBlock(trace, Interlocked.Increment(ref gateSeq),
                             ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed"),
-                            action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
+                            action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId,
+                            evidence, failedClosedOnThrow: true);
                         if (policy == ToolGatePolicy.Terminate)
                         {
                             context.Terminate = true;
@@ -269,7 +277,7 @@ public static class AgentEvalToolGateExtensions
                             if (changesArgs || !applied)
                             {
                                 RecordMutate(trace, Interlocked.Increment(ref gateSeq), verdict, before,
-                                    verdict.NewArguments ?? context.Arguments, mutationCaptureMode, applied);
+                                    verdict.NewArguments ?? context.Arguments, mutationCaptureMode, applied, evidence);
                             }
 
                             if (changesArgs)
@@ -289,7 +297,7 @@ public static class AgentEvalToolGateExtensions
                             // Honest evidence: only an ENFORCED block records action="Block" (so GlassBoxEvidence's
                             // GateBlockCount never counts a call that actually ran). WarnOnly records action="Warn".
                             RecordBlock(trace, seq, verdict, action: enforced ? "Block" : "Warn",
-                                terminating: policy == ToolGatePolicy.Terminate, referenceId: referenceId);
+                                terminating: policy == ToolGatePolicy.Terminate, referenceId: referenceId, evidence);
 
                             if (!enforced)
                             {
@@ -326,7 +334,8 @@ public static class AgentEvalToolGateExtensions
                     RecordBlock(trace, Interlocked.Increment(ref gateSeq),
                         ToolGateVerdict.Block("MutationRevalidation",
                             $"tool-call arguments did not converge after {maxMutationRevalidations} mutation re-validations — failing closed"),
-                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: refId);
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: refId, evidence,
+                        failedClosedOnThrow: true);
                     if (policy == ToolGatePolicy.Terminate)
                     {
                         context.Terminate = true;
@@ -377,7 +386,8 @@ public static class AgentEvalToolGateExtensions
                     var throwReferenceId = GateReferenceId.New();
                     RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultGate.PolicyName,
                         $"result gate evaluation threw ({ex.GetType().Name}) — failing closed",
-                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId,
+                        evidence, failedClosedOnThrow: true);
 
                     if (policy == ToolGatePolicy.Terminate)
                     {
@@ -400,7 +410,7 @@ public static class AgentEvalToolGateExtensions
                         // The real result flows through unchanged; the evidence shows a redaction WOULD have fired.
                         if (policy == ToolGatePolicy.WarnOnly)
                         {
-                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: false);
+                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: false, evidence);
                             continue;
                         }
 
@@ -415,13 +425,13 @@ public static class AgentEvalToolGateExtensions
                             var redactReferenceId = GateReferenceId.New();
                             RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultVerdict.PolicyName,
                                 resultVerdict.Reason ?? "result redacted with no replacement supplied — failing closed to a non-revealing refusal",
-                                action: "Redact", terminating: false, referenceId: redactReferenceId);
+                                action: "Redact", terminating: false, referenceId: redactReferenceId, evidence);
                             toolResult = GateReferenceId.RefusalBody(redactReferenceId);
                         }
                         else
                         {
                             toolResult = resultVerdict.RedactedResult;
-                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: true);
+                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: true, evidence);
                         }
 
                         continue;
@@ -434,7 +444,7 @@ public static class AgentEvalToolGateExtensions
 
                         RecordResultBlock(trace, seq, resultVerdict.PolicyName, resultVerdict.Reason,
                             action: enforced ? "Block" : "Warn", terminating: policy == ToolGatePolicy.Terminate,
-                            referenceId: referenceId);
+                            referenceId: referenceId, evidence);
 
                         if (!enforced)
                         {
@@ -539,27 +549,25 @@ public static class AgentEvalToolGateExtensions
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
     // evidence, never returned to the model. referenceId is the ONLY thing the two are allowed to share, so an
     // auditor can correlate what the model saw with what actually happened.
-    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating, string referenceId)
+    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
         if (trace is null)
         {
             return;
         }
 
-        var value = new Dictionary<string, object?>
-        {
-            ["action"] = action,   // "Block" (enforced) or "Warn" (WarnOnly — recorded but the tool ran)
-            ["reason"] = verdict.Reason,
-            ["matches"] = null,
-            ["correlationId"] = ToolCorrelationScope.Current,
-            ["referenceId"] = referenceId,
-        };
+        var extra = new Dictionary<string, object?> { ["matches"] = null };
         if (terminating)
         {
-            value["terminate"] = true;
+            extra["terminate"] = true;
         }
 
-        trace.SetMetadata($"gate.tool.{seq}.{verdict.PolicyName}", value);
+        // F-C: one canonical record, projected to the same superset trace value the readers parse.
+        var record = evidence.Build(
+            stage: "tool", policy: verdict.PolicyName, action: action, referenceId: referenceId, reason: verdict.Reason,
+            severity: GateSeverityClassifier.Classify(verdict.PolicyName, failedClosedOnThrow),
+            correlationId: ToolCorrelationScope.Current, extra: extra);
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 
     // P0-3: same shape as RecordBlock, stage token "tool-result" (not "tool") so a result-gate block is
@@ -567,27 +575,24 @@ public static class AgentEvalToolGateExtensions
     // GateMetadataReader/GlassBoxEvidence.CountGateBlocks (both are stage-agnostic — any gate.{stage}.{seq}.{policy}
     // key with action="Block" counts). Reason is passed as a plain string (not a verdict) since this is also
     // called from the fail-closed catch block, which has no ToolResultVerdict to hand in.
-    private static void RecordResultBlock(AgentTrace? trace, int seq, string policyName, string? reason, string action, bool terminating, string referenceId)
+    private static void RecordResultBlock(AgentTrace? trace, int seq, string policyName, string? reason, string action, bool terminating, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
         if (trace is null)
         {
             return;
         }
 
-        var value = new Dictionary<string, object?>
-        {
-            ["action"] = action,
-            ["reason"] = reason,
-            ["matches"] = null,
-            ["correlationId"] = ToolCorrelationScope.Current,
-            ["referenceId"] = referenceId,
-        };
+        var extra = new Dictionary<string, object?> { ["matches"] = null };
         if (terminating)
         {
-            value["terminate"] = true;
+            extra["terminate"] = true;
         }
 
-        trace.SetMetadata($"gate.tool-result.{seq}.{policyName}", value);
+        var record = evidence.Build(
+            stage: "tool-result", policy: policyName, action: action, referenceId: referenceId, reason: reason,
+            severity: GateSeverityClassifier.Classify(policyName, failedClosedOnThrow),
+            correlationId: ToolCorrelationScope.Current, extra: extra);
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 
     // P0-3: a Redact verdict is recorded (action="Redact", NOT counted as a block) — deliberately does NOT
@@ -596,44 +601,42 @@ public static class AgentEvalToolGateExtensions
     // a database row) — capturing it into the trace at all, even redacted-by-default, is a bigger surface than
     // this pass scopes; only the fact that a redaction happened, and why, is recorded. Full result-capture
     // (mirroring MutationEvidenceRenderer/TraceCaptureMode) is deliberately deferred, not an oversight.
-    private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict, bool applied)
+    private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict, bool applied, GateEvidenceContext evidence)
     {
         if (trace is null)
         {
             return;
         }
 
-        trace.SetMetadata($"gate.tool-result.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
-        {
-            ["action"] = "Redact",
-            // P2-2: false under WarnOnly, where the redaction is recorded but the real result was NOT replaced.
-            ["applied"] = applied,
-            ["reason"] = verdict.Reason,
-            ["correlationId"] = ToolCorrelationScope.Current,
-        });
+        // P2-2: applied=false under WarnOnly, where the redaction is recorded but the real result was NOT replaced.
+        var record = evidence.Build(
+            stage: "tool-result", policy: verdict.PolicyName, action: "Redact", referenceId: GateReferenceId.New(),
+            reason: verdict.Reason, severity: GateSeverityClassifier.Classify(verdict.PolicyName),
+            correlationId: ToolCorrelationScope.Current,
+            extra: new Dictionary<string, object?> { ["applied"] = applied });
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 
     // #4-revisit: the best-effort RUNTIME missing-run-scope signal — see the field comment where
     // scopeRequiringGateNames is computed. Uses the "warning" stage token (not "tool") and action="Warn" so it
     // reads naturally alongside real gate verdicts in GateVoice/GlassBoxEvidence (never counted as a block —
     // GlassBoxEvidence.CountGateBlocks only counts action="Block").
-    private static void RecordMissingScopeWarning(AgentTrace? trace, int seq, IReadOnlyList<string> offenders)
+    private static void RecordMissingScopeWarning(AgentTrace? trace, int seq, IReadOnlyList<string> offenders, GateEvidenceContext evidence)
     {
         if (trace is null)
         {
             return;
         }
 
-        trace.SetMetadata($"gate.warning.{seq}.MissingRunScope", new Dictionary<string, object?>
-        {
-            ["action"] = "Warn",
-            ["reason"] = $"{string.Join(", ", offenders)} declare GateRequirements.RunScope, but no AgentRunScope " +
-                          "is established for this run — they fall back to shared, process-wide state (self-" +
-                          "documented on RunLedger/SequenceGate). Call UseAgentEvalGate() before this middleware, " +
-                          "or prefer UseGatekeeper(...), which refuses construction for this case instead of only warning.",
-            ["matches"] = null,
-            ["correlationId"] = ToolCorrelationScope.Current,
-        });
+        var reason = $"{string.Join(", ", offenders)} declare GateRequirements.RunScope, but no AgentRunScope " +
+                     "is established for this run — they fall back to shared, process-wide state (self-" +
+                     "documented on RunLedger/SequenceGate). Call UseAgentEvalGate() before this middleware, " +
+                     "or prefer UseGatekeeper(...), which refuses construction for this case instead of only warning.";
+        var record = evidence.Build(
+            stage: "warning", policy: "MissingRunScope", action: "Warn", referenceId: GateReferenceId.New(), reason: reason,
+            severity: GateSeverity.Suspicious, correlationId: ToolCorrelationScope.Current,
+            extra: new Dictionary<string, object?> { ["matches"] = null });
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 
     // A Mutate is recorded (action="Mutate", NOT counted as a block) with before/after args so the change is
@@ -675,24 +678,26 @@ public static class AgentEvalToolGateExtensions
 
     private static void RecordMutate(
         AgentTrace? trace, int seq, ToolGateVerdict verdict,
-        IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode, bool applied)
+        IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode, bool applied, GateEvidenceContext evidence)
     {
         if (trace is null)
         {
             return;
         }
 
-        trace.SetMetadata($"gate.tool.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
-        {
-            ["action"] = "Mutate",
-            // P2-2: honest observe evidence — false under WarnOnly, where argsAfter is the counterfactual the
-            // gate proposed but the tool did NOT receive (the live arguments were left unchanged).
-            ["applied"] = applied,
-            ["reason"] = verdict.Reason,
-            ["argsBefore"] = MutationEvidenceRenderer.Render(argsBefore, captureMode),
-            ["argsAfter"] = MutationEvidenceRenderer.Render(argsAfter, captureMode),
-            ["captureMode"] = captureMode.ToString(),
-            ["correlationId"] = ToolCorrelationScope.Current,
-        });
+        var record = evidence.Build(
+            stage: "tool", policy: verdict.PolicyName, action: "Mutate", referenceId: GateReferenceId.New(),
+            reason: verdict.Reason, severity: GateSeverityClassifier.Classify(verdict.PolicyName),
+            correlationId: ToolCorrelationScope.Current,
+            extra: new Dictionary<string, object?>
+            {
+                // P2-2: applied is false under WarnOnly, where argsAfter is the counterfactual the gate proposed
+                // but the tool did NOT receive (the live arguments were left unchanged).
+                ["applied"] = applied,
+                ["argsBefore"] = MutationEvidenceRenderer.Render(argsBefore, captureMode),
+                ["argsAfter"] = MutationEvidenceRenderer.Render(argsAfter, captureMode),
+                ["captureMode"] = captureMode.ToString(),
+            });
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 }

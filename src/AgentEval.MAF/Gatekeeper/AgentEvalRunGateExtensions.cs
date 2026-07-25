@@ -90,12 +90,17 @@ public static class AgentEvalRunGateExtensions
 
         var seq = new int[1];   // shared block-seq counter across both branches
 
+        // F-C / P3-6: fingerprint the pre/post gate configuration once; every run-gate evidence record is stamped
+        // with it. AgentName / RunId are filled from AgentRunScope at record time (the run gate establishes it).
+        var evidenceContext = new GateEvidenceContext(null, null, null,
+            GateConfigFingerprint.Compute(chatGates: preGates.Concat(postGates).ToArray()));
+
         return builder.Use(
             runFunc: async (messages, session, options, innerAgent, ct) =>
             {
                 using var scope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-                var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, effectivePolicy, trace, seq, ct).ConfigureAwait(false);
+                var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, effectivePolicy, trace, seq, evidenceContext, ct).ConfigureAwait(false);
                 if (preOutcome.ReturnBody is not null)
                 {
                     return Refusal(innerAgent, preOutcome.ReturnBody);
@@ -106,21 +111,21 @@ public static class AgentEvalRunGateExtensions
 
                 var response = await innerAgent.RunAsync(effectiveMessages, session, options, ct).ConfigureAwait(false);
 
-                var postOutcome = await RunGatesAsync(postGates, response.Text, "run-post", isPreStage: false, effectivePolicy, trace, seq, ct).ConfigureAwait(false);
+                var postOutcome = await RunGatesAsync(postGates, response.Text, "run-post", isPreStage: false, effectivePolicy, trace, seq, evidenceContext, ct).ConfigureAwait(false);
                 if (postOutcome.ReturnBody is not null)
                 {
                     // P2-3: an enforced run-post Block/Redact swapped what the CALLER sees, but the model's original
                     // (unsafe) response is already persisted in the session and would re-enter context next turn.
                     // Reconcile the persisted turn to the caller-safe text (for sessions that expose the seam) and
                     // emit divergence evidence either way.
-                    ReconcileSession(session, safeText: postOutcome.ReturnBody, withheldText: response.Text, trace, seq);
+                    ReconcileSession(session, safeText: postOutcome.ReturnBody, withheldText: response.Text, trace, seq, evidenceContext);
                     return Refusal(innerAgent, postOutcome.ReturnBody);
                 }
 
                 return response;
             },
             runStreamingFunc: (messages, session, options, innerAgent, ct) =>
-                StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, ct));
+                StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, evidenceContext, ct));
     }
 
     private static async IAsyncEnumerable<AgentResponseUpdate> StreamCore(
@@ -133,6 +138,7 @@ public static class AgentEvalRunGateExtensions
         EvalGatePolicy policy,
         AgentTrace? trace,
         int[] seq,
+        GateEvidenceContext evidence,
         [EnumeratorCancellation] CancellationToken ct)
     {
         // A run-post gate cannot BLOCK a streamed response without buffering the whole stream (which destroys
@@ -151,7 +157,7 @@ public static class AgentEvalRunGateExtensions
         // SessionContextGate pre-gate sees the session, exactly as on the non-streaming path).
         using var runScope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-        var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, policy, trace, seq, ct).ConfigureAwait(false);
+        var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, policy, trace, seq, evidence, ct).ConfigureAwait(false);
         if (preOutcome.ReturnBody is not null)
         {
             var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preOutcome.ReturnBody)) { AgentId = innerAgent.Id };
@@ -196,7 +202,7 @@ public static class AgentEvalRunGateExtensions
         {
             using (runScope.Enter())
             {
-                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, ct).ConfigureAwait(false);
+                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, evidence, ct).ConfigureAwait(false);
             }
         }
     }
@@ -224,7 +230,7 @@ public static class AgentEvalRunGateExtensions
         => outcome.RewrittenInput is null ? original : [new ChatMessage(ChatRole.User, outcome.RewrittenInput)];
 
     private static async ValueTask<GateStageOutcome> RunGatesAsync(
-        IReadOnlyList<IChatGate> gates, string text, string stage, bool isPreStage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, CancellationToken ct)
+        IReadOnlyList<IChatGate> gates, string text, string stage, bool isPreStage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, GateEvidenceContext evidence, CancellationToken ct)
     {
         foreach (var gate in gates)
         {
@@ -239,7 +245,7 @@ public static class AgentEvalRunGateExtensions
                 // block regardless of policy (mirrors the tool gate).
                 var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
                 var throwReferenceId = GateReferenceId.New();
-                RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId);
+                RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId, evidence, failedClosedOnThrow: true);
                 return GateStageOutcome.Return(GateReferenceId.RefusalBody(throwReferenceId));
             }
 
@@ -252,7 +258,7 @@ public static class AgentEvalRunGateExtensions
             // run that proceeded). Under WarnOnly the block is recorded as action="Warn".
             var enforced = policy != EvalGatePolicy.WarnOnly;
             var referenceId = GateReferenceId.New();
-            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict, enforced ? "Block" : "Warn", referenceId);
+            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict, enforced ? "Block" : "Warn", referenceId, evidence);
 
             if (policy == EvalGatePolicy.ThrowOnFail)
             {
@@ -293,7 +299,7 @@ public static class AgentEvalRunGateExtensions
     // actually saw and record the divergence. The scrub itself is only possible for a session that opts into the
     // IReconcilableSession seam (directly or via GetService) — MAF's built-in session exposes no mutable history,
     // so it is left untouched and the evidence honestly records scrubbed=false (never a false success).
-    private static void ReconcileSession(AgentSession? session, string safeText, string withheldText, AgentTrace? trace, int[] seq)
+    private static void ReconcileSession(AgentSession? session, string safeText, string withheldText, AgentTrace? trace, int[] seq, GateEvidenceContext evidence)
     {
         var reconciler = session as IReconcilableSession;
         if (reconciler is null && session is not null)
@@ -342,15 +348,17 @@ public static class AgentEvalRunGateExtensions
 
         // Per-turn hash-divergence record: the caller-safe text vs. the withheld model text, so an auditor can
         // confirm a scrub happened (or see, honestly, that it could not) without either text stored verbatim.
-        trace.SetMetadata($"gate.session.{Interlocked.Increment(ref seq[0])}.reconciliation", new Dictionary<string, object?>
-        {
-            ["action"] = "Reconcile",
-            ["scrubbed"] = scrubbed,
-            ["safeHash"] = ShortHash(safeText),
-            ["withheldHash"] = ShortHash(withheldText),
-            ["diverged"] = !string.Equals(safeText, withheldText, StringComparison.Ordinal),
-            ["reason"] = reason,
-        });
+        var record = evidence.Build(
+            stage: "session", policy: "reconciliation", action: "Reconcile", referenceId: GateReferenceId.New(),
+            reason: reason, severity: GateSeverity.Suspicious,
+            extra: new Dictionary<string, object?>
+            {
+                ["scrubbed"] = scrubbed,
+                ["safeHash"] = ShortHash(safeText),
+                ["withheldHash"] = ShortHash(withheldText),
+                ["diverged"] = !string.Equals(safeText, withheldText, StringComparison.Ordinal),
+            });
+        trace.SetMetadata(record.TraceKey(Interlocked.Increment(ref seq[0])), record.ToMetadata());
     }
 
     private static string ShortHash(string text)
@@ -359,7 +367,7 @@ public static class AgentEvalRunGateExtensions
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
     // evidence, never returned as run-refusal content (see GateReferenceId.RefusalBody). referenceId is the
     // ONLY thing the two are allowed to share, so an auditor can correlate what was returned with what happened.
-    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action, string referenceId)
+    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
         if (trace is null)
         {
@@ -374,13 +382,16 @@ public static class AgentEvalRunGateExtensions
         // arguments. Redact both fields unconditionally for these two axes; audit-visible for every other gate.
         var sensitive = SensitiveJudgeAxes.IsSensitive(verdict.PolicyName);
 
-        trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
-        {
-            ["action"] = action,   // "Block" (enforced) or "Warn" (WarnOnly — recorded but the run proceeded)
-            ["reason"] = sensitive ? "[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]" : verdict.Reason,
-            ["matches"] = sensitive ? null : verdict.Matches,
-            ["correlationId"] = ToolCorrelationScope.Current,
-            ["referenceId"] = referenceId,
-        });
+        // F-C / P3-3: persist the verdict's GateProvenance for the first time (a judge's threshold/actual/evidence),
+        // sensitive-axis-redacted like Reason/Matches so a sensitive judge's rationale is never leaked into the trace.
+        var provenance = sensitive ? null : verdict.Provenance;
+
+        var record = evidence.Build(
+            stage: stage, policy: verdict.PolicyName, action: action, referenceId: referenceId,
+            reason: sensitive ? "[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]" : verdict.Reason,
+            severity: GateSeverityClassifier.Classify(verdict.PolicyName, failedClosedOnThrow),
+            correlationId: ToolCorrelationScope.Current, provenance: provenance,
+            extra: new Dictionary<string, object?> { ["matches"] = sensitive ? null : verdict.Matches });
+        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
     }
 }
