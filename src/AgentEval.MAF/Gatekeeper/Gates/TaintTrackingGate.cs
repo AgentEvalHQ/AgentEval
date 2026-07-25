@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
@@ -46,6 +47,25 @@ public sealed class TaintTrackingGate : IToolGate
     private readonly int _minTaintLength;
     private readonly bool _canonicalize;
 
+    // P5-1: per-run incremental taint state, keyed by the run scope. Weak keys, so a run's ledger is collected with
+    // its scope (no manual cleanup / leak). Owned by THIS gate instance, so two differently-configured taint gates in
+    // one run never cross-contaminate. Populated only when a run scope is in effect; otherwise the stateless
+    // CollectTaintedTokens fallback runs (see InspectAsync).
+    private readonly ConditionalWeakTable<AgentRunScope, RunTaintState> _perRun = new();
+
+    // The accumulating taint ledger for one run: the tainted-token set, the source CallIds seen, a monotonic cursor
+    // into the run's history (how many messages have been folded in), the nearest-preceding-call name for the
+    // CallId-less fallback, and a sticky cap flag. All access is under Lock.
+    private sealed class RunTaintState
+    {
+        public readonly object Lock = new();
+        public readonly HashSet<string> Tainted = new(StringComparer.Ordinal);
+        public readonly HashSet<string> SourceCallIds = new(StringComparer.Ordinal);
+        public int ProcessedCount;
+        public string? LastCallName;
+        public bool CapHit;
+    }
+
     /// <inheritdoc/>
     public string PolicyName => "TaintTrackingGate";
 
@@ -89,38 +109,93 @@ public sealed class TaintTrackingGate : IToolGate
     {
         ArgumentNullException.ThrowIfNull(call);
 
-        // Only sink tools with arguments can leak — everything else is an immediate allow (skip the taint scan).
-        if (!_sinks.Contains(call.FunctionName) || call.Arguments is null || call.Arguments.Count == 0)
-        {
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
-        }
+        // Only sink tools WITH arguments can leak; everything else is an immediate allow — but under a run scope we
+        // still fold this call's history first (below), so taint from an earlier non-sink call is visible to a later sink.
+        var isSink = _sinks.Contains(call.FunctionName) && call.Arguments is { Count: > 0 };
+        var scope = AgentRunScope.Current;
 
         HashSet<string> tainted;
-        try
+        if (scope is not null)
         {
-            tainted = CollectTaintedTokens(call.Messages);
+            // P5-1 fast path: fold only this call's newly-appeared history into the run ledger ONCE (incremental),
+            // then scan against the accumulated token set — O(total history) across the run, not O(n²).
+            var state = _perRun.GetValue(scope, static _ => new RunTaintState());
+            lock (state.Lock)
+            {
+                try
+                {
+                    IngestIncremental(state, call.Messages);
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    return TimedOut(call.FunctionName);   // fail closed WITHIN the policy (WarnOnly still only warns)
+                }
+
+                if (!isSink)
+                {
+                    return Allow();   // history folded; a non-sink (or arg-less) call has nothing to scan
+                }
+
+                if (state.CapHit)
+                {
+                    return CapExceeded(call.FunctionName);
+                }
+
+                if (state.Tainted.Count == 0)
+                {
+                    return Allow();
+                }
+
+                tainted = new HashSet<string>(state.Tainted, StringComparer.Ordinal);   // snapshot; scan outside the lock
+            }
         }
-        catch (RegexMatchTimeoutException)
+        else
         {
-            // A pathological history can time out the bounded token scan. Fail closed WITHIN the policy (a WarnOnly
-            // registration still only warns) rather than let the exception become an unconditional block upstream.
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-                $"taint scan timed out for sink '{call.FunctionName}' — cannot verify, failing closed"));
+            // No run scope ⇒ no stable per-run key (the shared fallback key would bleed taint across runs). Fall back
+            // to the original stateless per-call computation: identical behavior to pre-P5-1, at the pre-P5-1 cost.
+            if (!isSink)
+            {
+                return Allow();
+            }
+
+            try
+            {
+                tainted = CollectTaintedTokens(call.Messages);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return TimedOut(call.FunctionName);
+            }
+
+            if (tainted.Count >= MaxTaintedTokens)
+            {
+                return CapExceeded(call.FunctionName);
+            }
+
+            if (tainted.Count == 0)
+            {
+                return Allow();
+            }
         }
 
-        if (tainted.Count >= MaxTaintedTokens)
-        {
-            // A source flooded the taint set past the cost bound — fail closed within the policy (WarnOnly warns).
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-                $"too many tainted tokens to scan for sink '{call.FunctionName}' — cannot verify, failing closed"));
-        }
+        return ScanArguments(call, tainted);
+    }
 
-        if (tainted.Count == 0)
-        {
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
-        }
+    private ValueTask<ToolGateVerdict> Allow()
+        => new(ToolGateVerdict.Allow(PolicyName));
 
-        foreach (var kv in call.Arguments)
+    // A pathological history can time out the bounded token scan. Fail closed within the policy rather than let the
+    // exception become an unconditional block upstream.
+    private ValueTask<ToolGateVerdict> TimedOut(string sink)
+        => new(ToolGateVerdict.Block(PolicyName, $"taint scan timed out for sink '{sink}' — cannot verify, failing closed"));
+
+    // A source flooded the taint set past the cost bound — fail closed within the policy.
+    private ValueTask<ToolGateVerdict> CapExceeded(string sink)
+        => new(ToolGateVerdict.Block(PolicyName, $"too many tainted tokens to scan for sink '{sink}' — cannot verify, failing closed"));
+
+    private ValueTask<ToolGateVerdict> ScanArguments(GatedToolCall call, HashSet<string> tainted)
+    {
+        foreach (var kv in call.Arguments!)   // non-null: only reached on the isSink path (Arguments has ≥1 entry)
         {
             var argText = GateText.Stringify(kv.Value);
             if (argText.Length == 0)
@@ -150,6 +225,65 @@ public sealed class TaintTrackingGate : IToolGate
         }
 
         return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    // P5-1: fold the messages the run has produced since the last call into the ledger, in a single forward pass (a
+    // source CALL always precedes its RESULT, so one pass suffices where the stateless path used two). Tokens and
+    // source CallIds only accumulate. If the history shrank (a reducer rewrote the prefix), the cursor is stale, so
+    // reprocess from the top — re-adds are idempotent and previously-tainted tokens are retained.
+    private void IngestIncremental(RunTaintState state, IReadOnlyList<ChatMessage>? messages)
+    {
+        if (messages is null || state.CapHit)
+        {
+            return;
+        }
+
+        var start = state.ProcessedCount;
+        if (messages.Count < start)
+        {
+            start = 0;
+            state.LastCallName = null;   // prefix changed — rebuild the nearest-preceding-call name from scratch
+        }
+
+        for (var i = start; i < messages.Count; i++)
+        {
+            foreach (var content in messages[i].Contents)
+            {
+                switch (content)
+                {
+                    case FunctionCallContent fcCall:
+                        state.LastCallName = fcCall.Name;
+                        if (!string.IsNullOrEmpty(fcCall.CallId) && _sources.Contains(fcCall.Name))
+                        {
+                            state.SourceCallIds.Add(fcCall.CallId);
+                        }
+
+                        break;
+
+                    case FunctionResultContent fr when IsSourceResult(fr, state.SourceCallIds, state.LastCallName):
+                        foreach (var text in TaintTexts(fr.Result))
+                        {
+                            foreach (Match match in Token.Matches(text))
+                            {
+                                if (match.Value.Length >= _minTaintLength)
+                                {
+                                    state.Tainted.Add(match.Value);
+                                    if (state.Tainted.Count >= MaxTaintedTokens)
+                                    {
+                                        state.CapHit = true;      // saturated — the caller fails closed
+                                        state.ProcessedCount = messages.Count;
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
+                        break;
+                }
+            }
+        }
+
+        state.ProcessedCount = messages.Count;
     }
 
     private HashSet<string> CollectTaintedTokens(IReadOnlyList<ChatMessage>? messages)
