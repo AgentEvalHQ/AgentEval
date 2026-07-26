@@ -36,6 +36,19 @@ public enum RunBudgetDecision
     MonetaryExceeded,
 }
 
+/// <summary>The outcome of atomically checking and admitting one hashed value to a bounded run-ledger dimension.</summary>
+public enum DistinctValueDecision
+{
+    /// <summary>The hash was already present; no state changed.</summary>
+    Existing,
+
+    /// <summary>The hash was new and was admitted below the configured cap.</summary>
+    Admitted,
+
+    /// <summary>The hash was new but the configured cap had already been reached; it was not stored.</summary>
+    Exceeded,
+}
+
 /// <summary>
 /// Gatekeeper — a per-run <b>cross-hop accumulator</b>. A single tool body can't see state that spans the whole
 /// orchestration (total calls, per-tool counts, monetary sums), so the <see cref="RunBudgetGate"/> reads it here
@@ -76,6 +89,7 @@ public sealed class RunLedger
     // over an overlapping tool/argument name cannot cross-contaminate either gate's count. See the class doc.
     private readonly Dictionary<string, decimal> _monetaryLimitSums = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<string>> _distinctValueHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // P4-3: per-(tool+arg-shape) denial tally (F-B dimension)
     private int _treeDenials;          // P6-1: enforced-block volume, aggregated at the run-tree ROOT (see RecordTreeDenial)
@@ -278,6 +292,53 @@ public sealed class RunLedger
 
             _perToolCallBudgetCounts[toolName] = cur + 1;
             return RunBudgetDecision.Admitted;
+        }
+    }
+
+    /// <summary>
+    /// Atomically checks and admits a SHA-256 value hash to one isolated, bounded dimension. Existing hashes
+    /// remain admissible after the cap is reached; a new hash at the cap is rejected without being stored.
+    /// The caller must supply a secret-free dimension key and exactly 32 hash bytes. Raw values are never accepted.
+    /// </summary>
+    public DistinctValueDecision TryAdmitDistinctValue(
+        string dimensionKey,
+        ReadOnlySpan<byte> canonicalValueHash,
+        int maxDistinctValues)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dimensionKey);
+        if (canonicalValueHash.Length != 32)
+        {
+            throw new ArgumentException("canonical value hash must be exactly 32 bytes.", nameof(canonicalValueHash));
+        }
+
+        if (maxDistinctValues is < 1 or > 4096)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxDistinctValues),
+                "maximum distinct values must be between 1 and 4096.");
+        }
+
+        var hash = Convert.ToHexString(canonicalValueHash);
+        lock (_lock)
+        {
+            if (!_distinctValueHashes.TryGetValue(dimensionKey, out var values))
+            {
+                values = new HashSet<string>(StringComparer.Ordinal);
+                _distinctValueHashes.Add(dimensionKey, values);
+            }
+
+            if (values.Contains(hash))
+            {
+                return DistinctValueDecision.Existing;
+            }
+
+            if (values.Count >= maxDistinctValues)
+            {
+                return DistinctValueDecision.Exceeded;
+            }
+
+            values.Add(hash);
+            return DistinctValueDecision.Admitted;
         }
     }
 

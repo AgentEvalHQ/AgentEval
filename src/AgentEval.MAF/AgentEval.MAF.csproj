@@ -6,11 +6,11 @@
     <RootNamespace>AgentEval</RootNamespace>
   </PropertyGroup>
 
-  <!--
-    No <InternalsVisibleTo> entries — AgentEval.MAF has zero `internal` types, so the prior
-    InternalsVisibleTo("AgentEval") + InternalsVisibleTo("AgentEval.Tests") entries were no-ops.
-    Dropped under plan-13 T4.1d item 27.
-  -->
+  <!-- Internal implementation details are exercised through public behavior; no InternalsVisibleTo is needed. -->
+
+  <ItemGroup>
+    <EmbeddedResource Include="Gatekeeper/Schema/*.json" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />

@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/gatekeeper-contract-v1.schema.json",
+  "title": "AgentEval Gatekeeper tool usage contracts v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "contracts"],
+  "properties": {
+    "schema": { "const": "gatekeeper.contract/1" },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/contract" }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768,
+      "pattern": "\\S"
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "predicates"],
+      "properties": {
+        "tool": { "$ref": "#/$defs/name" },
+        "predicates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/predicate" }
+        }
+      }
+    },
+    "predicate": {
+      "oneOf": [
+        { "$ref": "#/$defs/piiScan" },
+        { "$ref": "#/$defs/recipientDomainAllowList" },
+        { "$ref": "#/$defs/shellMetacharDeny" },
+        { "$ref": "#/$defs/forbiddenIfPrecededBy" },
+        { "$ref": "#/$defs/pathContainment" },
+        { "$ref": "#/$defs/maxDistinctValues" },
+        { "$ref": "#/$defs/deniedKeywords" }
+      ]
+    },
+    "piiScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument"],
+      "properties": {
+        "kind": { "const": "piiScan" },
+        "argument": { "$ref": "#/$defs/name" }
+      }
+    },
+    "recipientDomainAllowList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "allowedDomains"],
+      "properties": {
+        "kind": { "const": "recipientDomainAllowList" },
+        "argument": { "$ref": "#/$defs/name" },
+        "allowedDomains": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "shellMetacharDeny": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "dialect"],
+      "properties": {
+        "kind": { "const": "shellMetacharDeny" },
+        "argument": { "$ref": "#/$defs/name" },
+        "dialect": { "enum": ["PowerShell", "PosixSh", "Cmd"] }
+      }
+    },
+    "forbiddenIfPrecededBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "triggerTools"],
+      "properties": {
+        "kind": { "const": "forbiddenIfPrecededBy" },
+        "triggerTools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/name" }
+        }
+      }
+    },
+    "pathContainment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "allowedRoots"],
+      "properties": {
+        "kind": { "const": "pathContainment" },
+        "argument": { "$ref": "#/$defs/name" },
+        "allowedRoots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/path" }
+        },
+        "basePath": { "$ref": "#/$defs/path" }
+      }
+    },
+    "maxDistinctValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "max"],
+      "properties": {
+        "kind": { "const": "maxDistinctValues" },
+        "argument": { "$ref": "#/$defs/name" },
+        "max": { "type": "integer", "minimum": 1, "maximum": 4096 }
+      }
+    },
+    "deniedKeywords": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "keywords"],
+      "properties": {
+        "kind": { "const": "deniedKeywords" },
+        "argument": { "$ref": "#/$defs/name" },
+        "keywords": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  }
+}

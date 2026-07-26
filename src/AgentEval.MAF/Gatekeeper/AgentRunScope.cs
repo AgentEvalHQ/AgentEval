@@ -42,11 +42,9 @@ public sealed class AgentRunScope : IDisposable
     /// <summary>
     /// The scope of the ENCLOSING run (P2-8) — the scope that was <see cref="Current"/> when this one began,
     /// which for a sub-agent / nested run IS the parent run's scope; null for a top-level run. Distinct in intent
-    /// from the private restore target even though they coincide by construction: budget gates walk this chain
-    /// (see <see cref="Root"/>) so a fan-out of nested runs cannot each start a fresh budget and launder past a
-    /// parent cap.
+    /// from the private restore target: budget gates walk this chain so nested runs cannot launder past a parent cap.
     /// </summary>
-    public AgentRunScope? Parent => _previous;
+    public AgentRunScope? Parent => _parent;
 
     /// <summary>
     /// The OUTERMOST scope in this run's parent chain — this scope itself when it has no <see cref="Parent"/>
@@ -58,7 +56,7 @@ public sealed class AgentRunScope : IDisposable
         get
         {
             var scope = this;
-            while (scope._previous is { } parent)
+            while (scope._parent is { } parent)
             {
                 scope = parent;
             }
@@ -67,21 +65,30 @@ public sealed class AgentRunScope : IDisposable
         }
     }
 
-    private readonly AgentRunScope? _previous;
+    private readonly AgentRunScope? _parent;
+    private readonly AgentRunScope? _restoreTarget;
     private bool _disposed;
 
-    private AgentRunScope(AgentSession? session, string? agentName, AgentTrace? trace)
+    private AgentRunScope(AgentSession? session, string? agentName, AgentTrace? trace, bool inheritParent)
     {
         Session = session;
         AgentName = agentName;
         Trace = trace;
-        _previous = CurrentScope.Value;   // nesting-safe restore
+        _restoreTarget = CurrentScope.Value;
+        _parent = inheritParent ? _restoreTarget : null;
         CurrentScope.Value = this;
     }
 
     /// <summary>Begins a scope for the current run. Dispose (via <c>using</c>) restores the previous scope.</summary>
     public static AgentRunScope Begin(AgentSession? session, string? agentName, AgentTrace? trace)
-        => new(session, agentName, trace);
+        => new(session, agentName, trace, inheritParent: true);
+
+    /// <summary>
+    /// Begins a scope that restores the ambient scope when disposed but does not inherit it as a run-tree parent.
+    /// Used by counterfactual replay so baseline and candidate ledgers cannot share an enclosing live run's root.
+    /// </summary>
+    internal static AgentRunScope BeginDetached(AgentSession? session, string? agentName, AgentTrace? trace)
+        => new(session, agentName, trace, inheritParent: false);
 
     /// <summary>
     /// Re-assert THIS scope as <see cref="Current"/> on the calling async flow, returning a disposable that
@@ -123,6 +130,6 @@ public sealed class AgentRunScope : IDisposable
         }
 
         _disposed = true;
-        CurrentScope.Value = _previous;
+        CurrentScope.Value = _restoreTarget;
     }
 }

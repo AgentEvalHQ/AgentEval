@@ -64,6 +64,8 @@
     <EmbeddedResource Include="Compliance/Gdpr/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="Compliance/EuAiAct/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="MAF/Gatekeeper/Fixtures/gatekeeper-replay-v1.jsonl"
+                      LogicalName="AgentEval.Tests.GatekeeperReplayCorpus.jsonl" />
   </ItemGroup>
 
 </Project>

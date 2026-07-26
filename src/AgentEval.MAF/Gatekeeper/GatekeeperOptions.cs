@@ -19,8 +19,73 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed class GatekeeperOptions
 {
+    private readonly List<ToolContract> _toolContracts = new();
+
     /// <summary>Tool gates, run in order on every tool call (via <c>UseAgentEvalToolGate</c>).</summary>
     public IList<IToolGate> ToolGates { get; } = new List<IToolGate>();
+
+    /// <summary>
+    /// Atomically adds one immutable per-tool usage contract. The callback builds a temporary model; if it
+    /// throws, creates no predicates, or duplicates an existing tool name ordinal-ignore-case, this options
+    /// instance is unchanged.
+    /// </summary>
+    public void Contract(string toolName, Action<ToolContractBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var builder = new ToolContractBuilder(toolName);
+        configure(builder);
+        AddContractsAtomically([builder.Build()]);
+    }
+
+    /// <summary>
+    /// Parses and atomically appends a strict <c>gatekeeper.contract/1</c> JSON document. Unknown or duplicate
+    /// properties, unsupported kinds, malformed shapes, and limit violations throw
+    /// <see cref="GatekeeperContractConfigurationException"/> without changing this options instance.
+    /// </summary>
+    public void LoadContractsFromJson(string json)
+    {
+        var parsed = ToolContractJsonParser.Parse(json);
+        var names = new HashSet<string>(_toolContracts.Select(contract => contract.ToolName), StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < parsed.Count; index++)
+        {
+            if (!names.Add(parsed[index].ToolName))
+            {
+                throw new GatekeeperContractConfigurationException(
+                    "duplicate_tool",
+                    $"$.contracts[{index}].tool",
+                    "tool name duplicates an already configured contract case-insensitively.");
+            }
+        }
+
+        AddContractsAtomically(parsed);
+    }
+
+    /// <summary>
+    /// Reads one UTF-8 contract file once, then delegates to <see cref="LoadContractsFromJson"/>. There is no live
+    /// reload in schema v1; rebuild the agent to adopt a changed file.
+    /// </summary>
+    public void LoadContractsFromFile(string path)
+        => LoadContractsFromJson(ToolContractJsonParser.ReadFileOnce(path));
+
+    internal IReadOnlyList<ToolContract> ToolContracts => _toolContracts;
+
+    internal void AddContractsAtomically(IReadOnlyList<ToolContract> contracts)
+    {
+        ArgumentNullException.ThrowIfNull(contracts);
+        var names = new HashSet<string>(_toolContracts.Select(contract => contract.ToolName), StringComparer.OrdinalIgnoreCase);
+        foreach (var contract in contracts)
+        {
+            ArgumentNullException.ThrowIfNull(contract);
+            if (!names.Add(contract.ToolName))
+            {
+                throw new ArgumentException(
+                    $"duplicate tool contract '{contract.ToolName}' (tool names are case-insensitive).",
+                    nameof(contracts));
+            }
+        }
+
+        _toolContracts.AddRange(contracts);
+    }
 
     /// <summary>
     /// Tool RESULT gates (Phase 2, P0-3), run in order on every already-executed tool call's result, AFTER

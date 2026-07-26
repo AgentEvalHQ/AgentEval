@@ -23,13 +23,19 @@ public static class GateConfigFingerprint
         IReadOnlyList<IChatGate>? chatGates = null)
     {
         var sb = new StringBuilder();
-        AppendList(sb, "tool", toolGates?.Select(g => Describe(g.GetType(), g.PolicyName)));
-        AppendList(sb, "result", resultGates?.Select(g => Describe(g.GetType(), g.PolicyName)));
-        AppendList(sb, "chat", chatGates?.Select(g => Describe(g.GetType(), g.PolicyName)));
+        AppendList(sb, "tool", toolGates?.Select(g => Describe(g, g.GetType(), g.PolicyName)));
+        AppendList(sb, "result", resultGates?.Select(g => Describe(g, g.GetType(), g.PolicyName)));
+        AppendList(sb, "chat", chatGates?.Select(g => Describe(g, g.GetType(), g.PolicyName)));
         return ManifestFingerprint.Hash(sb.ToString());
     }
 
-    private static string Describe(Type gateType, string policyName) => $"{gateType.FullName}#{policyName}";
+    private static string Describe(object gate, Type gateType, string policyName)
+    {
+        var description = $"{gateType.FullName}#{policyName}";
+        return gate is IConfigurationFingerprintContributor contributor
+            ? description + "@" + contributor.ConfigurationFingerprintContribution
+            : description;
+    }
 
     private static void AppendList(StringBuilder sb, string label, IEnumerable<string>? entries)
     {
@@ -44,4 +50,10 @@ public static class GateConfigFingerprint
             sb.Append(entry).Append('\n');
         }
     }
+}
+
+/// <summary>Optional internal contribution for gates whose behavior depends on configuration beyond PolicyName.</summary>
+internal interface IConfigurationFingerprintContributor
+{
+    string ConfigurationFingerprintContribution { get; }
 }
