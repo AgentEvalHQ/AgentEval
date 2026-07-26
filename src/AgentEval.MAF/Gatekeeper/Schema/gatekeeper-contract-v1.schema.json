@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/gatekeeper-contract-v1.schema.json",
+  "title": "AgentEval Gatekeeper tool usage contracts v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "contracts"],
+  "properties": {
+    "schema": { "const": "gatekeeper.contract/1" },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/contract" }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "predicates"],
+      "properties": {
+        "tool": { "$ref": "#/$defs/name" },
+        "predicates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/predicate" }
+        }
+      }
+    },
+    "predicate": {
+      "oneOf": [
+        { "$ref": "#/$defs/piiScan" },
+        { "$ref": "#/$defs/deniedKeywords" }
+      ]
+    },
+    "piiScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument"],
+      "properties": {
+        "kind": { "const": "piiScan" },
+        "argument": { "$ref": "#/$defs/name" }
+      }
+    },
+    "deniedKeywords": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "keywords"],
+      "properties": {
+        "kind": { "const": "deniedKeywords" },
+        "argument": { "$ref": "#/$defs/name" },
+        "keywords": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  }
+}

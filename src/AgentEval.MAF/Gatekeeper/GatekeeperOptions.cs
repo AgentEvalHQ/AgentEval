@@ -37,6 +37,36 @@ public sealed class GatekeeperOptions
         AddContractsAtomically([builder.Build()]);
     }
 
+    /// <summary>
+    /// Parses and atomically appends a strict <c>gatekeeper.contract/1</c> JSON document. Unknown or duplicate
+    /// properties, unsupported kinds, malformed shapes, and limit violations throw
+    /// <see cref="GatekeeperContractConfigurationException"/> without changing this options instance.
+    /// </summary>
+    public void LoadContractsFromJson(string json)
+    {
+        var parsed = ToolContractJsonParser.Parse(json);
+        var names = new HashSet<string>(_toolContracts.Select(contract => contract.ToolName), StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < parsed.Count; index++)
+        {
+            if (!names.Add(parsed[index].ToolName))
+            {
+                throw new GatekeeperContractConfigurationException(
+                    "duplicate_tool",
+                    $"$.contracts[{index}].tool",
+                    "tool name duplicates an already configured contract case-insensitively.");
+            }
+        }
+
+        AddContractsAtomically(parsed);
+    }
+
+    /// <summary>
+    /// Reads one UTF-8 contract file once, then delegates to <see cref="LoadContractsFromJson"/>. There is no live
+    /// reload in schema v1; rebuild the agent to adopt a changed file.
+    /// </summary>
+    public void LoadContractsFromFile(string path)
+        => LoadContractsFromJson(ToolContractJsonParser.ReadFileOnce(path));
+
     internal IReadOnlyList<ToolContract> ToolContracts => _toolContracts;
 
     internal void AddContractsAtomically(IReadOnlyList<ToolContract> contracts)
