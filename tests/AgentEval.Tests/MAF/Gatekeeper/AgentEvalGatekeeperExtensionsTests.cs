@@ -719,6 +719,50 @@ public class AgentEvalGatekeeperExtensionsTests
         Assert.Equal(1, snapshot.BlockCount);
     }
 
+    [Fact]
+    public async Task BlockStormSentinel_EnforcedBlockFromComposite_BlocksRetryWithoutSecondCounter()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create(
+            (string x) => { Interlocked.Increment(ref executed); return x; },
+            "delete_account");
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "delete_account", new Dictionary<string, object?> { ["x"] = "first" })
+            .AddToolCall("c2", "delete_account", new Dictionary<string, object?> { ["x"] = "retry" })
+            .AddText("done");
+        var agent = new ChatClientAgent(
+            scripted,
+            new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [tool] } });
+        var telemetry = new GateTelemetry();
+        var incidents = new List<BlockStormIncident>();
+
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g =>
+            {
+                // The sentinel must be first: once the real loop records ForbiddenTool's enforced block, the
+                // existing root-run ledger signal lets the sentinel stop the retry before later gates run.
+                g.Add(new BlockStormSentinelGate(threshold: 1, onBlockStorm: incidents.Add));
+                g.Add(new ForbiddenToolGate("delete_account"));
+                g.Telemetry = telemetry;
+            })
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);
+        var incident = Assert.Single(incidents);
+        Assert.Equal(1, incident.EnforcedBlockCount);
+        Assert.Contains(
+            telemetry.Snapshot(),
+            snapshot => snapshot.PolicyName == "BlockStormSentinel"
+                        && snapshot.AllowCount == 1
+                        && snapshot.BlockCount == 1);
+        Assert.Contains(
+            telemetry.Snapshot(),
+            snapshot => snapshot.PolicyName == "ForbiddenToolGate"
+                        && snapshot.BlockCount == 1);
+    }
+
     // ── GatekeeperOptions sugar ──
 
     [Fact]
