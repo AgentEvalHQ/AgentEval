@@ -273,7 +273,10 @@ public static class AgentEvalGatekeeperExtensions
                 post: options.PostGates.Count > 0 ? options.PostGates.ToArray() : null,
                 policy: evalPolicy,
                 trace: options.Trace,
-                evidenceSink: options.EvidenceSink);
+                evidenceSink: options.EvidenceSink,
+                compositeToolConfigFingerprint: GateConfigFingerprint.Compute(
+                    options.ToolGates.Count > 0 ? options.ToolGates.ToArray() : null,
+                    options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null));
         }
 
         // P0-3: a result-gate-only configuration (ToolGates empty, ToolResultGates non-empty) is valid —

@@ -48,6 +48,23 @@ public static class AgentEvalRunGateExtensions
         EvalGatePolicy? policy = null,
         AgentTrace? trace = null,
         IGateEvidenceSink? evidenceSink = null)
+        => UseAgentEvalGate(
+            builder,
+            pre,
+            post,
+            policy,
+            trace,
+            evidenceSink,
+            compositeToolConfigFingerprint: null);
+
+    internal static AIAgentBuilder UseAgentEvalGate(
+        this AIAgentBuilder builder,
+        IReadOnlyList<IChatGate>? pre,
+        IReadOnlyList<IChatGate>? post,
+        EvalGatePolicy? policy,
+        AgentTrace? trace,
+        IGateEvidenceSink? evidenceSink,
+        string? compositeToolConfigFingerprint)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -95,9 +112,15 @@ public static class AgentEvalRunGateExtensions
         // with it. Pre and post are fingerprinted SEPARATELY and combined (Phase 3 review #7) so that moving a gate
         // across the pre/post boundary — a different configuration — yields a different fingerprint. AgentName /
         // RunId are filled from AgentRunScope at record time (the run gate establishes it).
-        var runConfigFingerprint = ManifestFingerprint.Hash(
+        var runConfiguration =
             "pre|" + GateConfigFingerprint.Compute(chatGates: preGates.Count > 0 ? preGates : null) +
-            "|post|" + GateConfigFingerprint.Compute(chatGates: postGates.Count > 0 ? postGates : null));
+            "|post|" + GateConfigFingerprint.Compute(chatGates: postGates.Count > 0 ? postGates : null);
+        if (compositeToolConfigFingerprint is not null)
+        {
+            runConfiguration += "|tool|" + compositeToolConfigFingerprint;
+        }
+
+        var runConfigFingerprint = ManifestFingerprint.Hash(runConfiguration);
         var evidenceContext = new GateEvidenceContext(null, null, null, runConfigFingerprint, evidenceSink);
 
         return builder.Use(
