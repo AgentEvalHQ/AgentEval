@@ -34,6 +34,37 @@ public sealed class PiiPredicate : ContractPredicate
     public PiiPredicate(string argument) : base(argument) { }
 }
 
+/// <summary>Shell syntax dialect whose metacharacters are denied.</summary>
+public enum ShellDialect
+{
+    /// <summary>PowerShell syntax.</summary>
+    PowerShell,
+    /// <summary>POSIX-compatible sh syntax.</summary>
+    PosixSh,
+    /// <summary>Windows cmd.exe syntax.</summary>
+    Cmd,
+}
+
+/// <summary>
+/// Denies dialect-specific shell syntax metacharacters. This is not a command allow-list or semantic safety proof.
+/// </summary>
+public sealed class ShellMetacharDenyPredicate : ContractPredicate
+{
+    /// <summary>Creates a shell-metacharacter predicate for <paramref name="argument"/>.</summary>
+    public ShellMetacharDenyPredicate(string argument, ShellDialect dialect) : base(argument)
+    {
+        if (!Enum.IsDefined(dialect))
+        {
+            throw new ArgumentOutOfRangeException(nameof(dialect));
+        }
+
+        Dialect = dialect;
+    }
+
+    /// <summary>The exact shell syntax table applied to the argument.</summary>
+    public ShellDialect Dialect { get; }
+}
+
 /// <summary>Allows recipient mailboxes only when every normalized domain is on the configured allow-list.</summary>
 public sealed class RecipientDomainAllowListPredicate : ContractPredicate
 {
@@ -163,6 +194,13 @@ public sealed class ToolContractBuilder
         return this;
     }
 
+    /// <summary>Adds dialect-specific shell metacharacter denial for the named string argument.</summary>
+    public ToolContractBuilder ShellMetacharDeny(string argument, ShellDialect dialect)
+    {
+        _predicates.Add(new ShellMetacharDenyPredicate(argument, dialect));
+        return this;
+    }
+
     /// <summary>Adds literal denied keywords for an exact argument name.</summary>
     public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
     {
@@ -263,6 +301,8 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
 
             var clean = predicate switch
             {
+                ShellMetacharDenyPredicate shell =>
+                    ShellMetacharPolicy.IsSafe(value, shell.Dialect),
                 RecipientDomainAllowListPredicate recipient =>
                     RecipientDomainPolicy.AllowsAll(value, recipient.AllowedDomainSet),
                 _ => InspectBoundedProjections(predicate, value),
@@ -414,6 +454,10 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                         AppendCanonical(canonical, "keywordHash", ManifestFingerprint.Hash(keyword.ToUpperInvariant()));
                     }
                 }
+                else if (predicate is ShellMetacharDenyPredicate shell)
+                {
+                    AppendCanonical(canonical, "dialect", shell.Dialect.ToString());
+                }
                 else if (predicate is RecipientDomainAllowListPredicate recipient)
                 {
                     foreach (var domain in recipient.AllowedDomains)
@@ -469,19 +513,20 @@ internal static class ContractPredicateMetadata
     {
         PiiPredicate => "piiScan",
         RecipientDomainAllowListPredicate => "recipientDomainAllowList",
+        ShellMetacharDenyPredicate => "shellMetacharDeny",
         DeniedKeywordsPredicate => "deniedKeywords",
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 
     internal static GateCost Cost(ContractPredicate predicate) => predicate switch
     {
-        PiiPredicate or RecipientDomainAllowListPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
+        PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 
     internal static GateRequirements Requirements(ContractPredicate predicate) => predicate switch
     {
-        PiiPredicate or RecipientDomainAllowListPredicate or DeniedKeywordsPredicate => GateRequirements.None,
+        PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateRequirements.None,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 }

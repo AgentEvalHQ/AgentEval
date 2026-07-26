@@ -50,6 +50,8 @@ internal static class ToolContractJsonParser
         new HashSet<string>(["kind", "argument"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> RecipientDomainProperties =
         new HashSet<string>(["kind", "argument", "allowedDomains"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ShellMetacharProperties =
+        new HashSet<string>(["kind", "argument", "dialect"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> DeniedKeywordProperties =
         new HashSet<string>(["kind", "argument", "keywords"], StringComparer.Ordinal);
 
@@ -208,6 +210,7 @@ internal static class ToolContractJsonParser
             {
                 "piiScan" => ParsePii(element, argument, path),
                 "recipientDomainAllowList" => ParseRecipientDomains(element, argument, path),
+                "shellMetacharDeny" => ParseShellMetacharDeny(element, argument, path),
                 "deniedKeywords" => ParseDeniedKeywords(element, argument, path),
                 _ => throw Error("unknown_predicate_kind", path + ".kind", "predicate kind is not supported."),
             };
@@ -223,6 +226,24 @@ internal static class ToolContractJsonParser
         ValidateProperties(element, PiiProperties, path, "unknown_predicate_property");
         return new PiiPredicate(argument);
     }
+    private static ShellMetacharDenyPredicate ParseShellMetacharDeny(
+        JsonElement element,
+        string argument,
+        string path)
+    {
+        ValidateProperties(element, ShellMetacharProperties, path, "unknown_predicate_property");
+        var dialectName = RequireString(element, "dialect", path, ToolContractJsonLimits.MaxNameChars);
+        var dialect = dialectName switch
+        {
+            "PowerShell" => ShellDialect.PowerShell,
+            "PosixSh" => ShellDialect.PosixSh,
+            "Cmd" => ShellDialect.Cmd,
+            _ => throw Error("invalid_shell_dialect", path + ".dialect", "shell dialect is not supported."),
+        };
+
+        return new ShellMetacharDenyPredicate(argument, dialect);
+    }
+
 
     private static RecipientDomainAllowListPredicate ParseRecipientDomains(
         JsonElement element,
