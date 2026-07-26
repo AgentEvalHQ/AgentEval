@@ -4,6 +4,7 @@
 
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using AgentEval.Guardrails;
@@ -63,6 +64,57 @@ public sealed class ShellMetacharDenyPredicate : ContractPredicate
 
     /// <summary>The exact shell syntax table applied to the argument.</summary>
     public ShellDialect Dialect { get; }
+}
+
+/// <summary>
+/// Blocks this contract's tool after any configured trigger proposal reached the same gate earlier in the run.
+/// Observation is conservative proposal history, not proof of tool execution. Concurrent calls from one model batch
+/// have no deterministic happens-before here; compose <see cref="SameBatchOrderingGate"/> when that guarantee is needed.
+/// </summary>
+public sealed class ForbiddenIfPrecededByPredicate : ContractPredicate
+{
+    internal const int MaxTriggerTools = 256;
+    internal const int MaxTriggerToolChars = 256;
+
+    /// <summary>Creates a sequence predicate from the trigger tool names.</summary>
+    public ForbiddenIfPrecededByPredicate(IEnumerable<string> triggerTools) : base(argument: null)
+    {
+        ArgumentNullException.ThrowIfNull(triggerTools);
+
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var inputCount = 0;
+        foreach (var triggerTool in triggerTools)
+        {
+            inputCount++;
+            if (inputCount > MaxTriggerTools)
+            {
+                throw new ArgumentException($"at most {MaxTriggerTools} trigger tools may be configured.", nameof(triggerTools));
+            }
+
+            var normalizedTool = ContractValidation.RequiredName(triggerTool, nameof(triggerTools));
+            if (normalizedTool.Length > MaxTriggerToolChars)
+            {
+                throw new ArgumentException(
+                    $"trigger tool names may contain at most {MaxTriggerToolChars} characters.",
+                    nameof(triggerTools));
+            }
+
+            normalized.Add(normalizedTool);
+        }
+
+        if (normalized.Count == 0)
+        {
+            throw new ArgumentException("at least one trigger tool is required.", nameof(triggerTools));
+        }
+
+        TriggerTools = new ReadOnlyCollection<string>(normalized
+            .OrderBy(tool => tool, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(tool => tool, StringComparer.Ordinal)
+            .ToArray());
+    }
+
+    /// <summary>Case-insensitively matched trigger tool names.</summary>
+    public IReadOnlyList<string> TriggerTools { get; }
 }
 
 /// <summary>Allows recipient mailboxes only when every normalized domain is on the configured allow-list.</summary>
@@ -201,6 +253,13 @@ public sealed class ToolContractBuilder
         return this;
     }
 
+    /// <summary>Adds a run-scoped prior-trigger prohibition for this contract's tool.</summary>
+    public ToolContractBuilder ForbiddenIfPrecededBy(params string[] triggerTools)
+    {
+        _predicates.Add(new ForbiddenIfPrecededByPredicate(triggerTools));
+        return this;
+    }
+
     /// <summary>Adds literal denied keywords for an exact argument name.</summary>
     public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
     {
@@ -223,6 +282,10 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
 
     private readonly IReadOnlyList<ToolContract> _contracts;
     private readonly IReadOnlyDictionary<string, ToolContract> _contractsByTool;
+
+    private readonly HashSet<string> _sequenceTriggers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConditionalWeakTable<object, SequenceRunState> _sequenceStates = new();
+    private readonly object _sequenceFallbackKey = new();
 
     /// <summary>Creates a frozen contract gate. Tool names must be unique ordinal-ignore-case.</summary>
     public ToolUsageContractGate(IEnumerable<ToolContract> contracts)
@@ -252,6 +315,13 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
             {
                 cost = (GateCost)Math.Max((int)cost, (int)ContractPredicateMetadata.Cost(predicate));
                 requirements |= ContractPredicateMetadata.Requirements(predicate);
+                if (predicate is ForbiddenIfPrecededByPredicate sequence)
+                {
+                    foreach (var triggerTool in sequence.TriggerTools)
+                    {
+                        _sequenceTriggers.Add(triggerTool);
+                    }
+                }
             }
         }
 
@@ -286,7 +356,14 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
     {
         ArgumentNullException.ThrowIfNull(call);
 
-        if (!_contractsByTool.TryGetValue(call.FunctionName, out var contract))
+        _contractsByTool.TryGetValue(call.FunctionName, out var contract);
+        if (_sequenceTriggers.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        var sequenceViolation = ObserveSequence(call.FunctionName, contract);
+        if (contract is null)
         {
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
         }
@@ -294,6 +371,16 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
         foreach (var predicate in contract.Predicates)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (predicate is ForbiddenIfPrecededByPredicate sequence)
+            {
+                if (ReferenceEquals(sequence, sequenceViolation))
+                {
+                    return Block(contract, predicate);
+                }
+
+                continue;
+            }
+
             if (!TryReadArgument(call.Arguments, predicate.Argument!, out var value))
             {
                 return Block(contract, predicate);
@@ -315,6 +402,30 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
         }
 
         return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private ForbiddenIfPrecededByPredicate? ObserveSequence(string toolName, ToolContract? contract)
+    {
+        if (_sequenceTriggers.Count == 0)
+        {
+            return null;
+        }
+
+        var key = (object?)AgentRunScope.Current ?? _sequenceFallbackKey;
+        var state = _sequenceStates.GetValue(key, static _ => new SequenceRunState());
+        lock (state)
+        {
+            var violation = contract?.Predicates
+                .OfType<ForbiddenIfPrecededByPredicate>()
+                .FirstOrDefault(predicate => predicate.TriggerTools.Any(state.SeenTriggers.Contains));
+
+            if (_sequenceTriggers.Contains(toolName))
+            {
+                state.SeenTriggers.Add(toolName);
+            }
+
+            return violation;
+        }
     }
 
     private static bool InspectBoundedProjections(ContractPredicate predicate, object value)
@@ -339,10 +450,14 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
     }
 
     private ValueTask<ToolGateVerdict> Block(ToolContract contract, ContractPredicate predicate)
-        => new(ToolGateVerdict.Block(
+    {
+        var subject = predicate.Argument is null
+            ? $"Tool '{contract.ToolName}' violated predicate "
+            : $"Tool '{contract.ToolName}' argument '{predicate.Argument}' violated predicate ";
+        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(
             PolicyName,
-            $"Tool '{contract.ToolName}' argument '{predicate.Argument}' violated predicate " +
-            $"'{ContractPredicateMetadata.Kind(predicate)}'."));
+            subject + $"'{ContractPredicateMetadata.Kind(predicate)}'."));
+    }
 
     private static bool TryReadArgument(
         IReadOnlyDictionary<string, object?>? arguments,
@@ -446,8 +561,22 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
             foreach (var predicate in contract.Predicates)
             {
                 AppendCanonical(canonical, "kind", ContractPredicateMetadata.Kind(predicate));
-                AppendCanonical(canonical, "argument", predicate.Argument!);
-                if (predicate is DeniedKeywordsPredicate denied)
+                if (predicate.Argument is not null)
+                {
+                    AppendCanonical(canonical, "argument", predicate.Argument);
+                }
+
+                if (predicate is ForbiddenIfPrecededByPredicate sequence)
+                {
+                    foreach (var triggerTool in sequence.TriggerTools)
+                    {
+                        AppendCanonical(
+                            canonical,
+                            "triggerToolHash",
+                            ManifestFingerprint.Hash(triggerTool.ToUpperInvariant()));
+                    }
+                }
+                else if (predicate is DeniedKeywordsPredicate denied)
                 {
                     foreach (var keyword in denied.Keywords)
                     {
@@ -504,6 +633,11 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
         }
     }
 
+    private sealed class SequenceRunState
+    {
+        internal HashSet<string> SeenTriggers { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
     private sealed class BoundedProjectionException : Exception;
 }
 
@@ -512,6 +646,7 @@ internal static class ContractPredicateMetadata
     internal static string Kind(ContractPredicate predicate) => predicate switch
     {
         PiiPredicate => "piiScan",
+        ForbiddenIfPrecededByPredicate => "forbiddenIfPrecededBy",
         RecipientDomainAllowListPredicate => "recipientDomainAllowList",
         ShellMetacharDenyPredicate => "shellMetacharDeny",
         DeniedKeywordsPredicate => "deniedKeywords",
@@ -520,6 +655,7 @@ internal static class ContractPredicateMetadata
 
     internal static GateCost Cost(ContractPredicate predicate) => predicate switch
     {
+        ForbiddenIfPrecededByPredicate => GateCost.PureCode,
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
@@ -527,6 +663,7 @@ internal static class ContractPredicateMetadata
     internal static GateRequirements Requirements(ContractPredicate predicate) => predicate switch
     {
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateRequirements.None,
+        ForbiddenIfPrecededByPredicate => GateRequirements.RunScope,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 }

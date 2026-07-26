@@ -52,6 +52,8 @@ internal static class ToolContractJsonParser
         new HashSet<string>(["kind", "argument", "allowedDomains"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> ShellMetacharProperties =
         new HashSet<string>(["kind", "argument", "dialect"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> SequenceProperties =
+        new HashSet<string>(["kind", "triggerTools"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> DeniedKeywordProperties =
         new HashSet<string>(["kind", "argument", "keywords"], StringComparer.Ordinal);
 
@@ -196,7 +198,9 @@ internal static class ToolContractJsonParser
             var path = $"{arrayPath}[{index}]";
             RequireKind(element, JsonValueKind.Object, path, "predicate_type", "predicate must be an object.");
             var kind = RequireString(element, "kind", path, ToolContractJsonLimits.MaxNameChars);
-            var argument = RequireName(element, "argument", path);
+            var argument = string.Equals(kind, "forbiddenIfPrecededBy", StringComparison.Ordinal)
+                ? null
+                : RequireName(element, "argument", path);
             var identity = kind + "\0" + argument;
             if (!identities.Add(identity))
             {
@@ -208,10 +212,11 @@ internal static class ToolContractJsonParser
 
             ContractPredicate predicate = kind switch
             {
-                "piiScan" => ParsePii(element, argument, path),
-                "recipientDomainAllowList" => ParseRecipientDomains(element, argument, path),
-                "shellMetacharDeny" => ParseShellMetacharDeny(element, argument, path),
-                "deniedKeywords" => ParseDeniedKeywords(element, argument, path),
+                "piiScan" => ParsePii(element, argument!, path),
+                "recipientDomainAllowList" => ParseRecipientDomains(element, argument!, path),
+                "shellMetacharDeny" => ParseShellMetacharDeny(element, argument!, path),
+                "forbiddenIfPrecededBy" => ParseForbiddenIfPrecededBy(element, path),
+                "deniedKeywords" => ParseDeniedKeywords(element, argument!, path),
                 _ => throw Error("unknown_predicate_kind", path + ".kind", "predicate kind is not supported."),
             };
             predicates.Add(predicate);
@@ -226,6 +231,61 @@ internal static class ToolContractJsonParser
         ValidateProperties(element, PiiProperties, path, "unknown_predicate_property");
         return new PiiPredicate(argument);
     }
+
+    private static ForbiddenIfPrecededByPredicate ParseForbiddenIfPrecededBy(
+        JsonElement element,
+        string path)
+    {
+        ValidateProperties(element, SequenceProperties, path, "unknown_predicate_property");
+        var triggersElement = RequireProperty(element, "triggerTools", path, JsonValueKind.Array);
+        var count = triggersElement.GetArrayLength();
+        if (count is < 1 or > ForbiddenIfPrecededByPredicate.MaxTriggerTools)
+        {
+            throw Error(
+                "trigger_count_limit",
+                path + ".triggerTools",
+                $"trigger-tool count must be 1..{ForbiddenIfPrecededByPredicate.MaxTriggerTools}.");
+        }
+
+        var triggers = new string[count];
+        var index = 0;
+        foreach (var triggerElement in triggersElement.EnumerateArray())
+        {
+            var triggerPath = $"{path}.triggerTools[{index}]";
+            RequireKind(
+                triggerElement,
+                JsonValueKind.String,
+                triggerPath,
+                "trigger_type",
+                "trigger tool must be a string.");
+            var trigger = triggerElement.GetString()!;
+            if (trigger.Length > ForbiddenIfPrecededByPredicate.MaxTriggerToolChars)
+            {
+                throw Error(
+                    "trigger_length_limit",
+                    triggerPath,
+                    $"trigger tool exceeds {ForbiddenIfPrecededByPredicate.MaxTriggerToolChars} characters.");
+            }
+
+            if (string.IsNullOrWhiteSpace(trigger))
+            {
+                throw Error("empty_trigger", triggerPath, "trigger tool must be non-empty.");
+            }
+
+            triggers[index] = trigger;
+            index++;
+        }
+
+        try
+        {
+            return new ForbiddenIfPrecededByPredicate(triggers);
+        }
+        catch (ArgumentException)
+        {
+            throw Error("invalid_trigger", path + ".triggerTools", "trigger-tool text is invalid.");
+        }
+    }
+
     private static ShellMetacharDenyPredicate ParseShellMetacharDeny(
         JsonElement element,
         string argument,

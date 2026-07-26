@@ -40,6 +40,7 @@
         { "$ref": "#/$defs/piiScan" },
         { "$ref": "#/$defs/recipientDomainAllowList" },
         { "$ref": "#/$defs/shellMetacharDeny" },
+        { "$ref": "#/$defs/forbiddenIfPrecededBy" },
         { "$ref": "#/$defs/deniedKeywords" }
       ]
     },
@@ -80,6 +81,20 @@
         "kind": { "const": "shellMetacharDeny" },
         "argument": { "$ref": "#/$defs/name" },
         "dialect": { "enum": ["PowerShell", "PosixSh", "Cmd"] }
+      }
+    },
+    "forbiddenIfPrecededBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "triggerTools"],
+      "properties": {
+        "kind": { "const": "forbiddenIfPrecededBy" },
+        "triggerTools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/name" }
+        }
       }
     },
     "deniedKeywords": {
