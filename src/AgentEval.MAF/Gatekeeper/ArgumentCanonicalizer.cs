@@ -42,52 +42,83 @@ public static class ArgumentCanonicalizer
     /// </summary>
     public static IReadOnlyList<string> Canonicalize(
         string raw, int maxDepth = DefaultMaxDepth, int maxLength = DefaultMaxLength, int maxProjections = DefaultMaxProjections)
+        => CanonicalizeWithStatus(raw, maxDepth, maxLength, maxProjections).Projections;
+
+    /// <summary>
+    /// Status-returning path for fail-closed callers. <see cref="Canonicalize"/> preserves its best-effort
+    /// compatibility behavior; this variant also reports when a depth, length, projection-count, or regex-timeout
+    /// bound prevented the input from being fully canonicalized.
+    /// </summary>
+    internal static ArgumentCanonicalizationResult CanonicalizeWithStatus(
+        string raw, int maxDepth = DefaultMaxDepth, int maxLength = DefaultMaxLength, int maxProjections = DefaultMaxProjections)
     {
         ArgumentNullException.ThrowIfNull(raw);
 
         var results = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var frontier = new Queue<(string Text, int Depth)>();
+        var complete = true;
 
-        void Add(string s, int depth)
+        void Add(string value, int depth)
         {
-            if (s.Length > maxLength || results.Count >= maxProjections || !seen.Add(s))
+            if (seen.Contains(value))
             {
                 return;
             }
 
-            results.Add(s);
+            if (value.Length > maxLength || results.Count >= maxProjections)
+            {
+                complete = false;
+                return;
+            }
+
+            seen.Add(value);
+            results.Add(value);
             if (depth < maxDepth)
             {
-                frontier.Enqueue((s, depth));
+                frontier.Enqueue((value, depth));
+            }
+            else if (depth > 0)
+            {
+                complete = false;
             }
         }
 
         Add(raw, 0);
-        while (frontier.Count > 0 && results.Count < maxProjections)
+        while (frontier.Count > 0)
         {
             var (text, depth) = frontier.Dequeue();
-            foreach (var decoded in DecodeOneLayer(text))
+            var layer = DecodeOneLayer(text);
+            complete &= layer.IsComplete;
+            foreach (var decoded in layer.Projections)
             {
                 Add(decoded, depth + 1);
             }
         }
 
-        return results;
+        return new ArgumentCanonicalizationResult(results.AsReadOnly(), complete);
     }
 
-    private static IEnumerable<string> DecodeOneLayer(string text)
+    private static DecodeLayerResult DecodeOneLayer(string text)
     {
+        var projections = new List<string>();
+        var complete = true;
+
         // Percent-decoding (URL): %2F → '/', %68%74%74%70 → 'http'. Uri.UnescapeDataString is lenient (leaves a
-        // malformed % as-is) and never throws.
+        // malformed % as-is).
         if (text.IndexOf('%') >= 0)
         {
-            string percent;
-            try { percent = Uri.UnescapeDataString(text); }
-            catch (UriFormatException) { percent = text; }
-            if (!string.Equals(percent, text, StringComparison.Ordinal))
+            try
             {
-                yield return percent;
+                var percent = Uri.UnescapeDataString(text);
+                if (!string.Equals(percent, text, StringComparison.Ordinal))
+                {
+                    projections.Add(percent);
+                }
+            }
+            catch (UriFormatException)
+            {
+                complete = false;
             }
         }
 
@@ -97,7 +128,7 @@ public static class ArgumentCanonicalizer
             var html = WebUtility.HtmlDecode(text);
             if (!string.Equals(html, text, StringComparison.Ordinal))
             {
-                yield return html;
+                projections.Add(html);
             }
         }
 
@@ -105,30 +136,27 @@ public static class ArgumentCanonicalizer
         // hides a char as a backslash-u sequence in the argument string itself.
         if (text.Contains("\\u", StringComparison.Ordinal))
         {
-            string unescaped;
             try
             {
-                unescaped = UnicodeEscape.Replace(text, m => ((char)Convert.ToInt32(m.Groups[1].Value, 16)).ToString());
+                var unescaped = UnicodeEscape.Replace(text, match => ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString());
+                if (!string.Equals(unescaped, text, StringComparison.Ordinal))
+                {
+                    projections.Add(unescaped);
+                }
             }
             catch (RegexMatchTimeoutException)
             {
-                unescaped = text;
-            }
-
-            if (!string.Equals(unescaped, text, StringComparison.Ordinal))
-            {
-                yield return unescaped;
+                complete = false;
             }
         }
 
-        // Base64-candidate runs decoded to printable UTF-8 text.
-        foreach (var decoded in DecodeBase64Candidates(text))
-        {
-            yield return decoded;
-        }
+        var base64 = DecodeBase64Candidates(text);
+        complete &= base64.IsComplete;
+        projections.AddRange(base64.Projections);
+        return new DecodeLayerResult(projections, complete);
     }
 
-    private static IEnumerable<string> DecodeBase64Candidates(string text)
+    private static DecodeLayerResult DecodeBase64Candidates(string text)
     {
         MatchCollection matches;
         try
@@ -137,9 +165,10 @@ public static class ArgumentCanonicalizer
         }
         catch (RegexMatchTimeoutException)
         {
-            yield break;
+            return new DecodeLayerResult(Array.Empty<string>(), IsComplete: false);
         }
 
+        var projections = new List<string>();
         foreach (Match match in matches)
         {
             var candidate = match.Value;
@@ -176,9 +205,11 @@ public static class ArgumentCanonicalizer
             // Require mostly-printable so decoded binary doesn't manufacture pattern-matching noise.
             if (IsMostlyPrintable(text8))
             {
-                yield return text8;
+                projections.Add(text8);
             }
         }
+
+        return new DecodeLayerResult(projections, IsComplete: true);
     }
 
     private static bool IsMostlyPrintable(string s)
@@ -200,3 +231,11 @@ public static class ArgumentCanonicalizer
         return printable >= s.Length * 0.9;
     }
 }
+
+internal readonly record struct ArgumentCanonicalizationResult(
+    IReadOnlyList<string> Projections,
+    bool IsComplete);
+
+internal readonly record struct DecodeLayerResult(
+    IReadOnlyList<string> Projections,
+    bool IsComplete);

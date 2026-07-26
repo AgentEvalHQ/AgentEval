@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.RegularExpressions;
-
 namespace AgentEval.Guardrails.Gates;
 
 /// <summary>
@@ -15,17 +13,6 @@ namespace AgentEval.Guardrails.Gates;
 /// </summary>
 public sealed class RegexPiiGate : IChatGate
 {
-    private static readonly TimeSpan PiiTimeout = GateRegexTimeouts.Standard;
-
-    private static readonly (string Name, Regex Pattern)[] Patterns =
-    {
-        ("Email", new Regex(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled, PiiTimeout)),
-        ("Phone_US", new Regex(@"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", RegexOptions.Compiled, PiiTimeout)),
-        ("SSN", new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, PiiTimeout)),
-        ("CreditCard", new Regex(@"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", RegexOptions.Compiled, PiiTimeout)),
-        ("IP_Address", new Regex(@"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", RegexOptions.Compiled, PiiTimeout)),
-    };
-
     /// <inheritdoc />
     public string PolicyName => "pii-detection";
 
@@ -37,34 +24,21 @@ public sealed class RegexPiiGate : IChatGate
             return new ValueTask<GateVerdict>(GateVerdict.Allow(PolicyName));
         }
 
-        var matchedNames = new List<string>();
-        var redacted = text;
-        foreach (var (name, pattern) in Patterns)
-        {
-            try
-            {
-                if (!pattern.IsMatch(text))
-                {
-                    continue;
-                }
+        var scan = PiiScanner.Scan(text);
 
-                matchedNames.Add(name);
-                // Mask each match with block characters of the matched length (for the Redact path).
-                redacted = pattern.Replace(redacted, m => new string('█', m.Length));
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                // Treat a timeout as no-match for this pattern (ReDoS guard); other patterns still run.
-            }
-        }
-
-        if (matchedNames.Count == 0)
+        // Preserve this gate's compatibility behavior: a timeout without a completed match is advisory-clean.
+        // Contract predicates consume the same scanner but map Inconclusive to Block.
+        if (scan.DetectedKinds.Count == 0)
         {
             return new ValueTask<GateVerdict>(GateVerdict.Allow(PolicyName));
         }
 
         // Block carries the redacted text too, so the client can mask under the Redact policy.
-        var verdict = GateVerdict.Block(PolicyName, $"PII detected: {string.Join(", ", matchedNames)}", matchedNames, redactedText: redacted);
+        var verdict = GateVerdict.Block(
+            PolicyName,
+            $"PII detected: {string.Join(", ", scan.DetectedKinds)}",
+            scan.DetectedKinds,
+            redactedText: scan.RedactedText);
         return new ValueTask<GateVerdict>(verdict);
     }
 }

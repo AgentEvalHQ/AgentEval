@@ -1,0 +1,457 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using AgentEval.Guardrails;
+using AgentEval.Guardrails.Gates;
+
+namespace AgentEval.MAF.Gatekeeper;
+
+/// <summary>
+/// Closed, data-only base for predicates understood by <see cref="ToolUsageContractGate"/>. The
+/// <see langword="private protected"/> constructor prevents external assemblies from adding executable or
+/// unrecognized predicate implementations.
+/// </summary>
+public abstract class ContractPredicate
+{
+    private protected ContractPredicate(string? argument)
+    {
+        Argument = argument is null ? null : ContractValidation.RequiredName(argument, nameof(argument));
+    }
+
+    /// <summary>The exact, case-sensitive tool argument name inspected by this predicate.</summary>
+    public string? Argument { get; }
+}
+
+/// <summary>Requires the named argument's bounded projections to contain no recognized PII.</summary>
+public sealed class PiiPredicate : ContractPredicate
+{
+    /// <summary>Creates a PII predicate for <paramref name="argument"/>.</summary>
+    public PiiPredicate(string argument) : base(argument) { }
+}
+
+/// <summary>Rejects literal denied keywords in the named argument's bounded decoded projections.</summary>
+public sealed class DeniedKeywordsPredicate : ContractPredicate
+{
+    /// <summary>Creates a literal, case-insensitive denied-keyword predicate.</summary>
+    public DeniedKeywordsPredicate(string argument, IEnumerable<string> keywords) : base(argument)
+    {
+        ArgumentNullException.ThrowIfNull(keywords);
+
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var keyword in keywords)
+        {
+            if (keyword is null)
+            {
+                throw new ArgumentException("keywords cannot contain null.", nameof(keywords));
+            }
+
+            string value;
+            try
+            {
+                value = keyword.Normalize(NormalizationForm.FormKC).Trim();
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ArgumentException("keywords must contain valid Unicode text.", nameof(keywords), exception);
+            }
+
+            if (value.Length == 0)
+            {
+                throw new ArgumentException("keywords cannot contain an empty or whitespace-only entry.", nameof(keywords));
+            }
+
+            normalized.Add(value);
+        }
+
+        if (normalized.Count == 0)
+        {
+            throw new ArgumentException("at least one denied keyword is required.", nameof(keywords));
+        }
+
+        Keywords = new ReadOnlyCollection<string>(normalized
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(value => value, StringComparer.Ordinal)
+            .ToArray());
+    }
+
+    /// <summary>Normalized, non-empty, case-insensitively deduplicated literal keywords.</summary>
+    public IReadOnlyList<string> Keywords { get; }
+}
+
+/// <summary>An immutable ordered predicate list for one uniquely named tool.</summary>
+public sealed class ToolContract
+{
+    /// <summary>Creates and validates a tool contract.</summary>
+    public ToolContract(string toolName, IEnumerable<ContractPredicate> predicates)
+    {
+        ToolName = ContractValidation.RequiredName(toolName, nameof(toolName));
+        ArgumentNullException.ThrowIfNull(predicates);
+
+        var frozen = predicates.ToArray();
+        if (frozen.Length == 0)
+        {
+            throw new ArgumentException("a tool contract must contain at least one predicate.", nameof(predicates));
+        }
+
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var predicate in frozen)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            var kind = ContractPredicateMetadata.Kind(predicate);
+            var identity = kind + "\0" + predicate.Argument;
+            if (!identities.Add(identity))
+            {
+                throw new ArgumentException(
+                    $"duplicate predicate '{kind}' for argument '{predicate.Argument}'.",
+                    nameof(predicates));
+            }
+        }
+
+        Predicates = new ReadOnlyCollection<ContractPredicate>(frozen);
+    }
+
+    /// <summary>The tool name, matched with <see cref="StringComparer.OrdinalIgnoreCase"/>.</summary>
+    public string ToolName { get; }
+
+    /// <summary>Predicates evaluated in declaration order; first violation blocks.</summary>
+    public IReadOnlyList<ContractPredicate> Predicates { get; }
+}
+
+/// <summary>Fluent, atomic builder used by <see cref="GatekeeperOptions.Contract"/>.</summary>
+public sealed class ToolContractBuilder
+{
+    private readonly string _toolName;
+    private readonly List<ContractPredicate> _predicates = new();
+
+    internal ToolContractBuilder(string toolName)
+    {
+        _toolName = ContractValidation.RequiredName(toolName, nameof(toolName));
+    }
+
+    /// <summary>Adds a fail-closed PII scan for an exact argument name.</summary>
+    public ToolContractBuilder Pii(string argument)
+    {
+        _predicates.Add(new PiiPredicate(argument));
+        return this;
+    }
+
+    /// <summary>Adds literal denied keywords for an exact argument name.</summary>
+    public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
+    {
+        _predicates.Add(new DeniedKeywordsPredicate(argument, words));
+        return this;
+    }
+
+    internal ToolContract Build() => new(_toolName, _predicates);
+}
+
+/// <summary>
+/// One immutable, declarative per-tool contract gate. Tool names match ordinal-ignore-case; argument names match
+/// exact ordinal spelling. Missing, null, malformed, over-limit, or inconclusive values fail closed.
+/// </summary>
+public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprintContributor
+{
+    private const int MaxSerializedArgumentBytes = ArgumentCanonicalizer.DefaultMaxLength;
+    private static readonly JsonSerializerOptions ProjectionJsonOptions = new() { MaxDepth = 32 };
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    private readonly IReadOnlyList<ToolContract> _contracts;
+    private readonly IReadOnlyDictionary<string, ToolContract> _contractsByTool;
+
+    /// <summary>Creates a frozen contract gate. Tool names must be unique ordinal-ignore-case.</summary>
+    public ToolUsageContractGate(IEnumerable<ToolContract> contracts)
+    {
+        ArgumentNullException.ThrowIfNull(contracts);
+
+        var frozen = contracts.ToArray();
+        if (frozen.Length == 0)
+        {
+            throw new ArgumentException("at least one tool contract is required.", nameof(contracts));
+        }
+
+        var byTool = new Dictionary<string, ToolContract>(StringComparer.OrdinalIgnoreCase);
+        var cost = GateCost.PureCode;
+        var requirements = GateRequirements.None;
+        foreach (var contract in frozen)
+        {
+            ArgumentNullException.ThrowIfNull(contract);
+            if (!byTool.TryAdd(contract.ToolName, contract))
+            {
+                throw new ArgumentException(
+                    $"duplicate tool contract '{contract.ToolName}' (tool names are case-insensitive).",
+                    nameof(contracts));
+            }
+
+            foreach (var predicate in contract.Predicates)
+            {
+                cost = (GateCost)Math.Max((int)cost, (int)ContractPredicateMetadata.Cost(predicate));
+                requirements |= ContractPredicateMetadata.Requirements(predicate);
+            }
+        }
+
+        _contracts = new ReadOnlyCollection<ToolContract>(frozen);
+        _contractsByTool = new ReadOnlyDictionary<string, ToolContract>(byTool);
+        Cost = cost;
+        Requirements = requirements;
+        ConfigurationFingerprint = ComputeConfigurationFingerprint(frozen);
+    }
+
+    /// <inheritdoc />
+    public string PolicyName => "ToolUsageContractGate";
+
+    /// <inheritdoc />
+    public GateCost Cost { get; }
+
+    /// <inheritdoc />
+    public GateRequirements Requirements { get; }
+
+    /// <summary>SHA-256 fingerprint of the normalized, secret-free contract configuration.</summary>
+    public string ConfigurationFingerprint { get; }
+
+    /// <summary>The gate's immutable tool contracts.</summary>
+    public IReadOnlyList<ToolContract> Contracts => _contracts;
+
+    string IConfigurationFingerprintContributor.ConfigurationFingerprintContribution => ConfigurationFingerprint;
+
+    /// <inheritdoc />
+    public ValueTask<ToolGateVerdict> InspectAsync(
+        GatedToolCall call,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+
+        if (!_contractsByTool.TryGetValue(call.FunctionName, out var contract))
+        {
+            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+        }
+
+        foreach (var predicate in contract.Predicates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryReadArgument(call.Arguments, predicate.Argument!, out var value) ||
+                !TryCreateProjection(value, out var rawProjection))
+            {
+                return Block(contract, predicate);
+            }
+
+            var canonical = ArgumentCanonicalizer.CanonicalizeWithStatus(rawProjection);
+            if (!canonical.IsComplete || canonical.Projections.Count == 0)
+            {
+                return Block(contract, predicate);
+            }
+
+            var clean = predicate switch
+            {
+                PiiPredicate => EveryProjectionHasNoPii(canonical.Projections),
+                DeniedKeywordsPredicate denied => EveryProjectionOmitsKeywords(canonical.Projections, denied.Keywords),
+                _ => false,
+            };
+
+            if (!clean)
+            {
+                return Block(contract, predicate);
+            }
+        }
+
+        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private ValueTask<ToolGateVerdict> Block(ToolContract contract, ContractPredicate predicate)
+        => new(ToolGateVerdict.Block(
+            PolicyName,
+            $"Tool '{contract.ToolName}' argument '{predicate.Argument}' violated predicate " +
+            $"'{ContractPredicateMetadata.Kind(predicate)}'."));
+
+    private static bool TryReadArgument(
+        IReadOnlyDictionary<string, object?>? arguments,
+        string name,
+        out object value)
+    {
+        if (arguments is not null)
+        {
+            foreach (var pair in arguments)
+            {
+                if (string.Equals(pair.Key, name, StringComparison.Ordinal) && pair.Value is not null)
+                {
+                    value = pair.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = null!;
+        return false;
+    }
+
+    private static bool TryCreateProjection(object value, out string projection)
+    {
+        if (value is string text)
+        {
+            if (text.Length <= ArgumentCanonicalizer.DefaultMaxLength)
+            {
+                projection = text;
+                return true;
+            }
+
+            projection = string.Empty;
+            return false;
+        }
+
+        try
+        {
+            using var stream = new BoundedWriteStream(MaxSerializedArgumentBytes);
+            JsonSerializer.Serialize(stream, value, value.GetType(), ProjectionJsonOptions);
+            projection = StrictUtf8.GetString(stream.WrittenSpan);
+            return true;
+        }
+        catch (Exception exception) when
+            (exception is not OperationCanceledException and not OutOfMemoryException)
+        {
+            projection = string.Empty;
+            return false;
+        }
+    }
+
+    private static bool EveryProjectionHasNoPii(IReadOnlyList<string> projections)
+    {
+        foreach (var projection in projections)
+        {
+            if (PiiScanner.Scan(projection).Status != PiiScanStatus.Clean)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool EveryProjectionOmitsKeywords(
+        IReadOnlyList<string> projections,
+        IReadOnlyList<string> keywords)
+    {
+        foreach (var projection in projections)
+        {
+            string normalized;
+            try
+            {
+                normalized = projection.Normalize(NormalizationForm.FormKC);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            foreach (var keyword in keywords)
+            {
+                if (normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static string ComputeConfigurationFingerprint(IEnumerable<ToolContract> contracts)
+    {
+        var canonical = new StringBuilder("gatekeeper.contract/1\n");
+        foreach (var contract in contracts
+            .OrderBy(item => item.ToolName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.ToolName, StringComparer.Ordinal))
+        {
+            AppendCanonical(canonical, "tool", contract.ToolName.ToUpperInvariant());
+            foreach (var predicate in contract.Predicates)
+            {
+                AppendCanonical(canonical, "kind", ContractPredicateMetadata.Kind(predicate));
+                AppendCanonical(canonical, "argument", predicate.Argument!);
+                if (predicate is DeniedKeywordsPredicate denied)
+                {
+                    foreach (var keyword in denied.Keywords)
+                    {
+                        AppendCanonical(canonical, "keywordHash", ManifestFingerprint.Hash(keyword.ToUpperInvariant()));
+                    }
+                }
+            }
+        }
+
+        return ManifestFingerprint.Hash(canonical.ToString());
+    }
+
+    private static void AppendCanonical(StringBuilder target, string name, string value)
+        => target.Append(name).Append(':').Append(value.Length).Append(':').Append(value).Append('\n');
+
+    private sealed class BoundedWriteStream(int maxBytes) : Stream
+    {
+        private readonly MemoryStream _inner = new(Math.Min(maxBytes, 4096));
+
+        internal ReadOnlySpan<byte> WrittenSpan => _inner.GetBuffer().AsSpan(0, checked((int)_inner.Length));
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _inner.Length;
+        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+            => Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            if (_inner.Length + buffer.Length > maxBytes)
+            {
+                throw new BoundedProjectionException();
+            }
+
+            _inner.Write(buffer);
+        }
+    }
+
+    private sealed class BoundedProjectionException : Exception;
+}
+
+internal static class ContractPredicateMetadata
+{
+    internal static string Kind(ContractPredicate predicate) => predicate switch
+    {
+        PiiPredicate => "piiScan",
+        DeniedKeywordsPredicate => "deniedKeywords",
+        _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
+    };
+
+    internal static GateCost Cost(ContractPredicate predicate) => predicate switch
+    {
+        PiiPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
+        _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
+    };
+
+    internal static GateRequirements Requirements(ContractPredicate predicate) => predicate switch
+    {
+        PiiPredicate or DeniedKeywordsPredicate => GateRequirements.None,
+        _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
+    };
+}
+
+internal static class ContractValidation
+{
+    internal static string RequiredName(string value, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameterName);
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+        {
+            throw new ArgumentException("value must be non-empty.", parameterName);
+        }
+
+        return trimmed;
+    }
+}

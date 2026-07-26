@@ -45,6 +45,7 @@ public static class AgentEvalGatekeeperExtensions
 
         var options = new GatekeeperOptions();
         configure(options);
+        NormalizeContractGate(options);
 
         // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
         // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
@@ -332,6 +333,40 @@ public static class AgentEvalGatekeeperExtensions
         }
 
         return builder.UseGatekeeper(level, configure);
+    }
+
+    private static void NormalizeContractGate(GatekeeperOptions options)
+    {
+        var directGates = options.ToolGates.OfType<ToolUsageContractGate>().ToArray();
+        if (directGates.Length > 1)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: more than one direct ToolUsageContractGate was registered. Register exactly one " +
+                "direct instance, or use GatekeeperOptions.Contract(...) to generate one immutable gate.");
+        }
+
+        if (directGates.Length == 1 && options.ToolContracts.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: GatekeeperOptions.Contract(...) configuration cannot be combined with a directly " +
+                "registered ToolUsageContractGate. Choose one configuration path so exactly one effective gate exists.");
+        }
+
+        ToolUsageContractGate? contractGate = directGates.SingleOrDefault();
+        if (options.ToolContracts.Count > 0)
+        {
+            contractGate = new ToolUsageContractGate(options.ToolContracts);
+        }
+
+        if (contractGate is null)
+        {
+            return;
+        }
+
+        // Phase 2 owns the first deterministic slot. Phase 3 will reserve absolute slot zero for containment and
+        // shift this normalized contract gate immediately behind it; ordinary caller gates remain after both.
+        options.ToolGates.Remove(contractGate);
+        options.ToolGates.Insert(0, contractGate);
     }
 
     private static ToolGatePolicy ToToolGatePolicy(GatekeeperEnforcement enforcement) => enforcement switch
