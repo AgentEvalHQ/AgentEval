@@ -59,7 +59,8 @@ internal static class GatekeeperOptionsResolver
             return new ResolvedGatekeeperOptions(
                 threshold,
                 style,
-                Array.AsReadOnly(Array.Empty<string>()));
+                Array.AsReadOnly(Array.Empty<string>()),
+                options.ContainmentStore);
         }
 
         if (configuredMessages is null)
@@ -142,7 +143,11 @@ internal static class GatekeeperOptionsResolver
             copy[index] = message;
         }
 
-        return new ResolvedGatekeeperOptions(threshold, style, Array.AsReadOnly(copy));
+        return new ResolvedGatekeeperOptions(
+            threshold,
+            style,
+            Array.AsReadOnly(copy),
+            options.ContainmentStore);
     }
 
     private static int ReadMessageCount(IReadOnlyList<string> messages)

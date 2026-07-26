@@ -205,6 +205,13 @@ public sealed class GatekeeperOptions
     /// </summary>
     public IReadOnlyList<string>? CamouflagedRefusalMessages { get; set; }
 
+    /// <summary>
+    /// Optional caller-owned containment store. The reference is resolved once after configuration and is never
+    /// disposed by <c>UseGatekeeper</c>. Null leaves containment disabled until a later Phase-3 consumer is wired.
+    /// </summary>
+    public IContainmentStore? ContainmentStore { get; set; }
+
+
 
     /// <summary>
     /// Optional shared resolver for a <b>durable logical session id</b> (F-A / P1-4). When set, <c>UseGatekeeper</c>

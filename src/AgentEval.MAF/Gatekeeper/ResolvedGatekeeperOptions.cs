@@ -11,4 +11,5 @@ namespace AgentEval.MAF.Gatekeeper;
 internal sealed record ResolvedGatekeeperOptions(
     int ContainmentRetryThreshold,
     GatekeeperRefusalStyle RefusalStyle,
-    IReadOnlyList<string> CamouflagedRefusalMessages);
+    IReadOnlyList<string> CamouflagedRefusalMessages,
+    IContainmentStore? ContainmentStore);
