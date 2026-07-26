@@ -38,6 +38,7 @@
     "predicate": {
       "oneOf": [
         { "$ref": "#/$defs/piiScan" },
+        { "$ref": "#/$defs/recipientDomainAllowList" },
         { "$ref": "#/$defs/deniedKeywords" }
       ]
     },
@@ -48,6 +49,26 @@
       "properties": {
         "kind": { "const": "piiScan" },
         "argument": { "$ref": "#/$defs/name" }
+      }
+    },
+    "recipientDomainAllowList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "allowedDomains"],
+      "properties": {
+        "kind": { "const": "recipientDomainAllowList" },
+        "argument": { "$ref": "#/$defs/name" },
+        "allowedDomains": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "\\S"
+          }
+        }
       }
     },
     "deniedKeywords": {

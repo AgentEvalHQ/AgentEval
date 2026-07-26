@@ -48,6 +48,8 @@ internal static class ToolContractJsonParser
         new HashSet<string>(["tool", "predicates"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> PiiProperties =
         new HashSet<string>(["kind", "argument"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> RecipientDomainProperties =
+        new HashSet<string>(["kind", "argument", "allowedDomains"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> DeniedKeywordProperties =
         new HashSet<string>(["kind", "argument", "keywords"], StringComparer.Ordinal);
 
@@ -205,6 +207,7 @@ internal static class ToolContractJsonParser
             ContractPredicate predicate = kind switch
             {
                 "piiScan" => ParsePii(element, argument, path),
+                "recipientDomainAllowList" => ParseRecipientDomains(element, argument, path),
                 "deniedKeywords" => ParseDeniedKeywords(element, argument, path),
                 _ => throw Error("unknown_predicate_kind", path + ".kind", "predicate kind is not supported."),
             };
@@ -219,6 +222,61 @@ internal static class ToolContractJsonParser
     {
         ValidateProperties(element, PiiProperties, path, "unknown_predicate_property");
         return new PiiPredicate(argument);
+    }
+
+    private static RecipientDomainAllowListPredicate ParseRecipientDomains(
+        JsonElement element,
+        string argument,
+        string path)
+    {
+        ValidateProperties(element, RecipientDomainProperties, path, "unknown_predicate_property");
+        var domainsElement = RequireProperty(element, "allowedDomains", path, JsonValueKind.Array);
+        var count = domainsElement.GetArrayLength();
+        if (count is < 1 or > RecipientDomainPolicy.MaxAllowedDomains)
+        {
+            throw Error(
+                "domain_count_limit",
+                path + ".allowedDomains",
+                $"allowed-domain count must be 1..{RecipientDomainPolicy.MaxAllowedDomains}.");
+        }
+
+        var domains = new string[count];
+        var index = 0;
+        foreach (var domainElement in domainsElement.EnumerateArray())
+        {
+            var domainPath = $"{path}.allowedDomains[{index}]";
+            RequireKind(
+                domainElement,
+                JsonValueKind.String,
+                domainPath,
+                "domain_type",
+                "allowed domain must be a string.");
+            var domain = domainElement.GetString()!;
+            if (domain.Length > RecipientDomainPolicy.MaxDomainChars)
+            {
+                throw Error(
+                    "domain_length_limit",
+                    domainPath,
+                    $"allowed domain exceeds {RecipientDomainPolicy.MaxDomainChars} characters.");
+            }
+
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                throw Error("empty_domain", domainPath, "allowed domain must be non-empty.");
+            }
+
+            domains[index] = domain;
+            index++;
+        }
+
+        try
+        {
+            return new RecipientDomainAllowListPredicate(argument, domains);
+        }
+        catch (ArgumentException)
+        {
+            throw Error("invalid_domain", path + ".allowedDomains", "allowed-domain text is invalid.");
+        }
     }
 
     private static DeniedKeywordsPredicate ParseDeniedKeywords(JsonElement element, string argument, string path)

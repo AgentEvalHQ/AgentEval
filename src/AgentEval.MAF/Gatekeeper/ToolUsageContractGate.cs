@@ -34,6 +34,22 @@ public sealed class PiiPredicate : ContractPredicate
     public PiiPredicate(string argument) : base(argument) { }
 }
 
+/// <summary>Allows recipient mailboxes only when every normalized domain is on the configured allow-list.</summary>
+public sealed class RecipientDomainAllowListPredicate : ContractPredicate
+{
+    /// <summary>Creates a recipient-domain predicate for <paramref name="argument"/>.</summary>
+    public RecipientDomainAllowListPredicate(string argument, IEnumerable<string> allowedDomains) : base(argument)
+    {
+        AllowedDomains = RecipientDomainPolicy.NormalizeAllowedDomains(allowedDomains, nameof(allowedDomains));
+        AllowedDomainSet = new HashSet<string>(AllowedDomains, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Normalized ASCII domains; each entry also allows its subdomains.</summary>
+    public IReadOnlyList<string> AllowedDomains { get; }
+
+    internal IReadOnlySet<string> AllowedDomainSet { get; }
+}
+
 /// <summary>Rejects literal denied keywords in the named argument's bounded decoded projections.</summary>
 public sealed class DeniedKeywordsPredicate : ContractPredicate
 {
@@ -140,6 +156,13 @@ public sealed class ToolContractBuilder
         return this;
     }
 
+    /// <summary>Adds a fail-closed mailbox-domain allow-list for the named recipient argument.</summary>
+    public ToolContractBuilder RecipientDomains(string argument, params string[] allowedDomains)
+    {
+        _predicates.Add(new RecipientDomainAllowListPredicate(argument, allowedDomains));
+        return this;
+    }
+
     /// <summary>Adds literal denied keywords for an exact argument name.</summary>
     public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
     {
@@ -233,23 +256,16 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
         foreach (var predicate in contract.Predicates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryReadArgument(call.Arguments, predicate.Argument!, out var value) ||
-                !TryCreateProjection(value, out var rawProjection))
-            {
-                return Block(contract, predicate);
-            }
-
-            var canonical = ArgumentCanonicalizer.CanonicalizeWithStatus(rawProjection);
-            if (!canonical.IsComplete || canonical.Projections.Count == 0)
+            if (!TryReadArgument(call.Arguments, predicate.Argument!, out var value))
             {
                 return Block(contract, predicate);
             }
 
             var clean = predicate switch
             {
-                PiiPredicate => EveryProjectionHasNoPii(canonical.Projections),
-                DeniedKeywordsPredicate denied => EveryProjectionOmitsKeywords(canonical.Projections, denied.Keywords),
-                _ => false,
+                RecipientDomainAllowListPredicate recipient =>
+                    RecipientDomainPolicy.AllowsAll(value, recipient.AllowedDomainSet),
+                _ => InspectBoundedProjections(predicate, value),
             };
 
             if (!clean)
@@ -259,6 +275,27 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
         }
 
         return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private static bool InspectBoundedProjections(ContractPredicate predicate, object value)
+    {
+        if (!TryCreateProjection(value, out var rawProjection))
+        {
+            return false;
+        }
+
+        var canonical = ArgumentCanonicalizer.CanonicalizeWithStatus(rawProjection);
+        if (!canonical.IsComplete || canonical.Projections.Count == 0)
+        {
+            return false;
+        }
+
+        return predicate switch
+        {
+            PiiPredicate => EveryProjectionHasNoPii(canonical.Projections),
+            DeniedKeywordsPredicate denied => EveryProjectionOmitsKeywords(canonical.Projections, denied.Keywords),
+            _ => false,
+        };
     }
 
     private ValueTask<ToolGateVerdict> Block(ToolContract contract, ContractPredicate predicate)
@@ -377,6 +414,13 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                         AppendCanonical(canonical, "keywordHash", ManifestFingerprint.Hash(keyword.ToUpperInvariant()));
                     }
                 }
+                else if (predicate is RecipientDomainAllowListPredicate recipient)
+                {
+                    foreach (var domain in recipient.AllowedDomains)
+                    {
+                        AppendCanonical(canonical, "domainHash", ManifestFingerprint.Hash(domain));
+                    }
+                }
             }
         }
 
@@ -424,19 +468,20 @@ internal static class ContractPredicateMetadata
     internal static string Kind(ContractPredicate predicate) => predicate switch
     {
         PiiPredicate => "piiScan",
+        RecipientDomainAllowListPredicate => "recipientDomainAllowList",
         DeniedKeywordsPredicate => "deniedKeywords",
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 
     internal static GateCost Cost(ContractPredicate predicate) => predicate switch
     {
-        PiiPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
+        PiiPredicate or RecipientDomainAllowListPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 
     internal static GateRequirements Requirements(ContractPredicate predicate) => predicate switch
     {
-        PiiPredicate or DeniedKeywordsPredicate => GateRequirements.None,
+        PiiPredicate or RecipientDomainAllowListPredicate or DeniedKeywordsPredicate => GateRequirements.None,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 }
