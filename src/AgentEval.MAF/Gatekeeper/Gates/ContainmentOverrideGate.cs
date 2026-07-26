@@ -15,16 +15,32 @@ public sealed class ContainmentOverrideGate : IToolGate
     private readonly IContainmentStore _store;
     private readonly Func<AgentSession, IReadOnlyList<ContainmentTarget>> _sessionTargets;
     private readonly Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? _additionalCallTargets;
+    private readonly BlockStormSentinelGate? _blockStormSentinel;
+    private readonly ContainmentBlockStormHandler? _blockStormHandler;
 
     /// <summary>Creates a containment override over caller-owned bounded target resolvers.</summary>
     public ContainmentOverrideGate(
         IContainmentStore store,
         Func<AgentSession, IReadOnlyList<ContainmentTarget>> sessionTargets,
         Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? additionalCallTargets = null)
+        : this(store, sessionTargets, additionalCallTargets, containmentRetryThreshold: null)
+    {
+    }
+
+    internal ContainmentOverrideGate(
+        IContainmentStore store,
+        Func<AgentSession, IReadOnlyList<ContainmentTarget>> sessionTargets,
+        Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? additionalCallTargets,
+        int? containmentRetryThreshold)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _sessionTargets = sessionTargets ?? throw new ArgumentNullException(nameof(sessionTargets));
         _additionalCallTargets = additionalCallTargets;
+        if (containmentRetryThreshold is { } threshold)
+        {
+            _blockStormSentinel = new BlockStormSentinelGate(threshold);
+            _blockStormHandler = new ContainmentBlockStormHandler(_store, _sessionTargets);
+        }
     }
 
     /// <inheritdoc/>
@@ -40,7 +56,7 @@ public sealed class ContainmentOverrideGate : IToolGate
     public GateRequirements Requirements => GateRequirements.RunScope;
 
     /// <inheritdoc/>
-    public ValueTask<ToolGateVerdict> InspectAsync(
+    public async ValueTask<ToolGateVerdict> InspectAsync(
         GatedToolCall call,
         CancellationToken cancellationToken = default)
     {
@@ -81,13 +97,28 @@ public sealed class ContainmentOverrideGate : IToolGate
         }
 
         var decision = ContainmentGateEvaluator.Evaluate(_store, targets, cancellationToken);
-        return decision.MustBlock
-            ? Block(decision.ReasonCode!)
-            : new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+        if (decision.MustBlock)
+        {
+            return Block(decision.ReasonCode!);
+        }
+
+        if (_blockStormSentinel is not null)
+        {
+            var stormVerdict = await _blockStormSentinel.InspectAsync(
+                call,
+                _blockStormHandler!.HandleAsync,
+                cancellationToken).ConfigureAwait(false);
+            if (stormVerdict.Action == ToolGateAction.Block)
+            {
+                return stormVerdict;
+            }
+        }
+
+        return ToolGateVerdict.Allow(PolicyName);
     }
 
-    private ValueTask<ToolGateVerdict> Block(string reasonCode)
-        => new(ToolGateVerdict.Block(
+    private ToolGateVerdict Block(string reasonCode)
+        => ToolGateVerdict.Block(
             PolicyName,
-            $"containment_override:{reasonCode}"));
+            $"containment_override:{reasonCode}");
 }

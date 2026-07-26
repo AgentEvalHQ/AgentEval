@@ -212,9 +212,11 @@ public sealed class GatekeeperOptions
     public IContainmentStore? ContainmentStore { get; set; }
 
     /// <summary>
-    /// Bounded synchronous resolver for the exact durable targets applicable to a session. It may return the
-    /// current stable session target plus exact prior targets linked by a caller-owned authenticated identity
-    /// index. Configure together with <see cref="ContainmentStore"/>; each resolver result is capped at 16 entries.
+    /// Bounded synchronous resolver for the exact durable targets applicable to a session. It must return the
+    /// current stable <see cref="ContainmentTarget.Session"/> first, followed by exact prior targets linked by a
+    /// caller-owned authenticated identity index. The first entry is the Task-3.4 escalation target; a run id is
+    /// never substituted for it. Configure together with <see cref="ContainmentStore"/>; each resolver result is
+    /// capped at 16 entries.
     /// </summary>
     public Func<Microsoft.Agents.AI.AgentSession, IReadOnlyList<ContainmentTarget>>? ContainmentTargets { get; set; }
 

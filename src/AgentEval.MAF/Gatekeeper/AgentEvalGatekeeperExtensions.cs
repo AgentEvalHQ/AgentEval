@@ -411,7 +411,8 @@ public static class AgentEvalGatekeeperExtensions
                 new ContainmentOverrideGate(
                     resolved.ContainmentStore,
                     resolved.ContainmentTargets!,
-                    resolved.AdditionalContainmentTargets));
+                    resolved.AdditionalContainmentTargets,
+                    resolved.ContainmentRetryThreshold));
             options.PreGates.Insert(
                 0,
                 new ContainedIdentityGate(
