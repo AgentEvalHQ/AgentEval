@@ -46,10 +46,10 @@ public static class AgentEvalGatekeeperExtensions
         var options = new GatekeeperOptions();
         configure(options);
         // Phase 3, Task 3.0: validate and freeze defaults before any preflight side effect or builder mutation.
-        // Tasks 3.1/3.4/3.6 consume the returned snapshot as their concrete types are introduced.
-        _ = GatekeeperOptionsResolver.Resolve(options);
+        var resolvedOptions = GatekeeperOptionsResolver.Resolve(options);
 
         NormalizeContractGate(options);
+        NormalizeContainmentGates(options, resolvedOptions);
 
         // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
         // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
@@ -374,6 +374,63 @@ public static class AgentEvalGatekeeperExtensions
         // shift this normalized contract gate immediately behind it; ordinary caller gates remain after both.
         options.ToolGates.Remove(contractGate);
         options.ToolGates.Insert(0, contractGate);
+    }
+
+    private static void NormalizeContainmentGates(
+        GatekeeperOptions options,
+        ResolvedGatekeeperOptions resolved)
+    {
+        var directOverrides = options.ToolGates.OfType<ContainmentOverrideGate>().ToArray();
+        var directIdentities = options.PreGates.OfType<ContainedIdentityGate>().ToArray();
+        var misplacedIdentities = options.PostGates.OfType<ContainedIdentityGate>().ToArray();
+        if (directOverrides.Length > 1 || directIdentities.Length > 1)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: register at most one direct ContainmentOverrideGate and one direct " +
+                "ContainedIdentityGate.");
+        }
+
+        if (misplacedIdentities.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: ContainedIdentityGate is a run-pre admission gate and cannot be registered " +
+                "as a post gate.");
+        }
+
+        if (resolved.ContainmentStore is not null)
+        {
+            if (directOverrides.Length > 0 || directIdentities.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "UseGatekeeper: automatic containment configuration cannot be combined with directly " +
+                    "registered containment gates.");
+            }
+
+            options.ToolGates.Insert(
+                0,
+                new ContainmentOverrideGate(
+                    resolved.ContainmentStore,
+                    resolved.ContainmentTargets!,
+                    resolved.AdditionalContainmentTargets));
+            options.PreGates.Insert(
+                0,
+                new ContainedIdentityGate(
+                    resolved.ContainmentStore,
+                    resolved.ContainmentTargets!));
+            return;
+        }
+
+        if (directOverrides.SingleOrDefault() is { } directOverride)
+        {
+            options.ToolGates.Remove(directOverride);
+            options.ToolGates.Insert(0, directOverride);
+        }
+
+        if (directIdentities.SingleOrDefault() is { } directIdentity)
+        {
+            options.PreGates.Remove(directIdentity);
+            options.PreGates.Insert(0, directIdentity);
+        }
     }
 
     private static ToolGatePolicy ToToolGatePolicy(GatekeeperEnforcement enforcement) => enforcement switch

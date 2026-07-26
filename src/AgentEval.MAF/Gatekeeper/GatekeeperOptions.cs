@@ -207,9 +207,23 @@ public sealed class GatekeeperOptions
 
     /// <summary>
     /// Optional caller-owned containment store. The reference is resolved once after configuration and is never
-    /// disposed by <c>UseGatekeeper</c>. Null leaves containment disabled until a later Phase-3 consumer is wired.
+    /// disposed by <c>UseGatekeeper</c>. Configure together with <see cref="ContainmentTargets"/>.
     /// </summary>
     public IContainmentStore? ContainmentStore { get; set; }
+
+    /// <summary>
+    /// Bounded synchronous resolver for the exact durable targets applicable to a session. It may return the
+    /// current stable session target plus exact prior targets linked by a caller-owned authenticated identity
+    /// index. Configure together with <see cref="ContainmentStore"/>; each resolver result is capped at 16 entries.
+    /// </summary>
+    public Func<Microsoft.Agents.AI.AgentSession, IReadOnlyList<ContainmentTarget>>? ContainmentTargets { get; set; }
+
+    /// <summary>
+    /// Optional bounded synchronous resolver adding exact MCP-server or agent-endpoint targets for a tool call.
+    /// It requires <see cref="ContainmentStore"/> and <see cref="ContainmentTargets"/>.
+    /// </summary>
+    public Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? AdditionalContainmentTargets { get; set; }
+
 
 
 

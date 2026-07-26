@@ -12,4 +12,6 @@ internal sealed record ResolvedGatekeeperOptions(
     int ContainmentRetryThreshold,
     GatekeeperRefusalStyle RefusalStyle,
     IReadOnlyList<string> CamouflagedRefusalMessages,
-    IContainmentStore? ContainmentStore);
+    IContainmentStore? ContainmentStore,
+    Func<Microsoft.Agents.AI.AgentSession, IReadOnlyList<ContainmentTarget>>? ContainmentTargets,
+    Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? AdditionalContainmentTargets);

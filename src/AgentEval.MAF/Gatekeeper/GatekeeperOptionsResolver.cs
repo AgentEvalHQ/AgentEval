@@ -29,6 +29,20 @@ internal static class GatekeeperOptionsResolver
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        var containmentConfigured = options.ContainmentStore is not null;
+        var targetsConfigured = options.ContainmentTargets is not null;
+        if (containmentConfigured != targetsConfigured)
+        {
+            throw new InvalidOperationException(
+                "GatekeeperOptions.ContainmentStore and ContainmentTargets must be configured together.");
+        }
+
+        if (options.AdditionalContainmentTargets is not null && !containmentConfigured)
+        {
+            throw new InvalidOperationException(
+                "GatekeeperOptions.AdditionalContainmentTargets requires ContainmentStore and ContainmentTargets.");
+        }
+
         var threshold = options.ContainmentRetryThreshold ?? DefaultContainmentRetryThreshold;
         if (threshold is < 1 or > MaxContainmentRetryThreshold)
         {
@@ -60,7 +74,9 @@ internal static class GatekeeperOptionsResolver
                 threshold,
                 style,
                 Array.AsReadOnly(Array.Empty<string>()),
-                options.ContainmentStore);
+                options.ContainmentStore,
+                options.ContainmentTargets,
+                options.AdditionalContainmentTargets);
         }
 
         if (configuredMessages is null)
@@ -147,7 +163,9 @@ internal static class GatekeeperOptionsResolver
             threshold,
             style,
             Array.AsReadOnly(copy),
-            options.ContainmentStore);
+            options.ContainmentStore,
+            options.ContainmentTargets,
+            options.AdditionalContainmentTargets);
     }
 
     private static int ReadMessageCount(IReadOnlyList<string> messages)

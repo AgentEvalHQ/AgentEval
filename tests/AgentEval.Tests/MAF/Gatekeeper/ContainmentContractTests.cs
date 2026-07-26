@@ -252,16 +252,24 @@ public class ContainmentContractTests
     }
 
     [Fact]
-    public void ResolvedOptions_PreserveExactCallerOwnedStoreReference()
+    public void ResolvedOptions_PreserveExactCallerOwnedStoreAndTargetResolverReferences()
     {
         using var store = new FakeStore();
-        var options = new GatekeeperOptions { ContainmentStore = store };
+        Func<Microsoft.Agents.AI.AgentSession, IReadOnlyList<ContainmentTarget>> targets = _ => [Target()];
+        var options = new GatekeeperOptions
+        {
+            ContainmentStore = store,
+            ContainmentTargets = targets,
+        };
         var resolver = typeof(GatekeeperOptions).Assembly
             .GetType("AgentEval.MAF.Gatekeeper.GatekeeperOptionsResolver", throwOnError: true)!;
         var resolved = resolver.GetMethod("Resolve", BindingFlags.Static | BindingFlags.NonPublic)!
             .Invoke(null, [options])!;
         var resolvedStore = resolved.GetType().GetProperty("ContainmentStore")!.GetValue(resolved);
+        var resolvedTargets = resolved.GetType().GetProperty("ContainmentTargets")!.GetValue(resolved);
 
+
+        Assert.Same(targets, resolvedTargets);
         Assert.Same(store, resolvedStore);
     }
 
