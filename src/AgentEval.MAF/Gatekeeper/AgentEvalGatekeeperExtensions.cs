@@ -45,6 +45,10 @@ public static class AgentEvalGatekeeperExtensions
 
         var options = new GatekeeperOptions();
         configure(options);
+        // Phase 3, Task 3.0: validate and freeze defaults before any preflight side effect or builder mutation.
+        // Tasks 3.1/3.4/3.6 consume the returned snapshot as their concrete types are introduced.
+        _ = GatekeeperOptionsResolver.Resolve(options);
+
         NormalizeContractGate(options);
 
         // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change

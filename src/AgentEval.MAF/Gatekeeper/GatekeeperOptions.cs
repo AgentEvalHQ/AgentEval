@@ -185,6 +185,26 @@ public sealed class GatekeeperOptions
     /// the shared-fallback-state behavior those gates self-document.
     /// </summary>
     public bool EstablishRunScope { get; set; } = true;
+    /// <summary>
+    /// Optional Phase-3 repeated-block threshold. When unset, construction resolves it to <c>5</c>, matching
+    /// <see cref="BlockStormSentinelGate"/>'s existing default. Values must be in the inclusive range
+    /// <c>1..1000</c>. Task 3.4 consumes the resolved value when containment escalation is configured.
+    /// </summary>
+    public int? ContainmentRetryThreshold { get; set; }
+
+    /// <summary>
+    /// Optional model-visible refusal presentation. Unset resolves to
+    /// <see cref="GatekeeperRefusalStyle.Structured"/>, preserving the versioned refusal envelope used today.
+    /// Camouflage affects presentation only; it never changes enforcement or operator evidence.
+    /// </summary>
+    public GatekeeperRefusalStyle? RefusalStyle { get; set; }
+
+    /// <summary>
+    /// Caller-owned generic failure messages used only with <see cref="GatekeeperRefusalStyle.Camouflaged"/>.
+    /// Construction defensively copies the collection, so later caller mutation cannot change behavior.
+    /// </summary>
+    public IReadOnlyList<string>? CamouflagedRefusalMessages { get; set; }
+
 
     /// <summary>
     /// Optional shared resolver for a <b>durable logical session id</b> (F-A / P1-4). When set, <c>UseGatekeeper</c>
