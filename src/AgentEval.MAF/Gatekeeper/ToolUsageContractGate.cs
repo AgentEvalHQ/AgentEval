@@ -117,6 +117,35 @@ public sealed class ForbiddenIfPrecededByPredicate : ContractPredicate
     public IReadOnlyList<string> TriggerTools { get; }
 }
 
+/// <summary>
+/// Requires a host-local path to remain lexically at or below a configured absolute root after resolving
+/// relative segments. This does not resolve symlinks/reparse points and cannot prevent TOCTOU races; use an
+/// execution-sandbox or tool-level real-path check when those guarantees are required.
+/// </summary>
+public sealed class PathContainmentPredicate : ContractPredicate
+{
+    /// <summary>Creates a lexical path-containment predicate.</summary>
+    public PathContainmentPredicate(
+        string argument,
+        IEnumerable<string> allowedRoots,
+        string? basePath = null)
+        : base(argument)
+    {
+        var configuration = PathContainmentPolicy.NormalizeConfiguration(
+            allowedRoots,
+            basePath,
+            nameof(allowedRoots));
+        AllowedRoots = configuration.Roots;
+        BasePath = configuration.BasePath;
+    }
+
+    /// <summary>Construction-time-normalized, fully-qualified host-local roots.</summary>
+    public IReadOnlyList<string> AllowedRoots { get; }
+
+    /// <summary>Normalized absolute base for relative argument values; null means relative values block.</summary>
+    public string? BasePath { get; }
+}
+
 /// <summary>Allows recipient mailboxes only when every normalized domain is on the configured allow-list.</summary>
 public sealed class RecipientDomainAllowListPredicate : ContractPredicate
 {
@@ -260,6 +289,16 @@ public sealed class ToolContractBuilder
         return this;
     }
 
+    /// <summary>Adds lexical host-local path containment for an exact argument name.</summary>
+    public ToolContractBuilder PathContainment(
+        string argument,
+        IEnumerable<string> allowedRoots,
+        string? basePath = null)
+    {
+        _predicates.Add(new PathContainmentPredicate(argument, allowedRoots, basePath));
+        return this;
+    }
+
     /// <summary>Adds literal denied keywords for an exact argument name.</summary>
     public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
     {
@@ -392,6 +431,8 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                     ShellMetacharPolicy.IsSafe(value, shell.Dialect),
                 RecipientDomainAllowListPredicate recipient =>
                     RecipientDomainPolicy.AllowsAll(value, recipient.AllowedDomainSet),
+                PathContainmentPredicate path =>
+                    PathContainmentPolicy.Contains(value, path),
                 _ => InspectBoundedProjections(predicate, value),
             };
 
@@ -576,6 +617,20 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                             ManifestFingerprint.Hash(triggerTool.ToUpperInvariant()));
                     }
                 }
+                else if (predicate is PathContainmentPredicate path)
+                {
+                    AppendCanonical(
+                        canonical,
+                        "basePathHash",
+                        ManifestFingerprint.Hash(NormalizePathForFingerprint(path.BasePath)));
+                    foreach (var root in path.AllowedRoots)
+                    {
+                        AppendCanonical(
+                            canonical,
+                            "allowedRootHash",
+                            ManifestFingerprint.Hash(NormalizePathForFingerprint(root)));
+                    }
+                }
                 else if (predicate is DeniedKeywordsPredicate denied)
                 {
                     foreach (var keyword in denied.Keywords)
@@ -602,6 +657,11 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
 
     private static void AppendCanonical(StringBuilder target, string name, string value)
         => target.Append(name).Append(':').Append(value.Length).Append(':').Append(value).Append('\n');
+
+    private static string NormalizePathForFingerprint(string? path)
+        => path is null
+            ? "<none>"
+            : OperatingSystem.IsWindows() ? path.ToUpperInvariant() : path;
 
     private sealed class BoundedWriteStream(int maxBytes) : Stream
     {
@@ -647,6 +707,7 @@ internal static class ContractPredicateMetadata
     {
         PiiPredicate => "piiScan",
         ForbiddenIfPrecededByPredicate => "forbiddenIfPrecededBy",
+        PathContainmentPredicate => "pathContainment",
         RecipientDomainAllowListPredicate => "recipientDomainAllowList",
         ShellMetacharDenyPredicate => "shellMetacharDeny",
         DeniedKeywordsPredicate => "deniedKeywords",
@@ -656,6 +717,7 @@ internal static class ContractPredicateMetadata
     internal static GateCost Cost(ContractPredicate predicate) => predicate switch
     {
         ForbiddenIfPrecededByPredicate => GateCost.PureCode,
+        PathContainmentPredicate => GateCost.PureCode,
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
@@ -664,6 +726,7 @@ internal static class ContractPredicateMetadata
     {
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateRequirements.None,
         ForbiddenIfPrecededByPredicate => GateRequirements.RunScope,
+        PathContainmentPredicate => GateRequirements.None,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
 }

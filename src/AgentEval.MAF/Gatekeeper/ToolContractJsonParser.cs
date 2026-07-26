@@ -54,6 +54,8 @@ internal static class ToolContractJsonParser
         new HashSet<string>(["kind", "argument", "dialect"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> SequenceProperties =
         new HashSet<string>(["kind", "triggerTools"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> PathProperties =
+        new HashSet<string>(["kind", "argument", "allowedRoots", "basePath"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> DeniedKeywordProperties =
         new HashSet<string>(["kind", "argument", "keywords"], StringComparer.Ordinal);
 
@@ -216,6 +218,7 @@ internal static class ToolContractJsonParser
                 "recipientDomainAllowList" => ParseRecipientDomains(element, argument!, path),
                 "shellMetacharDeny" => ParseShellMetacharDeny(element, argument!, path),
                 "forbiddenIfPrecededBy" => ParseForbiddenIfPrecededBy(element, path),
+                "pathContainment" => ParsePathContainment(element, argument!, path),
                 "deniedKeywords" => ParseDeniedKeywords(element, argument!, path),
                 _ => throw Error("unknown_predicate_kind", path + ".kind", "predicate kind is not supported."),
             };
@@ -230,6 +233,81 @@ internal static class ToolContractJsonParser
     {
         ValidateProperties(element, PiiProperties, path, "unknown_predicate_property");
         return new PiiPredicate(argument);
+    }
+
+    private static PathContainmentPredicate ParsePathContainment(
+        JsonElement element,
+        string argument,
+        string path)
+    {
+        ValidateProperties(element, PathProperties, path, "unknown_predicate_property");
+        var rootsElement = RequireProperty(element, "allowedRoots", path, JsonValueKind.Array);
+        var count = rootsElement.GetArrayLength();
+        if (count is < 1 or > PathContainmentPolicy.MaxAllowedRoots)
+        {
+            throw Error(
+                "root_count_limit",
+                path + ".allowedRoots",
+                $"allowed-root count must be 1..{PathContainmentPolicy.MaxAllowedRoots}.");
+        }
+
+        var roots = new string[count];
+        var index = 0;
+        foreach (var rootElement in rootsElement.EnumerateArray())
+        {
+            var rootPath = $"{path}.allowedRoots[{index}]";
+            RequireKind(rootElement, JsonValueKind.String, rootPath, "root_type", "allowed root must be a string.");
+            var root = rootElement.GetString()!;
+            if (root.Length > PathContainmentPolicy.MaxPathChars)
+            {
+                throw Error(
+                    "root_length_limit",
+                    rootPath,
+                    $"allowed root exceeds {PathContainmentPolicy.MaxPathChars} characters.");
+            }
+
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                throw Error("empty_root", rootPath, "allowed root must be non-empty.");
+            }
+
+            roots[index] = root;
+            index++;
+        }
+
+        string? basePath = null;
+        if (element.TryGetProperty("basePath", out var baseElement))
+        {
+            var basePathJsonPath = path + ".basePath";
+            RequireKind(
+                baseElement,
+                JsonValueKind.String,
+                basePathJsonPath,
+                "base_path_type",
+                "base path must be a string.");
+            basePath = baseElement.GetString()!;
+            if (basePath.Length > PathContainmentPolicy.MaxPathChars)
+            {
+                throw Error(
+                    "base_path_length_limit",
+                    basePathJsonPath,
+                    $"base path exceeds {PathContainmentPolicy.MaxPathChars} characters.");
+            }
+
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                throw Error("empty_base_path", basePathJsonPath, "base path must be non-empty.");
+            }
+        }
+
+        try
+        {
+            return new PathContainmentPredicate(argument, roots, basePath);
+        }
+        catch (ArgumentException)
+        {
+            throw Error("invalid_path_configuration", path, "path configuration is invalid for this host.");
+        }
     }
 
     private static ForbiddenIfPrecededByPredicate ParseForbiddenIfPrecededBy(

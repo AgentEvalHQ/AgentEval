@@ -21,6 +21,12 @@
       "maxLength": 256,
       "pattern": "\\S"
     },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768,
+      "pattern": "\\S"
+    },
     "contract": {
       "type": "object",
       "additionalProperties": false,
@@ -41,6 +47,7 @@
         { "$ref": "#/$defs/recipientDomainAllowList" },
         { "$ref": "#/$defs/shellMetacharDeny" },
         { "$ref": "#/$defs/forbiddenIfPrecededBy" },
+        { "$ref": "#/$defs/pathContainment" },
         { "$ref": "#/$defs/deniedKeywords" }
       ]
     },
@@ -95,6 +102,22 @@
           "maxItems": 256,
           "items": { "$ref": "#/$defs/name" }
         }
+      }
+    },
+    "pathContainment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "allowedRoots"],
+      "properties": {
+        "kind": { "const": "pathContainment" },
+        "argument": { "$ref": "#/$defs/name" },
+        "allowedRoots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/path" }
+        },
+        "basePath": { "$ref": "#/$defs/path" }
       }
     },
     "deniedKeywords": {
