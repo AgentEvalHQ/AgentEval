@@ -50,6 +50,8 @@ internal static class ToolContractJsonParser
         new HashSet<string>(["kind", "argument"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> RecipientDomainProperties =
         new HashSet<string>(["kind", "argument", "allowedDomains"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> MaxDistinctProperties =
+        new HashSet<string>(["kind", "argument", "max"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> ShellMetacharProperties =
         new HashSet<string>(["kind", "argument", "dialect"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> SequenceProperties =
@@ -216,6 +218,7 @@ internal static class ToolContractJsonParser
             {
                 "piiScan" => ParsePii(element, argument!, path),
                 "recipientDomainAllowList" => ParseRecipientDomains(element, argument!, path),
+                "maxDistinctValues" => ParseMaxDistinctValues(element, argument!, path),
                 "shellMetacharDeny" => ParseShellMetacharDeny(element, argument!, path),
                 "forbiddenIfPrecededBy" => ParseForbiddenIfPrecededBy(element, path),
                 "pathContainment" => ParsePathContainment(element, argument!, path),
@@ -436,6 +439,27 @@ internal static class ToolContractJsonParser
         {
             throw Error("invalid_domain", path + ".allowedDomains", "allowed-domain text is invalid.");
         }
+    }
+
+    private static MaxDistinctValuesPredicate ParseMaxDistinctValues(
+        JsonElement element,
+        string argument,
+        string path)
+    {
+        ValidateProperties(element, MaxDistinctProperties, path, "unknown_predicate_property");
+        var maxElement = RequireProperty(element, "max", path, JsonValueKind.Number);
+        var rawMax = maxElement.GetRawText();
+        if (rawMax.Length == 0 || rawMax.Any(character => character is < '0' or > '9') ||
+            !maxElement.TryGetInt32(out var max) ||
+            max is < MaxDistinctValuesPredicate.Minimum or > MaxDistinctValuesPredicate.Maximum)
+        {
+            throw Error(
+                "distinct_value_limit",
+                path + ".max",
+                $"maximum distinct values must be an integer from {MaxDistinctValuesPredicate.Minimum} to {MaxDistinctValuesPredicate.Maximum}.");
+        }
+
+        return new MaxDistinctValuesPredicate(argument, max);
     }
 
     private static DeniedKeywordsPredicate ParseDeniedKeywords(JsonElement element, string argument, string path)

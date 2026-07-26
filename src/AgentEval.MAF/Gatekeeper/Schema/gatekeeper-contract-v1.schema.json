@@ -48,6 +48,7 @@
         { "$ref": "#/$defs/shellMetacharDeny" },
         { "$ref": "#/$defs/forbiddenIfPrecededBy" },
         { "$ref": "#/$defs/pathContainment" },
+        { "$ref": "#/$defs/maxDistinctValues" },
         { "$ref": "#/$defs/deniedKeywords" }
       ]
     },
@@ -118,6 +119,16 @@
           "items": { "$ref": "#/$defs/path" }
         },
         "basePath": { "$ref": "#/$defs/path" }
+      }
+    },
+    "maxDistinctValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "argument", "max"],
+      "properties": {
+        "kind": { "const": "maxDistinctValues" },
+        "argument": { "$ref": "#/$defs/name" },
+        "max": { "type": "integer", "minimum": 1, "maximum": 4096 }
       }
     },
     "deniedKeywords": {

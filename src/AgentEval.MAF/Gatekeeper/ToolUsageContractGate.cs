@@ -162,6 +162,36 @@ public sealed class RecipientDomainAllowListPredicate : ContractPredicate
     internal IReadOnlySet<string> AllowedDomainSet { get; }
 }
 
+/// <summary>
+/// Limits one named argument to a bounded number of distinct canonical JSON values per run. Values are represented
+/// in the ledger only by SHA-256 hashes. Admission records values that reach and pass this predicate, not successful
+/// tool execution; a later predicate or gate does not roll the admission back.
+/// </summary>
+public sealed class MaxDistinctValuesPredicate : ContractPredicate
+{
+    /// <summary>Smallest supported per-run distinct-value cap.</summary>
+    public const int Minimum = 1;
+
+    /// <summary>Largest supported cap and therefore the hard per-dimension memory bound.</summary>
+    public const int Maximum = 4096;
+
+    /// <summary>Creates a per-run distinct-value limit for <paramref name="argument"/>.</summary>
+    public MaxDistinctValuesPredicate(string argument, int max) : base(argument)
+    {
+        if (max is < Minimum or > Maximum)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(max),
+                $"maximum distinct values must be between {Minimum} and {Maximum}.");
+        }
+
+        Max = max;
+    }
+
+    /// <summary>Maximum number of distinct canonical values admitted during one run.</summary>
+    public int Max { get; }
+}
+
 /// <summary>Rejects literal denied keywords in the named argument's bounded decoded projections.</summary>
 public sealed class DeniedKeywordsPredicate : ContractPredicate
 {
@@ -299,6 +329,13 @@ public sealed class ToolContractBuilder
         return this;
     }
 
+    /// <summary>Adds a run-scoped cap on distinct canonical values for an exact argument name.</summary>
+    public ToolContractBuilder MaxDistinctValues(string argument, int max)
+    {
+        _predicates.Add(new MaxDistinctValuesPredicate(argument, max));
+        return this;
+    }
+
     /// <summary>Adds literal denied keywords for an exact argument name.</summary>
     public ToolContractBuilder DeniedKeywords(string argument, params string[] words)
     {
@@ -433,6 +470,8 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                     RecipientDomainPolicy.AllowsAll(value, recipient.AllowedDomainSet),
                 PathContainmentPredicate path =>
                     PathContainmentPolicy.Contains(value, path),
+                MaxDistinctValuesPredicate distinct =>
+                    InspectDistinctValue(contract, distinct, value),
                 _ => InspectBoundedProjections(predicate, value),
             };
 
@@ -467,6 +506,29 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
 
             return violation;
         }
+    }
+
+    private bool InspectDistinctValue(
+        ToolContract contract,
+        MaxDistinctValuesPredicate predicate,
+        object value)
+    {
+        if (!ContractValueCanonicalizer.TryHash(value, out var valueHash))
+        {
+            return false;
+        }
+
+        var dimension = new StringBuilder("gatekeeper.contract.distinct/1\n");
+        AppendCanonical(dimension, "configuration", ConfigurationFingerprint);
+        AppendCanonical(dimension, "tool", contract.ToolName.ToUpperInvariant());
+        AppendCanonical(dimension, "kind", ContractPredicateMetadata.Kind(predicate));
+        AppendCanonical(dimension, "argument", predicate.Argument!);
+        var dimensionKey = ManifestFingerprint.Hash(dimension.ToString());
+
+        return RunLedger.ForCurrentRun().TryAdmitDistinctValue(
+            dimensionKey,
+            valueHash,
+            predicate.Max) is not DistinctValueDecision.Exceeded;
     }
 
     private static bool InspectBoundedProjections(ContractPredicate predicate, object value)
@@ -638,6 +700,10 @@ public sealed class ToolUsageContractGate : IToolGate, IConfigurationFingerprint
                         AppendCanonical(canonical, "keywordHash", ManifestFingerprint.Hash(keyword.ToUpperInvariant()));
                     }
                 }
+                else if (predicate is MaxDistinctValuesPredicate distinct)
+                {
+                    AppendCanonical(canonical, "max", distinct.Max.ToString(CultureInfo.InvariantCulture));
+                }
                 else if (predicate is ShellMetacharDenyPredicate shell)
                 {
                     AppendCanonical(canonical, "dialect", shell.Dialect.ToString());
@@ -710,6 +776,7 @@ internal static class ContractPredicateMetadata
         PathContainmentPredicate => "pathContainment",
         RecipientDomainAllowListPredicate => "recipientDomainAllowList",
         ShellMetacharDenyPredicate => "shellMetacharDeny",
+        MaxDistinctValuesPredicate => "maxDistinctValues",
         DeniedKeywordsPredicate => "deniedKeywords",
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
@@ -718,6 +785,7 @@ internal static class ContractPredicateMetadata
     {
         ForbiddenIfPrecededByPredicate => GateCost.PureCode,
         PathContainmentPredicate => GateCost.PureCode,
+        MaxDistinctValuesPredicate => GateCost.PureCode,
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateCost.Bounded,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
@@ -726,6 +794,7 @@ internal static class ContractPredicateMetadata
     {
         PiiPredicate or RecipientDomainAllowListPredicate or ShellMetacharDenyPredicate or DeniedKeywordsPredicate => GateRequirements.None,
         ForbiddenIfPrecededByPredicate => GateRequirements.RunScope,
+        MaxDistinctValuesPredicate => GateRequirements.RunScope,
         PathContainmentPredicate => GateRequirements.None,
         _ => throw new ArgumentException("unrecognized contract predicate type.", nameof(predicate)),
     };
