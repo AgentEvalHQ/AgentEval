@@ -16,7 +16,8 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <remarks>
 /// The inner function must resolve <see cref="HttpClient"/> from the invocation's
 /// <see cref="AIFunctionArguments.Services"/> provider. A client already captured by the function cannot be
-/// replaced. The decorator borrows its dependencies and does not dispose them.
+/// replaced. Selection linearizes at the containment snapshot read; an already in-flight invocation is not
+/// rerouted by a later containment mutation. The decorator borrows its dependencies and does not dispose them.
 /// </remarks>
 public sealed class ContainmentHttpResourceRoutingFunction : AIFunction
 {

@@ -27,13 +27,16 @@ public sealed class ContainmentHttpClientPoolOptions
 
     /// <summary>
     /// Optional factory for the normal primary handler. It is called exactly once and the pool owns the returned
-    /// handler. When omitted, a dedicated <see cref="SocketsHttpHandler"/> is created.
+    /// handler. When omitted, a dedicated <see cref="SocketsHttpHandler"/> is created. A custom factory is
+    /// responsible for returning an independent complete handler graph; the pool can verify only the top-level
+    /// instance. The outer request-concurrency cap is enforced in either case.
     /// </summary>
     public Func<HttpMessageHandler>? NormalPrimaryHandlerFactory { get; set; }
 
     /// <summary>
     /// Optional factory for the isolated primary handler. It is called exactly once and the pool owns the
-    /// returned handler. When omitted, a separate dedicated <see cref="SocketsHttpHandler"/> is created.
+    /// returned handler. When omitted, a separate dedicated <see cref="SocketsHttpHandler"/> is created. A
+    /// custom factory has the same independent-handler-graph responsibility as the normal factory.
     /// </summary>
     public Func<HttpMessageHandler>? IsolatedPrimaryHandlerFactory { get; set; }
 }
