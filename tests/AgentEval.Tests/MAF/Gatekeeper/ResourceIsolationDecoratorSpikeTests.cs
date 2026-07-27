@@ -107,6 +107,36 @@ public sealed class ResourceIsolationDecoratorSpikeTests
     }
 
     [Fact]
+    public async Task MissingControlledService_DoesNotFallBackToOriginalProvider()
+    {
+        var fallback = new ResourceProbe("fallback-normal");
+        var inner = AIFunctionFactory.Create(
+            (IServiceProvider services) =>
+                services.GetRequiredService<ResourceProbe>().Use(),
+            "resource_probe");
+        var function = new ResourceRoutingFunction(
+            inner,
+            new RoutingStore(_ => Active(Target)),
+            _ => Target,
+            new ProbeServiceProvider(new ResourceProbe("normal")),
+            new EmptyServiceProvider(),
+            [typeof(ResourceProbe)]);
+        var arguments = new AIFunctionArguments
+        {
+            Services = new ProbeServiceProvider(fallback),
+        };
+        using var scope = AgentRunScope.Begin(
+            new TestSession(),
+            "agent",
+            trace: null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => function.InvokeAsync(arguments).AsTask());
+
+        Assert.Equal(0, fallback.CallCount);
+    }
+
+    [Fact]
     public async Task Decorator_PreservesMetadataAndCallerCancellation()
     {
         var fixture = Fixture(ContainmentSnapshot.NotContained(Target));
@@ -155,7 +185,8 @@ public sealed class ResourceIsolationDecoratorSpikeTests
                 return Target;
             },
             new ProbeServiceProvider(normal),
-            new ProbeServiceProvider(isolated));
+            new ProbeServiceProvider(isolated),
+            [typeof(ResourceProbe)]);
         return new SpikeFixture(
             function,
             inner,
@@ -197,19 +228,29 @@ public sealed class ResourceIsolationDecoratorSpikeTests
         private readonly Func<AgentSession, ContainmentTarget> _targetResolver;
         private readonly IServiceProvider _normalServices;
         private readonly IServiceProvider _isolatedServices;
+        private readonly IReadOnlySet<Type> _isolatedServiceTypes;
 
         public ResourceRoutingFunction(
             AIFunction inner,
             IContainmentStore store,
             Func<AgentSession, ContainmentTarget> targetResolver,
             IServiceProvider normalServices,
-            IServiceProvider isolatedServices)
+            IServiceProvider isolatedServices,
+            IEnumerable<Type> isolatedServiceTypes)
         {
             _inner = inner;
             _store = store;
             _targetResolver = targetResolver;
             _normalServices = normalServices;
             _isolatedServices = isolatedServices;
+            _isolatedServiceTypes = new HashSet<Type>(
+                isolatedServiceTypes ?? throw new ArgumentNullException(nameof(isolatedServiceTypes)));
+            if (_isolatedServiceTypes.Count == 0)
+            {
+                throw new ArgumentException(
+                    "At least one isolation-controlled service type is required.",
+                    nameof(isolatedServiceTypes));
+            }
         }
 
         public override string Name => _inner.Name;
@@ -244,12 +285,14 @@ public sealed class ResourceIsolationDecoratorSpikeTests
             var selected = MustIsolate(cancellationToken)
                 ? _isolatedServices
                 : _normalServices;
+            cancellationToken.ThrowIfCancellationRequested();
             var routedArguments = new AIFunctionArguments(arguments)
             {
                 Context = arguments.Context,
                 Services = new SelectedServiceProvider(
                     selected,
-                    arguments.Services),
+                    arguments.Services,
+                    _isolatedServiceTypes),
             };
             return _inner.InvokeAsync(routedArguments, cancellationToken);
         }
@@ -275,8 +318,9 @@ public sealed class ResourceIsolationDecoratorSpikeTests
                 var snapshot = _store.GetCurrent(target);
                 return snapshot is null ||
                        snapshot.Target != target ||
-                       snapshot.State is ContainmentSnapshotState.Active
-                           or ContainmentSnapshotState.Indeterminate;
+                       snapshot.State is not (
+                           ContainmentSnapshotState.NotContained or
+                           ContainmentSnapshotState.Released);
             }
             catch (OperationCanceledException) when (
                 cancellationToken.IsCancellationRequested)
@@ -293,11 +337,21 @@ public sealed class ResourceIsolationDecoratorSpikeTests
 
     private sealed class SelectedServiceProvider(
         IServiceProvider selected,
-        IServiceProvider? fallback) : IServiceProvider
+        IServiceProvider? fallback,
+        IReadOnlySet<Type> isolatedServiceTypes) : IServiceProvider
     {
         public object? GetService(Type serviceType)
-            => selected.GetService(serviceType) ??
-               fallback?.GetService(serviceType);
+        {
+            var selectedService = selected.GetService(serviceType);
+            return selectedService ?? (isolatedServiceTypes.Contains(serviceType)
+                ? null
+                : fallback?.GetService(serviceType));
+        }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => null;
     }
 
     private sealed class ProbeServiceProvider(ResourceProbe probe) : IServiceProvider
