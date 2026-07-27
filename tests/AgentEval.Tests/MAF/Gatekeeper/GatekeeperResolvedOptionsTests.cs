@@ -97,6 +97,11 @@ public class GatekeeperResolvedOptionsTests
             ["The operation\u2028could not be completed."],
             ["The operation {code} could not be completed."],
             ["The security operation could not be completed."],
+            ["The Gatekeeper operation could not be completed."],
+            ["Resolve the reference with support."],
+            ["The target is unavailable."],
+            ["Try another attempt."],
+            ["Use a bypass procedure."],
         };
 
         foreach (var pool in invalidPools)

@@ -103,9 +103,56 @@ public static class AgentEvalToolGateExtensions
         IReadOnlyList<IToolResultGate>? resultGates = null,
         IGateEvidenceSink? evidenceSink = null,
         Func<AgentSession, IReadOnlyList<ContainmentTarget>>? denialCorrelationTargets = null)
+        => UseAgentEvalToolGateCore(
+            builder,
+            gates,
+            policy,
+            trace,
+            telemetry,
+            mutationCaptureMode,
+            resultGates,
+            evidenceSink,
+            denialCorrelationTargets,
+            GatekeeperRefusalPresenter.Structured);
+
+    internal static AIAgentBuilder UseAgentEvalToolGateWithPresentation(
+        this AIAgentBuilder builder,
+        IReadOnlyList<IToolGate> gates,
+        ToolGatePolicy policy,
+        AgentTrace? trace,
+        GateTelemetry? telemetry,
+        TraceCaptureMode mutationCaptureMode,
+        IReadOnlyList<IToolResultGate>? resultGates,
+        IGateEvidenceSink? evidenceSink,
+        Func<AgentSession, IReadOnlyList<ContainmentTarget>>? denialCorrelationTargets,
+        GatekeeperRefusalPresenter refusalPresenter)
+        => UseAgentEvalToolGateCore(
+            builder,
+            gates,
+            policy,
+            trace,
+            telemetry,
+            mutationCaptureMode,
+            resultGates,
+            evidenceSink,
+            denialCorrelationTargets,
+            refusalPresenter);
+
+    private static AIAgentBuilder UseAgentEvalToolGateCore(
+        AIAgentBuilder builder,
+        IReadOnlyList<IToolGate> gates,
+        ToolGatePolicy policy,
+        AgentTrace? trace,
+        GateTelemetry? telemetry,
+        TraceCaptureMode mutationCaptureMode,
+        IReadOnlyList<IToolResultGate>? resultGates,
+        IGateEvidenceSink? evidenceSink,
+        Func<AgentSession, IReadOnlyList<ContainmentTarget>>? denialCorrelationTargets,
+        GatekeeperRefusalPresenter refusalPresenter)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
+        ArgumentNullException.ThrowIfNull(refusalPresenter);
         ValidateGates(gates, policy);
 
         // Snapshot NOW — gates may be a caller-owned mutable List<IToolGate>. The closure below runs on every
@@ -223,7 +270,7 @@ public static class AgentEvalToolGateExtensions
                             context.Terminate = true;
                         }
 
-                        return GateReferenceId.RefusalBody(throwReferenceId, RefusalDispositionClassifier.Classify(gate.PolicyName, failedClosedOnThrow: true));
+                        return refusalPresenter.Present(throwReferenceId, RefusalDispositionClassifier.Classify(gate.PolicyName, failedClosedOnThrow: true));
                     }
 
                     telemetry?.Record(gate.PolicyName, verdict.Action, stopwatch!.Elapsed);
@@ -338,7 +385,7 @@ public static class AgentEvalToolGateExtensions
                             // #12: the model sees only a stable, non-revealing {error, referenceId} shape — never the
                             // policy name or reason (that stays in the trace evidence below, audit-visible only).
 
-                            return GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName), attempts);
+                            return refusalPresenter.Present(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName), attempts);
                         }
                     }
 
@@ -367,7 +414,7 @@ public static class AgentEvalToolGateExtensions
                         context.Terminate = true;
                     }
 
-                    return GateReferenceId.RefusalBody(refId, RefusalDisposition.Transient);   // non-convergence is a fail-closed defensive block
+                    return refusalPresenter.Present(refId, RefusalDisposition.Transient);   // non-convergence is a fail-closed defensive block
                 }
             }
 
@@ -419,7 +466,7 @@ public static class AgentEvalToolGateExtensions
                         context.Terminate = true;
                     }
 
-                    return GateReferenceId.RefusalBody(throwReferenceId, RefusalDispositionClassifier.Classify(resultGate.PolicyName, failedClosedOnThrow: true));
+                    return refusalPresenter.Present(throwReferenceId, RefusalDispositionClassifier.Classify(resultGate.PolicyName, failedClosedOnThrow: true));
                 }
 
                 telemetry?.Record(resultGate.PolicyName, resultVerdict.Action, resultStopwatch!.Elapsed);
@@ -454,7 +501,7 @@ public static class AgentEvalToolGateExtensions
                             RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultVerdict.PolicyName,
                                 resultVerdict.Reason ?? "result redacted with no replacement supplied — failing closed to a non-revealing refusal",
                                 action: "Block", terminating: false, referenceId: redactReferenceId, evidence);
-                            toolResult = GateReferenceId.RefusalBody(redactReferenceId, RefusalDispositionClassifier.Classify(resultVerdict.PolicyName));
+                            toolResult = refusalPresenter.Present(redactReferenceId, RefusalDispositionClassifier.Classify(resultVerdict.PolicyName));
                         }
                         else
                         {
@@ -486,7 +533,7 @@ public static class AgentEvalToolGateExtensions
                         }
 
                         // Same non-revealing shape the call-gate loop uses — #12's design applies identically here.
-                        return GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(resultVerdict.PolicyName));
+                        return refusalPresenter.Present(referenceId, RefusalDispositionClassifier.Classify(resultVerdict.PolicyName));
                     }
                 }
             }
@@ -576,8 +623,8 @@ public static class AgentEvalToolGateExtensions
     // {action,reason,matches,correlationId}. A Terminate is still action="Block" (it blocked) + terminate=true,
     // so the shipped GlassBoxEvidence.CountGateBlocks counts it.
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
-    // evidence, never returned to the model. referenceId is the ONLY thing the two are allowed to share, so an
-    // auditor can correlate what the model saw with what actually happened.
+    // evidence, never returned to the model. Structured presentation echoes referenceId for correlation;
+    // camouflaged presentation deliberately withholds it while the evidence remains intact.
     // F-C: write one record to the trace (audit projection) AND fan it out to any registered extra sink
     // (ledger / alerting). The trace write is null-safe so evidence still reaches the sink with tracing off.
     private static void EmitEvidence(AgentTrace? trace, GateEvidenceContext evidence, int seq, GateEvidence record)

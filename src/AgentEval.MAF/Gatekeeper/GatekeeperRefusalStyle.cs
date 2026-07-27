@@ -17,8 +17,8 @@ public enum GatekeeperRefusalStyle
     Structured,
 
     /// <summary>
-    /// Emit a validated caller-owned generic failure message while retaining the complete structured refusal
-    /// and reason in operator evidence. Phase 3 containment wiring supplies the runtime presentation behavior.
+    /// Emit a validated caller-owned generic failure message while retaining the complete reference, action,
+    /// policy, and reason in operator evidence.
     /// </summary>
     Camouflaged,
 }

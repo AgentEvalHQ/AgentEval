@@ -47,6 +47,7 @@ public static class AgentEvalGatekeeperExtensions
         configure(options);
         // Phase 3, Task 3.0: validate and freeze defaults before any preflight side effect or builder mutation.
         var resolvedOptions = GatekeeperOptionsResolver.Resolve(options);
+        var refusalPresenter = GatekeeperRefusalPresenter.FromResolved(resolvedOptions);
 
         NormalizeContractGate(options);
         NormalizeContainmentGates(options, resolvedOptions);
@@ -280,7 +281,8 @@ public static class AgentEvalGatekeeperExtensions
                 evidenceSink: options.EvidenceSink,
                 compositeToolConfigFingerprint: GateConfigFingerprint.Compute(
                     options.ToolGates.Count > 0 ? options.ToolGates.ToArray() : null,
-                    options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null));
+                    options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null),
+                refusalPresenter: refusalPresenter);
         }
 
         // P0-3: a result-gate-only configuration (ToolGates empty, ToolResultGates non-empty) is valid —
@@ -288,11 +290,12 @@ public static class AgentEvalGatekeeperExtensions
         // whenever EITHER list is non-empty, not just when ToolGates is.
         if (options.ToolGates.Count > 0 || options.ToolResultGates.Count > 0)
         {
-            result = result.UseAgentEvalToolGate(
+            result = result.UseAgentEvalToolGateWithPresentation(
                 options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode,
                 options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null,
                 options.EvidenceSink,
-                denialCorrelationTargets: resolvedOptions.ContainmentTargets);
+                denialCorrelationTargets: resolvedOptions.ContainmentTargets,
+                refusalPresenter: refusalPresenter);
         }
 
         if (options.ApprovalGates.Count > 0)

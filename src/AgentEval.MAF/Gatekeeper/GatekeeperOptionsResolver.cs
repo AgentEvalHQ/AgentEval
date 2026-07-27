@@ -15,9 +15,18 @@ internal static class GatekeeperOptionsResolver
     private static readonly string[] ReservedDisclosureTokens =
     [
         "_gatekeeper",
+        "gatekeeper",
+        "reference",
+        "target",
         "referenceId",
         "policy",
         "threshold",
+        "attempt",
+        "bypass",
+        "disposition",
+        "quota",
+        "escalate",
+        "transient",
         "containment",
         "blocked",
         "denied",

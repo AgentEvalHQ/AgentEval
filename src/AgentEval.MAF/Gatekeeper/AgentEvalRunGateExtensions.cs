@@ -41,6 +41,7 @@ public static class AgentEvalRunGateExtensions
     /// <c>EnforceAgentEvalGates(...)</c> for new code.
     /// </param>
     /// <param name="trace">Optional Glass Box trace for <c>gate.run-*.*</c> evidence.</param>
+    /// <param name="evidenceSink">Optional additional destination for canonical gate evidence.</param>
     public static AIAgentBuilder UseAgentEvalGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IChatGate>? pre = null,
@@ -55,7 +56,8 @@ public static class AgentEvalRunGateExtensions
             policy,
             trace,
             evidenceSink,
-            compositeToolConfigFingerprint: null);
+            compositeToolConfigFingerprint: null,
+            refusalPresenter: GatekeeperRefusalPresenter.Structured);
 
     internal static AIAgentBuilder UseAgentEvalGate(
         this AIAgentBuilder builder,
@@ -64,9 +66,11 @@ public static class AgentEvalRunGateExtensions
         EvalGatePolicy? policy,
         AgentTrace? trace,
         IGateEvidenceSink? evidenceSink,
-        string? compositeToolConfigFingerprint)
+        string? compositeToolConfigFingerprint,
+        GatekeeperRefusalPresenter refusalPresenter)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(refusalPresenter);
 
         // Snapshot NOW, at registration — pre/post may be a caller-owned mutable List<IChatGate>. Without a
         // defensive copy, the closure captured below would see any LATER mutation to that same list instance
@@ -128,7 +132,7 @@ public static class AgentEvalRunGateExtensions
             {
                 using var scope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-                var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, effectivePolicy, trace, seq, evidenceContext, ct).ConfigureAwait(false);
+                var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, effectivePolicy, trace, seq, evidenceContext, refusalPresenter, ct).ConfigureAwait(false);
                 if (preOutcome.ReturnBody is not null)
                 {
                     return Refusal(innerAgent, preOutcome.ReturnBody);
@@ -139,7 +143,7 @@ public static class AgentEvalRunGateExtensions
 
                 var response = await innerAgent.RunAsync(effectiveMessages, session, options, ct).ConfigureAwait(false);
 
-                var postOutcome = await RunGatesAsync(postGates, response.Text, "run-post", isPreStage: false, effectivePolicy, trace, seq, evidenceContext, ct).ConfigureAwait(false);
+                var postOutcome = await RunGatesAsync(postGates, response.Text, "run-post", isPreStage: false, effectivePolicy, trace, seq, evidenceContext, refusalPresenter, ct).ConfigureAwait(false);
                 if (postOutcome.ReturnBody is not null)
                 {
                     // P2-3: an enforced run-post Block/Redact swapped what the CALLER sees, but the model's original
@@ -154,7 +158,7 @@ public static class AgentEvalRunGateExtensions
                 return response;
             },
             runStreamingFunc: (messages, session, options, innerAgent, ct) =>
-                StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, evidenceContext, ct));
+                StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, evidenceContext, refusalPresenter, ct));
     }
 
     private static async IAsyncEnumerable<AgentResponseUpdate> StreamCore(
@@ -168,6 +172,7 @@ public static class AgentEvalRunGateExtensions
         AgentTrace? trace,
         int[] seq,
         GateEvidenceContext evidence,
+        GatekeeperRefusalPresenter refusalPresenter,
         [EnumeratorCancellation] CancellationToken ct)
     {
         // A run-post gate cannot BLOCK a streamed response without buffering the whole stream (which destroys
@@ -186,7 +191,7 @@ public static class AgentEvalRunGateExtensions
         // SessionContextGate pre-gate sees the session, exactly as on the non-streaming path).
         using var runScope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-        var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, policy, trace, seq, evidence, ct).ConfigureAwait(false);
+        var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, policy, trace, seq, evidence, refusalPresenter, ct).ConfigureAwait(false);
         if (preOutcome.ReturnBody is not null)
         {
             var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preOutcome.ReturnBody)) { AgentId = innerAgent.Id };
@@ -231,7 +236,7 @@ public static class AgentEvalRunGateExtensions
         {
             using (runScope.Enter())
             {
-                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, evidence, ct).ConfigureAwait(false);
+                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, evidence, refusalPresenter, ct).ConfigureAwait(false);
             }
         }
 
@@ -265,7 +270,7 @@ public static class AgentEvalRunGateExtensions
         => outcome.RewrittenInput is null ? original : [new ChatMessage(ChatRole.User, outcome.RewrittenInput)];
 
     private static async ValueTask<GateStageOutcome> RunGatesAsync(
-        IReadOnlyList<IChatGate> gates, string text, string stage, bool isPreStage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, GateEvidenceContext evidence, CancellationToken ct)
+        IReadOnlyList<IChatGate> gates, string text, string stage, bool isPreStage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, GateEvidenceContext evidence, GatekeeperRefusalPresenter refusalPresenter, CancellationToken ct)
     {
         foreach (var gate in gates)
         {
@@ -281,7 +286,7 @@ public static class AgentEvalRunGateExtensions
                 var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
                 var throwReferenceId = GateReferenceId.New();
                 RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId, evidence, failedClosedOnThrow: true);
-                return GateStageOutcome.Return(GateReferenceId.RefusalBody(throwReferenceId, RefusalDispositionClassifier.Classify(gate.PolicyName, failedClosedOnThrow: true)));
+                return GateStageOutcome.Return(refusalPresenter.Present(throwReferenceId, RefusalDispositionClassifier.Classify(gate.PolicyName, failedClosedOnThrow: true)));
             }
 
             if (verdict.Action != GateAction.Block)
@@ -305,7 +310,7 @@ public static class AgentEvalRunGateExtensions
                 // No safe version supplied ⇒ a hard block: the non-revealing refusal shape, both stages.
                 if (verdict.RedactedText is null)
                 {
-                    return GateStageOutcome.Return(GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName)));
+                    return GateStageOutcome.Return(refusalPresenter.Present(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName)));
                 }
 
                 // #12 / P2-1: RedactedText IS the SAFE version of the content, not a refusal. On run-POST it
@@ -400,8 +405,8 @@ public static class AgentEvalRunGateExtensions
         => "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)), 0, 8).ToLowerInvariant();
 
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
-    // evidence, never returned as run-refusal content (see GateReferenceId.RefusalBody). referenceId is the
-    // ONLY thing the two are allowed to share, so an auditor can correlate what was returned with what happened.
+    // evidence, never returned as run-refusal content. Structured presentation echoes referenceId so an auditor
+    // can correlate the two; camouflaged presentation deliberately withholds it while the evidence remains intact.
     // F-C: write one record to the trace (audit projection) AND fan it out to any registered extra sink
     // (ledger / alerting). The trace write is null-safe so evidence still reaches the sink with tracing off.
     private static void EmitEvidence(AgentTrace? trace, GateEvidenceContext evidence, int seq, GateEvidence record)
