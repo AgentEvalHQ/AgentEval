@@ -34,6 +34,16 @@ public class GatekeeperBridgeTests
             GateVerdict.Block("judge:system-prompt-extraction", "leak", new[] { "You are ACME-Bot" }),
             "judge:system-prompt-extraction");
         Assert.Null(leak.Matches);
+
+        var inbound = GateVerdictDto.FromChat(
+            GateVerdict.Block("judge:indirect-injection", "pi", new[] { "remote payload" }),
+            "judge:indirect-injection");
+        Assert.Null(inbound.Matches);
+
+        var outbound = GateVerdictDto.FromChat(
+            GateVerdict.Block("judge:inter-agent-outbound-goal-drift", "drift", new[] { "delegated payload" }),
+            "judge:inter-agent-outbound-goal-drift");
+        Assert.Null(outbound.Matches);
     }
 
     [Fact]
@@ -43,11 +53,6 @@ public class GatekeeperBridgeTests
             GateVerdict.Block("keyword-oracle", "keyword match", new[] { "ignore previous" }), "keyword-injection");
         Assert.Null(kw.Axis);                                   // not a judge:<axis> policy
         Assert.Equal(new[] { "ignore previous" }, kw.Matches);  // keyword spans are echoed (they are the finding, not a secret)
-
-        var judge = GateVerdictDto.FromChat(
-            GateVerdict.Block("judge:indirect-injection", "pi", new[] { "ignore all previous" }), "judge:indirect-injection");
-        Assert.Equal("indirect-injection", judge.Axis);
-        Assert.Equal(new[] { "ignore all previous" }, judge.Matches);   // indirect-injection is NOT in the redact set
     }
 
     [Fact]

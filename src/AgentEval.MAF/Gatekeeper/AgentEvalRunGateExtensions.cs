@@ -444,12 +444,12 @@ public static class AgentEvalRunGateExtensions
             return;
         }
 
-        // #6: the two SensitiveJudgeAxes (exfiltration-intent, system-prompt-extraction) can have Reason/
-        // Matches carry the offending phrase verbatim — an LLM judge's own rationale can quote back the exact
+        // #6: SensitiveJudgeAxes can have Reason/Matches carry the offending phrase verbatim — an LLM judge's
+        // own rationale can quote back the exact
         // secret/leaked-prompt text it detected ("the offending phrase may BE the secret," the same rule
         // GateVerdictDto.RedactAxes already applies to the CLI verdict JSON). This is otherwise the one
         // trace-evidence write path TraceCaptureMode (#13) does NOT cover — that only gates Mutate tool-call
-        // arguments. Redact both fields unconditionally for these two axes; audit-visible for every other gate.
+        // arguments. Redact both fields unconditionally for these axes; audit-visible for every other gate.
         var sensitive = SensitiveJudgeAxes.IsSensitive(verdict.PolicyName);
 
         // F-C / P3-3: persist the verdict's GateProvenance for the first time (a judge's threshold/actual/evidence),

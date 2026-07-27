@@ -8,14 +8,16 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Guardrails.Judges;
 
 /// <summary>
-/// Screens content returned by another agent before the caller consumes it. The inbound boundary is
-/// not-fully-trusted external text, so this facade reuses <see cref="IndirectInjectionJudge"/> and its
-/// <see cref="IndirectInjectionRubric"/> verbatim rather than creating a boundary-specific detector.
+/// Defines directional gates for content crossing an inter-agent boundary. The inbound half screens content
+/// returned by another agent and reuses <see cref="IndirectInjectionJudge"/>. The outbound half compares a
+/// delegated instruction with a separately supplied trusted parent goal before transport.
 /// </summary>
 /// <remarks>
 /// Place the gate returned by <see cref="CreateInbound"/> at the remote agent's run-post seam. For a MAF
 /// <c>AIAgent</c>, add it to <c>GatekeeperOptions.PostGates</c> while wrapping that remote agent. Remote tools
 /// execute server-side and are not intercepted by this chat-content gate.
+/// Use <c>CreateOutbound</c> as a run-pre gate; its trusted goal must come from application/session state,
+/// never from the outbound instruction being inspected.
 /// <para>
 /// Reusing the canonical rubric does not promote a model automatically. Calibrate the exact model, options,
 /// and deployment traffic with <see cref="CalibrateInboundAsync"/>, and require
@@ -27,7 +29,7 @@ namespace AgentEval.Guardrails.Judges;
 /// Use observe-only streaming or buffer the remote response at a trusted boundary when streaming is required.
 /// </para>
 /// </remarks>
-public static class InterAgentBoundaryInjectionGate
+public static partial class InterAgentBoundaryInjectionGate
 {
     /// <summary>
     /// The inbound axis id. It intentionally matches <see cref="IndirectInjectionJudge.Axis"/> because this is
