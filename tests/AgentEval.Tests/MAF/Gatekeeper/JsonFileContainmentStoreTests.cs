@@ -235,6 +235,27 @@ public sealed class JsonFileContainmentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ReleaseAsync_ConcurrentSameAuthorizationAppliesExactlyOnce()
+    {
+        var verifier = new TestVerifier();
+        using var store = CreateStore(verifier);
+        var target = Session();
+        await store.ContainAsync(Request(target));
+        var authorization = Authorization(target, nonce: "concurrent-nonce-01");
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 32)
+                .Select(_ => store.ReleaseAsync(authorization).AsTask()));
+
+        Assert.Equal(1, results.Count(result => result.Disposition == ContainmentMutationDisposition.Applied));
+        Assert.Equal(31, results.Count(result => result.Disposition == ContainmentMutationDisposition.Conflict));
+        Assert.Equal(1, verifier.Calls);
+        var released = store.GetCurrent(target);
+        Assert.Equal(ContainmentSnapshotState.Released, released.State);
+        Assert.Equal(2, released.Record!.Version);
+    }
+
+    [Fact]
     public async Task ReleaseAsync_RejectsStaleFutureExpiredWrongTargetAndInvalidSignature()
     {
         var verifier = new TestVerifier();
