@@ -3,6 +3,8 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -73,6 +75,8 @@ public enum DistinctValueDecision
 /// </summary>
 public sealed class RunLedger
 {
+    private const int MaxDenialCorrelationKeys = 1_024;
+
     // Weak, so a run's ledger is collected when the run scope is. The fallback key gives a single shared ledger
     // when there is no run scope (documented caveat — register the run gate for per-run isolation).
     private static readonly ConditionalWeakTable<object, RunLedger> PerRun = new();
@@ -91,7 +95,7 @@ public sealed class RunLedger
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> _distinctValueHashes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // P4-3: per-(tool+arg-shape) denial tally (F-B dimension)
+    private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // SHA-256-only precise denial dimension
     private int _treeDenials;          // P6-1: enforced-block volume, aggregated at the run-tree ROOT (see RecordTreeDenial)
     private bool _blockStormAlerted;   // P6-1: one-shot latch so a block-storm incident alert fires once per run tree
 
@@ -386,19 +390,39 @@ public sealed class RunLedger
     }
 
     /// <summary>
-    /// Records one denial for <paramref name="denialKey"/> (a tool + arg-shape signature) and returns the running
-    /// count INCLUDING this one (Phase 4, P4-3 / F-B). An equivalent retry — same tool, same argument shape —
-    /// shares the key, so the returned count is "how many times this same denied action has been tried". Surfaced
-    /// as the refusal envelope's <c>attempts</c>; also the dimension the Bulkhead RepeatedBlockEscalationGate reads.
+    /// Records one denial for a caller-defined key after hashing it, returning the running count including this
+    /// one. Storage is capped at 1,024 SHA-256 keys; a new key beyond the cap returns 1 without being retained.
     /// </summary>
     public int RecordDenial(string denialKey)
     {
         ArgumentNullException.ThrowIfNull(denialKey);
+        return RecordDenialHash(SHA256.HashData(Encoding.UTF8.GetBytes(denialKey)));
+    }
+
+    internal int RecordDenialHash(ReadOnlySpan<byte> denialHash)
+    {
+        if (denialHash.Length != SHA256.HashSizeInBytes)
+        {
+            throw new ArgumentException("A denial correlation hash must contain exactly 32 bytes.", nameof(denialHash));
+        }
+
+        var key = Convert.ToHexString(denialHash);
         lock (_lock)
         {
-            var count = (_denials.TryGetValue(denialKey, out var n) ? n : 0) + 1;
-            _denials[denialKey] = count;
-            return count;
+            if (_denials.TryGetValue(key, out var existing))
+            {
+                var count = existing == int.MaxValue ? int.MaxValue : existing + 1;
+                _denials[key] = count;
+                return count;
+            }
+
+            if (_denials.Count >= MaxDenialCorrelationKeys)
+            {
+                return 1;
+            }
+
+            _denials[key] = 1;
+            return 1;
         }
     }
 
@@ -448,9 +472,10 @@ public sealed class RunLedger
     public int DenialCount(string denialKey)
     {
         ArgumentNullException.ThrowIfNull(denialKey);
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(denialKey)));
         lock (_lock)
         {
-            return _denials.TryGetValue(denialKey, out var n) ? n : 0;
+            return _denials.TryGetValue(key, out var n) ? n : 0;
         }
     }
 

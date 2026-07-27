@@ -291,7 +291,8 @@ public static class AgentEvalGatekeeperExtensions
             result = result.UseAgentEvalToolGate(
                 options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode,
                 options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null,
-                options.EvidenceSink);
+                options.EvidenceSink,
+                denialCorrelationTargets: resolvedOptions.ContainmentTargets);
         }
 
         if (options.ApprovalGates.Count > 0)
