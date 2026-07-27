@@ -168,7 +168,7 @@ public sealed class A2ACompositionSpikeTests
         public void Record(GateEvidence evidence, int sequence) => Records.Add(evidence);
     }
 
-    private sealed class FakeA2AClient(string reply) : IA2AClient
+    internal sealed class FakeA2AClient(string reply) : IA2AClient
     {
         public int SendCount { get; private set; }
 
