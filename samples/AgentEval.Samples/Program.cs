@@ -137,6 +137,7 @@ public static class Program
             new("Output Panel (Stage-2)",    "Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) in a fan-out + the over-refusal utility valve", GatekeeperOutputPanel.RunAsync),
             new("Monetary + Per-Call Budget", "MonetaryLimitGate + PerToolCallBudgetGate vs. a live refund-spray injection attack", GatekeeperMonetaryAndPerCallBudget.RunAsync),
             new("Explainability & Trust",    "Why a judge gate blocked (GateProvenance) · counterfactual gate-config replay (GateReplayer) · one honest composite score (TrustScoreCalculator)", GatekeeperExplainabilityAndTrust.RunAsync),
+            new("Real A2A Boundary",          "Calibrate, then guard a consent-gated real remote A2A call (set AGENTEVAL_A2A_BASE_URL)", GatekeeperA2ABoundary.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",

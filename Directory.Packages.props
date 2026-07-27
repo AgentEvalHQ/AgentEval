@@ -22,7 +22,7 @@
          changes — both in Microsoft.Agents.AI.Hosting.OpenAI / Microsoft.Agents.AI.Foundry.Hosting, packages
          AgentEval does not reference. No source changes required for this bump. -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.13.0-preview.260703.1" /><!-- preview-only; test-only A2A composition spike -->
+    <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.13.0-preview.260703.1" /><!-- preview-only; A2A boundary sample + tests -->
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.13.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.13.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.13.0" />
