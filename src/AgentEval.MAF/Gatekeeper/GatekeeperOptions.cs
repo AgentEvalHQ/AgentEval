@@ -231,9 +231,10 @@ public sealed class GatekeeperOptions
 
     /// <summary>
     /// Optional shared resolver for a <b>durable logical session id</b> (F-A / P1-4). When set, <c>UseGatekeeper</c>
-    /// injects it into every registered <see cref="ISessionIdentityAware"/> gate (<see cref="RateLimitGate"/> today),
-    /// so per-session caps survive a persisted-session reload or a logical session load-balanced across workers,
-    /// configured ONCE here instead of per gate. A gate given its own explicit resolver keeps it. Use the
+    /// injects it into every registered <see cref="ISessionIdentityAware"/> gate (including
+    /// <see cref="RateLimitGate"/> and <see cref="SessionIdentityDriftGate"/>), so per-session state can
+    /// survive a persisted-session reload or move between in-process workers. Each gate owns its state boundary;
+    /// this resolver is not a cross-process store. A gate given its own explicit resolver keeps it. Use the
     /// <see cref="SessionIdentity"/> helpers (<c>FromStateBag</c> / <c>Combine</c>). Default <see langword="null"/> —
     /// gates key on the <see cref="Microsoft.Agents.AI.AgentSession"/> object identity (the pre-F-A behavior).
     /// </summary>
