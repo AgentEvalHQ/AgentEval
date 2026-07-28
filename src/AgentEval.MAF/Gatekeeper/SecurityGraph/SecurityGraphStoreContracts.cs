@@ -178,11 +178,20 @@ public sealed class SecurityGraphMutationResult
     public string ReasonCode { get; }
 }
 
-/// <summary>Tenant-bound persistent security graph event store.</summary>
-public interface ISecurityGraphStore : IDisposable
+/// <summary>Read-only tenant security graph snapshot source.</summary>
+public interface ISecurityGraphReader
 {
     /// <summary>Returns a bounded immutable in-memory view; implementations must not perform I/O.</summary>
     SecurityGraphTenantSnapshot Read(TimeSpan window);
+}
+
+/// <summary>Tenant-bound persistent security graph event store.</summary>
+public interface ISecurityGraphStore : ISecurityGraphReader, IDisposable
+{
+    /// <summary>
+    /// Returns a bounded immutable in-memory view. Redeclared to preserve the original interface method token.
+    /// </summary>
+    new SecurityGraphTenantSnapshot Read(TimeSpan window);
 
     /// <summary>Idempotently appends one content-free observation.</summary>
     ValueTask<SecurityGraphMutationResult> AppendAsync(

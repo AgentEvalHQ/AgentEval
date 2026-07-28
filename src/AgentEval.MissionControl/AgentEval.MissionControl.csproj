@@ -17,6 +17,7 @@
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="..\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
+    <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />
   </ItemGroup>
 
   <ItemGroup>
