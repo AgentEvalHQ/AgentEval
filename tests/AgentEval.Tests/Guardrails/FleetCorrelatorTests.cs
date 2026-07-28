@@ -14,8 +14,18 @@ namespace AgentEval.Tests.Guardrails;
 /// </summary>
 public class FleetCorrelatorTests
 {
-    private static GateVerdict Verdict(string policy, double? confidence) =>
-        GateVerdict.Allow(policy) with { Confidence = confidence };
+    private static GateVerdict Verdict(string policy, double? confidence)
+        => GateVerdict.Allow(policy) with
+        {
+            Confidence = confidence,
+            Provenance = confidence is null
+                ? null
+                : new GateProvenance(
+                    policy,
+                    Array.Empty<string>(),
+                    Threshold: 1.0,
+                    ActualValue: confidence),
+        };
 
     // ── Core escalation ──
 

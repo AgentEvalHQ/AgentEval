@@ -683,6 +683,15 @@ public class EvalGatingChatClientTests
         public string PolicyName { get; }
 
         public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
-            => new(GateVerdict.Allow(PolicyName) with { Confidence = _confidence });
+            => new(
+                GateVerdict.Allow(PolicyName) with
+                {
+                    Confidence = _confidence,
+                    Provenance = new GateProvenance(
+                        PolicyName,
+                        Array.Empty<string>(),
+                        Threshold: 1.0,
+                        ActualValue: _confidence),
+                });
     }
 }

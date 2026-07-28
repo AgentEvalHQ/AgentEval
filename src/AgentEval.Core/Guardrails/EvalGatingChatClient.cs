@@ -62,9 +62,9 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var msgs = new List<ChatMessage>(messages);   // fresh mutable list — pre-gate Redact may rewrite a message
-        await ApplyPreAsync(msgs, cancellationToken).ConfigureAwait(false);
+        var correlationTurn = await ApplyPreAsync(msgs, cancellationToken).ConfigureAwait(false);
         var response = await base.GetResponseAsync(msgs, options, cancellationToken).ConfigureAwait(false);
-        return await ApplyPostAsync(response, cancellationToken).ConfigureAwait(false);
+        return await ApplyPostAsync(response, cancellationToken, correlationTurn).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -105,16 +105,16 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
     // corrupt replay. Trace-level Metadata keeps gate evidence out of the pairing/replay path while still
     // being serialized, hash-anchored, and surfaced to compliance / Mission Control. `msgs` is always a
     // fresh List<>, so the in-place Redact index-set is safe.
-    private async Task ApplyPreAsync(List<ChatMessage> msgs, CancellationToken cancellationToken)
+    private async Task<long?> ApplyPreAsync(List<ChatMessage> msgs, CancellationToken cancellationToken)
     {
-        // Advance unconditionally, before any gate runs this round-trip — the ONE call site both the
+        // Start exactly one stable correlation turn per user round-trip — the ONE call site both the
         // streaming and non-streaming paths share (see GetResponseAsync/GetStreamingResponseAsync, both of
         // which call this method first). A no-op when _correlator is null.
-        _correlator?.AdvanceTurn();
+        var correlationTurn = _correlator?.BeginTurn();
 
         if (_pre.Count == 0 && _correlator is null)
         {
-            return;
+            return correlationTurn;
         }
 
         // Inspect AND redact the SAME message so a Redact verdict is never silently dropped: target the last
@@ -134,7 +134,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             foreach (var verdict in verdicts)
             {
                 Record(verdict, "pre");
-                _correlator?.Observe(verdict, "pre");
+                ObserveCorrelation(verdict, "pre", correlationTurn);
                 // WarnOnly: recorded, proceed (no throw, no redact).
             }
         }
@@ -144,7 +144,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             {
                 var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
                 Record(verdict, "pre");
-                _correlator?.Observe(verdict, "pre");
+                ObserveCorrelation(verdict, "pre", correlationTurn);
                 if (verdict.Action == GateAction.Allow)
                 {
                     continue;
@@ -189,9 +189,14 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
                 // WarnOnly: recorded, proceed.
             }
         }
+
+        return correlationTurn;
     }
 
-    private async Task<ChatResponse> ApplyPostAsync(ChatResponse response, CancellationToken cancellationToken)
+    private async Task<ChatResponse> ApplyPostAsync(
+        ChatResponse response,
+        CancellationToken cancellationToken,
+        long? correlationTurn)
     {
         if (_post.Count == 0 && _correlator is null)
         {
@@ -207,7 +212,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             foreach (var verdict in verdicts)
             {
                 Record(verdict, "post");
-                _correlator?.Observe(verdict, "post");
+                ObserveCorrelation(verdict, "post", correlationTurn);
             }
         }
         else
@@ -216,7 +221,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             {
                 var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
                 Record(verdict, "post");
-                _correlator?.Observe(verdict, "post");
+                ObserveCorrelation(verdict, "post", correlationTurn);
                 if (verdict.Action == GateAction.Allow)
                 {
                     continue;
@@ -257,6 +262,25 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         }
 
         return response;
+    }
+
+    private void ObserveCorrelation(
+        GateVerdict verdict,
+        string stage,
+        long? correlationTurn)
+    {
+        if (_correlator is null)
+        {
+            return;
+        }
+
+        if (correlationTurn is not { } stableTurn)
+        {
+            throw new InvalidOperationException(
+                "Fleet correlator turn token is unavailable.");
+        }
+
+        _correlator.Observe(verdict, stage, stableTurn);
     }
 
     /// <summary>
