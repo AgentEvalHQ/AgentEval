@@ -66,10 +66,12 @@ public static class GatekeeperA2ABoundary
             $"   outbound → accuracy {outbound.DecisiveAccuracy:P0}, " +
             $"missed {outbound.DangerousErrorCount}, inline-ready {outbound.IsInlineReady}");
 
-        if (!inbound.IsInlineReady || !outbound.IsInlineReady)
+        if (!GatekeeperA2ACalibration.IsPhase4PromotionReady(inbound) ||
+            !GatekeeperA2ACalibration.IsPhase4PromotionReady(outbound))
         {
             Console.WriteLine(
-                "   STOP: at least one judge is not inline-ready; the remote agent was not resolved or called.");
+                "   STOP: at least one judge failed the Phase-4 safety/utility bar; " +
+                "the remote agent was not resolved or called.");
             return;
         }
 
