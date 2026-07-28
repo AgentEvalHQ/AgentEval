@@ -91,38 +91,82 @@ internal static class ContainmentGateEvaluator
         IReadOnlyList<ContainmentTarget> targets,
         CancellationToken cancellationToken)
     {
+        var tenantScopes = new HashSet<string>(StringComparer.Ordinal);
         foreach (var target in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            ContainmentSnapshot? snapshot;
-            try
+            if (target is null)
             {
-                snapshot = store.GetCurrent(target);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception) when (exception is not (StackOverflowException or OutOfMemoryException))
-            {
-                return ContainmentGateDecision.Block("store_read_failed");
+                return ContainmentGateDecision.Block("target_set_invalid");
             }
 
-            if (snapshot is null || snapshot.Target != target)
+            if (tenantScopes.Add(target.Tenant))
             {
-                return ContainmentGateDecision.Block("store_snapshot_invalid");
+                var tenantDecision = EvaluateTarget(
+                    store,
+                    new ContainmentTarget.TenantScope(target.Tenant),
+                    cancellationToken);
+                if (tenantDecision.MustBlock)
+                {
+                    return tenantDecision;
+                }
+            }
+        }
+
+        foreach (var target in targets)
+        {
+            if (target is ContainmentTarget.TenantScope)
+            {
+                continue;
             }
 
-            if (snapshot.State == ContainmentSnapshotState.Active)
+            var decision = EvaluateTarget(
+                store,
+                target,
+                cancellationToken);
+            if (decision.MustBlock)
             {
-                return ContainmentGateDecision.Block("active");
+                return decision;
             }
+        }
 
-            if (snapshot.State == ContainmentSnapshotState.Indeterminate)
-            {
-                return ContainmentGateDecision.Block("indeterminate");
-            }
+        return ContainmentGateDecision.Allow;
+    }
+
+    private static ContainmentGateDecision EvaluateTarget(
+        IContainmentStore store,
+        ContainmentTarget target,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ContainmentSnapshot? snapshot;
+        try
+        {
+            snapshot = store.GetCurrent(target);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is not (StackOverflowException or OutOfMemoryException))
+        {
+            return ContainmentGateDecision.Block("store_read_failed");
+        }
+
+        if (snapshot is null || snapshot.Target != target)
+        {
+            return ContainmentGateDecision.Block("store_snapshot_invalid");
+        }
+
+        if (snapshot.State == ContainmentSnapshotState.Active)
+        {
+            return ContainmentGateDecision.Block("active");
+        }
+
+        if (snapshot.State == ContainmentSnapshotState.Indeterminate)
+        {
+            return ContainmentGateDecision.Block("indeterminate");
         }
 
         return ContainmentGateDecision.Allow;

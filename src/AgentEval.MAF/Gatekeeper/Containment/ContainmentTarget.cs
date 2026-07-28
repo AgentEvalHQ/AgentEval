@@ -15,6 +15,9 @@ public enum ContainmentTargetKind
 
     /// <summary>A delegated or remote agent endpoint.</summary>
     AgentEndpoint,
+
+    /// <summary>Every Gatekeeper boundary in one tenant.</summary>
+    TenantScope,
 }
 
 /// <summary>
@@ -107,5 +110,21 @@ public abstract class ContainmentTarget : IEquatable<ContainmentTarget>
 
         /// <summary>The normalized agent endpoint identifier.</summary>
         public string AgentId => Identifier;
+    }
+
+    /// <summary>Every Gatekeeper boundary in one tenant.</summary>
+    public sealed class TenantScope : ContainmentTarget
+    {
+        /// <summary>The canonical durable identifier for a tenant-wide target.</summary>
+        public const string GlobalIdentifier = "global";
+
+        /// <summary>Creates the one global containment target for a tenant.</summary>
+        public TenantScope(string tenant)
+            : base(tenant, GlobalIdentifier)
+        {
+        }
+
+        /// <inheritdoc/>
+        public override ContainmentTargetKind Kind => ContainmentTargetKind.TenantScope;
     }
 }

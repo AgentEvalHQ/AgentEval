@@ -44,7 +44,10 @@ public sealed class ContainmentGateTests
         var verdict = await Inspect(gate);
 
         Assert.Equal(ToolGateAction.Allow, verdict.Action);
-        Assert.Equal(2, store.Reads.Count);
+        Assert.Equal(3, store.Reads.Count);
+        Assert.Contains(
+            new ContainmentTarget.TenantScope("tenant-a"),
+            store.Reads);
         Assert.Contains(sessionTarget, store.Reads);
         Assert.Contains(releasedTarget, store.Reads);
     }
@@ -63,7 +66,12 @@ public sealed class ContainmentGateTests
 
         Assert.Equal(ToolGateAction.Block, verdict.Action);
         Assert.Equal("containment_override:active", verdict.Reason);
-        Assert.Equal([sessionTarget], store.Reads);
+        Assert.Equal(
+            [
+                new ContainmentTarget.TenantScope("tenant-a"),
+                sessionTarget,
+            ],
+            store.Reads);
         Assert.DoesNotContain("tenant-a", verdict.Reason, StringComparison.Ordinal);
         Assert.DoesNotContain("session-a", verdict.Reason, StringComparison.Ordinal);
     }
@@ -94,7 +102,12 @@ public sealed class ContainmentGateTests
         var verdict = await Inspect(gate);
 
         Assert.Equal(ToolGateAction.Allow, verdict.Action);
-        Assert.Equal([target], store.Reads);
+        Assert.Equal(
+            [
+                new ContainmentTarget.TenantScope("tenant-a"),
+                target,
+            ],
+            store.Reads);
     }
 
     [Fact]

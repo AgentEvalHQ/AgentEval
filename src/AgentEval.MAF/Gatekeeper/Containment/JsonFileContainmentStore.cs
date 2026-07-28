@@ -553,6 +553,10 @@ public sealed class JsonFileContainmentStore : IContainmentStore
             ContainmentTargetKind.Session => new ContainmentTarget.Session(tenant, identifier),
             ContainmentTargetKind.McpServer => new ContainmentTarget.McpServer(tenant, identifier),
             ContainmentTargetKind.AgentEndpoint => new ContainmentTarget.AgentEndpoint(tenant, identifier),
+            ContainmentTargetKind.TenantScope when string.Equals(
+                identifier,
+                ContainmentTarget.TenantScope.GlobalIdentifier,
+                StringComparison.Ordinal) => new ContainmentTarget.TenantScope(tenant),
             _ => throw InvalidStore(),
         };
     }

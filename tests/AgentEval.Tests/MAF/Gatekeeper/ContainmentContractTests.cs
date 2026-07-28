@@ -24,6 +24,7 @@ public class ContainmentContractTests
         Assert.True(typeof(ContainmentTarget.Session).IsSealed);
         Assert.True(typeof(ContainmentTarget.McpServer).IsSealed);
         Assert.True(typeof(ContainmentTarget.AgentEndpoint).IsSealed);
+        Assert.True(typeof(ContainmentTarget.TenantScope).IsSealed);
     }
 
     [Fact]
