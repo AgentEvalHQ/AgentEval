@@ -36,6 +36,38 @@ public class IndirectInjectionRubricTests
         => Assert.Equal(JudgeDecision.Allowed, _rubric.Parse("{\"instructs\": false, \"confidence\": 0.8}").Decision);
 
     [Fact]
+    public void Parse_TaskSpecificAgentControl_Blocks()
+        => Assert.Equal(
+            JudgeDecision.Blocked,
+            _rubric.Parse(
+                "{\"agentControl\":true,\"ordinaryContent\":false,\"confidence\":0.9,\"evidence\":\"override\"}")
+                .Decision);
+
+    [Fact]
+    public void Parse_TaskSpecificOrdinaryContent_Allows()
+        => Assert.Equal(
+            JudgeDecision.Allowed,
+            _rubric.Parse(
+                "{\"agentControl\":false,\"ordinaryContent\":true,\"confidence\":0.9,\"evidence\":\"\"}")
+                .Decision);
+
+    [Fact]
+    public void Parse_ConflictingCompositeSignals_IsInconclusive()
+        => Assert.Equal(
+            JudgeDecision.Inconclusive,
+            _rubric.Parse(
+                "{\"agentControl\":true,\"ordinaryContent\":true,\"confidence\":0.5,\"evidence\":\"ambiguous\"}")
+                .Decision);
+
+    [Fact]
+    public void Parse_TaskSpecificReplyMissingOrdinaryContent_IsInconclusive()
+        => Assert.Equal(
+            JudgeDecision.Inconclusive,
+            _rubric.Parse(
+                "{\"agentControl\":true,\"confidence\":0.9,\"evidence\":\"override\"}")
+                .Decision);
+
+    [Fact]
     public void Parse_Unparseable_IsInconclusive()
         => Assert.Equal(JudgeDecision.Inconclusive, _rubric.Parse("I think maybe it could be an injection?").Decision);
 
