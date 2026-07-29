@@ -16,7 +16,7 @@ namespace AgentEval.Memory.External.LongMemEval;
 /// history injection (0 LLM calls), query (1 LLM call), type-specific judge (1 LLM call).
 /// Supports stratified sampling, binary scoring, and session-boundary-preserving history formatting.
 /// </summary>
-public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
+public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 {
     private readonly IChatClient _chatClient;
     private string? _datasetPath;
@@ -106,6 +106,16 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 
         // 1. Load data
         var entries = LoadEntries(options);
+        return await RunSelectedAsync(agent, options, entries, executionLabel: null, ct);
+    }
+
+    private async Task<ExternalBenchmarkResult> RunSelectedAsync(
+        IEvaluableAgent agent,
+        ExternalBenchmarkOptions options,
+        IReadOnlyList<LongMemEvalEntry> entries,
+        string? executionLabel,
+        CancellationToken ct)
+    {
         _logger.LogInformation(
             "LongMemEval: loaded {Count} questions ({Mode} mode, stratified={Stratified})",
             entries.Count, options.DatasetMode, options.StratifiedSampling);
@@ -266,7 +276,7 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         totalStopwatch.Stop();
 
         // 3. Aggregate results
-        return AggregateResults(questionResults, options, totalStopwatch.Elapsed);
+        return AggregateResults(questionResults, options, totalStopwatch.Elapsed, executionLabel);
     }
 
     private IReadOnlyList<LongMemEvalEntry> LoadEntries(ExternalBenchmarkOptions options)
@@ -285,7 +295,8 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     private ExternalBenchmarkResult AggregateResults(
         List<QuestionResult> questionResults,
         ExternalBenchmarkOptions options,
-        TimeSpan duration)
+        TimeSpan duration,
+        string? executionLabel)
     {
         bool IsScored(QuestionResult question) =>
             question.Correct.HasValue ||
@@ -340,12 +351,16 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         var totalLlmCalls = questionResults.Sum(q =>
             q.AgentLlmCallCount + q.JudgeLlmCallCount);
 
+        var benchmarkName = options.DatasetMode != null
+            ? $"LongMemEval-{options.DatasetMode} {questionResults.Count}q"
+            : $"LongMemEval {questionResults.Count}q";
+        if (!string.IsNullOrWhiteSpace(executionLabel))
+            benchmarkName += $" ({executionLabel})";
+
         return new ExternalBenchmarkResult
         {
             BenchmarkId = BenchmarkId,
-            BenchmarkName = options.DatasetMode != null
-                ? $"LongMemEval-{options.DatasetMode} {questionResults.Count}q"
-                : $"LongMemEval {questionResults.Count}q",
+            BenchmarkName = benchmarkName,
             OverallAccuracy = overallAccuracy,
             TaskAveragedAccuracy = taskAveraged,
             PerTypeResults = perType,
