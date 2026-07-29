@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Text.Json.Serialization;
+
 namespace AgentEval.Memory.External.Models;
 
 /// <summary>
@@ -165,6 +167,14 @@ public class QuestionResult
 
     /// <summary>Judge tokens consumed across attempts.</summary>
     public int JudgeTokensUsed { get; init; }
+
+    /// <summary>Validated, copy-owned normalized evidence when capture is enabled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public QuestionEvidenceEnvelope? Evidence { get; init; }
+
+    /// <summary>Evaluator-side evidence diagnostics when capture is enabled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public QuestionEvidenceDiagnostics? EvidenceDiagnostics { get; init; }
 
     /// <summary>Bounded AgentEval-owned failure code.</summary>
     public string? SafeFailureCode { get; init; }

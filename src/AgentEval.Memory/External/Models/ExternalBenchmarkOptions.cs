@@ -74,18 +74,35 @@ public class ExternalBenchmarkOptions
     /// <summary>Controls diagnostic evidence retained from judge responses.</summary>
     public JudgeEvidenceMode JudgeEvidenceMode { get; init; } = JudgeEvidenceMode.Outcome;
 
-    /// <summary>Validates bounded judge configuration before provider calls begin.</summary>
+    /// <summary>Controls normalized retrieval-evidence capture. Default: None.</summary>
+    public EvidenceCaptureMode EvidenceCaptureMode { get; init; } = EvidenceCaptureMode.None;
+
+    /// <summary>Top-K retrieval depth used for evaluator-side gold diagnostics.</summary>
+    public int EvidenceTopK { get; init; } = 10;
+
+    /// <summary>Whether Full evidence mode can persist bounded user content.</summary>
+    public bool PersistsEvidenceContent => EvidenceCaptureMode == EvidenceCaptureMode.Full;
+
+    /// <summary>Validates bounded judge and evidence configuration before provider calls begin.</summary>
     public void Validate()
     {
         if (!Enum.IsDefined(JudgeFailurePolicy))
             throw new ArgumentOutOfRangeException(nameof(JudgeFailurePolicy));
         if (!Enum.IsDefined(JudgeEvidenceMode))
             throw new ArgumentOutOfRangeException(nameof(JudgeEvidenceMode));
+        if (!Enum.IsDefined(EvidenceCaptureMode))
+            throw new ArgumentOutOfRangeException(nameof(EvidenceCaptureMode));
         if (MaxJudgeRetries is < 0 or > MaximumJudgeRetries)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(MaxJudgeRetries), MaxJudgeRetries,
                 $"MaxJudgeRetries must be between 0 and {MaximumJudgeRetries}.");
+        }
+        if (EvidenceTopK is < 1 or > QuestionEvidenceEnvelope.MaximumReferences)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(EvidenceTopK), EvidenceTopK,
+                $"EvidenceTopK must be between 1 and {QuestionEvidenceEnvelope.MaximumReferences}.");
         }
     }
 }

@@ -212,6 +212,8 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     i + 1, entries.Count, entry.QuestionType, safeCode, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
                 continue;
             }
+            // Evidence capture occurs only after the normal agent has answered.
+            var evidenceCapture = LongMemEvalEvidenceCapture.Capture(response, entry, options);
 
             // Judge only after the agent has completed. Judge failures retain their own
             // typed status and can never be misclassified as agent failures.
@@ -244,6 +246,8 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 JudgeTokensUsed = judgment.TokensUsed,
                 SafeFailureCode = judgment.SafeFailureCode,
                 JudgeExplanation = judgment.Explanation,
+                Evidence = evidenceCapture.Envelope,
+                EvidenceDiagnostics = evidenceCapture.Diagnostics,
                 Duration = qStopwatch.Elapsed
             });
 
