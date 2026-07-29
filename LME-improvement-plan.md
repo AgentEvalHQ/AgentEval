@@ -1,6 +1,6 @@
 # LongMemEval trustworthiness and diagnostics improvement plan
 
-> **Status:** ready for implementation; analysis and design only
+> **Status:** implementation in progress on `codex/longmemeval-trustworthiness`
 > **Prepared:** 2026-07-29
 > **Target baseline:** AgentEval `0.16.0-beta`
 > **Scope:** AgentEval's .NET LongMemEval runner, judge, result contracts, reporting, tests, samples, and documentation
@@ -67,14 +67,14 @@ becomes `100%` only after its focused tests pass and its task review has fixed a
 
 | Phase | Task | Description | Effort | % Done | Reviewed | Depends on | Implementation notes |
 |---|---|---|---:|---:|:---:|---|---|
-| 0 | 0.1 | Freeze current successful-result JSON and public API baselines | S | 0 | — | — | Golden fixtures must cover both `yes` and `no` |
-| 0 | 0.2 | Add red-first judge, runner, leakage, evidence, and compatibility tests | M | 0 | — | 0.1 | Tests must fail for the current reason, not incidental formatting |
-| 0 | 0.R | Contract and threat-model review | S | 0 | — | 0.1–0.2 | Gates coding promotion into Phase 1 |
-| 1 | 1.1 | Add typed judge outcomes and validated judge options | M | 0 | — | 0.R | Nullable binary result; bounded retry validation |
-| 1 | 1.2 | Extract strict response parser and align official prompts | M | 0 | — | 1.1 | No production special case for any question ID |
-| 1 | 1.3 | Implement retry, cancellation, sanitization, and call accounting | M | 0 | — | 1.1–1.2 | Every provider attempt counted exactly once |
-| 1 | 1.4 | Propagate outcomes through runner and aggregates | L | 0 | — | 1.3 | Separate agent failure from judge failure |
-| 1 | 1.R | Judge-semantics promotion review | M | 0 | — | 1.1–1.4 | Parser matrix, aggregation matrix, compatibility diff |
+| 0 | 0.1 | Freeze current successful-result JSON and public API baselines | S | 100 | ✅ | — | Yes/no values, legacy status inference, and 0–100 scale are covered |
+| 0 | 0.2 | Add red-first judge, runner, leakage, evidence, and compatibility tests | M | 60 | — | 0.1 | Phase 1 matrix complete; Phase 2/3 evidence and oracle red tests remain |
+| 0 | 0.R | Contract and threat-model review | S | 75 | — | 0.1–0.2 | Phase 1 boundary reviewed; evidence/oracle threat reviews remain staged |
+| 1 | 1.1 | Add typed judge outcomes and validated judge options | M | 100 | ✅ | 0.R | Nullable results, owned statuses, and retry bound `0..3` implemented |
+| 1 | 1.2 | Extract strict response parser and align official prompts | M | 100 | ✅ | 1.1 | All five official prompt families plus general preference corpus covered |
+| 1 | 1.3 | Implement retry, cancellation, sanitization, and call accounting | M | 100 | ✅ | 1.1–1.2 | Per-question counters are the sole source for total LLM calls |
+| 1 | 1.4 | Propagate outcomes through runner and aggregates | L | 100 | ✅ | 1.3 | Null accuracy, explicit denominators, and distinct failure counts implemented |
+| 1 | 1.R | Judge-semantics promotion review | M | 100 | ✅ | 1.1–1.4 | Fixed duplicate accounting and legacy TypeResult denominator findings |
 | 2 | 2.1 | Add generic typed question-evidence contracts | M | 0 | — | 1.R | Content-free references by default |
 | 2 | 2.2 | Capture reserved, allowlisted `AgentResponse.AdditionalProperties` evidence | L | 0 | — | 2.1 | Strict schema, bounds, and sensitive-field rejection |
 | 2 | 2.3 | Derive evaluator-side retrieval diagnostics from gold labels | L | 0 | — | 2.2 | Gold joins happen only after agent execution |
@@ -84,11 +84,11 @@ becomes `100%` only after its focused tests pass and its task review has fixed a
 | 3 | 3.2 | Add retrieval-bypassing oracle reader using the answer client | L | 0 | — | 3.1 | Same answer model configuration, separate execution path |
 | 3 | 3.3 | Add paired normal/oracle result without score mixing | M | 0 | — | 3.2 | Separate results plus diagnostic gap only |
 | 3 | 3.R | Oracle integrity review | M | 0 | — | 3.1–3.3 | Selected-ID equality and contamination tests |
-| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 0 | — | 1.R | Keep public accuracy values on 0–100 scale |
-| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 0 | — | 1.R, 2.R | Inconclusive is neither passed nor failed |
+| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 70 | — | 1.R | Runtime fix complete; command-level mixed/null tests remain |
+| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 40 | — | 1.R, 2.R | Nullable consumers compile; tri-state synthesized-report design remains |
 | 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 0 | — | 3.R, 4.1–4.2 | Correct labels, limitations, and examples |
 | 4 | 4.R | Reporting and documentation review | S | 0 | — | 4.1–4.3 | JSON snapshots and rendered console output |
-| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 0 | — | 4.R | No live provider required |
+| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 55 | — | 4.R | Memory: 537 tests × 3 TFMs passed; solution builds; full solution tests remain |
 | 5 | 5.2 | Run authorized live diagnostic and oracle comparison | M | 0 | — | 5.1 | Record model/deployment identity; never persist secrets |
 | 5 | 5.3 | Final API, security, and migration review | M | 0 | — | 5.1–5.2 | Review only changed code and affected consumers |
 | 5 | 5.R | Release-readiness review | S | 0 | — | 5.3 | All acceptance criteria and docs complete |

@@ -8,6 +8,9 @@ namespace AgentEval.Memory.External.Models;
 /// </summary>
 public class ExternalBenchmarkOptions
 {
+    /// <summary>Maximum supported judge retries.</summary>
+    public const int MaximumJudgeRetries = 3;
+
     /// <summary>Maximum number of questions to run (null = all, runs every question in the dataset). Default: null.</summary>
     public int? MaxQuestions { get; init; } = null;
 
@@ -58,4 +61,31 @@ public class ExternalBenchmarkOptions
     /// runner choose based on agent capabilities.
     /// </remarks>
     public HistoryInjectionMode HistoryInjectionMode { get; init; } = HistoryInjectionMode.TextBlob;
+
+    /// <summary>
+    /// Controls how judge infrastructure failures affect the run.
+    /// Default: retry within the configured bound, then retain an inconclusive result.
+    /// </summary>
+    public JudgeFailurePolicy JudgeFailurePolicy { get; init; } = JudgeFailurePolicy.RetryThenInconclusive;
+
+    /// <summary>Maximum retry count after the initial judge attempt. Valid range: 0-3.</summary>
+    public int MaxJudgeRetries { get; init; } = 1;
+
+    /// <summary>Controls diagnostic evidence retained from judge responses.</summary>
+    public JudgeEvidenceMode JudgeEvidenceMode { get; init; } = JudgeEvidenceMode.Outcome;
+
+    /// <summary>Validates bounded judge configuration before provider calls begin.</summary>
+    public void Validate()
+    {
+        if (!Enum.IsDefined(JudgeFailurePolicy))
+            throw new ArgumentOutOfRangeException(nameof(JudgeFailurePolicy));
+        if (!Enum.IsDefined(JudgeEvidenceMode))
+            throw new ArgumentOutOfRangeException(nameof(JudgeEvidenceMode));
+        if (MaxJudgeRetries is < 0 or > MaximumJudgeRetries)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxJudgeRetries), MaxJudgeRetries,
+                $"MaxJudgeRetries must be between 0 and {MaximumJudgeRetries}.");
+        }
+    }
 }

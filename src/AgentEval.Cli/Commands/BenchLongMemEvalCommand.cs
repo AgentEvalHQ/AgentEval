@@ -195,21 +195,26 @@ public static class BenchLongMemEvalCommand
             // Skip per-scenario writes; persist the native result as report-native.json beside
             // the manifest below. The summary still captures pass/fail totals.
 
-            var verdict = result.OverallAccuracy >= 0.5 ? "PASS" : "FAIL";
+            const double passThresholdPercent = 50.0;
+            var verdict = result.OverallAccuracy switch
+            {
+                null => "INCONCLUSIVE",
+                >= passThresholdPercent => "PASS",
+                _ => "FAIL"
+            };
+            var metrics = new Dictionary<string, double>();
+            if (result.OverallAccuracy is { } overall) metrics["overall_accuracy"] = overall;
+            if (result.TaskAveragedAccuracy is { } taskAverage) metrics["task_averaged_accuracy"] = taskAverage;
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
                 Stats: new RunStats(
                     Total: result.QuestionResults.Count,
-                    Passed: result.QuestionResults.Count(q => q.Correct),
-                    Failed: result.QuestionResults.Count(q => !q.Correct),
-                    Warnings: 0),
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overall_accuracy"] = result.OverallAccuracy,
-                    ["task_averaged_accuracy"] = result.TaskAveragedAccuracy,
-                });
+                    Passed: result.QuestionResults.Count(q => q.Correct is true),
+                    Failed: result.QuestionResults.Count(q => q.Correct is false),
+                    Warnings: result.QuestionResults.Count(q => !q.Correct.HasValue)),
+                Metrics: metrics);
             await store.CompleteRunAsync(manifest, summary, ct);
 
             // Write the native ExternalBenchmarkResult JSON alongside the manifest.
@@ -222,8 +227,10 @@ public static class BenchLongMemEvalCommand
 
             Console.WriteLine();
             Console.WriteLine($"   Completed in {result.Duration.TotalSeconds:F1}s ({result.TotalLlmCalls} LLM calls)");
-            Console.WriteLine($"   Overall accuracy:        {result.OverallAccuracy:P1}  ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count})");
-            Console.WriteLine($"   Task-averaged accuracy:  {result.TaskAveragedAccuracy:P1}");
+            Console.WriteLine($"   Overall accuracy:        {FormatPercent(result.OverallAccuracy)}  ({result.CorrectQuestions}/{result.ScoredQuestions} scored, {result.SelectedQuestions} selected)");
+            Console.WriteLine($"   Task-averaged accuracy:  {FormatPercent(result.TaskAveragedAccuracy)}  ({result.ScoredTypeCount} scored types)");
+            Console.WriteLine($"   Inconclusive judgments:  {result.InconclusiveQuestions}");
+            Console.WriteLine($"   Agent failures:          {result.AgentFailureQuestions}");
             Console.WriteLine($"   Verdict:                 {verdict}");
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
@@ -236,6 +243,13 @@ public static class BenchLongMemEvalCommand
             return 1;
         }
 
-        return result.OverallAccuracy >= 0.5 ? ExitCodes.Success : ExitCodes.GateFailed;
+        return result.OverallAccuracy switch
+        {
+            null => ExitCodes.GateInconclusive,
+            >= 50.0 => ExitCodes.Success,
+            _ => ExitCodes.GateFailed
+        };
     }
+
+    private static string FormatPercent(double? value) => value is { } score ? $"{score:F1}%" : "n/a";
 }

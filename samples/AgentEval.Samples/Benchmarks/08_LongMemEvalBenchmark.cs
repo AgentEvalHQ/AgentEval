@@ -215,7 +215,7 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine();
         Console.Write("   Overall accuracy:      ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($"   ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count} correct)");
+        Console.WriteLine($"   ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)");
         Console.Write("   Task-averaged accuracy: ");
         PrintScore(result.TaskAveragedAccuracy);
         Console.WriteLine("   (macro-average across question types)");
@@ -329,9 +329,12 @@ public static class LongMemEvalBenchmarkSample
             var leaves = new List<EvalResult>(typeQuestions.Count);
             foreach (var q in typeQuestions)
             {
-                var leafScoreValue = q.Correct ? 1.0 : 0.0;
-                var leafLabel = q.Correct ? "pass" : "fail";
-                var leafSeverity = q.Correct ? "none" : "medium";
+                var leafScoreValue = q.Correct is true ? 1.0 : 0.0;
+                var leafLabel = q.Correct switch { true => "pass", false => "fail", null => "inconclusive" };
+                var leafSeverity = q.Correct switch { true => "none", false => "medium", null => "low" };
+                var dimensions = q.RawScore.HasValue
+                    ? new Dictionary<string, double> { ["rawScore"] = q.RawScore.Value }
+                    : new Dictionary<string, double>();
 
                 var evidence = new List<EvalEvidence>(3)
                 {
@@ -352,12 +355,12 @@ public static class LongMemEvalBenchmarkSample
                         Value: leafScoreValue,
                         Ordinal: null,
                         Label: leafLabel,
-                        Passed: q.Correct,
+                        Passed: q.Correct is true,
                         Threshold: 1.0,
                         Severity: leafSeverity,
                         Confidence: null),
                     Details: new EvalDetails(
-                        Dimensions: new Dictionary<string, double> { ["rawScore"] = q.RawScore },
+                        Dimensions: dimensions,
                         Evidence: evidence,
                         Recommendations: null,
                         SubResults: null,
@@ -374,10 +377,14 @@ public static class LongMemEvalBenchmarkSample
             }
 
             // Per-type composite (accuracy in 0..1 range — TypeResult.Accuracy is 0..100).
-            var typeAccuracy01 = typeResult.Accuracy / 100.0;
-            var typePassed = typeAccuracy01 >= passThreshold;
-            var typeLabel = typeAccuracy01 >= 0.7 ? "pass" : typeAccuracy01 >= passThreshold ? "warn" : "fail";
-            var typeSeverity = typeAccuracy01 >= 0.7 ? "none" : typeAccuracy01 >= passThreshold ? "low" : "medium";
+            var typeAccuracy01 = typeResult.Accuracy.GetValueOrDefault() / 100.0;
+            var typePassed = typeResult.Accuracy.HasValue && typeAccuracy01 >= passThreshold;
+            var typeLabel = !typeResult.Accuracy.HasValue
+                ? "inconclusive"
+                : typeAccuracy01 >= 0.7 ? "pass" : typeAccuracy01 >= passThreshold ? "warn" : "fail";
+            var typeSeverity = !typeResult.Accuracy.HasValue
+                ? "low"
+                : typeAccuracy01 >= 0.7 ? "none" : typeAccuracy01 >= passThreshold ? "low" : "medium";
 
             perTypeNodes.Add(new EvalResult(
                 Metric: new EvalMetadata(
@@ -415,10 +422,26 @@ public static class LongMemEvalBenchmarkSample
         }
 
         // Root composite (overall accuracy in 0..1).
-        var overall01 = result.OverallAccuracy / 100.0;
-        var overallPassed = overall01 >= passThreshold;
-        var overallLabel = overall01 >= 0.7 ? "pass" : overall01 >= passThreshold ? "warn" : "fail";
-        var overallSeverity = overall01 >= 0.7 ? "none" : overall01 >= passThreshold ? "low" : "medium";
+        var overall01 = result.OverallAccuracy.GetValueOrDefault() / 100.0;
+        var overallPassed = result.OverallAccuracy.HasValue && overall01 >= passThreshold;
+        var overallLabel = !result.OverallAccuracy.HasValue
+            ? "inconclusive"
+            : overall01 >= 0.7 ? "pass" : overall01 >= passThreshold ? "warn" : "fail";
+        var overallSeverity = !result.OverallAccuracy.HasValue
+            ? "low"
+            : overall01 >= 0.7 ? "none" : overall01 >= passThreshold ? "low" : "medium";
+
+        var rootDimensions = new Dictionary<string, double>
+        {
+            ["totalQuestions"] = result.QuestionResults.Count,
+            ["correctQuestions"] = result.QuestionResults.Count(q => q.Correct is true),
+            ["totalLlmCalls"] = result.TotalLlmCalls,
+            ["durationSeconds"] = result.Duration.TotalSeconds,
+        };
+        if (result.OverallAccuracy is { } overallAccuracy)
+            rootDimensions["overallAccuracy"] = overallAccuracy;
+        if (result.TaskAveragedAccuracy is { } taskAveragedAccuracy)
+            rootDimensions["taskAveragedAccuracy"] = taskAveragedAccuracy;
 
         return new EvalResult(
             Metric: new EvalMetadata(
@@ -435,15 +458,7 @@ public static class LongMemEvalBenchmarkSample
                 Severity: overallSeverity,
                 Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double>
-                {
-                    ["overallAccuracy"] = result.OverallAccuracy,
-                    ["taskAveragedAccuracy"] = result.TaskAveragedAccuracy,
-                    ["totalQuestions"] = result.QuestionResults.Count,
-                    ["correctQuestions"] = result.QuestionResults.Count(q => q.Correct),
-                    ["totalLlmCalls"] = result.TotalLlmCalls,
-                    ["durationSeconds"] = result.Duration.TotalSeconds,
-                },
+                Dimensions: rootDimensions,
                 Evidence: null,
                 Recommendations: new[]
                 {
@@ -463,11 +478,18 @@ public static class LongMemEvalBenchmarkSample
             EvaluatedAt: now);
     }
 
-    private static void PrintScore(double scorePercent)
+    private static void PrintScore(double? scorePercent)
     {
-        Console.ForegroundColor = scorePercent >= 70 ? ConsoleColor.Green :
-                                  scorePercent >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{scorePercent,5:F1}%");
+        if (scorePercent is not { } score)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  n/a ");
+            Console.ResetColor();
+            return;
+        }
+        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
+                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        Console.Write($"{score,5:F1}%");
         Console.ResetColor();
     }
 }

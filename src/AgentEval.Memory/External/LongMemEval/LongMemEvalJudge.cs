@@ -26,78 +26,174 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
     /// Judges a response using the type-specific prompt from the official LongMemEval evaluation.
     /// Returns binary yes/no matching the official scoring methodology.
     /// </summary>
+    public Task<ExternalJudgmentResult> JudgeAsync(
+        string agentResponse,
+        ExternalBenchmarkQuestion question,
+        CancellationToken ct = default)
+        => JudgeAsync(agentResponse, question, new ExternalBenchmarkOptions(), ct);
+
+    /// <summary>Judges a response with explicit bounded failure and diagnostic options.</summary>
     public async Task<ExternalJudgmentResult> JudgeAsync(
         string agentResponse,
         ExternalBenchmarkQuestion question,
+        ExternalBenchmarkOptions options,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(agentResponse);
         ArgumentNullException.ThrowIfNull(question);
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
 
         var judgePrompt = SelectPrompt(question, agentResponse);
+        var totalTokens = 0;
+        var attempts = 0;
+        ExternalJudgmentResult? lastResult = null;
 
-        try
+        while (attempts <= options.MaxJudgeRetries)
         {
-            var response = await _chatClient.GetResponseAsync(
-                [new ChatMessage(ChatRole.User, judgePrompt)],
-                new ChatOptions { Temperature = 0, MaxOutputTokens = 30 },
-                ct);
-
-            var rawResponseText = response.Text ?? string.Empty;
-            var normalizedResponseText = rawResponseText.Trim();
-
-            // Determine correctness based on the first token of the first non-empty line.
-            string? firstLine = null;
-            if (!string.IsNullOrEmpty(normalizedResponseText))
+            attempts++;
+            try
             {
-                var lineSeparators = new[] { '\r', '\n' };
-                var lines = normalizedResponseText.Split(lineSeparators, StringSplitOptions.RemoveEmptyEntries);
-                if (lines.Length > 0)
+                var response = await _chatClient.GetResponseAsync(
+                    [new ChatMessage(ChatRole.User, judgePrompt)],
+                    new ChatOptions { Temperature = 0, MaxOutputTokens = 30 },
+                    ct).ConfigureAwait(false);
+
+                totalTokens += (int)(response.Usage?.TotalTokenCount ?? 0);
+                var finishReason = response.FinishReason?.Value;
+                var status = ParseResponse(response.Text, finishReason);
+                var safeCode = finishReason?.ToLowerInvariant() switch
                 {
-                    firstLine = lines[0];
-                }
+                    "content_filter" => "content_filtered",
+                    "length" => "invalid_finish_reason",
+                    _ when status == JudgeOutcomeStatus.Empty => "empty_response",
+                    _ when status == JudgeOutcomeStatus.Invalid => "invalid_response",
+                    _ => null
+                };
+                lastResult = CreateResult(
+                    status, response.Text, attempts, totalTokens, options.JudgeEvidenceMode, safeCode);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var safeCode = ex is TimeoutException ? "timeout" : "provider_error";
+                _logger.LogWarning(
+                    "LongMemEval judge provider failure for question {QuestionId}: {FailureCode}",
+                    question.QuestionId,
+                    safeCode);
+                lastResult = CreateResult(
+                    JudgeOutcomeStatus.ProviderError,
+                    raw: null,
+                    attempts,
+                    totalTokens,
+                    options.JudgeEvidenceMode,
+                    safeCode);
             }
 
-            string? firstToken = null;
-            if (!string.IsNullOrEmpty(firstLine))
+            if (lastResult.Status is JudgeOutcomeStatus.Yes or JudgeOutcomeStatus.No)
+                return lastResult;
+
+            if (options.JudgeFailurePolicy == JudgeFailurePolicy.FailRun)
             {
-                // Split on any whitespace to get the first token ("yes"/"no"/etc.).
-                var tokens = firstLine.Split(Array.Empty<char>(), StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Length > 0)
-                {
-                    firstToken = tokens[0];
-                }
+                throw new LongMemEvalJudgeException(question.QuestionId, lastResult.Status);
             }
-
-            var correct = string.Equals(firstToken, "yes", StringComparison.OrdinalIgnoreCase);
-
-            var tokensUsed = (int)(response.Usage?.TotalTokenCount ?? 0);
-
-            _logger.LogDebug(
-                "LongMemEval judge [{QuestionId}] type={Type} correct={Correct} raw=\"{Raw}\"",
-                question.QuestionId, question.QuestionType, correct, normalizedResponseText);
-
-            return new ExternalJudgmentResult
-            {
-                Correct = correct,
-                RawScore = correct ? 100 : 0,
-                Explanation = $"Judge said: {normalizedResponseText}",
-                TokensUsed = tokensUsed
-            };
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Judge call failed for question {QuestionId}", question.QuestionId);
 
-            return new ExternalJudgmentResult
-            {
-                Correct = false,
-                RawScore = 0,
-                Explanation = $"Judge error: {ex.Message}"
-            };
-        }
+        return lastResult!;
     }
 
+    internal static JudgeOutcomeStatus ParseResponse(string? raw, string? finishReason = null)
+    {
+        if (string.Equals(finishReason, "length", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(finishReason, "content_filter", StringComparison.OrdinalIgnoreCase))
+            return JudgeOutcomeStatus.Invalid;
+
+        var text = raw?.Trim().TrimStart('\uFEFF').Trim();
+        if (string.IsNullOrWhiteSpace(text))
+            return JudgeOutcomeStatus.Empty;
+        if (text.Length > 16_384)
+            return JudgeOutcomeStatus.Invalid;
+
+        var tokenLength = 0;
+        while (tokenLength < text.Length && char.IsLetter(text[tokenLength]))
+            tokenLength++;
+        if (tokenLength == 0)
+            return JudgeOutcomeStatus.Invalid;
+
+        var firstToken = text[..tokenLength];
+        var status = firstToken.Equals("yes", StringComparison.OrdinalIgnoreCase)
+            ? JudgeOutcomeStatus.Yes
+            : firstToken.Equals("no", StringComparison.OrdinalIgnoreCase)
+                ? JudgeOutcomeStatus.No
+                : JudgeOutcomeStatus.Invalid;
+        if (status == JudgeOutcomeStatus.Invalid)
+            return status;
+
+        var opposite = status == JudgeOutcomeStatus.Yes ? "no" : "yes";
+        return ContainsWord(text[tokenLength..], opposite)
+            ? JudgeOutcomeStatus.Invalid
+            : status;
+    }
+
+    private static bool ContainsWord(string text, string expected)
+    {
+        var start = -1;
+        for (var i = 0; i <= text.Length; i++)
+        {
+            if (i < text.Length && char.IsLetter(text[i]))
+            {
+                if (start < 0)
+                    start = i;
+                continue;
+            }
+
+            if (start >= 0)
+            {
+                if (text.AsSpan(start, i - start).Equals(expected, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                start = -1;
+            }
+        }
+        return false;
+    }
+
+    private static ExternalJudgmentResult CreateResult(
+        JudgeOutcomeStatus status,
+        string? raw,
+        int attempts,
+        int totalTokens,
+        JudgeEvidenceMode evidenceMode,
+        string? safeFailureCode = null)
+    {
+        var normalized = raw?.Trim();
+        var boundedRaw = normalized is { Length: > 4096 } ? normalized[..4096] : normalized;
+        var explanation = evidenceMode switch
+        {
+            JudgeEvidenceMode.None => null,
+            JudgeEvidenceMode.Outcome => $"Judge outcome: {status}",
+            _ when !string.IsNullOrEmpty(boundedRaw) => $"Judge said: {boundedRaw}",
+            _ => $"Judge outcome: {status}"
+        };
+
+        return new ExternalJudgmentResult
+        {
+            Status = status,
+            Correct = status == JudgeOutcomeStatus.Yes
+                ? true
+                : status == JudgeOutcomeStatus.No ? false : null,
+            RawScore = status == JudgeOutcomeStatus.Yes
+                ? 100
+                : status == JudgeOutcomeStatus.No ? 0 : null,
+            Explanation = explanation,
+            TokensUsed = totalTokens,
+            LlmCallCount = attempts,
+            SafeFailureCode = safeFailureCode,
+            RawResponse = evidenceMode == JudgeEvidenceMode.Raw ? boundedRaw : null
+        };
+    }
     /// <summary>
     /// Selects the appropriate judge prompt template based on question type.
     /// Abstention is detected by _abs suffix in question_id (cross-type concern).
@@ -106,7 +202,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
     {
         // Abstention takes priority — it's a cross-type concern identified by question_id
         if (question.IsAbstention)
-            return LongMemEvalJudgePrompts.Abstention(question.Question, hypothesis);
+            return LongMemEvalJudgePrompts.Abstention(question.Question, question.GoldAnswer, hypothesis);
 
         return question.QuestionType switch
         {

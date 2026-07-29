@@ -102,6 +102,7 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
 
         // 1. Load data
         var entries = LoadEntries(options);
@@ -112,7 +113,6 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         var judge = new LongMemEvalJudge(_chatClient, NullLogger<LongMemEvalJudge>.Instance);
         var totalStopwatch = Stopwatch.StartNew();
         var questionResults = new List<QuestionResult>();
-        var totalLlmCalls = 0;
 
         // 2. Run each question
         for (int i = 0; i < entries.Count; i++)
@@ -177,52 +177,17 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             if (textBlobPrefix == null && !string.IsNullOrEmpty(entry.QuestionDate))
                 queryPrompt = $"Current Date: {entry.QuestionDate}\n\n{queryPrompt}";
 
+            AgentResponse response;
             try
             {
-                var response = await agent.InvokeAsync(queryPrompt, ct);
-                totalLlmCalls++;
-
-                // Judge (1 LLM call)
-                var question = new ExternalBenchmarkQuestion
-                {
-                    QuestionId = entry.QuestionId,
-                    QuestionType = entry.QuestionType,
-                    Question = entry.Question,
-                    GoldAnswer = entry.Answer,
-                    QuestionDate = entry.QuestionDate,
-                    IsAbstention = entry.IsAbstention
-                };
-
-                var judgment = await judge.JudgeAsync(response.Text, question, ct);
-                totalLlmCalls++;
-
-                qStopwatch.Stop();
-
-                questionResults.Add(new QuestionResult
-                {
-                    QuestionId = entry.QuestionId,
-                    QuestionType = entry.QuestionType,
-                    Question = entry.Question,
-                    GoldAnswer = entry.Answer,
-                    AgentResponse = response.Text,
-                    Correct = judgment.Correct,
-                    RawScore = judgment.RawScore,
-                    JudgeExplanation = judgment.Explanation,
-                    Duration = qStopwatch.Elapsed
-                });
-
-                var correctLabel = judgment.Correct ? "CORRECT" : "WRONG";
-                _logger.LogInformation(
-                    "[{Index}/{Total}] {Type,-30} {Correct}  ({Elapsed:F1}s)",
-                    i + 1, entries.Count, entry.QuestionType,
-                    correctLabel, qStopwatch.Elapsed.TotalSeconds);
+                response = await agent.InvokeAsync(queryPrompt, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 qStopwatch.Stop();
-                var errorMsg = ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
-                    ? "CONTENT_FILTER"
-                    : $"ERROR: {ex.Message}";
+                var safeCode = ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
+                    ? "content_filter"
+                    : "agent_error";
 
                 questionResults.Add(new QuestionResult
                 {
@@ -230,23 +195,74 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     QuestionType = entry.QuestionType,
                     Question = entry.Question,
                     GoldAnswer = entry.Answer,
-                    AgentResponse = $"[{errorMsg}]",
-                    Correct = false,
-                    RawScore = 0,
-                    JudgeExplanation = $"Skipped due to error: {ex.Message}",
+                    AgentResponse = $"[{safeCode.ToUpperInvariant()}]",
+                    Correct = null,
+                    RawScore = null,
+                    ExecutionStatus = QuestionExecutionStatus.AgentError,
+                    JudgeStatus = null,
+                    AgentLlmCallCount = 1,
+                    JudgeLlmCallCount = 0,
+                    SafeFailureCode = safeCode,
+                    JudgeExplanation = "Agent execution did not complete.",
                     Duration = qStopwatch.Elapsed
                 });
 
                 _logger.LogWarning(
                     "[{Index}/{Total}] {Type,-30} {Error} — {QuestionId}  ({Elapsed:F1}s)",
-                    i + 1, entries.Count, entry.QuestionType, errorMsg, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
+                    i + 1, entries.Count, entry.QuestionType, safeCode, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
+                continue;
             }
+
+            // Judge only after the agent has completed. Judge failures retain their own
+            // typed status and can never be misclassified as agent failures.
+            var question = new ExternalBenchmarkQuestion
+            {
+                QuestionId = entry.QuestionId,
+                QuestionType = entry.QuestionType,
+                Question = entry.Question,
+                GoldAnswer = entry.Answer,
+                QuestionDate = entry.QuestionDate,
+                IsAbstention = entry.IsAbstention
+            };
+
+            var judgment = await judge.JudgeAsync(response.Text, question, options, ct);
+
+            qStopwatch.Stop();
+            questionResults.Add(new QuestionResult
+            {
+                QuestionId = entry.QuestionId,
+                QuestionType = entry.QuestionType,
+                Question = entry.Question,
+                GoldAnswer = entry.Answer,
+                AgentResponse = response.Text,
+                Correct = judgment.Correct,
+                RawScore = judgment.RawScore,
+                ExecutionStatus = QuestionExecutionStatus.Completed,
+                JudgeStatus = judgment.Status,
+                AgentLlmCallCount = 1,
+                JudgeLlmCallCount = judgment.LlmCallCount,
+                JudgeTokensUsed = judgment.TokensUsed,
+                SafeFailureCode = judgment.SafeFailureCode,
+                JudgeExplanation = judgment.Explanation,
+                Duration = qStopwatch.Elapsed
+            });
+
+            var correctLabel = judgment.Status switch
+            {
+                JudgeOutcomeStatus.Yes => "CORRECT",
+                JudgeOutcomeStatus.No => "WRONG",
+                _ => $"INCONCLUSIVE ({judgment.Status})"
+            };
+            _logger.LogInformation(
+                "[{Index}/{Total}] {Type,-30} {Correct}  ({Elapsed:F1}s)",
+                i + 1, entries.Count, entry.QuestionType,
+                correctLabel, qStopwatch.Elapsed.TotalSeconds);
         }
 
         totalStopwatch.Stop();
 
         // 3. Aggregate results
-        return AggregateResults(questionResults, options, totalStopwatch.Elapsed, totalLlmCalls);
+        return AggregateResults(questionResults, options, totalStopwatch.Elapsed);
     }
 
     private IReadOnlyList<LongMemEvalEntry> LoadEntries(ExternalBenchmarkOptions options)
@@ -265,9 +281,15 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     private ExternalBenchmarkResult AggregateResults(
         List<QuestionResult> questionResults,
         ExternalBenchmarkOptions options,
-        TimeSpan duration,
-        int totalLlmCalls)
+        TimeSpan duration)
     {
+        bool IsScored(QuestionResult question) =>
+            question.Correct.HasValue ||
+            (options.JudgeFailurePolicy == JudgeFailurePolicy.RetryThenIncorrect &&
+             question.ExecutionStatus == QuestionExecutionStatus.Completed &&
+             question.JudgeStatus is not JudgeOutcomeStatus.Yes and
+                 not JudgeOutcomeStatus.No);
+
         // Per-type results: group by the 6 original question types.
         // Abstention questions (_abs suffix) stay in their original type for per-type reporting,
         // matching the official LongMemEval evaluation methodology.
@@ -279,20 +301,40 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 {
                     TypeName = g.Key,
                     TotalQuestions = g.Count(),
-                    CorrectQuestions = g.Count(q => q.Correct),
+                    CorrectQuestions = g.Count(q => q.Correct is true),
+                    ScoredQuestions = g.Count(IsScored),
+                    InconclusiveQuestions = g.Count(q =>
+                        q.ExecutionStatus == QuestionExecutionStatus.Completed &&
+                        !q.Correct.HasValue),
+                    AgentFailureQuestions = g.Count(q =>
+                        q.ExecutionStatus == QuestionExecutionStatus.AgentError),
                     Duration = TimeSpan.FromTicks(g.Sum(q => q.Duration.Ticks))
                 });
 
         // Micro-average (overall)
-        var totalCorrect = questionResults.Count(q => q.Correct);
-        var overallAccuracy = questionResults.Count > 0
-            ? (double)totalCorrect / questionResults.Count * 100
-            : 0;
+        var totalCorrect = questionResults.Count(q => q.Correct is true);
+        var totalIncorrect = questionResults.Count(q => q.Correct is false);
+        var totalScored = questionResults.Count(IsScored);
+        double? overallAccuracy = totalScored > 0
+            ? (double)totalCorrect / totalScored * 100
+            : null;
 
-        // Macro-average (task-averaged: mean of per-type accuracies across the 6 types)
-        var taskAveraged = perType.Count > 0
-            ? perType.Values.Average(t => t.Accuracy)
-            : 0;
+        // Macro-average only includes types with a defined denominator.
+        var scoredTypeAccuracies = perType.Values
+            .Select(t => t.Accuracy)
+            .Where(a => a.HasValue)
+            .Select(a => a!.Value)
+            .ToList();
+        double? taskAveraged = scoredTypeAccuracies.Count > 0
+            ? scoredTypeAccuracies.Average()
+            : null;
+        var agentCompleted = questionResults.Count(q =>
+            q.ExecutionStatus == QuestionExecutionStatus.Completed);
+        var inconclusive = questionResults.Count(q =>
+            q.ExecutionStatus == QuestionExecutionStatus.Completed && !q.Correct.HasValue);
+        var agentFailures = questionResults.Count - agentCompleted;
+        var totalLlmCalls = questionResults.Sum(q =>
+            q.AgentLlmCallCount + q.JudgeLlmCallCount);
 
         return new ExternalBenchmarkResult
         {
@@ -304,6 +346,15 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             TaskAveragedAccuracy = taskAveraged,
             PerTypeResults = perType,
             QuestionResults = questionResults,
+            SelectedQuestions = questionResults.Count,
+            AgentCompletedQuestions = agentCompleted,
+            ScoredQuestions = totalScored,
+            CorrectQuestions = totalCorrect,
+            IncorrectQuestions = totalIncorrect,
+            InconclusiveQuestions = inconclusive,
+            AgentFailureQuestions = agentFailures,
+            JudgeFailureRate = agentCompleted > 0 ? (double)inconclusive / agentCompleted : null,
+            ScoredTypeCount = scoredTypeAccuracies.Count,
             Duration = duration,
             TotalLlmCalls = totalLlmCalls,
             Options = options

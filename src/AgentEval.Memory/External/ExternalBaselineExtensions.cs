@@ -37,12 +37,18 @@ public static class ExternalBaselineExtensions
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(config);
 
-        var categoryResults = result.PerTypeResults.ToDictionary(
-            kvp => kvp.Key,
-            kvp => new CategoryScoreEntry
+        if (result.OverallAccuracy is not { } overallScore)
+            throw new InvalidOperationException(
+                "Cannot create a scored MemoryBaseline from an external benchmark with no scored questions.");
+
+        var categoryResults = result.PerTypeResults
+            .Where(kvp => kvp.Value.Accuracy.HasValue)
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => new CategoryScoreEntry
             {
-                Score = kvp.Value.Accuracy,
-                Grade = ComputeGrade(kvp.Value.Accuracy),
+                Score = kvp.Value.Accuracy!.Value,
+                Grade = ComputeGrade(kvp.Value.Accuracy.Value),
                 Skipped = false,
                 ScenarioCount = kvp.Value.TotalQuestions
             });
@@ -50,8 +56,6 @@ public static class ExternalBaselineExtensions
         var dimensionScores = pentagonMapperFull?.Invoke(result.PerTypeResults, result.QuestionResults)
             ?? pentagonMapper?.Invoke(result.PerTypeResults)
             ?? new Dictionary<string, double>();
-
-        var overallScore = result.OverallAccuracy;
 
         return new MemoryBaseline
         {
@@ -87,13 +91,18 @@ public static class ExternalBaselineExtensions
 
         foreach (var (typeName, typeResult) in result.PerTypeResults)
         {
-            if (typeResult.Accuracy < 50)
-                recs.Add($"{typeName}: accuracy {typeResult.Accuracy:F0}% is below 50% — review agent's handling of this question type.");
-            else if (typeResult.Accuracy < 70)
-                recs.Add($"{typeName}: accuracy {typeResult.Accuracy:F0}% is moderate — consider improving recall for this category.");
+            if (typeResult.Accuracy is not { } accuracy)
+                continue;
+
+            if (accuracy < 50)
+                recs.Add($"{typeName}: accuracy {accuracy:F0}% is below 50% — review agent's handling of this question type.");
+            else if (accuracy < 70)
+                recs.Add($"{typeName}: accuracy {accuracy:F0}% is moderate — consider improving recall for this category.");
         }
 
-        if (result.OverallAccuracy < result.TaskAveragedAccuracy - 5)
+        if (result.OverallAccuracy is { } overall &&
+            result.TaskAveragedAccuracy is { } taskAverage &&
+            overall < taskAverage - 5)
             recs.Add("Overall accuracy is lower than task-averaged — performance is weaker on high-volume question types.");
 
         return recs;

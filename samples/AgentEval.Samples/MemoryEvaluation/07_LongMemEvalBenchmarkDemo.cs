@@ -131,7 +131,7 @@ public static class LongMemEvalBenchmarkDemo
 
         Console.Write($"   Overall accuracy:      ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($" ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count} correct)\n");
+        Console.WriteLine($" ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)\n");
 
         Console.Write($"   Task-averaged accuracy: ");
         PrintScore(result.TaskAveragedAccuracy);
@@ -176,11 +176,18 @@ public static class LongMemEvalBenchmarkDemo
         PrintKeyTakeaways();
     }
 
-    private static void PrintScore(double score)
+    private static void PrintScore(double? score)
     {
-        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
-                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{score,5:F1}%");
+        if (score is not { } value)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  n/a ");
+            Console.ResetColor();
+            return;
+        }
+        Console.ForegroundColor = value >= 70 ? ConsoleColor.Green :
+                                  value >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        Console.Write($"{value,5:F1}%");
         Console.ResetColor();
     }
 
