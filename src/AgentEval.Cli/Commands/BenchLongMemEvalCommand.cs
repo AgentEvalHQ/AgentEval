@@ -26,15 +26,16 @@ namespace AgentEval.Cli.Commands;
 /// canonical run manifest. A human-readable summary lands in <c>report.md</c>.
 ///
 /// <para>
-/// REQUIRES Azure OpenAI (the runner makes ~2 LLM calls per question). All three
+/// REQUIRES Azure OpenAI. The runner normally makes one answer call plus one judge
+/// call per question, with bounded judge retries increasing the total. All three
 /// <c>AZURE_OPENAI_*</c> env vars must be set; there is no stub fallback because
 /// LongMemEval's correctness signal IS the LLM grader.
 /// </para>
 ///
 /// <para>
 /// The AuditGrade / Full preset additionally requires <c>LONGMEMEVAL_DATASET_PATH</c>
-/// pointing at the full ~500-question dataset (the canonical bundled file ships only the
-/// Subset; cf. <see cref="LongMemEvalDataLoader.DatasetPathEnvVar"/>). When unset, the
+/// pointing at the full ~500-question dataset. No dataset is bundled; the subset preset
+/// can also resolve the canonical local path. When the full-path variable is unset, the
 /// command exits cleanly with a clear download-instructions message.
 /// </para>
 /// </remarks>
@@ -203,12 +204,15 @@ public static class BenchLongMemEvalCommand
                 _ => "FAIL"
             };
             var metrics = new Dictionary<string, double>();
+            // The canonical RunSummary schema uses WARN for indeterminate runs.
+            // Keep the more precise INCONCLUSIVE label in LongMemEval's console/native surfaces.
+            var summaryVerdict = result.OverallAccuracy.HasValue ? verdict : "WARN";
             if (result.OverallAccuracy is { } overall) metrics["overall_accuracy"] = overall;
             if (result.TaskAveragedAccuracy is { } taskAverage) metrics["task_averaged_accuracy"] = taskAverage;
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
-                Verdict: verdict,
+                Verdict: summaryVerdict,
                 Stats: new RunStats(
                     Total: result.QuestionResults.Count,
                     Passed: result.QuestionResults.Count(q => q.Correct is true),

@@ -150,12 +150,11 @@ public static class LongMemEvalBaselineRepro
 
         Console.WriteLine("Step 3: Results vs Paper Baselines\n");
 
-        var correct = result.QuestionResults.Count(q => q.Correct is true);
-        var total = result.QuestionResults.Count;
-
         Console.Write($"   Your result ({modelDeployment}): ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($" ({correct}/{total} correct)");
+        Console.WriteLine(
+            $" ({result.CorrectQuestions}/{result.ScoredQuestions} scored, " +
+            $"{result.SelectedQuestions} selected, {result.InconclusiveQuestions} inconclusive)");
 
         Console.Write($"   Task-averaged:               ");
         PrintScore(result.TaskAveragedAccuracy);

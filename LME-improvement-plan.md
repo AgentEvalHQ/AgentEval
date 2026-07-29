@@ -84,10 +84,10 @@ becomes `100%` only after its focused tests pass and its task review has fixed a
 | 3 | 3.2 | Add retrieval-bypassing oracle reader using the answer client | L | 100 | ✅ | 3.1 | Direct isolated chat path clears per-question state and records declared/reported model identity |
 | 3 | 3.3 | Add paired normal/oracle result without score mixing | M | 100 | ✅ | 3.2 | One frozen ID set; normal completes first; separate results, counters, evidence, and diagnostic gap |
 | 3 | 3.R | Oracle integrity review | M | 100 | ✅ | 3.1–3.3 | 9 focused tests; 581 tests × 3 TFMs pass; metadata capture hardened and solution builds |
-| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 70 | — | 1.R | Runtime fix complete; command-level mixed/null tests remain |
-| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 40 | — | 1.R, 2.R | Nullable consumers compile; tri-state synthesized-report design remains |
-| 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 0 | — | 3.R, 4.1–4.2 | Correct labels, limitations, and examples |
-| 4 | 4.R | Reporting and documentation review | S | 0 | — | 4.1–4.3 | JSON snapshots and rendered console output |
+| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 100 | ✅ | 1.R | Mixed and zero-scored command tests verify 0–100 output, scored denominators, WARN persistence, and inconclusive exit |
+| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 100 | ✅ | 1.R, 2.R | Reusable content-free adapter, explicit status/count dimensions, warning aggregation, and opt-in sensitive sample-native report |
+| 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 100 | ✅ | 3.R, 4.1–4.2 | Correct six labels, scales, policies, evidence adapter, paired oracle, ownership, privacy, and migration documented |
+| 4 | 4.R | Reporting and documentation review | S | 100 | ✅ | 4.1–4.3 | 2 CLI + 41 evidence/report tests passed; samples build clean; DocFX build succeeded; review hardened thresholds and status sanitization |
 | 5 | 5.1 | Run full offline test suite across supported TFMs | M | 75 | — | 4.R | Memory: 581 tests × 3 TFMs pass after Phase 3; solution builds; final full-solution tests remain |
 | 5 | 5.2 | Run authorized live diagnostic and oracle comparison | M | 0 | — | 5.1 | Record model/deployment identity; never persist secrets |
 | 5 | 5.3 | Final API, security, and migration review | M | 0 | — | 5.1–5.2 | Review only changed code and affected consumers |

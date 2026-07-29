@@ -117,7 +117,7 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine($"   Questions: {options.MaxQuestions} (stratified from 500)");
         Console.WriteLine($"   Mode: {options.DatasetMode} (~115K tokens per question)");
         Console.WriteLine($"   Session boundaries: preserved  |  Timestamps: included");
-        Console.WriteLine($"   Judge: 5 type-specific prompts matching official eval\n");
+        Console.WriteLine($"   Judge: 4 task-specific prompt templates covering 6 dataset labels\n");
 
         var result = await runner.RunAsync(agent, config, options);
 
@@ -200,7 +200,7 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine("Research-grade memory evaluation using LongMemEval (ICLR 2025, MIT).");
         Console.WriteLine("Uses the new External Benchmark framework with:");
         Console.WriteLine("  - Stratified sampling across all 6 question types");
-        Console.WriteLine("  - 5 type-specific judge prompts (official methodology)");
+        Console.WriteLine("  - 4 task-specific judge prompt templates (official methodology)");
         Console.WriteLine("  - Session boundary + timestamp preservation");
         Console.WriteLine("  - Binary scoring comparable to published results");
         Console.WriteLine();

@@ -41,6 +41,11 @@ public sealed class QuestionEvidenceEnvelope
     /// <summary>Supported schema version.</summary>
     public const string CurrentSchemaVersion = "1.0";
 
+    /// <summary>
+    /// Reserved <c>AgentResponse.AdditionalProperties</c> key used by adapters.
+    /// </summary>
+    public const string AdditionalPropertiesKey = "agenteval.question_evidence.v1";
+
     /// <summary>Maximum references accepted in either list.</summary>
     public const int MaximumReferences = 100;
 

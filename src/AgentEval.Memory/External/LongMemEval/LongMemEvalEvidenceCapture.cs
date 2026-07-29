@@ -13,7 +13,8 @@ namespace AgentEval.Memory.External.LongMemEval;
 /// </summary>
 internal static class LongMemEvalEvidenceCapture
 {
-    internal const string ReservedPropertyKey = "agenteval.question_evidence.v1";
+    internal const string ReservedPropertyKey =
+        QuestionEvidenceEnvelope.AdditionalPropertiesKey;
 
     private static readonly JsonSerializerOptions StrictJsonOptions = new()
     {
