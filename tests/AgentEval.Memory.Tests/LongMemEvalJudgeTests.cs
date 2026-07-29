@@ -314,6 +314,68 @@ public class LongMemEvalJudgeTests
         Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
     }
 
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(2.1)]
+    [InlineData(double.NaN)]
+    public void Validate_InvalidJudgeTemperature_Throws(double temperature)
+    {
+        var options = new ExternalBenchmarkOptions { JudgeTemperature = temperature };
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+
+        Assert.Equal(nameof(ExternalBenchmarkOptions.JudgeTemperature), error.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4097)]
+    public void Validate_InvalidJudgeOutputBudget_Throws(int maxOutputTokens)
+    {
+        var options = new ExternalBenchmarkOptions { JudgeMaxOutputTokens = maxOutputTokens };
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+
+        Assert.Equal(nameof(ExternalBenchmarkOptions.JudgeMaxOutputTokens), error.ParamName);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_DefaultOptions_OmitsTemperatureAndUsesReasoningSafeOutputBudget()
+    {
+        var client = new SequenceChatClient(Response("yes"));
+        var judge = new LongMemEvalJudge(client, NullLogger<LongMemEvalJudge>.Instance);
+
+        var result = await judge.JudgeAsync(
+            "answer",
+            Question(),
+            new ExternalBenchmarkOptions { MaxJudgeRetries = 0 });
+
+        Assert.Equal(JudgeOutcomeStatus.Yes, result.Status);
+        Assert.NotNull(client.LastOptions);
+        Assert.Null(client.LastOptions.Temperature);
+        Assert.Equal(256, client.LastOptions.MaxOutputTokens);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_ConfiguredTemperature_PropagatesToProvider()
+    {
+        var client = new SequenceChatClient(Response("yes"));
+        var judge = new LongMemEvalJudge(client, NullLogger<LongMemEvalJudge>.Instance);
+
+        await judge.JudgeAsync(
+            "answer",
+            Question(),
+            new ExternalBenchmarkOptions
+            {
+                MaxJudgeRetries = 0,
+                JudgeTemperature = 0.2,
+                JudgeMaxOutputTokens = 512
+            });
+
+        Assert.Equal(0.2f, client.LastOptions!.Temperature);
+        Assert.Equal(512, client.LastOptions.MaxOutputTokens);
+    }
+
     private static LongMemEvalJudge CreateJudge(params Func<ChatResponse>[] sequence)
         => new(new SequenceChatClient(sequence), NullLogger<LongMemEvalJudge>.Instance);
 
@@ -346,6 +408,8 @@ public class LongMemEvalJudgeTests
     {
         private readonly Queue<Func<ChatResponse>> _sequence = new(sequence);
 
+        public ChatOptions? LastOptions { get; private set; }
+
         public ChatClientMetadata Metadata { get; } = new("sequence", new Uri("http://localhost"));
 
         public Task<ChatResponse> GetResponseAsync(
@@ -353,6 +417,7 @@ public class LongMemEvalJudgeTests
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
+            LastOptions = options;
             if (_sequence.Count == 0)
                 throw new InvalidOperationException("No response configured.");
             return Task.FromResult(_sequence.Dequeue().Invoke());

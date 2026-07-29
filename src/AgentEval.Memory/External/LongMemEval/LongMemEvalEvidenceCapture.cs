@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Buffers;
 using System.Text.Json;
 using AgentEval.Core;
 using AgentEval.Memory.External.Models;
@@ -78,10 +79,23 @@ internal static class LongMemEvalEvidenceCapture
         QuestionEvidenceEnvelope envelope => envelope,
         string json when json.Length <= QuestionEvidenceEnvelope.MaximumSerializedLength =>
             JsonSerializer.Deserialize<QuestionEvidenceEnvelope>(json, StrictJsonOptions),
-        JsonElement element when element.GetRawText().Length <= QuestionEvidenceEnvelope.MaximumSerializedLength =>
-            element.Deserialize<QuestionEvidenceEnvelope>(StrictJsonOptions),
+        JsonElement element => DeserializeBounded(element),
         _ => null
     };
+
+    private static QuestionEvidenceEnvelope? DeserializeBounded(JsonElement element)
+    {
+        var buffer = new BoundedJsonBufferWriter(
+            QuestionEvidenceEnvelope.MaximumSerializedLength);
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            element.WriteTo(writer);
+        }
+
+        return JsonSerializer.Deserialize<QuestionEvidenceEnvelope>(
+            buffer.WrittenSpan,
+            StrictJsonOptions);
+    }
 
     private static EvidenceValidationResult ValidateAndCopy(
         QuestionEvidenceEnvelope source,
@@ -318,6 +332,46 @@ internal static class LongMemEvalEvidenceCapture
         QuestionEvidenceEnvelope? Envelope,
         QuestionEvidenceDiagnostics? Diagnostics);
 
+    private sealed class BoundedJsonBufferWriter : IBufferWriter<byte>
+    {
+        private readonly byte[] _buffer;
+        private int _written;
+
+        internal BoundedJsonBufferWriter(int maximumLength)
+        {
+            _buffer = new byte[maximumLength];
+        }
+
+        internal ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
+
+        public void Advance(int count)
+        {
+            if (count < 0 || count > _buffer.Length - _written)
+                throw new JsonException("Evidence JSON exceeds the configured bound.");
+            _written += count;
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            EnsureAvailable(sizeHint);
+            return _buffer.AsMemory(_written);
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            EnsureAvailable(sizeHint);
+            return _buffer.AsSpan(_written);
+        }
+
+        private void EnsureAvailable(int sizeHint)
+        {
+            if (sizeHint < 0)
+                throw new ArgumentOutOfRangeException(nameof(sizeHint));
+            var required = Math.Max(sizeHint, 1);
+            if (required > _buffer.Length - _written)
+                throw new JsonException("Evidence JSON exceeds the configured bound.");
+        }
+    }
     private sealed record EvidenceValidationResult(
         QuestionEvidenceEnvelope? Envelope,
         string? SafeFailureCode)

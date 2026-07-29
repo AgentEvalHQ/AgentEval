@@ -75,6 +75,27 @@ public sealed class LongMemEvalEvidenceSecurityTests
     };
 
     [Fact]
+    public void Capture_OversizedJsonElement_RejectsThroughBoundedWriter()
+    {
+        var oversized = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = QuestionEvidenceEnvelope.CurrentSchemaVersion,
+            Retrieved = Array.Empty<object>(),
+            AnswerContext = Array.Empty<object>(),
+            Padding = new string(
+                'x',
+                QuestionEvidenceEnvelope.MaximumSerializedLength)
+        });
+        using var document = JsonDocument.Parse(oversized);
+
+        var result = Capture(ResponseWith(document.RootElement));
+
+        Assert.Null(result.Envelope);
+        Assert.Equal(EvidenceObservationStatus.Invalid, result.Diagnostics!.Status);
+        Assert.Equal("invalid_evidence_schema", result.Diagnostics.SafeFailureCode);
+    }
+
+    [Fact]
     public void Capture_ControlCharacterInIdentifier_RejectsDeterministically()
     {
         var envelope = new QuestionEvidenceEnvelope

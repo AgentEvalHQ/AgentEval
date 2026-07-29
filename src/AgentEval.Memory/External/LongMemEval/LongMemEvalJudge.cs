@@ -56,7 +56,11 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             {
                 var response = await _chatClient.GetResponseAsync(
                     [new ChatMessage(ChatRole.User, judgePrompt)],
-                    new ChatOptions { Temperature = 0, MaxOutputTokens = 30 },
+                    new ChatOptions
+                    {
+                        Temperature = (float?)options.JudgeTemperature,
+                        MaxOutputTokens = options.JudgeMaxOutputTokens
+                    },
                     ct).ConfigureAwait(false);
 
                 totalTokens += (int)(response.Usage?.TotalTokenCount ?? 0);

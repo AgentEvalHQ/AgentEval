@@ -71,6 +71,18 @@ public class ExternalBenchmarkOptions
     /// <summary>Maximum retry count after the initial judge attempt. Valid range: 0-3.</summary>
     public int MaxJudgeRetries { get; init; } = 1;
 
+    /// <summary>
+    /// Optional judge sampling temperature. Null uses the provider/model default and is
+    /// compatible with deployments that reject explicit temperature values.
+    /// </summary>
+    public double? JudgeTemperature { get; init; }
+
+    /// <summary>
+    /// Maximum judge output-token budget. Includes reasoning tokens on reasoning models.
+    /// Valid range: 1-4096. Default: 256.
+    /// </summary>
+    public int JudgeMaxOutputTokens { get; init; } = 256;
+
     /// <summary>Controls diagnostic evidence retained from judge responses.</summary>
     public JudgeEvidenceMode JudgeEvidenceMode { get; init; } = JudgeEvidenceMode.Outcome;
 
@@ -97,6 +109,19 @@ public class ExternalBenchmarkOptions
             throw new ArgumentOutOfRangeException(
                 nameof(MaxJudgeRetries), MaxJudgeRetries,
                 $"MaxJudgeRetries must be between 0 and {MaximumJudgeRetries}.");
+        }
+        if (JudgeTemperature is { } temperature &&
+            (!double.IsFinite(temperature) || temperature is < 0 or > 2))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(JudgeTemperature), JudgeTemperature,
+                "JudgeTemperature must be null or a finite value between 0 and 2.");
+        }
+        if (JudgeMaxOutputTokens is < 1 or > 4096)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(JudgeMaxOutputTokens), JudgeMaxOutputTokens,
+                "JudgeMaxOutputTokens must be between 1 and 4096.");
         }
         if (EvidenceTopK is < 1 or > QuestionEvidenceEnvelope.MaximumReferences)
         {

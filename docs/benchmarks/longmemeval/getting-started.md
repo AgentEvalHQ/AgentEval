@@ -131,6 +131,13 @@ Configure `ExternalBenchmarkOptions.JudgeFailurePolicy`:
 into an inconclusive result. Provider exceptions are represented by bounded safe
 failure codes; provider messages and secrets are not copied into result fields.
 
+`JudgeTemperature` defaults to `null`, which uses the provider/model default.
+Set an explicit value only when the deployment supports it; some reasoning
+deployments reject explicit temperature. `JudgeMaxOutputTokens` defaults to 256
+and includes reasoning tokens on reasoning models. A very small budget can
+produce empty or truncated judgments even when the visible answer should be only
+`yes` or `no`.
+
 Configure retained judge information separately:
 
 | `JudgeEvidenceMode` | Retained judge information |
@@ -180,6 +187,8 @@ var options = new ExternalBenchmarkOptions
     RandomSeed = 42,
     JudgeFailurePolicy = JudgeFailurePolicy.RetryThenInconclusive,
     MaxJudgeRetries = 1,
+    JudgeTemperature = null,       // provider default; widest model compatibility
+    JudgeMaxOutputTokens = 256,    // includes reasoning tokens
     JudgeEvidenceMode = JudgeEvidenceMode.Outcome,
     EvidenceCaptureMode = EvidenceCaptureMode.References,
 };
@@ -333,15 +342,18 @@ When upgrading from the earlier LongMemEval implementation:
    `ExecutionStatus`, and safe failure codes.
 4. Choose a `JudgeFailurePolicy`; the new default is
    `RetryThenInconclusive` with one retry.
-5. Update percent output from `{score:P1}` to `{score:F1}%`.
-6. If you emit retrieval diagnostics, use
+5. Remove assumptions that every judge deployment accepts `Temperature=0`.
+   Leave `JudgeTemperature` null or configure it explicitly after a provider
+   compatibility check, and budget reasoning tokens with `JudgeMaxOutputTokens`.
+6. Update percent output from `{score:P1}` to `{score:F1}%`.
+7. If you emit retrieval diagnostics, use
    `QuestionEvidenceEnvelope.AdditionalPropertiesKey` and choose an
    `EvidenceCaptureMode`. `Full` is an explicit content-persistence decision.
-7. Use `RunPairedAsync` for oracle diagnostics; do not combine oracle questions,
+8. Use `RunPairedAsync` for oracle diagnostics; do not combine oracle questions,
    scores, evidence, or calls with the normal result.
-8. Expect zero-scored CLI runs to return `GateInconclusive`; canonical summaries
+9. Expect zero-scored CLI runs to return `GateInconclusive`; canonical summaries
    encode that supported state as `WARN`.
-9. Access-control `report-native.json`. Prefer
+10. Access-control `report-native.json`. Prefer
    `LongMemEvalEvalResultAdapter` for content-free generic reports.
 
 No retrieval implementation moved into AgentEval. Existing AgentMemory storage,
@@ -362,4 +374,6 @@ application's responsibility.
 
 See also [Memory benchmark](../memory/getting-started.md), the
 [CLI reference](../../cli.md), and the
-[LongMemEval paper](https://arxiv.org/abs/2410.10813).
+[LongMemEval paper](https://arxiv.org/abs/2410.10813). The
+[2026-07-29 live validation](live-validation-2026-07-29.md) records the
+provider-compatibility and judge-reliability calibration for this release.

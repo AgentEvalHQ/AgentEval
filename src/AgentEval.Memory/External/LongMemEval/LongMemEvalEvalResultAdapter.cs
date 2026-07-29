@@ -111,7 +111,16 @@ public static class LongMemEvalEvalResultAdapter
             ["scoredTypeCount"] = result.ScoredTypeCount,
             ["totalLlmCalls"] = result.TotalLlmCalls,
             ["durationSeconds"] = result.Duration.TotalSeconds,
+            ["judgeFailurePolicy"] = (int)result.Options.JudgeFailurePolicy,
+            ["maxJudgeRetries"] = result.Options.MaxJudgeRetries,
+            ["judgeTemperatureConfigured"] = result.Options.JudgeTemperature.HasValue ? 1 : 0,
+            ["judgeMaxOutputTokens"] = result.Options.JudgeMaxOutputTokens,
+            ["judgeEvidenceMode"] = (int)result.Options.JudgeEvidenceMode,
+            ["evidenceCaptureMode"] = (int)result.Options.EvidenceCaptureMode,
+            ["evidenceTopK"] = result.Options.EvidenceTopK,
         };
+        if (result.Options.JudgeTemperature is { } judgeTemperature)
+            rootDimensions["judgeTemperature"] = judgeTemperature;
         if (overallAccuracy is { } overallAccuracyPercent)
             rootDimensions["overallAccuracyPercent"] = overallAccuracyPercent;
         if (result.TaskAveragedAccuracy is { } taskAveragedAccuracyPercent)

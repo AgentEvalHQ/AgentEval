@@ -207,6 +207,14 @@ public static class BenchLongMemEvalCommand
             // The canonical RunSummary schema uses WARN for indeterminate runs.
             // Keep the more precise INCONCLUSIVE label in LongMemEval's console/native surfaces.
             var summaryVerdict = result.OverallAccuracy.HasValue ? verdict : "WARN";
+            metrics["judge_failure_policy"] = (int)options.JudgeFailurePolicy;
+            metrics["max_judge_retries"] = options.MaxJudgeRetries;
+            metrics["judge_temperature_configured"] = options.JudgeTemperature.HasValue ? 1 : 0;
+            metrics["judge_max_output_tokens"] = options.JudgeMaxOutputTokens;
+            metrics["judge_evidence_mode"] = (int)options.JudgeEvidenceMode;
+            metrics["evidence_capture_mode"] = (int)options.EvidenceCaptureMode;
+            metrics["evidence_top_k"] = options.EvidenceTopK;
+            if (options.JudgeTemperature is { } temperature) metrics["judge_temperature"] = temperature;
             if (result.OverallAccuracy is { } overall) metrics["overall_accuracy"] = overall;
             if (result.TaskAveragedAccuracy is { } taskAverage) metrics["task_averaged_accuracy"] = taskAverage;
             var summary = new RunSummary(

@@ -8,8 +8,9 @@
 namespace AgentEval.Memory.External.LongMemEval;
 
 /// <summary>
-/// The 5 type-specific judge prompt templates matching the official LongMemEval benchmark.
-/// Each template expects the judge to respond with "yes" or "no".
+/// Four question-family judge templates plus the cross-cutting abstention template,
+/// adapted from the official LongMemEval benchmark. Each template expects the judge
+/// to respond with "yes" or "no".
 /// </summary>
 internal static class LongMemEvalJudgePrompts
 {

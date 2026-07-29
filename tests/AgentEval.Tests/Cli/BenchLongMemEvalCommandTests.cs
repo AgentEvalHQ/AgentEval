@@ -51,6 +51,10 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Equal(1, stats.GetProperty("passed").GetInt32());
         Assert.Equal(1, stats.GetProperty("failed").GetInt32());
         Assert.Equal(1, stats.GetProperty("warnings").GetInt32());
+        var metrics = summary.RootElement.GetProperty("metrics");
+        Assert.Equal(256, metrics.GetProperty("judge_max_output_tokens").GetDouble());
+        Assert.Equal(0, metrics.GetProperty("judge_temperature_configured").GetDouble());
+        Assert.Equal(0, metrics.GetProperty("evidence_capture_mode").GetDouble());
 
         var native = JsonSerializer.Deserialize<ExternalBenchmarkResult>(
             await File.ReadAllTextAsync(Path.Combine(runDirectory, "report-native.json")));
