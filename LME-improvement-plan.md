@@ -1,6 +1,6 @@
 # LongMemEval trustworthiness and diagnostics improvement plan
 
-> **Status:** ready for implementation; analysis and design only
+> **Status:** implementation in progress on `codex/longmemeval-trustworthiness`
 > **Prepared:** 2026-07-29
 > **Target baseline:** AgentEval `0.16.0-beta`
 > **Scope:** AgentEval's .NET LongMemEval runner, judge, result contracts, reporting, tests, samples, and documentation
@@ -67,31 +67,31 @@ becomes `100%` only after its focused tests pass and its task review has fixed a
 
 | Phase | Task | Description | Effort | % Done | Reviewed | Depends on | Implementation notes |
 |---|---|---|---:|---:|:---:|---|---|
-| 0 | 0.1 | Freeze current successful-result JSON and public API baselines | S | 0 | — | — | Golden fixtures must cover both `yes` and `no` |
-| 0 | 0.2 | Add red-first judge, runner, leakage, evidence, and compatibility tests | M | 0 | — | 0.1 | Tests must fail for the current reason, not incidental formatting |
-| 0 | 0.R | Contract and threat-model review | S | 0 | — | 0.1–0.2 | Gates coding promotion into Phase 1 |
-| 1 | 1.1 | Add typed judge outcomes and validated judge options | M | 0 | — | 0.R | Nullable binary result; bounded retry validation |
-| 1 | 1.2 | Extract strict response parser and align official prompts | M | 0 | — | 1.1 | No production special case for any question ID |
-| 1 | 1.3 | Implement retry, cancellation, sanitization, and call accounting | M | 0 | — | 1.1–1.2 | Every provider attempt counted exactly once |
-| 1 | 1.4 | Propagate outcomes through runner and aggregates | L | 0 | — | 1.3 | Separate agent failure from judge failure |
-| 1 | 1.R | Judge-semantics promotion review | M | 0 | — | 1.1–1.4 | Parser matrix, aggregation matrix, compatibility diff |
-| 2 | 2.1 | Add generic typed question-evidence contracts | M | 0 | — | 1.R | Content-free references by default |
-| 2 | 2.2 | Capture reserved, allowlisted `AgentResponse.AdditionalProperties` evidence | L | 0 | — | 2.1 | Strict schema, bounds, and sensitive-field rejection |
-| 2 | 2.3 | Derive evaluator-side retrieval diagnostics from gold labels | L | 0 | — | 2.2 | Gold joins happen only after agent execution |
-| 2 | 2.4 | Serialize evidence according to capture mode | M | 0 | — | 2.2–2.3 | `None` emits no evidence property |
-| 2 | 2.R | Evidence security and compatibility review | M | 0 | — | 2.1–2.4 | Leakage, privacy, hostile payload, and JSON review |
-| 3 | 3.1 | Add selected-ID oracle projection | M | 0 | — | 1.R | Clone only labelled sessions; strip all labels |
-| 3 | 3.2 | Add retrieval-bypassing oracle reader using the answer client | L | 0 | — | 3.1 | Same answer model configuration, separate execution path |
-| 3 | 3.3 | Add paired normal/oracle result without score mixing | M | 0 | — | 3.2 | Separate results plus diagnostic gap only |
-| 3 | 3.R | Oracle integrity review | M | 0 | — | 3.1–3.3 | Selected-ID equality and contamination tests |
-| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 0 | — | 1.R | Keep public accuracy values on 0–100 scale |
-| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 0 | — | 1.R, 2.R | Inconclusive is neither passed nor failed |
-| 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 0 | — | 3.R, 4.1–4.2 | Correct labels, limitations, and examples |
-| 4 | 4.R | Reporting and documentation review | S | 0 | — | 4.1–4.3 | JSON snapshots and rendered console output |
-| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 0 | — | 4.R | No live provider required |
-| 5 | 5.2 | Run authorized live diagnostic and oracle comparison | M | 0 | — | 5.1 | Record model/deployment identity; never persist secrets |
-| 5 | 5.3 | Final API, security, and migration review | M | 0 | — | 5.1–5.2 | Review only changed code and affected consumers |
-| 5 | 5.R | Release-readiness review | S | 0 | — | 5.3 | All acceptance criteria and docs complete |
+| 0 | 0.1 | Freeze current successful-result JSON and public API baselines | S | 100 | ✅ | — | Yes/no values, legacy status inference, and 0–100 scale are covered |
+| 0 | 0.2 | Add red-first judge, runner, leakage, evidence, and compatibility tests | M | 100 | ✅ | 0.1 | Judge, runner, leakage, evidence, compatibility, and oracle matrices complete |
+| 0 | 0.R | Contract and threat-model review | S | 100 | ✅ | 0.1–0.2 | Judge, evidence, and oracle boundaries reviewed and promoted |
+| 1 | 1.1 | Add typed judge outcomes and validated judge options | M | 100 | ✅ | 0.R | Nullable results, owned statuses, and retry bound `0..3` implemented |
+| 1 | 1.2 | Extract strict response parser and align official prompts | M | 100 | ✅ | 1.1 | All five official prompt families plus general preference corpus covered |
+| 1 | 1.3 | Implement retry, cancellation, sanitization, and call accounting | M | 100 | ✅ | 1.1–1.2 | Per-question counters are the sole source for total LLM calls |
+| 1 | 1.4 | Propagate outcomes through runner and aggregates | L | 100 | ✅ | 1.3 | Null accuracy, explicit denominators, and distinct failure counts implemented |
+| 1 | 1.R | Judge-semantics promotion review | M | 100 | ✅ | 1.1–1.4 | Fixed duplicate accounting and legacy TypeResult denominator findings |
+| 2 | 2.1 | Add generic typed question-evidence contracts | M | 100 | ✅ | 1.R | Versioned envelope, content-free references, modes, diagnostics, and public bounds implemented |
+| 2 | 2.2 | Capture reserved, allowlisted `AgentResponse.AdditionalProperties` evidence | L | 100 | ✅ | 2.1 | Copy-owned strict DTO/JSON bridge; arbitrary provider properties and objects are never retained |
+| 2 | 2.3 | Derive evaluator-side retrieval diagnostics from gold labels | L | 100 | ✅ | 2.2 | Post-answer top-K/session/turn/rank/diversity/timestamp/order diagnostics implemented |
+| 2 | 2.4 | Serialize evidence according to capture mode | M | 100 | ✅ | 2.2–2.3 | `None` performs no property access and omits both evidence fields; invalid evidence cannot change score |
+| 2 | 2.R | Evidence security and compatibility review | M | 100 | ✅ | 2.1–2.4 | Fixed hostile-dictionary escape; 35 focused tests and 572 tests × 3 TFMs pass |
+| 3 | 3.1 | Add selected-ID oracle projection | M | 100 | ✅ | 1.R | Deep-clones only labelled sessions; strips session IDs, answer IDs, and turn labels |
+| 3 | 3.2 | Add retrieval-bypassing oracle reader using the answer client | L | 100 | ✅ | 3.1 | Direct isolated chat path clears per-question state and records declared/reported model identity |
+| 3 | 3.3 | Add paired normal/oracle result without score mixing | M | 100 | ✅ | 3.2 | One frozen ID set; normal completes first; separate results, counters, evidence, and diagnostic gap |
+| 3 | 3.R | Oracle integrity review | M | 100 | ✅ | 3.1–3.3 | 9 focused tests; 581 tests × 3 TFMs pass; metadata capture hardened and solution builds |
+| 4 | 4.1 | Correct CLI denominators, counts, threshold, and percent rendering | M | 100 | ✅ | 1.R | Mixed and zero-scored command tests verify 0–100 output, scored denominators, WARN persistence, and inconclusive exit |
+| 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 100 | ✅ | 1.R, 2.R | Reusable content-free adapter, explicit status/count dimensions, warning aggregation, and opt-in sensitive sample-native report |
+| 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 100 | ✅ | 3.R, 4.1–4.2 | Correct six labels, scales, policies, evidence adapter, paired oracle, ownership, privacy, and migration documented |
+| 4 | 4.R | Reporting and documentation review | S | 100 | ✅ | 4.1–4.3 | 2 CLI + 41 evidence/report tests passed; samples build clean; DocFX build succeeded; review hardened thresholds and status sanitization |
+| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 100 | ✅ | 4.R | Fresh integrated build: 0 errors and 175 inherited analyzer/XML-doc warnings; 28,745 tests passed, 4 intentional manual skips, 0 failures; Memory: 595 × 3 |
+| 5 | 5.2 | Run authorized live diagnostic and oracle comparison | M | 100 | ✅ | 5.1 | Seeded 10-item `gpt-5.5` run including `d24813b1`: normal 8/9 (88.9%, 90% completion with induced empty); oracle 10/10 (100%); 11.1 pp gap; no sensitive content persisted |
+| 5 | 5.3 | Final API, security, and migration review | M | 100 | ✅ | 5.1–5.2 | Fixed reasoning-model temperature/output-budget compatibility, bounded `JsonElement` capture before allocation, and recorded evidence/judge policies in reports |
+| 5 | 5.R | Release-readiness review | S | 100 | ✅ | 5.3 | All feature acceptance criteria complete; full tests pass, build has 0 errors with inherited warnings recorded honestly; DocFX succeeds with 32 pre-existing warnings and no LongMemEval warnings |
 
 Estimated implementation size: roughly 8–12 focused engineering days, excluding live
 provider latency and review turnaround. Phase 1 is the critical correctness fix and should

@@ -150,12 +150,11 @@ public static class LongMemEvalBaselineRepro
 
         Console.WriteLine("Step 3: Results vs Paper Baselines\n");
 
-        var correct = result.QuestionResults.Count(q => q.Correct);
-        var total = result.QuestionResults.Count;
-
         Console.Write($"   Your result ({modelDeployment}): ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($" ({correct}/{total} correct)");
+        Console.WriteLine(
+            $" ({result.CorrectQuestions}/{result.ScoredQuestions} scored, " +
+            $"{result.SelectedQuestions} selected, {result.InconclusiveQuestions} inconclusive)");
 
         Console.Write($"   Task-averaged:               ");
         PrintScore(result.TaskAveragedAccuracy);
@@ -217,11 +216,18 @@ public static class LongMemEvalBaselineRepro
         PrintKeyTakeaways(modelDeployment, result.OverallAccuracy);
     }
 
-    private static void PrintScore(double score)
+    private static void PrintScore(double? score)
     {
-        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
-                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{score,5:F1}%");
+        if (score is not { } value)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  n/a ");
+            Console.ResetColor();
+            return;
+        }
+        Console.ForegroundColor = value >= 70 ? ConsoleColor.Green :
+                                  value >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        Console.Write($"{value,5:F1}%");
         Console.ResetColor();
     }
 
@@ -239,13 +245,13 @@ public static class LongMemEvalBaselineRepro
         Console.WriteLine();
     }
 
-    private static void PrintKeyTakeaways(string model, double ourScore)
+    private static void PrintKeyTakeaways(string model, double? ourScore)
     {
         Console.WriteLine();
         Console.WriteLine(new string('=', 70));
         Console.WriteLine("KEY TAKEAWAYS:");
         Console.WriteLine($"   * TextBlob injection: history in user message (paper-matching)");
-        Console.WriteLine($"   * Your {model}: {ourScore:F1}% vs paper GPT-4o direct: 60.6%");
+        Console.WriteLine($"   * Your {model}: {(ourScore is { } score ? $"{score:F1}%" : "n/a")} vs paper GPT-4o direct: 60.6%");
         Console.WriteLine($"   * Paper's 57.7% = ChatGPT commercial system (NOT comparable)");
         Console.WriteLine($"   * The 60.6% (direct) and 64.0% (CoN) are the right baselines");
         Console.WriteLine($"   * TextBlob mode also ensures AIContextProviders see the history");

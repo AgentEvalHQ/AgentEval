@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Text.Json.Serialization;
+
 namespace AgentEval.Memory.External.Models;
 
 /// <summary>
@@ -15,11 +17,44 @@ public class ExternalBenchmarkResult
     /// <summary>Display name (e.g., "LongMemEval-S 30q").</summary>
     public required string BenchmarkName { get; init; }
 
-    /// <summary>Overall accuracy: correct / total * 100 (micro-average).</summary>
-    public required double OverallAccuracy { get; init; }
+    /// <summary>
+    /// Overall accuracy: correct / scored * 100 (micro-average), or null when
+    /// no question received an explicit binary judgment.
+    /// </summary>
+    public required double? OverallAccuracy { get; init; }
 
-    /// <summary>Task-averaged accuracy: mean of per-type accuracies (macro-average).</summary>
-    public required double TaskAveragedAccuracy { get; init; }
+    /// <summary>
+    /// Task-averaged accuracy across types with at least one scored question,
+    /// or null when no type has a score.
+    /// </summary>
+    public required double? TaskAveragedAccuracy { get; init; }
+
+    /// <summary>Questions selected for execution.</summary>
+    public int SelectedQuestions { get; init; }
+
+    /// <summary>Questions for which the agent completed and reached the judge boundary.</summary>
+    public int AgentCompletedQuestions { get; init; }
+
+    /// <summary>Questions included in the configured accuracy denominator.</summary>
+    public int ScoredQuestions { get; init; }
+
+    /// <summary>Questions judged explicitly correct.</summary>
+    public int CorrectQuestions { get; init; }
+
+    /// <summary>Questions judged explicitly incorrect.</summary>
+    public int IncorrectQuestions { get; init; }
+
+    /// <summary>Completed questions without an explicit binary judge outcome.</summary>
+    public int InconclusiveQuestions { get; init; }
+
+    /// <summary>Questions that failed before reaching a judge outcome.</summary>
+    public int AgentFailureQuestions { get; init; }
+
+    /// <summary>Fraction of agent-completed questions with a non-binary judge outcome.</summary>
+    public double? JudgeFailureRate { get; init; }
+
+    /// <summary>Question types contributing to task-averaged accuracy.</summary>
+    public int ScoredTypeCount { get; init; }
 
     /// <summary>Per question-type results.</summary>
     public required Dictionary<string, TypeResult> PerTypeResults { get; init; }
@@ -45,6 +80,8 @@ public class ExternalBenchmarkResult
 /// </summary>
 public class TypeResult
 {
+    private int? _scoredQuestions;
+
     /// <summary>Question type name (e.g., "temporal-reasoning").</summary>
     public required string TypeName { get; init; }
 
@@ -54,8 +91,23 @@ public class TypeResult
     /// <summary>Number answered correctly.</summary>
     public required int CorrectQuestions { get; init; }
 
-    /// <summary>Accuracy as percentage (0-100).</summary>
-    public double Accuracy => TotalQuestions > 0 ? (double)CorrectQuestions / TotalQuestions * 100 : 0;
+    /// <summary>Number with an explicit yes/no judgment.</summary>
+    public int ScoredQuestions
+    {
+        get => _scoredQuestions ?? TotalQuestions;
+        init => _scoredQuestions = value;
+    }
+
+    /// <summary>Completed questions without an explicit binary judge outcome.</summary>
+    public int InconclusiveQuestions { get; init; }
+
+    /// <summary>Questions that failed before reaching a judge outcome.</summary>
+    public int AgentFailureQuestions { get; init; }
+
+    /// <summary>Accuracy as percentage (0-100), or null when no result is scored.</summary>
+    public double? Accuracy => ScoredQuestions > 0
+        ? (double)CorrectQuestions / ScoredQuestions * 100
+        : null;
 
     /// <summary>Execution time for this type's questions.</summary>
     public required TimeSpan Duration { get; init; }
@@ -66,6 +118,8 @@ public class TypeResult
 /// </summary>
 public class QuestionResult
 {
+    private JudgeOutcomeStatus? _judgeStatus;
+
     /// <summary>Question identifier from the dataset.</summary>
     public required string QuestionId { get; init; }
 
@@ -81,11 +135,49 @@ public class QuestionResult
     /// <summary>Agent's response.</summary>
     public required string AgentResponse { get; init; }
 
-    /// <summary>Binary judgment: correct or not.</summary>
-    public required bool Correct { get; init; }
+    /// <summary>Binary judgment; null when agent execution or judging was inconclusive.</summary>
+    public required bool? Correct { get; init; }
 
-    /// <summary>Raw score from judge (0-100), kept for granular analysis.</summary>
-    public required double RawScore { get; init; }
+    /// <summary>Raw score from judge (0-100); null when inconclusive.</summary>
+    public required double? RawScore { get; init; }
+
+    /// <summary>Whether the agent completed before judging.</summary>
+    public QuestionExecutionStatus ExecutionStatus { get; init; } = QuestionExecutionStatus.Completed;
+
+    /// <summary>
+    /// Typed judge status; null when the agent failed before judging. Legacy successful
+    /// JSON without this field infers Yes or No from Correct.
+    /// </summary>
+    public JudgeOutcomeStatus? JudgeStatus
+    {
+        get => _judgeStatus ?? Correct switch
+        {
+            true => JudgeOutcomeStatus.Yes,
+            false => JudgeOutcomeStatus.No,
+            null => null
+        };
+        init => _judgeStatus = value;
+    }
+
+    /// <summary>Agent provider calls attempted for this question.</summary>
+    public int AgentLlmCallCount { get; init; }
+
+    /// <summary>Judge provider calls attempted for this question, including retries.</summary>
+    public int JudgeLlmCallCount { get; init; }
+
+    /// <summary>Judge tokens consumed across attempts.</summary>
+    public int JudgeTokensUsed { get; init; }
+
+    /// <summary>Validated, copy-owned normalized evidence when capture is enabled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public QuestionEvidenceEnvelope? Evidence { get; init; }
+
+    /// <summary>Evaluator-side evidence diagnostics when capture is enabled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public QuestionEvidenceDiagnostics? EvidenceDiagnostics { get; init; }
+
+    /// <summary>Bounded AgentEval-owned failure code.</summary>
+    public string? SafeFailureCode { get; init; }
 
     /// <summary>Judge's explanation.</summary>
     public string? JudgeExplanation { get; init; }

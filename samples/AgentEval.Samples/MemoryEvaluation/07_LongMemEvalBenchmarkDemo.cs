@@ -117,7 +117,7 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine($"   Questions: {options.MaxQuestions} (stratified from 500)");
         Console.WriteLine($"   Mode: {options.DatasetMode} (~115K tokens per question)");
         Console.WriteLine($"   Session boundaries: preserved  |  Timestamps: included");
-        Console.WriteLine($"   Judge: 5 type-specific prompts matching official eval\n");
+        Console.WriteLine($"   Judge: 4 task-specific prompt templates covering 6 dataset labels\n");
 
         var result = await runner.RunAsync(agent, config, options);
 
@@ -131,7 +131,7 @@ public static class LongMemEvalBenchmarkDemo
 
         Console.Write($"   Overall accuracy:      ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($" ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count} correct)\n");
+        Console.WriteLine($" ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)\n");
 
         Console.Write($"   Task-averaged accuracy: ");
         PrintScore(result.TaskAveragedAccuracy);
@@ -176,11 +176,18 @@ public static class LongMemEvalBenchmarkDemo
         PrintKeyTakeaways();
     }
 
-    private static void PrintScore(double score)
+    private static void PrintScore(double? score)
     {
-        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
-                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{score,5:F1}%");
+        if (score is not { } value)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  n/a ");
+            Console.ResetColor();
+            return;
+        }
+        Console.ForegroundColor = value >= 70 ? ConsoleColor.Green :
+                                  value >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        Console.Write($"{value,5:F1}%");
         Console.ResetColor();
     }
 
@@ -193,7 +200,7 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine("Research-grade memory evaluation using LongMemEval (ICLR 2025, MIT).");
         Console.WriteLine("Uses the new External Benchmark framework with:");
         Console.WriteLine("  - Stratified sampling across all 6 question types");
-        Console.WriteLine("  - 5 type-specific judge prompts (official methodology)");
+        Console.WriteLine("  - 4 task-specific judge prompt templates (official methodology)");
         Console.WriteLine("  - Session boundary + timestamp preservation");
         Console.WriteLine("  - Binary scoring comparable to published results");
         Console.WriteLine();

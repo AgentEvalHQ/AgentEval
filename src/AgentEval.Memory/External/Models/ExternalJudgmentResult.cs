@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
+using System.Text.Json.Serialization;
 
 namespace AgentEval.Memory.External.Models;
 
@@ -9,15 +10,45 @@ namespace AgentEval.Memory.External.Models;
 /// </summary>
 public class ExternalJudgmentResult
 {
-    /// <summary>Binary correctness: true = judge said "yes", false = "no".</summary>
-    public required bool Correct { get; init; }
+    private JudgeOutcomeStatus? _status;
 
-    /// <summary>Raw score 0-100 for granular analysis. 100 if correct, 0 if not (for binary mode).</summary>
-    public required double RawScore { get; init; }
+    /// <summary>
+    /// Typed judge outcome. Only Yes and No are ordinary quality judgments.
+    /// Legacy successful JSON without this field infers the status from Correct.
+    /// </summary>
+    public JudgeOutcomeStatus Status
+    {
+        get => _status ?? Correct switch
+        {
+            true => JudgeOutcomeStatus.Yes,
+            false => JudgeOutcomeStatus.No,
+            null => JudgeOutcomeStatus.Invalid
+        };
+        init => _status = value;
+    }
+
+    /// <summary>Binary correctness; null when the judge was inconclusive.</summary>
+    public required bool? Correct { get; init; }
+
+    /// <summary>Raw score 0-100; null when the judge was inconclusive.</summary>
+    public required double? RawScore { get; init; }
 
     /// <summary>Optional explanation from the judge.</summary>
     public string? Explanation { get; init; }
 
     /// <summary>Tokens consumed by the judge call.</summary>
     public int TokensUsed { get; init; }
+
+    /// <summary>Number of provider calls attempted, including retries.</summary>
+    public int LlmCallCount { get; init; }
+
+    /// <summary>Number of provider calls attempted, including retries.</summary>
+    public int AttemptCount => LlmCallCount;
+
+    /// <summary>Bounded AgentEval-owned failure code; never provider exception text.</summary>
+    public string? SafeFailureCode { get; init; }
+
+    /// <summary>Bounded raw response, emitted only when JudgeEvidenceMode.Raw is enabled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RawResponse { get; init; }
 }

@@ -38,18 +38,18 @@ public static class LongMemEvalPentagonMapper
 
         // 2. Multi-Session Reasoning = multi-session (non-abs only if we have question-level data)
         //    Can the agent synthesize partial facts scattered across 2-6 different sessions?
-        if (perTypeResults.TryGetValue("multi-session", out var ms))
-            scores["Multi-Session"] = ms.Accuracy;
+        if (perTypeResults.TryGetValue("multi-session", out var ms) && ms.Accuracy is { } msAccuracy)
+            scores["Multi-Session"] = msAccuracy;
 
         // 3. Temporal Reasoning = temporal-reasoning
         //    Can the agent reason about time ordering, durations, and event sequences?
-        if (perTypeResults.TryGetValue("temporal-reasoning", out var tr))
-            scores["Temporal"] = tr.Accuracy;
+        if (perTypeResults.TryGetValue("temporal-reasoning", out var tr) && tr.Accuracy is { } trAccuracy)
+            scores["Temporal"] = trAccuracy;
 
         // 4. Knowledge Updates = knowledge-update
         //    Can the agent track corrected/updated facts and return the latest value?
-        if (perTypeResults.TryGetValue("knowledge-update", out var ku))
-            scores["Knowledge Update"] = ku.Accuracy;
+        if (perTypeResults.TryGetValue("knowledge-update", out var ku) && ku.Accuracy is { } kuAccuracy)
+            scores["Knowledge Update"] = kuAccuracy;
 
         // 5. Abstention = cross-type, all questions with _abs suffix on question_id
         //    Does the agent refuse to fabricate answers about non-existent information?
@@ -58,8 +58,9 @@ public static class LongMemEvalPentagonMapper
             var absQuestions = questionResults.Where(q => q.QuestionId.EndsWith("_abs", StringComparison.Ordinal)).ToList();
             if (absQuestions.Count > 0)
             {
-                var absCorrect = absQuestions.Count(q => q.Correct);
-                scores["Abstention"] = (double)absCorrect / absQuestions.Count * 100;
+                var absScored = absQuestions.Count(q => q.Correct.HasValue);
+                if (absScored > 0)
+                    scores["Abstention"] = (double)absQuestions.Count(q => q.Correct is true) / absScored * 100;
             }
         }
 
@@ -83,6 +84,8 @@ public static class LongMemEvalPentagonMapper
         var values = types
             .Where(t => perTypeResults.ContainsKey(t))
             .Select(t => perTypeResults[t].Accuracy)
+            .Where(a => a.HasValue)
+            .Select(a => a!.Value)
             .ToList();
 
         if (values.Count > 0)

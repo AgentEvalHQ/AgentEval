@@ -23,9 +23,11 @@ namespace AgentEval.Samples.Benchmarks;
 /// This sample wires the preset-driven (Smoke / Standard / AuditGrade) running-
 /// sample shape used by H2–H8 over the LongMemEval runner: real Azure OpenAI
 /// agent (history-injectable) + LLM judge + canonical <c>.agenteval/</c> store
-/// + sidecar JSON / HTML / PDF. The native <c>ExternalBenchmarkResult</c> is
-/// also written to <c>report-native.json</c> for power users who need the
-/// unaltered per-question / per-type shape.
+/// + sidecar JSON / HTML / PDF. Set
+/// <c>AGENTEVAL_LONGMEMEVAL_WRITE_NATIVE_REPORT=true</c> to additionally write
+/// the unaltered <c>ExternalBenchmarkResult</c> to <c>report-native.json</c>.
+/// That opt-in artefact contains questions, answers, responses, and potentially
+/// captured evidence content, so it must be access-controlled.
 ///
 /// v0.10.1-beta: all presets read the REAL <c>longmemeval_s_cleaned.json</c>
 /// dataset on disk — the previously-bundled "embedded subset" was a hand-
@@ -51,6 +53,8 @@ namespace AgentEval.Samples.Benchmarks;
 /// </remarks>
 public static class LongMemEvalBenchmarkSample
 {
+    private const string WriteNativeReportEnvVar = "AGENTEVAL_LONGMEMEVAL_WRITE_NATIVE_REPORT";
+
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
@@ -180,7 +184,7 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine($"   Stratified sampling: {options.StratifiedSampling}");
         Console.WriteLine($"   Scoring:             binary (0/1) — official LongMemEval methodology");
         Console.WriteLine();
-        Console.WriteLine($"   Running LongMemEval ({presetName})... this makes ~2 LLM calls per question.");
+        Console.WriteLine($"   Running LongMemEval ({presetName})... judge retries can increase call count.");
         Console.WriteLine();
 
         // ── Run the benchmark.
@@ -215,7 +219,7 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine();
         Console.Write("   Overall accuracy:      ");
         PrintScore(result.OverallAccuracy);
-        Console.WriteLine($"   ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count} correct)");
+        Console.WriteLine($"   ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)");
         Console.Write("   Task-averaged accuracy: ");
         PrintScore(result.TaskAveragedAccuracy);
         Console.WriteLine("   (macro-average across question types)");
@@ -233,7 +237,10 @@ public static class LongMemEvalBenchmarkSample
 
         // ── Synthesise an EvalResult tree from the Shape-B result so we get
         // canonical .agenteval/ persistence + sidecar JSON / HTML / PDF for free.
-        var evalTree = SynthesizeEvalResult(result, presetName);
+        var evalTree = LongMemEvalEvalResultAdapter.ToEvalResult(
+            result,
+            presetName,
+            judgeModel: AIConfig.ModelDeployment);
 
         var subject = new SubjectIdentity(
             Kind: SubjectKind.Agent,
@@ -250,19 +257,25 @@ public static class LongMemEvalBenchmarkSample
             presetLabel: presetName,
             judgeModel: AIConfig.ModelDeployment);
 
-        // ── Side-write the native ExternalBenchmarkResult alongside report.json
-        // so power users keep the unaltered shape (per-question + per-type
-        // breakdown the synthesised tree flattens slightly).
-        try
+        // The native shape carries raw benchmark/user content and is therefore
+        // an explicit opt-in rather than a default sidecar.
+        if (string.Equals(
+                Environment.GetEnvironmentVariable(WriteNativeReportEnvVar),
+                "true",
+                StringComparison.OrdinalIgnoreCase))
         {
-            var nativeJsonPath = Path.Combine(paths.SidecarDir, "report-native.json");
-            await File.WriteAllTextAsync(
-                nativeJsonPath,
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"   Warning: failed to write report-native.json: {ex.GetType().Name}: {ex.Message}");
+            try
+            {
+                var nativeJsonPath = Path.Combine(paths.SidecarDir, "report-native.json");
+                await File.WriteAllTextAsync(
+                    nativeJsonPath,
+                    JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                Console.WriteLine($"   Native report (sensitive): {nativeJsonPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   Warning: failed to write report-native.json: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
@@ -272,8 +285,9 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - LongMemEval is a Shape B family — runner returns ExternalBenchmarkResult,");
         Console.WriteLine("     synthesised into an EvalResult tree (root + per-type composites + per-question leaves).");
-        Console.WriteLine("   - report.json / report.html / report.pdf reflect the synthesised tree;");
-        Console.WriteLine("     report-native.json carries the unaltered ExternalBenchmarkResult shape.");
+        Console.WriteLine("   - Default reports contain status/count diagnostics but no raw question, answer,");
+        Console.WriteLine("     response, judge-explanation, or evidence content.");
+        Console.WriteLine($"   - Set {WriteNativeReportEnvVar}=true only for access-controlled native diagnostics.");
         Console.WriteLine("   - Reference (paper, S mode): GPT-4o = 57.7%; small samples are high variance.");
         Console.WriteLine("   - v0.10.1+: Smoke=10Q, Standard=50Q, AuditGrade=~500Q — all real dataset.");
     }
@@ -308,166 +322,19 @@ public static class LongMemEvalBenchmarkSample
         Console.ResetColor();
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    //  Synthesis: ExternalBenchmarkResult → EvalResult tree
-    //  Root composite (overall accuracy) → per-question-type composites
-    //  → per-question atomic leaves (0/1 score).
-    // ──────────────────────────────────────────────────────────────────────
 
-    private static EvalResult SynthesizeEvalResult(ExternalBenchmarkResult result, string presetName)
+    private static void PrintScore(double? scorePercent)
     {
-        var now = DateTimeOffset.UtcNow;
-        const double passThreshold = 0.5; // 50 % — generous; calibrate per-deployment
-
-        // Build per-type composites.
-        var perTypeNodes = new List<EvalResult>();
-        foreach (var (typeName, typeResult) in result.PerTypeResults.OrderBy(kv => kv.Key))
+        if (scorePercent is not { } score)
         {
-            var typeQuestions = result.QuestionResults.Where(q => q.QuestionType == typeName).ToList();
-
-            // Per-question atomic leaves.
-            var leaves = new List<EvalResult>(typeQuestions.Count);
-            foreach (var q in typeQuestions)
-            {
-                var leafScoreValue = q.Correct ? 1.0 : 0.0;
-                var leafLabel = q.Correct ? "pass" : "fail";
-                var leafSeverity = q.Correct ? "none" : "medium";
-
-                var evidence = new List<EvalEvidence>(3)
-                {
-                    new("question", q.QuestionId, q.Question),
-                    new("gold-answer", q.QuestionId, q.GoldAnswer),
-                    new("agent-response", q.QuestionId, q.AgentResponse),
-                };
-                if (!string.IsNullOrEmpty(q.JudgeExplanation))
-                    evidence.Add(new EvalEvidence("judge", q.QuestionId, q.JudgeExplanation));
-
-                leaves.Add(new EvalResult(
-                    Metric: new EvalMetadata(
-                        Key: $"longmemeval.{q.QuestionType}.{q.QuestionId}",
-                        Name: $"{q.QuestionType} — {q.QuestionId}",
-                        Category: "memory",
-                        Version: "1.0.0"),
-                    Score: new EvalScore(
-                        Value: leafScoreValue,
-                        Ordinal: null,
-                        Label: leafLabel,
-                        Passed: q.Correct,
-                        Threshold: 1.0,
-                        Severity: leafSeverity,
-                        Confidence: null),
-                    Details: new EvalDetails(
-                        Dimensions: new Dictionary<string, double> { ["rawScore"] = q.RawScore },
-                        Evidence: evidence,
-                        Recommendations: null,
-                        SubResults: null,
-                        AggregationStrategy: null),
-                    Provenance: new EvalProvenance(
-                        Type: "external-benchmark",
-                        JudgeModel: AIConfig.ModelDeployment,
-                        PromptId: null,
-                        PromptHash: null,
-                        TokensUsed: null,
-                        EstimatedCost: 0,
-                        CacheHit: false),
-                    EvaluatedAt: now));
-            }
-
-            // Per-type composite (accuracy in 0..1 range — TypeResult.Accuracy is 0..100).
-            var typeAccuracy01 = typeResult.Accuracy / 100.0;
-            var typePassed = typeAccuracy01 >= passThreshold;
-            var typeLabel = typeAccuracy01 >= 0.7 ? "pass" : typeAccuracy01 >= passThreshold ? "warn" : "fail";
-            var typeSeverity = typeAccuracy01 >= 0.7 ? "none" : typeAccuracy01 >= passThreshold ? "low" : "medium";
-
-            perTypeNodes.Add(new EvalResult(
-                Metric: new EvalMetadata(
-                    Key: $"longmemeval.{typeName}",
-                    Name: $"LongMemEval — {typeName}",
-                    Category: "memory",
-                    Version: "1.0.0"),
-                Score: new EvalScore(
-                    Value: typeAccuracy01,
-                    Ordinal: null,
-                    Label: typeLabel,
-                    Passed: typePassed,
-                    Threshold: passThreshold,
-                    Severity: typeSeverity,
-                    Confidence: null),
-                Details: new EvalDetails(
-                    Dimensions: new Dictionary<string, double>
-                    {
-                        ["correct"] = typeResult.CorrectQuestions,
-                        ["total"] = typeResult.TotalQuestions,
-                    },
-                    Evidence: null,
-                    Recommendations: null,
-                    SubResults: leaves,
-                    AggregationStrategy: "mean"),
-                Provenance: new EvalProvenance(
-                    Type: "composite",
-                    JudgeModel: null,
-                    PromptId: null,
-                    PromptHash: null,
-                    TokensUsed: null,
-                    EstimatedCost: 0,
-                    CacheHit: false),
-                EvaluatedAt: now));
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  n/a ");
+            Console.ResetColor();
+            return;
         }
-
-        // Root composite (overall accuracy in 0..1).
-        var overall01 = result.OverallAccuracy / 100.0;
-        var overallPassed = overall01 >= passThreshold;
-        var overallLabel = overall01 >= 0.7 ? "pass" : overall01 >= passThreshold ? "warn" : "fail";
-        var overallSeverity = overall01 >= 0.7 ? "none" : overall01 >= passThreshold ? "low" : "medium";
-
-        return new EvalResult(
-            Metric: new EvalMetadata(
-                Key: "longmemeval",
-                Name: $"LongMemEval — {presetName} preset (ICLR 2025)",
-                Category: "memory",
-                Version: "1.0.0"),
-            Score: new EvalScore(
-                Value: overall01,
-                Ordinal: null,
-                Label: overallLabel,
-                Passed: overallPassed,
-                Threshold: passThreshold,
-                Severity: overallSeverity,
-                Confidence: null),
-            Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double>
-                {
-                    ["overallAccuracy"] = result.OverallAccuracy,
-                    ["taskAveragedAccuracy"] = result.TaskAveragedAccuracy,
-                    ["totalQuestions"] = result.QuestionResults.Count,
-                    ["correctQuestions"] = result.QuestionResults.Count(q => q.Correct),
-                    ["totalLlmCalls"] = result.TotalLlmCalls,
-                    ["durationSeconds"] = result.Duration.TotalSeconds,
-                },
-                Evidence: null,
-                Recommendations: new[]
-                {
-                    $"Reference: paper-reported GPT-4o = 57.7 % on LongMemEval-S (full ~500Q). " +
-                    "Small samples are high variance — interpret accordingly."
-                },
-                SubResults: perTypeNodes,
-                AggregationStrategy: "mean"),
-            Provenance: new EvalProvenance(
-                Type: "composite",
-                JudgeModel: AIConfig.ModelDeployment,
-                PromptId: null,
-                PromptHash: null,
-                TokensUsed: null,
-                EstimatedCost: 0,
-                CacheHit: false),
-            EvaluatedAt: now);
-    }
-
-    private static void PrintScore(double scorePercent)
-    {
-        Console.ForegroundColor = scorePercent >= 70 ? ConsoleColor.Green :
-                                  scorePercent >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{scorePercent,5:F1}%");
+        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
+                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        Console.Write($"{score,5:F1}%");
         Console.ResetColor();
     }
 }

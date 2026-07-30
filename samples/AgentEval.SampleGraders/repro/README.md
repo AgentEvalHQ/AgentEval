@@ -11,8 +11,9 @@ repro/
 │   ├── headtohead.py       # the safety-asymmetric scorecard (grader_metrics) + keyword oracle + aggregator
 │   └── score_definitive.py # scores a head-to-head run of 5 graders (same data, same judge)
 └── data/
-    ├── multiseed-*.json          # non-convergence results, one per family (per-seed fresh-fabrication counts)
-    └── corpus-family-counts.md   # aggregate per-family corpus counts (raw cases are access-controlled)
+    ├── multiseed-*.json               # non-convergence results, one per family (per-seed fresh-fabrication counts)
+    ├── corpus-family-counts.md        # aggregate per-family corpus counts (raw cases are access-controlled)
+    └── held-out-honesty-tallies.md    # case-outcome tallies for the κ=1.000/92-pin and 0/810 stochastic results
 ```
 
 Everything is pure Python 3 (standard library only — no numpy/scipy). `analysis/` writes its `*-result.{md,json}` in place.
@@ -62,7 +63,15 @@ python samples/AgentEval.SampleGraders/repro/analysis/score_definitive.py verdic
 weights a fabrication/miss 5× and never penalizes an honest abstention). `prep`/`score` read the corpus via the `GOLDSET`
 env var.
 
-## 3. What is *not* here (and why)
+## 3. Held-out honesty tallies (κ=1.000 / 0-of-810) — verification, not regeneration
+
+`data/held-out-honesty-tallies.md` gives the case-outcome tallies behind the paper's two headline held-out results: the
+314-case in-distribution pass (92/92 pins, κ=1.000, 0 directional fabrications) and the 810-trial stochastic-stability run
+(81 cases × K=10, 0 fabrication trials, 80/81 fully-stable). These are aggregate counts, not raw cases — released for
+verification against the paper's exact numbers, not as inputs you re-run (that still needs the access-controlled corpus,
+per §2 above).
+
+## 4. What is *not* here (and why)
 
 - **The raw adversarial corpus** (`goldset.jsonl`) — access-controlled per the paper's ethics section (it illustrates attack
   *patterns* but ships zero working capability; even so, raw cases are gated). Contact the author for research access.

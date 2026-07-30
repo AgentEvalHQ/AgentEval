@@ -491,14 +491,17 @@ internal static class BenchmarkSampleHelpers
     private static RunSummary BuildRunSummary(EvalResult root, string runId)
     {
         var leaves = EnumerateAtomicLeaves(root).Select(l => l.Result).ToList();
-        var passed = leaves.Count(l => l.Score.Passed);
-        var failed = leaves.Count(l => !l.Score.Passed && l.Score.Label != "warn");
-        var warnings = leaves.Count(l => l.Score.Label == "warn");
+        static bool IsWarning(EvalResult leaf) =>
+            leaf.Score.Label is "warn" or "inconclusive";
+        var passed = leaves.Count(l => l.Score.Passed && !IsWarning(l));
+        var failed = leaves.Count(l => !l.Score.Passed && !IsWarning(l));
+        var warnings = leaves.Count(IsWarning);
 
         var verdict = root.Score.Label.ToUpperInvariant() switch
         {
             "PASS" => "PASS",
             "WARN" => "WARN",
+            "INCONCLUSIVE" => "WARN",
             _      => "FAIL",
         };
 

@@ -26,15 +26,16 @@ namespace AgentEval.Cli.Commands;
 /// canonical run manifest. A human-readable summary lands in <c>report.md</c>.
 ///
 /// <para>
-/// REQUIRES Azure OpenAI (the runner makes ~2 LLM calls per question). All three
+/// REQUIRES Azure OpenAI. The runner normally makes one answer call plus one judge
+/// call per question, with bounded judge retries increasing the total. All three
 /// <c>AZURE_OPENAI_*</c> env vars must be set; there is no stub fallback because
 /// LongMemEval's correctness signal IS the LLM grader.
 /// </para>
 ///
 /// <para>
 /// The AuditGrade / Full preset additionally requires <c>LONGMEMEVAL_DATASET_PATH</c>
-/// pointing at the full ~500-question dataset (the canonical bundled file ships only the
-/// Subset; cf. <see cref="LongMemEvalDataLoader.DatasetPathEnvVar"/>). When unset, the
+/// pointing at the full ~500-question dataset. No dataset is bundled; the subset preset
+/// can also resolve the canonical local path. When the full-path variable is unset, the
 /// command exits cleanly with a clear download-instructions message.
 /// </para>
 /// </remarks>
@@ -195,21 +196,37 @@ public static class BenchLongMemEvalCommand
             // Skip per-scenario writes; persist the native result as report-native.json beside
             // the manifest below. The summary still captures pass/fail totals.
 
-            var verdict = result.OverallAccuracy >= 0.5 ? "PASS" : "FAIL";
+            const double passThresholdPercent = 50.0;
+            var verdict = result.OverallAccuracy switch
+            {
+                null => "INCONCLUSIVE",
+                >= passThresholdPercent => "PASS",
+                _ => "FAIL"
+            };
+            var metrics = new Dictionary<string, double>();
+            // The canonical RunSummary schema uses WARN for indeterminate runs.
+            // Keep the more precise INCONCLUSIVE label in LongMemEval's console/native surfaces.
+            var summaryVerdict = result.OverallAccuracy.HasValue ? verdict : "WARN";
+            metrics["judge_failure_policy"] = (int)options.JudgeFailurePolicy;
+            metrics["max_judge_retries"] = options.MaxJudgeRetries;
+            metrics["judge_temperature_configured"] = options.JudgeTemperature.HasValue ? 1 : 0;
+            metrics["judge_max_output_tokens"] = options.JudgeMaxOutputTokens;
+            metrics["judge_evidence_mode"] = (int)options.JudgeEvidenceMode;
+            metrics["evidence_capture_mode"] = (int)options.EvidenceCaptureMode;
+            metrics["evidence_top_k"] = options.EvidenceTopK;
+            if (options.JudgeTemperature is { } temperature) metrics["judge_temperature"] = temperature;
+            if (result.OverallAccuracy is { } overall) metrics["overall_accuracy"] = overall;
+            if (result.TaskAveragedAccuracy is { } taskAverage) metrics["task_averaged_accuracy"] = taskAverage;
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
-                Verdict: verdict,
+                Verdict: summaryVerdict,
                 Stats: new RunStats(
                     Total: result.QuestionResults.Count,
-                    Passed: result.QuestionResults.Count(q => q.Correct),
-                    Failed: result.QuestionResults.Count(q => !q.Correct),
-                    Warnings: 0),
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overall_accuracy"] = result.OverallAccuracy,
-                    ["task_averaged_accuracy"] = result.TaskAveragedAccuracy,
-                });
+                    Passed: result.QuestionResults.Count(q => q.Correct is true),
+                    Failed: result.QuestionResults.Count(q => q.Correct is false),
+                    Warnings: result.QuestionResults.Count(q => !q.Correct.HasValue)),
+                Metrics: metrics);
             await store.CompleteRunAsync(manifest, summary, ct);
 
             // Write the native ExternalBenchmarkResult JSON alongside the manifest.
@@ -222,8 +239,10 @@ public static class BenchLongMemEvalCommand
 
             Console.WriteLine();
             Console.WriteLine($"   Completed in {result.Duration.TotalSeconds:F1}s ({result.TotalLlmCalls} LLM calls)");
-            Console.WriteLine($"   Overall accuracy:        {result.OverallAccuracy:P1}  ({result.QuestionResults.Count(q => q.Correct)}/{result.QuestionResults.Count})");
-            Console.WriteLine($"   Task-averaged accuracy:  {result.TaskAveragedAccuracy:P1}");
+            Console.WriteLine($"   Overall accuracy:        {FormatPercent(result.OverallAccuracy)}  ({result.CorrectQuestions}/{result.ScoredQuestions} scored, {result.SelectedQuestions} selected)");
+            Console.WriteLine($"   Task-averaged accuracy:  {FormatPercent(result.TaskAveragedAccuracy)}  ({result.ScoredTypeCount} scored types)");
+            Console.WriteLine($"   Inconclusive judgments:  {result.InconclusiveQuestions}");
+            Console.WriteLine($"   Agent failures:          {result.AgentFailureQuestions}");
             Console.WriteLine($"   Verdict:                 {verdict}");
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
@@ -236,6 +255,13 @@ public static class BenchLongMemEvalCommand
             return 1;
         }
 
-        return result.OverallAccuracy >= 0.5 ? ExitCodes.Success : ExitCodes.GateFailed;
+        return result.OverallAccuracy switch
+        {
+            null => ExitCodes.GateInconclusive,
+            >= 50.0 => ExitCodes.Success,
+            _ => ExitCodes.GateFailed
+        };
     }
+
+    private static string FormatPercent(double? value) => value is { } score ? $"{score:F1}%" : "n/a";
 }
