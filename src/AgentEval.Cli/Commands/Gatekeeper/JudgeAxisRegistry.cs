@@ -47,6 +47,9 @@ internal static class JudgeAxisRegistry
         ["goal-hijack-drift"] = new(
             (m, c) => GoalHijackDriftJudge.Create(m, null, c), GoalHijackDriftJudge.KeywordBaseline,
             GoalHijackDriftJudge.GoldSet, () => new GoalHijackDriftRubric()),
+        ["inter-agent-outbound-goal-drift"] = new(
+            CreateOutboundGoalDriftJudge, InterAgentBoundaryInjectionGate.OutboundKeywordBaseline,
+            InterAgentBoundaryInjectionGate.OutboundGoldSet, () => new InterAgentOutboundGoalDriftRubric()),
         ["ungrounded-claim"] = new(
             (m, c) => UngroundedClaimJudge.Create(m, null, c), UngroundedClaimJudge.KeywordBaseline,
             UngroundedClaimJudge.GoldSet, () => new UngroundedClaimRubric()),
@@ -74,6 +77,14 @@ internal static class JudgeAxisRegistry
         // HallucinatedCitationJudge.CalibrationGoldSet + the live check) — just not through this CLI surface
         // without a registry shape change this session didn't scope.
     };
+
+    private static IChatGate CreateOutboundGoalDriftJudge(IChatClient model, bool cache)
+    {
+        IChatGate gate = new CompositeJudgeGate<InterAgentOutboundGoalDriftRubric>(
+            new InterAgentOutboundGoalDriftRubric(),
+            model);
+        return cache ? new JudgeVerdictCache(gate) : gate;
+    }
 
     public static JudgeAxisEntry? For(string axis) => Map.TryGetValue(axis, out var e) ? e : null;
 

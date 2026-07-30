@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace AgentEval.Guardrails;
 
@@ -23,10 +24,12 @@ namespace AgentEval.Guardrails;
 /// <para>
 /// <b>What counts as "correlated," precisely.</b> Within a bounded trailing-turn window
 /// (<see cref="FleetCorrelatorOptions.WindowTurns"/>), at least <see cref="FleetCorrelatorOptions.MinDistinctFamilies"/>
-/// distinct families (see <see cref="FleetCorrelatorOptions.FamilyOf"/>) must each report a verdict with
-/// <see cref="GateVerdict.Confidence"/> at or above <see cref="FleetCorrelatorOptions.SoftSignalFloor"/>. A
-/// family is the gate's independent detection MECHANISM, not its instance — the same family firing twice in
-/// one session proves nothing new the second time; only independent mechanisms agreeing counts. This directly
+/// distinct families (see <see cref="FleetCorrelatorOptions.FamilyOf"/>) must each report an Allow verdict
+/// whose finite confidence is at or above <see cref="FleetCorrelatorOptions.SoftSignalFloor"/> and whose
+/// matching threshold/actual provenance proves that the verdict was a sub-threshold finding. A family is the
+/// gate's independent detection MECHANISM, not its instance — only the strongest signal from a family counts,
+/// so repeated firings cannot manufacture independent agreement. Retained contribution provenance is bounded
+/// and content-free. This directly
 /// reuses <c>ParallelJudgeFanOut</c>'s fail-closed-OR PHILOSOPHY (any sufficient evidence blocks) while being
 /// genuinely new in the dimension that matters: OR-across-time-and-policy instead of OR-across-one-turn.
 /// </para>
@@ -50,10 +53,13 @@ namespace AgentEval.Guardrails;
 [Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]
 public sealed class FleetCorrelator
 {
+    private const int MaximumObservations = 65_536;
+    private const int MaximumFamilyLength = 128;
+    private const int MaximumContributingFamilies = 64;
     private readonly FleetCorrelatorOptions _options;
     private readonly object _lock = new();
     private readonly List<Observation> _observations = new();
-    private int _currentTurn;
+    private long _currentTurn;
 
     /// <summary>Creates a new session-scoped correlator.</summary>
     public FleetCorrelator(FleetCorrelatorOptions? options = null)
@@ -70,54 +76,194 @@ public sealed class FleetCorrelator
             throw new ArgumentOutOfRangeException(nameof(options), "FleetCorrelatorOptions.WindowTurns must be positive.");
         }
 
-        if (_options.MinDistinctFamilies < 2)
+        if (_options.MinDistinctFamilies < 2 ||
+            _options.MinDistinctFamilies > MaximumContributingFamilies)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "FleetCorrelatorOptions.MinDistinctFamilies must be at least 2 — correlating fewer than 2 " +
-                "distinct families defeats the purpose (a single low-confidence signal proves nothing new).");
+                $"FleetCorrelatorOptions.MinDistinctFamilies must be between 2 and {MaximumContributingFamilies}.");
+        }
+
+        if (_options.MaxObservations < _options.MinDistinctFamilies ||
+            _options.MaxObservations > MaximumObservations)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                $"FleetCorrelatorOptions.MaxObservations must be at least MinDistinctFamilies and no greater than {MaximumObservations}.");
         }
 
         ArgumentNullException.ThrowIfNull(_options.FamilyOf, nameof(options));
     }
 
-    private readonly record struct Observation(string Family, double Confidence, int Turn);
+    private readonly record struct Observation(
+        string Family,
+        double Confidence,
+        long Turn,
+        GateProvenance Provenance);
 
     /// <summary>
-    /// Advances the internal turn counter. Call exactly once per round-trip, before any gate in that
-    /// round-trip runs — <see cref="EvalGatingChatClient"/> calls this once per <c>GetResponseAsync</c>/
-    /// <c>GetStreamingResponseAsync</c> invocation.
+    /// Advances the internal turn counter for sequential callers. Concurrent callers should use
+    /// <see cref="BeginTurn"/> and pass its token to <see cref="Observe(GateVerdict,string,long)"/>.
     /// </summary>
-    public void AdvanceTurn()
+    public void AdvanceTurn() => _ = BeginTurn();
+
+    /// <summary>
+    /// Starts one round trip and returns its stable correlation turn token. The token must be carried through
+    /// every pre/post observation produced by that round trip so concurrent requests cannot reattribute a slow
+    /// observation to a newer turn.
+    /// </summary>
+    /// <returns>The positive, monotonically increasing token for this round trip.</returns>
+    public long BeginTurn()
     {
         lock (_lock)
         {
-            _currentTurn++;
+            if (_currentTurn == long.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Fleet correlator turn capacity exhausted.");
+            }
+
+            return ++_currentTurn;
         }
     }
 
     /// <summary>
-    /// Records <paramref name="verdict"/> as a correlation input, if it carries a soft signal
-    /// (<see cref="GateVerdict.Confidence"/> is not <see langword="null"/>). A verdict with no confidence
-    /// (most deterministic/regex gates) is silently not a candidate — there is no signal to correlate, and
-    /// that is a legitimate, common case, not an error.
+    /// Records <paramref name="verdict"/> as a correlation input only when it is an Allow carrying a finite
+    /// confidence and matching threshold/actual provenance that proves it was a sub-threshold finding. An
+    /// ordinary Allow or any Block is not a near miss and is ignored.
     /// </summary>
     /// <param name="verdict">The gate's verdict for this turn.</param>
     /// <param name="stage">"pre" or "post" — recorded for parity with <c>EvalGatingChatClient.Record</c>'s own trace key shape, not currently used in the correlation decision itself.</param>
     public void Observe(GateVerdict verdict, string stage)
+        => ObserveCore(verdict, stage, turn: null);
+
+    /// <summary>
+    /// Records a verdict against the stable token returned by <see cref="BeginTurn"/>. An observation whose
+    /// turn has already left the configured window is ignored rather than reattributed or allowed to consume
+    /// current capacity.
+    /// </summary>
+    /// <param name="verdict">The gate verdict produced by the identified round trip.</param>
+    /// <param name="stage">The exact pipeline stage: <c>pre</c> or <c>post</c>.</param>
+    /// <param name="turn">The token returned by <see cref="BeginTurn"/> for that round trip.</param>
+    public void Observe(
+        GateVerdict verdict,
+        string stage,
+        long turn)
+    {
+        if (turn < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(turn));
+        }
+
+        ObserveCore(verdict, stage, turn);
+    }
+
+    private void ObserveCore(
+        GateVerdict verdict,
+        string stage,
+        long? turn)
     {
         ArgumentNullException.ThrowIfNull(verdict);
-        ArgumentException.ThrowIfNullOrWhiteSpace(stage);
+        if (stage is not ("pre" or "post"))
+        {
+            throw new ArgumentException(
+                "Fleet correlation stage must be 'pre' or 'post'.",
+                nameof(stage));
+        }
 
-        if (verdict.Confidence is not { } confidence)
+        if (verdict.Action != GateAction.Allow ||
+            verdict.Confidence is not { } confidence)
         {
             return;
         }
 
-        var family = _options.FamilyOf(verdict.PolicyName);
+        if (!double.IsFinite(confidence) ||
+            confidence is < 0.0 or > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(verdict),
+                "A near-miss confidence must be finite and in [0, 1].");
+        }
+
+        if (verdict.Provenance is not
+            {
+                Threshold: { } threshold,
+                ActualValue: { } actual,
+            })
+        {
+            return;
+        }
+
+        if (!double.IsFinite(threshold) ||
+            !double.IsFinite(actual) ||
+            threshold is < 0.0 or > 1.0 ||
+            actual is < 0.0 or > 1.0 ||
+            actual != confidence ||
+            actual >= threshold)
+        {
+            throw new ArgumentException(
+                "A near miss requires matching finite threshold/actual provenance below its block threshold.",
+                nameof(verdict));
+        }
+
+        var family = ValidateFamily(
+            _options.FamilyOf(verdict.PolicyName));
+        var retainedProvenance = new GateProvenance(
+            family,
+            Array.Empty<string>(),
+            Threshold: threshold,
+            ActualValue: actual);
         lock (_lock)
         {
-            _observations.Add(new Observation(family, confidence, _currentTurn));
+            var observationTurn = turn ?? _currentTurn;
+            if (observationTurn > _currentTurn)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(turn),
+                    "Fleet correlation turn cannot be in the future.");
+            }
+
+            PruneExpired();
+            var windowStart = _currentTurn - _options.WindowTurns + 1L;
+            if (observationTurn < windowStart)
+            {
+                return;
+            }
+
+            var existingIndex = _observations.FindIndex(
+                observation =>
+                    observation.Turn == observationTurn &&
+                    string.Equals(
+                        observation.Family,
+                        family,
+                        StringComparison.Ordinal));
+            if (existingIndex >= 0)
+            {
+                if (confidence > _observations[existingIndex].Confidence)
+                {
+                    _observations[existingIndex] =
+                        new Observation(
+                            family,
+                            confidence,
+                            observationTurn,
+                            retainedProvenance);
+                }
+
+                return;
+            }
+
+            if (_observations.Count >= _options.MaxObservations)
+            {
+                throw new InvalidOperationException(
+                    "Fleet correlator observation capacity exhausted.");
+            }
+
+            _observations.Add(
+                new Observation(
+                    family,
+                    confidence,
+                    observationTurn,
+                    retainedProvenance));
         }
     }
 
@@ -135,35 +281,94 @@ public sealed class FleetCorrelator
         {
             if (_observations.Count == 0)
             {
-                // The common case (most gates never carry a soft signal, see Observe) — skip the LINQ
-                // chain below entirely rather than allocating for a result that MinDistinctFamilies >= 2
-                // (enforced in the constructor) guarantees can never qualify.
                 return null;
             }
 
-            var windowStart = _currentTurn - _options.WindowTurns + 1;
-            _observations.RemoveAll(o => o.Turn < windowStart);
+            PruneExpired();
 
-            var qualifying = _observations.Where(o => o.Confidence >= _options.SoftSignalFloor).ToList();
-            var families = qualifying
-                .Select(o => o.Family)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(f => f, StringComparer.Ordinal)
+            var representatives = _observations
+                .Where(
+                    observation =>
+                        observation.Confidence >=
+                        _options.SoftSignalFloor)
+                .GroupBy(
+                    observation => observation.Family,
+                    StringComparer.Ordinal)
+                .Select(
+                    family => family
+                        .OrderByDescending(
+                            observation =>
+                                observation.Confidence)
+                        .ThenByDescending(
+                            observation => observation.Turn)
+                        .First())
+                .OrderBy(
+                    observation => observation.Family,
+                    StringComparer.Ordinal)
                 .ToList();
 
-            if (families.Count < _options.MinDistinctFamilies)
+            if (representatives.Count < _options.MinDistinctFamilies)
             {
                 return null;
             }
 
-            var combinedConfidence = qualifying.Average(o => o.Confidence);
+            var represented = representatives
+                .Take(MaximumContributingFamilies)
+                .ToArray();
+            var families = represented
+                .Select(observation => observation.Family)
+                .ToArray();
+            var combinedConfidence = represented.Average(
+                observation => observation.Confidence);
+            var contributing = represented
+                .Select(observation => observation.Provenance)
+                .ToArray();
+            var familyCount = representatives.Count == represented.Length
+                ? $"{represented.Length} independent gate family signal(s)"
+                : $"{representatives.Count} qualifying gate families; bounded evidence represents the first {represented.Length} in canonical order";
             return GateVerdict.Block(
                 "fleet-correlation",
-                $"{qualifying.Count} independent gate signal(s) across {families.Count} families " +
+                $"{familyCount} " +
                 $"(families: {string.Join(", ", families)}) each showed elevated but sub-threshold concern " +
                 $"within the last {_options.WindowTurns} turn(s). This is a WEAKER signal than any single " +
                 "gate's own Block — no individual gate was confident enough to act alone.",
-                matches: families) with { Confidence = combinedConfidence };
+                matches: families) with
+            {
+                Confidence = combinedConfidence,
+                Provenance = new GateProvenance(
+                    "fleet-correlation",
+                    Array.Empty<string>(),
+                    Contributing: contributing),
+            };
         }
+    }
+
+    private void PruneExpired()
+    {
+        var windowStart = _currentTurn - _options.WindowTurns + 1;
+        _observations.RemoveAll(
+            observation => observation.Turn < windowStart);
+    }
+
+    private static string ValidateFamily(string? family)
+    {
+        if (string.IsNullOrWhiteSpace(family) ||
+            family.Length > MaximumFamilyLength ||
+            !string.Equals(
+                family,
+                family.Trim(),
+                StringComparison.Ordinal) ||
+            family.Any(
+                character =>
+                    char.IsControl(character) ||
+                    CharUnicodeInfo.GetUnicodeCategory(character) ==
+                    UnicodeCategory.Format))
+        {
+            throw new ArgumentException(
+                "Fleet correlation family must be a bounded, canonical visible identity.",
+                nameof(family));
+        }
+
+        return family;
     }
 }

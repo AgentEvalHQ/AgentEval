@@ -6,6 +6,7 @@ using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentEval.MissionControl;
 
@@ -37,6 +38,9 @@ public static class McHost
         // from AgentEval.Evals.Agentic's embedded resources. Drives
         // Query.evaluators(...). Plan-08 MC1.5.3.
         builder.Services.AddSingleton<EvaluatorCardRegistry>();
+        builder.Services.TryAddSingleton<
+            ISecurityGraphReportSource,
+            UnconfiguredSecurityGraphReportSource>();
 
         // IOutputStoreReader: read-only access to the local .agenteval/ folder.
         // Workspace-root resolution order:

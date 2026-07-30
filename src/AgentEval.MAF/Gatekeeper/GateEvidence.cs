@@ -18,7 +18,7 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed record GateEvidence
 {
-    /// <summary>Short, opaque, correlatable id — the value echoed in the model-facing refusal and looked up by the reference ledger (P3-1).</summary>
+    /// <summary>Short, opaque, correlatable id — echoed in structured refusals, withheld from camouflaged refusals, and looked up by the reference ledger (P3-1).</summary>
     public required string ReferenceId { get; init; }
 
     /// <summary>When the finding was recorded (UTC).</summary>

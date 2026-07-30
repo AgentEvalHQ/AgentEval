@@ -27,7 +27,9 @@ public enum GateAction
 /// 0..1 confidence behind this verdict, when the gate has one to report (e.g. a judge's own confidence). Null means
 /// the gate doesn't produce a soft signal (most deterministic/regex gates). Optional and additive — every existing
 /// <see cref="Allow"/>/<see cref="Block"/> call site is unaffected. Intended for cross-gate correlation (a fleet
-/// correlator reading verdicts across a session), not for enforcement by the gate itself.
+/// correlator reading verdicts across a session), not for enforcement by the gate itself. A correlatable near miss
+/// is an Allow carrying matching threshold/actual <see cref="Provenance"/>; confidence alone is directionally
+/// ambiguous and is not sufficient.
 /// </param>
 /// <param name="Provenance">
 /// A reconstructable "why" behind this verdict — see <see cref="GateProvenance"/>. Optional and additive, same

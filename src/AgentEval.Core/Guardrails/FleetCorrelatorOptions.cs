@@ -17,7 +17,14 @@ namespace AgentEval.Guardrails;
 public sealed class FleetCorrelatorOptions
 {
     /// <summary>
-    /// Minimum per-verdict <see cref="GateVerdict.Confidence"/> to count as a "soft signal" worth correlating.
+    /// Maximum retained near-miss observations in this session-scoped correlator. The correlator coalesces
+    /// repeated observations from the same family in the same turn before applying this cap. Must be at least
+    /// <see cref="MinDistinctFamilies"/> and no greater than 65,536. Default 1,024.
+    /// </summary>
+    public int MaxObservations { get; init; } = 1024;
+
+    /// <summary>
+    /// Minimum validated near-miss <see cref="GateVerdict.Confidence"/> to count as a soft signal worth correlating.
     /// Default 0.4 — deliberately well below any individual gate's own block threshold (typically ~0.7-0.8), a
     /// separate, higher-friction-to-misconfigure knob from that threshold.
     /// </summary>
@@ -35,7 +42,8 @@ public sealed class FleetCorrelatorOptions
     /// signal before <see cref="FleetCorrelator.CheckCorrelation"/> escalates. Default and floor: 2 — the
     /// single biggest lever against noise; a chatty single family firing repeatedly proves nothing new on its
     /// own. Must be at least 2 (enforced by <see cref="FleetCorrelator"/>'s constructor) — 1 would mean a
-    /// single low-confidence signal alone escalates, defeating the entire correlation premise.
+    /// single low-confidence signal alone escalates, defeating the entire correlation premise. The maximum is
+    /// 64 so a synthetic verdict's contributing evidence remains bounded.
     /// </summary>
     public int MinDistinctFamilies { get; init; } = 2;
 

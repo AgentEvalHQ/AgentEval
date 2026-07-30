@@ -9,8 +9,9 @@ namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
 /// Ready-made resolvers for a <b>durable logical session id</b> (F-A, Fable 5 P1-4) — the id per-session gates
-/// (<see cref="RateLimitGate"/> today, containment tomorrow) key on so a cap survives a persisted-session reload or a
-/// logical session load-balanced across workers, instead of resetting with each fresh <see cref="AgentSession"/>
+/// (including <see cref="RateLimitGate"/> and <see cref="SessionIdentityDriftGate"/>) key on so state survives
+/// a persisted-session reload or a move between in-process workers, instead of resetting with each
+/// fresh <see cref="AgentSession"/>
 /// object. Set one on <see cref="GatekeeperOptions.SessionIdentity"/> and <c>UseGatekeeper</c> injects it into every
 /// <see cref="ISessionIdentityAware"/> gate. A resolver returning <see langword="null"/>/empty for a session means
 /// "no durable id here" — the gate falls back to object identity for that session, so a partial rollout degrades

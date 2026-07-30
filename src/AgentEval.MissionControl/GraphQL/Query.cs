@@ -49,6 +49,30 @@ public sealed class Query
     /// </summary>
     public string Ping() => "pong";
 
+    // ─── Gatekeeper security graph (Phase 6.5) ──────────────────────────────
+
+    /// <summary>
+    /// Returns a bounded privacy-minimized security graph view, or <see langword="null"/> when this Mission
+    /// Control host has no explicitly injected read-only graph source.
+    /// </summary>
+    [Cost(100.0)]
+    public SecurityGraphOpsView? SecurityGraph(
+        [Service] ISecurityGraphReportSource source,
+        int nodeLimit = SecurityGraphOpsProjector.DefaultNodeLimit,
+        int edgeLimit = SecurityGraphOpsProjector.DefaultEdgeLimit)
+    {
+        SecurityGraphOpsProjector.ValidateLimits(
+            nodeLimit,
+            edgeLimit);
+        var report = source.Read();
+        return report is null
+            ? null
+            : SecurityGraphOpsProjector.Project(
+                report,
+                nodeLimit,
+                edgeLimit);
+    }
+
     // ─── Evaluator registry (MC1.5.3) ────────────────────────────────────────
 
     /// <summary>

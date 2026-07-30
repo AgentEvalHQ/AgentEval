@@ -11,7 +11,8 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <summary>
 /// Fail-closed authorization gate: blocks the run unless the session carries an operator identity (under
 /// <see cref="OperatorMetadataKey"/> in the session <c>StateBag</c>, set by the caller) that is on the
-/// allow-list. Missing identity ⇒ Block (MAF surfaces no framework identity, so the caller must supply one).
+/// allow-list. Missing identity ⇒ Block (MAF surfaces no framework identity, so the caller must supply one). Use
+/// <see cref="SessionIdentityDriftGate"/> instead when the first admitted operator must remain bound to the session.
 /// </summary>
 public sealed class OperatorAuthGate : SessionContextGate
 {

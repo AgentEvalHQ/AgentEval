@@ -45,7 +45,12 @@ public static class AgentEvalGatekeeperExtensions
 
         var options = new GatekeeperOptions();
         configure(options);
+        // Phase 3, Task 3.0: validate and freeze defaults before any preflight side effect or builder mutation.
+        var resolvedOptions = GatekeeperOptionsResolver.Resolve(options);
+        var refusalPresenter = GatekeeperRefusalPresenter.FromResolved(resolvedOptions);
+
         NormalizeContractGate(options);
+        NormalizeContainmentGates(options, resolvedOptions);
 
         // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
         // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
@@ -276,7 +281,8 @@ public static class AgentEvalGatekeeperExtensions
                 evidenceSink: options.EvidenceSink,
                 compositeToolConfigFingerprint: GateConfigFingerprint.Compute(
                     options.ToolGates.Count > 0 ? options.ToolGates.ToArray() : null,
-                    options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null));
+                    options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null),
+                refusalPresenter: refusalPresenter);
         }
 
         // P0-3: a result-gate-only configuration (ToolGates empty, ToolResultGates non-empty) is valid —
@@ -284,10 +290,12 @@ public static class AgentEvalGatekeeperExtensions
         // whenever EITHER list is non-empty, not just when ToolGates is.
         if (options.ToolGates.Count > 0 || options.ToolResultGates.Count > 0)
         {
-            result = result.UseAgentEvalToolGate(
+            result = result.UseAgentEvalToolGateWithPresentation(
                 options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode,
                 options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null,
-                options.EvidenceSink);
+                options.EvidenceSink,
+                denialCorrelationTargets: resolvedOptions.ContainmentTargets,
+                refusalPresenter: refusalPresenter);
         }
 
         if (options.ApprovalGates.Count > 0)
@@ -370,6 +378,64 @@ public static class AgentEvalGatekeeperExtensions
         // shift this normalized contract gate immediately behind it; ordinary caller gates remain after both.
         options.ToolGates.Remove(contractGate);
         options.ToolGates.Insert(0, contractGate);
+    }
+
+    private static void NormalizeContainmentGates(
+        GatekeeperOptions options,
+        ResolvedGatekeeperOptions resolved)
+    {
+        var directOverrides = options.ToolGates.OfType<ContainmentOverrideGate>().ToArray();
+        var directIdentities = options.PreGates.OfType<ContainedIdentityGate>().ToArray();
+        var misplacedIdentities = options.PostGates.OfType<ContainedIdentityGate>().ToArray();
+        if (directOverrides.Length > 1 || directIdentities.Length > 1)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: register at most one direct ContainmentOverrideGate and one direct " +
+                "ContainedIdentityGate.");
+        }
+
+        if (misplacedIdentities.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: ContainedIdentityGate is a run-pre admission gate and cannot be registered " +
+                "as a post gate.");
+        }
+
+        if (resolved.ContainmentStore is not null)
+        {
+            if (directOverrides.Length > 0 || directIdentities.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "UseGatekeeper: automatic containment configuration cannot be combined with directly " +
+                    "registered containment gates.");
+            }
+
+            options.ToolGates.Insert(
+                0,
+                new ContainmentOverrideGate(
+                    resolved.ContainmentStore,
+                    resolved.ContainmentTargets!,
+                    resolved.AdditionalContainmentTargets,
+                    resolved.ContainmentRetryThreshold));
+            options.PreGates.Insert(
+                0,
+                new ContainedIdentityGate(
+                    resolved.ContainmentStore,
+                    resolved.ContainmentTargets!));
+            return;
+        }
+
+        if (directOverrides.SingleOrDefault() is { } directOverride)
+        {
+            options.ToolGates.Remove(directOverride);
+            options.ToolGates.Insert(0, directOverride);
+        }
+
+        if (directIdentities.SingleOrDefault() is { } directIdentity)
+        {
+            options.PreGates.Remove(directIdentity);
+            options.PreGates.Insert(0, directIdentity);
+        }
     }
 
     private static ToolGatePolicy ToToolGatePolicy(GatekeeperEnforcement enforcement) => enforcement switch

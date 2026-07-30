@@ -21,8 +21,21 @@ public sealed class JudgeGateOptions
     /// </summary>
     public double BlockThreshold { get; init; }
 
-    /// <summary>Cap on the judge's output tokens (a judge answers briefly). Default 256.</summary>
-    public int MaxOutputTokens { get; init; } = 256;
+    /// <summary>
+    /// Cap on the judge's output tokens. Default 1024: reasoning-capable models may consume part of this budget
+    /// internally before emitting the short classifier JSON, so the former 256-token cap could produce an empty,
+    /// length-truncated response that the fail-closed gate correctly—but misleadingly—treated as a block.
+    /// </summary>
+    public int MaxOutputTokens { get; init; } = 1024;
+
+    /// <summary>
+    /// Optional sampling temperature for the judge call. The default is <see langword="null"/>, which lets the
+    /// provider use its supported default. Set this explicitly only when the selected model supports the value,
+    /// and calibrate that exact configuration. Some reasoning-model deployments reject an explicit
+    /// <c>temperature=0</c>; leaving it unspecified avoids turning a provider capability mismatch into a
+    /// fail-closed block on every inspected case.
+    /// </summary>
+    public float? Temperature { get; init; }
 
     /// <summary>
     /// Cap on the number of input characters the judge sends to the model (Phase 5, P5-3 — bounds cost, latency,

@@ -27,8 +27,9 @@ public enum RefusalDisposition
 }
 
 /// <summary>
-/// The versioned, model-facing refusal envelope (Phase 4, P4-1) — the SINGLE projection of an F-C
-/// <see cref="GateEvidence"/> block that the model sees. It replaces the old bare
+/// The versioned, structured model-facing refusal envelope (Phase 4, P4-1) — the default projection of an F-C
+/// <see cref="GateEvidence"/> block. Camouflaged presentation deliberately substitutes validated generic text
+/// while retaining the same evidence. This contract replaces the old bare
 /// <c>{"error":"ACTION_NOT_AUTHORIZED",…}</c> (whose top-level <c>error</c> collided with a tool's OWN error shape,
 /// so a model couldn't tell a gate refusal from a tool failure) with a NAMESPACED, versioned object under
 /// <c>_gatekeeper</c>. It still leaks nothing (#12): only an opaque reference id, the schema, a coarse

@@ -35,6 +35,7 @@
     <PackageReference Include="Microsoft.Agents.AI.Harness" />
     <PackageReference Include="Azure.AI.Projects" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Agents.AI.A2A" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />

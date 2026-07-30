@@ -16,12 +16,17 @@ public static class SensitiveJudgeAxes
 {
     /// <summary>
     /// Axes whose evidence (<see cref="GateVerdict.Reason"/>, <see cref="GateVerdict.Matches"/>) must never be
-    /// persisted verbatim — <c>exfiltration-intent</c> (the leaked data may be quoted in the judge's own
-    /// rationale/spans) and <c>system-prompt-extraction</c> (the extracted prompt fragment may be quoted the
-    /// same way).
+    /// persisted verbatim. This includes exfiltration/system-prompt axes, plus inbound and outbound injection axes
+    /// whose model-supplied evidence may quote untrusted boundary payloads or delegated instructions.
     /// </summary>
     public static readonly IReadOnlySet<string> RedactAxes =
-        new HashSet<string>(StringComparer.Ordinal) { "exfiltration-intent", "system-prompt-extraction" };
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "exfiltration-intent",
+            "system-prompt-extraction",
+            "indirect-injection",
+            "inter-agent-outbound-goal-drift",
+        };
 
     /// <summary>
     /// The axis encoded in a <c>judge:&lt;axis&gt;</c> policy name (as <see cref="CompositeJudgeGate{TRubric}"/>
