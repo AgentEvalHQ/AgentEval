@@ -1,0 +1,5 @@
+[mcp_servers.maf-doctor]
+command = "maf-doctor"
+
+[mcp_servers.maf-doctor.env]
+MAF_DOCTOR_INIT_VERSION = "1.11.0"
