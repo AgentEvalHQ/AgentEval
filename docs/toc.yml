@@ -145,6 +145,8 @@
     items:
     - name: Getting Started
       href: benchmarks/longmemeval/getting-started.md
+    - name: Live Validation — 2026-07-29
+      href: benchmarks/longmemeval/live-validation-2026-07-29.md
   - name: Memory Benchmark
     items:
     - name: Getting Started
