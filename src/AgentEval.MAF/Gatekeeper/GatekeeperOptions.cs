@@ -185,12 +185,56 @@ public sealed class GatekeeperOptions
     /// the shared-fallback-state behavior those gates self-document.
     /// </summary>
     public bool EstablishRunScope { get; set; } = true;
+    /// <summary>
+    /// Optional Phase-3 repeated-block threshold. When unset, construction resolves it to <c>5</c>, matching
+    /// <see cref="BlockStormSentinelGate"/>'s existing default. Values must be in the inclusive range
+    /// <c>1..1000</c>. Task 3.4 consumes the resolved value when containment escalation is configured.
+    /// </summary>
+    public int? ContainmentRetryThreshold { get; set; }
+
+    /// <summary>
+    /// Optional model-visible refusal presentation. Unset resolves to
+    /// <see cref="GatekeeperRefusalStyle.Structured"/>, preserving the versioned refusal envelope used today.
+    /// Camouflage affects presentation only; it never changes enforcement or operator evidence.
+    /// </summary>
+    public GatekeeperRefusalStyle? RefusalStyle { get; set; }
+
+    /// <summary>
+    /// Caller-owned generic failure messages used only with <see cref="GatekeeperRefusalStyle.Camouflaged"/>.
+    /// Construction defensively copies the collection, so later caller mutation cannot change behavior.
+    /// </summary>
+    public IReadOnlyList<string>? CamouflagedRefusalMessages { get; set; }
+
+    /// <summary>
+    /// Optional caller-owned containment store. The reference is resolved once after configuration and is never
+    /// disposed by <c>UseGatekeeper</c>. Configure together with <see cref="ContainmentTargets"/>.
+    /// </summary>
+    public IContainmentStore? ContainmentStore { get; set; }
+
+    /// <summary>
+    /// Bounded synchronous resolver for the exact durable targets applicable to a session. It must return the
+    /// current stable <see cref="ContainmentTarget.Session"/> first, followed by exact prior targets linked by a
+    /// caller-owned authenticated identity index. The first entry is the Task-3.4 escalation target; a run id is
+    /// never substituted for it. Configure together with <see cref="ContainmentStore"/>; each resolver result is
+    /// capped at 16 entries.
+    /// </summary>
+    public Func<Microsoft.Agents.AI.AgentSession, IReadOnlyList<ContainmentTarget>>? ContainmentTargets { get; set; }
+
+    /// <summary>
+    /// Optional bounded synchronous resolver adding exact MCP-server or agent-endpoint targets for a tool call.
+    /// It requires <see cref="ContainmentStore"/> and <see cref="ContainmentTargets"/>.
+    /// </summary>
+    public Func<GatedToolCall, IReadOnlyList<ContainmentTarget>>? AdditionalContainmentTargets { get; set; }
+
+
+
 
     /// <summary>
     /// Optional shared resolver for a <b>durable logical session id</b> (F-A / P1-4). When set, <c>UseGatekeeper</c>
-    /// injects it into every registered <see cref="ISessionIdentityAware"/> gate (<see cref="RateLimitGate"/> today),
-    /// so per-session caps survive a persisted-session reload or a logical session load-balanced across workers,
-    /// configured ONCE here instead of per gate. A gate given its own explicit resolver keeps it. Use the
+    /// injects it into every registered <see cref="ISessionIdentityAware"/> gate (including
+    /// <see cref="RateLimitGate"/> and <see cref="SessionIdentityDriftGate"/>), so per-session state can
+    /// survive a persisted-session reload or move between in-process workers. Each gate owns its state boundary;
+    /// this resolver is not a cross-process store. A gate given its own explicit resolver keeps it. Use the
     /// <see cref="SessionIdentity"/> helpers (<c>FromStateBag</c> / <c>Combine</c>). Default <see langword="null"/> —
     /// gates key on the <see cref="Microsoft.Agents.AI.AgentSession"/> object identity (the pre-F-A behavior).
     /// </summary>

@@ -9,10 +9,10 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <summary>
 /// A gate that keys per-session state on a <b>durable logical session id</b> and can adopt a shared resolver for it
 /// (F-A, Fable 5 P1-4). <c>UseGatekeeper</c> injects <see cref="GatekeeperOptions.SessionIdentity"/> into every gate
-/// implementing this, so a deployment configures "how do I identify a session across reloads / across workers" ONCE
+/// implementing this, so a deployment configures "how do I identify a session across reloads / in-process workers" ONCE
 /// instead of per gate. A gate that was already given its own explicit resolver keeps it — the shared one is only a
-/// <i>default</i>. Implemented today by <see cref="RateLimitGate"/>; the primitive the future containment track keys
-/// <c>ContainmentTarget.Session(id)</c> on.
+/// <i>default</i>. Implemented by <see cref="RateLimitGate"/> and <see cref="SessionIdentityDriftGate"/>; the
+/// primitive the containment track keys <c>ContainmentTarget.Session(id)</c> on.
 /// </summary>
 public interface ISessionIdentityAware
 {

@@ -76,6 +76,29 @@ public class CompositeJudgeGateTests
     }
 
     [Fact]
+    public async Task JudgeCall_DefaultsToProviderTemperature()
+    {
+        var model = new OptionsCapturingChatClient("ALLOW");
+
+        _ = await Gate(model).InspectAsync("please scan this input");
+
+        Assert.NotNull(model.ReceivedOptions);
+        Assert.Null(model.ReceivedOptions!.Temperature);
+        Assert.Equal(1024, model.ReceivedOptions.MaxOutputTokens);
+    }
+
+    [Fact]
+    public async Task JudgeCall_ExplicitTemperature_IsForwarded()
+    {
+        var model = new OptionsCapturingChatClient("ALLOW");
+
+        _ = await Gate(model, new JudgeGateOptions { Temperature = 0f })
+            .InspectAsync("please scan this input");
+
+        Assert.Equal(0f, model.ReceivedOptions!.Temperature);
+    }
+
+    [Fact]
     public async Task BlockedVerdict_HasProvenance_WithRuleNameEvidenceThresholdAndActual()
     {
         var opts = new JudgeGateOptions { BlockThreshold = 0.5 };
@@ -246,7 +269,7 @@ public class CompositeJudgeGateTests
     [Fact]
     public async Task SpendGovernor_BudgetExhausted_FailOpen_Allows_AndSkipsModel()
     {
-        // maxTokens=1 is smaller than any real estimate (chars/4 + 256 output cap), so the first reservation is
+        // maxTokens=1 is smaller than any real estimate (chars/4 + 1024 output cap), so the first reservation is
         // already refused — the model must be skipped and the turn allowed (fail-open default), with provenance.
         var model = new ScriptedChatClient().AddText("BLOCK");   // would block IF called
         var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1);
@@ -374,6 +397,30 @@ public class CompositeJudgeGateTests
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class OptionsCapturingChatClient(string reply) : IChatClient
+    {
+        public ChatOptions? ReceivedOptions { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            ReceivedOptions = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;

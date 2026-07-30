@@ -8,11 +8,15 @@ namespace AgentEval.MAF.Gatekeeper;
 /// One block-storm incident (Phase 6, P6-1): a run has accumulated enough ENFORCED policy blocks that the pattern
 /// itself is the signal — an agent (or an attacker steering it) repeatedly trying denied actions is probing.
 /// </summary>
-/// <param name="RunId">The run this fired on (<see cref="AgentRunScope.RunId"/>).</param>
+/// <param name="RunId">The root run tree this fired on (<see cref="AgentRunScope.RunId"/>).</param>
 /// <param name="EnforcedBlockCount">Enforced blocks recorded this run when the sentinel tripped.</param>
 /// <param name="Threshold">The configured trip threshold.</param>
 /// <param name="Severity">Triage severity — <see cref="GateSeverity.Incident"/> (a block-storm demands attention).</param>
-public sealed record BlockStormIncident(string? RunId, int EnforcedBlockCount, int Threshold, GateSeverity Severity);
+public sealed record BlockStormIncident(string? RunId, int EnforcedBlockCount, int Threshold, GateSeverity Severity)
+{
+    /// <summary>Opaque operator-only reference for correlating escalation and durable containment evidence.</summary>
+    public string EvidenceReference { get; init; } = GateReferenceId.New();
+}
 
 /// <summary>
 /// A meta-gate (Phase 6, P6-1) that watches the run tree's ENFORCED-block volume —
@@ -32,7 +36,7 @@ public sealed record BlockStormIncident(string? RunId, int EnforcedBlockCount, i
 /// threshold — matching the P2-8 nested-run hardening the budget gates use. Separate <i>top-level</i> runs each have
 /// their own tree and do not share. With no run scope the sentinel is a no-op (there is no tally to read) — register
 /// the run gate for it to work.</para>
-/// <para>The optional <paramref name="onBlockStorm"/> callback fires <b>exactly once per run tree</b>, the first time
+/// <para>The optional <c>onBlockStorm</c> callback fires <b>exactly once per run tree</b>, the first time
 /// the threshold is crossed (via an atomic latch, so it is race-free under concurrent tool calls), with an
 /// <see cref="BlockStormIncident"/> for alerting/incident routing; it is exception-isolated (an alert sink must never
 /// break the gate).</para>
@@ -64,13 +68,38 @@ public sealed class BlockStormSentinelGate : IToolGate
 
     /// <inheritdoc/>
     public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default)
+        => InspectCoreAsync(
+            call,
+            _onBlockStorm is null
+                ? null
+                : (incident, _) =>
+                {
+                    _onBlockStorm(incident);
+                    return ValueTask.CompletedTask;
+                },
+            cancellationToken);
+
+    internal ValueTask<ToolGateVerdict> InspectAsync(
+        GatedToolCall call,
+        Func<BlockStormIncident, CancellationToken, ValueTask> onBlockStorm,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(onBlockStorm);
+        return InspectCoreAsync(call, onBlockStorm, cancellationToken);
+    }
+
+    private async ValueTask<ToolGateVerdict> InspectCoreAsync(
+        GatedToolCall call,
+        Func<BlockStormIncident, CancellationToken, ValueTask>? onBlockStorm,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(call);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var scope = AgentRunScope.Current;
         if (scope is null)
         {
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));   // no per-run tally to read
+            return ToolGateVerdict.Allow(PolicyName);   // no per-run tally to read
         }
 
         // Tree-wide total (ForRootRun) so a storm can't be laundered across nested sub-runs. Blocking is monotonic
@@ -78,25 +107,42 @@ public sealed class BlockStormSentinelGate : IToolGate
         var enforcedBlocks = RunLedger.ForRootRun().TreeDenialCount;
         if (enforcedBlocks < _threshold)
         {
-            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+            return ToolGateVerdict.Allow(PolicyName);
         }
 
         // Alert exactly once per run tree via an atomic latch — race-free under concurrent tool calls and correct
         // even when the tally jumps past the threshold (a naive "== threshold" check would miss or double-fire).
-        if (_onBlockStorm is not null && RunLedger.ForRootRun().TryLatchBlockStorm())
+        BlockStormIncident? incident = null;
+        var callbackFailed = false;
+        if (onBlockStorm is not null && RunLedger.ForRootRun().TryLatchBlockStorm())
         {
+            incident = new BlockStormIncident(
+                scope.Root.RunId,
+                enforcedBlocks,
+                _threshold,
+                GateSeverity.Incident);
             try
             {
-                _onBlockStorm(new BlockStormIncident(scope.RunId, enforcedBlocks, _threshold, GateSeverity.Incident));
+                await onBlockStorm(incident, cancellationToken).ConfigureAwait(false);
             }
-            catch
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is not (StackOverflowException or OutOfMemoryException))
             {
                 // An alert sink must never break the gate (Phase 3 exception-isolation discipline).
+                callbackFailed = true;
             }
         }
 
         // Reason is audit-only (trace evidence); the model sees only the non-revealing {referenceId} refusal body (#12).
-        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-            $"block-storm: {enforcedBlocks} enforced policy blocks this run (threshold {_threshold}) — repeated denials indicate probing"));
+        var incidentSuffix = incident is null
+            ? string.Empty
+            : $"; incidentRef={incident.EvidenceReference}; callback={(callbackFailed ? "failed" : "completed")}";
+        return ToolGateVerdict.Block(
+            PolicyName,
+            $"block-storm: {enforcedBlocks} enforced policy blocks this run (threshold {_threshold}) — " +
+            $"repeated denials indicate probing{incidentSuffix}");
     }
 }

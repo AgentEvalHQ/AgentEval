@@ -177,7 +177,11 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         {
             cts.CancelAfter(_options.Timeout);   // inside the try so a bad value degrades to Inconclusive, never escapes
             var messages = new List<ChatMessage> { new(ChatRole.User, _rubric.BuildPrompt(BoundInput(text))) };
-            var options = new ChatOptions { MaxOutputTokens = _options.MaxOutputTokens, Temperature = 0f };
+            var options = new ChatOptions
+            {
+                MaxOutputTokens = _options.MaxOutputTokens,
+                Temperature = _options.Temperature,
+            };
             var response = await _fastModel.GetResponseAsync(messages, options, cts.Token).ConfigureAwait(false);
             return _rubric.Parse(response.Text ?? string.Empty) ?? JudgeVerdict.Inconclusive($"{_rubric.Axis} rubric returned null");
         }
