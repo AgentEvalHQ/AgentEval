@@ -48,6 +48,8 @@
   items:
   - name: Introduction
     href: gatekeeper/introduction.md
+  - name: Implementation Status
+    href: gatekeeper/implementation-status.md
   - name: What's New
     href: gatekeeper-whats-new.md
   - name: Gate Reference (ranked)

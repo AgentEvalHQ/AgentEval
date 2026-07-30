@@ -1,6 +1,6 @@
 # LongMemEval trustworthiness and diagnostics improvement plan
 
-> **Status:** implementation in progress on `codex/longmemeval-trustworthiness`
+> **Status:** implementation complete and merged into `main` (PR #148)
 > **Prepared:** 2026-07-29
 > **Target baseline:** AgentEval `0.16.0-beta`
 > **Scope:** AgentEval's .NET LongMemEval runner, judge, result contracts, reporting, tests, samples, and documentation

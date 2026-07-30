@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: design ready for implementation
+Status: Phase 0 design freeze complete; Phase 1 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -38,6 +38,8 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 ## Index
 
 - [Tracking table](#tracking-table)
+- [Phase 0 design freeze record](#phase-0-design-freeze-record)
+- [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
 - [Threat model](#threat-model)
@@ -57,15 +59,16 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 
 ## Tracking table
 
-`Reviewed` becomes ✅ only after the task's changed code has received a focused review and all
-findings have been fixed. `Done` becomes 100 only after its tests pass.
+`Reviewed` becomes ✅ only after the task's changed code or design artifact has received a focused
+review and all findings have been fixed. `Done` becomes 100 only after its applicable tests or
+document checks pass.
 
 | Phase | Task | Description | Size | Done | Reviewed | Depends on | Implementation notes |
 |---:|---|---|:---:|---:|:---:|---|---|
-| 0 | 0.1 | Freeze threat model, source adoption matrix, and security claims | M | 0 | — | — | Map OWASP ASI06 and MITRE AML.T0080 |
-| 0 | 0.2 | Freeze MAF surface/coverage model | M | 0 | — | 0.1 | Distinguish local tools, local MCP, hosted MCP, and context providers |
-| 0 | 0.3 | Freeze public contracts, verdict actions, and sequencing | L | 0 | — | 0.1–0.2 | API review before code |
-| 0 | 0.R | Architecture and threat-model review | M | 0 | — | 0.1–0.3 | Security, MAF, API, and dependency review |
+| 0 | 0.1 | Freeze threat model, source adoption matrix, and security claims | M | 100 | ✅ | — | Sources classified; adopted requirements and claim boundaries frozen 2026-07-30 |
+| 0 | 0.2 | Freeze MAF surface/coverage model | M | 100 | ✅ | 0.1 | Per-operation coverage and fail-closed rules frozen for all six surface classes |
+| 0 | 0.3 | Freeze public contracts, verdict actions, and sequencing | L | 100 | ✅ | 0.1–0.2 | Requirements, stage/action legality, ownership, pipeline order, and promotion gates frozen |
+| 0 | 0.R | Architecture and threat-model review | M | 100 | ✅ | 0.1–0.3 | Security, MAF, API, dependency, privacy, and warning-baseline findings resolved |
 | 1 | 1.1 | Add memory operation, scope, provenance, and policy models | L | 0 | — | 0.R | Bounded, immutable public models |
 | 1 | 1.2 | Add `IMemoryGate` and deterministic pipeline | L | 0 | — | 1.1 | Snapshot configuration; cancellation propagates |
 | 1 | 1.3 | Add safe evidence, receipts, reason codes, and fingerprints | M | 0 | — | 1.1–1.2 | Content-free by default |
@@ -102,6 +105,170 @@ findings have been fixed. `Done` becomes 100 only after its tests pass.
 | 7 | 7.3 | Add samples, migration guide, and operational runbook | L | 0 | — | 6.R–7.2 | Tool, MCP, and context-provider samples |
 | 7 | 7.4 | Run full offline and authorized live validation | L | 0 | — | 7.1–7.3 | All TFMs; live only with explicit authorization |
 | 7 | 7.R | Release-readiness review | M | 0 | — | 7.1–7.4 | All acceptance criteria and claims verified |
+
+## Phase 0 design freeze record
+
+> **Decision date:** 2026-07-30
+>
+> Phase 0 is documentation and architecture only. No runtime memory-security code is claimed by
+> completing these rows. The decisions below are the entry contract for Phase 1.
+
+### Task 0.1 — source and threat adoption
+
+Sources are classified so that guidance, production patterns, attack evidence, and experimental
+results are not presented as equivalent proof. Dates are publication dates when available;
+"accessed" identifies a mutable documentation page reviewed on that date.
+
+| Source | Date | Classification | Adopted requirement | Claim boundary |
+|---|---|---|---|---|
+| [OWASP ASI06](https://genai.owasp.org/2026/05/13/memory-is-a-feature-it-is-also-an-attack-surface/) | 2026-05-13 | Industry threat guidance | Treat persistent context as a cross-session trust boundary; cover poisoning, scope, integrity, monitoring, and recovery | Guidance identifies risk and controls; it does not certify this implementation |
+| [MITRE ATLAS AML.T0080](https://atlas.mitre.org/techniques/AML.T0080) | accessed 2026-07-30 | Attack taxonomy | Model memory poisoning as a durable adversary technique and preserve attack/evidence mapping | Taxonomy is not a prevention standard or effectiveness result |
+| [Microsoft — Guarding AI memory](https://www.microsoft.com/en-us/security/blog/2026/06/22/guarding-ai-memory/) | 2026-06-22 | Vendor security guidance | Separate trusted identity from model content; retain provenance; use layered write, recall, and action controls | Recommendations are adopted as design input, not a Microsoft certification |
+| [Microsoft — AI Recommendation Poisoning](https://www.microsoft.com/en-us/security/blog/2026/02/10/ai-recommendation-poisoning/) | 2026-02-10 | Attack evidence and guidance | Test repeated influence, source-trust manipulation, recommendation drift, and delayed effects | Reported attacks motivate tests; their rates are not AgentEval performance claims |
+| [MAF agent safety](https://learn.microsoft.com/en-us/agent-framework/agents/safety) and inspected 1.13.0 source | accessed 2026-07-30 | Framework contract and guidance | Use supported middleware, approval, session, and context-provider seams; preflight before builder mutation | Framework seams define observability, not automatic memory protection |
+| [AWS AgentCore Memory best practices](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/best-practices.html) | accessed 2026-07-30 | Cloud production guidance | Validate before persistence, apply least privilege, encrypt provider storage, and security-test extraction paths | Infrastructure security remains a shared responsibility outside AgentEval's gates |
+| [GitHub Copilot agentic memory](https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/) | 2026-01-15 | Production pattern | Scope memory, retain citations, revalidate evidence at use time, handle conflicts, expiry, and stale branches | Citation revalidation is domain-dependent and does not prove general truth |
+| [Mem0 memory security practices](https://mem0.ai/blog/ai-memory-security-best-practices) | 2026-07-23 | Vendor guidance and production pattern | Layer pre-write validation, per-user/session isolation, inclusion/exclusion, TTL, audit, integrity, and monitoring | Provider capability statements must be verified in the configured deployment |
+| [MINJA](https://arxiv.org/abs/2503.03704) | 2025-03 | Primary attack research | Include query-only planting, dormancy, cross-session trigger, and ordinary-user access | Paper results motivate the corpus; they are not release thresholds |
+| [MemMorph](https://arxiv.org/abs/2605.26154) | 2026-05 | Primary attack research | Test memory-driven tool selection and persistent tool hijacking | Transfer to each model/provider must be measured |
+| [No Attacker Needed](https://arxiv.org/abs/2604.01350) | 2026-04 | Primary failure/attack research | Treat cross-user contamination and incorrect sharing as security failures even without malice | The plan does not assume every contamination event is adversarial |
+| [MemPoison](https://arxiv.org/abs/2605.29960) | 2026-05 | Primary attack research | Include policy-satisfying poison that bypasses simple prompt-injection filters | No single content classifier may claim complete coverage |
+| [Trojan Hippo](https://arxiv.org/abs/2605.01970) | 2026-05 | Primary attack research | Include sleeper activation and memory-assisted exfiltration | Prevention and attribution are measured separately |
+| [The Misattribution Gap](https://arxiv.org/abs/2605.22842) | 2026-05 | Primary audit research | Preserve write-to-recall-to-action lineage and support counterfactual audit | Attribution evidence identifies influence, not objective causality in every case |
+| [A-MemGuard](https://arxiv.org/abs/2510.02373), [SMSR](https://arxiv.org/abs/2606.12703), and [MemAudit](https://arxiv.org/abs/2605.23723) | 2025-10 to 2026-06 | Experimental defenses | Evaluate composite trust, sanitization, retrieval controls, and audits offline against frozen gold data | Experimental defenses remain shadow/quarantine candidates until locally calibrated |
+
+Frozen security claims:
+
+- AgentEval will reduce, expose, and measure memory risk; it will not claim that poisoning can be
+  eliminated.
+- A deterministic gate proves only the operation and seam it observes. Coverage never transfers to
+  hidden provider extraction, another client, or an uninstrumented repository path.
+- Scope, provenance, hashes, content filtering, reconciliation, recall filtering, and action
+  containment solve different problems. None is evidence that a natural-language memory is true.
+- Vendor controls are recognized only when the configured adapter can prove their presence and
+  scope. Marketing or documentation alone is not runtime evidence.
+- Published attack and defense rates are motivation, not AgentEval accuracy, calibration, or release
+  thresholds.
+- An LLM or network judge remains offline, shadow, or quarantine-only until a representative frozen
+  corpus demonstrates the existing inline-calibration requirements. A semantic result never
+  overrides a deterministic confirmed scope leak, unauthorized write, or exfiltration.
+
+### Task 0.2 — surface and coverage freeze
+
+Coverage is assigned per operation, not per provider or package. The following table freezes the
+maximum claim available from each MAF surface; actual coverage may be lower when a required hook,
+contract, scope resolver, or result seam is absent.
+
+| Surface | Observable read seam | Observable write seam | Maximum frozen coverage | Enforcing rule |
+|---|---|---|---|---|
+| Local MAF memory tool | Pre-call plus post-result function middleware | Explicit arguments before the function call | `FullLifecycle` for that declared invocation path only when candidate, trusted scope, result, and derived actions are visible; otherwise `Boundary` | Require an explicit operation contract; names and descriptions are never authority |
+| Local `McpClientTool` | Local AIFunction call/result | Local MCP arguments before transport | `Boundary` from the client alone; `FullLifecycle` requires an owned server gate or equivalent provider-native hook | Pin server identity and schema fingerprint; changed schema invalidates coverage |
+| Owned MCP memory server | Before repository/service access and before result serialization | Authenticated server request immediately before persistence | `FullLifecycle` when server scope, candidate writes, recalled items, and client-side derived actions are all gated | Enforce server-side even when the originating client is gated |
+| Hosted MCP memory tool | Provider-dependent callback or approval receipt | Provider-dependent callback or approval receipt | `ActionOnly` with mandatory approval; `FullLifecycle` only with a complete provider callback or owned gated server; otherwise `Unsupported` | Enforcing construction fails for sensitive read/write without the required seam |
+| Generic `AIContextProvider` decorator | Complete returned `AIContext` before merge | Source request/response messages before delegation | `Boundary` | Never claim visibility into provider-internal extraction, reconciliation, async writes, or direct external writes |
+| Provider-native candidate/item hook | Each recalled item before formatting | Each extracted candidate immediately before commit | `FullLifecycle` for declared operations when scope and derived-action coverage are also present | Hook identity, version, and capabilities are fingerprinted and preflighted |
+
+AgentMemory isolation and admission controls count as provider-native evidence only for the exact
+configured paths that can be verified. They do not automatically upgrade a generic wrapper or an
+unrelated client to `FullLifecycle`. Dynamic tools returned by a context provider are classified
+individually before merge; an unknown side-effecting memory tool is `Unsupported`.
+
+The existing construction failure rules in [Coverage model](#coverage-model) are normative. In
+addition, a coverage report must retain separate read, write, promotion, and derived-action rows so
+that strong read coverage cannot hide weak write coverage. No aggregate percentage may convert
+`Boundary`, `ActionOnly`, `ObserveOnly`, or `Unsupported` into a full-enforcement claim.
+
+### Task 0.3 — API, action, sequencing, and promotion freeze
+
+The public type names and enum value sets in [Proposed contracts](#proposed-contracts) are normative
+for Phase 1. Constructor arity may still be simplified during 1.1, but semantic fields, bounds, and
+fail-closed behavior may not be removed without reopening 0.R. Public contexts, verdicts, receipts,
+policies, and operation contracts are immutable; caller collections are defensively copied and
+bounded during construction.
+
+Operation-to-stage mapping is fixed:
+
+- `Search` and `Recall` use `BeforeRead` and `AfterRead`;
+- `Write`, `Update`, `Delete`, and `Reconcile` use `BeforeWrite`;
+- `Promote` uses `BeforeWrite` and `BeforePromotion`;
+- a sensitive tool influenced by recalled memory uses `BeforeAction`;
+- `Audit` and finalized receipts use `AfterDecision`, which is observational and cannot mutate the
+  completed operation.
+
+Legal actions are stage-specific:
+
+| Stage | Legal actions | Semantic boundary |
+|---|---|---|
+| `BeforeRead` | `Allow`, `Reject` | A rejected query never reaches the provider |
+| `AfterRead` | `Allow`, `Sanitize`, `Exclude`, `Reject` | `Exclude` removes one item; `Reject` fails the whole read safely |
+| `BeforeWrite` | `Allow`, `Sanitize`, `Quarantine`, `RequireApproval`, `Reject` | No active-store side effect occurs before the disposition is applied |
+| `BeforePromotion` | `Allow`, `Sanitize`, `Quarantine`, `RequireApproval`, `Reject` | Promotion is a new write and reruns required write gates |
+| `BeforeAction` | `Allow`, `RequireApproval`, `Reject` | Tool adapters map the decision to existing Gatekeeper approval/block behavior |
+| `AfterDecision` | `Allow` | Evidence/audit only; never retroactively changes a completed operation |
+
+A gate is a side-effect-free decision component. The orchestrator applies quarantine, approval, or
+persistence exactly once after aggregation. Gate order and configuration are snapshotted and
+fingerprinted. `Reject` is terminal; otherwise the most restrictive legal result wins in this order:
+`Quarantine`, `RequireApproval`, `Exclude`, `Sanitize`, `Allow`. `Sanitize` transformations run in
+frozen order and the result is revalidated once; a second sanitization request or an invalid action
+for the current stage fails closed. Caller cancellation always propagates as cancellation.
+
+Sequencing is frozen as documented in [Mandatory sequencing](#mandatory-sequencing). In particular,
+reconciliation occurs after authenticated scope, provenance, trust, inclusion/exclusion, and
+sensitive-data admission, and before promotion or persistence. A rejected or quarantined candidate
+never contributes a conflict vote, embedding, or active retrieval index.
+
+Development and promotion gates are distinct:
+
+- construction coverage/capability checks run before builder mutation and before runtime
+  enforcement can start;
+- each implementation task receives a focused changed-code review before its tracker row becomes
+  ✅;
+- each `X.R` review must pass before dependent-phase coding starts or the phase is promoted;
+- semantic gates may be implemented for offline/shadow/quarantine evaluation before calibration,
+  but calibration is mandatory before inline enforcement;
+- Gatekeeper Phase 4's deferred remote A2A validation is unrelated to the provider-neutral memory
+  substrate and does not block Phase 1.
+
+### Project ownership and dependency freeze
+
+| Project | Frozen ownership | Dependency rule |
+|---|---|---|
+| `AgentEval.MAF` | Runtime memory contracts, pipeline, deterministic gates, MAF tool/MCP/context-provider adapters, coverage, receipts, and configuration | May continue to depend on `AgentEval.Abstractions` and `AgentEval.Core`; must not reference `AgentEval.Memory` or `AgentEval.RedTeam` |
+| `AgentEval.RedTeam` | Provider-neutral memory attack definitions, corpora, attack observations, and security evaluator models that do not require MAF | Must not depend on `AgentEval.MAF` |
+| `AgentEval.RedTeam.Gatekeeper` | Optional bridge that executes RedTeam memory attacks against the MAF/Gatekeeper runtime and CompositeEvals | May depend on both `AgentEval.RedTeam` and `AgentEval.MAF`, matching the existing direction |
+| `AgentEval.Memory` | LongMemEval and memory quality/trustworthiness evaluation | Remains independent of the runtime gate; no `AgentEval.MAF -> AgentEval.Memory` reference |
+| `AgentEval` umbrella | Packaging only | May aggregate packages but must not become the owner of runtime contracts |
+
+Shared contracts move downward only when a demonstrated second runtime consumer requires it. No new
+project or interface is created merely to avoid an otherwise acyclic dependency.
+
+### Task 0.R — focused architecture and threat-model review
+
+| Review dimension | Finding | Resolution |
+|---|---|---|
+| Security claims | Guidance, vendor claims, and paper results could be read as equivalent evidence | Added the classified source matrix and explicit claim boundaries |
+| Coverage honesty | Local MCP client interception could be mistaken for repository-level lifecycle protection | Capped client-only MCP at `Boundary`; full coverage now requires a gated server or equivalent native hook |
+| Public API | `IMemoryGate.Requirements` referenced an undefined type | Froze the flags enum and construction-time capability mapping below |
+| Verdict semantics | Stage/action legality and competing gate outcomes were underspecified | Added the legal-action matrix, precedence, single-application rule, and bounded sanitization re-entry |
+| Provider boundary | A generic context-provider wrapper could be over-promoted | Retained an explicit `Boundary` ceiling and required provider-native candidate/item hooks for full coverage |
+| Dependencies | Runtime, benchmark, and attack ownership were implicit | Froze project ownership without adding `AgentEval.MAF -> AgentEval.Memory` or a RedTeam cycle |
+| Sequencing | Reconciliation and promotion timing could be implemented in the wrong order | Froze admission → conflict/reconciliation → promotion → persistence |
+| Gate timing | Construction, coding review, promotion, and inline calibration gates could be conflated | Defined each gate and when it blocks progress |
+| Privacy | Evidence could accumulate raw memory or provider failures | Kept content-free receipts as default and bounded private review data to quarantine storage |
+| MAF/version risk | Repo-wide diagnostics include unrelated historical and nested-worktree findings | Scoped changed-file MAF review remains mandatory; heuristic findings require verification before edits |
+
+Validation baseline for Phase 0:
+
+- branch point: `bb2cf6a2f5ae75e16dea196b246d5003eebc8df4` on `main`;
+- repository build baseline: zero errors and 175 warnings; Phase 0 changes are documentation-only and
+  must add no warning;
+- repository-wide MAF Doctor baseline on 2026-07-30: grade F with 34 errors and 18 warnings, dominated
+  by nested-worktree/sample findings and broad missing-`MaxOutputTokens` findings; no
+  silent-starvation finding;
+- prior scoped Gatekeeper MAF scans on the merged runtime changes reported zero findings;
+- open Phase 0 security/API/dependency blockers: none. Phase 1 may start only from the frozen
+  decisions above.
 
 ## Goals and non-goals
 
@@ -196,7 +363,7 @@ AgentEval must not duplicate these provider-native controls. It should:
 
 ### MAF Doctor baseline
 
-MAF Doctor reported grade F for the repository on 2026-07-29. The headline includes findings in
+MAF Doctor reported grade F for the repository on 2026-07-30. The headline includes findings in
 nested `.claude/worktrees` and thousands of broad missing-`MaxOutputTokens` call-site findings. It
 reported no silent-starvation risks and no prompt-lint findings. This plan does not silently absorb
 that unrelated remediation scope. Implementation review must run MAF Doctor on changed production
@@ -322,6 +489,36 @@ public interface IMemoryGate
         CancellationToken cancellationToken = default);
 }
 ```
+
+
+`MemoryGateRequirements` is a flags enum because one gate may require multiple host capabilities:
+
+```csharp
+[Flags]
+public enum MemoryGateRequirements
+{
+    None = 0,
+    RunScope = 1,
+    AuthenticatedMemoryScope = 2,
+    QuarantineStore = 4,
+    ApprovalHandler = 8,
+    ProviderCandidateHook = 16
+}
+```
+
+Requirements are construction-time obligations:
+
+| Requirement | Required capability | Failure behavior |
+|---|---|---|
+| `RunScope` | Stable `AgentRunScope` and logical session for the invocation | Enforcing configuration is rejected before builder mutation |
+| `AuthenticatedMemoryScope` | Application-supplied `IMemoryScopeResolver` deriving required identity dimensions from trusted host/session state | No fallback to model arguments or ambient unverified state |
+| `QuarantineStore` | Separate store excluded from ordinary retrieval plus a bounded receipt | A policy that can quarantine cannot be registered without it |
+| `ApprovalHandler` | Surface-specific approval mechanism or an explicitly configured quarantine fallback | Missing capability never becomes `Allow` |
+| `ProviderCandidateHook` | Versioned provider callback exposing candidate records/items before commit/formatting | Requested `FullLifecycle` coverage is rejected without the hook |
+
+Preflight validates the union of gate requirements, configured verdict actions, requested coverage,
+and surface capabilities. The resulting snapshot is immutable and contributes to the policy
+fingerprint.
 
 Inline gates accept only `PureCode` or `Bounded` cost. Network/LLM gates run against quarantine,
 shadow traffic, replay, or offline corpora unless separately calibrated and explicitly promoted.
@@ -1030,7 +1227,7 @@ The operations guide must explain:
 | Do hashes stop poisoning? | Only unauthorized tampering; authorized malicious writes still require admission |
 | Generic provider full protection? | No; decorator is boundary coverage unless candidate records are exposed |
 | Add a sibling context gate provider? | No; decorate the provider to avoid ordering/bypass ambiguity |
-| Local MCP coverage? | Yes through AIFunction middleware, plus server-side defense for owned servers |
+| Local MCP coverage? | Client call/result coverage through AIFunction middleware is `Boundary`; `FullLifecycle` also requires a gated owned server or equivalent provider-native hook |
 | Hosted MCP coverage? | Separate coverage; fail closed without inspectable hook/server/approval |
 | LLM judge inline? | No by default; quarantine/shadow/offline, calibrated promotion only |
 | Default ambiguous write behavior? | Quarantine under enforcing profile; observe under rollout profile |
