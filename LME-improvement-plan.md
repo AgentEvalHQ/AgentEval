@@ -88,10 +88,10 @@ becomes `100%` only after its focused tests pass and its task review has fixed a
 | 4 | 4.2 | Update native report, sample synthesis, and Mission Control assumptions | M | 100 | ✅ | 1.R, 2.R | Reusable content-free adapter, explicit status/count dimensions, warning aggregation, and opt-in sensitive sample-native report |
 | 4 | 4.3 | Update docs, programmatic sample, and `0.16.0-beta` migration note | M | 100 | ✅ | 3.R, 4.1–4.2 | Correct six labels, scales, policies, evidence adapter, paired oracle, ownership, privacy, and migration documented |
 | 4 | 4.R | Reporting and documentation review | S | 100 | ✅ | 4.1–4.3 | 2 CLI + 41 evidence/report tests passed; samples build clean; DocFX build succeeded; review hardened thresholds and status sanitization |
-| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 100 | ✅ | 4.R | Build: 0 warnings/errors; 27,887 tests passed across supported TFMs, 4 intentional manual skips, 0 failures; Memory: 595 × 3 |
+| 5 | 5.1 | Run full offline test suite across supported TFMs | M | 100 | ✅ | 4.R | Fresh integrated build: 0 errors and 175 inherited analyzer/XML-doc warnings; 28,745 tests passed, 4 intentional manual skips, 0 failures; Memory: 595 × 3 |
 | 5 | 5.2 | Run authorized live diagnostic and oracle comparison | M | 100 | ✅ | 5.1 | Seeded 10-item `gpt-5.5` run including `d24813b1`: normal 8/9 (88.9%, 90% completion with induced empty); oracle 10/10 (100%); 11.1 pp gap; no sensitive content persisted |
 | 5 | 5.3 | Final API, security, and migration review | M | 100 | ✅ | 5.1–5.2 | Fixed reasoning-model temperature/output-budget compatibility, bounded `JsonElement` capture before allocation, and recorded evidence/judge policies in reports |
-| 5 | 5.R | Release-readiness review | S | 100 | ✅ | 5.3 | All acceptance criteria complete; full tests and build clean; DocFX succeeds with 32 pre-existing warnings and no LongMemEval warnings |
+| 5 | 5.R | Release-readiness review | S | 100 | ✅ | 5.3 | All feature acceptance criteria complete; full tests pass, build has 0 errors with inherited warnings recorded honestly; DocFX succeeds with 32 pre-existing warnings and no LongMemEval warnings |
 
 Estimated implementation size: roughly 8–12 focused engineering days, excluding live
 provider latency and review turnaround. Phase 1 is the critical correctness fix and should
