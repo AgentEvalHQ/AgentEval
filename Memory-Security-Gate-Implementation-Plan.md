@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 0 design freeze complete; Phase 1 ready for implementation
+Status: Phase 1 core substrate complete; Phase 2 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -39,6 +39,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 
 - [Tracking table](#tracking-table)
 - [Phase 0 design freeze record](#phase-0-design-freeze-record)
+- [Phase 1 implementation and review record](#phase-1-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -69,11 +70,11 @@ document checks pass.
 | 0 | 0.2 | Freeze MAF surface/coverage model | M | 100 | ✅ | 0.1 | Per-operation coverage and fail-closed rules frozen for all six surface classes |
 | 0 | 0.3 | Freeze public contracts, verdict actions, and sequencing | L | 100 | ✅ | 0.1–0.2 | Requirements, stage/action legality, ownership, pipeline order, and promotion gates frozen |
 | 0 | 0.R | Architecture and threat-model review | M | 100 | ✅ | 0.1–0.3 | Security, MAF, API, dependency, privacy, and warning-baseline findings resolved |
-| 1 | 1.1 | Add memory operation, scope, provenance, and policy models | L | 0 | — | 0.R | Bounded, immutable public models |
-| 1 | 1.2 | Add `IMemoryGate` and deterministic pipeline | L | 0 | — | 1.1 | Snapshot configuration; cancellation propagates |
-| 1 | 1.3 | Add safe evidence, receipts, reason codes, and fingerprints | M | 0 | — | 1.1–1.2 | Content-free by default |
-| 1 | 1.4 | Add quarantine and approval capability preflight | M | 0 | — | 1.2 | Never silently downgrade |
-| 1 | 1.R | Core contracts review | M | 0 | — | 1.1–1.4 | API, serialization, concurrency, privacy |
+| 1 | 1.1 | Add memory operation, scope, provenance, and policy models | L | 100 | ✅ | 0.R | Immutable bounded models; defensive collection copies; strict enum, identifier, stage, and digest validation |
+| 1 | 1.2 | Add `IMemoryGate` and deterministic pipeline | L | 100 | ✅ | 1.1 | Frozen deterministic gates; cancellation propagation; one-pass sanitization; explicit observe/enforce behavior |
+| 1 | 1.3 | Add safe evidence, receipts, reason codes, and fingerprints | M | 100 | ✅ | 1.1–1.2 | Content-free receipts/fingerprints; raw and effective content excluded from JSON serialization |
+| 1 | 1.4 | Add quarantine and approval capability preflight | M | 100 | ✅ | 1.2 | Typed capabilities; enforcing policies fail construction without required disposition services or explicit fallback |
+| 1 | 1.R | Core contracts review | M | 100 | ✅ | 1.1–1.4 | Fixed enum acceptance, fingerprint omissions, and observe-mode mutation/enforcement; 30 tests pass on each supported TFM |
 | 2 | 2.1 | Implement `MemoryScopeIntegrityGate` | L | 0 | — | 1.R | Trusted resolver; no model-controlled scope |
 | 2 | 2.2 | Implement `MemoryWriteAdmissionGate` | L | 0 | — | 1.R | Provenance, secrets, inclusion/exclusion, promotion |
 | 2 | 2.3 | Implement `MemoryConflictGate` | L | 0 | — | 2.1–2.2 | Trust-aware reconciliation and independent corroboration |
@@ -270,6 +271,33 @@ Validation baseline for Phase 0:
 - open Phase 0 security/API/dependency blockers: none. Phase 1 may start only from the frozen
   decisions above.
 
+## Phase 1 implementation and review record
+
+> **Completion date:** 2026-07-31
+>
+> Phase 1 supplies the provider-neutral substrate only. It does not claim that a tool, MCP server,
+> context provider, or provider-native memory path is protected until the applicable later adapter
+> and coverage tasks are complete.
+
+The implementation adds immutable and bounded operation, scope, provenance, conflict, policy, and
+context models; a deterministic, side-effect-free `IMemoryGate` pipeline; privacy-minimized
+receipts; configuration fingerprints; and typed host capability contracts for trusted scope,
+quarantine, approval, run scope, and provider-native candidate hooks.
+
+The focused review found and fixed four material issues before completion:
+
+- undefined enum values could enter public models;
+- concrete host capability types were absent from the configuration fingerprint;
+- observe mode could accidentally enforce a disposition or expose hypothetical sanitized content
+  as caller-visible output;
+- enforcing ambiguous-write policies could be constructed without the disposition capability
+  needed to apply their configured action.
+
+Thirty focused tests per target framework cover immutability, serialization privacy, invalid input,
+stage/action legality, sanitizer re-entry, precedence, exception safety, cancellation,
+configuration snapshots, capability preflight, observe/enforce behavior, and concurrent isolation.
+They pass on `net8.0`, `net9.0`, and `net10.0`. A scoped MAF anti-pattern scan of the new production
+directory reported no findings. Phase 2 remains responsible for the concrete deterministic gates.
 ## Goals and non-goals
 
 ### Goals
