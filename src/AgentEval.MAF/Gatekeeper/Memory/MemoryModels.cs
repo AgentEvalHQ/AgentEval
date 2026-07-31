@@ -296,7 +296,10 @@ public sealed class MemoryGateContext
         IEnumerable<MemoryConflictCandidate>? conflicts = null,
         string? runId = null,
         string? logicalSessionId = null,
-        MemoryDestination destination = MemoryDestination.Active)
+        MemoryDestination destination = MemoryDestination.Active,
+        MemoryRecordMetadata? recordMetadata = null,
+        MemoryBudgetSnapshot? budget = null,
+        bool hasAdministrativeCrossScopeCapability = false)
     {
         OperationId = MemoryValidation.Identifier(operationId, nameof(operationId));
         Stage = MemoryValidation.SingleStage(stage, nameof(stage));
@@ -311,6 +314,9 @@ public sealed class MemoryGateContext
         RunId = MemoryValidation.OptionalIdentifier(runId, nameof(runId));
         LogicalSessionId = MemoryValidation.OptionalIdentifier(logicalSessionId, nameof(logicalSessionId));
         Destination = MemoryValidation.Defined(destination, nameof(destination));
+        RecordMetadata = recordMetadata;
+        Budget = budget;
+        HasAdministrativeCrossScopeCapability = hasAdministrativeCrossScopeCapability;
 
         MemoryValidation.ValidateOperationStage(Operation.Kind, Stage);
     }
@@ -321,16 +327,24 @@ public sealed class MemoryGateContext
     public MemorySurface Surface => Operation.Surface;
     public MemoryOperationContract Operation { get; }
     public string ProviderId { get; }
+    [JsonIgnore]
     public MemorySecurityScope? AuthenticatedScope { get; }
+    [JsonIgnore]
     public MemoryProvenance Provenance { get; }
     [JsonIgnore]
     public string? Content { get; }
     public string ContentDigest { get; }
+    [JsonIgnore]
     public IReadOnlyDictionary<string, string?> ModelSuppliedScope { get; }
+    [JsonIgnore]
     public IReadOnlyList<MemoryConflictCandidate> Conflicts { get; }
     public string? RunId { get; }
     public string? LogicalSessionId { get; }
     public MemoryDestination Destination { get; }
+    [JsonIgnore]
+    public MemoryRecordMetadata? RecordMetadata { get; }
+    public MemoryBudgetSnapshot? Budget { get; }
+    public bool HasAdministrativeCrossScopeCapability { get; }
 
     public MemoryGateContext WithContent(string? content)
         => new(

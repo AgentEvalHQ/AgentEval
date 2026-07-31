@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 1 core substrate complete; Phase 2 ready for implementation
+Status: Phase 2 deterministic gates complete; Phase 3 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -40,6 +40,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Tracking table](#tracking-table)
 - [Phase 0 design freeze record](#phase-0-design-freeze-record)
 - [Phase 1 implementation and review record](#phase-1-implementation-and-review-record)
+- [Phase 2 implementation and review record](#phase-2-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -75,12 +76,12 @@ document checks pass.
 | 1 | 1.3 | Add safe evidence, receipts, reason codes, and fingerprints | M | 100 | ✅ | 1.1–1.2 | Content-free receipts/fingerprints; raw and effective content excluded from JSON serialization |
 | 1 | 1.4 | Add quarantine and approval capability preflight | M | 100 | ✅ | 1.2 | Typed capabilities; enforcing policies fail construction without required disposition services or explicit fallback |
 | 1 | 1.R | Core contracts review | M | 100 | ✅ | 1.1–1.4 | Fixed enum acceptance, fingerprint omissions, and observe-mode mutation/enforcement; 30 tests pass on each supported TFM |
-| 2 | 2.1 | Implement `MemoryScopeIntegrityGate` | L | 0 | — | 1.R | Trusted resolver; no model-controlled scope |
-| 2 | 2.2 | Implement `MemoryWriteAdmissionGate` | L | 0 | — | 1.R | Provenance, secrets, inclusion/exclusion, promotion |
-| 2 | 2.3 | Implement `MemoryConflictGate` | L | 0 | — | 2.1–2.2 | Trust-aware reconciliation and independent corroboration |
-| 2 | 2.4 | Implement `MemoryRecallAdmissionGate` | L | 0 | — | 1.R, 2.1 | Integrity, citation, expiry, trust, delimiter policy |
-| 2 | 2.5 | Implement `MemoryResourceBudgetGate` | M | 0 | — | 1.R | Size/rate/retrieval/promotion caps |
-| 2 | 2.R | Deterministic gate review | M | 0 | — | 2.1–2.5 | False-open, false-block, complexity, ReDoS |
+| 2 | 2.1 | Implement `MemoryScopeIntegrityGate` | L | 100 | ✅ | 1.R | Required host scope, safe aliases, mismatch rejection/explicit ignore, administrative override, and no broader read scope |
+| 2 | 2.2 | Implement `MemoryWriteAdmissionGate` | L | 100 | ✅ | 1.R | Bounded provenance/trust/category/promotion checks, hidden-character rejection, instruction quarantine, and secret/PII redaction |
+| 2 | 2.3 | Implement `MemoryConflictGate` | L | 100 | ✅ | 2.1–2.2 | Higher-trust protection, same-lineage deduplication, and independent same-content corroboration |
+| 2 | 2.4 | Implement `MemoryRecallAdmissionGate` | L | 100 | ✅ | 1.R, 2.1 | Owner scope, state, TTL, integrity, citation, trust, instruction exclusion, and escaped bounded delimiters |
+| 2 | 2.5 | Implement `MemoryResourceBudgetGate` | M | 100 | ✅ | 1.R | Host snapshots enforce write/rate/retrieval/promotion/reconciliation/lineage/quarantine caps fail closed |
+| 2 | 2.R | Deterministic gate review | M | 100 | ✅ | 2.1–2.5 | Corrected corroboration, scope breadth, delimiter, ignored-policy, and serialization privacy findings; bounded non-backtracking regexes |
 | 3 | 3.1 | Add explicit memory tool contracts and classifier | L | 0 | — | 2.R | Never infer security semantics from names alone |
 | 3 | 3.2 | Adapt write/read tools to `IToolGate` and `IToolResultGate` | L | 0 | — | 3.1 | One MAF function middleware registration |
 | 3 | 3.3 | Implement `MemoryInfluenceGate` over recalled-memory lineage | L | 0 | — | 3.1–3.2 | Reuse Gatekeeper evidence/run scope |
@@ -298,6 +299,35 @@ stage/action legality, sanitizer re-entry, precedence, exception safety, cancell
 configuration snapshots, capability preflight, observe/enforce behavior, and concurrent isolation.
 They pass on `net8.0`, `net9.0`, and `net10.0`. A scoped MAF anti-pattern scan of the new production
 directory reported no findings. Phase 2 remains responsible for the concrete deterministic gates.
+## Phase 2 implementation and review record
+
+> **Completion date:** 2026-07-31
+>
+> Phase 2 implements provider-neutral deterministic decisions. It still does not claim that any MAF
+> tool, MCP, or context-provider surface is protected until the applicable Phase 3–5 adapter is
+> installed and Phase 7 coverage preflight succeeds.
+
+The five gates now enforce trusted host scope, bounded write admission, trust-aware reconciliation,
+recall admission, and host-computed resource caps. Credential/PII detection uses bounded
+non-backtracking regular expressions; other instruction and hidden-character checks are linear over
+the already bounded context. Recall delimiters escape metadata and refuse transformations that
+would exceed the absolute content bound.
+
+The focused false-open/false-block, privacy, and complexity review found and fixed these issues:
+
+- a contradictory equal-trust record was incorrectly counted as independent support for the new
+  candidate; corroboration now requires distinct existing roots with the candidate's digest;
+- scope options could permit read scope broader than authorized write scope;
+- the configured model-scope ignore path was fingerprinted but not applied;
+- delimiter metadata could inject markup or make sanitized content exceed the absolute bound;
+- default context serialization could expose raw authenticated/model scope, provenance, conflict,
+  and record identifiers.
+
+Forty-seven Phase 2 tests plus the thirty Phase 1 regressions pass on `net8.0`, `net9.0`, and
+`net10.0` (77 per target framework). Maximum-size content completes within the bounded test budget,
+configuration changes alter the pipeline fingerprint, and the scoped MAF anti-pattern scan reports
+zero findings.
+
 ## Goals and non-goals
 
 ### Goals
