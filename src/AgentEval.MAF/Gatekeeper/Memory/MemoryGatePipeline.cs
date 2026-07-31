@@ -56,6 +56,7 @@ public sealed class MemoryGatePipeline
 
     public IReadOnlyList<IMemoryGate> Gates => _gates;
     public MemorySecurityPolicy Policy { get; }
+    public MemoryGateCapabilities Capabilities => _capabilities;
     public string PolicyFingerprint { get; }
     public MemoryGateRequirements Requirements
         => _gates.Aggregate(MemoryGateRequirements.None, (current, gate) => current | gate.Requirements);

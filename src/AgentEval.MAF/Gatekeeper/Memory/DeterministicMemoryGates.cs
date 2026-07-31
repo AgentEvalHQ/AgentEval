@@ -167,6 +167,11 @@ public sealed class MemoryWriteAdmissionGate : IMemoryGate, IConfigurationFinger
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (context.Kind is MemoryOperationKind.Delete)
+        {
+            return Result(MemoryGateVerdict.Allow(PolicyName, "memory.write.content_not_applicable"));
+        }
+
         if (context.Content is null)
         {
             return Result(MemoryGateVerdict.Reject(PolicyName, "memory.write.content_missing"));

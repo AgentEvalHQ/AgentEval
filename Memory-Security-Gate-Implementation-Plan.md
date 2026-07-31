@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 2 deterministic gates complete; Phase 3 ready for implementation
+Status: Phase 3 local tool integration complete; Phase 4 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -41,6 +41,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Phase 0 design freeze record](#phase-0-design-freeze-record)
 - [Phase 1 implementation and review record](#phase-1-implementation-and-review-record)
 - [Phase 2 implementation and review record](#phase-2-implementation-and-review-record)
+- [Phase 3 implementation and review record](#phase-3-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -82,11 +83,11 @@ document checks pass.
 | 2 | 2.4 | Implement `MemoryRecallAdmissionGate` | L | 100 | ✅ | 1.R, 2.1 | Owner scope, state, TTL, integrity, citation, trust, instruction exclusion, and escaped bounded delimiters |
 | 2 | 2.5 | Implement `MemoryResourceBudgetGate` | M | 100 | ✅ | 1.R | Host snapshots enforce write/rate/retrieval/promotion/reconciliation/lineage/quarantine caps fail closed |
 | 2 | 2.R | Deterministic gate review | M | 100 | ✅ | 2.1–2.5 | Corrected corroboration, scope breadth, delimiter, ignored-policy, and serialization privacy findings; bounded non-backtracking regexes |
-| 3 | 3.1 | Add explicit memory tool contracts and classifier | L | 0 | — | 2.R | Never infer security semantics from names alone |
-| 3 | 3.2 | Adapt write/read tools to `IToolGate` and `IToolResultGate` | L | 0 | — | 3.1 | One MAF function middleware registration |
-| 3 | 3.3 | Implement `MemoryInfluenceGate` over recalled-memory lineage | L | 0 | — | 3.1–3.2 | Reuse Gatekeeper evidence/run scope |
-| 3 | 3.4 | Add memory-tool coverage analyzer | M | 0 | — | 3.1–3.3 | Refuse unclassified high-risk memory tools |
-| 3 | 3.R | Tool-surface review | M | 0 | — | 3.1–3.4 | Mutation, result redaction, approval, starvation |
+| 3 | 3.1 | Add explicit memory tool contracts and classifier | L | 100 | ✅ | 2.R | Immutable exact-name registry; descriptive hints only flag unclassified memory-like tools and never assign operation semantics |
+| 3 | 3.2 | Adapt write/read tools to `IToolGate` and `IToolResultGate` | L | 100 | ✅ | 3.1 | Pre-call mutation/block and post-result redact/exclude adapters compose through the existing single tool middleware |
+| 3 | 3.3 | Implement `MemoryInfluenceGate` over recalled-memory lineage | L | 100 | ✅ | 3.1–3.2 | Reuses run-scoped `TaintTrackingGate`; explicit memory sources and sensitive sinks; cancellation and safe reasons |
+| 3 | 3.4 | Add memory-tool coverage analyzer | M | 100 | ✅ | 3.1–3.3 | Per-tool coverage refuses unknown/hosted paths and mismatched registries/pipelines; configurable minimum coverage |
+| 3 | 3.R | Tool-surface review | M | 100 | ✅ | 3.1–3.4 | Fixed observe-mode overclaim, pipeline/registry mismatch, null sanitizer, cancellation, and transient-content serialization findings |
 | 4 | 4.1 | Implement `GatedAIContextProvider` decorator | L | 0 | — | 2.R | Wrap, do not append as a sibling provider |
 | 4 | 4.2 | Gate recalled messages/instructions/tools before merge | L | 0 | — | 4.1 | Dynamic tool coverage included |
 | 4 | 4.3 | Gate source messages before delegated persistence | L | 0 | — | 4.1 | Boundary coverage; not extracted-record coverage |
@@ -327,6 +328,40 @@ Forty-seven Phase 2 tests plus the thirty Phase 1 regressions pass on `net8.0`, 
 `net10.0` (77 per target framework). Maximum-size content completes within the bounded test budget,
 configuration changes alter the pipeline fingerprint, and the scoped MAF anti-pattern scan reports
 zero findings.
+
+
+## Phase 3 implementation and review record
+
+> **Completion date:** 2026-07-31
+>
+> Phase 3 protects declared local MAF function invocation paths. It does not upgrade generic context
+> providers, local/hosted MCP, provider-internal extraction, or direct repository access; those remain
+> Phase 4–5 work and retain their frozen maximum coverage.
+
+The exact-name operation registry is the only authority that assigns memory semantics. Name and
+Description hints can identify an unclassified memory-like tool, but cannot infer read/write,
+scope, promotion, or sensitivity behavior. Pre-call and post-result adapters translate registered
+operations into the existing Gatekeeper tool-gate interfaces, while disposition side effects execute
+once only after side-effect-free aggregation. The influence adapter reuses the run-scoped taint engine
+for conservative recalled-value flow into explicit sensitive sinks.
+
+The coverage analyzer reports each suspected or declared memory tool independently. It refuses
+unclassified and provider-hosted tools, validates matching registry and pipeline fingerprints, keeps
+local MCP at `Boundary`, distinguishes observe-only adapters from enforcement, and requires influence
+coverage before a sensitive local read can claim `FullLifecycle`.
+
+The focused security/API review found and fixed these issues:
+
+- observe-profile adapters could incorrectly satisfy an enforcing coverage threshold;
+- call and result adapters from different policy pipelines could be treated as a complete read path;
+- an influence gate from another registry could incorrectly upgrade sensitive-read coverage;
+- a trusted sanitizer returning null could fail open or propagate an invalid mutation;
+- caller cancellation was not checked before influence inspection;
+- the executor's transient effective content could be serialized by default;
+- content-independent delete operations were incorrectly rejected for lacking candidate content.
+
+Thirty-seven Phase 3 tests and all 143 memory regressions pass on `net8.0`, `net9.0`, and
+`net10.0`. The scoped MAF anti-pattern scan reports zero findings.
 
 ## Goals and non-goals
 
