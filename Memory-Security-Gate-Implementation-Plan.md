@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 4 context-provider integration complete; Phase 5 ready for implementation
+Status: Phase 5 MCP integration complete; Phase 6 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -43,6 +43,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Phase 2 implementation and review record](#phase-2-implementation-and-review-record)
 - [Phase 3 implementation and review record](#phase-3-implementation-and-review-record)
 - [Phase 4 implementation and review record](#phase-4-implementation-and-review-record)
+- [Phase 5 implementation and review record](#phase-5-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -94,11 +95,11 @@ document checks pass.
 | 4 | 4.3 | Gate source messages before delegated persistence | L | 100 | ✅ | 4.1 | Successful invocation messages gated before provider delegation; generic provider remains honestly capped at `Boundary` |
 | 4 | 4.4 | Define provider-native candidate-write hook | L | 100 | ✅ | 4.1–4.3 | Versioned provider identity/capabilities plus candidate-write and recalled-item hooks |
 | 4 | 4.R | Context-provider review | M | 100 | ✅ | 4.1–4.4 | Fixed structured-content bypass, raw-representation leakage, identity binding, bounded failure, and continuation observability |
-| 5 | 5.1 | Protect local `McpClientTool` memory operations | M | 0 | — | 3.R | AIFunction/function-middleware path |
-| 5 | 5.2 | Add owned MCP server-side memory gate adapter | L | 0 | — | 2.R | Enforce immediately before service/repository access |
-| 5 | 5.3 | Add hosted MCP coverage/approval policy | L | 0 | — | 3.4 | Refuse full-enforcement claim without inspectable hook |
-| 5 | 5.4 | Add MCP read-result admission and safe error mapping | M | 0 | — | 5.1–5.3 | No provider exception or credential leakage |
-| 5 | 5.R | MCP review | M | 0 | — | 5.1–5.4 | Local/hosted/server threat boundaries |
+| 5 | 5.1 | Protect local `McpClientTool` memory operations | M | 100 | ✅ | 3.R | Exact server/version/transport/schema binding composes with existing AIFunction call/result middleware; client-only remains `Boundary` |
+| 5 | 5.2 | Add owned MCP server-side memory gate adapter | L | 100 | ✅ | 2.R | Generic wrapper gates immediately before backend access and recalled-result serialization; backend is never called after denial |
+| 5 | 5.3 | Add hosted MCP coverage/approval policy | L | 100 | ✅ | 3.4 | Per-operation `Unsupported`/`ActionOnly`/`FullLifecycle`; full requires complete callbacks or matching stage-complete owned-server evidence |
+| 5 | 5.4 | Add MCP read-result admission and safe error mapping | M | 100 | ✅ | 5.1–5.3 | Read results allow/sanitize/deny before return; backend/adapter errors expose only owned reason and correlation codes |
+| 5 | 5.R | MCP review | M | 100 | ✅ | 5.1–5.4 | Fixed bounds, schema ambiguity, invented semantics, incomplete fingerprints/matching, and empty-pipeline overclaim |
 | 6 | 6.1 | Add persistent memory-poisoning attack corpus | L | 0 | — | 2.R | Four write channels plus cross-session activation |
 | 6 | 6.2 | Add deterministic security and utility evaluators | L | 0 | — | 6.1 | CompositeEvals-compatible |
 | 6 | 6.3 | Add mocked SQL, browser, email/cloud, MCP, and context providers | L | 0 | — | 3.R–5.R | No real provider required |
@@ -403,6 +404,46 @@ Twenty-nine Phase 4 tests and all 172 memory regressions pass on `net8.0`, `net9
 dynamic tool coverage, enforce/observe behavior, safe provider failures, structured-content
 rejection, representation normalization, quarantine/approval, provider-native identity and
 capabilities, and serialization privacy. The scoped MAF anti-pattern scan reports zero findings.
+
+## Phase 5 implementation and review record
+
+> **Completion date:** 2026-07-31
+>
+> Phase 5 protects local MCP client boundaries and owned MCP servers, and reports hosted MCP
+> limitations per operation. A local client alone remains capped at `Boundary`; provider-hosted
+> execution is never silently grouped with owned server enforcement.
+
+Local MCP bindings pin the exact server identity, version, transport, operation semantics, and
+canonical JSON schema fingerprint. The actual `AIFunction` schema can be fingerprinted directly,
+and schema drift invalidates coverage. Calls and results continue through the one existing
+Gatekeeper function middleware, so this phase adds no parallel invocation loop.
+
+`MemoryMcpServerGate<TRequest, TResult>` wraps an owned server handler. It evaluates request
+stages and executes quarantine/approval before invoking the backend, then gates recalled content
+before the transport can serialize it. Denied requests never reach the repository callback.
+Backend and adapter failures are replaced with AgentEval-owned reason codes and bounded correlation
+IDs without retaining an inner provider exception.
+
+Hosted coverage remains explicit: mandatory provider approval is `ActionOnly`, incomplete or
+unapproved opaque execution is `Unsupported`, and `FullLifecycle` requires complete provider
+callbacks or matching owned-server evidence plus required derived-action coverage. Owned-server
+evidence itself requires an enforcing, stage-complete pipeline and a fingerprinted trusted adapter.
+
+The focused local/hosted/server threat-boundary review found and fixed these issues:
+
+- operation and coverage inventories were initially unbounded;
+- ambiguous duplicate-property schemas needed rejection before canonical hashing;
+- an unregistered MCP binding was assigned an invented placeholder operation kind;
+- owned-server matching omitted version and complete operation security semantics;
+- server and hosted fingerprints omitted content/scope fields and adapter configuration;
+- an empty server pipeline could emit evidence that upgraded client coverage;
+- coverage reports lacked a stable content-free configuration fingerprint.
+
+Forty Phase 5 tests and all 212 memory regressions pass on `net8.0`, `net9.0`, and
+`net10.0`. Tests prove schema-drift refusal, backend non-invocation after denial, request/result
+sanitization, quarantine single execution, cancellation, safe error mapping, serialization privacy,
+local/client/server coverage composition, adapter fingerprinting, and hosted-MCP claim ceilings.
+The scoped MAF anti-pattern scan reports zero findings.
 
 ## Goals and non-goals
 
