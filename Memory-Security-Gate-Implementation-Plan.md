@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 3 local tool integration complete; Phase 4 ready for implementation
+Status: Phase 4 context-provider integration complete; Phase 5 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -42,6 +42,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Phase 1 implementation and review record](#phase-1-implementation-and-review-record)
 - [Phase 2 implementation and review record](#phase-2-implementation-and-review-record)
 - [Phase 3 implementation and review record](#phase-3-implementation-and-review-record)
+- [Phase 4 implementation and review record](#phase-4-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -88,11 +89,11 @@ document checks pass.
 | 3 | 3.3 | Implement `MemoryInfluenceGate` over recalled-memory lineage | L | 100 | ✅ | 3.1–3.2 | Reuses run-scoped `TaintTrackingGate`; explicit memory sources and sensitive sinks; cancellation and safe reasons |
 | 3 | 3.4 | Add memory-tool coverage analyzer | M | 100 | ✅ | 3.1–3.3 | Per-tool coverage refuses unknown/hosted paths and mismatched registries/pipelines; configurable minimum coverage |
 | 3 | 3.R | Tool-surface review | M | 100 | ✅ | 3.1–3.4 | Fixed observe-mode overclaim, pipeline/registry mismatch, null sanitizer, cancellation, and transient-content serialization findings |
-| 4 | 4.1 | Implement `GatedAIContextProvider` decorator | L | 0 | — | 2.R | Wrap, do not append as a sibling provider |
-| 4 | 4.2 | Gate recalled messages/instructions/tools before merge | L | 0 | — | 4.1 | Dynamic tool coverage included |
-| 4 | 4.3 | Gate source messages before delegated persistence | L | 0 | — | 4.1 | Boundary coverage; not extracted-record coverage |
-| 4 | 4.4 | Define provider-native candidate-write hook | L | 0 | — | 4.1–4.3 | Required for full write coverage |
-| 4 | 4.R | Context-provider review | M | 0 | — | 4.1–4.4 | StateKeys, session state, ordering, failure behavior |
+| 4 | 4.1 | Implement `GatedAIContextProvider` decorator | L | 100 | ✅ | 2.R | Wraps one provider; freezes state keys; delegates service lookup; carries no per-session instance state |
+| 4 | 4.2 | Gate recalled messages/instructions/tools before merge | L | 100 | ✅ | 4.1 | Bounded snapshots; messages/instructions gated before return; dynamic memory tools require matching registered coverage |
+| 4 | 4.3 | Gate source messages before delegated persistence | L | 100 | ✅ | 4.1 | Successful invocation messages gated before provider delegation; generic provider remains honestly capped at `Boundary` |
+| 4 | 4.4 | Define provider-native candidate-write hook | L | 100 | ✅ | 4.1–4.3 | Versioned provider identity/capabilities plus candidate-write and recalled-item hooks |
+| 4 | 4.R | Context-provider review | M | 100 | ✅ | 4.1–4.4 | Fixed structured-content bypass, raw-representation leakage, identity binding, bounded failure, and continuation observability |
 | 5 | 5.1 | Protect local `McpClientTool` memory operations | M | 0 | — | 3.R | AIFunction/function-middleware path |
 | 5 | 5.2 | Add owned MCP server-side memory gate adapter | L | 0 | — | 2.R | Enforce immediately before service/repository access |
 | 5 | 5.3 | Add hosted MCP coverage/approval policy | L | 0 | — | 3.4 | Refuse full-enforcement claim without inspectable hook |
@@ -362,6 +363,46 @@ The focused security/API review found and fixed these issues:
 
 Thirty-seven Phase 3 tests and all 143 memory regressions pass on `net8.0`, `net9.0`, and
 `net10.0`. The scoped MAF anti-pattern scan reports zero findings.
+
+## Phase 4 implementation and review record
+
+> **Completion date:** 2026-07-31
+>
+> Phase 4 protects the generic `AIContextProvider` boundary and defines a provider-native hook.
+> A generic provider is still capped at `Boundary`: AgentEval cannot claim that records extracted
+> and persisted inside an opaque provider were inspected.
+
+`GatedAIContextProvider` wraps exactly one provider rather than running as a sibling. It preserves
+the wrapped provider's lifecycle context, state keys, and service lookup while keeping trusted
+scope and session state in per-invocation contexts. Bounded materialization happens before policy
+inspection. Recalled instructions and messages are gated before they reach the model, dynamic
+memory tools require matching registered call/result coverage, and source messages are gated before
+the wrapped provider receives them for persistence.
+
+Enforce mode normalizes allowed or sanitized text into representation-free messages, preserves
+provider attribution, and rejects opaque structured content that cannot be safely reconstructed.
+Provider failures map to content-free reason codes; an explicitly configured continuation mode
+requires an event sink so degraded protection cannot be silent. Caller cancellation propagates.
+
+The provider-native contract binds a versioned provider identity, declared candidate-write and
+recalled-item capabilities, and a configuration fingerprint to pipeline-backed hooks. Candidate
+writes execute quarantine/approval dispositions before provider commit, while recalled items are
+admitted before formatting. A generic wrapper never uses this contract to overstate its coverage.
+
+The focused security/API review found and fixed these issues:
+
+- non-text provider messages could bypass content inspection;
+- allowed messages could retain provider-specific raw representations after inspection;
+- provider-native hook calls did not initially prove the caller matched the declared provider;
+- malformed reason codes and incomplete fingerprints weakened stable configuration evidence;
+- provider enumeration and dynamic-tool output needed explicit bounds and safe failure mapping;
+- a continuation policy could otherwise suppress provider failures without observable evidence.
+
+Twenty-nine Phase 4 tests and all 172 memory regressions pass on `net8.0`, `net9.0`, and
+`net10.0`. Tests cover lifecycle ordering, state keys, attribution, concurrency, cancellation,
+dynamic tool coverage, enforce/observe behavior, safe provider failures, structured-content
+rejection, representation normalization, quarantine/approval, provider-native identity and
+capabilities, and serialization privacy. The scoped MAF anti-pattern scan reports zero findings.
 
 ## Goals and non-goals
 
