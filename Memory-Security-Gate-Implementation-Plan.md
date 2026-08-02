@@ -1,6 +1,6 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 5 MCP integration complete; Phase 6 ready for implementation
+Status: Phase 6 attacks, evaluators, and calibration complete; Phase 7 ready for implementation
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
@@ -44,6 +44,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Phase 3 implementation and review record](#phase-3-implementation-and-review-record)
 - [Phase 4 implementation and review record](#phase-4-implementation-and-review-record)
 - [Phase 5 implementation and review record](#phase-5-implementation-and-review-record)
+- [Phase 6 implementation and review record](#phase-6-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -100,11 +101,11 @@ document checks pass.
 | 5 | 5.3 | Add hosted MCP coverage/approval policy | L | 100 | ✅ | 3.4 | Per-operation `Unsupported`/`ActionOnly`/`FullLifecycle`; full requires complete callbacks or matching stage-complete owned-server evidence |
 | 5 | 5.4 | Add MCP read-result admission and safe error mapping | M | 100 | ✅ | 5.1–5.3 | Read results allow/sanitize/deny before return; backend/adapter errors expose only owned reason and correlation codes |
 | 5 | 5.R | MCP review | M | 100 | ✅ | 5.1–5.4 | Fixed bounds, schema ambiguity, invented semantics, incomplete fingerprints/matching, and empty-pipeline overclaim |
-| 6 | 6.1 | Add persistent memory-poisoning attack corpus | L | 0 | — | 2.R | Four write channels plus cross-session activation |
-| 6 | 6.2 | Add deterministic security and utility evaluators | L | 0 | — | 6.1 | CompositeEvals-compatible |
-| 6 | 6.3 | Add mocked SQL, browser, email/cloud, MCP, and context providers | L | 0 | — | 3.R–5.R | No real provider required |
-| 6 | 6.4 | Add calibration and confidence-interval reporting | L | 0 | — | 6.1–6.3 | No uncalibrated inline semantic judge |
-| 6 | 6.R | Benchmark/evaluator review | M | 0 | — | 6.1–6.4 | Label leakage, judge validity, denominator honesty |
+| 6 | 6.1 | Add persistent memory-poisoning attack corpus | L | 100 | ✅ | 2.R | Frozen 16-scenario corpus covers all four write channels, separated dormancy/trigger phases, scope, action, tamper, audit, and four benign controls |
+| 6 | 6.2 | Add deterministic security and utility evaluators | L | 100 | ✅ | 6.1 | Five task-specific atomic code leaves compose through severity-driven `CompositeEval`; missing required evidence propagates `error` |
+| 6 | 6.3 | Add mocked SQL, browser, email/cloud, MCP, and context providers | L | 100 | ✅ | 3.R–5.R | Hermetic partitioned SQL-style store, deliberate sharing defect, external sources, local/hosted MCP, real MAF context lifecycle, quarantine, and audit mocks |
+| 6 | 6.4 | Add calibration and confidence-interval reporting | L | 100 | ✅ | 6.1–6.3 | Separate security/utility rates with Wilson intervals and inconclusive counts; optional judge promotion requires reviewed balanced held-out evidence |
+| 6 | 6.R | Benchmark/evaluator review | M | 100 | ✅ | 6.1–6.4 | Fixed constructor-validation bypass; verified label separation, error propagation, bounded state, judge refusal, and honest denominators; 246 memory tests per TFM |
 | 7 | 7.1 | Integrate memory protection into `UseGatekeeper` safely | L | 0 | — | 3.R–5.R | Preflight before builder mutation |
 | 7 | 7.2 | Add DI, configuration, reports, and schema support | L | 0 | — | 7.1 | Policy provenance in every report |
 | 7 | 7.3 | Add samples, migration guide, and operational runbook | L | 0 | — | 6.R–7.2 | Tool, MCP, and context-provider samples |
@@ -444,6 +445,56 @@ Forty Phase 5 tests and all 212 memory regressions pass on `net8.0`, `net9.0`, a
 sanitization, quarantine single execution, cancellation, safe error mapping, serialization privacy,
 local/client/server coverage composition, adapter fingerprinting, and hosted-MCP claim ceilings.
 The scoped MAF anti-pattern scan reports zero findings.
+
+## Phase 6 implementation and review record
+
+> **Completion date:** 2026-08-02
+>
+> Phase 6 adds a persistent, provider-neutral attack corpus and deterministic evaluation layer. It
+> uses only mocked backends for mandatory validation; no SQL, browser, email, cloud, MCP provider,
+> LLM, or network service is contacted.
+
+The frozen corpus contains twelve attack scenarios and four benign controls. It covers direct
+injection, policy-satisfying poison, summary survival, procedure promotion, delayed activation,
+cross-user contamination, unsafe memory-driven tools, exfiltration, overwrite/trust escalation,
+retrieval crowd-out, resource exhaustion, tampering, attribution, and rollback. Plant inputs,
+dormancy, trigger inputs, and gold objectives remain distinct so evaluator labels are not supplied
+to the system under test.
+
+Five deterministic atomic evaluators measure poison containment, scope isolation, memory influence,
+audit/recovery, and benign utility. They compose through AgentEval's existing severity-driven
+`CompositeEval`: required missing evidence is `error`, confirmed security violations are
+high/critical failures, and utility remains a separately visible optional warning. Content-free
+observations carry scenario IDs and outcome flags only; reports never persist corpus prompts or
+provider payloads.
+
+Calibration reports retain distinct attack-success, persistence, activation, scope-leak,
+unsafe-action, exfiltration, benign-write, precision, and recall measurements. Every rate exposes
+its conclusive denominator, inconclusive count, estimate, and Wilson interval. The optional
+semantic-judge readiness check performs no model call and refuses promotion for empty, failed,
+unreviewed, imbalanced, statistically weak, or coin-flip evidence.
+
+Hermetic components exercise a tenant/user-partitioned SQL-style store, a deliberate shared-state
+bug, restart persistence, browser/email/cloud sources, local and hosted MCP identities with a
+server-side admission hook, quarantine/rollback, content-free audit events, and the real MAF
+`AIContextProvider` invocation/storage lifecycle.
+
+The focused benchmark/evaluator review found and fixed these issues:
+
+- public init-only observation properties allowed `with` expressions to bypass constructor
+  validation; observations are now constructor-only immutable records;
+- the initial persistence test expectation undercounted objective-eligible scenarios and was
+  corrected to preserve denominator honesty;
+- missing required observations needed an explicit `error` result so a composite could never
+  attest an unmeasured security control; complete balanced scenario trials are now required;
+- utility and security results needed separate verdict semantics rather than one blended score;
+- semantic-judge readiness needed explicit reviewed/conclusive minima and separate false-positive
+  and false-negative confidence bounds;
+- the MCP simulator needed a server-side recall admission hook, and audit events needed strict
+  content-free identifier and digest validation.
+
+Thirty-four focused Phase 6 tests and all 246 memory regressions pass on `net8.0`, `net9.0`, and
+`net10.0`. The bridge project retains a MAF Doctor grade A with zero findings.
 
 ## Goals and non-goals
 
