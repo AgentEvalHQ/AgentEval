@@ -191,6 +191,19 @@ public sealed class DeterministicMemoryGatesTests
     }
 
     [Fact]
+    public async Task WriteGate_MaximumBoundedInput_ConcurrentCalls_DoNotTimeout()
+    {
+        var value = new string('a', MemoryGateContext.MaximumContentCharacters);
+        var gate = new MemoryWriteAdmissionGate(new MemoryWriteAdmissionOptions(
+            maximumContentCharacters: MemoryGateContext.MaximumContentCharacters));
+
+        var verdicts = await Task.WhenAll(Enumerable.Range(0, 64).Select(async _ =>
+            await gate.InspectAsync(Context(content: value))));
+
+        Assert.All(verdicts, verdict => Assert.Equal(MemoryGateAction.Allow, verdict.Action));
+    }
+
+    [Fact]
     public async Task ConflictGate_NoConflicts_Allows()
     {
         var verdict = await new MemoryConflictGate().InspectAsync(Context());

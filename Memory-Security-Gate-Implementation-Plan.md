@@ -110,7 +110,7 @@ document checks pass.
 | 7 | 7.1 | Integrate memory protection into `UseGatekeeper` safely | L | 100 | ✅ | 3.R–5.R | Single `ProtectMemory` path; all memory preflight before builder mutation; 10 integration tests per TFM |
 | 7 | 7.2 | Add DI, configuration, reports, and schema support | L | 100 | ✅ | 7.1 | Strict fingerprint-pinned JSON, explicit DI, embedded schemas, nested provenance, and adapter fingerprint; 17 combined Phase 7 tests per TFM |
 | 7 | 7.3 | Add samples, migration guide, and operational runbook | L | 100 | ✅ | 6.R–7.2 | Eight runnable offline scenarios; operations, incident/rollback, migration, and coverage guidance; DocFX adds no warnings |
-| 7 | 7.4 | Run full offline and authorized live validation | L | 100 | ✅ | 7.1–7.3 | 29,447 full-suite passes; 263 memory tests per TFM; 8/8 samples; authorized live A2A calibration 100/100 |
+| 7 | 7.4 | Run full offline and authorized live validation | L | 100 | ✅ | 7.1–7.3 | 29,450 full-suite passes; 264 memory tests per TFM; 8/8 samples; authorized live A2A calibration 100/100 |
 | 7 | 7.R | Release-readiness review | M | 100 | ✅ | 7.1–7.4 | Findings fixed; format/diff/build/tests/DocFX clean; scoped MAF scans report zero findings |
 
 ## Phase 0 design freeze record
@@ -561,9 +561,9 @@ outside the new documents. A release review caught and fixed the initially missi
 
 ### Task 7.4 — offline and authorized live validation
 
-The Release solution builds with zero errors and no new Phase 7 warnings; a non-incremental build reports the repository's 153 pre-existing compiler/analyzer warnings. The full solution test run passes 27,653
-main tests, 1,785 dedicated memory tests, and 9 NuGet-consumer tests (29,447 total), with only
-explicit manual tests skipped. The memory filter passes 263 tests on each supported TFM, and the
+The Release solution builds with zero errors and no new Phase 7 warnings; a non-incremental build reports the repository's 153 pre-existing compiler/analyzer warnings. The full solution test run passes 27,656
+main tests, 1,785 dedicated memory tests, and 9 NuGet-consumer tests (29,450 total), with only
+explicit manual tests skipped. The memory filter passes 264 tests on each supported TFM, and the
 eight-scenario release runner passes 8/8.
 
 Memory enforcement is deterministic and has no memory-specific network judge. As complementary
@@ -578,7 +578,11 @@ The focused review fixed an observe-mode influence composition defect, incomplet
 provenance, a configuration fingerprint that initially omitted adapter differences, and local-MCP
 coverage accounting that did not initially recognize matching owned-server full-lifecycle evidence.
 Client-only MCP remains capped at `Boundary`; hosted opaque paths still fail closed. The review also
-fixed documentation navigation and applied repository formatting to all changed C# files.
+fixed documentation navigation and applied repository formatting to all changed C# files. Hosted CI then exposed a
+50 ms regex timeout that could expire under parallel runner load; redaction now uses a centralized 300 ms extended
+cap over bounded non-backtracking patterns, fails closed on timeout, and has a 64-way concurrent
+maximum-input regression. Token-like dummy fingerprints are generated at runtime so security scanning
+does not misclassify test fixtures as credentials.
 
 Git whitespace checks, formatter verification, Release build, the focused/memory/full test suites,
 the offline runner, and DocFX validation pass. Scoped MAF anti-pattern scans of the changed

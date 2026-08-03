@@ -4,6 +4,7 @@
 
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper.Memory;
 
@@ -118,15 +119,17 @@ public sealed class MemoryScopeIntegrityGate : IMemoryGate, IConfigurationFinger
 /// <summary>Applies bounded provenance, trust, content, and promotion checks before persistence.</summary>
 public sealed class MemoryWriteAdmissionGate : IMemoryGate, IConfigurationFingerprintContributor
 {
+    private static readonly TimeSpan RegexTimeout = GateRegexTimeouts.Extended;
+
     private static readonly Regex CredentialPattern = new(
         @"\b(api[_-]?key|password|secret|token)\b\s*[:=]\s*[^\s,;]+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
-        TimeSpan.FromMilliseconds(50));
+        RegexTimeout);
 
     private static readonly Regex EmailPattern = new(
         @"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
-        TimeSpan.FromMilliseconds(50));
+        RegexTimeout);
 
     private static readonly string[] InstructionSignals =
     [
@@ -219,9 +222,18 @@ public sealed class MemoryWriteAdmissionGate : IMemoryGate, IConfigurationFinger
 
         if (_options.SanitizeSecrets)
         {
-            var sanitized = EmailPattern.Replace(
-                CredentialPattern.Replace(context.Content, "$1=[REDACTED]"),
-                "[REDACTED_EMAIL]");
+            string sanitized;
+            try
+            {
+                sanitized = EmailPattern.Replace(
+                    CredentialPattern.Replace(context.Content, "$1=[REDACTED]"),
+                    "[REDACTED_EMAIL]");
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return Result(MemoryGateVerdict.Reject(PolicyName, "memory.write.redaction_timeout"));
+            }
+
             if (!string.Equals(sanitized, context.Content, StringComparison.Ordinal))
             {
                 return Result(MemoryGateVerdict.Sanitize(

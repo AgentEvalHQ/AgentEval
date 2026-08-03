@@ -15,6 +15,23 @@ namespace AgentEval.Tests.MAF.Gatekeeper;
 
 public sealed class MemoryProtectionConfigurationTests
 {
+    public static IEnumerable<object[]> InvalidConfigurations()
+    {
+        var fingerprint = new string('a', 64);
+        yield return
+        [
+            "{\"schema\":\"gatekeeper.memory-protection/1\",\"schema\":\"gatekeeper.memory-protection/1\",\"expectedPolicyFingerprint\":\"" +
+            fingerprint + "\",\"minimumCoverage\":\"Boundary\"}",
+            "duplicate_property",
+        ];
+        yield return
+        [
+            "{\"schema\":\"gatekeeper.memory-protection/1\",\"expectedPolicyFingerprint\":\"" +
+            fingerprint + "\",\"minimumCoverage\":\"Boundary\",\"typeName\":\"Unsafe.Runtime.Type\"}",
+            "unknown_property",
+        ];
+    }
+
     [Fact]
     public void ParseJson_ValidStrictConfiguration_BindsReviewedPolicy()
     {
@@ -34,8 +51,7 @@ public sealed class MemoryProtectionConfigurationTests
     }
 
     [Theory]
-    [InlineData("{\"schema\":\"gatekeeper.memory-protection/1\",\"schema\":\"gatekeeper.memory-protection/1\",\"expectedPolicyFingerprint\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"minimumCoverage\":\"Boundary\"}", "duplicate_property")]
-    [InlineData("{\"schema\":\"gatekeeper.memory-protection/1\",\"expectedPolicyFingerprint\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"minimumCoverage\":\"Boundary\",\"typeName\":\"Unsafe.Runtime.Type\"}", "unknown_property")]
+    [MemberData(nameof(InvalidConfigurations))]
     public void ParseJson_DuplicateOrUnknownProperty_Refuses(string json, string reason)
     {
         var exception = Assert.Throws<MemoryProtectionConfigurationException>(() =>
@@ -50,10 +66,10 @@ public sealed class MemoryProtectionConfigurationTests
         var configuration = MemoryProtectionConfiguration.ParseJson("""
             {
               "schema": "gatekeeper.memory-protection/1",
-              "expectedPolicyFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "expectedPolicyFingerprint": "POLICY",
               "minimumCoverage": "Boundary"
             }
-            """);
+            """.Replace("POLICY", new string('a', 64), StringComparison.Ordinal));
         var protection = new MemoryProtectionOptions(
             Pipeline(),
             new MemoryToolOperationRegistry([]),
