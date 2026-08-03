@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Guardrails;
+using AgentEval.MAF.Gatekeeper.Memory;
 using Microsoft.Agents.AI;
 
 namespace AgentEval.MAF.Gatekeeper;
@@ -51,6 +52,7 @@ public static class AgentEvalGatekeeperExtensions
 
         NormalizeContractGate(options);
         NormalizeContainmentGates(options, resolvedOptions);
+        ComposeMemoryProtection(options, enforcement);
 
         // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
         // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
@@ -344,6 +346,37 @@ public static class AgentEvalGatekeeperExtensions
         }
 
         return builder.UseGatekeeper(level, configure);
+    }
+
+    private static void ComposeMemoryProtection(
+        GatekeeperOptions options,
+        GatekeeperEnforcement enforcement)
+    {
+        if (options.MemoryProtection is null)
+        {
+            return;
+        }
+
+        if (options.ToolGates.Any(gate => gate is MemoryToolCallGate or MemoryInfluenceGate) ||
+            options.ToolResultGates.Any(gate => gate is MemoryToolResultGate))
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: ProtectMemory(...) cannot be combined with manually registered memory " +
+                "call, result, or influence adapters. Use the single composite memory-protection path.");
+        }
+
+        var resolved = MemoryProtectionOptionsResolver.Resolve(
+            options.MemoryProtection,
+            enforcement,
+            options.KnownTools);
+        options.ToolGates.Add(resolved.CallGate);
+        if (resolved.InfluenceGate is not null)
+        {
+            options.ToolGates.Add(resolved.InfluenceGate);
+        }
+
+        options.ToolResultGates.Add(resolved.ResultGate);
+        options.MemoryProtectionReport = resolved.Report;
     }
 
     private static void NormalizeContractGate(GatekeeperOptions options)

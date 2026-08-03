@@ -1,10 +1,10 @@
 # Memory Security Gate implementation plan
 
-Status: Phase 6 attacks, evaluators, and calibration complete; Phase 7 ready for implementation
+Status: Phase 7 composite integration complete and release-reviewed
 Date: 2026-07-29
 Target: AgentEval on Microsoft Agent Framework (MAF) .NET 1.13.0
 Scope: memory exposed as local tools, MCP tools/servers, and custom `AIContextProvider` implementations
-Out of scope for this document: implementation, provider credentials, production data migration, and a claim that memory poisoning can be eliminated
+Out of scope for this document: provider credentials, production data migration, and a claim that memory poisoning can be eliminated
 
 ## Executive decision
 
@@ -45,6 +45,7 @@ they satisfy AgentEval's existing calibration requirements on a representative g
 - [Phase 4 implementation and review record](#phase-4-implementation-and-review-record)
 - [Phase 5 implementation and review record](#phase-5-implementation-and-review-record)
 - [Phase 6 implementation and review record](#phase-6-implementation-and-review-record)
+- [Phase 7 implementation and review record](#phase-7-implementation-and-review-record)
 - [Project ownership and dependency freeze](#project-ownership-and-dependency-freeze)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Evidence and current architecture](#evidence-and-current-architecture)
@@ -106,11 +107,11 @@ document checks pass.
 | 6 | 6.3 | Add mocked SQL, browser, email/cloud, MCP, and context providers | L | 100 | ✅ | 3.R–5.R | Hermetic partitioned SQL-style store, deliberate sharing defect, external sources, local/hosted MCP, real MAF context lifecycle, quarantine, and audit mocks |
 | 6 | 6.4 | Add calibration and confidence-interval reporting | L | 100 | ✅ | 6.1–6.3 | Separate security/utility rates with Wilson intervals and inconclusive counts; optional judge promotion requires reviewed balanced held-out evidence |
 | 6 | 6.R | Benchmark/evaluator review | M | 100 | ✅ | 6.1–6.4 | Fixed constructor-validation bypass; verified label separation, error propagation, bounded state, judge refusal, and honest denominators; 246 memory tests per TFM |
-| 7 | 7.1 | Integrate memory protection into `UseGatekeeper` safely | L | 0 | — | 3.R–5.R | Preflight before builder mutation |
-| 7 | 7.2 | Add DI, configuration, reports, and schema support | L | 0 | — | 7.1 | Policy provenance in every report |
-| 7 | 7.3 | Add samples, migration guide, and operational runbook | L | 0 | — | 6.R–7.2 | Tool, MCP, and context-provider samples |
-| 7 | 7.4 | Run full offline and authorized live validation | L | 0 | — | 7.1–7.3 | All TFMs; live only with explicit authorization |
-| 7 | 7.R | Release-readiness review | M | 0 | — | 7.1–7.4 | All acceptance criteria and claims verified |
+| 7 | 7.1 | Integrate memory protection into `UseGatekeeper` safely | L | 100 | ✅ | 3.R–5.R | Single `ProtectMemory` path; all memory preflight before builder mutation; 10 integration tests per TFM |
+| 7 | 7.2 | Add DI, configuration, reports, and schema support | L | 100 | ✅ | 7.1 | Strict fingerprint-pinned JSON, explicit DI, embedded schemas, nested provenance, and adapter fingerprint; 17 combined Phase 7 tests per TFM |
+| 7 | 7.3 | Add samples, migration guide, and operational runbook | L | 100 | ✅ | 6.R–7.2 | Eight runnable offline scenarios; operations, incident/rollback, migration, and coverage guidance; DocFX adds no warnings |
+| 7 | 7.4 | Run full offline and authorized live validation | L | 100 | ✅ | 7.1–7.3 | 29,447 full-suite passes; 263 memory tests per TFM; 8/8 samples; authorized live A2A calibration 100/100 |
+| 7 | 7.R | Release-readiness review | M | 100 | ✅ | 7.1–7.4 | Findings fixed; format/diff/build/tests/DocFX clean; scoped MAF scans report zero findings |
 
 ## Phase 0 design freeze record
 
@@ -495,6 +496,95 @@ The focused benchmark/evaluator review found and fixed these issues:
 
 Thirty-four focused Phase 6 tests and all 246 memory regressions pass on `net8.0`, `net9.0`, and
 `net10.0`. The bridge project retains a MAF Doctor grade A with zero findings.
+
+
+## Phase 7 implementation and review record
+
+> **Task 7.1 completion date:** 2026-08-02
+>
+> Phase 7 release integration is in progress. This record is updated after each task's focused
+> review; it does not claim Tasks 7.2–7.R are complete.
+
+`GatekeeperOptions.ProtectMemory(...)` is the single composite configuration path. Its resolver
+freezes caller-owned collections, requires Gatekeeper enforcement to match the memory policy
+profile, constructs matching call/result/influence adapters, and evaluates local tools, local and
+hosted MCP, generic context providers, and provider-native hooks before `AIAgentBuilder` is
+mutated. Enforcing policies refuse unclassified memory-like tools and any declared surface below
+the policy minimum.
+
+`MemoryProtectionReport` is computed from the exact adapters selected for composition. Every
+report carries policy identity, version, profile, minimum coverage, policy fingerprint, surface
+reports, and a content-free configuration fingerprint. Generic context-provider decorators remain
+capped at `Boundary`; complete provider-native candidate-write and recalled-item hooks may prove
+`FullLifecycle`; hosted MCP remains separate and approval-only paths cannot be promoted to full
+coverage.
+
+The Task 7.1 review found and fixed an observe-mode composition defect: sensitive-sink
+configuration initially created the enforcing `MemoryInfluenceGate`, conflicting with
+Gatekeeper's `WarnOnly` floor. Observe now composes only observe-capable call/result adapters and
+reports `ObserveOnly`; influence enforcement is installed only for an enforcing memory profile.
+Ten focused integration tests pass on `net8.0`, `net9.0`, and `net10.0`.
+
+
+### Task 7.2 — DI, configuration, reports, and schemas
+
+Memory protection can be registered explicitly as a singleton instance or factory through
+`AddAgentEvalMemoryProtection`. Strict JSON configuration pins a reviewed SHA-256 policy
+fingerprint, the exact minimum coverage, and a bounded sensitive-sink list; it cannot activate
+runtime types or replace code/DI-owned gates and adapters. Unknown properties, duplicate
+properties, invalid enums, oversized documents, and configuration/runtime drift fail closed.
+
+The embedded `gatekeeper.memory-protection/1` configuration schema and
+`gatekeeper.memory-protection-report/1` report schema are validated in tests. The authoritative
+report and its nested tool, MCP, and provider reports carry policy provenance. A separate adapter
+fingerprint covers the exact generated call/result/influence configuration, while the overall
+configuration fingerprint covers policy, adapters, and every reported surface. The core CI
+workflow now supports explicit `workflow_dispatch` in addition to push and pull-request triggers.
+
+The Task 7.2 review found and fixed incomplete nested-report constructor plumbing caused by mixed
+line endings, missing hosted-MCP provenance, and an incomplete report fingerprint that did not
+initially distinguish influence-gate configuration. Seventeen Phase 7.1–7.2 tests pass on every
+supported TFM.
+
+### Task 7.3 — samples, migration, and operations
+
+The standalone validation runner now executes eight offline scenarios: strict host-scoped local
+tools, local MCP plus an owned gated server, a generic context-provider boundary, provider-native
+full-lifecycle hooks, a cross-session browser/email isolation fixture, observe rollout, quarantine
+rollback, and intentional refusal of opaque hosted MCP. All eight pass without external services.
+
+The operations guide documents authenticated host identity, profiles and dispositions, honest
+coverage claims, configuration and DI, content-free telemetry, incident attribution, and rollback.
+The migration guide covers custom `IToolGate`, Mem0/AgentMemory, custom `AIContextProvider`, and
+local/hosted MCP paths. DocFX content validation succeeds; its 25 warnings are pre-existing links
+outside the new documents. A release review caught and fixed the initially missing TOC entry.
+
+### Task 7.4 — offline and authorized live validation
+
+The Release solution builds with zero errors and no new Phase 7 warnings; a non-incremental build reports the repository's 153 pre-existing compiler/analyzer warnings. The full solution test run passes 27,653
+main tests, 1,785 dedicated memory tests, and 9 NuGet-consumer tests (29,447 total), with only
+explicit manual tests skipped. The memory filter passes 263 tests on each supported TFM, and the
+eight-scenario release runner passes 8/8.
+
+Memory enforcement is deterministic and has no memory-specific network judge. As complementary
+deployment evidence—not as memory-gate accuracy proof—the previously reviewed and explicitly
+authorized Gatekeeper A2A gold corpora were sent to the configured Azure OpenAI deployment. The
+inbound judge passed 52/52 and the outbound judge 48/48, both with zero false positives, 100%
+accuracy, and κ=1.0.
+
+### Task 7.R — release-readiness review
+
+The focused review fixed an observe-mode influence composition defect, incomplete nested report
+provenance, a configuration fingerprint that initially omitted adapter differences, and local-MCP
+coverage accounting that did not initially recognize matching owned-server full-lifecycle evidence.
+Client-only MCP remains capped at `Boundary`; hosted opaque paths still fail closed. The review also
+fixed documentation navigation and applied repository formatting to all changed C# files.
+
+Git whitespace checks, formatter verification, Release build, the focused/memory/full test suites,
+the offline runner, and DocFX validation pass. Scoped MAF anti-pattern scans of the changed
+Gatekeeper and validation-sample surfaces report zero errors, warnings, or informational findings.
+The overall MAF project remains grade B only because of six pre-existing heuristic unbounded-cost
+call sites outside this phase; no Phase 7 change introduced or modified them.
 
 ## Goals and non-goals
 

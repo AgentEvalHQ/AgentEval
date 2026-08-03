@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/gatekeeper/memory-protection-config-v1.schema.json",
+  "title": "AgentEval Gatekeeper memory-protection configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "expectedPolicyFingerprint", "minimumCoverage"],
+  "properties": {
+    "schema": { "const": "gatekeeper.memory-protection/1" },
+    "expectedPolicyFingerprint": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "minimumCoverage": {
+      "enum": ["Unsupported", "ObserveOnly", "ActionOnly", "Boundary", "FullLifecycle"]
+    },
+    "sensitiveSinkTools": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    }
+  }
+}

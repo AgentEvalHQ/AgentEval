@@ -784,14 +784,17 @@ public sealed record MemoryMcpCoverageEntry(
 /// <summary>Separate per-operation coverage report for local, owned, and hosted MCP paths.</summary>
 public sealed class MemoryMcpCoverageReport
 {
-    internal MemoryMcpCoverageReport(IEnumerable<MemoryMcpCoverageEntry> entries)
+    internal MemoryMcpCoverageReport(
+        IEnumerable<MemoryMcpCoverageEntry> entries,
+        string? policyFingerprint = null)
     {
+        PolicyFingerprint = policyFingerprint;
         Entries = new ReadOnlyCollection<MemoryMcpCoverageEntry>(
             MemoryMcpValidation.Snapshot(
                 entries,
                 nameof(entries),
                 MemoryMcpValidation.MaximumCoverageEntries));
-        ConfigurationFingerprint = MemoryPolicyFingerprint.Compute(Entries.Select(entry => string.Join(
+        ConfigurationFingerprint = MemoryPolicyFingerprint.Compute(PolicyFingerprint, Entries.Select(entry => string.Join(
             ":",
             entry.ServerId,
             entry.ServerVersion,
@@ -804,6 +807,7 @@ public sealed class MemoryMcpCoverageReport
     }
 
     public IReadOnlyList<MemoryMcpCoverageEntry> Entries { get; }
+    public string? PolicyFingerprint { get; }
     public string ConfigurationFingerprint { get; }
 
     public bool HasCoverageBelow(MemoryCoverageLevel minimum)
@@ -947,13 +951,14 @@ public static class MemoryMcpCoverageAnalyzer
                 "reviewed local MCP operation has no runtime tool binding"));
         }
 
-        return new MemoryMcpCoverageReport(entries);
+        return new MemoryMcpCoverageReport(entries, callGate?.PipelineFingerprint);
     }
 
     public static MemoryMcpCoverageReport AnalyzeHosted(
         IEnumerable<MemoryHostedMcpOperationContract> contracts,
         MemorySecurityProfile profile,
-        MemoryMcpServerCoverageEvidence? ownedServer = null)
+        MemoryMcpServerCoverageEvidence? ownedServer = null,
+        string? policyFingerprint = null)
     {
         MemoryValidation.Defined(profile, nameof(profile));
         var snapshot = MemoryMcpValidation.Snapshot(contracts, nameof(contracts));
@@ -1023,7 +1028,7 @@ public static class MemoryMcpCoverageAnalyzer
                 note));
         }
 
-        return new MemoryMcpCoverageReport(entries);
+        return new MemoryMcpCoverageReport(entries, policyFingerprint);
     }
 
     public static MemoryMcpCoverageReport RequireCoverage(

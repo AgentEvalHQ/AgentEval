@@ -62,6 +62,13 @@
     href: gatekeeper/attack-the-gate.md
   - name: Explainability & Trust
     href: gatekeeper/explainability-and-trust.md
+  - name: Memory Security
+    href: gatekeeper/memory-security.md
+    items:
+    - name: Samples
+      href: gatekeeper/memory-security-samples.md
+    - name: Migration Guide
+      href: gatekeeper/memory-security-migration.md
 
 - name: Evaluation Coverage
   items:

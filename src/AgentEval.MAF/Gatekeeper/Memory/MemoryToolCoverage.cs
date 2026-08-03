@@ -20,10 +20,16 @@ public sealed record MemoryToolCoverageEntry(
 /// <summary>Itemized coverage report for declared and suspected memory tools.</summary>
 public sealed class MemoryToolCoverageReport
 {
-    internal MemoryToolCoverageReport(IEnumerable<MemoryToolCoverageEntry> entries)
-        => Entries = new ReadOnlyCollection<MemoryToolCoverageEntry>(entries.ToList());
+    internal MemoryToolCoverageReport(
+        IEnumerable<MemoryToolCoverageEntry> entries,
+        string? policyFingerprint = null)
+    {
+        Entries = new ReadOnlyCollection<MemoryToolCoverageEntry>(entries.ToList());
+        PolicyFingerprint = policyFingerprint;
+    }
 
     public IReadOnlyList<MemoryToolCoverageEntry> Entries { get; }
+    public string? PolicyFingerprint { get; }
     public bool HasUnsupportedMemoryTools
         => Entries.Any(entry => entry.Coverage is MemoryCoverageLevel.Unsupported);
     public bool HasUnclassifiedMemoryLikeTools
@@ -156,7 +162,7 @@ public static class MemoryToolCoverageAnalyzer
                 note));
         }
 
-        return new MemoryToolCoverageReport(entries);
+        return new MemoryToolCoverageReport(entries, callGate?.PipelineFingerprint);
     }
 
     public static MemoryToolCoverageReport AnalyzeOrThrow(
