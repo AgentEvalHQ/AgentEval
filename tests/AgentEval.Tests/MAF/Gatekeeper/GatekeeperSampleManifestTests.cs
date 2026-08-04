@@ -16,6 +16,8 @@ public sealed class GatekeeperSampleManifestTests
         "description",
         "executionMode",
         "complexity",
+        "compositionMode",
+        "compositionRationale",
         "launcherStatus",
         "source",
         "boundaries",
@@ -82,6 +84,7 @@ public sealed class GatekeeperSampleManifestTests
             var source = RequiredString(sample, "source");
             var execution = RequiredString(sample, "executionMode");
             var complexity = RequiredString(sample, "complexity");
+            var composition = RequiredString(sample, "compositionMode");
             var launcher = RequiredString(sample, "launcherStatus");
 
             Assert.True(ids.Add(id), $"Duplicate Gatekeeper sample id '{id}'.");
@@ -89,10 +92,12 @@ public sealed class GatekeeperSampleManifestTests
             Assert.True(sources.Add(source), $"Duplicate Gatekeeper sample source '{source}'.");
             Assert.Contains(execution, new[] { "offline", "live-model", "live-boundary", "hybrid" });
             Assert.Contains(complexity, new[] { "introductory", "intermediate", "advanced" });
+            Assert.Contains(composition, new[] { "supported-composite", "intentional-low-level" });
             Assert.Contains(launcher, new[] { "menu", "direct" });
 
             RequiredString(sample, "name");
             RequiredString(sample, "description");
+            RequiredString(sample, "compositionRationale");
             RequiredString(sample, "guarantee");
             RequiredString(sample, "nonGuarantee");
             RequiredString(sample, "benignControl");
@@ -108,10 +113,27 @@ public sealed class GatekeeperSampleManifestTests
                 Path.DirectorySeparatorChar;
             Assert.StartsWith(gatekeeperRoot, fullSource, StringComparison.OrdinalIgnoreCase);
             Assert.True(File.Exists(fullSource), $"Manifest source does not exist: {source}.");
+            var sourceText = File.ReadAllText(fullSource);
             Assert.Contains(
                 $"GatekeeperSampleContractRenderer.Print(\"{id}\")",
-                File.ReadAllText(fullSource),
+                sourceText,
                 StringComparison.Ordinal);
+
+            if (int.TryParse(id, out var numericId) && numericId <= 9)
+            {
+                Assert.Equal("hybrid", execution);
+                Assert.Contains($"GatekeeperOfflineScenarioSuite.ExecuteAsync(\"{id}\")", sourceText, StringComparison.Ordinal);
+            }
+
+            if (composition == "supported-composite")
+            {
+                Assert.Contains(".UseGatekeeper(", sourceText, StringComparison.Ordinal);
+            }
+
+            if (sourceText.Contains(".UseAgentEvalToolGate(", StringComparison.Ordinal))
+            {
+                Assert.Equal("intentional-low-level", composition);
+            }
 
             if (launcher == "menu")
             {

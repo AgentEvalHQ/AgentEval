@@ -19,22 +19,26 @@ For concepts, start with the [introduction](introduction.md). For gate contracts
 A sample passes only when an internal invariant proves the claimed behavior. Console text, model compliance, or the
 absence of an exception is not a sufficient oracle.
 
+Samples 00–09 choose the deterministic offline path when Azure OpenAI is not configured. Set
+`AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true` to force that release oracle even on a configured workstation; otherwise
+the optional live overlay runs. Both paths use fake/local tool effects.
+
 ## Core Gatekeeper catalog
 
 Stable IDs preserve the two historical `11_` source files as **11A** and **11B** without a breaking rename.
 
 | ID | Sample | Complexity | Execution | Protected boundaries | Primary mechanisms | Launcher |
 |---|---|---|---|---|---|---|
-| 00 | [Hello World](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) | Introductory | Live model | tool, evidence | `ProbeEvaluatorGate` | Menu |
-| 01 | [Enforcement Walkthrough](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) | Advanced | Live model | run, tool, session, shadow, evidence | deny/canary/sequence/quarantine/shadow stack | Menu |
-| 02 | [MAF Support Agent](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) | Intermediate | Live model | tool, evidence | `SequenceGate` | Menu |
-| 03 | [Tool Approval](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) | Intermediate | Live model | approval | argument approval + MAF continuation | Menu |
-| 04 | [Beachhead and Tribunal](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) | Advanced | Live model | run, tool, evidence | budget, domain, output, calibrated injection judge | Menu |
-| 05 | [Agent Harness Simple](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) | Intermediate | Live model | tool, autonomous harness | run budget | Menu |
-| 06 | [Agent Harness Defended](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) | Advanced | Live model | tool, autonomous harness | budget, sequence, domain | Menu |
-| 07 | [Defense in Depth](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) | Advanced | Live model | run, tool, result | injection judge, result admission, identity, taint, domain | Menu |
-| 08 | [Output Panel](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) | Advanced | Live model | run-post, evidence | calibrated output judges + fan-out | Menu |
-| 09 | [Monetary and Per-Call Budget](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) | Intermediate | Live model | tool, evidence | monetary and per-tool limits | Menu |
+| 00 | [Hello World](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) | Introductory | Hybrid | tool, evidence | `ProbeEvaluatorGate` | Menu |
+| 01 | [Enforcement Walkthrough](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) | Advanced | Hybrid | run, tool, session, shadow, evidence | deny/canary/sequence/quarantine/shadow stack | Menu |
+| 02 | [MAF Support Agent](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) | Intermediate | Hybrid | tool, evidence | `SequenceGate` | Menu |
+| 03 | [Tool Approval](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) | Intermediate | Hybrid | approval | argument approval + MAF continuation | Menu |
+| 04 | [Beachhead and Tribunal](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) | Advanced | Hybrid | run, tool, evidence | budget, domain, output, calibrated injection judge | Menu |
+| 05 | [Agent Harness Simple](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) | Intermediate | Hybrid | tool, autonomous harness | run budget | Menu |
+| 06 | [Agent Harness Defended](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) | Advanced | Hybrid | tool, autonomous harness | budget, sequence, domain | Menu |
+| 07 | [Defense in Depth](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) | Advanced | Hybrid | run, tool, result | injection judge, result admission, identity, taint, domain | Menu |
+| 08 | [Output Panel](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) | Advanced | Hybrid | run-post, evidence | calibrated output judges + fan-out | Menu |
+| 09 | [Monetary and Per-Call Budget](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) | Intermediate | Hybrid | tool, evidence | monetary and per-tool limits | Menu |
 | 10 | [Explainability and Trust](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) | Intermediate | Hybrid | tool, replay, evidence | provenance, replay, trust aggregation | Menu |
 | 11A | [Real A2A Boundary](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) | Advanced | Live boundary | construction, A2A run-pre/post | calibrated inbound/outbound boundary judges | Menu |
 | 11B | [A2A Calibration](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ACalibration.cs) | Advanced | Live model | construction, A2A promotion | both calibration corpora + thresholds | Direct |
@@ -81,7 +85,7 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Exfiltration through sequence/taint/domain | 02, 06, 07, 14 | Strong deterministic coverage |
 | Tool-specific argument contracts | 13, 14, 16 | Production contracts plus clearly labelled design fixtures |
 | Tool-result secrets and size | 17 | Clear introductory offline fixture |
-| Human approval | 03 | One live scenario; broader matrix remains a specialized follow-up |
+| Human approval | 03 | Deterministic routine/pause oracle plus optional live continuation; broader matrix remains a specialized follow-up |
 | Budgets/denial of wallet | 04, 05, 06, 09, 14–16 | Strong |
 | Agent Harness protection | 05, 06, 15 | Includes runtime-injected capability discovery |
 | Repeated-denial escalation/containment | 01, 14 | Shadow quarantine and durable fake-source containment |

@@ -40,9 +40,9 @@ public static class GatekeeperEnforcement
         GatekeeperSampleContractRenderer.Print("01");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("01");
             return;
         }
 

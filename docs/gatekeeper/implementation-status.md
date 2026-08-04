@@ -63,9 +63,9 @@ discoverable demonstrations and records review evidence separately.
 |---|---|---|---:|:---:|---|
 | 9 | 9.1 | Bound live sample output and review MAF findings | 100% | ✅ | Local call caps reduced cost findings from 29 to one remote-A2A limitation; live pipelines gained non-sensitive OpenTelemetry; the remaining three telemetry warnings are offline scripted fixtures |
 | 9 | 9.2 | Standardize threat, guarantee, and pass-oracle output | 100% | ✅ | All 19 sample entry points render one embedded manifest contract; tests enforce fields, packaging, source declarations, launcher registration, and catalog ids |
-| 9 | 9.3 | Add deterministic offline-first paths to live samples 00–09 | 0% | — | Next implementation task |
-| 9 | 9.4 | Normalize supported multi-layer composition | 0% | — | Follows the offline-path pass-oracle work |
-| 9 | 9.R | Sample reliability promotion review | 0% | — | Runs after 9.3–9.4 |
+| 9 | 9.3 | Add deterministic offline-first paths to live samples 00–09 | 100% | ✅ | All ten hybrid samples execute scripted attack + benign controls, throw on invariant failure, use fake/local effects, and retain optional bounded Azure overlays |
+| 9 | 9.4 | Normalize supported multi-layer composition | 100% | ✅ | Samples 02 and 04–09 use `UseGatekeeper`; 00, 01, 03 and non-runtime fixtures declare why their specialist low-level surface is intentional |
+| 9 | 9.R | Sample reliability promotion review | 100% | ✅ | Ten offline oracles pass; Release samples build clean; manifest passes net8/net9/net10; 1,384 net10 Gatekeeper tests pass; formatter clean; scoped MAF Doctor B/0 errors |
 
 ## Deferred and demand-gated work
 
@@ -91,10 +91,9 @@ coverage.
   manifest contract passes on net8/net9/net10, 1,384 passing net10 Gatekeeper tests, and a successful
   Release sample build. DocFX completes with zero errors and 28 existing warnings, none owned by the
   changed Gatekeeper documentation.
-- A scoped MAF Doctor review of the Gatekeeper samples reports grade B and zero errors. Its 29
-  unbounded live-call findings were reduced to one reviewed A2A limitation, because only the remote endpoint can
-  set its model token cap; the caller enforces a 30-second timeout and 64 KiB response buffer. Eleven observability
-  warnings were reduced to three reviewed offline-scripted false positives.
+- The Phase 9 scoped MAF Doctor review reports grade B and zero errors. Of 39 detected run sites, the only cost
+  findings are the reviewed remote-A2A server-side cap limitation and one bounded scripted-provider helper false
+  positive. Four observability warnings are deterministic offline fixtures where exporters add no production signal.
 - The repository build baseline at the merged LongMemEval commit
   (`bb2cf6a2f5ae75e16dea196b246d5003eebc8df4`) is zero errors and 175 existing warnings. New work
   must introduce no additional warnings.
@@ -105,8 +104,8 @@ coverage.
 ## Release posture
 
 The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up, Phase 8, and
-Phase 9.1–9.2 are complete and reviewed on the current local branch, but remain intentionally unpublished under the
-local-only instruction. Phase 9.3–9.R remains in progress.
+Phase 9 is complete and reviewed on the current local branch, but remains intentionally unpublished under the
+local-only instruction.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase
 the completed local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
 surface may be reported as fully enforced.

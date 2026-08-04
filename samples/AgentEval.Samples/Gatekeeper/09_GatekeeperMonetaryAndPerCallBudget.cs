@@ -7,6 +7,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -31,9 +32,9 @@ public static class GatekeeperMonetaryAndPerCallBudget
         GatekeeperSampleContractRenderer.Print("09");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("09");
             return;
         }
 
@@ -85,9 +86,12 @@ public static class GatekeeperMonetaryAndPerCallBudget
         var processed = new List<(string OrderId, decimal Amount)>();
         var trace = new AgentTrace();
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "SupportAgent", ChatOptions = new ChatOptions { Tools = [RefundTool(processed)], MaxOutputTokens = 512 } })
-            .AsBuilder().UseAgentEvalGate()
-            // Terminate stops the loop the moment the cap is hit — ReplaceResult would let the model keep trying.
-            .UseAgentEvalToolGate([new PerToolCallBudgetGate(new Dictionary<string, int> { ["process_refund"] = 3 })], ToolGatePolicy.Terminate, trace)
+            .AsBuilder()
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new PerToolCallBudgetGate(new Dictionary<string, int> { ["process_refund"] = 3 }));
+            })
             .Build();
 
         var response = await agent.RunAsync(
@@ -111,8 +115,12 @@ public static class GatekeeperMonetaryAndPerCallBudget
         var processed = new List<(string OrderId, decimal Amount)>();
         var trace = new AgentTrace();
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "SupportAgent", ChatOptions = new ChatOptions { Tools = [RefundTool(processed)], MaxOutputTokens = 512 } })
-            .AsBuilder().UseAgentEvalGate()
-            .UseAgentEvalToolGate([new MonetaryLimitGate("amount", 1000m)], ToolGatePolicy.Terminate, trace)
+            .AsBuilder()
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new MonetaryLimitGate("amount", 1000m));
+            })
             .Build();
 
         var response = await agent.RunAsync(
@@ -141,8 +149,15 @@ public static class GatekeeperMonetaryAndPerCallBudget
             new MonetaryLimitGate("amount", 500m),
         };
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "SupportAgent", ChatOptions = new ChatOptions { Tools = [RefundTool(processed)], MaxOutputTokens = 512 } })
-            .AsBuilder().UseAgentEvalGate()
-            .UseAgentEvalToolGate(gates, ToolGatePolicy.Terminate, trace)
+            .AsBuilder()
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                foreach (var gate in gates)
+                {
+                    options.Add(gate);
+                }
+            })
             .Build();
 
         var response = await agent.RunAsync(

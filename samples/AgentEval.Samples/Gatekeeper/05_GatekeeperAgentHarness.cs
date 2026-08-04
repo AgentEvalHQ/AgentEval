@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -32,9 +33,9 @@ public static class GatekeeperAgentHarness
         GatekeeperSampleContractRenderer.Print("05");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("05");
             return;
         }
 
@@ -74,8 +75,11 @@ public static class GatekeeperAgentHarness
         // Wrap the REAL harness agent in the Gatekeeper — cap the autonomous loop's tool calls.
         var trace = new AgentTrace();
         AIAgent gated = harness.AsBuilder()
-            .UseAgentEvalGate()   // establishes the per-run RunLedger scope
-            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: Budget)], ToolGatePolicy.Terminate, trace)
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new RunBudgetGate(maxToolCalls: Budget));
+            })
             .Build();
 
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a REAL MAF HarnessAgent (AsHarnessAgent), budget = {Budget}.\n");

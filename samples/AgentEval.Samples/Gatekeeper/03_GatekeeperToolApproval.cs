@@ -28,9 +28,9 @@ public static class GatekeeperToolApproval
         GatekeeperSampleContractRenderer.Print("03");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("03");
             return;
         }
 

@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -36,9 +37,9 @@ public static class GatekeeperOutputPanel
         GatekeeperSampleContractRenderer.Print("08");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("08");
             return;
         }
 
@@ -120,7 +121,15 @@ public static class GatekeeperOutputPanel
             },
         });
         var agent = agentBase.AsBuilder()
-            .UseAgentEvalGate(post: [panel], policy: policy, trace: trace)
+            .UseGatekeeper(
+                policy == EvalGatePolicy.ThrowOnFail
+                    ? RuntimeEnforcement.Terminate
+                    : RuntimeEnforcement.ReplaceResult,
+                options =>
+                {
+                    options.Trace = trace;
+                    options.AddPostGate(panel);
+                })
             .Build();
 
         // The user plants exfil-shaped text (a data-leak line, NOT a jailbreak phrase — so it doesn't trip the

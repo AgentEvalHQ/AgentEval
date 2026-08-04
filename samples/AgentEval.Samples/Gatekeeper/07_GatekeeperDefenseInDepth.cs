@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -36,9 +37,9 @@ public static class GatekeeperDefenseInDepth
         GatekeeperSampleContractRenderer.Print("07");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("07");
             return;
         }
 
@@ -146,17 +147,16 @@ public static class GatekeeperDefenseInDepth
 
         var trace = new AgentTrace();
         var agent = agentBase.AsBuilder()
-            .UseAgentEvalGate(trace: trace)   // establish the per-run scope
-            .UseAgentEvalToolGate(
-                [
-                    // read_ticket is UNTRUSTED, so an order id it introduces is NOT "observed" — a refund on it blocks.
-                    new ReferentialIntegrityGate(["order_id"], ["refund"]),
-                    new TaintTrackingGate(["read_secrets"], ["http_post"]),   // a secret must not reach an external sink
-                    new DomainAllowListGate(["mycompany.com"]),               // off-host egress
-                ],
-                ToolGatePolicy.Terminate, trace,
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                // read_ticket is UNTRUSTED, so an order id it introduces is NOT "observed" — a refund on it blocks.
+                options.Add(new ReferentialIntegrityGate(["order_id"], ["refund"]));
+                options.Add(new TaintTrackingGate(["read_secrets"], ["http_post"]));
+                options.Add(new DomainAllowListGate(["mycompany.com"]));
                 // Scan the untrusted read_ticket payload before it re-enters the model.
-                resultGates: [new ToolResultInjectionGate(tokens: null, functionNames: ["read_ticket"])])
+                options.AddResultGate(new ToolResultInjectionGate(tokens: null, functionNames: ["read_ticket"]));
+            })
             .Build();
 
         return (agent, trace, tools);

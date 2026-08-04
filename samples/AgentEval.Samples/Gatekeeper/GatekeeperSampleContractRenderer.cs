@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using System.Reflection;
 using System.Text.Json;
 
 namespace AgentEval.Samples;
@@ -33,6 +32,7 @@ internal static class GatekeeperSampleContractRenderer
         Console.WriteLine($"   Threat:           {Join(contract.Threats)}");
         Console.WriteLine($"   Protected seam:   {Join(contract.Boundaries)}");
         Console.WriteLine($"   Gates/mechanisms: {Join(contract.Mechanisms)}");
+        Console.WriteLine($"   Composition:      {contract.CompositionMode} — {contract.CompositionRationale}");
         Console.WriteLine($"   Guarantee:        {contract.Guarantee}");
         Console.WriteLine($"   Non-guarantee:    {contract.NonGuarantee}");
         Console.WriteLine($"   Execution:        {contract.ExecutionMode}; effects: {Join(contract.ExternalEffects)}");
@@ -97,6 +97,10 @@ internal static class GatekeeperSampleContractRenderer
         public required IReadOnlyList<string> Mechanisms { get; init; }
 
         public required IReadOnlyList<string> Threats { get; init; }
+
+        public required string CompositionMode { get; init; }
+
+        public required string CompositionRationale { get; init; }
 
         public required IReadOnlyList<string> ExternalEffects { get; init; }
 

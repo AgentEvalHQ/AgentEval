@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -36,9 +37,9 @@ public static class GatekeeperAgentHarnessDefended
         GatekeeperSampleContractRenderer.Print("06");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("06");
             return;
         }
 
@@ -91,14 +92,13 @@ public static class GatekeeperAgentHarnessDefended
         // Wrap the REAL harness agent in a defense-in-depth Gatekeeper stack.
         var trace = new AgentTrace();
         AIAgent gated = harness.AsBuilder()
-            .UseAgentEvalGate()                            // per-run RunLedger + sequence scope
-            .UseAgentEvalToolGate(
-                [
-                    new RunBudgetGate(maxToolCalls: 10),                                 // cap the autonomous loop
-                    new SequenceGate(["read_customer_record"], ["http_post"]),          // read → POST = exfiltration
-                    new DomainAllowListGate(["mycompany.com"]),                         // off-host egress
-                ],
-                ToolGatePolicy.Terminate, trace)
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new RunBudgetGate(maxToolCalls: 10));
+                options.Add(new SequenceGate(["read_customer_record"], ["http_post"]));
+                options.Add(new DomainAllowListGate(["mycompany.com"]));
+            })
             .Build();
 
         Console.WriteLine($"\n▸ {label}");

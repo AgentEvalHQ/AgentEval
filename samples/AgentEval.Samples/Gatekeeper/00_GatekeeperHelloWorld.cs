@@ -31,9 +31,9 @@ public static class GatekeeperHelloWorld
         GatekeeperSampleContractRenderer.Print("00");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("00");
             return;
         }
 
