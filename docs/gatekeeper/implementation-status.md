@@ -3,7 +3,7 @@
 > **Status:** implementation complete for the currently approved scope; one live promotion
 > validation remains deferred.
 >
-> **Updated:** 2026-07-30
+> **Updated:** 2026-08-04
 >
 > **Merged baseline:** [PR #147](https://github.com/AgentEvalHQ/AgentEval/pull/147)
 
@@ -26,6 +26,21 @@ implemented.
 | 5 | Resource isolation | ✅ | HTTP resource isolation is implemented and promoted; additional resource types remain demand-gated until a concrete exhaustion mode exists |
 | 6 | Security graph and escalation | ✅ | Durable graph storage/computation, ingestion, global containment, and the read-only operations surface are merged |
 | 7 | Applicable long-tail work | ✅ | Mock dangerous-tool fixtures and session-identity drift coverage are complete; deployment-specific predicates and judges remain demand-gated |
+
+## Sample and documentation showcase follow-up
+
+This follow-up does not change the core phase percentages. It turns the implemented controls into deterministic,
+discoverable demonstrations and records review evidence separately.
+
+| Phase | Task | Description | Done | Reviewed | Implementation notes |
+|---|---|---|---:|:---:|---|
+| Showcase | S.1 | Inventory samples and map gates/features/boundaries | 100% | ✅ | Added complexity/execution catalog plus gate-boundary and feature coverage matrices |
+| Showcase | S.2 | Register mocked SQL/browser/cloud/package fixture | 100% | ✅ | Offline menu sample; 4 allowed mock bodies and 5 hostile calls blocked |
+| Showcase | S.3 | Add poisoned-tool kill-chain demonstration | 100% | ✅ | Fake MCP poison withheld and isolated; bulk read, email, POST, delete and propagation effects remain zero |
+| Showcase | S.4 | Protect a Harness-owned capability | 100% | ✅ | Discovers todos_add at runtime, blocks weird-request misuse, preserves benign control |
+| Showcase | S.5 | Add jailbreak-to-tool-abuse demonstration | 100% | ✅ | Obvious input stops pre-model; paraphrase remains bounded by shell, deletion and recipient contracts |
+| Showcase | S.6 | Document gate lifecycle and coordination | 100% | ✅ | Added lifecycle/order/shared-state guide, sample index, TOC and cross-links |
+| Showcase | S.R | Focused review and validation | 100% | ✅ | Release sample build 0 warnings; 1,383 Gatekeeper tests; 4/4 offline samples; DocFX adds no warnings; scoped MAF Doctor has 0 errors |
 
 ## Deferred and demand-gated work
 

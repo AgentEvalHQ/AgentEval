@@ -8,9 +8,10 @@ checks **in the request path** so a forbidden tool call, a poisoned argument, or
 every gate is **fail‑closed**: if a gate cannot prove an action safe, it does not run it.
 
 > **Where to go:** this page is the **introduction** (concepts, the layer categories, and how to wire them
-> together with `UseGatekeeper`). The [**Gate reference**](gate-reference.md) is the ranked catalogue — every
-> gate, what it does, and *how much it actually earns its keep*. The [**Examples**](examples.md) page is the
-> runnable cookbook.
+> together with `UseGatekeeper`). The [**Gate lifecycle and coordination**](gate-lifecycle-and-coordination.md)
+> guide explains execution order and cross-gate state. The [**Gate reference**](gate-reference.md) is the ranked
+> catalogue, the [**Sample index**](sample-index.md) maps executable coverage, and [**Examples**](examples.md) is
+> the recipe-oriented cookbook.
 
 ## The design principle: fail closed, and prove it
 
@@ -159,8 +160,10 @@ The [**Gate reference**](gate-reference.md) ranks every gate on exactly this bas
 
 ## See also
 
+- [**Gate lifecycle and coordination**](gate-lifecycle-and-coordination.md) — gate types, execution order, shared state, containment, and known boundaries.
+- [**Sample index and coverage**](sample-index.md) — choose a runnable scenario by complexity, gate, feature, or protected boundary.
 - [**Gate reference**](gate-reference.md) — the ranked catalogue (what each gate does + how useful it is).
-- [**Examples**](examples.md) — runnable cookbook (the samples drive a real model — need Azure OpenAI) + a credential‑free CLI on‑ramp.
+- [**Examples**](examples.md) — offline and live runnable recipes plus a credential-free CLI on-ramp.
 - [**Explainability & Trust**](explainability-and-trust.md) — reconstructable gate provenance, counterfactual gate-config replay, and a unified Trust Score.
 - [Glass Box](../glass-box.md) — the dual‑boundary trace Gatekeeper records its evidence into.
 - [Guardrails](../guardrails.md) — the chat‑gate primitives (`IChatGate`, `EvalGatePolicy`) the run gate reuses.

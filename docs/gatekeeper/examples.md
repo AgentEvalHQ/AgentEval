@@ -1,7 +1,7 @@
 # Gatekeeper — examples
 
 Runnable recipes, from a hello‑world to the gates with no simpler equivalent (the snippets are provider‑agnostic;
-the runnable **samples** drive a real model — see [Runnable demos](#runnable-demos-real-agents)). For
+the runnable **samples** include offline and live agents — see [Runnable demos](#runnable-demos-offline-and-live-agents)). For
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 
@@ -337,12 +337,13 @@ var agent = baseAgent.AsBuilder()
 The judge runs *after* the run returns; an adverse verdict arms quarantine so the `QuarantineGate` refuses the
 session's **next** run.
 
-## Runnable demos (real agents)
+## Runnable demos (offline and live agents)
 
-The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a **real MAF
-agent** on a live model — set `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`. The
-gates fire on the model's actual behavior (a real loop that runs away, a real POST to an off‑host URL, a real
-judge scoring a gold set), and where a well‑aligned model resists an attack the sample reports that honestly:
+The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) mixes deterministic **offline** scenarios
+with live MAF-agent demonstrations. Offline samples use scripted providers and fake effect counters; live samples use
+`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`. In both modes, pass/fail claims
+come from gate evidence and observable fake effects rather than assuming model compliance. See the
+[sample index and coverage matrices](sample-index.md) to choose by gate, feature, complexity, or boundary:
 
 - [`Gatekeeper/00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
   **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.
@@ -378,6 +379,22 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
   **`MonetaryLimitGate` + `PerToolCallBudgetGate`**: a 10‑call refund‑spray injection capped at 3 calls, a single
   $50,000 refund blocked by a $1,000 monetary cap, and both gates together against a realistic $300 × 10‑order
   spray — success is keyed on the recorded `gate.tool.*` block count, never on "no exception thrown."
+
+- [`Gatekeeper/10_GatekeeperExplainabilityAndTrust`](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) —
+  reconstructable provenance, counterfactual policy replay, and an honest composite trust score.
+- [`Gatekeeper/11_GatekeeperA2ABoundary`](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) —
+  an explicitly authorized remote A2A boundary with inbound/outbound calibration and consent checks.
+- [`Gatekeeper/13_GatekeeperMockedDangerousTools`](../../samples/AgentEval.Samples/Gatekeeper/13_GatekeeperMockedDangerousTools.cs) —
+  offline SQL/browser/cloud/package contract fixtures with no real external components.
+- [`Gatekeeper/14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) —
+  offline poisoned MCP result admission and isolation followed by blocked bulk-read, customer-email, external-POST,
+  delete-all and fake worm-propagation attempts.
+- [`Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse`](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) —
+  discovers an actual runtime-injected Agent Harness capability, blocks a weird request from using it, and keeps a
+  benign control useful.
+- [`Gatekeeper/16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) —
+  contrasts an obvious pre-model jailbreak block with shell, deletion, and email contracts that remain authoritative
+  when a paraphrase reaches the model.
 
 ## From the CLI
 

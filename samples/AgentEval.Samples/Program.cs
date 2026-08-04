@@ -124,7 +124,7 @@ public static class Program
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
-        new('J', "Gatekeeper (Runtime Protection)", "🔑 real MAF agents (Azure OpenAI) — fail-closed runtime enforcement",
+        new('J', "Gatekeeper (Runtime Protection)", "offline simulations + optional live MAF agents — fail-closed runtime enforcement",
         [
             new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync),
             new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
@@ -138,6 +138,10 @@ public static class Program
             new("Monetary + Per-Call Budget", "MonetaryLimitGate + PerToolCallBudgetGate vs. a live refund-spray injection attack", GatekeeperMonetaryAndPerCallBudget.RunAsync),
             new("Explainability & Trust",    "Why a judge gate blocked (GateProvenance) · counterfactual gate-config replay (GateReplayer) · one honest composite score (TrustScoreCalculator)", GatekeeperExplainabilityAndTrust.RunAsync),
             new("Real A2A Boundary",          "Calibrate, then guard a consent-gated real remote A2A call (set AGENTEVAL_A2A_BASE_URL)", GatekeeperA2ABoundary.RunAsync),
+            new("Mocked Dangerous Tools",      "Offline SQL/browser/cloud contract fixture — no real side effects", GatekeeperMockedDangerousTools.RunAsync),
+            new("Poisoned Tool Kill Chain",   "Offline fake MCP poison → isolation; bulk read, email, delete, exfil, and worm chain blocked", GatekeeperPoisonedToolKillChain.RunAsync),
+            new("Harness-Owned Tool Misuse",  "Offline real Agent Harness: weird request cannot misuse its runtime-injected capability", GatekeeperHarnessOwnedToolMisuse.RunAsync),
+            new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
@@ -209,7 +213,7 @@ public static class Program
                     await RunEntry(group.Samples[idx - 1]);
             }
         }
-        done:
+    done:
 
         Console.WriteLine("\n👋 Goodbye!\n");
     }

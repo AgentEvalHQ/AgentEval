@@ -1,7 +1,7 @@
 # Gatekeeper — gate reference
 
 Every built‑in gate, what it does, and **how much it actually earns its keep**. For the concepts and the layer
-map, start with the [introduction](introduction.md); for runnable code, see the [examples](examples.md).
+map, start with the [introduction](introduction.md); use [lifecycle and coordination](gate-lifecycle-and-coordination.md) for execution order and the [sample index](sample-index.md) for runnable coverage.
 
 ## How to read the rank
 

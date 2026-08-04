@@ -54,6 +54,10 @@
     href: gatekeeper-whats-new.md
   - name: Gate Reference (ranked)
     href: gatekeeper/gate-reference.md
+  - name: Gate Lifecycle & Coordination
+    href: gatekeeper/gate-lifecycle-and-coordination.md
+  - name: Sample Index & Coverage
+    href: gatekeeper/sample-index.md
   - name: CLI (from any language)
     href: gatekeeper-cli.md
   - name: Examples
