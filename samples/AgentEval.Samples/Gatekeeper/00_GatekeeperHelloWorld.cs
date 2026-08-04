@@ -28,6 +28,7 @@ public static class GatekeeperHelloWorld
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("00");
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
@@ -38,7 +39,10 @@ public static class GatekeeperHelloWorld
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
+            .Build();
 
         // A tool that publishes content. Without a gate, the poisoned content would go live.
         var published = 0;
@@ -54,7 +58,7 @@ public static class GatekeeperHelloWorld
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "Publisher",
-            ChatOptions = new ChatOptions { Tools = [writePage] },
+            ChatOptions = new ChatOptions { Tools = [writePage], MaxOutputTokens = 256 },
         })
             .AsBuilder()
             .UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult, trace)

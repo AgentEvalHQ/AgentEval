@@ -37,6 +37,7 @@ public static class GatekeeperPoisonedToolKillChain
 
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("14");
         Console.WriteLine("\n=== Gatekeeper — Poisoned Tool Kill Chain (offline) ===\n");
         Console.WriteLine("   All tools are fakes. Harmful effects are counters, never external operations.\n");
 

@@ -41,6 +41,11 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Gatekeeper\sample-manifest.json"
+                      LogicalName="AgentEval.Samples.Gatekeeper.sample-manifest.json" />
+  </ItemGroup>
+
   <!--
     Group K (Agent Skills) reuses the expense-report skill fixture already authored for
     samples/AgentEval.AgentSkillsEval instead of duplicating SKILL.md/resources/scripts content —

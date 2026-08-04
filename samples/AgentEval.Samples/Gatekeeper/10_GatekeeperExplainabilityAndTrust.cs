@@ -28,6 +28,7 @@ public static class GatekeeperExplainabilityAndTrust
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("10");
         PrintHeader();
 
         bool? realTurnWasBlocked = null;   // set by Scene 1 if it ran; feeds Scene 3's real-signal row

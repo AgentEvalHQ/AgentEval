@@ -29,6 +29,7 @@ public static class GatekeeperAgentHarness
 
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("05");
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
@@ -52,7 +53,7 @@ public static class GatekeeperAgentHarness
             Name = "ResearchHarness",
             Description = "An autonomous research agent that plans and executes.",
             MaxContextWindowTokens = 120_000,
-            MaxOutputTokens = 4_000,
+            MaxOutputTokens = 1_024,
             DisableFileAccess = true,
             DisableWebSearch = true,   // gpt-4o-mini (chat completions) doesn't support the harness's built-in web_search_options
             DisableFileMemory = true,  // keep the demo self-contained (no on-disk agent-files/ working dir)
@@ -61,6 +62,7 @@ public static class GatekeeperAgentHarness
             LoopAgentOptions = new LoopAgentOptions { MaxIterations = 12 },
             ChatOptions = new ChatOptions
             {
+                MaxOutputTokens = 1_024,
                 Instructions =
                     "You are an autonomous research agent. Plan the ticket, then in execute mode use the `search` " +
                     "tool MANY times — at least a dozen distinct queries across billing, refunds, prior tickets and " +

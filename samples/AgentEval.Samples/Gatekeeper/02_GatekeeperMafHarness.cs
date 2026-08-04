@@ -29,6 +29,7 @@ public static class GatekeeperMafHarness
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("02");
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
@@ -39,7 +40,10 @@ public static class GatekeeperMafHarness
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
+            .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a real support agent gated by a SequenceGate.\n");
 
         await RunScenario(chatClient, "LEGIT — an order-status question",
@@ -69,7 +73,7 @@ public static class GatekeeperMafHarness
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SupportAgent",
-            ChatOptions = new ChatOptions { Tools = [lookupOrder, readCustomerData, httpPost] },
+            ChatOptions = new ChatOptions { Tools = [lookupOrder, readCustomerData, httpPost], MaxOutputTokens = 512 },
         })
             .AsBuilder()
             .UseAgentEvalGate()   // establishes the per-run scope the sequence gate tracks

@@ -22,6 +22,9 @@ public sealed class GatekeeperSampleManifestTests
         "mechanisms",
         "threats",
         "externalEffects",
+        "guarantee",
+        "nonGuarantee",
+        "benignControl",
         "passOracle",
     ];
 
@@ -36,6 +39,7 @@ public sealed class GatekeeperSampleManifestTests
             "Gatekeeper",
             "sample-manifest.json");
         var programPath = Path.Combine(root, "samples", "AgentEval.Samples", "Program.cs");
+        var samplesProjectPath = Path.Combine(root, "samples", "AgentEval.Samples", "AgentEval.Samples.csproj");
         var catalogPath = Path.Combine(root, "docs", "gatekeeper", "sample-index.md");
 
         Assert.True(File.Exists(manifestPath), $"Missing sample manifest at {manifestPath}.");
@@ -60,6 +64,7 @@ public sealed class GatekeeperSampleManifestTests
         Assert.Equal(19, samples.GetArrayLength());
 
         var program = File.ReadAllText(programPath);
+        var samplesProject = File.ReadAllText(samplesProjectPath);
         var catalog = File.ReadAllText(catalogPath);
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var handlers = new HashSet<string>(StringComparer.Ordinal);
@@ -88,6 +93,9 @@ public sealed class GatekeeperSampleManifestTests
 
             RequiredString(sample, "name");
             RequiredString(sample, "description");
+            RequiredString(sample, "guarantee");
+            RequiredString(sample, "nonGuarantee");
+            RequiredString(sample, "benignControl");
             RequiredString(sample, "passOracle");
             RequiredStringArray(sample, "boundaries");
             RequiredStringArray(sample, "mechanisms");
@@ -100,6 +108,10 @@ public sealed class GatekeeperSampleManifestTests
                 Path.DirectorySeparatorChar;
             Assert.StartsWith(gatekeeperRoot, fullSource, StringComparison.OrdinalIgnoreCase);
             Assert.True(File.Exists(fullSource), $"Manifest source does not exist: {source}.");
+            Assert.Contains(
+                $"GatekeeperSampleContractRenderer.Print(\"{id}\")",
+                File.ReadAllText(fullSource),
+                StringComparison.Ordinal);
 
             if (launcher == "menu")
             {
@@ -118,6 +130,10 @@ public sealed class GatekeeperSampleManifestTests
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         Assert.Equal(sourceFiles.Order().ToArray(), sources.Order().ToArray());
+        Assert.Contains(
+            "<EmbeddedResource Include=\"Gatekeeper\\sample-manifest.json\"",
+            samplesProject,
+            StringComparison.Ordinal);
     }
 
     private static string RequiredString(JsonElement element, string propertyName)

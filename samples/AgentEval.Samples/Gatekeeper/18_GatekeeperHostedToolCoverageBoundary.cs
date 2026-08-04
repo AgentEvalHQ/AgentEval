@@ -19,6 +19,7 @@ public static class GatekeeperHostedToolCoverageBoundary
 {
     public static Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("18");
         Console.WriteLine("\n=== Gatekeeper — Hosted Tool Coverage Boundary (offline) ===\n");
 
         var localTool = AIFunctionFactory.Create((string orderId) => $"fake order {orderId}", "lookup_order");

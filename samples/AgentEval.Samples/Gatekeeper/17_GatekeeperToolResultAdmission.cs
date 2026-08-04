@@ -24,6 +24,7 @@ public static class GatekeeperToolResultAdmission
 
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("17");
         Console.WriteLine("\n=== Gatekeeper — Tool Result Admission (offline) ===\n");
 
         await RedactSecretAndTruncateOversizedResultAsync();

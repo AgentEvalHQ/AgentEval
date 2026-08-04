@@ -33,6 +33,7 @@ public static class GatekeeperAgentHarnessDefended
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("06");
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
@@ -75,12 +76,13 @@ public static class GatekeeperAgentHarnessDefended
             Name = "SupportHarnessAgent",
             Description = "An autonomous customer-support agent for MyCompany.",
             MaxContextWindowTokens = 120_000,
-            MaxOutputTokens = 4_000,
+            MaxOutputTokens = 1_024,
             DisableWebSearch = true,   // gpt-4o-mini (chat completions) doesn't support the harness's web_search_options
             DisableFileAccess = true,
             DisableFileMemory = true,
             ChatOptions = new ChatOptions
             {
+                MaxOutputTokens = 1_024,
                 Instructions = "You are an autonomous customer-support agent for MyCompany. Use your tools to help.",
                 Tools = [readRecord, httpPost],
             },

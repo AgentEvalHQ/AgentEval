@@ -24,6 +24,7 @@ public static class GatekeeperJailbreakAndToolAbuse
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("16");
         Console.WriteLine("\n=== Gatekeeper — Jailbreak + Tool Abuse (offline) ===\n");
 
         await BlockObviousJailbreakAsync();

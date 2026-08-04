@@ -33,6 +33,7 @@ public static class GatekeeperOutputPanel
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("08");
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
@@ -43,7 +44,10 @@ public static class GatekeeperOutputPanel
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
+            .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment}\n");
 
         // Scene ① reports whether both output judges cleared the inline-ready bar on THIS model; scene ③ ENFORCES
