@@ -144,6 +144,11 @@ public static class Program
             new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync),
             new("Tool Result Admission",       "Offline result seam: fake secret masking + bounded result truncation before model context", GatekeeperToolResultAdmission.RunAsync),
             new("Hosted Tool Coverage",        "Offline promotion boundary: hosted code execution stays opaque even when risk is acknowledged", GatekeeperHostedToolCoverageBoundary.RunAsync),
+            new("Bulkhead + Containment",       "Offline measured isolation: contained saturation cannot consume normal HTTP permits", GatekeeperBulkheadIsolation.RunAsync),
+            new("Stateful Gate Timeline",       "Offline call/run/session/durable state transitions, resets, reloads, and containment", GatekeeperStatefulTimeline.RunAsync),
+            new("Same-Batch Exfil Race",        "Offline concurrent sibling-call seam: SequenceGate vs SameBatchOrderingGate", GatekeeperSameBatchRace.RunAsync),
+            new("Security Graph Incident",      "Offline observations → honest graph → containment → enforced endpoint refusal", GatekeeperSecurityGraphIncident.RunAsync),
+            new("HTTP Wire Boundary",           "Offline redirect, DNS-rebind, SSRF, cancellation, and disclosure enforcement", GatekeeperHttpWireBoundary.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",

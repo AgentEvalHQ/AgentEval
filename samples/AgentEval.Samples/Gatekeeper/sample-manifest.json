@@ -652,6 +652,185 @@
       "benignControl": "A local-tool-only inventory remains the fully interceptable comparison case.",
       "compositionMode": "intentional-low-level",
       "compositionRationale": "Exercises the coverage analyzer directly because no runtime gate stack is constructed."
+    },
+    {
+      "id": "19",
+      "name": "Bulkhead and Containment Isolation",
+      "handler": "GatekeeperBulkheadIsolation",
+      "description": "Measures separate concurrency pools for clean and contained HTTP work.",
+      "executionMode": "offline",
+      "complexity": "advanced",
+      "launcherStatus": "menu",
+      "source": "samples/AgentEval.Samples/Gatekeeper/19_GatekeeperBulkheadIsolation.cs",
+      "boundaries": [
+        "construction",
+        "tool-resource",
+        "containment",
+        "evidence"
+      ],
+      "mechanisms": [
+        "ContainmentHttpClientPool",
+        "WithContainmentHttpResourceIsolation",
+        "AgentRunScope"
+      ],
+      "threats": [
+        "resource starvation",
+        "contained workload interference"
+      ],
+      "externalEffects": [
+        "none; fake blocking HTTP handlers only"
+      ],
+      "passOracle": "Measured normal and isolated peaks are 3 and 1, every result uses the selected pool, and all permits return to zero.",
+      "guarantee": "Contained saturation cannot consume the independent normal HTTP pool permits in this process.",
+      "nonGuarantee": "Separate local pools cannot isolate a shared downstream provider quota or a resource type that is not decorated.",
+      "benignControl": "Clean work completes through the normal pool while the contained queue remains saturated.",
+      "compositionMode": "intentional-low-level",
+      "compositionRationale": "Exercises the dedicated resource-isolation decorator and measured pool metrics directly; no agent middleware stack is needed."
+    },
+    {
+      "id": "20",
+      "name": "Stateful Gate Timeline",
+      "handler": "GatekeeperStatefulTimeline",
+      "description": "Renders and proves reset, reload, window, and durable containment boundaries.",
+      "executionMode": "offline",
+      "complexity": "advanced",
+      "launcherStatus": "menu",
+      "source": "samples/AgentEval.Samples/Gatekeeper/20_GatekeeperStatefulTimeline.cs",
+      "boundaries": [
+        "tool-call",
+        "run",
+        "session",
+        "durable-containment"
+      ],
+      "mechanisms": [
+        "RunBudgetGate",
+        "RateLimitGate",
+        "JsonFileContainmentStore",
+        "ContainedIdentityGate"
+      ],
+      "threats": [
+        "state reset bypass",
+        "session reload bypass",
+        "containment loss"
+      ],
+      "externalEffects": [
+        "none; an owned temporary signed-state file is removed after the run"
+      ],
+      "passOracle": "Run budget resets only per run, stable session rate state survives object reload, the time window resets, and reopened containment blocks admission.",
+      "guarantee": "Each demonstrated state owner changes or persists only at its documented boundary.",
+      "nonGuarantee": "The in-process session counter is not a distributed quota; a distributed deployment needs shared authoritative state.",
+      "benignControl": "A new run and an elapsed rate window restore the operations those scopes are defined to reset.",
+      "compositionMode": "intentional-low-level",
+      "compositionRationale": "Calls stateful gates and stores directly so each before-decision-after transition is visible without unrelated agent behavior."
+    },
+    {
+      "id": "21",
+      "name": "Same-Batch Exfiltration Race",
+      "handler": "GatekeeperSameBatchRace",
+      "description": "Contrasts cross-iteration sequence state with concurrent sibling-call protection.",
+      "executionMode": "offline",
+      "complexity": "advanced",
+      "launcherStatus": "menu",
+      "source": "samples/AgentEval.Samples/Gatekeeper/21_GatekeeperSameBatchRace.cs",
+      "boundaries": [
+        "tool-call",
+        "concurrent-batch",
+        "evidence"
+      ],
+      "mechanisms": [
+        "SequenceGate",
+        "SameBatchOrderingGate",
+        "UseGatekeeper"
+      ],
+      "threats": [
+        "same-turn read-and-exfiltrate race",
+        "false happens-before assumption"
+      ],
+      "externalEffects": [
+        "none; scripted parallel calls and fake email counter"
+      ],
+      "passOracle": "SequenceGate honestly allows un-ordered siblings, SameBatchOrderingGate blocks the guarded effect, and five ordering controls match their seams.",
+      "guarantee": "A guarded fake effect is blocked whenever its configured trigger is present in the same assistant tool-call batch.",
+      "nonGuarantee": "SameBatchOrderingGate does not replace SequenceGate for triggers observed in prior iterations.",
+      "benignControl": "A guarded call alone and a guarded call beside an unrelated tool remain allowed.",
+      "compositionMode": "supported-composite",
+      "compositionRationale": "Uses UseGatekeeper for the end-to-end effect proof and direct gate calls only to contrast the two ordering contracts."
+    },
+    {
+      "id": "22",
+      "name": "Security Graph Incident Response",
+      "handler": "GatekeeperSecurityGraphIncident",
+      "description": "Moves content-free multi-session observations through graph computation into enforced containment.",
+      "executionMode": "offline",
+      "complexity": "advanced",
+      "launcherStatus": "menu",
+      "source": "samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs",
+      "boundaries": [
+        "ingestion",
+        "durable-graph",
+        "containment",
+        "tool-call"
+      ],
+      "mechanisms": [
+        "SecurityGraphIngestionPump",
+        "JsonFileSecurityGraphStore",
+        "AgenticSecurityGraph",
+        "SecurityGraphContainmentBridge",
+        "SecurityGraphStoreReportSource",
+        "MissionControl Query.SecurityGraph",
+        "ContainmentOverrideGate"
+      ],
+      "threats": [
+        "cross-session campaign",
+        "incomplete-evidence overclaim",
+        "contained endpoint reuse"
+      ],
+      "externalEffects": [
+        "none; owned temporary graph and containment files are removed after the run"
+      ],
+      "passOracle": "Two events drain durably, the complete report produces a bounded read-only operations view and containment, the next endpoint call blocks, and an incomplete report cannot mint a new decision.",
+      "guarantee": "Only a complete report with observed node facts can produce the demonstrated endpoint containment decision.",
+      "nonGuarantee": "The sample's two observations are illustrative evidence, not a universal campaign-detection threshold.",
+      "benignControl": "A known ingestion gap removes the fleet-rate claim and prevents a new graph containment decision.",
+      "compositionMode": "intentional-low-level",
+      "compositionRationale": "Exercises the bounded ingestion, durable store, compute, bridge, and override contracts directly to expose every incident-response handoff."
+    },
+    {
+      "id": "23",
+      "name": "HTTP Wire Boundary",
+      "handler": "GatekeeperHttpWireBoundary",
+      "description": "Revalidates host and DNS policy at every fake HTTP hop.",
+      "executionMode": "offline",
+      "complexity": "advanced",
+      "launcherStatus": "menu",
+      "source": "samples/AgentEval.Samples/Gatekeeper/23_GatekeeperHttpWireBoundary.cs",
+      "boundaries": [
+        "http-wire",
+        "dns",
+        "redirect",
+        "cancellation"
+      ],
+      "mechanisms": [
+        "GatekeeperHttpMessageHandler",
+        "IDnsResolver",
+        "HttpEgressBlockedException"
+      ],
+      "threats": [
+        "redirect escape",
+        "DNS rebinding",
+        "SSRF",
+        "unbounded redirect chain",
+        "refusal disclosure"
+      ],
+      "externalEffects": [
+        "none; fake DNS and scripted message handler only"
+      ],
+      "passOracle": "Public allow-list control passes; redirect, private DNS, and limit attacks block at measured hops; cancellation and query withholding are asserted.",
+      "guarantee": "The demonstrated async HTTP path validates each target and DNS answer before the fake transport receives it.",
+      "nonGuarantee": "Argument-level gates alone do not provide this wire guarantee, and synchronous HttpClient use is intentionally unsupported.",
+      "benignControl": "An allow-listed hostname resolving to a public address reaches the scripted transport once.",
+      "compositionMode": "intentional-low-level",
+      "compositionRationale": "Exercises the network-layer handler directly because it sits below the agent and tool middleware stack."
     }
   ]
 }

@@ -48,6 +48,11 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 | 16 | [Jailbreak and Tool Abuse](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Offline | construction, run, tool | input marker + authoritative contracts + coverage | Menu |
 | 17 | [Tool Result Admission](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Offline | tool result | secret masking + fixed-size truncation | Menu |
 | 18 | [Hosted Tool Coverage Boundary](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) | Intermediate | Offline | construction, coverage | hosted-tool classification + promotion refusal | Menu |
+| 19 | [Bulkhead + Containment Isolation](../../samples/AgentEval.Samples/Gatekeeper/19_GatekeeperBulkheadIsolation.cs) | Advanced | Offline | construction, tool-resource, containment, evidence | separate normal/isolated HTTP pools + measured concurrency | Menu |
+| 20 | [Stateful Gate Timeline](../../samples/AgentEval.Samples/Gatekeeper/20_GatekeeperStatefulTimeline.cs) | Advanced | Offline | tool-call, run, session, durable containment | run budget, session rate state, signed containment persistence | Menu |
+| 21 | [Same-Batch Exfiltration Race](../../samples/AgentEval.Samples/Gatekeeper/21_GatekeeperSameBatchRace.cs) | Advanced | Offline | tool-call, concurrent batch, evidence | `SequenceGate` contrast + `SameBatchOrderingGate` | Menu |
+| 22 | [Security Graph Incident Response](../../samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs) | Advanced | Offline | ingestion, durable graph, containment, tool-call | bounded ingestion/store/compute, read-only projection, containment bridge | Menu |
+| 23 | [HTTP Wire Boundary](../../samples/AgentEval.Samples/Gatekeeper/23_GatekeeperHttpWireBoundary.cs) | Advanced | Offline | HTTP wire, DNS, redirect, cancellation | `GatekeeperHttpMessageHandler` + fake DNS/transport | Menu |
 
 ## Boundary coverage
 
@@ -74,6 +79,11 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | 16 | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
 | 17 |  |  |  | ✓ |  |  |  |  | ✓ |
 | 18 | ✓ |  |  |  |  |  |  |  | ✓ |
+| 19 | ✓ |  | ✓ |  |  |  | ✓ |  | ✓ |
+| 20 |  | ✓ | ✓ |  |  |  | ✓ |  | ✓ |
+| 21 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 22 |  |  | ✓ |  |  |  | ✓ |  | ✓ |
+| 23 |  |  | ✓ |  |  |  |  |  | ✓ |
 
 ## Threat and feature coverage
 
@@ -92,11 +102,11 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Remote A2A boundary | 11A, 11B | Implementation/calibration covered; 11A requires a configured endpoint |
 | Provider-hosted coverage honesty | 18 | Strong construction-time boundary |
 | Explainability and replay | 10 | Strong |
-| Bulkhead/resource isolation | none | Highest-priority new architecture sample |
-| Stateful lifecycle/reset/restart | partial across 01, 09, 14 | Needs a dedicated timeline sample |
-| Same-batch ordering race | focused tests only | Needs a dedicated sample |
-| Security-graph incident response | focused tests/ops surface only | Needs a dedicated sample |
-| HTTP redirect/DNS wire boundary | focused tests/examples only | Needs a dedicated offline sample |
+| Bulkhead/resource isolation | 19 | Strong measured 3:1 pool isolation with contained saturation |
+| Stateful lifecycle/reset/restart | 01, 09, 14, 20 | Dedicated call/run/session/durable timeline plus focused examples |
+| Same-batch ordering race | 21 | Dedicated five-control race demonstration and fake-effect proof |
+| Security-graph incident response | 22 | Durable multi-session path through honest compute, read-only ops, containment, and refusal |
+| HTTP redirect/DNS wire boundary | 23 | Deterministic redirect, private-DNS, limit, cancellation, and disclosure checks |
 
 ## Other Gatekeeper sample suites
 

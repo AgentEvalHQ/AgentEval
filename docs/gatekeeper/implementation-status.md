@@ -27,6 +27,8 @@ implemented.
 | 6 | Security graph and escalation | ✅ | Durable graph storage/computation, ingestion, global containment, and the read-only operations surface are merged |
 | 7 | Applicable long-tail work | ✅ | Mock dangerous-tool fixtures and session-identity drift coverage are complete; deployment-specific predicates and judges remain demand-gated |
 | 8 | Documentation truth and information architecture | ✅ | High-level introductions, focused references, state and isolation operations, and a validated 19-entry sample manifest are complete and reviewed locally |
+| 9 | Sample reliability foundation | ✅ | Samples 00–09 are deterministic offline-first hybrids, contracts are standardized, and supported composition is explicit |
+| 10 | Architecture showcase | ✅ | Five offline samples expose measured resource isolation, state lifecycle, same-batch ordering, graph escalation, and HTTP wire enforcement |
 
 ## Sample and documentation showcase follow-up
 
@@ -67,6 +69,17 @@ discoverable demonstrations and records review evidence separately.
 | 9 | 9.4 | Normalize supported multi-layer composition | 100% | ✅ | Samples 02 and 04–09 use `UseGatekeeper`; 00, 01, 03 and non-runtime fixtures declare why their specialist low-level surface is intentional |
 | 9 | 9.R | Sample reliability promotion review | 100% | ✅ | Ten offline oracles pass; Release samples build clean; manifest passes net8/net9/net10; 1,384 net10 Gatekeeper tests pass; formatter clean; scoped MAF Doctor B/0 errors |
 
+## Architecture showcase
+
+| Phase | Task | Description | Done | Reviewed | Implementation notes |
+|---|---|---|---:|:---:|---|
+| 10 | 10.1 | Demonstrate Bulkhead and containment isolation | 100% | ✅ | Measured independent peaks of 3 normal and 1 isolated permit while contained saturation could not starve normal work |
+| 10 | 10.2 | Demonstrate state ownership and lifecycle | 100% | ✅ | Proves run reset, stable-session reload, rate-window reset, and signed durable containment after store reopen |
+| 10 | 10.3 | Demonstrate the same-batch exfiltration race | 100% | ✅ | Contrasts the honest `SequenceGate` limitation with enforced `SameBatchOrderingGate`; five controls and a zero-effect oracle pass |
+| 10 | 10.4 | Demonstrate security-graph incident response | 100% | ✅ | Bounded ingestion → durable compute → real read-only Mission Control projection → containment → future refusal; incomplete coverage cannot mint a decision |
+| 10 | 10.5 | Demonstrate the HTTP wire boundary | 100% | ✅ | Fake DNS/transport prove redirect, private-address, limit, cancellation, and non-disclosure behavior without network access |
+| 10 | 10.R | Architecture-showcase promotion review | 100% | ✅ | Five launcher oracles pass; Release build 0 warnings; manifest net8/net9/net10; 1,384 Gatekeeper tests; formatter; DocFX 0 errors; scoped MAF Doctor B/0 errors |
+
 ## Deferred and demand-gated work
 
 | Item | State | Reactivation condition |
@@ -91,6 +104,7 @@ coverage.
   manifest contract passes on net8/net9/net10, 1,384 passing net10 Gatekeeper tests, and a successful
   Release sample build. DocFX completes with zero errors and 28 existing warnings, none owned by the
   changed Gatekeeper documentation.
+- Phase 10 adds five self-validating offline architecture samples and expands the synchronized manifest/catalog to 24 entries. All five launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and 28 existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
 - The Phase 9 scoped MAF Doctor review reports grade B and zero errors. Of 39 detected run sites, the only cost
   findings are the reviewed remote-A2A server-side cap limitation and one bounded scripted-provider helper false
   positive. Four observability warnings are deterministic offline fixtures where exporters add no production signal.
@@ -103,9 +117,9 @@ coverage.
 
 ## Release posture
 
-The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up, Phase 8, and
-Phase 9 is complete and reviewed on the current local branch, but remains intentionally unpublished under the
-local-only instruction.
+The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–10
+are complete and reviewed on the current local branch, but remain intentionally unpublished under the local-only
+instruction.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase
 the completed local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
 surface may be reported as fully enforced.

@@ -63,7 +63,7 @@ public sealed class GatekeeperSampleManifestTests
 
         var samples = rootElement.GetProperty("samples");
         Assert.Equal(JsonValueKind.Array, samples.ValueKind);
-        Assert.Equal(19, samples.GetArrayLength());
+        Assert.Equal(24, samples.GetArrayLength());
 
         var program = File.ReadAllText(programPath);
         var samplesProject = File.ReadAllText(samplesProjectPath);
