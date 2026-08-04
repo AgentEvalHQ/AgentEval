@@ -188,6 +188,11 @@ registered gate; it does not prove the policy is semantically sufficient.
   discovers a real Harness-owned function at runtime, blocks its misuse and retains a benign control.
 - [`16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs)
   contrasts an obvious pre-model block with paraphrases stopped by authoritative tool contracts.
+- [`17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs)
+  composes secret masking and output-size truncation before tool results become model context.
+- [`18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs)
+  demonstrates construction-time refusal and honest acknowledgment of provider-hosted execution.
 
-All three are deterministic and offline. Their harmful operations are fake counters, and their pass/fail result is
-derived from gate evidence and effect invariants rather than model compliance.
+All five are deterministic and offline. Their harmful operations are fake counters, and their pass/fail result is
+derived from gate evidence and effect invariants rather than model compliance. The hosted-boundary sample invokes
+neither the hosted tool nor a provider.

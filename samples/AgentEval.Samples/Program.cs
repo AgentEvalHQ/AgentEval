@@ -142,6 +142,8 @@ public static class Program
             new("Poisoned Tool Kill Chain",   "Offline fake MCP poison → isolation; bulk read, email, delete, exfil, and worm chain blocked", GatekeeperPoisonedToolKillChain.RunAsync),
             new("Harness-Owned Tool Misuse",  "Offline real Agent Harness: weird request cannot misuse its runtime-injected capability", GatekeeperHarnessOwnedToolMisuse.RunAsync),
             new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync),
+            new("Tool Result Admission",       "Offline result seam: fake secret masking + bounded result truncation before model context", GatekeeperToolResultAdmission.RunAsync),
+            new("Hosted Tool Coverage",        "Offline promotion boundary: hosted code execution stays opaque even when risk is acknowledged", GatekeeperHostedToolCoverageBoundary.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",

@@ -40,7 +40,9 @@ discoverable demonstrations and records review evidence separately.
 | Showcase | S.4 | Protect a Harness-owned capability | 100% | ✅ | Discovers todos_add at runtime, blocks weird-request misuse, preserves benign control |
 | Showcase | S.5 | Add jailbreak-to-tool-abuse demonstration | 100% | ✅ | Obvious input stops pre-model; paraphrase remains bounded by shell, deletion and recipient contracts |
 | Showcase | S.6 | Document gate lifecycle and coordination | 100% | ✅ | Added lifecycle/order/shared-state guide, sample index, TOC and cross-links |
-| Showcase | S.R | Focused review and validation | 100% | ✅ | Release sample build 0 warnings; 1,383 Gatekeeper tests; 4/4 offline samples; DocFX adds no warnings; scoped MAF Doctor has 0 errors |
+| Showcase | S.7 | Demonstrate tool-result admission | 100% | ✅ | Fake credential is masked and oversized diagnostics are truncated before model context; clean bounded control is unchanged |
+| Showcase | S.8 | Demonstrate the provider-hosted coverage boundary | 100% | ✅ | Unacknowledged hosted code execution refuses promotion; acknowledgment admits risk without fabricating interception or inflating 50% coverage |
+| Showcase | S.R | Focused review and validation | 100% | ✅ | Release sample build 0 warnings; 1,383 Gatekeeper tests; 6/6 offline samples; formatter clean; DocFX has 32 existing and 0 new warnings; scoped MAF Doctor has 0 errors |
 
 ## Deferred and demand-gated work
 
@@ -71,7 +73,8 @@ coverage.
 
 ## Release posture
 
-All completed Gatekeeper work listed above is merged into `main`. Phase 4's deferred endpoint check
-limits only the promotion claim for a real remote A2A boundary; it does not erase the completed
-local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
+The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up is complete
+and reviewed on the current local branch, but remains intentionally unpublished under the local-only instruction.
+Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase
+the completed local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
 surface may be reported as fully enforced.

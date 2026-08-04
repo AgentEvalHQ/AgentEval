@@ -40,6 +40,8 @@ Execution modes are reported explicitly:
 | [`14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) | Advanced | Offline | `ToolResultInjectionGate`, containment override/store, `ToolUsageContractGate`, `TaintTrackingGate`, `DomainAllowListGate`, `ForbiddenToolGate`, `BlockStormSentinelGate`, `RunBudgetGate` | Isolates a fake poisoned MCP source, then blocks bulk retrieval, customer-email exfiltration, external POST, delete-all and worm propagation | Menu |
 | [`15_GatekeeperHarnessOwnedToolMisuse`](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) | Intermediate | Offline | `ForbiddenToolGate`, `RunBudgetGate`, real MAF Agent Harness with scripted provider | Discovers an actual runtime-injected Harness tool name, blocks a weird request from using it, and preserves a benign control | Menu |
 | [`16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Offline | `TokenInjectionGate`, `ToolUsageContractGate`, `RunBudgetGate`, coverage analyzer | Contrasts an obvious pre-model jailbreak block with shell, bulk-delete and external-email contracts that remain authoritative after a paraphrase | Menu |
+| [`17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Offline | `ToolResultSecretGate`, `ToolResultSizeGate`, result metadata | Masks a fake credential and truncates oversized diagnostics before model context while preserving a clean bounded result | Menu |
+| [`18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) | Intermediate | Offline | coverage analyzer, `HostedCodeInterpreterTool`, promotion refusal and risk acknowledgment | Proves local gates cannot intercept provider-hosted execution and that acknowledgment never inflates structural coverage | Menu |
 
 ## Gate-boundary coverage matrix
 
@@ -65,6 +67,8 @@ sample executes or directly evaluates that boundary.
 | 14 Poisoned kill chain | ✓ |  | ✓ | ✓ |  |  |  |  | ✓ |
 | 15 Harness-owned tool |  | ✓ | ✓ |  |  |  |  | ✓ | ✓ |
 | 16 Jailbreak + abuse | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
+| 17 Result admission |  |  |  | ✓ |  |  |  |  | ✓ |
+| 18 Hosted coverage | ✓ |  |  |  |  |  |  |  | ✓ |
 
 ## Feature coverage matrix
 
@@ -78,26 +82,28 @@ sample executes or directly evaluates that boundary.
 | Taint from a sensitive source to an external sink | 07, 14 | Covered in both campaign and complete kill-chain scenarios |
 | Argument-level domain control | 04, 06, 07, 14 | Strong coverage |
 | Tool-specific argument contracts | 13, 14, 16 | Sample-local design fixture plus production declarative contracts |
-| Tool-result injection, secret and size handling | 07, 14 demonstrate injection | Poison admission and containment are focused; secret/size combinations remain a useful next sample |
+| Tool-result injection, secret and size handling | 07, 14, 17 | Injection, secret masking and size truncation are all demonstrated at the actual result-admission seam |
 | Human approval and continuation | 03 | Focused coverage |
 | Budget and denial-of-wallet | 04, 05, 06, 09, 14, 15, 16 | Strong coverage |
 | Autonomous Agent Harness protection | 05, 06, 15 | Includes exact runtime discovery and denial of a Harness-owned capability |
 | Repeated-denial incident escalation | 01, 14 | Shadow quarantine, block-storm incident evidence and durable fake MCP containment are covered |
 | Remote-agent/A2A boundary | 11 A2A samples | Strong, explicitly consented coverage |
 | Memory lifecycle protection | [Memory-security samples](memory-security-samples.md) | Covered in the dedicated offline release-validation suite |
-| Coverage analysis and construction-time refusal | 14, 16 plus focused tests | Runnable reports cover local tools; hosted/dynamic coverage remains an explicit boundary |
+| Coverage analysis and construction-time refusal | 14, 16, 18 plus focused tests | Runnable reports cover local tools and honestly refuse unacknowledged provider-hosted code execution |
 | Explainability, replay and trust aggregation | 10 | Strong coverage |
 
 ## Coverage delivered and next additions
 
-Samples 14–16 close the highest-priority showcase gaps identified by the first matrix:
+Samples 14–18 close the highest-priority showcase gaps identified by the first matrix:
 
 - a poisoned tool/MCP result is withheld, its fake server is durably isolated, and retries are blocked;
 - a compromised-model kill chain cannot retrieve all customers, email tainted records, POST externally, delete all customers, or propagate worm instructions;
 - a real Agent Harness contribution is discovered by runtime name and denied on a weird request;
-- an obvious jailbreak stops before the model while paraphrased attacks remain bounded by declarative contracts; and
-- construction-time coverage reports and fake effect counters make the assertions independent of model compliance.
+- an obvious jailbreak stops before the model while paraphrased attacks remain bounded by declarative contracts;
+- construction-time coverage reports and fake effect counters make the assertions independent of model compliance;
+- secret-shaped data is masked and oversized output is truncated before model context; and
+- unacknowledged provider-hosted code execution refuses promotion without claiming local interception after acknowledgment.
 
-The best next sample additions are a focused secret/oversize result-gate composition, an explicitly unsupported
-provider-hosted-tool coverage case, and a cross-link from the memory-security release validation suite. Live-model
-variants may be layered on the offline fixtures, but must keep gate evidence and fake effects as the pass/fail oracle.
+The next additions should be driven by concrete production integrations: provider-hosted compensating controls,
+dynamic context-provider inventory, or a new resource-exhaustion mode with an enforceable seam. Live-model variants
+may be layered on the offline fixtures, but must keep gate evidence and fake effects as the pass/fail oracle.

@@ -395,6 +395,11 @@ come from gate evidence and observable fake effects rather than assuming model c
 - [`Gatekeeper/16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) —
   contrasts an obvious pre-model jailbreak block with shell, deletion, and email contracts that remain authoritative
   when a paraphrase reaches the model.
+- [`Gatekeeper/17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) —
+  composes fake-secret masking with result-size truncation at the result-admission seam and preserves a clean control.
+- [`Gatekeeper/18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) —
+  refuses an unacknowledged hosted code interpreter, then proves acknowledgment records risk without inventing local
+  interception or inflating coverage.
 
 ## From the CLI
 
