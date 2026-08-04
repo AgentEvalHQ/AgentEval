@@ -29,7 +29,19 @@ separate HTTP resources.
 The security graph correlates privacy-minimized observations across sessions without storing prompts, arguments, or
 responses.
 
-| Component | Responsibility |
+```text
+content-free observation
+        ↓
+bounded ingestion pump ── drop/conflict ──→ durable coverage gap
+        ↓
+tenant-bound graph store
+        ↓
+immutable compute ── incomplete coverage ──→ no healthy/global decision
+        ↓ complete approved fact
+containment bridge → signed containment lifecycle → future run/tool refusal
+        ↓
+read-only Mission Control projection
+``` | Responsibility |
 |---|---|
 | Graph observation models | Carry bounded tenant/session/agent/MCP/endpoint facts and coverage-gap markers |
 | `SecurityGraphIngestionPump` | Caller-owned bounded queue, one serial durable consumer, linearizable completion |

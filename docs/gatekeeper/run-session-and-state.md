@@ -4,7 +4,22 @@ This page owns run/session gates and the state-lifecycle contract for Gatekeeper
 using process state where run state was intended can leak decisions across users, while losing durable state at a
 restart can silently remove containment.
 
-## Run gates
+## Lifecycle map
+
+```text
+one proposal/batch
+       ↓
+run ledger ── resets at the end of the root run
+       ↓
+logical session / rate window ── survives object reload; expires or is explicitly cleared
+       ↓
+process-owned state ── survives runs, not process restart
+       ↓
+durable containment / graph / calibration report ── survives reopen; explicit retention or release
+```
+
+Choose the narrowest lifetime that still governs the threat. A longer lifetime is not automatically safer: it can
+leak decisions across users or make recovery impossible.
 
 Run gates implement `IChatGate` and inspect text at a run-pre or run-post boundary.
 

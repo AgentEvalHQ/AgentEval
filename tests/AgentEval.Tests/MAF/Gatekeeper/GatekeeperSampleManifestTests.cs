@@ -71,6 +71,8 @@ public sealed class GatekeeperSampleManifestTests
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var handlers = new HashSet<string>(StringComparer.Ordinal);
         var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var menuCount = 0;
+        var directCount = 0;
 
         foreach (var sample in samples.EnumerateArray())
         {
@@ -137,12 +139,33 @@ public sealed class GatekeeperSampleManifestTests
 
             if (launcher == "menu")
             {
+                menuCount++;
                 Assert.Contains($"{handler}.RunAsync", program, StringComparison.Ordinal);
+            }
+            else
+            {
+                directCount++;
             }
 
             Assert.Contains($"| {id} |", catalog, StringComparison.Ordinal);
         }
 
+        Assert.Equal(29, menuCount);
+        Assert.Equal(1, directCount);
+        Assert.Equal(6, program.Split("Recommended: true", StringSplitOptions.None).Length - 1);
+        Assert.Contains("], Progressive: true)", program, StringComparison.Ordinal);
+        foreach (var recommendedHandler in new[]
+        {
+            "GatekeeperHelloWorld",
+            "GatekeeperPoisonedToolKillChain",
+            "GatekeeperJailbreakAndToolAbuse",
+            "GatekeeperStatefulTimeline",
+            "GatekeeperHttpWireBoundary",
+            "GatekeeperManifestProvenanceDrift",
+        })
+        {
+            Assert.Contains($"{recommendedHandler}.RunAsync, Recommended: true", program, StringComparison.Ordinal);
+        }
         var sourceFiles = Directory
             .EnumerateFiles(
                 Path.Combine(root, "samples", "AgentEval.Samples", "Gatekeeper"),

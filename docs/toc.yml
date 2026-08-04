@@ -75,7 +75,7 @@
     href: gatekeeper-cli.md
   - name: Implementation Status
     href: gatekeeper/implementation-status.md
-  - name: What's New (history)
+  - name: Capability History
     href: gatekeeper-whats-new.md
   - name: Memory Security
     href: gatekeeper/memory-security.md

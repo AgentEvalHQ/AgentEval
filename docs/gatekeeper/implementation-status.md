@@ -30,6 +30,7 @@ implemented.
 | 9 | Sample reliability foundation | ✅ | Samples 00–09 are deterministic offline-first hybrids, contracts are standardized, and supported composition is explicit |
 | 10 | Architecture showcase | ✅ | Five offline samples expose measured resource isolation, state lifecycle, same-batch ordering, graph escalation, and HTTP wire enforcement |
 | 11 | Specialized showcase | ✅ | Six offline samples cover dynamic providers, Crescendo trajectories, identity takeover, manifest drift, approval edges, and result anomalies |
+| 12 | Documentation and sample usability consolidation | ✅ | Six recommended entry points, curated paths, compiled canonical snippets, architecture maps, current capability history, and measured console summaries are complete |
 
 ## Sample and documentation showcase follow-up
 
@@ -96,6 +97,17 @@ discoverable demonstrations and records review evidence separately.
 The Crescendo sample intentionally stays deterministic and offline. Live semantic promotion remains owned by the
 calibrated-corpus workflow, avoiding a second uncalibrated model path that could be mistaken for production evidence.
 
+## Documentation and sample usability consolidation
+
+| Phase | Task | Description | Done | Reviewed | Implementation notes |
+|---|---|---|---:|:---:|---|
+| 12 | 12.1 | Reorganize sample discovery without deleting coverage | 100% | ✅ | Group J shows six recommended samples by default; **M** reveals all 29 menu entries; the 30-contract manifest and legacy numeric order remain unchanged |
+| 12 | 12.2 | Simplify recipes and current capability navigation | 100% | ✅ | Replaced the recipe encyclopedia with curated learning paths, added direct sample links to gate selection, and converted the dated “What’s New” page into compact capability history |
+| 12 | 12.3 | Add executable documentation and architecture maps | 100% | ✅ | Two canonical `UseGatekeeper` snippets compile and match docs mechanically; lifecycle, graph/containment, and memory architecture maps expose ownership and handoffs |
+| 12 | 12.4 | Clarify operational decisions and CLI truth | 100% | ✅ | Added calibration-release and approval matrices; the unimplemented `serve` command is explicitly reserved/deferred rather than advertised as a stub |
+| 12 | 12.5 | Improve dense sample console evidence | 100% | ✅ | Samples 14, 20, 22, and 27 print asserted effect, transition, incident, and construction-decision matrices |
+| 12 | 12.R | Usability-consolidation review | 100% | ✅ | Recommended launcher + four oracles pass; 1,386 Gatekeeper tests; Release build 0 warnings; task C# formatter clean; DocFX 0 errors; scoped MAF B/0 errors |
+
 ## Deferred and demand-gated work
 
 | Item | State | Reactivation condition |
@@ -106,6 +118,7 @@ calibrated-corpus workflow, avoiding a second uncalibrated model path that could
 | SQL/browser/cloud/package predicates | ⏸️ | A production caller and concrete policy contract are identified |
 | Calendar/physical-action gates | ⏸️ | A production calendar or actuator integration needs enforcement |
 | Additional semantic judges | ⏸️ | A specific judge has a justified use case and a representative calibration corpus |
+| Gatekeeper CLI serve mode | ⏸️ | A concrete service-hosting contract, authentication model, and deployment owner are approved |
 
 Deferred items are not included in completion percentages and are not represented as enforced
 coverage.
@@ -122,6 +135,13 @@ coverage.
   changed Gatekeeper documentation.
 - Phase 10 adds five self-validating offline architecture samples and expands the synchronized manifest/catalog to 24 entries. All five launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and 28 existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
 - Phase 11 adds six self-validating offline specialized samples and expands the synchronized manifest/catalog to 30 entries. All six launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and only existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
+- Phase 12 adds progressive discovery, compiled recipe contracts, focused architecture maps, current history/CLI
+  truth, and measured output tables. The recommended view and four enhanced oracles pass; 1,386 Gatekeeper tests pass;
+  Release samples build with 0 warnings; the seven task C# files pass formatter verification; DocFX has 0 errors and
+  28 pre-existing non-Gatekeeper warnings; scoped Gatekeeper MAF Doctor remains B with 0 errors, 8 reviewed warnings,
+  and 3 known cost heuristics.
+- A repo-root MAF Doctor run is polluted by ignored `.claude/worktrees` and reports duplicate/generated findings;
+  the changed Gatekeeper source scope is the recorded health boundary for this review.
 - The final scoped MAF Doctor review reports grade B and zero errors. Its eight observability warnings are
   deterministic offline fixtures. The three cost heuristics are the pre-existing remote-A2A/server and scripted-helper
   limitations plus one false positive whose Crescendo call has both agent-level and explicit per-run token caps.
@@ -134,7 +154,7 @@ coverage.
 
 ## Release posture
 
-The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–11
+The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–12
 are complete and reviewed on the current local branch, but remain intentionally unpublished under the local-only
 instruction.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase

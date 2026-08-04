@@ -23,20 +23,20 @@ Rank is not a correctness score. A lower-ranked gate can be exactly right for on
 
 ## Choose by protected boundary
 
-| Need | Start with | Detailed reference |
-|---|---|---|
-| Deny or constrain local tool execution | `ToolUsageContractGate`, budgets, sequence, taint, allow/deny gates | [Tool and result gates](tool-and-result-gates.md) |
-| Keep unsafe tool output away from the model | result injection, secret, fixed-size, or anomaly gates | [Tool and result gates](tool-and-result-gates.md#tool-result-gates) |
-| Stop redirect, DNS-rebinding, or private-network egress | `GatekeeperHttpMessageHandler` inside the tool's client | [Tool and result gates](tool-and-result-gates.md#http-wire-boundary) |
-| Govern run input or final output | deterministic `IChatGate` or a calibrated judge | [Run, session, and state](run-session-and-state.md) |
-| Bind identity, rate, or quarantine across runs | session gates with a host-attested identity | [Run, session, and state](run-session-and-state.md#session-gates) |
-| Ask a human before execution | approval gates over MAF approval | [Judges, approval, and shadow](judges-approval-and-shadow.md#tool-approval) |
-| Use expensive judgment without blocking this run | bounded shadow pump and later-run quarantine | [Judges, approval, and shadow](judges-approval-and-shadow.md#shadow-judgment) |
-| Isolate a compromised target | signed containment plus override/admission gates | [Containment, coverage, and operations](containment-coverage-and-operations.md) |
-| Isolate local HTTP resource pressure | normal and isolated client pools | [Resource isolation and containment](resource-isolation-and-containment.md) |
-| Correlate attacks across sessions | security-graph ingestion, honest compute, containment bridge | [Containment, coverage, and operations](containment-coverage-and-operations.md#security-graph) |
-| Prove structural reachability and decisions | coverage analyzer, trace, telemetry, replay, fingerprints | [Containment, coverage, and operations](containment-coverage-and-operations.md#coverage-and-evidence) |
-| Protect memory recall/write/promotion/lifecycle | memory protection pipeline and adapters | [Memory security](memory-security.md) |
+| Need | Start with | Detailed reference | See it |
+|---|---|---|---:|
+| Deny or constrain local tool execution | `ToolUsageContractGate`, budgets, sequence, taint, allow/deny gates | [Tool and result gates](tool-and-result-gates.md) | [14](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) |
+| Keep unsafe tool output away from the model | result injection, secret, fixed-size, or anomaly gates | [Tool and result gates](tool-and-result-gates.md#tool-result-gates) | [17](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs), [29](../../samples/AgentEval.Samples/Gatekeeper/29_GatekeeperToolResultBehavioralAnomaly.cs) |
+| Stop redirect, DNS-rebinding, or private-network egress | `GatekeeperHttpMessageHandler` inside the tool's client | [Tool and result gates](tool-and-result-gates.md#http-wire-boundary) | [23](../../samples/AgentEval.Samples/Gatekeeper/23_GatekeeperHttpWireBoundary.cs) |
+| Govern run input or final output | deterministic `IChatGate` or a calibrated judge | [Run, session, and state](run-session-and-state.md) | [16](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) |
+| Bind identity, rate, or quarantine across runs | session gates with a host-attested identity | [Run, session, and state](run-session-and-state.md#session-gates) | [20](../../samples/AgentEval.Samples/Gatekeeper/20_GatekeeperStatefulTimeline.cs), [26](../../samples/AgentEval.Samples/Gatekeeper/26_GatekeeperSessionIdentityTakeover.cs) |
+| Ask a human before execution | approval gates over MAF approval | [Judges, approval, and shadow](judges-approval-and-shadow.md#tool-approval) | [28](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) |
+| Use expensive judgment without blocking this run | bounded shadow pump and later-run quarantine | [Judges, approval, and shadow](judges-approval-and-shadow.md#shadow-judgment) | [25](../../samples/AgentEval.Samples/Gatekeeper/25_GatekeeperCrescendoTrajectory.cs) |
+| Isolate a compromised target | signed containment plus override/admission gates | [Containment, coverage, and operations](containment-coverage-and-operations.md) | [22](../../samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs) |
+| Isolate local HTTP resource pressure | normal and isolated client pools | [Resource isolation and containment](resource-isolation-and-containment.md) | [19](../../samples/AgentEval.Samples/Gatekeeper/19_GatekeeperBulkheadIsolation.cs) |
+| Correlate attacks across sessions | security-graph ingestion, honest compute, containment bridge | [Containment, coverage, and operations](containment-coverage-and-operations.md#security-graph) | [22](../../samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs) |
+| Prove structural reachability and decisions | coverage analyzer, trace, telemetry, replay, fingerprints | [Containment, coverage, and operations](containment-coverage-and-operations.md#coverage-and-evidence) | [18](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs), [24](../../samples/AgentEval.Samples/Gatekeeper/24_GatekeeperDynamicContextProviderBoundary.cs) |
+| Protect memory recall/write/promotion/lifecycle | memory protection pipeline and adapters | [Memory security](memory-security.md) | [Memory samples](memory-security-samples.md) |
 
 ## Gate families at a glance
 

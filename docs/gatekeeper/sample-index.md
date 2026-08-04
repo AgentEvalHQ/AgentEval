@@ -23,6 +23,24 @@ Samples 00–09 choose the deterministic offline path when Azure OpenAI is not c
 `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true` to force that release oracle even on a configured workstation; otherwise
 the optional live overlay runs. Both paths use fake/local tool effects.
 
+## Start small: recommended paths
+
+The repository keeps 30 contracts because each sample owns distinct executable evidence. The interactive launcher
+uses progressive disclosure: group **J** initially shows six recommended samples and **M** reveals all 29 menu
+entries. The direct-only A2A calibration fixture accounts for the thirtieth manifest entry. Legacy numeric execution
+order is unchanged.
+
+| Path | Samples | Outcome |
+|---|---|---|
+| Recommended six | **00, 14, 16, 20, 23, 27** | Smallest gate, capstone attack, authorization, state, wire, and construction integrity |
+| Tool and egress | **02 → 17 → 21 → 23** | Cross-call, result, batch, and network boundaries |
+| State and containment | **20 → 19 → 22 → 26** | Lifecycle, isolation, graph response, and actor binding |
+| Dynamic and construction | **18 → 24 → 27** | Hosted limits, runtime providers, and manifest drift |
+| Semantic and approval | **03 → 28 → 25 → 04** | Continuation, fail-safe approval, trajectory timing, and calibrated judges |
+
+Use [Gatekeeper recipes](examples.md) for the reasoning behind each path. The catalog below remains complete for
+regression ownership and specialist lookup.
+
 ## Core Gatekeeper catalog
 
 Stable IDs preserve the two historical `11_` source files as **11A** and **11B** without a breaking rename.

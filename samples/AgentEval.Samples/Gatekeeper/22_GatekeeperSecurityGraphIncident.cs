@@ -140,11 +140,13 @@ public static class GatekeeperSecurityGraphIncident
                     "sample-incomplete"),
                 "an incomplete graph must not mint a new containment decision");
 
-            Console.WriteLine("   durable observations: 2 calls across 2 sessions (1 blocked)");
-            Console.WriteLine("   complete graph:       decision admitted → endpoint containment active");
-            Console.WriteLine("   read-only ops view:   2 bounded nodes, 1 edge, no content payloads");
-            Console.WriteLine("   future endpoint call: BLOCK by ContainmentOverrideGate");
-            Console.WriteLine("   incomplete control:   no fleet rate and no new containment decision");
+            Console.WriteLine("   Stage           Measured evidence                                  Security disposition");
+            Console.WriteLine("   ──────────────  ─────────────────────────────────────────────────  ─────────────────────");
+            PrintStage("1  ingest", $"{report.TotalCallCount} calls / {report.TotalBlockedCallCount} blocked / 2 sessions", "DURABLY APPLIED");
+            PrintStage("2  compute", $"coverage={report.Coverage}; fleet block rate={report.FleetBlockRate!.Value:P0}", "DECISION ELIGIBLE");
+            PrintStage("3  project", $"{operationsView!.Nodes.Count} nodes / {operationsView.Edges.Count} edge / content-free", "READ ONLY");
+            PrintStage("4  enforce", "partner-endpoint containment active", refusal.Action.ToString().ToUpperInvariant());
+            PrintStage("5  gap test", $"coverage={incomplete.Coverage}; fleet rate absent", "NO NEW DECISION");
             Console.WriteLine("   ✅ local finding → graph → containment → enforced refusal completed with content-free evidence.");
         }
         finally
@@ -153,6 +155,8 @@ public static class GatekeeperSecurityGraphIncident
         }
     }
 
+    private static void PrintStage(string stage, string evidence, string disposition) =>
+        Console.WriteLine($"   {stage,-14} {evidence,-50} {disposition}");
     private static SecurityGraphObservationRequest Observation(
         string eventId,
         SecurityGraphNode source,

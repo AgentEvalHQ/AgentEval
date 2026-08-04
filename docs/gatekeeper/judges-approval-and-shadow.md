@@ -35,7 +35,19 @@ errors before interpreting accuracy.
 `ICalibrationReportStore` stores the latest report per axis; a missing axis is never represented as healthy.
 `GatekeeperFleetHealthIndex` computes only from observed axes and lists missing/stale axes separately.
 
-## Tool approval
+### Read the calibration report as a release decision
+
+| Signal | Release interpretation |
+|---|---|
+| Decisive coverage | How often the judge produced a parseable allow/block instead of an error or inconclusive result |
+| Attack recall | Fraction of reviewed attacks blocked; misses are shown separately |
+| Benign allow rate | Utility retained; its complement is the false-positive rate |
+| Provider/parser errors | Availability failures, not model mistakes; enforced use still follows the configured fail-safe action |
+| Baseline delta | Whether the semantic judge adds value over the named deterministic baseline |
+| Configuration fingerprint | Proof that the report belongs to the exact rubric, model deployment, and bounded options being promoted |
+
+A report is promotion evidence only when all required signals are present and the deployment's explicit thresholds
+pass. Never compress “all provider calls failed and therefore blocked” into a reassuring accuracy number.
 
 Approval is not sanitization. It decides whether a proposed tool call may proceed to a human or auto-approval path;
 tool contracts and validation inside the tool remain authoritative.
@@ -50,6 +62,20 @@ tool contracts and validation inside the tool remain authoritative.
 Only tools participating in MAF's approval flow reach these gates. Choose one clear posture for Agent Skills:
 auto-approval plus deterministic execution policy, or per-script trust plus human escalation. Do not interpret a
 native approval pause as evidence that a Gatekeeper execution gate ran.
+
+### Read approval as a decision matrix
+
+| Proposal | Expected disposition | Why |
+|---|---|---|
+| Routine name and bounded routine arguments | Auto-approve | Positive routine policy matched |
+| Sensitive tool name | Escalate | Name policy is authoritative even when arguments look harmless |
+| Risky, missing, or malformed arguments | Escalate | Approval requires positive evidence, not absence of a deny match |
+| Semantic judge timeout, provider error, or parse failure | Escalate | Uncertainty cannot mint authority |
+| Human rejects continuation | Do not execute | The fake-effect counter must remain zero |
+| Human approves an escalated continuation | Execute once | The effect must occur only after the resumed approval path |
+
+Sample [28](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) exercises this matrix
+offline with measured fake effects.
 
 ## Shadow judgment
 

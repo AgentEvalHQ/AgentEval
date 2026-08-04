@@ -5,7 +5,23 @@ AgentEval can place deterministic policy gates around memory tools, local and ho
 defense-in-depth boundary: it reduces memory-poisoning, scope-confusion, unsafe recall, and resource-abuse
 risk, but it does **not** prove that poisoning or data leakage is impossible.
 
-## Start with one composite configuration
+```text
+authenticated host identity
+        ↓
+one immutable memory-protection configuration
+        ├─ local memory tool / MCP boundary
+        ├─ GatedAIContextProvider boundary
+        └─ provider-native candidate + recall hooks
+        ↓
+MemoryGatePipeline: recall → write → promotion → lifecycle → action influence
+        ↓
+allow / reject / quarantine / explicit approval
+        ↓
+content-free coverage report, receipts, and operational evidence
+```
+
+Every real path must pass through one of the declared adapters. A stronger adapter on one operation never upgrades
+an opaque or bypassing operation. with one composite configuration
 
 Configure memory protection once, before the agent is built:
 

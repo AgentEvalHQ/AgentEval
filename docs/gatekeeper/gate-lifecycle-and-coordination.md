@@ -200,6 +200,8 @@ registered gate; it does not prove the policy is semantically sufficient.
 - [`18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs)
   demonstrates construction-time refusal and honest acknowledgment of provider-hosted execution.
 
-All five are deterministic and offline. Their harmful operations are fake counters, and their pass/fail result is
-derived from gate evidence and effect invariants rather than model compliance. The hosted-boundary sample invokes
-neither the hosted tool nor a provider.
+These five are the attack-boundary entry set. Continue with samples 19–23 for resource, state, concurrency, graph,
+and HTTP architecture, then 24–29 for dynamic providers, trajectory, identity, construction integrity, approval,
+and adaptive result state. All are deterministic and offline. Harmful operations use fake counters, and pass/fail is
+derived from evidence and effect invariants rather than model compliance. Use the
+[curated learning paths](sample-index.md#start-small-recommended-paths) instead of running the entire catalog at once.

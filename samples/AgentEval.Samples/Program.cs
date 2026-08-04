@@ -17,8 +17,13 @@ public static class Program
     //  Sample catalogue — one record per group, samples in order
     // ──────────────────────────────────────────────────────────
 
-    private record SampleEntry(string Name, string Description, Func<Task> Run);
-    private record SampleGroup(char Key, string Name, string Note, IReadOnlyList<SampleEntry> Samples);
+    private record SampleEntry(string Name, string Description, Func<Task> Run, bool Recommended = false);
+    private record SampleGroup(
+        char Key,
+        string Name,
+        string Note,
+        IReadOnlyList<SampleEntry> Samples,
+        bool Progressive = false);
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
@@ -124,9 +129,9 @@ public static class Program
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
-        new('J', "Gatekeeper (Runtime Protection)", "offline simulations + optional live MAF agents — fail-closed runtime enforcement",
+        new('J', "Gatekeeper (Runtime Protection)", "★ 6 recommended · M shows all 29 menu samples",
         [
-            new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync),
+            new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync, Recommended: true),
             new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
             new("MAF Support Agent (exfil)", "A realistic gated MAF support agent: data-exfiltration (read→POST) blocked by SequenceGate", GatekeeperMafHarness.RunAsync),
             new("Tool Approval (human-in-the-loop)", "Routine calls auto-approve; risky ones pause for a human (MAF UseToolApproval interop)", GatekeeperToolApproval.RunAsync),
@@ -139,23 +144,23 @@ public static class Program
             new("Explainability & Trust",    "Why a judge gate blocked (GateProvenance) · counterfactual gate-config replay (GateReplayer) · one honest composite score (TrustScoreCalculator)", GatekeeperExplainabilityAndTrust.RunAsync),
             new("Real A2A Boundary",          "Calibrate, then guard a consent-gated real remote A2A call (set AGENTEVAL_A2A_BASE_URL)", GatekeeperA2ABoundary.RunAsync),
             new("Mocked Dangerous Tools",      "Offline SQL/browser/cloud contract fixture — no real side effects", GatekeeperMockedDangerousTools.RunAsync),
-            new("Poisoned Tool Kill Chain",   "Offline fake MCP poison → isolation; bulk read, email, delete, exfil, and worm chain blocked", GatekeeperPoisonedToolKillChain.RunAsync),
+            new("Poisoned Tool Kill Chain",   "Offline fake MCP poison → isolation; bulk read, email, delete, exfil, and worm chain blocked", GatekeeperPoisonedToolKillChain.RunAsync, Recommended: true),
             new("Harness-Owned Tool Misuse",  "Offline real Agent Harness: weird request cannot misuse its runtime-injected capability", GatekeeperHarnessOwnedToolMisuse.RunAsync),
-            new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync),
+            new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync, Recommended: true),
             new("Tool Result Admission",       "Offline result seam: fake secret masking + bounded result truncation before model context", GatekeeperToolResultAdmission.RunAsync),
             new("Hosted Tool Coverage",        "Offline promotion boundary: hosted code execution stays opaque even when risk is acknowledged", GatekeeperHostedToolCoverageBoundary.RunAsync),
             new("Bulkhead + Containment",       "Offline measured isolation: contained saturation cannot consume normal HTTP permits", GatekeeperBulkheadIsolation.RunAsync),
-            new("Stateful Gate Timeline",       "Offline call/run/session/durable state transitions, resets, reloads, and containment", GatekeeperStatefulTimeline.RunAsync),
+            new("Stateful Gate Timeline",       "Offline call/run/session/durable state transitions, resets, reloads, and containment", GatekeeperStatefulTimeline.RunAsync, Recommended: true),
             new("Same-Batch Exfil Race",        "Offline concurrent sibling-call seam: SequenceGate vs SameBatchOrderingGate", GatekeeperSameBatchRace.RunAsync),
             new("Security Graph Incident",      "Offline observations → honest graph → containment → enforced endpoint refusal", GatekeeperSecurityGraphIncident.RunAsync),
-            new("HTTP Wire Boundary",           "Offline redirect, DNS-rebind, SSRF, cancellation, and disclosure enforcement", GatekeeperHttpWireBoundary.RunAsync),
+            new("HTTP Wire Boundary",           "Offline redirect, DNS-rebind, SSRF, cancellation, and disclosure enforcement", GatekeeperHttpWireBoundary.RunAsync, Recommended: true),
             new("Dynamic Context Provider",     "Offline dynamic tool inventory refusal + real provider-boundary filtering", GatekeeperDynamicContextProviderBoundary.RunAsync),
             new("Crescendo Trajectory",         "Offline gradual escalation → shadow compromise → next-run quarantine", GatekeeperCrescendoTrajectory.RunAsync),
             new("Session Identity Takeover",    "Offline reload, baseline-poisoning, and concurrent actor-drift defenses", GatekeeperSessionIdentityTakeover.RunAsync),
-            new("Manifest Provenance Drift",    "Offline prompt + MCP schema/provenance construction checks", GatekeeperManifestProvenanceDrift.RunAsync),
+            new("Manifest Provenance Drift",    "Offline prompt + MCP schema/provenance construction checks", GatekeeperManifestProvenanceDrift.RunAsync, Recommended: true),
             new("Approval Decision Matrix",     "Offline routine/escalate/error/reject/approve matrix with fake effects", GatekeeperApprovalDecisionMatrix.RunAsync),
             new("Result Behavioral Anomaly",    "Offline fixed cap vs per-tool running result-size anomaly detection", GatekeeperToolResultBehavioralAnomaly.RunAsync),
-        ]),
+        ], Progressive: true),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
         [
@@ -214,18 +219,22 @@ public static class Program
             var group = PromptForGroup();
             if (group is null) break;           // 'Q' → exit
 
+            var showAll = !group.Progressive;
             while (true)
             {
-                var choice = PromptForSample(group);
+                var visible = VisibleSamples(group, showAll);
+                var choice = PromptForSample(group, visible, showAll);
 
                 if (choice == "B") break;
                 if (choice == "Q") goto done;
-                if (choice == "A") { foreach (var s in group.Samples) await RunEntry(s); continue; }
+                if (choice == "M") { showAll = !showAll; continue; }
+                if (choice == "A") { foreach (var s in visible) await RunEntry(s); continue; }
 
-                if (int.TryParse(choice, out var idx) && idx >= 1 && idx <= group.Samples.Count)
-                    await RunEntry(group.Samples[idx - 1]);
+                if (int.TryParse(choice, out var idx) && idx >= 1 && idx <= visible.Count)
+                    await RunEntry(visible[idx - 1]);
             }
         }
+
     done:
 
         Console.WriteLine("\n👋 Goodbye!\n");
@@ -247,29 +256,39 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–K or Q to quit.\n");
+            Console.WriteLine("  Enter a listed group letter or Q to quit.\n");
         }
     }
 
-    // Returns "B" (back), "Q" (quit), "A" (run all), or a digit string for a sample index.
-    private static string PromptForSample(SampleGroup group)
+    // Returns "B" (back), "Q" (quit), "A" (run shown), "M" (toggle), or a sample index.
+    private static string PromptForSample(
+        SampleGroup group,
+        IReadOnlyList<SampleEntry> samples,
+        bool showAll)
     {
         while (true)
         {
-            PrintSampleMenu(group);
+            PrintSampleMenu(group, samples, showAll);
             var raw = Console.ReadLine()?.Trim().ToUpperInvariant() ?? "";
 
             if (raw == "" || raw == "B") return "B";
             if (raw == "Q") return "Q";
             if (raw == "A") return "A";
+            if (raw == "M" && group.Progressive) return "M";
 
-            if (int.TryParse(raw, out var idx) && idx >= 1 && idx <= group.Samples.Count)
+            if (int.TryParse(raw, out var idx) && idx >= 1 && idx <= samples.Count)
                 return raw;
 
-            Console.WriteLine($"  Enter 1–{group.Samples.Count}, A to run all, B to go back, or Q to quit.\n");
+            var toggle = group.Progressive ? ", M to toggle recommended/all" : "";
+            Console.WriteLine(
+                $"  Enter 1–{samples.Count}, A to run shown samples{toggle}, B to go back, or Q to quit.\n");
         }
     }
 
+    private static IReadOnlyList<SampleEntry> VisibleSamples(SampleGroup group, bool showAll) =>
+        showAll || !group.Progressive
+            ? group.Samples
+            : group.Samples.Where(sample => sample.Recommended).ToArray();
     // ──────────────────────────────────────────────────────────
     //  Menu rendering
     // ──────────────────────────────────────────────────────────
@@ -298,30 +317,43 @@ public static class Program
         Console.Write("\n  Group: ");
     }
 
-    private static void PrintSampleMenu(SampleGroup group)
+    private static void PrintSampleMenu(
+        SampleGroup group,
+        IReadOnlyList<SampleEntry> samples,
+        bool showAll)
     {
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Green;
-        var header = group.Name + (string.IsNullOrEmpty(group.Note) ? "" : "  " + group.Note);
+        var view = group.Progressive ? (showAll ? "all" : "recommended") : "all";
+        var header = $"{group.Name} — {view} ({samples.Count})";
         Console.WriteLine($"  ┌─────────────────────────────────────────────────────────────────┐");
-        Console.WriteLine($"  │  {header,-65}│");
+        Console.WriteLine($"  │  {Fit(header, 63),-63}│");
         Console.WriteLine($"  ├─────────────────────────────────────────────────────────────────┤");
         Console.ResetColor();
 
-        for (var i = 0; i < group.Samples.Count; i++)
+        for (var i = 0; i < samples.Count; i++)
         {
-            var s = group.Samples[i];
-            Console.WriteLine($"  │  [{i + 1,2}] {s.Name,-28} {s.Description,-33}│");
+            var sample = samples[i];
+            var marker = sample.Recommended ? "★" : " ";
+            Console.WriteLine(
+                $"  │ {marker}[{i + 1,2}] {Fit(sample.Name, 27),-27} {Fit(sample.Description, 31),-31}│");
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
-        Console.WriteLine("  │  [A] Run all in this group   [B] Back   [Q] Quit               │");
+        Console.WriteLine("  │  [A] Run shown   [B] Back   [Q] Quit                           │");
+        if (group.Progressive)
+        {
+            var toggle = showAll ? "[M] Show recommended only" : "[M] Show all samples";
+            Console.WriteLine($"  │  {toggle,-63}│");
+        }
         Console.WriteLine("  └─────────────────────────────────────────────────────────────────┘");
         Console.ResetColor();
         Console.Write("\n  Sample: ");
     }
 
+    private static string Fit(string value, int width) =>
+        value.Length <= width ? value : value[..(width - 1)] + "…";
     // ──────────────────────────────────────────────────────────
     //  Runner
     // ──────────────────────────────────────────────────────────

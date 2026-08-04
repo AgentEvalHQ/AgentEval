@@ -12,8 +12,9 @@ The deterministic gates need **no credentials** and are byte-stable, so they dro
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect  --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
 agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify] [--min-cases-per-direction N] …
-agenteval gatekeeper serve                               # stub — not implemented
 ```
+
+`serve` is reserved but is not part of the current CLI surface; see the Gatekeeper [implementation-status page](gatekeeper/implementation-status.md).
 
 `inspect` reads one JSON object from **stdin** (single) or one per line from `--input <file>.jsonl` (batch). Batch
 `--input` is supported for the **deterministic and tool gates**; the `judge:*` and `panel:*` gates are **stdin-only**

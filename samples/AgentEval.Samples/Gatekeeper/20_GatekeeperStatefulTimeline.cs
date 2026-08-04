@@ -17,6 +17,7 @@ public static class GatekeeperStatefulTimeline
     {
         GatekeeperSampleContractRenderer.Print("20");
         Console.WriteLine("\n=== Gatekeeper — Stateful Gate Timeline (offline) ===\n");
+        PrintTimelineHeader();
 
         await RunScopedBudgetTimelineAsync();
         await SessionReloadTimelineAsync();
@@ -46,7 +47,7 @@ public static class GatekeeperStatefulTimeline
         Require(first.Action == ToolGateAction.Allow, "first call in a run must be admitted");
         Require(second.Action == ToolGateAction.Block, "second call in the same run must exhaust the budget");
         Require(nextRun.Action == ToolGateAction.Allow, "a new run must receive a new run ledger");
-        PrintTransition("run budget", "0 calls", "allow → block", "new run: 0 calls");
+        PrintTransition("1  run budget", "call #1: ALLOW", "call #2: BLOCK", "new run: ALLOW");
     }
 
     private static async Task SessionReloadTimelineAsync()
@@ -83,7 +84,7 @@ public static class GatekeeperStatefulTimeline
         Require(sameLogicalSession.Action == GateAction.Block,
             "a fresh session object with the same host-attested id must retain the rate counter");
         Require(afterWindow.Action == GateAction.Allow, "the fixed rate window must reset after time advances");
-        PrintTransition("session rate", "logical-42: 0", "allow → reload/block", "window elapsed: allow");
+        PrintTransition("2  session rate", "run #1: ALLOW", "reload: BLOCK", "window: ALLOW");
     }
 
     private static async Task DurableContainmentTimelineAsync()
@@ -127,7 +128,7 @@ public static class GatekeeperStatefulTimeline
 
             Require(admission.Action == GateAction.Block,
                 "a reopened active containment record must refuse session admission");
-            PrintTransition("durable containment", "not contained", "persist active", "reopen: admission blocked");
+            PrintTransition("3  containment", "inactive", "persist: ACTIVE", "reopen: BLOCK");
         }
         finally
         {
@@ -149,8 +150,14 @@ public static class GatekeeperStatefulTimeline
     private static string? StableId(AgentSession session) =>
         session.StateBag.TryGetValue<string>(StableIdKey, out var id, JsonSerializerOptions.Default) ? id : null;
 
+    private static void PrintTimelineHeader()
+    {
+        Console.WriteLine("   Scope                  First observation        Boundary observation     After reset/reload");
+        Console.WriteLine("   ─────────────────────  ───────────────────────  ───────────────────────  ───────────────────");
+    }
+
     private static void PrintTransition(string scope, string before, string decision, string after) =>
-        Console.WriteLine($"   {scope,-20} {before,-22} → {decision,-22} → {after}");
+        Console.WriteLine($"   {scope,-22} {before,-24} {decision,-24} {after}");
 
     private static void DeleteOwnedTemporaryDirectory(string directory)
     {

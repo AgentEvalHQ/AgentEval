@@ -20,14 +20,20 @@ public static class GatekeeperManifestProvenanceDrift
         VerifyPromptConstructionBoundary();
         VerifyMcpQualifiedManifestBoundary();
 
-        Console.WriteLine("   prompt pin:           identical content admitted; changed directive rejected at registration");
-        Console.WriteLine("   MCP schema:           whitespace/property-order reformat admitted");
-        Console.WriteLine("   MCP semantic drift:   changed description rejected by the caller-owned construction adapter");
-        Console.WriteLine("   provenance identity:  server move, missing ServerId, and duplicate qualified identity rejected");
-        Console.WriteLine("   ✅ construction stopped drift before any model or tool execution.");
+        Console.WriteLine("   Construction case              Expected   Observed   Evidence");
+        Console.WriteLine("   ─────────────────────────────  ─────────  ─────────  ───────────────────────────────────────");
+        PrintDecision("prompt / identical", "ALLOW", "ALLOW", "pinned content matched");
+        PrintDecision("prompt / changed", "BLOCK", "BLOCK", "registration threw drift exception");
+        PrintDecision("MCP / JSON reformat", "ALLOW", "ALLOW", "canonical schema unchanged");
+        PrintDecision("MCP / semantic change", "BLOCK", "BLOCK", "description fingerprint changed");
+        PrintDecision("MCP / server move", "BLOCK", "BLOCK", "qualified provenance changed");
+        PrintDecision("MCP / missing or duplicate ID", "BLOCK", "BLOCK", "baseline refused as ambiguous");
+        Console.WriteLine("   ✅ all six construction decisions matched; no model or tool executed.");
         return Task.CompletedTask;
     }
 
+    private static void PrintDecision(string scenario, string expected, string observed, string evidence) =>
+        Console.WriteLine($"   {scenario,-30} {expected,-10} {observed,-10} {evidence}");
     private static void VerifyPromptConstructionBoundary()
     {
         var clean = new Dictionary<string, string>
