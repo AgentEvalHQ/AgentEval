@@ -53,6 +53,12 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 | 21 | [Same-Batch Exfiltration Race](../../samples/AgentEval.Samples/Gatekeeper/21_GatekeeperSameBatchRace.cs) | Advanced | Offline | tool-call, concurrent batch, evidence | `SequenceGate` contrast + `SameBatchOrderingGate` | Menu |
 | 22 | [Security Graph Incident Response](../../samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs) | Advanced | Offline | ingestion, durable graph, containment, tool-call | bounded ingestion/store/compute, read-only projection, containment bridge | Menu |
 | 23 | [HTTP Wire Boundary](../../samples/AgentEval.Samples/Gatekeeper/23_GatekeeperHttpWireBoundary.cs) | Advanced | Offline | HTTP wire, DNS, redirect, cancellation | `GatekeeperHttpMessageHandler` + fake DNS/transport | Menu |
+| 24 | [Dynamic Context Provider Boundary](../../samples/AgentEval.Samples/Gatekeeper/24_GatekeeperDynamicContextProviderBoundary.cs) | Advanced | Offline | construction, AIContextProvider, dynamic tool | static inventory refusal + real provider-boundary filtering | Menu |
+| 25 | [Crescendo Trajectory](../../samples/AgentEval.Samples/Gatekeeper/25_GatekeeperCrescendoTrajectory.cs) | Advanced | Offline | shadow, run pre, session | trajectory judge + shadow pump + next-run quarantine | Menu |
+| 26 | [Session Identity Takeover and Reload](../../samples/AgentEval.Samples/Gatekeeper/26_GatekeeperSessionIdentityTakeover.cs) | Advanced | Offline | session, run pre, concurrency | stable logical identity + atomic actor binding | Menu |
+| 27 | [Prompt and MCP Manifest Provenance Drift](../../samples/AgentEval.Samples/Gatekeeper/27_GatekeeperManifestProvenanceDrift.cs) | Advanced | Offline | construction, prompt, MCP discovery | prompt pin + qualified MCP manifest | Menu |
+| 28 | [Approval Decision Matrix](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) | Advanced | Offline | approval, tool, human continuation | deterministic + semantic gates and real continuation | Menu |
+| 29 | [Tool Result Behavioral Anomaly](../../samples/AgentEval.Samples/Gatekeeper/29_GatekeeperToolResultBehavioralAnomaly.cs) | Advanced | Offline | result, run, state | fixed cap + per-tool running anomaly | Menu |
 
 ## Boundary coverage
 
@@ -84,6 +90,12 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | 21 |  |  | ✓ |  |  |  |  |  | ✓ |
 | 22 |  |  | ✓ |  |  |  | ✓ |  | ✓ |
 | 23 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 24 | ✓ |  | ✓ |  |  |  |  | ✓ | ✓ |
+| 25 |  | ✓ |  |  |  |  | ✓ |  | ✓ |
+| 26 |  | ✓ |  |  |  |  | ✓ |  | ✓ |
+| 27 | ✓ |  |  |  |  |  |  | ✓ | ✓ |
+| 28 |  |  | ✓ |  | ✓ |  |  |  | ✓ |
+| 29 |  |  |  | ✓ |  |  | ✓ |  | ✓ |
 
 ## Threat and feature coverage
 
@@ -94,8 +106,8 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Indirect injection from tool content | 07, 14 | Covered at run and result seams |
 | Exfiltration through sequence/taint/domain | 02, 06, 07, 14 | Strong deterministic coverage |
 | Tool-specific argument contracts | 13, 14, 16 | Production contracts plus clearly labelled design fixtures |
-| Tool-result secrets and size | 17 | Clear introductory offline fixture |
-| Human approval | 03 | Deterministic routine/pause oracle plus optional live continuation; broader matrix remains a specialized follow-up |
+| Tool-result secrets and size | 17, 29 | Fixed admission plus per-tool run-scoped behavioral anomaly and reset |
+| Human approval | 03, 28 | Routine, parameterless-sensitive, risky args, goal mismatch, failure, rejection, and approved continuation |
 | Budgets/denial of wallet | 04, 05, 06, 09, 14–16 | Strong |
 | Agent Harness protection | 05, 06, 15 | Includes runtime-injected capability discovery |
 | Repeated-denial escalation/containment | 01, 14 | Shadow quarantine and durable fake-source containment |
@@ -107,6 +119,12 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Same-batch ordering race | 21 | Dedicated five-control race demonstration and fake-effect proof |
 | Security-graph incident response | 22 | Durable multi-session path through honest compute, read-only ops, containment, and refusal |
 | HTTP redirect/DNS wire boundary | 23 | Deterministic redirect, private-DNS, limit, cancellation, and disclosure checks |
+| Dynamic AIContextProvider tool coverage | 24 | Static promotion refuses unknown inventory; real provider boundary filters unsupported tools |
+| Crescendo/slow-burn trajectory | 25 | Deterministic shadow timing, one-time arm, next-run quarantine, and safe-frustration control |
+| Session actor takeover/reload | 26 | Weak-object limitation contrasted with stable reload, poisoning, and concurrent-race defense |
+| Prompt/MCP manifest and provenance drift | 27 | Prompt registration pin plus canonical schema and qualified server identity checks |
+| Approval edge-case matrix | 28 | Every risky/inconclusive path pauses; reject/approve effects measured |
+| Per-tool result behavioral anomaly | 29 | Independent run-scoped baselines, non-poisoning repeats, and reset proof |
 
 ## Other Gatekeeper sample suites
 

@@ -29,6 +29,7 @@ implemented.
 | 8 | Documentation truth and information architecture | ✅ | High-level introductions, focused references, state and isolation operations, and a validated 19-entry sample manifest are complete and reviewed locally |
 | 9 | Sample reliability foundation | ✅ | Samples 00–09 are deterministic offline-first hybrids, contracts are standardized, and supported composition is explicit |
 | 10 | Architecture showcase | ✅ | Five offline samples expose measured resource isolation, state lifecycle, same-batch ordering, graph escalation, and HTTP wire enforcement |
+| 11 | Specialized showcase | ✅ | Six offline samples cover dynamic providers, Crescendo trajectories, identity takeover, manifest drift, approval edges, and result anomalies |
 
 ## Sample and documentation showcase follow-up
 
@@ -80,6 +81,21 @@ discoverable demonstrations and records review evidence separately.
 | 10 | 10.5 | Demonstrate the HTTP wire boundary | 100% | ✅ | Fake DNS/transport prove redirect, private-address, limit, cancellation, and non-disclosure behavior without network access |
 | 10 | 10.R | Architecture-showcase promotion review | 100% | ✅ | Five launcher oracles pass; Release build 0 warnings; manifest net8/net9/net10; 1,384 Gatekeeper tests; formatter; DocFX 0 errors; scoped MAF Doctor B/0 errors |
 
+## Specialized showcase
+
+| Phase | Task | Description | Done | Reviewed | Implementation notes |
+|---|---|---|---:|:---:|---|
+| 11 | 11.1 | Dynamic context-provider coverage boundary | 100% | ✅ | Automatic inventory-gap detection refuses promotion; a real gated provider filters unsupported runtime tools and emits content-free evidence |
+| 11 | 11.2 | Crescendo multi-turn trajectory | 100% | ✅ | Deterministic slow escalation emits one shadow compromise, allows the observed run, quarantines the next, and preserves frustrated-safe/direct-danger controls |
+| 11 | 11.3 | Session-identity takeover and reload | 100% | ✅ | Contrasts weak object identity with stable logical identity across reload; proves non-poisoning, repeated use, and atomic concurrent binding |
+| 11 | 11.4 | Prompt/MCP manifest provenance drift | 100% | ✅ | Allows canonical schema reformatting while refusing prompt/description/server drift, missing provenance, and duplicate qualified identities |
+| 11 | 11.5 | Approval decision matrix | 100% | ✅ | Routine arguments auto-run; sensitive, risky, mismatched, and judge-failure paths pause; real reject/approve continuations measure effects |
+| 11 | 11.6 | Tool-result behavioral anomaly | 100% | ✅ | Contrasts a fixed cap with per-tool run baselines, repeated non-poisoning anomaly handling, and run reset |
+| 11 | 11.R | Specialized-showcase promotion review | 100% | ✅ | Six launcher oracles pass; synchronized manifest/catalog has 30 entries; Release build 0 warnings; regressions, formatter, DocFX, and scoped MAF review are green |
+
+The Crescendo sample intentionally stays deterministic and offline. Live semantic promotion remains owned by the
+calibrated-corpus workflow, avoiding a second uncalibrated model path that could be mistaken for production evidence.
+
 ## Deferred and demand-gated work
 
 | Item | State | Reactivation condition |
@@ -105,9 +121,10 @@ coverage.
   Release sample build. DocFX completes with zero errors and 28 existing warnings, none owned by the
   changed Gatekeeper documentation.
 - Phase 10 adds five self-validating offline architecture samples and expands the synchronized manifest/catalog to 24 entries. All five launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and 28 existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
-- The Phase 9 scoped MAF Doctor review reports grade B and zero errors. Of 39 detected run sites, the only cost
-  findings are the reviewed remote-A2A server-side cap limitation and one bounded scripted-provider helper false
-  positive. Four observability warnings are deterministic offline fixtures where exporters add no production signal.
+- Phase 11 adds six self-validating offline specialized samples and expands the synchronized manifest/catalog to 30 entries. All six launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and only existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
+- The final scoped MAF Doctor review reports grade B and zero errors. Its eight observability warnings are
+  deterministic offline fixtures. The three cost heuristics are the pre-existing remote-A2A/server and scripted-helper
+  limitations plus one false positive whose Crescendo call has both agent-level and explicit per-run token caps.
 - The repository build baseline at the merged LongMemEval commit
   (`bb2cf6a2f5ae75e16dea196b246d5003eebc8df4`) is zero errors and 175 existing warnings. New work
   must introduce no additional warnings.
@@ -117,7 +134,7 @@ coverage.
 
 ## Release posture
 
-The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–10
+The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–11
 are complete and reviewed on the current local branch, but remain intentionally unpublished under the local-only
 instruction.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase

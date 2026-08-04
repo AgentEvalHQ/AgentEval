@@ -149,6 +149,12 @@ public static class Program
             new("Same-Batch Exfil Race",        "Offline concurrent sibling-call seam: SequenceGate vs SameBatchOrderingGate", GatekeeperSameBatchRace.RunAsync),
             new("Security Graph Incident",      "Offline observations → honest graph → containment → enforced endpoint refusal", GatekeeperSecurityGraphIncident.RunAsync),
             new("HTTP Wire Boundary",           "Offline redirect, DNS-rebind, SSRF, cancellation, and disclosure enforcement", GatekeeperHttpWireBoundary.RunAsync),
+            new("Dynamic Context Provider",     "Offline dynamic tool inventory refusal + real provider-boundary filtering", GatekeeperDynamicContextProviderBoundary.RunAsync),
+            new("Crescendo Trajectory",         "Offline gradual escalation → shadow compromise → next-run quarantine", GatekeeperCrescendoTrajectory.RunAsync),
+            new("Session Identity Takeover",    "Offline reload, baseline-poisoning, and concurrent actor-drift defenses", GatekeeperSessionIdentityTakeover.RunAsync),
+            new("Manifest Provenance Drift",    "Offline prompt + MCP schema/provenance construction checks", GatekeeperManifestProvenanceDrift.RunAsync),
+            new("Approval Decision Matrix",     "Offline routine/escalate/error/reject/approve matrix with fake effects", GatekeeperApprovalDecisionMatrix.RunAsync),
+            new("Result Behavioral Anomaly",    "Offline fixed cap vs per-tool running result-size anomaly detection", GatekeeperToolResultBehavioralAnomaly.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
