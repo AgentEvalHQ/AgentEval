@@ -26,6 +26,7 @@ implemented.
 | 5 | Resource isolation | ✅ | HTTP resource isolation is implemented and promoted; additional resource types remain demand-gated until a concrete exhaustion mode exists |
 | 6 | Security graph and escalation | ✅ | Durable graph storage/computation, ingestion, global containment, and the read-only operations surface are merged |
 | 7 | Applicable long-tail work | ✅ | Mock dangerous-tool fixtures and session-identity drift coverage are complete; deployment-specific predicates and judges remain demand-gated |
+| 8 | Documentation truth and information architecture | ✅ | High-level introductions, focused references, state and isolation operations, and a validated 19-entry sample manifest are complete and reviewed locally |
 
 ## Sample and documentation showcase follow-up
 
@@ -43,6 +44,18 @@ discoverable demonstrations and records review evidence separately.
 | Showcase | S.7 | Demonstrate tool-result admission | 100% | ✅ | Fake credential is masked and oversized diagnostics are truncated before model context; clean bounded control is unchanged |
 | Showcase | S.8 | Demonstrate the provider-hosted coverage boundary | 100% | ✅ | Unacknowledged hosted code execution refuses promotion; acknowledgment admits risk without fabricating interception or inflating 50% coverage |
 | Showcase | S.R | Focused review and validation | 100% | ✅ | Release sample build 0 warnings; 1,383 Gatekeeper tests; 6/6 offline samples; formatter clean; DocFX has 32 existing and 0 new warnings; scoped MAF Doctor has 0 errors |
+
+## Documentation and discovery improvement
+
+| Phase | Task | Description | Done | Reviewed | Implementation notes |
+|---|---|---|---:|:---:|---|
+| 8 | 8.0 | Audit and freeze the improvement backlog | 100% | ✅ | Scored 19 core samples and prioritized state, Bulkhead, reliability, and architecture-showcase gaps |
+| 8 | 8.1 | Correct documentation truth and simplify introductions | 100% | ✅ | Reduced the introduction to protected seams, one quick start, operating principles, architecture tiers, limits, and navigation; corrected stale links and semantics |
+| 8 | 8.2 | Restructure and complete the gate reference | 100% | ✅ | Replaced the encyclopedia entry point with a selection index and four focused references organized by protected boundary and operator concern |
+| 8 | 8.3 | Add state ownership and lifecycle matrix | 100% | ✅ | Documents scope, owner, partitioning, concurrency, reset/release, restart, missing-scope behavior, fingerprinting, and evidence for every stateful mechanism |
+| 8 | 8.4 | Document resource isolation and containment operations | 100% | ✅ | Covers separate HTTP pools, routing authority, permit ownership, Active/Indeterminate behavior, metrics, disposal, and the downstream shared-quota ceiling |
+| 8 | 8.5 | Add validated sample manifest and cross-suite discovery | 100% | ✅ | Added a strict 19-entry manifest, stable 11A/11B identifiers, launcher/source/catalog synchronization test, and memory-security/Agent Skills links |
+| 8 | 8.R | Documentation promotion review | 100% | ✅ | Formatter clean; manifest test passes on net8/net9/net10; 1,384 Gatekeeper tests pass on net10; Release samples build; DocFX has 0 errors and no Gatekeeper-owned warnings |
 
 ## Deferred and demand-gated work
 
@@ -64,6 +77,12 @@ coverage.
   and zero failures across the supported target frameworks.
 - Gatekeeper phase reviews include focused adversarial tests, full-suite regressions, and scoped
   MAF Doctor checks on changed MAF code.
+- Phase 8 review adds a mechanically validated 19-entry sample manifest, a clean formatter check,
+  manifest contract passes on net8/net9/net10, 1,384 passing net10 Gatekeeper tests, and a successful
+  Release sample build. DocFX completes with zero errors and 28 existing warnings, none owned by the
+  changed Gatekeeper documentation.
+- A scoped MAF Doctor review of the Gatekeeper samples reports grade B and zero errors. Its 29
+  unbounded live-call findings and 11 warnings are retained as the Phase 9.1 reliability backlog.
 - The repository build baseline at the merged LongMemEval commit
   (`bb2cf6a2f5ae75e16dea196b246d5003eebc8df4`) is zero errors and 175 existing warnings. New work
   must introduce no additional warnings.
@@ -73,8 +92,9 @@ coverage.
 
 ## Release posture
 
-The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up is complete
-and reviewed on the current local branch, but remains intentionally unpublished under the local-only instruction.
+The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phase 8
+documentation/discovery improvement are complete and reviewed on the current local branch, but remain intentionally
+unpublished under the local-only instruction.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase
 the completed local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
 surface may be reported as fully enforced.

@@ -1,7 +1,7 @@
 # Gatekeeper — examples
 
 Runnable recipes, from a hello‑world to the gates with no simpler equivalent (the snippets are provider‑agnostic;
-the runnable **samples** include offline and live agents — see [Runnable demos](#runnable-demos-offline-and-live-agents)). For
+the runnable **samples** include offline and live agents — see [Runnable demos](#runnable-demos)). For
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 
@@ -39,7 +39,7 @@ Every example below chains the low-level builder calls by hand (`.UseAgentEvalGa
 `.UseAgentEvalToolGate(...)`) to keep each one focused on ONE gate at a time. For real code wiring several gates
 together, use `UseGatekeeper(enforcement, configure)` instead — it installs them in the correct order and
 refuses to construct (rather than silently misbehave) if it can prove the composition is unsafe. See the
-[introduction](introduction.md#wiring-it-together-usegatekeeper) for the full explanation; here's the shape:
+[introduction](introduction.md#start-with-one-coordinated-stack) for the full explanation; here's the shape:
 
 ```csharp
 using AgentEval.MAF.Gatekeeper;
@@ -337,70 +337,17 @@ var agent = baseAgent.AsBuilder()
 The judge runs *after* the run returns; an adverse verdict arms quarantine so the `QuarantineGate` refuses the
 session's **next** run.
 
-## Runnable demos (offline and live agents)
+## Runnable demos
 
-The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) mixes deterministic **offline** scenarios
-with live MAF-agent demonstrations. Offline samples use scripted providers and fake effect counters; live samples use
-`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`. In both modes, pass/fail claims
-come from gate evidence and observable fake effects rather than assuming model compliance. See the
-[sample index and coverage matrices](sample-index.md) to choose by gate, feature, complexity, or boundary:
+Use the [sample index](sample-index.md) as the canonical catalog. It identifies stable IDs, execution modes,
+external effects, protected boundaries, mechanisms, threats, launcher status, and each scenario's pass oracle.
 
-- [`Gatekeeper/00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
-  **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.
-- [`Gatekeeper/01_GatekeeperEnforcement`](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
-  the **enforcement walkthrough**: a forbidden tool, the moat, a canary honeypot, a shadow verdict quarantining
-  the next run, a **defense‑in‑depth** scene, and a **more‑gates** scene (`ArgumentPatternGate` + `SequenceGate` +
-  a run‑post PII gate).
-- [`Gatekeeper/02_GatekeeperMafHarness`](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
-  **realistic MAF support agent** — **data-exfiltration defense**: every tool is legitimate, but a prompt injection's
-  read‑customer‑data → external‑POST *sequence* is blocked by `SequenceGate` (no tool‑list trick catches this).
-- [`Gatekeeper/03_GatekeeperToolApproval`](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) —
-  **human‑in‑the‑loop approval**: a routine refund auto‑approves, a large one pauses for a human and resumes.
-- [`Gatekeeper/04_GatekeeperBeachhead`](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) — the
-  **beachhead + the Tribunal**: `RunBudgetGate` (denial‑of‑wallet), `DomainAllowListGate` (exfil),
-  `RenderedOutputExfilGate` (rendered‑output beacon), and a **calibrated** indirect‑injection judge that earns the
-  right to block.
-- [`Gatekeeper/05_GatekeeperAgentHarness`](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) —
-  **× MAF Agent Harness (simple)**: a genuine MAF Agent Harness agent (`IChatClient.AsHarnessAgent(new
-  HarnessAgentOptions { … })` — planning + todo + mode + an autonomous `LoopAgent`) whose runaway loop is capped by
-  `RunBudgetGate`.
-- [`Gatekeeper/06_GatekeeperAgentHarnessDefended`](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) —
-  **× MAF Agent Harness (defended)**: a genuine `AsHarnessAgent` behind defense‑in‑depth (budget + `SequenceGate` +
-  `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked.
-- [`Gatekeeper/07_GatekeeperDefenseInDepth`](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) —
-  **defense in depth against one injection campaign**: the calibrated `IndirectInjectionJudge` (its detection verdict
-  on the injected content) alongside `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate` on a
-  defended agent, where a *different* gate catches each step, printed from the trace.
-- [`Gatekeeper/08_GatekeeperOutputPanel`](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) —
-  **the output Panel (Tribunal Stage-2)**: `ExfiltrationIntentJudge` + `SystemPromptExtractionJudge` composed via
-  `ParallelJudgeFanOut` into a run-post Panel, plus the `OverRefusalJudge` utility valve (advisory, `WarnOnly`,
-  never blocking) — calibration, detection, and inline enforcement all end-to-end on a real model.
-- [`Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget`](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) —
-  **`MonetaryLimitGate` + `PerToolCallBudgetGate`**: a 10‑call refund‑spray injection capped at 3 calls, a single
-  $50,000 refund blocked by a $1,000 monetary cap, and both gates together against a realistic $300 × 10‑order
-  spray — success is keyed on the recorded `gate.tool.*` block count, never on "no exception thrown."
+For the fastest credential-free tour, run samples **13–18**. They use fake or scripted components and assert effects
+from gate evidence and local counters. Samples **00–11A** add live-model or explicitly consented boundary behavior;
+their model output is comparative evidence, not the release oracle.
 
-- [`Gatekeeper/10_GatekeeperExplainabilityAndTrust`](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) —
-  reconstructable provenance, counterfactual policy replay, and an honest composite trust score.
-- [`Gatekeeper/11_GatekeeperA2ABoundary`](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) —
-  an explicitly authorized remote A2A boundary with inbound/outbound calibration and consent checks.
-- [`Gatekeeper/13_GatekeeperMockedDangerousTools`](../../samples/AgentEval.Samples/Gatekeeper/13_GatekeeperMockedDangerousTools.cs) —
-  offline SQL/browser/cloud/package contract fixtures with no real external components.
-- [`Gatekeeper/14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) —
-  offline poisoned MCP result admission and isolation followed by blocked bulk-read, customer-email, external-POST,
-  delete-all and fake worm-propagation attempts.
-- [`Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse`](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) —
-  discovers an actual runtime-injected Agent Harness capability, blocks a weird request from using it, and keeps a
-  benign control useful.
-- [`Gatekeeper/16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) —
-  contrasts an obvious pre-model jailbreak block with shell, deletion, and email contracts that remain authoritative
-  when a paraphrase reaches the model.
-- [`Gatekeeper/17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) —
-  composes fake-secret masking with result-size truncation at the result-admission seam and preserves a clean control.
-- [`Gatekeeper/18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) —
-  refuses an unacknowledged hosted code interpreter, then proves acknowledgment records risk without inventing local
-  interception or inflating coverage.
-
+The catalog is mechanically checked against the launcher, source files, and
+[Gatekeeper sample manifest](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/sample-manifest.json).
 ## From the CLI
 
 ```bash

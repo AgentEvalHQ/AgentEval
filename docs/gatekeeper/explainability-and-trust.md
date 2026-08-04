@@ -113,7 +113,7 @@ network call and no live agent.
 
 **Status:** library API, demonstrated in the sample above. Getting `GatedToolCall`s to replay from a REAL
 production trace currently means capturing them yourself (e.g. from an `AgentTrace`, or reconstructing them
-from a `--capture-fixture` JSONL capture — see [CLI Reference](../cli.md#agenteval-log-file)). A
+from a `--capture-fixture` JSONL capture — see [CLI troubleshooting reference](../cli.md)). A
 `agenteval log-file gate-replay` command wiring this directly to a capture file is the natural, mechanical
 next step — not built yet.
 

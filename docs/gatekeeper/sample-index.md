@@ -1,109 +1,120 @@
 # Gatekeeper sample index
 
-Use this page to choose a Gatekeeper sample by difficulty, execution mode, protected boundary, or gate family.
-For conceptual guidance, start with the [introduction](introduction.md). For individual gate contracts, see the
-[gate reference](gate-reference.md). The [examples](examples.md) page remains the recipe-oriented walkthrough.
+Choose a scenario by execution mode, complexity, protected boundary, or threat. The catalog is mechanically checked
+against the launcher and sample source files by `GatekeeperSampleManifestTests`. Its canonical metadata is
+[`sample-manifest.json`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/sample-manifest.json).
 
-## Complexity legend
+For concepts, start with the [introduction](introduction.md). For gate contracts, use the
+[compact reference](gate-reference.md).
 
-| Level | Best for | Expected background |
-|---|---|---|
-| Introductory | First successful runtime block | MAF agent and tool basics |
-| Intermediate | One or two coordinated boundaries | Tool middleware, traces and enforcement modes |
-| Advanced | Multi-stage attacks, calibration or autonomous agents | Run scope, tool/result ordering and threat modeling |
+## Execution modes
 
-Execution modes are reported explicitly:
+| Mode | Meaning |
+|---|---|
+| **Offline** | Scripted/fake components; no network or destructive effect |
+| **Live model** | Calls the explicitly configured Azure OpenAI deployment; tool effects remain local/fake |
+| **Live boundary** | Also contacts an explicitly configured and consented remote boundary |
+| **Hybrid** | Has a useful offline path and an optional live overlay |
 
-- **Offline** uses deterministic scripted components and performs no network or destructive operation.
-- **Live model** calls the configured Azure OpenAI deployment, while sample tool effects remain fake or in-memory.
-- **Live boundary** additionally contacts an explicitly authorized remote boundary.
-- **Hybrid** retains a useful offline path but enables extra evidence when credentials are configured.
+A sample passes only when an internal invariant proves the claimed behavior. Console text, model compliance, or the
+absence of an exception is not a sufficient oracle.
 
-## Current sample catalog
+## Core Gatekeeper catalog
 
-| Sample | Complexity | Execution | Primary gates and mechanisms | What it demonstrates | Launcher |
-|---|---|---|---|---|---|
-| [`00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) | Introductory | Live model | `ProbeEvaluatorGate` | Reuses a deterministic red-team evaluator as a pre-execution tool gate | Menu |
-| [`01_GatekeeperEnforcement`](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) | Advanced | Live model | `ForbiddenToolGate`, `ProbeEvaluatorGate`, `CanaryToolGate`, `QuarantineGate`, `TokenInjectionGate`, `OperatorAuthGate`, `RateLimitGate`, `ArgumentPatternGate`, `SequenceGate`, `RegexPiiGate`, shadow judge | Walks through tool, run, session, moat, shadow and output enforcement | Menu |
-| [`02_GatekeeperMafHarness`](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) | Intermediate | Live model | `SequenceGate` | Allows legitimate customer reads and HTTP tools independently, but blocks read-to-POST exfiltration | Menu |
-| [`03_GatekeeperToolApproval`](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) | Intermediate | Live model | `ArgumentPatternApprovalGate`, MAF approval continuation | Auto-approves routine work and pauses a risky call for a human decision | Menu |
-| [`04_GatekeeperBeachhead`](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) | Advanced | Live model | `RunBudgetGate`, `DomainAllowListGate`, `RenderedOutputExfilGate`, calibrated `IndirectInjectionJudge` | Combines deterministic budget/egress controls with a judge that must earn inline promotion | Menu |
-| [`05_GatekeeperAgentHarness`](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) | Intermediate | Live model | `RunBudgetGate`, MAF Agent Harness | Caps an autonomous harness loop without claiming the harness itself is unsafe | Menu |
-| [`06_GatekeeperAgentHarnessDefended`](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) | Advanced | Live model | `RunBudgetGate`, `SequenceGate`, `DomainAllowListGate`, MAF Agent Harness | Protects a capable autonomous support harness against runaway work and customer-data exfiltration | Menu |
-| [`07_GatekeeperDefenseInDepth`](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) | Advanced | Live model | calibrated `IndirectInjectionJudge`, `ToolResultInjectionGate`, `ReferentialIntegrityGate`, `TaintTrackingGate`, `DomainAllowListGate` | Shows different boundaries catching different stages of one indirect-injection campaign | Menu |
-| [`08_GatekeeperOutputPanel`](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) | Advanced | Live model | `ExfiltrationIntentJudge`, `SystemPromptExtractionJudge`, `OverRefusalJudge`, parallel fan-out | Calibrates and composes blocking output axes with an advisory utility valve | Menu |
-| [`09_GatekeeperMonetaryAndPerCallBudget`](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) | Intermediate | Live model | `MonetaryLimitGate`, `PerToolCallBudgetGate` | Limits refund spray by both call count and cumulative financial exposure | Menu |
-| [`10_GatekeeperExplainabilityAndTrust`](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) | Intermediate | Hybrid | `CompositeJudgeGate`, `GateProvenance`, `GateReplayer`, `ForbiddenToolGate`, `TrustScoreCalculator` | Explains a decision, replays captured calls under a candidate policy and computes an honest trust score | Menu |
-| [`11_GatekeeperA2ABoundary`](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) | Advanced | Live boundary | inbound/outbound inter-agent boundary judges, consent and promotion checks | Guards both directions of an explicitly authorized remote A2A delegation | Menu |
-| [`11_GatekeeperA2ACalibration`](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ACalibration.cs) | Advanced | Live model | inter-agent judge calibration corpora and promotion thresholds | Calibrates A2A judges without contacting an A2A endpoint | Direct source fixture |
-| [`13_GatekeeperMockedDangerousTools`](../../samples/AgentEval.Samples/Gatekeeper/13_GatekeeperMockedDangerousTools.cs) | Intermediate | Offline | sample-local SQL, browser, cloud and package contract gates | Exercises narrow fake grammars and fail-closed verdicts; it is a design fixture, not production parser guidance | Menu |
-| [`14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) | Advanced | Offline | `ToolResultInjectionGate`, containment override/store, `ToolUsageContractGate`, `TaintTrackingGate`, `DomainAllowListGate`, `ForbiddenToolGate`, `BlockStormSentinelGate`, `RunBudgetGate` | Isolates a fake poisoned MCP source, then blocks bulk retrieval, customer-email exfiltration, external POST, delete-all and worm propagation | Menu |
-| [`15_GatekeeperHarnessOwnedToolMisuse`](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) | Intermediate | Offline | `ForbiddenToolGate`, `RunBudgetGate`, real MAF Agent Harness with scripted provider | Discovers an actual runtime-injected Harness tool name, blocks a weird request from using it, and preserves a benign control | Menu |
-| [`16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Offline | `TokenInjectionGate`, `ToolUsageContractGate`, `RunBudgetGate`, coverage analyzer | Contrasts an obvious pre-model jailbreak block with shell, bulk-delete and external-email contracts that remain authoritative after a paraphrase | Menu |
-| [`17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Offline | `ToolResultSecretGate`, `ToolResultSizeGate`, result metadata | Masks a fake credential and truncates oversized diagnostics before model context while preserving a clean bounded result | Menu |
-| [`18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) | Intermediate | Offline | coverage analyzer, `HostedCodeInterpreterTool`, promotion refusal and risk acknowledgment | Proves local gates cannot intercept provider-hosted execution and that acknowledgment never inflates structural coverage | Menu |
+Stable IDs preserve the two historical `11_` source files as **11A** and **11B** without a breaking rename.
 
-## Gate-boundary coverage matrix
+| ID | Sample | Complexity | Execution | Protected boundaries | Primary mechanisms | Launcher |
+|---|---|---|---|---|---|---|
+| 00 | [Hello World](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) | Introductory | Live model | tool, evidence | `ProbeEvaluatorGate` | Menu |
+| 01 | [Enforcement Walkthrough](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) | Advanced | Live model | run, tool, session, shadow, evidence | deny/canary/sequence/quarantine/shadow stack | Menu |
+| 02 | [MAF Support Agent](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) | Intermediate | Live model | tool, evidence | `SequenceGate` | Menu |
+| 03 | [Tool Approval](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) | Intermediate | Live model | approval | argument approval + MAF continuation | Menu |
+| 04 | [Beachhead and Tribunal](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) | Advanced | Live model | run, tool, evidence | budget, domain, output, calibrated injection judge | Menu |
+| 05 | [Agent Harness Simple](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) | Intermediate | Live model | tool, autonomous harness | run budget | Menu |
+| 06 | [Agent Harness Defended](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) | Advanced | Live model | tool, autonomous harness | budget, sequence, domain | Menu |
+| 07 | [Defense in Depth](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) | Advanced | Live model | run, tool, result | injection judge, result admission, identity, taint, domain | Menu |
+| 08 | [Output Panel](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) | Advanced | Live model | run-post, evidence | calibrated output judges + fan-out | Menu |
+| 09 | [Monetary and Per-Call Budget](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) | Intermediate | Live model | tool, evidence | monetary and per-tool limits | Menu |
+| 10 | [Explainability and Trust](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) | Intermediate | Hybrid | tool, replay, evidence | provenance, replay, trust aggregation | Menu |
+| 11A | [Real A2A Boundary](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) | Advanced | Live boundary | construction, A2A run-pre/post | calibrated inbound/outbound boundary judges | Menu |
+| 11B | [A2A Calibration](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ACalibration.cs) | Advanced | Live model | construction, A2A promotion | both calibration corpora + thresholds | Direct |
+| 13 | [Mocked Dangerous Tools](../../samples/AgentEval.Samples/Gatekeeper/13_GatekeeperMockedDangerousTools.cs) | Intermediate | Offline | tool, evidence | sample-local SQL/browser/cloud/package fixtures | Menu |
+| 14 | [Poisoned Tool Kill Chain](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) | Advanced | Offline | construction, tool, result, containment | result injection, contracts, taint, containment, block storm | Menu |
+| 15 | [Harness-Owned Tool Misuse](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) | Intermediate | Offline | run, tool, autonomous harness | discovered runtime capability + deny/budget | Menu |
+| 16 | [Jailbreak and Tool Abuse](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Offline | construction, run, tool | input marker + authoritative contracts + coverage | Menu |
+| 17 | [Tool Result Admission](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Offline | tool result | secret masking + fixed-size truncation | Menu |
+| 18 | [Hosted Tool Coverage Boundary](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) | Intermediate | Offline | construction, coverage | hosted-tool classification + promotion refusal | Menu |
 
-The matrix records demonstrated behavior, not merely a type mentioned in a comment. A filled cell means the
-sample executes or directly evaluates that boundary.
+## Boundary coverage
 
-| Sample | Construction | Run pre | Tool call | Tool result | Approval | Run post | Shadow/later run | Autonomous/handoff | Evidence/replay |
+A check means the sample executes or directly evaluates the boundary; a type mentioned only in prose does not count.
+
+| ID | Construction | Run pre | Tool | Result | Approval | Run post | Shadow/later | Harness/A2A | Evidence/replay |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 00 Hello World |  |  | ✓ |  |  |  |  |  | ✓ |
-| 01 Enforcement |  | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
-| 02 MAF support |  |  | ✓ |  |  |  |  |  | ✓ |
-| 03 Approval |  |  |  |  | ✓ |  |  |  |  |
-| 04 Beachhead |  | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
-| 05 Harness |  |  | ✓ |  |  |  |  | ✓ | ✓ |
-| 06 Defended harness |  |  | ✓ |  |  |  |  | ✓ | ✓ |
-| 07 Defense in depth |  | ✓ | ✓ | ✓ |  |  |  |  | ✓ |
-| 08 Output Panel |  |  |  |  |  | ✓ |  |  | ✓ |
-| 09 Budget |  |  | ✓ |  |  |  |  |  | ✓ |
-| 10 Explainability |  |  | ✓ |  |  |  |  |  | ✓ |
-| 11 A2A boundary | ✓ | ✓ |  |  |  | ✓ |  | ✓ | ✓ |
-| 11 A2A calibration | ✓ |  |  |  |  |  |  | ✓ | ✓ |
-| 13 Dangerous tools |  |  | ✓ |  |  |  |  |  | ✓ |
-| 14 Poisoned kill chain | ✓ |  | ✓ | ✓ |  |  |  |  | ✓ |
-| 15 Harness-owned tool |  | ✓ | ✓ |  |  |  |  | ✓ | ✓ |
-| 16 Jailbreak + abuse | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
-| 17 Result admission |  |  |  | ✓ |  |  |  |  | ✓ |
-| 18 Hosted coverage | ✓ |  |  |  |  |  |  |  | ✓ |
+| 00 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 01 |  | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
+| 02 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 03 |  |  |  |  | ✓ |  |  |  |  |
+| 04 |  | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
+| 05 |  |  | ✓ |  |  |  |  | ✓ | ✓ |
+| 06 |  |  | ✓ |  |  |  |  | ✓ | ✓ |
+| 07 |  | ✓ | ✓ | ✓ |  |  |  |  | ✓ |
+| 08 |  |  |  |  |  | ✓ |  |  | ✓ |
+| 09 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 10 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 11A | ✓ | ✓ |  |  |  | ✓ |  | ✓ | ✓ |
+| 11B | ✓ |  |  |  |  |  |  | ✓ | ✓ |
+| 13 |  |  | ✓ |  |  |  |  |  | ✓ |
+| 14 | ✓ |  | ✓ | ✓ |  |  |  |  | ✓ |
+| 15 |  | ✓ | ✓ |  |  |  |  | ✓ | ✓ |
+| 16 | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
+| 17 |  |  |  | ✓ |  |  |  |  | ✓ |
+| 18 | ✓ |  |  |  |  |  |  |  | ✓ |
 
-## Feature coverage matrix
+## Threat and feature coverage
 
-| Feature or threat | Current demonstrating samples | Coverage assessment |
+| Threat or capability | Current samples | Assessment |
 |---|---|---|
-| Deterministic evaluator reused inline | 00, 01 | Clear introductory coverage |
-| Direct destructive-tool denial | 01, 10, 14 | Covered, including a complete fake kill chain |
-| Indirect prompt injection in retrieved/tool content | 07, 14 | Covered across judge, tool-result admission and source containment |
-| Direct jailbreak or malicious user request | 01, 04, 16 | Focused offline malicious, paraphrased and benign controls now included |
-| Data exfiltration through tool sequences | 02, 06, 07 | Strong coverage |
-| Taint from a sensitive source to an external sink | 07, 14 | Covered in both campaign and complete kill-chain scenarios |
-| Argument-level domain control | 04, 06, 07, 14 | Strong coverage |
-| Tool-specific argument contracts | 13, 14, 16 | Sample-local design fixture plus production declarative contracts |
-| Tool-result injection, secret and size handling | 07, 14, 17 | Injection, secret masking and size truncation are all demonstrated at the actual result-admission seam |
-| Human approval and continuation | 03 | Focused coverage |
-| Budget and denial-of-wallet | 04, 05, 06, 09, 14, 15, 16 | Strong coverage |
-| Autonomous Agent Harness protection | 05, 06, 15 | Includes exact runtime discovery and denial of a Harness-owned capability |
-| Repeated-denial incident escalation | 01, 14 | Shadow quarantine, block-storm incident evidence and durable fake MCP containment are covered |
-| Remote-agent/A2A boundary | 11 A2A samples | Strong, explicitly consented coverage |
-| Memory lifecycle protection | [Memory-security samples](memory-security-samples.md) | Covered in the dedicated offline release-validation suite |
-| Coverage analysis and construction-time refusal | 14, 16, 18 plus focused tests | Runnable reports cover local tools and honestly refuse unacknowledged provider-hosted code execution |
-| Explainability, replay and trust aggregation | 10 | Strong coverage |
+| Direct destructive-tool denial | 01, 10, 14 | Covered, including fake-effect proof |
+| Direct jailbreak/malicious request | 01, 04, 16 | Attack, paraphrase, and benign paths |
+| Indirect injection from tool content | 07, 14 | Covered at run and result seams |
+| Exfiltration through sequence/taint/domain | 02, 06, 07, 14 | Strong deterministic coverage |
+| Tool-specific argument contracts | 13, 14, 16 | Production contracts plus clearly labelled design fixtures |
+| Tool-result secrets and size | 17 | Clear introductory offline fixture |
+| Human approval | 03 | One live scenario; broader matrix remains a specialized follow-up |
+| Budgets/denial of wallet | 04, 05, 06, 09, 14–16 | Strong |
+| Agent Harness protection | 05, 06, 15 | Includes runtime-injected capability discovery |
+| Repeated-denial escalation/containment | 01, 14 | Shadow quarantine and durable fake-source containment |
+| Remote A2A boundary | 11A, 11B | Implementation/calibration covered; 11A requires a configured endpoint |
+| Provider-hosted coverage honesty | 18 | Strong construction-time boundary |
+| Explainability and replay | 10 | Strong |
+| Bulkhead/resource isolation | none | Highest-priority new architecture sample |
+| Stateful lifecycle/reset/restart | partial across 01, 09, 14 | Needs a dedicated timeline sample |
+| Same-batch ordering race | focused tests only | Needs a dedicated sample |
+| Security-graph incident response | focused tests/ops surface only | Needs a dedicated sample |
+| HTTP redirect/DNS wire boundary | focused tests/examples only | Needs a dedicated offline sample |
 
-## Coverage delivered and next additions
+## Other Gatekeeper sample suites
 
-Samples 14–18 close the highest-priority showcase gaps identified by the first matrix:
+The core catalog does not duplicate these specialized suites:
 
-- a poisoned tool/MCP result is withheld, its fake server is durably isolated, and retries are blocked;
-- a compromised-model kill chain cannot retrieve all customers, email tainted records, POST externally, delete all customers, or propagate worm instructions;
-- a real Agent Harness contribution is discovered by runtime name and denied on a weird request;
-- an obvious jailbreak stops before the model while paraphrased attacks remain bounded by declarative contracts;
-- construction-time coverage reports and fake effect counters make the assertions independent of model compliance;
-- secret-shaped data is masked and oversized output is truncated before model context; and
-- unacknowledged provider-hosted code execution refuses promotion without claiming local interception after acknowledgment.
+| Suite | Coverage | Entry point |
+|---|---|---|
+| Memory security | Eight offline scenarios covering recall, write, tenant, provenance, lifecycle, MCP, tool, and context-provider adapters | [Memory-security samples](memory-security-samples.md) |
+| Agent Skills | Manifest/content construction checks plus deterministic script execution and approval postures | [Agent Skills documentation](../agent-skills.md) and [`04_AgentSkillsSkillGate`](../../samples/AgentEval.Samples/AgentSkills/04_AgentSkillsSkillGate.cs) |
+| Attack the Gate | Credential-free red-team regression target and baseline comparison | [Attack the Gate](attack-the-gate.md) |
 
-The next additions should be driven by concrete production integrations: provider-hosted compensating controls,
-dynamic context-provider inventory, or a new resource-exhaustion mode with an enforceable seam. Live-model variants
-may be layered on the offline fixtures, but must keep gate evidence and fake effects as the pass/fail oracle.
+## Using the manifest
+
+`sample-manifest.json` records, for every core entry:
+
+- stable ID and handler;
+- source and launcher status;
+- execution mode and complexity;
+- protected boundaries, mechanisms, and threats;
+- external effects; and
+- the pass oracle.
+
+The validation test rejects missing/extra fields, duplicates, invalid enum values, missing sources, unregistered menu
+handlers, uncatalogued Gatekeeper sample files, and catalog entries without a stable ID. Add the manifest row, source,
+launcher registration, and this catalog in the same change.

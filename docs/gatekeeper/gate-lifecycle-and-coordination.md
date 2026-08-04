@@ -5,8 +5,9 @@ effective when each gate is placed at the earliest boundary that can still preve
 when stateful gates share a run scope, evidence trail, identity, and containment policy.
 
 Use this guide to decide where a gate belongs and how several gates cooperate. See the
-[gate reference](gate-reference.md) for individual APIs and the [sample index](sample-index.md) for executable
-coverage.
+[compact gate reference](gate-reference.md) for gate-family selection, the
+[state ownership matrix](run-session-and-state.md#state-ownership-and-lifecycle-matrix) for exact lifetimes, and the
+[sample index](sample-index.md) for executable coverage.
 
 ## Lifecycle at a glance
 
@@ -99,13 +100,17 @@ Several gates coordinate through resources owned by the composed stack:
 
 | Shared resource | Purpose | Typical consumers |
 |---|---|---|
-| `AgentRunScope` / run ledger | Isolates counters and proposal history per run | budgets, sequence, taint and block-storm controls |
+| `AgentRunScope` / run ledger | Isolates counters and proposal history per run | budgets, sequence, stateful contracts and block-storm controls |
+| Per-run gate-owned state | Keeps mechanism-specific state bound to the current run | incremental taint and result-size anomaly baselines |
 | `SessionIdentity` | Provides a stable logical session key across persisted reloads or workers | rate limits, identity drift and session-aware gates |
 | `AgentTrace` | One Glass Box record of run, tool and result decisions | samples, review, incident reconstruction and replay |
 | `IGateEvidenceSink` | Fans structured findings to another bounded operator sink | reference ledger and alerting |
 | `GateTelemetry` | Aggregates gate effectiveness without replacing trace evidence | rollout tuning and false-positive review |
 | `IContainmentStore` | Persists exact containment targets and evidence references | containment override and operator response |
 | calibration report store | Proves a judge beat its deterministic baseline before inline promotion | `IRequiresCalibration` run gates |
+
+For the authoritative call/batch/run/session/process/durable ownership, partition, concurrency, reset, restart,
+fallback, and evidence contract, use the [state ownership matrix](run-session-and-state.md#state-ownership-and-lifecycle-matrix).
 
 `EstablishRunScope` defaults to `true`. Gatekeeper refuses an enforcing composition that registers a
 run-scope-dependent gate without establishing the scope. Configure `SessionIdentity` once on
@@ -176,6 +181,8 @@ registered gate; it does not prove the policy is semantically sufficient.
   provider call counter.
 - Containment is an enforcement state, not a compromise classifier. Require evidence and an explicit policy or
   operator action before containing a shared server.
+- HTTP Bulkhead isolation separates local pools and concurrency. It cannot partition a provider quota shared by
+  the same credential; see [resource isolation operations](resource-isolation-and-containment.md).
 - Fail-closed protects safety but can reduce availability. Bound timeouts, refusal content and evidence payloads,
   and test benign controls beside attacks.
 
