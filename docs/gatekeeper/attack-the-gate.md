@@ -18,7 +18,7 @@ agenteval redteam --sut gatekeeper-demo --intensity quick \
 #   → the gate holds → Stable → the run passes.
 ```
 
-The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](../../src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
+The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
 
 ### The red case
 

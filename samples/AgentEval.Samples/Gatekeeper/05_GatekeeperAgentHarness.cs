@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -29,11 +30,12 @@ public static class GatekeeperAgentHarness
 
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("05");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("05");
             return;
         }
 
@@ -52,7 +54,7 @@ public static class GatekeeperAgentHarness
             Name = "ResearchHarness",
             Description = "An autonomous research agent that plans and executes.",
             MaxContextWindowTokens = 120_000,
-            MaxOutputTokens = 4_000,
+            MaxOutputTokens = 1_024,
             DisableFileAccess = true,
             DisableWebSearch = true,   // gpt-4o-mini (chat completions) doesn't support the harness's built-in web_search_options
             DisableFileMemory = true,  // keep the demo self-contained (no on-disk agent-files/ working dir)
@@ -61,6 +63,7 @@ public static class GatekeeperAgentHarness
             LoopAgentOptions = new LoopAgentOptions { MaxIterations = 12 },
             ChatOptions = new ChatOptions
             {
+                MaxOutputTokens = 1_024,
                 Instructions =
                     "You are an autonomous research agent. Plan the ticket, then in execute mode use the `search` " +
                     "tool MANY times — at least a dozen distinct queries across billing, refunds, prior tickets and " +
@@ -72,8 +75,11 @@ public static class GatekeeperAgentHarness
         // Wrap the REAL harness agent in the Gatekeeper — cap the autonomous loop's tool calls.
         var trace = new AgentTrace();
         AIAgent gated = harness.AsBuilder()
-            .UseAgentEvalGate()   // establishes the per-run RunLedger scope
-            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: Budget)], ToolGatePolicy.Terminate, trace)
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new RunBudgetGate(maxToolCalls: Budget));
+            })
             .Build();
 
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a REAL MAF HarnessAgent (AsHarnessAgent), budget = {Budget}.\n");

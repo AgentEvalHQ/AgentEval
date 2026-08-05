@@ -1,38 +1,22 @@
 # Explainability & Trust
 
-## New to this? Start here
+Gatekeeper has three complementary assurance primitives. They explain a decision, compare a proposed configuration
+against captured calls, and combine available signals without treating missing evidence as success or failure.
 
-**The problem:** a gate can tell you *what* it decided — Allow or Block — but not always *why*, and never
-*what a different setup would have decided*, or *how several signals should combine into one number you can
-actually act on*. Those three gaps are what this page closes:
+| Question | Primitive | Output |
+|---|---|---|
+| Why did this gate decide? | `GateProvenance` | Rule, content-free evidence, threshold, actual value, and contributors |
+| What would another configuration decide? | `GateReplayer` | Baseline/candidate verdicts and the calls whose outcome diverges |
+| How strong is the available evidence? | `TrustScoreCalculator` | Availability-aware score plus measured/total signal counts |
 
-1. **"Why did the gate block that?"** → [Gate provenance chains](#gate-provenance-chains) — a structured
-   answer (which rule, what evidence, what threshold vs. what it actually measured), not just a Block/Allow.
-2. **"What if I change the gate config — what would have happened to yesterday's traffic?"** →
-   [Counterfactual gate replay](#counterfactual-gate-replay) — replay real captured tool calls through a
-   proposed config, using the real gate objects, and see exactly which calls would flip.
-3. **"I have five different signals about this turn — gates, evals, judges. How do I get ONE trust number
-   without lying about the ones that failed to run?"** → [Unified Trust Score](#unified-trust-score).
+Start with sample [10](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs). In the
+interactive launcher, open group **J**, press **M** for the complete catalog, and choose **Explainability & Trust**.
+The sample walks through all three APIs; the sections below define their contracts and limits.
 
-None of this requires deep Gatekeeper knowledge to start using — each section below is short and has a
-complete, runnable example. If you'd rather read code than prose, the
-[Explainability & Trust sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
-(group **J**, sample 11, `dotnet run` from `samples/AgentEval.Samples`) walks through all three, gradually,
-against a real judge gate — start there and come back here for the reference detail.
-
----
-
-Three primitives that make a Gatekeeper decision reconstructable — WHY a gate decided what it decided, WHAT a
-different configuration would have decided against the same traffic, and HOW to combine several signals into
-one honest composite score. Shipped 2026-07-19 as library APIs, each independently tested, plus a runnable
-sample; none has a CLI command yet (see each section's "Status" note) — a CLI wrapper for each is a bounded,
-low-risk follow-on.
-
-> **Honest scope note.** These are additive to the existing gate primitives documented in the
-> [gate reference](gate-reference.md) and [examples](examples.md) — nothing here changes how an existing gate
-> behaves. `GateVerdictDto`, the JSON contract `gatekeeper inspect` emits, is a **frozen v1 schema** (see its
-> own remarks) that does not yet surface `Confidence` or `Provenance` — both exist in the C# `GateVerdict`
-> today, but reaching them from the CLI's JSON output needs a deliberate, versioned schema bump, not done here.
+> **Honest scope.** These are C# library APIs. `GateVerdictDto`, the versioned JSON contract emitted by
+> `gatekeeper inspect`, does not expose `Confidence` or `Provenance`; doing so requires a deliberate schema version.
+> Provenance explains observed gate reasoning, replay compares configured policies, and trust aggregation reports
+> available signals. None proves that the underlying policy is sufficient.
 
 ## Gate provenance chains
 
@@ -43,14 +27,14 @@ for a threshold-based gate, the threshold it was compared against versus the act
 their provenance chains too — not populated by anything yet (no aggregating gate is wired), but the shape is
 there for one.
 
-Attached via a new, optional `GateVerdict.Provenance` field — additive, same precedent as the existing
+Attached via the optional `GateVerdict.Provenance` field — additive, same precedent as the existing
 `Confidence` field: a gate that doesn't populate it behaves exactly as before.
 
 **Wired into:** `CompositeJudgeGate<TRubric>` (the Tribunal primitive — see [gate reference](gate-reference.md)),
 for both the Block path and the near-miss-Allow-with-Confidence path Fleet Correlation already reads.
 
 This is the complete, runnable core of it — the full version (with a benign turn shown for contrast, and
-console output) is Scene 1 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs):
+console output) is Scene 1 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs):
 
 ```csharp
 using AgentEval.Guardrails.Judges;
@@ -83,7 +67,7 @@ sequential, first-Block/Mutate-wins semantics the live `UseAgentEvalToolGate` pi
 found here is exactly what would have happened had the candidate configuration been live at capture time.
 
 This example is complete and runnable as written — no live model, no external state, just two gate lists and
-three tool calls (Scene 2 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
+three tool calls (Scene 2 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
 prints the console output for exactly this):
 
 ```csharp
@@ -113,7 +97,7 @@ network call and no live agent.
 
 **Status:** library API, demonstrated in the sample above. Getting `GatedToolCall`s to replay from a REAL
 production trace currently means capturing them yourself (e.g. from an `AgentTrace`, or reconstructing them
-from a `--capture-fixture` JSONL capture — see [CLI Reference](../cli.md#agenteval-log-file)). A
+from a `--capture-fixture` JSONL capture — see [CLI troubleshooting reference](../cli.md)). A
 `agenteval log-file gate-replay` command wiring this directly to a capture file is the natural, mechanical
 next step — not built yet.
 
@@ -126,7 +110,7 @@ TrustScoreCalculator.Compute` applies the same exclusion discipline already used
 aggregation strategies (`WeightedSumAggregation`/`WeightedMedianAggregation`/`MinAggregation`/
 `MajorityVoteAggregation`) to a cross-cutting mix of signal SOURCES, not just sub-evals of one eval tree.
 
-Complete and runnable as written (Scene 3 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
+Complete and runnable as written (Scene 3 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
 also folds in Scene 1's real gate verdict as one of the signals):
 
 ```csharp
@@ -157,7 +141,7 @@ when nothing could be scored at all.
 
 - [Gate reference](gate-reference.md) — every built-in gate, including `CompositeJudgeGate`'s Tribunal role.
 - [Examples](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
-- [Explainability & Trust sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
-- [Gatekeeper — What's New](../gatekeeper-whats-new.md) — capability history for this area, so a future addition doesn't go undocumented the way this one briefly did.
-- [CLI Reference — Exit codes](../cli.md#exit-codes) — the BUG-22 exit-code split (`9`/`10`/`11` for
-  benchmark gate outcomes) this same session also shipped, a related but separate honesty fix.
+- [Explainability & Trust sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
+- [Capability history](../gatekeeper-whats-new.md) — the compact chronology of Gatekeeper milestones.
+- [CLI Reference — Exit codes](../cli.md#exit-codes) — the benchmark-gate exit-code split
+  (`9`/`10`/`11`), a related but separate honesty contract.

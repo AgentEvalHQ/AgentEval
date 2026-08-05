@@ -48,18 +48,42 @@
   items:
   - name: Introduction
     href: gatekeeper/introduction.md
-  - name: What's New
-    href: gatekeeper-whats-new.md
-  - name: Gate Reference (ranked)
-    href: gatekeeper/gate-reference.md
-  - name: CLI (from any language)
-    href: gatekeeper-cli.md
-  - name: Examples
+  - name: First Recipes
     href: gatekeeper/examples.md
-  - name: Attack the Gate
-    href: gatekeeper/attack-the-gate.md
+  - name: Gate Reference
+    href: gatekeeper/gate-reference.md
+    items:
+    - name: Tool, Result & HTTP Gates
+      href: gatekeeper/tool-and-result-gates.md
+    - name: Run, Session & State
+      href: gatekeeper/run-session-and-state.md
+    - name: Judges, Approval & Shadow
+      href: gatekeeper/judges-approval-and-shadow.md
+    - name: Containment, Graph & Evidence
+      href: gatekeeper/containment-coverage-and-operations.md
+    - name: Resource Isolation Operations
+      href: gatekeeper/resource-isolation-and-containment.md
+  - name: Gate Lifecycle & Coordination
+    href: gatekeeper/gate-lifecycle-and-coordination.md
+  - name: Sample Index & Coverage
+    href: gatekeeper/sample-index.md
   - name: Explainability & Trust
     href: gatekeeper/explainability-and-trust.md
+  - name: Attack the Gate
+    href: gatekeeper/attack-the-gate.md
+  - name: CLI (from any language)
+    href: gatekeeper-cli.md
+  - name: Implementation Status
+    href: gatekeeper/implementation-status.md
+  - name: Capability History
+    href: gatekeeper-whats-new.md
+  - name: Memory Security
+    href: gatekeeper/memory-security.md
+    items:
+    - name: Samples
+      href: gatekeeper/memory-security-samples.md
+    - name: Migration Guide
+      href: gatekeeper/memory-security-migration.md
 
 - name: Evaluation Coverage
   items:

@@ -20,6 +20,9 @@ switch (args[0].ToLowerInvariant())
     case "mock-tools":
         await GatekeeperMockedDangerousTools.RunAsync();
         return 0;
+    case "memory-security":
+        await MemorySecurityReleaseValidation.RunAsync();
+        return 0;
     default:
         PrintUsage();
         return 2;
@@ -33,6 +36,7 @@ static void PrintUsage()
 
           calibrate   Live Azure calibration of both Phase-4 A2A boundary judges
           remote      Calibrate, then execute one consent-gated real A2A endpoint call
-          mock-tools  Offline Phase-7 SQL/browser/cloud/package-manager simulation
+          mock-tools       Offline Phase-7 SQL/browser/cloud/package-manager simulation
+          memory-security  Offline memory tool/MCP/context-provider release validation
         """);
 }

@@ -1,61 +1,69 @@
-# Gatekeeper — What's New
+# Gatekeeper capability history
 
-A roundup of what's landed for Gatekeeper's runtime enforcement layer recently — the fleet-wide correlation
-signal, honest confidence propagation, construction-time drift enforcement, and the newest addition,
-Explainability & Trust. See the [introduction](gatekeeper/introduction.md) and
-[gate reference](gatekeeper/gate-reference.md) for the full guide; this page is the capability history.
+> **Current status:** see [Implementation status](gatekeeper/implementation-status.md).
+> This page is a compact history, not the API reference or release-readiness record.
 
-> **TL;DR.** Judges now propagate a real confidence signal instead of discarding it, a Fleet Correlation
-> Layer combines near-miss signals across a whole session, SkillGate extends Gatekeeper's enforcement model
-> to Agent Skills, and — the newest addition — **Explainability & Trust**: reconstructable gate provenance,
-> counterfactual gate-config replay, and a unified Trust Score.
+Gatekeeper evolved from individual runtime gates into a coordinated protection and assurance layer. New users
+should start with the [introduction](gatekeeper/introduction.md), [recipes](gatekeeper/examples.md), and
+[gate reference](gatekeeper/gate-reference.md).
 
----
+## Current baseline — 2026-08-04
 
-## New & upgraded capabilities
+### Coordinated composition
 
-### Explainability & Trust *(the newest addition)*
-Three primitives that make a gate decision reconstructable instead of a bare Allow/Block. **Gate provenance
-chains** (`GateProvenance`) attach a structured "why" — rule name, evidence, threshold vs. actual — to a
-`GateVerdict`, wired into `CompositeJudgeGate<TRubric>`. **Counterfactual gate replay** (`GateReplayer`) runs
-a baseline and a candidate `IToolGate` configuration against the same captured tool calls — the real gate
-objects, not a simulation — and reports which calls would diverge. **Unified Trust Score**
-(`TrustScoreCalculator`) combines gate verdicts and eval scores into one honest 0-100 composite, excluding
-skipped/errored signals from the math entirely rather than scoring them 0. Full detail + a runnable sample:
-[Explainability & Trust](gatekeeper/explainability-and-trust.md).
+- `UseGatekeeper` is the preferred multi-layer entry point and requires an explicit enforcement mode.
+- Run, tool, result, approval, shadow, evidence, and memory surfaces share validated composition.
+- Unsafe middleware ordering, weakened policy floors, and uncalibrated inline judges refuse promotion.
 
-### Judge confidence propagation
-`CompositeJudgeGate` used to discard a judge's confidence once a verdict was decided. It now carries the real
-confidence through — including the near-miss case (a sub-threshold Block that gets downgraded to Allow) —
-so a fleet-wide correlator can see a genuine uncertain signal instead of a laundered "clean allow." This is
-the same signal Explainability & Trust's gate provenance now also reconstructs a full "why" around.
+### Runtime and construction protection
 
-### Fleet Correlation Layer
-Session-scoped correlation across multiple gates and turns — several individually-below-threshold near-miss
-signals, combined, can indicate a real problem no single gate would have blocked on its own. Wired into
-`EvalGatingChatClient` via an optional constructor parameter and a `UseEvalGate` builder extension.
+- Declarative tool contracts, budgets, sequencing, taint, same-batch ordering, and containment protect local effects.
+- Result injection, secret, fixed-size, and behavioral-anomaly gates protect model-context admission.
+- HTTP redirect and DNS validation operate inside the tool client at the wire boundary.
+- Prompt, MCP, Agent Skills, and coverage checks refuse unsafe or unverifiable construction.
 
-### SkillGate — Gatekeeper's enforcement model applied to Agent Skills
-`UseGatekeeper(...).WithSkillGate(...)` refuses to let an agent construct at all if a skill it will expose
-has drifted from a pinned baseline. The third application of the same audit-time-vs-enforcement-time pattern
-already used for skill manifests and prompt templates. Full detail (this one lives primarily in the
-[Agent Skills reference](agent-skills.md#3b--skillgate-construction-time-drift-enforcement), since that's
-where the governance question originates) —
-[Agent Skills — What's New](agent-skills-whats-new.md) covers it from that side.
+### Stateful operations
 
----
+- Run, session, rate-window, shadow-quarantine, and durable containment ownership is explicit.
+- The security graph correlates privacy-minimized observations and preserves coverage gaps.
+- Mission Control exposes a bounded read-only projection rather than a second mutation authority.
+- Bulkhead routing separates local normal and isolated HTTP pressure while documenting shared downstream quotas.
 
-## The doc-lag this page is meant to prevent
+### Memory security
 
-SkillGate and, above, Explainability & Trust both shipped as real, tested code with **zero** matching
-documentation at first — discovered only when someone went looking, not because anyone flagged the gap at
-ship time. That's the actual failure mode: nothing surfaces "a capability shipped with no matching doc
-change" automatically, and a changelog entry buried in `CHANGELOG.md` doesn't get read by whoever's about to
-write docs for a *different* feature next session. This page exists so the next Gatekeeper capability gets a
-line here the same week it ships.
+- One composite memory configuration protects tool, MCP, `AIContextProvider`, and provider-native seams.
+- Host identity remains authoritative; coverage levels never upgrade an unrelated operation.
+- Eight offline release fixtures cover scope, lifecycle, hosted limitations, quarantine, and rollback.
 
----
+### Documentation and samples
 
-*See the [Gatekeeper introduction](gatekeeper/introduction.md) for concepts and layers, the
-[gate reference](gatekeeper/gate-reference.md) for every built-in gate ranked by honest usefulness, and
-[examples](gatekeeper/examples.md) for runnable code.*
+- The public reading path separates introduction, selection, focused references, lifecycle, operations, and status.
+- A strict manifest synchronizes 30 sample contracts with sources, launcher registration, and the catalog.
+- The launcher presents six recommended samples first and reveals the complete 29-entry menu on demand.
+- Architecture and specialist samples cover state, concurrency, wire, graph, dynamic-provider, identity, approval,
+  provenance, Crescendo, and result-anomaly boundaries.
+
+## Earlier milestones
+
+### Explainability and trust
+
+- `GateProvenance` added structured reasons, thresholds, and contributing evidence.
+- `GateReplayer` added deterministic counterfactual policy comparison.
+- `TrustScoreCalculator` added availability-aware aggregation that excludes missing and errored signals.
+
+### Semantic judgment
+
+- `CompositeJudgeGate<TRubric>` established narrow Tribunal axes with bounded parsing and fail-closed behavior.
+- Confidence propagation and fleet correlation preserved near-miss signals rather than laundering them into clean allows.
+- Calibration certificates and reports bound promotion to the exact model, rubric, options, and corpus.
+
+### Skills and cross-agent boundaries
+
+- SkillGate applied construction-time manifest/content integrity to Agent Skills.
+- Inbound and outbound A2A judges added separately calibrated delegation and remote-response boundaries.
+- Real A2A endpoint promotion remains explicitly external and authorization-gated.
+
+## Maintenance rule
+
+Every new Gatekeeper capability must update one reference owner, executable evidence, and the implementation-status
+record in the same change. A historical entry is useful only after those three current sources are accurate.

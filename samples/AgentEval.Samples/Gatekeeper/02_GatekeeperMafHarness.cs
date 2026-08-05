@@ -7,6 +7,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
+using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 
 namespace AgentEval.Samples;
 
@@ -29,17 +30,21 @@ public static class GatekeeperMafHarness
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("02");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("02");
             return;
         }
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
+            .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a real support agent gated by a SequenceGate.\n");
 
         await RunScenario(chatClient, "LEGIT — an order-status question",
@@ -69,11 +74,14 @@ public static class GatekeeperMafHarness
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SupportAgent",
-            ChatOptions = new ChatOptions { Tools = [lookupOrder, readCustomerData, httpPost] },
+            ChatOptions = new ChatOptions { Tools = [lookupOrder, readCustomerData, httpPost], MaxOutputTokens = 512 },
         })
             .AsBuilder()
-            .UseAgentEvalGate()   // establishes the per-run scope the sequence gate tracks
-            .UseAgentEvalToolGate([new SequenceGate(["read_customer_data"], ["http_post", "send_email"])], ToolGatePolicy.Terminate, trace)
+            .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
+            {
+                options.Trace = trace;
+                options.Add(new SequenceGate(["read_customer_data"], ["http_post", "send_email"]));
+            })
             .Build();
 
         Console.WriteLine($"\n▸ {label}");

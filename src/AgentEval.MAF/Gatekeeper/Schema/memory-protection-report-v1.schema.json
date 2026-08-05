@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/gatekeeper/memory-protection-report-v1.schema.json",
+  "title": "AgentEval Gatekeeper memory-protection report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "policyId", "policyVersion", "profile", "minimumCoverage",
+    "policyFingerprint", "adapterFingerprint", "toolCoverage", "mcpCoverage", "providerCoverage",
+    "configurationFingerprint", "hasCoverageBelowMinimum"
+  ],
+  "properties": {
+    "schema": { "const": "gatekeeper.memory-protection-report/1" },
+    "policyId": { "$ref": "#/$defs/identifier" },
+    "policyVersion": { "$ref": "#/$defs/identifier" },
+    "profile": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "minimumCoverage": { "$ref": "#/$defs/coverage" },
+    "policyFingerprint": { "$ref": "#/$defs/digest" },
+    "adapterFingerprint": { "$ref": "#/$defs/digest" },
+    "configurationFingerprint": { "$ref": "#/$defs/digest" },
+    "hasCoverageBelowMinimum": { "type": "boolean" },
+    "toolCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entries", "policyFingerprint", "hasUnsupportedMemoryTools", "hasUnclassifiedMemoryLikeTools"],
+      "properties": {
+        "policyFingerprint": { "$ref": "#/$defs/digest" },
+        "entries": { "type": "array", "items": { "$ref": "#/$defs/toolEntry" } },
+        "hasUnsupportedMemoryTools": { "type": "boolean" },
+        "hasUnclassifiedMemoryLikeTools": { "type": "boolean" }
+      }
+    },
+    "mcpCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entries", "policyFingerprint", "configurationFingerprint"],
+      "properties": {
+        "policyFingerprint": { "$ref": "#/$defs/digest" },
+        "configurationFingerprint": { "$ref": "#/$defs/digest" },
+        "entries": { "type": "array", "items": { "$ref": "#/$defs/mcpEntry" } }
+      }
+    },
+    "providerCoverage": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/providerEntry" }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "coverage": { "type": "integer", "minimum": 0, "maximum": 4 },
+    "toolEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolName", "classification", "executionModel", "coverage", "note"],
+      "properties": {
+        "toolName": { "$ref": "#/$defs/identifier" },
+        "classification": { "type": "integer" },
+        "operationKind": { "type": ["integer", "null"] },
+        "surface": { "type": ["integer", "null"] },
+        "executionModel": { "type": "integer" },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "note": { "type": "string" }
+      }
+    },
+    "mcpEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverId", "serverVersion", "transport", "operationName", "surface", "schemaFingerprint", "coverage", "note"],
+      "properties": {
+        "serverId": { "$ref": "#/$defs/identifier" },
+        "serverVersion": { "$ref": "#/$defs/identifier" },
+        "transport": { "type": "integer" },
+        "operationName": { "$ref": "#/$defs/identifier" },
+        "operationKind": { "type": ["integer", "null"] },
+        "surface": { "type": "integer" },
+        "schemaFingerprint": { "$ref": "#/$defs/digest" },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "note": { "type": "string" }
+      }
+    },
+    "providerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerFingerprint", "integration", "nativeCapabilities", "coverage", "policyFingerprint", "note"],
+      "properties": {
+        "providerFingerprint": { "$ref": "#/$defs/digest" },
+        "integration": { "enum": ["generic-context-provider", "provider-native"] },
+        "nativeCapabilities": { "type": "integer" },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "policyFingerprint": { "$ref": "#/$defs/digest" },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

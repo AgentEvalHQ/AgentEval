@@ -25,17 +25,21 @@ public static class GatekeeperToolApproval
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("03");
         PrintHeader();
 
-        if (!AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("03");
             return;
         }
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
+            .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a real agent whose large refunds need a human.\n");
 
         var refundsIssued = new List<int>();
@@ -49,7 +53,7 @@ public static class GatekeeperToolApproval
         AIAgent BuildAgent() => new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SupportAgent",
-            ChatOptions = new ChatOptions { Tools = [refund.RequiresApproval()] },
+            ChatOptions = new ChatOptions { Tools = [refund.RequiresApproval()], MaxOutputTokens = 256 },
         }).AsBuilder().UseAgentEvalToolApproval([gate]).Build();
 
         // ── A routine refund flows straight through ──

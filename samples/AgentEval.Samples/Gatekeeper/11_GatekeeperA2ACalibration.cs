@@ -22,6 +22,7 @@ public static class GatekeeperA2ACalibration
 
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("11B");
         Console.WriteLine("\n=== Gatekeeper — Live A2A Judge Calibration ===\n");
 
         if (!AIConfig.IsConfigured)

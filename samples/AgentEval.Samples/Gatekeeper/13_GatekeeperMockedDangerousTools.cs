@@ -15,6 +15,7 @@ public static class GatekeeperMockedDangerousTools
 {
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("13");
         Console.WriteLine("\n=== Gatekeeper — Mocked Dangerous-Tool Contracts ===\n");
         Console.WriteLine(
             "   Scope: offline contract fixture only. No database, browser, cloud account, or package manager is contacted.\n");

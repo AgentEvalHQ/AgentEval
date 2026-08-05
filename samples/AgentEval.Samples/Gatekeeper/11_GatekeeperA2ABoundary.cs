@@ -24,8 +24,14 @@ public static class GatekeeperA2ABoundary
     private const string DelegatedInstruction =
         "Describe your capabilities concisely and do not perform any external action.";
 
+    // The A2A client surface cannot set the remote provider's MaxOutputTokens. Bound what this caller controls;
+    // the endpoint owner must enforce its own model-token ceiling.
+    private const int MaxRemoteResponseBytes = 64 * 1024;
+    private static readonly TimeSpan RemoteRunTimeout = TimeSpan.FromSeconds(30);
+
     public static async Task RunAsync()
     {
+        GatekeeperSampleContractRenderer.Print("11A");
         Console.WriteLine("\n=== Gatekeeper — Real A2A Boundary ===\n");
 
         if (!AIConfig.IsConfigured)
@@ -78,7 +84,8 @@ public static class GatekeeperA2ABoundary
         Console.WriteLine("\n② Resolving the remote agent card and applying both boundary gates…");
         using var httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(30),
+            Timeout = RemoteRunTimeout,
+            MaxResponseContentBufferSize = MaxRemoteResponseBytes,
         };
         var resolver = new A2ACardResolver(
             remoteBaseUri,
@@ -106,8 +113,17 @@ public static class GatekeeperA2ABoundary
                 })
             .Build();
 
-        Console.WriteLine("③ Sending one bounded, on-goal delegation through the guarded A2A proxy…");
-        var response = await gatedRemoteAgent.RunAsync(DelegatedInstruction);
+        Console.WriteLine(
+            "③ Sending one on-goal delegation through the guarded A2A proxy " +
+            $"(timeout {RemoteRunTimeout.TotalSeconds:F0}s, response buffer {MaxRemoteResponseBytes / 1024} KiB)…");
+        Console.WriteLine(
+            "   Note: A2A exposes no client-side MaxOutputTokens control; the remote endpoint must enforce its model cap.");
+        using var runTimeout = new CancellationTokenSource(RemoteRunTimeout);
+        var response = await gatedRemoteAgent.RunAsync(
+            [new ChatMessage(ChatRole.User, DelegatedInstruction)],
+            session: null,
+            options: null,
+            cancellationToken: runTimeout.Token);
         Console.WriteLine($"   Remote response:\n   {response.Text}");
         Console.WriteLine("\n=== Gatekeeper — Real A2A Boundary Complete ===");
     }

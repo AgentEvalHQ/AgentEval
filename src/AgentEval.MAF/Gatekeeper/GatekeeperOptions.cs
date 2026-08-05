@@ -4,6 +4,7 @@
 
 using AgentEval.Guardrails;
 using AgentEval.Guardrails.Judges;
+using AgentEval.MAF.Gatekeeper.Memory;
 using AgentEval.MAF.Skills;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
@@ -20,9 +21,33 @@ namespace AgentEval.MAF.Gatekeeper;
 public sealed class GatekeeperOptions
 {
     private readonly List<ToolContract> _toolContracts = new();
+    private MemoryProtectionOptions? _memoryProtection;
 
     /// <summary>Tool gates, run in order on every tool call (via <c>UseAgentEvalToolGate</c>).</summary>
     public IList<IToolGate> ToolGates { get; } = new List<IToolGate>();
+
+    /// <summary>
+    /// Configures the single composite memory-protection path. The complete configuration is resolved and
+    /// defensively snapshotted with ordinary gates before builder mutation. Call this at most once.
+    /// </summary>
+    public void ProtectMemory(MemoryProtectionOptions protection)
+    {
+        ArgumentNullException.ThrowIfNull(protection);
+        if (_memoryProtection is not null)
+        {
+            throw new InvalidOperationException("Gatekeeper memory protection can only be configured once.");
+        }
+
+        _memoryProtection = protection;
+    }
+
+    internal MemoryProtectionOptions? MemoryProtection => _memoryProtection;
+
+    /// <summary>
+    /// Authoritative content-free memory coverage and policy-provenance report. Read after
+    /// <c>UseGatekeeper</c> returns; null when memory protection was not configured.
+    /// </summary>
+    public MemoryProtectionReport? MemoryProtectionReport { get; internal set; }
 
     /// <summary>
     /// Atomically adds one immutable per-tool usage contract. The callback builds a temporary model; if it
