@@ -85,6 +85,7 @@ public sealed class GatekeeperDocumentationSnippetTests
     private static string Normalize(string value)
     {
         var lines = value.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
             .Split('\n')
             .SkipWhile(string.IsNullOrWhiteSpace)
             .Reverse()
