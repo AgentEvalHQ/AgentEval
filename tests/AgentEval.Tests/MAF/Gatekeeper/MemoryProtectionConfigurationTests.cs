@@ -150,6 +150,13 @@ public sealed class MemoryProtectionConfigurationTests
         Assert.Equal(report.PolicyFingerprint, report.ToolCoverage.PolicyFingerprint);
         Assert.Equal(report.PolicyFingerprint, report.McpCoverage.PolicyFingerprint);
         Assert.DoesNotContain("content", json, StringComparison.OrdinalIgnoreCase);
+
+        var document = JsonNode.Parse(json)!.AsObject();
+        document["toolCoverage"]!["unexpected"] = true;
+        var unexpectedPropertyResult = LoadSchema("memory-protection-report-v1.schema.json")
+            .Evaluate(document, new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+        Assert.False(unexpectedPropertyResult.IsValid);
     }
 
     private static JsonSchema LoadSchema(string fileName)

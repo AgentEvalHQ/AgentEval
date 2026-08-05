@@ -1,8 +1,8 @@
 # LongMemEval trustworthiness and diagnostics improvement plan
 
-> **Status:** implementation complete and merged into `main` (PR #148)
+> **Status:** implementation complete and merged into `main`
 > **Prepared:** 2026-07-29
-> **Target baseline:** AgentEval `0.16.0-beta`
+> **Target baseline:** the current AgentEval release line
 > **Scope:** AgentEval's .NET LongMemEval runner, judge, result contracts, reporting, tests, samples, and documentation
 > **Non-goal:** implementing AgentMemory retrieval, extraction, reranking, graph, or storage logic
 

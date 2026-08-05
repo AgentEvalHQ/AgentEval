@@ -21,6 +21,7 @@
     "hasCoverageBelowMinimum": { "type": "boolean" },
     "toolCoverage": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["entries", "policyFingerprint", "hasUnsupportedMemoryTools", "hasUnclassifiedMemoryLikeTools"],
       "properties": {
         "policyFingerprint": { "$ref": "#/$defs/digest" },
@@ -31,6 +32,7 @@
     },
     "mcpCoverage": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["entries", "policyFingerprint", "configurationFingerprint"],
       "properties": {
         "policyFingerprint": { "$ref": "#/$defs/digest" },
@@ -49,6 +51,7 @@
     "coverage": { "type": "integer", "minimum": 0, "maximum": 4 },
     "toolEntry": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["toolName", "classification", "executionModel", "coverage", "note"],
       "properties": {
         "toolName": { "$ref": "#/$defs/identifier" },
@@ -62,6 +65,7 @@
     },
     "mcpEntry": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["serverId", "serverVersion", "transport", "operationName", "surface", "schemaFingerprint", "coverage", "note"],
       "properties": {
         "serverId": { "$ref": "#/$defs/identifier" },
@@ -77,6 +81,7 @@
     },
     "providerEntry": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["providerFingerprint", "integration", "nativeCapabilities", "coverage", "policyFingerprint", "note"],
       "properties": {
         "providerFingerprint": { "$ref": "#/$defs/digest" },

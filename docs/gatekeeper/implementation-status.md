@@ -125,38 +125,25 @@ coverage.
 
 ## Validation snapshot
 
-- The latest merged repository validation recorded 28,745 passing tests, four intentional skips,
-  and zero failures across the supported target frameworks.
-- Gatekeeper phase reviews include focused adversarial tests, full-suite regressions, and scoped
+- Repository CI runs the comprehensive evaluation and test suites across every supported target framework,
+  with intentional skips documented by the owning tests.
+- Gatekeeper phase reviews include focused adversarial evaluations, full-suite regressions, and scoped
   MAF Doctor checks on changed MAF code.
-- Phase 8 review adds a mechanically validated 19-entry sample manifest, a clean formatter check,
-  manifest contract passes on net8/net9/net10, 1,384 passing net10 Gatekeeper tests, and a successful
-  Release sample build. DocFX completes with zero errors and 28 existing warnings, none owned by the
-  changed Gatekeeper documentation.
-- Phase 10 adds five self-validating offline architecture samples and expands the synchronized manifest/catalog to 24 entries. All five launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and 28 existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
-- Phase 11 adds six self-validating offline specialized samples and expands the synchronized manifest/catalog to 30 entries. All six launcher runs pass; the Release sample build has 0 warnings; the manifest passes net8/net9/net10; 1,384 Gatekeeper tests pass; formatter is clean; DocFX completes with 0 errors and only existing non-Gatekeeper warnings; scoped MAF Doctor remains B/0 errors.
-- Phase 12 adds progressive discovery, compiled recipe contracts, focused architecture maps, current history/CLI
-  truth, and measured output tables. The recommended view and four enhanced oracles pass; 1,386 Gatekeeper tests pass;
-  Release samples build with 0 warnings; the seven task C# files pass formatter verification; DocFX has 0 errors and
-  28 pre-existing non-Gatekeeper warnings; scoped Gatekeeper MAF Doctor remains B with 0 errors, 8 reviewed warnings,
-  and 3 known cost heuristics.
-- A repo-root MAF Doctor run is polluted by ignored `.claude/worktrees` and reports duplicate/generated findings;
-  the changed Gatekeeper source scope is the recorded health boundary for this review.
-- The final scoped MAF Doctor review reports grade B and zero errors. Its eight observability warnings are
-  deterministic offline fixtures. The three cost heuristics are the pre-existing remote-A2A/server and scripted-helper
-  limitations plus one false positive whose Crescendo call has both agent-level and explicit per-run token caps.
-- The repository build baseline at the merged LongMemEval commit
-  (`bb2cf6a2f5ae75e16dea196b246d5003eebc8df4`) is zero errors and 175 existing warnings. New work
-  must introduce no additional warnings.
+- The synchronized sample manifest, catalog contracts, offline launcher oracles, Release sample build,
+  formatter verification, and DocFX build all pass.
+- The scoped MAF Doctor review reports grade B with no errors. Its remaining observability and cost findings
+  are reviewed fixture limitations, known remote-boundary constraints, or bounded false positives.
+- A repo-root MAF Doctor run is polluted by ignored `.claude/worktrees` and reports duplicate/generated
+  findings; the changed Gatekeeper source scope is the recorded health boundary for this review.
+- New work must introduce no warnings beyond the established repository baseline.
 - Live semantic calibration is never treated as evidence of production generalization when it uses
   the calibration set itself. Inline promotion still requires representative data and the existing
   calibration safeguards.
 
 ## Release posture
 
-The core Gatekeeper phases are merged into `main` at the baseline above. The showcase follow-up and Phases 8–12
-are complete and reviewed on the current local branch, but remain intentionally unpublished under the local-only
-instruction.
+The core Gatekeeper phases, showcase work, and documentation/sample assurance phases are complete and
+included in the current release line.
 Phase 4's deferred endpoint check limits only the promotion claim for a real remote A2A boundary; it does not erase
 the completed local composition, gate implementation, or reviewed calibration. No unsupported or demand-gated
 surface may be reported as fully enforced.

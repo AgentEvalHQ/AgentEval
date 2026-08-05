@@ -1,6 +1,6 @@
 # Memory-security samples
 
-Run all eight offline release fixtures from the repository root:
+Run the full offline release-fixture suite from the repository root:
 
 ```powershell
 dotnet run --project samples/AgentEval.Gatekeeper.Validation -- memory-security

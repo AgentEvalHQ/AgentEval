@@ -30,4 +30,4 @@ or package managers.
 
 ## Memory-security release validation
 
-`memory-security` is fully offline and runs all eight Phase 7 examples: strict local tools, local MCP plus owned server, generic context-provider boundary coverage, provider-native full lifecycle, cross-session browser/email isolation, observe rollout, quarantine rollback, and intentional hosted-MCP refusal. The short console output includes content-free configuration fingerprint prefixes only.
+`memory-security` is fully offline and runs the Phase 7 examples: strict local tools, local MCP plus owned server, generic context-provider boundary coverage, provider-native full lifecycle, cross-session browser/email isolation, observe rollout, quarantine rollback, and intentional hosted-MCP refusal. The short console output includes content-free configuration fingerprint prefixes only.

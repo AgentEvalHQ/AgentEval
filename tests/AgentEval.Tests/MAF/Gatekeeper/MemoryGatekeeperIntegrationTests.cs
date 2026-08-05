@@ -27,7 +27,7 @@ public sealed class MemoryGatekeeperIntegrationTests
         });
 
         var report = Assert.IsType<MemoryProtectionReport>(captured.MemoryProtectionReport);
-        Assert.Equal(MemoryProtectionReport.SchemaVersion, MemoryProtectionReport.SchemaVersion);
+        Assert.Equal(MemoryProtectionReport.SchemaVersion, report.Schema);
         Assert.Equal("phase7-test", report.PolicyId);
         Assert.Equal(MemoryCoverageLevel.FullLifecycle, Assert.Single(report.ToolCoverage.Entries).Coverage);
         Assert.False(report.HasCoverageBelowMinimum);

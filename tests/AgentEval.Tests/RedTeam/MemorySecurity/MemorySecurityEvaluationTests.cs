@@ -114,6 +114,7 @@ public sealed class MemorySecurityEvaluationTests
 
         Assert.Equal("error", result.Score.Label);
         Assert.False(result.Score.Passed);
+        Assert.Equal("none", result.Score.Severity);
     }
 
     [Fact]

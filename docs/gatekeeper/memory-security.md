@@ -106,7 +106,7 @@ refuses it when the configured minimum is stronger.
 
 ## Deployment configuration and DI
 
-`MemoryProtectionConfiguration.Parse` and `ReadFileOnce` accept only
+`MemoryProtectionConfiguration.ParseJson` and `ReadFileOnce` accept only
 `gatekeeper.memory-protection/1`. The JSON schema is embedded in `AgentEval.MAF` and published at
 `Gatekeeper/Schema/memory-protection-config-v1.schema.json`. Unknown/duplicate properties, invalid enum
 names, oversized documents, fingerprint mismatches, and a different minimum coverage fail closed.
