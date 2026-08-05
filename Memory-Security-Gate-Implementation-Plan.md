@@ -502,8 +502,8 @@ Thirty-four focused Phase 6 tests and all 246 memory regressions pass on `net8.0
 
 > **Task 7.1 completion date:** 2026-08-02
 >
-> Phase 7 release integration is in progress. This record is updated after each task's focused
-> review; it does not claim Tasks 7.2–7.R are complete.
+> Phase 7 release integration is complete. This record is updated after each task's focused
+> review; Tasks 7.2–7.R completion evidence follows below.
 
 `GatekeeperOptions.ProtectMemory(...)` is the single composite configuration path. Its resolver
 freezes caller-owned collections, requires Gatekeeper enforcement to match the memory policy

@@ -3,9 +3,9 @@
 > **Status:** implementation complete for the currently approved scope; one live promotion
 > validation remains deferred.
 >
-> **Updated:** 2026-08-04
+> **Updated:** 2026-08-05
 >
-> **Merged baseline:** [PR #147](https://github.com/AgentEvalHQ/AgentEval/pull/147)
+> **Publication target:** the current main branch
 
 This page is the tracked, publication-safe status record for Gatekeeper. Detailed threat scenarios,
 calibration corpora, and internal design records remain outside the repository. A green check means
