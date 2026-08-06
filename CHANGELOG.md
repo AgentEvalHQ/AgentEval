@@ -7,6 +7,164 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0-beta] - 2026-08-06
+
+The security release. The headline is **Memory Security**: a provider-neutral memory-protection
+capability for MAF agents — coordinated lifecycle gates over every declared memory surface (local
+memory tools, local/hosted MCP, owned MCP servers, `AIContextProvider`, provider-native hooks) with
+honest per-operation coverage claims and fail-closed construction. Around it, the six-phase
+Gatekeeper hardening arc lands in full (fail-closed security fixes, enforcement-semantics
+correctness, unified evidence and refusal reporting, performance/cost bounds, meta-gates), plus the
+shared durable session-identity primitive, the tool-usage contract engine, and the Gatekeeper
+documentation/sample assurance phases (30 catalogued samples, 19 of them offline-deterministic
+launcher oracles). LongMemEval judging becomes trustworthy: a blank, malformed, or provider-failed
+judge response is now *inconclusive* — it can no longer be silently counted as an incorrect answer.
+
+### Memory Security Gate (#149)
+
+#### Added
+- **Deterministic memory lifecycle gates** (`src/AgentEval.MAF/Gatekeeper/Memory/`) — implemented as
+  coordinated gates rather than one text classifier: construction-time coverage, scope integrity
+  (identity resolved from trusted host/session state and never from model arguments; fails closed
+  before storage access), write admission (provenance, trust, content policy, promotion type,
+  secret/PII redaction, hidden-character rejection), conflict/reconciliation (lower-trust writes
+  cannot overwrite or outvote trusted memory; repeated copies from one source are not independent
+  corroboration), recall admission (scope, state, TTL, integrity, citations, trust, instruction
+  exclusion, escaped bounded delimiters), memory influence (run-scoped taint tracking from recalled
+  memory into sensitive tool sinks), resource budgets, and content-free audit/attribution.
+- **`GatekeeperOptions.ProtectMemory(...)`** — the single composition path; every preflight runs
+  before `AIAgentBuilder` mutation. `MemoryProtectionReport` records per-surface, per-operation
+  coverage (`FullLifecycle` / `Boundary` / `ActionOnly` / `ObserveOnly` / `Unsupported`) with
+  pinned policy, adapter, and configuration fingerprints. Coverage claims are deliberately honest:
+  a generic context-provider wrapper is capped at `Boundary`, client-only MCP is capped at
+  `Boundary`, and opaque hosted MCP fails closed rather than claiming enforcement.
+- **Surface adapters** — exact-name memory tool registry (names/descriptions are never authority),
+  `GatedAIContextProvider` decorator (gates recalled messages/instructions/dynamic tools before
+  merge and source messages before delegated persistence), local MCP bindings pinned to server
+  identity + canonical schema fingerprint (drift invalidates coverage), an owned MCP server-side
+  gate (`MemoryMcpServerGate`) that never invokes the backend after denial, and a versioned
+  provider-native candidate-write/recalled-item hook contract for true `FullLifecycle` coverage.
+- **Persistent memory-poisoning evaluation** (`AgentEval.RedTeam`) — a frozen 16-scenario corpus
+  (12 attacks + 4 benign controls) covering direct injection, policy-satisfying poison, summary
+  survival, procedure promotion, delayed activation, cross-user contamination, memory-driven unsafe
+  tools, exfiltration, overwrite/trust escalation, retrieval crowd-out, exhaustion, tampering, and
+  attribution; five deterministic evaluators composed through severity-driven `CompositeEval`, with
+  Wilson-interval calibration reporting and a semantic-judge readiness check that refuses promotion
+  on weak evidence.
+- **DI + strict JSON configuration** — `AddAgentEvalMemoryProtection`, fingerprint-pinned config
+  with embedded `gatekeeper.memory-protection/1` and `memory-protection-report/1` schemas; unknown
+  properties, invalid enums, and configuration/runtime drift fail closed.
+- **Docs and validation** — `docs/gatekeeper/memory-security.md`, migration guide, samples page,
+  and an eight-scenario offline release-validation runner (8/8 passing without external services).
+
+#### Validation evidence
+- 29,450 total test passes across the solution; 264 memory-filter tests per supported TFM; scoped
+  MAF anti-pattern scans of the changed surfaces report zero findings. As complementary deployment
+  evidence, the previously authorized Gatekeeper A2A gold corpora passed 52/52 inbound and 48/48
+  outbound against the configured live deployment (κ=1.0, zero false positives).
+
+### Gatekeeper hardening arc — phases 1–6 + foundations (#139–#146)
+
+#### Fixed — Phase 1 security hardening (#139)
+- Closes the confirmed fail-open / evasion / unverified findings class: every fix fails closed and
+  ships with regression tests (e.g. `ToolResultSecretGate` now fails closed on regex timeout with a
+  ReDoS-immune PEM mask).
+
+#### Changed (BREAKING — enforcement semantics, #140)
+- `Observe`/`Redact`/`Mutate`/session/quarantine now behave exactly as documented: a run-pre
+  `Redact` rewrites the input and continues to the model instead of short-circuiting; under
+  `Observe`/`WarnOnly` a `Mutate`/`Redact` is recorded but not applied (with an honest `applied`
+  flag), while a throwing gate still fails closed; enforced mutations re-validate from the top of
+  the gate list so a mutation cannot smuggle a pattern an earlier gate would block (fails closed
+  after 8 non-converging passes); post-run enforcement emits honest session hash-divergence records
+  and scrubs reconcilable sessions via the new `IReconcilableSession` seam.
+
+#### Added — reporting to humans and to AI (#141, #142)
+- **One unified `GateEvidence` model** replaces divergent per-writer trace dictionaries; every MAF
+  Gatekeeper trace writer projects it, existing readers are unaffected. `IGateEvidenceSink` (+
+  trace/composite sinks) registers observers without editing the pipeline; complete block evidence,
+  persisted `GateProvenance`, `GateSeverity`, and an order-sensitive `GateConfigFingerprint` land
+  with it.
+- **`GatekeeperRefusalContract`** — a namespaced, versioned refusal envelope
+  (`gatekeeper.refusal/1`) replaces the bare error body whose top-level `error` key collided with
+  tool errors; `RefusalDisposition` (`Denied`/`Quota`/`Transient`/`Escalate`) gives a good agent a
+  coarse, safe self-correction hint, and a denial-loop signal surfaces `"attempts":N` for repeated
+  equivalent calls — all without leaking policy names or reasons to the model.
+
+#### Added — performance & cost bounds (#143)
+- Incremental per-run taint ledger (kills O(n²) re-tokenization), `JudgeSpendGovernor` (a shared
+  windowed token+call wallet bounding denial-of-wallet), bounded judge input (head+tail sandwich),
+  bounded LRU+TTL judge verdict cache, deduplicated result-gate serialization, and a concurrent
+  panel for independent WarnOnly gates with unchanged evidence ordering.
+
+#### Added — meta-gates and counterfactual evidence (#144)
+- `BlockStormSentinelGate` watches the run tree's enforced-block volume and turns a probing storm
+  into a halt with a once-per-tree incident alert; Observe/WarnOnly runs now stamp
+  would-have-enforced counterfactuals (`WouldBlockCount` et al.), turning an Observe dry run into a
+  data-driven Observe→Enforce diff; `GateRegexTimeouts` centralizes every ReDoS timeout constant.
+
+#### Added — durable session identity (#145)
+- `SessionIdentity` + `GatekeeperOptions.SessionIdentity` + `ISessionIdentityAware`: session-keyed
+  gates (e.g. `RateLimitGate`) key on a durable logical session id resolved from trusted host state,
+  so caps survive persisted-session reloads and load-balanced workers instead of resetting with each
+  new `AgentSession` object. Non-breaking; default preserves object-identity behavior.
+
+#### Added — validation, boundaries, and the contract engine (#146)
+- Strict bounded `GateReplayer` corpus + promotion-report infrastructure; result-injection,
+  code-intent, MCP-provenance, block-storm, and opaque-hosted-tool boundary validation;
+  **`ToolUsageContractGate`** with fluent and strict-JSON configuration, seven deterministic
+  predicates (PII, denied keywords, recipient domains, shell metacharacters, sequences, lexical
+  path containment, bounded distinct values), stateful limits, and a fail-closed hidden-instruction
+  result prefilter; frozen tool/result configuration propagates into composite run-receipt
+  fingerprints.
+
+### Gatekeeper documentation and sample assurance (456ad98)
+
+- Completes the documentation-truth, sample-reliability, architecture-showcase, specialized-showcase,
+  and usability-consolidation phases: focused gate references replace the encyclopedia entry point;
+  state-ownership/lifecycle and resource-isolation operations guides; a strict synchronized
+  30-entry sample manifest with launcher/source/catalog tests; samples 00–09 rebuilt as
+  deterministic offline-first hybrids with scripted attack + benign controls; eleven new showcase
+  samples (Bulkhead isolation, stateful timelines, same-batch exfiltration race, security-graph
+  incident response, HTTP wire boundary, dynamic-provider coverage, Crescendo trajectory,
+  session-identity takeover, manifest provenance drift, approval decision matrix, result anomaly);
+  curated learning paths and compiled canonical `UseGatekeeper` snippets verified by tests.
+  1,386 Gatekeeper tests pass; the recommended launcher and all offline oracles are green.
+
+### LongMemEval trustworthiness (bb2cf6a)
+
+#### Changed (BREAKING — nullable judge outcomes)
+- `Correct` and `RawScore` become nullable in judgment and question results: `true`/`false` only for
+  an explicit parsed `yes`/`no`; `null` for every inconclusive outcome. Existing successful yes/no
+  JSON values are preserved (`true`/`false`, `100`/`0`, 0–100 accuracy scale).
+
+#### Added
+- Typed judge outcomes (`Yes`/`No`/`Empty`/`Invalid`/`ProviderError`) with a strict first-token
+  parser (truncation/content-filter finish reasons are inconclusive even if the text starts with
+  "yes"); bounded retry policy (`RetryThenInconclusive` default, `RetryThenIncorrect` as an explicit
+  recorded escape hatch); exact attempt/call/token accounting at the judge boundary; safe
+  AgentEval-owned failure codes (provider exception text is never persisted).
+- Content-free question-evidence envelope (`agenteval.question_evidence.v1`) with allowlisted
+  references and evaluator-side retrieval diagnostics derived from gold labels after answering
+  (top-K gold presence, first gold rank, session diversity, context ordering) — `NotObserved` when
+  no envelope is supplied, never fabricated as retrieval failure.
+- A retrieval-bypassing oracle reader over the same frozen question IDs (sanitized
+  labelled-sessions-only history, separate agents/counters/results) with a paired result and a
+  diagnostic oracle-gap — never mixed into normal scores.
+
+#### Fixed
+- The CLI accuracy-scale defect: stored 0–100 accuracy was compared against `0.5` and rendered with
+  `:P1`, so a 40% run passed the gate and printed as 4,000.0%. Thresholds, rendering, and
+  scored/selected/failure counts are corrected; a zero-scored run exits inconclusive, never PASS.
+- Agent-execution failures, judge failures, and explicit `no` are no longer conflated in accuracy
+  denominators.
+
+### Docs and dependencies
+
+- Copilot Studio documentation moved out from under Red Team in the site navigation (#138).
+- CI dependency bumps: postcss 8.5.15 → 8.5.25 in the Mission Control SPA (#150); GitHub Actions
+  group updates (#130).
+
 ## [0.17.0-beta] - 2026-07-19
 
 The biggest release by PR count so far (43 merged since 0.16.0-beta). Full MAF Agent Skills evaluation and
