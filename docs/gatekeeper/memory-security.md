@@ -21,7 +21,9 @@ content-free coverage report, receipts, and operational evidence
 ```
 
 Every real path must pass through one of the declared adapters. A stronger adapter on one operation never upgrades
-an opaque or bypassing operation. with one composite configuration
+an opaque or bypassing operation.
+
+## Configure with one composite configuration
 
 Configure memory protection once, before the agent is built:
 

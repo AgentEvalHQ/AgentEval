@@ -12,7 +12,8 @@ different corpora.
 
 | Axis | Typical boundary | Purpose |
 |---|---|---|
-| Indirect injection | run-pre or inbound A2A run-post | Separate agent-control instructions from ordinary untrusted content |
+| Indirect injection | run-pre | Separate agent-control instructions from ordinary untrusted content |
+| Inbound inter-agent injection | inbound A2A run-post (`InterAgentBoundaryInjectionGate`) | Detect instruction smuggling arriving from a peer agent |
 | Outbound goal drift | A2A run-pre | Compare a delegated instruction with a trusted parent goal |
 | Exfiltration intent | run-post | Detect an answer attempting to move protected data outward |
 | System-prompt extraction | run-post | Detect disclosure or reconstruction of protected instructions |
@@ -48,6 +49,8 @@ errors before interpreting accuracy.
 
 A report is promotion evidence only when all required signals are present and the deployment's explicit thresholds
 pass. Never compress “all provider calls failed and therefore blocked” into a reassuring accuracy number.
+
+## Tool approval
 
 Approval is not sanitization. It decides whether a proposed tool call may proceed to a human or auto-approval path;
 tool contracts and validation inside the tool remain authoritative.

@@ -26,9 +26,25 @@ internal static class GatekeeperSampleContractRenderer
             throw new InvalidDataException($"Gatekeeper sample contract '{id}' is not present in the embedded manifest.");
         }
 
+        var showFull = string.Equals(
+            Environment.GetEnvironmentVariable("AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine($"\n--- Gatekeeper sample contract {contract.Id}: {contract.Name} ---");
         Console.ResetColor();
+
+        if (!showFull)
+        {
+            Console.WriteLine($"   Threat:    {Join(contract.Threats)}");
+            Console.WriteLine($"   Guarantee: {contract.Guarantee}");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("   (AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true prints the full audited contract)\n");
+            Console.ResetColor();
+            return;
+        }
+
         Console.WriteLine($"   Threat:           {Join(contract.Threats)}");
         Console.WriteLine($"   Protected seam:   {Join(contract.Boundaries)}");
         Console.WriteLine($"   Gates/mechanisms: {Join(contract.Mechanisms)}");

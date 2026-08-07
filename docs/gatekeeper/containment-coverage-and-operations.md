@@ -41,7 +41,9 @@ immutable compute ── incomplete coverage ──→ no healthy/global decisio
 containment bridge → signed containment lifecycle → future run/tool refusal
         ↓
 read-only Mission Control projection
-``` | Responsibility |
+```
+
+| Component | Responsibility |
 |---|---|
 | Graph observation models | Carry bounded tenant/session/agent/MCP/endpoint facts and coverage-gap markers |
 | `SecurityGraphIngestionPump` | Caller-owned bounded queue, one serial durable consumer, linearizable completion |

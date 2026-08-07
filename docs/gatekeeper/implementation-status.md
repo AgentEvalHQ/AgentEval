@@ -26,7 +26,7 @@ implemented.
 | 5 | Resource isolation | ✅ | HTTP resource isolation is implemented and promoted; additional resource types remain demand-gated until a concrete exhaustion mode exists |
 | 6 | Security graph and escalation | ✅ | Durable graph storage/computation, ingestion, global containment, and the read-only operations surface are merged |
 | 7 | Applicable long-tail work | ✅ | Mock dangerous-tool fixtures and session-identity drift coverage are complete; deployment-specific predicates and judges remain demand-gated |
-| 8 | Documentation truth and information architecture | ✅ | High-level introductions, focused references, state and isolation operations, and a validated 19-entry sample manifest are complete and reviewed locally |
+| 8 | Documentation truth and information architecture | ✅ | High-level introductions, focused references, state and isolation operations, and a validated sample manifest (19 entries at that phase; 30 today) are complete and reviewed locally |
 | 9 | Sample reliability foundation | ✅ | Samples 00–09 are deterministic offline-first hybrids, contracts are standardized, and supported composition is explicit |
 | 10 | Architecture showcase | ✅ | Five offline samples expose measured resource isolation, state lifecycle, same-batch ordering, graph escalation, and HTTP wire enforcement |
 | 11 | Specialized showcase | ✅ | Six offline samples cover dynamic providers, Crescendo trajectories, identity takeover, manifest drift, approval edges, and result anomalies |
@@ -58,7 +58,7 @@ discoverable demonstrations and records review evidence separately.
 | 8 | 8.2 | Restructure and complete the gate reference | 100% | ✅ | Replaced the encyclopedia entry point with a selection index and four focused references organized by protected boundary and operator concern |
 | 8 | 8.3 | Add state ownership and lifecycle matrix | 100% | ✅ | Documents scope, owner, partitioning, concurrency, reset/release, restart, missing-scope behavior, fingerprinting, and evidence for every stateful mechanism |
 | 8 | 8.4 | Document resource isolation and containment operations | 100% | ✅ | Covers separate HTTP pools, routing authority, permit ownership, Active/Indeterminate behavior, metrics, disposal, and the downstream shared-quota ceiling |
-| 8 | 8.5 | Add validated sample manifest and cross-suite discovery | 100% | ✅ | Added a strict 19-entry manifest, stable 11A/11B identifiers, launcher/source/catalog synchronization test, and memory-security/Agent Skills links |
+| 8 | 8.5 | Add validated sample manifest and cross-suite discovery | 100% | ✅ | Added a strict manifest (19 entries at that phase; 30 today), stable 11A/11B identifiers, launcher/source/catalog synchronization test, and memory-security/Agent Skills links |
 | 8 | 8.R | Documentation promotion review | 100% | ✅ | Formatter clean; manifest test passes on net8/net9/net10; 1,384 Gatekeeper tests pass on net10; Release samples build; DocFX has 0 errors and no Gatekeeper-owned warnings |
 
 ## Sample reliability foundation
@@ -66,7 +66,7 @@ discoverable demonstrations and records review evidence separately.
 | Phase | Task | Description | Done | Reviewed | Implementation notes |
 |---|---|---|---:|:---:|---|
 | 9 | 9.1 | Bound live sample output and review MAF findings | 100% | ✅ | Local call caps reduced cost findings from 29 to one remote-A2A limitation; live pipelines gained non-sensitive OpenTelemetry; the remaining three telemetry warnings are offline scripted fixtures |
-| 9 | 9.2 | Standardize threat, guarantee, and pass-oracle output | 100% | ✅ | All 19 sample entry points render one embedded manifest contract; tests enforce fields, packaging, source declarations, launcher registration, and catalog ids |
+| 9 | 9.2 | Standardize threat, guarantee, and pass-oracle output | 100% | ✅ | All 19 then-registered sample entry points render one embedded manifest contract (all 30 render it today); tests enforce fields, packaging, source declarations, launcher registration, and catalog ids |
 | 9 | 9.3 | Add deterministic offline-first paths to live samples 00–09 | 100% | ✅ | All ten hybrid samples execute scripted attack + benign controls, throw on invariant failure, use fake/local effects, and retain optional bounded Azure overlays |
 | 9 | 9.4 | Normalize supported multi-layer composition | 100% | ✅ | Samples 02 and 04–09 use `UseGatekeeper`; 00, 01, 03 and non-runtime fixtures declare why their specialist low-level surface is intentional |
 | 9 | 9.R | Sample reliability promotion review | 100% | ✅ | Ten offline oracles pass; Release samples build clean; manifest passes net8/net9/net10; 1,384 net10 Gatekeeper tests pass; formatter clean; scoped MAF Doctor B/0 errors |

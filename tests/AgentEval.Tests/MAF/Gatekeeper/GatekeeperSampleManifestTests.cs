@@ -148,6 +148,20 @@ public sealed class GatekeeperSampleManifestTests
             }
 
             Assert.Contains($"| {id} |", catalog, StringComparison.Ordinal);
+
+            // The first `| {id} |` occurrence is the catalog table row (the boundary matrix comes later
+            // in the document). Its complexity and execution-mode cells must match the manifest.
+            var catalogRowStart = catalog.IndexOf($"| {id} |", StringComparison.Ordinal);
+            var catalogRowEnd = catalog.IndexOf('\n', catalogRowStart);
+            var catalogRow = catalogRowEnd < 0 ? catalog[catalogRowStart..] : catalog[catalogRowStart..catalogRowEnd];
+            Assert.Contains(complexity, catalogRow, StringComparison.OrdinalIgnoreCase);
+            var executionLabel = execution switch
+            {
+                "live-model" => "Live model",
+                "live-boundary" => "Live boundary",
+                _ => execution,
+            };
+            Assert.Contains(executionLabel, catalogRow, StringComparison.OrdinalIgnoreCase);
         }
 
         Assert.Equal(29, menuCount);
@@ -157,11 +171,11 @@ public sealed class GatekeeperSampleManifestTests
         foreach (var recommendedHandler in new[]
         {
             "GatekeeperHelloWorld",
+            "GatekeeperBeachhead",
+            "GatekeeperExplainabilityAndTrust",
             "GatekeeperPoisonedToolKillChain",
             "GatekeeperJailbreakAndToolAbuse",
-            "GatekeeperStatefulTimeline",
             "GatekeeperHttpWireBoundary",
-            "GatekeeperManifestProvenanceDrift",
         })
         {
             Assert.Contains($"{recommendedHandler}.RunAsync, Recommended: true", program, StringComparison.Ordinal);

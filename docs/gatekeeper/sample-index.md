@@ -1,7 +1,9 @@
 # Gatekeeper sample index
 
-Choose a scenario by execution mode, complexity, protected boundary, or threat. The catalog is mechanically checked
-against the launcher and sample source files by `GatekeeperSampleManifestTests`. Its canonical metadata is
+Choose a scenario by execution mode, complexity, protected boundary, or threat. Every stable ID, complexity, and
+execution mode in the catalog below is asserted against the manifest, launcher, and sample sources by
+`GatekeeperSampleManifestTests`; the boundary and threat matrices are hand-maintained review artifacts. The
+canonical metadata is
 [`sample-manifest.json`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/sample-manifest.json).
 
 For concepts, start with the [introduction](introduction.md). For gate contracts, use the
@@ -30,16 +32,18 @@ uses progressive disclosure: group **J** initially shows six recommended samples
 entries. The direct-only A2A calibration fixture accounts for the thirtieth manifest entry. Legacy numeric execution
 order is unchanged.
 
+Start the launcher with:
+
+```bash
+dotnet run --project samples/AgentEval.Samples
+```
+
 | Path | Samples | Outcome |
 |---|---|---|
-| Recommended six | **00, 14, 16, 20, 23, 27** | Smallest gate, capstone attack, authorization, state, wire, and construction integrity |
-| Tool and egress | **02 → 17 → 21 → 23** | Cross-call, result, batch, and network boundaries |
-| State and containment | **20 → 19 → 22 → 26** | Lifecycle, isolation, graph response, and actor binding |
-| Dynamic and construction | **18 → 24 → 27** | Hosted limits, runtime providers, and manifest drift |
-| Semantic and approval | **03 → 28 → 25 → 04** | Continuation, fail-safe approval, trajectory timing, and calibrated judges |
+| Recommended six (the 15-minute tour) | **00 → 16 → 14 → 04 → 10 → 23** | Smallest gate, detection versus authorization, kill-chain capstone, calibrated judges, replay and trust, the wire |
 
-Use [Gatekeeper recipes](examples.md) for the reasoning behind each path. The catalog below remains complete for
-regression ownership and specialist lookup.
+The full set of named learning paths lives in [Gatekeeper recipes](examples.md#pick-a-learning-path). The catalog
+below remains complete for regression ownership and specialist lookup.
 
 ## Core Gatekeeper catalog
 
@@ -82,38 +86,38 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 
 A check means the sample executes or directly evaluates the boundary; a type mentioned only in prose does not count.
 
-| ID | Construction | Run pre | Tool | Result | Approval | Run post | Shadow/later | Harness/A2A | Evidence/replay |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 00 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 01 |  | ✓ | ✓ |  |  | ✓ | ✓ |  | ✓ |
-| 02 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 03 |  |  |  |  | ✓ |  |  |  |  |
-| 04 |  | ✓ | ✓ |  |  | ✓ |  |  | ✓ |
-| 05 |  |  | ✓ |  |  |  |  | ✓ | ✓ |
-| 06 |  |  | ✓ |  |  |  |  | ✓ | ✓ |
-| 07 |  | ✓ | ✓ | ✓ |  |  |  |  | ✓ |
-| 08 |  |  |  |  |  | ✓ |  |  | ✓ |
-| 09 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 10 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 11A | ✓ | ✓ |  |  |  | ✓ |  | ✓ | ✓ |
-| 11B | ✓ |  |  |  |  |  |  | ✓ | ✓ |
-| 13 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 14 | ✓ |  | ✓ | ✓ |  |  |  |  | ✓ |
-| 15 |  | ✓ | ✓ |  |  |  |  | ✓ | ✓ |
-| 16 | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
-| 17 |  |  |  | ✓ |  |  |  |  | ✓ |
-| 18 | ✓ |  |  |  |  |  |  |  | ✓ |
-| 19 | ✓ |  | ✓ |  |  |  | ✓ |  | ✓ |
-| 20 |  | ✓ | ✓ |  |  |  | ✓ |  | ✓ |
-| 21 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 22 |  |  | ✓ |  |  |  | ✓ |  | ✓ |
-| 23 |  |  | ✓ |  |  |  |  |  | ✓ |
-| 24 | ✓ |  | ✓ |  |  |  |  | ✓ | ✓ |
-| 25 |  | ✓ |  |  |  |  | ✓ |  | ✓ |
-| 26 |  | ✓ |  |  |  |  | ✓ |  | ✓ |
-| 27 | ✓ |  |  |  |  |  |  | ✓ | ✓ |
-| 28 |  |  | ✓ |  | ✓ |  |  |  | ✓ |
-| 29 |  |  |  | ✓ |  |  | ✓ |  | ✓ |
+| ID | Construction | Run pre | Tool | Result | Approval | Run post | Wire | Later run / durable | Harness/A2A | Evidence/replay |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 00 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 01 |  | ✓ | ✓ |  |  | ✓ |  | ✓ |  | ✓ |
+| 02 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 03 |  |  |  |  | ✓ |  |  |  |  |  |
+| 04 |  | ✓ | ✓ |  |  | ✓ |  |  |  | ✓ |
+| 05 |  |  | ✓ |  |  |  |  |  | ✓ | ✓ |
+| 06 |  |  | ✓ |  |  |  |  |  | ✓ | ✓ |
+| 07 |  | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
+| 08 |  |  |  |  |  | ✓ |  |  |  | ✓ |
+| 09 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 10 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 11A | ✓ | ✓ |  |  |  | ✓ |  |  | ✓ | ✓ |
+| 11B | ✓ |  |  |  |  |  |  |  | ✓ | ✓ |
+| 13 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 14 | ✓ |  | ✓ | ✓ |  |  |  |  |  | ✓ |
+| 15 |  | ✓ | ✓ |  |  |  |  |  | ✓ | ✓ |
+| 16 | ✓ | ✓ | ✓ |  |  |  |  |  |  | ✓ |
+| 17 |  |  |  | ✓ |  |  |  |  |  | ✓ |
+| 18 | ✓ |  |  |  |  |  |  |  |  | ✓ |
+| 19 | ✓ |  | ✓ |  |  |  |  | ✓ |  | ✓ |
+| 20 |  |  | ✓ |  |  |  |  | ✓ |  | ✓ |
+| 21 |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 22 |  |  | ✓ |  |  |  |  | ✓ |  | ✓ |
+| 23 |  |  |  |  |  |  | ✓ |  |  | ✓ |
+| 24 | ✓ |  | ✓ |  |  |  |  |  |  | ✓ |
+| 25 |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
+| 26 |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
+| 27 | ✓ |  |  |  |  |  |  |  |  | ✓ |
+| 28 |  |  | ✓ |  | ✓ |  |  |  |  | ✓ |
+| 29 |  |  |  | ✓ |  |  |  | ✓ |  | ✓ |
 
 ## Threat and feature coverage
 

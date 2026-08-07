@@ -12,7 +12,7 @@ fixture is direct-only, which is why the manifest contains one more entry than t
 
 | Goal | Run these samples | What the path teaches |
 |---|---|---|
-| Fastest useful tour | **00 → 16 → 14** | One gate, layered jailbreak defense, then the poisoned-tool capstone |
+| The recommended 15-minute tour | **00 → 16 → 14 → 04 → 10 → 23** | One gate, detection versus authorization, the kill-chain capstone, calibrated judges, replay and trust, the wire |
 | Tool and egress protection | **02 → 17 → 21 → 23** | Cross-call policy, result admission, same-batch ordering, and the HTTP wire |
 | State and containment | **20 → 19 → 22 → 26** | Run/session/durable state, Bulkhead routing, graph response, and identity takeover |
 | Construction and dynamic tools | **18 → 24 → 27** | Honest hosted coverage, dynamic providers, and prompt/MCP drift |
@@ -21,6 +21,12 @@ fixture is direct-only, which is why the manifest contains one more entry than t
 
 All paths except the live portion of sample 04 run without credentials. Sample 11A is intentionally absent because
 it requires a separately authorized remote A2A endpoint.
+
+Start the interactive launcher and open group **J**:
+
+```bash
+dotnet run --project samples/AgentEval.Samples
+```
 
 ## Canonical composition
 
@@ -125,11 +131,11 @@ stable security identity and exercises atomic first-actor binding.
 | Sample | Why it is recommended |
 |---:|---|
 | 00 | Smallest gate and evidence loop |
+| 04 | Calibrated judges that visibly refuse promotion when the evidence is weak |
+| 10 | Provenance, counterfactual replay, and one honest trust score |
 | 14 | Best end-to-end poisoned-tool capstone |
 | 16 | Clearest detector-versus-authorization lesson |
-| 20 | Best state ownership and restart timeline |
 | 23 | The wire boundary argument-only examples miss |
-| 27 | Construction-time prompt and MCP integrity |
 
 The other samples are not obsolete. Each owns a unique threat, boundary, or operational proof in the
 [manifest-backed catalog](sample-index.md). Hiding them behind the launcher’s **M** toggle reduces cognitive load

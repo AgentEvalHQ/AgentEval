@@ -39,9 +39,10 @@ public sealed class GatekeeperDocumentationSnippetTests
     // docs-snippet:result-admission:end
 
     [Theory]
-    [InlineData("coordinated-stack")]
-    [InlineData("result-admission")]
-    public void Examples_CompiledSnippet_MatchesDocumentation(string snippetId)
+    [InlineData("coordinated-stack", "examples.md")]
+    [InlineData("result-admission", "examples.md")]
+    [InlineData("coordinated-stack", "introduction.md")]
+    public void Examples_CompiledSnippet_MatchesDocumentation(string snippetId, string documentationFile)
     {
         var root = RepoRoot();
         var source = File.ReadAllText(Path.Combine(
@@ -51,7 +52,7 @@ public sealed class GatekeeperDocumentationSnippetTests
             "MAF",
             "Gatekeeper",
             "GatekeeperDocumentationSnippetTests.cs"));
-        var documentation = File.ReadAllText(Path.Combine(root, "docs", "gatekeeper", "examples.md"));
+        var documentation = File.ReadAllText(Path.Combine(root, "docs", "gatekeeper", documentationFile));
 
         Assert.Equal(
             Normalize(ExtractSourceSnippet(source, snippetId)),

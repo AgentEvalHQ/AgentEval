@@ -1,0 +1,44 @@
+name: Gatekeeper offline samples
+
+# Executes every offline-capable Gatekeeper sample (00–10 forced offline, 13–29 offline by design)
+# so their ~150 deterministic Require/oracle invariants actually run in CI instead of only when a
+# human clicks through the launcher. The samples throw on any invariant failure; the suite runner
+# exits non-zero if any sample fails. Sample 11A is excluded (requires a consented live endpoint).
+on:
+  pull_request:
+    paths:
+      - 'samples/AgentEval.Samples/**'
+      - 'src/**'
+      - '.github/workflows/gatekeeper-offline-samples.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'samples/AgentEval.Samples/**'
+      - 'src/**'
+      - '.github/workflows/gatekeeper-offline-samples.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gatekeeper-offline-samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AGENTEVAL_GATEKEEPER_FORCE_OFFLINE: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_NOLOGO: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Run the Gatekeeper offline sample suite
+        run: dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
