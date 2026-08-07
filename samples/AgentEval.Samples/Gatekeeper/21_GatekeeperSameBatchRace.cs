@@ -19,6 +19,7 @@ public static class GatekeeperSameBatchRace
         GatekeeperSampleContractRenderer.Print("21");
         Console.WriteLine("\n=== Gatekeeper — Same-Batch Exfiltration Race (offline) ===\n");
 
+        Console.WriteLine("── One assistant turn proposes read_secrets AND send_email as concurrent siblings ──");
         var batch = AssistantBatch("read_secrets", "send_email");
         var sequence = new SequenceGate(["read_secrets"], ["send_email"]);
         ToolGateVerdict sequenceVerdict;
@@ -33,12 +34,15 @@ public static class GatekeeperSameBatchRace
             "SequenceGate must not invent a happens-before for sibling calls");
         Require(sameBatchVerdict.Action == ToolGateAction.Block,
             "SameBatchOrderingGate must conservatively block the guarded sibling");
+        Console.WriteLine($"   SequenceGate verdict:          {sequenceVerdict.Action} — siblings have no proven happens-before, so it honestly cannot claim one");
+        Console.WriteLine($"   SameBatchOrderingGate verdict: {sameBatchVerdict.Action} — a guarded sibling in the same batch is conservatively refused\n");
 
+        Console.WriteLine("── The same race inside a full agent run, then five ordering controls ──");
         await ProveInlineEffectBlockedAsync();
         await ProveControlsAsync(sequence, sameBatch);
 
-        Console.WriteLine("   SequenceGate on concurrent siblings:       ALLOW (no proven prior trigger)");
-        Console.WriteLine("   SameBatchOrderingGate on same siblings:    BLOCK");
+        Console.WriteLine($"\n   SequenceGate on concurrent siblings:       {sequenceVerdict.Action.ToString().ToUpperInvariant()} (no proven prior trigger)");
+        Console.WriteLine($"   SameBatchOrderingGate on same siblings:    {sameBatchVerdict.Action.ToString().ToUpperInvariant()}");
         Console.WriteLine("   ✅ guarded fake email stayed at zero; separate-order and benign controls matched their documented seams.");
     }
 
@@ -82,8 +86,9 @@ public static class GatekeeperSameBatchRace
             options: new ChatClientAgentRunOptions(new ChatOptions { MaxOutputTokens = 128 }));
 
         Require(sent == 0, "the guarded fake email effect must not execute");
-        Require((GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0) > 0,
-            "the inline block must emit Gatekeeper evidence");
+        var blocks = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
+        Require(blocks > 0, "the inline block must emit Gatekeeper evidence");
+        Console.WriteLine($"   full agent run: guarded fake-email effects = {sent}; enforced batch blocks recorded = {blocks}");
     }
 
     private static async Task ProveControlsAsync(SequenceGate sequence, SameBatchOrderingGate sameBatch)

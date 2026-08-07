@@ -10,7 +10,8 @@
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
 Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
-Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper), also run without credentials.
+Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
+needs a separately consented remote A2A endpoint), also run without credentials.
 Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
@@ -30,8 +31,8 @@ dotnet run -- 1    # Hello World             (A1)
 dotnet run -- 23   # Red Team Basic          (E2)
 dotnet run -- 43   # Performance benchmark   (H2)
 dotnet run -- 54   # Report Browser          (H13)
-dotnet run -- 59   # Gatekeeper walkthrough  (J1)
-dotnet run -- 69   # Agent Skills Hello World (K1)
+dotnet run -- 59   # Gatekeeper Hello World  (J1)
+dotnet run -- 88   # Agent Skills Hello World (K1)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -163,26 +164,53 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 
 ---
 
-### J — Gatekeeper (Runtime Protection)  ★ no credentials — fail-closed runtime enforcement
+### J — Gatekeeper (Runtime Protection)  ★ no credentials needed — fail-closed runtime enforcement
 
 AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
 runtime gates that block bad actions before they happen. See **`docs/gatekeeper/introduction.md`** for the developer guide.
 
-All Gatekeeper samples drive **real agents** on a live model, so they need Azure OpenAI credentials.
+The launcher opens group J on the **six recommended samples** (the 15-minute tour `00 → 16 → 14 → 04 → 10 → 23`,
+marked ★ below); press **M** for all 29, **P** for the named learning paths. 17 of 29 are offline by design;
+samples 00–10 are hybrids that run a deterministic offline oracle without credentials (or under
+`AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`) and add a live Azure OpenAI overlay when configured. Only 11A needs a
+separately consented remote endpoint. CI executes all 28 offline-capable samples on every PR.
 
-| # | Sample | What It Exercises | Azure? | Time |
-|---|--------|-------------------|--------|------|
-| 1 | **Hello World** | Start here — the simplest gate: your red-team check (`ProbeEvaluatorGate`) blocks a live poisoned call | Yes | 1 min |
-| 2 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | Yes | 5 min |
-| 3 | **MAF Support Agent** | A realistic gated support agent — **data-exfiltration defense**: a read→POST sequence is blocked by `SequenceGate` (every tool is legit; only the combination is the attack) | Yes | 2 min |
-| 4 | **Tool Approval (human-in-the-loop)** | Routine calls auto-approve; risky ones pause for a human via MAF's `UseToolApproval` (approve → resume) | Yes | 3 min |
-| 5 | **Beachhead + The Tribunal** | `RunBudgetGate` · `DomainAllowListGate` · `RenderedOutputExfilGate` + a **calibrated** indirect-injection judge that earns the right to block | Yes | 3 min |
-| 6 | **Agent Harness — simple** | A **real** MAF `AsHarnessAgent` (planning + todo + mode + an autonomous loop); its runaway loop is capped by `RunBudgetGate` | Yes | 2 min |
-| 7 | **Agent Harness — defended** | A **real** `AsHarnessAgent` behind defense-in-depth (budget + `SequenceGate` + `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked | Yes | 2 min |
-| 8 | **Defense in Depth** | One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint-tracking + allow-list | Yes | 3 min |
-| 9 | **Output Panel (Stage-2)** | Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) fanned out + the over-refusal utility valve | Yes | 3 min |
-| 10 | **Monetary + Per-Call Budget** | `MonetaryLimitGate` + `PerToolCallBudgetGate` vs. a live refund-spray injection attack | Yes | 2 min |
-| 11 | **Explainability & Trust** | `GateProvenance` (why a real judge blocked) → `GateReplayer` (counterfactual: what a different gate config would do — deterministic, no model) → `TrustScoreCalculator` (one honest composite score) — see [docs/gatekeeper/explainability-and-trust.md](../../docs/gatekeeper/explainability-and-trust.md) | Scene 1 only | 4 min |
+| ID | Sample | What it exercises | Execution | Time |
+|----|--------|-------------------|-----------|------|
+| 00 | **Hello World** ★ | The simplest gate: your red-team check (`ProbeEvaluatorGate`) blocks a poisoned publish | Hybrid | 1 min |
+| 01 | **Enforcement Walkthrough** | Six scenes: deny, moat, canary, shadow judge, defense-in-depth stack | Hybrid | 5 min |
+| 02 | **MAF Support Agent** | Data-exfiltration defense: a read→POST sequence blocked by `SequenceGate` (every tool is legit; only the combination is the attack) | Hybrid | 2 min |
+| 03 | **Tool Approval** | Routine calls auto-approve; risky ones pause for a human via MAF's `UseToolApproval` | Hybrid | 3 min |
+| 04 | **Beachhead + The Tribunal** ★ | Budgets, domains, output control + a **calibrated** injection judge that must earn inline promotion | Hybrid | 4 min |
+| 05 | **Agent Harness — simple** | A real autonomous `AsHarnessAgent` loop capped by `RunBudgetGate` | Hybrid | 2 min |
+| 06 | **Agent Harness — defended** | Budget + sequence + domain defense-in-depth around a capable harness | Hybrid | 2 min |
+| 07 | **Defense in Depth** | One injection campaign, three steps — a different layer catches each | Hybrid | 3 min |
+| 08 | **Output Panel** | Two calibrated run-post judges fanned out + the over-refusal utility valve | Hybrid | 3 min |
+| 09 | **Monetary + Per-Call Budget** | `MonetaryLimitGate` + `PerToolCallBudgetGate` vs a refund-spray injection | Hybrid | 2 min |
+| 10 | **Explainability & Trust** ★ | `GateProvenance` → `GateReplayer` counterfactual → `TrustScoreCalculator` — see [docs/gatekeeper/explainability-and-trust.md](../../docs/gatekeeper/explainability-and-trust.md) | Hybrid | 4 min |
+| 11A | **Real A2A Boundary** | Calibrate, then guard a consented real remote agent-to-agent call | Live boundary | 5 min |
+| 11B | **A2A Calibration** | Both A2A boundary judges calibrated (direct-only, via the validation runner) | Live model | 5 min |
+| 13 | **Mocked Dangerous Tools** | SQL/browser/cloud/package narrow-contract fixtures — no side effects | Offline | 2 min |
+| 14 | **Poisoned Tool Kill Chain** ★ | Poison, exfil, delete, worm — all zeroed, with an effect-ledger proof | Offline | 5 min |
+| 15 | **Harness-Owned Tool Misuse** | A runtime-injected capability discovered, its misuse blocked | Offline | 2 min |
+| 16 | **Jailbreak + Tool Abuse** ★ | The paraphrase gets through — authorization still holds | Offline | 3 min |
+| 17 | **Tool Result Admission** | Secrets masked + oversized results truncated before model context | Offline | 2 min |
+| 18 | **Hosted Tool Coverage** | Honesty: hosted code execution cannot be claimed as covered | Offline | 2 min |
+| 19 | **Bulkhead + Containment** | Contained saturation cannot starve normal work — measured peaks | Offline | 2 min |
+| 20 | **Stateful Gate Timeline** | Call/run/session/durable state resets, reloads, containment | Offline | 2 min |
+| 21 | **Same-Batch Exfil Race** | The sibling-call race `SequenceGate` honestly cannot stop | Offline | 2 min |
+| 22 | **Security Graph Incident** | Observations → graph → containment; incomplete evidence mints no verdict | Offline | 2 min |
+| 23 | **HTTP Wire Boundary** ★ | DNS rebind + redirect escape blocked at the actual wire | Offline | 2 min |
+| 24 | **Dynamic Context Provider** | Dynamic tool inventory refused; the real provider seam filtered | Offline | 2 min |
+| 25 | **Crescendo Trajectory** | Slow-burn escalation → shadow verdict → next-run quarantine | Offline | 2 min |
+| 26 | **Session Identity Takeover** | Reload, poisoning, and concurrent actor-drift defenses | Offline | 2 min |
+| 27 | **Manifest Provenance Drift** | Prompt rug-pulls and MCP drift fail construction closed | Offline | 2 min |
+| 28 | **Approval Decision Matrix** | Auto/escalate/error/reject/approve — judge failure escalates | Offline | 2 min |
+| 29 | **Result Behavioral Anomaly** | Fixed cap vs per-tool learned baseline for result anomalies | Offline | 2 min |
+
+Knobs: `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` prints each sample's full audited threat/guarantee contract
+(a compact two-line version prints by default); `dotnet run -- --gatekeeper-offline-suite` runs all 28
+offline-capable samples non-interactively (the CI mode).
 
 ---
 

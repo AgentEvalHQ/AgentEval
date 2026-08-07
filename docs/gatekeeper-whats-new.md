@@ -7,13 +7,22 @@ Gatekeeper evolved from individual runtime gates into a coordinated protection a
 should start with the [introduction](gatekeeper/introduction.md), [recipes](gatekeeper/examples.md), and
 [gate reference](gatekeeper/gate-reference.md).
 
-## Current baseline — 2026-08-04
+## Current baseline — 2026-08-07
 
 ### Coordinated composition
 
 - `UseGatekeeper` is the preferred multi-layer entry point and requires an explicit enforcement mode.
 - Run, tool, result, approval, shadow, evidence, and memory surfaces share validated composition.
 - Unsafe middleware ordering, weakened policy floors, and uncalibrated inline judges refuse promotion.
+
+### Discoverability and CI assurance
+
+- The launcher opens group J on a six-sample 15-minute tour (00/04/10/14/16/23) with ID-prefixed names, named
+  learning paths behind **P**, and all 29 menu entries behind **M**.
+- Samples print a compact two-line threat/guarantee contract by default; `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true`
+  prints the full audited contract.
+- All 28 offline-capable samples execute non-interactively in CI on every pull request via
+  `--gatekeeper-offline-suite`; sample 10 gained a deterministic replay + trust oracle.
 
 ### Runtime and construction protection
 

@@ -45,6 +45,8 @@ public static class GatekeeperSecurityGraphIncident
                 },
                 clock);
 
+            Console.WriteLine("── An incident, end to end: local finding → durable graph → containment → refusal ──");
+
             await using (var pump = new SecurityGraphIngestionPump(
                 graphStore,
                 queueCapacity: 8,
@@ -57,6 +59,7 @@ public static class GatekeeperSecurityGraphIncident
                 Require(await pump.CompleteAndDrainAsync(), "the bounded graph queue must drain");
                 Require(pump.AppliedCount == 2 && pump.DroppedCount == 0,
                     "exactly two content-free observations must be durably applied without drops");
+                Console.WriteLine($"   ▶ ingest   two content-free observations (a call, a blocked call) durably applied; dropped: {pump.DroppedCount}");
             }
 
             var report = AgenticSecurityGraph.Compute(
@@ -70,6 +73,7 @@ public static class GatekeeperSecurityGraphIncident
                 "the graph must report measured call and block totals");
             Require(report.FleetBlockRate is 0.5,
                 "the complete graph must compute the measured 50% block rate");
+            Console.WriteLine($"   ▶ compute  coverage={report.Coverage}; {report.TotalCallCount} calls, {report.TotalBlockedCallCount} blocked → measured fleet block rate {report.FleetBlockRate!.Value:P0}");
 
             var operationsSource = new SecurityGraphStoreReportSource(
                 Tenant,
@@ -94,6 +98,7 @@ public static class GatekeeperSecurityGraphIncident
                     EdgesTruncated: false,
                 },
                 "the real read-only operations projection must expose bounded content-free totals");
+            Console.WriteLine($"   ▶ project  Mission Control sees {operationsView!.Nodes.Count} nodes / {operationsView.Edges.Count} edge — read-only, bounded, content-free");
 
             var decision = SecurityGraphContainmentDecision.ForNode(
                 report,
@@ -109,6 +114,7 @@ public static class GatekeeperSecurityGraphIncident
                 .ApplyAsync(decision);
             Require(applied.Snapshot.State == ContainmentSnapshotState.Active,
                 "the evidence-backed graph decision must activate containment");
+            Console.WriteLine("   ▶ contain  the evidence-backed decision activates durable containment of partner-endpoint");
 
             var sessionTarget = new ContainmentTarget.Session(Tenant, "session-c");
             var overrideGate = new ContainmentOverrideGate(
@@ -123,7 +129,9 @@ public static class GatekeeperSecurityGraphIncident
 
             Require(refusal.Action == ToolGateAction.Block,
                 "future calls to the contained endpoint must be refused inline");
+            Console.WriteLine("   ▶ enforce  the next delegate_to_partner call → ⛔ BLOCK, inline, from the durable decision");
 
+            Console.WriteLine("   ▶ gap test mark a known ingestion gap, then try to mint another containment decision…");
             await graphStore.MarkCoverageGapAsync(new SecurityGraphCoverageGap("sample_queue_gap"));
             var incomplete = AgenticSecurityGraph.Compute(
                 graphStore.Read(TimeSpan.FromHours(1)),
@@ -139,10 +147,12 @@ public static class GatekeeperSecurityGraphIncident
                     "campaign_detected",
                     "sample-incomplete"),
                 "an incomplete graph must not mint a new containment decision");
+            Console.WriteLine("              └ coverage=Incomplete → fleet rate withdrawn → new decision REFUSED (incomplete evidence cannot mint containment)");
 
-            Console.WriteLine("   Stage           Measured evidence                                  Security disposition");
-            Console.WriteLine("   ──────────────  ─────────────────────────────────────────────────  ─────────────────────");
-            PrintStage("1  ingest", $"{report.TotalCallCount} calls / {report.TotalBlockedCallCount} blocked / 2 sessions", "DURABLY APPLIED");
+            Console.WriteLine();
+            Console.WriteLine($"   {"Stage",-14} {"Measured evidence",-50} Security disposition");
+            Console.WriteLine($"   {new string('─', 14)} {new string('─', 50)} {new string('─', 20)}");
+            PrintStage("1  ingest", $"{report.TotalCallCount} calls / {report.TotalBlockedCallCount} blocked", "DURABLY APPLIED");
             PrintStage("2  compute", $"coverage={report.Coverage}; fleet block rate={report.FleetBlockRate!.Value:P0}", "DECISION ELIGIBLE");
             PrintStage("3  project", $"{operationsView!.Nodes.Count} nodes / {operationsView.Edges.Count} edge / content-free", "READ ONLY");
             PrintStage("4  enforce", "partner-endpoint containment active", refusal.Action.ToString().ToUpperInvariant());

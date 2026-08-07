@@ -34,6 +34,7 @@ public static class GatekeeperBulkheadIsolation
         var function = HttpFunction()
             .WithContainmentHttpResourceIsolation(store, _ => Target, pool);
 
+        Console.WriteLine("── Act 1 · a CONTAINED session floods the HTTP tool with 6 concurrent calls ──");
         Task<object?>[] containedCalls;
         using (AgentRunScope.Begin(new SampleSession(), "bulkhead-sample", trace: null))
         {
@@ -41,6 +42,9 @@ public static class GatekeeperBulkheadIsolation
             await isolated.WaitForStartedAsync(1);
         }
 
+        Console.WriteLine($"   6 contained calls launched → {isolated.PeakCount} running in the isolated pool (1 permit); the rest queue behind it");
+
+        Console.WriteLine("\n── Act 2 · normal traffic arrives while the contained flood is still stuck ──");
         store.Snapshot = ContainmentSnapshot.NotContained(Target);
         Task<object?>[] normalCalls;
         using (AgentRunScope.Begin(new SampleSession(), "bulkhead-sample", trace: null))
@@ -49,15 +53,19 @@ public static class GatekeeperBulkheadIsolation
             await normal.WaitForStartedAsync(3);
         }
 
+        Console.WriteLine($"   6 normal calls launched → {normal.PeakCount} running at once on the normal pool (3 permits) — the flood took nothing from them");
+
         Require(isolated.PeakCount == 1, "contained work must use the one-permit isolated pool");
         Require(normal.PeakCount == 3, "normal work must retain all three normal permits");
         Require(pool.IsolatedPeakRequests == 1 && pool.NormalPeakRequests == 3,
             "pool metrics must report measured peaks, not configured claims");
 
+        Console.WriteLine("\n── Act 3 · release and drain — routing is proved by the response bodies ──");
         normal.Release();
         var normalResults = await Task.WhenAll(normalCalls);
         Require(normalResults.All(result => string.Equals(result?.ToString(), "normal", StringComparison.Ordinal)),
             "normal work must route only through the normal client");
+        Console.WriteLine("   normal pool released   → all 6 normal calls completed through the 'normal' client");
 
         isolated.Release();
         var containedResults = await Task.WhenAll(containedCalls);
@@ -65,9 +73,12 @@ public static class GatekeeperBulkheadIsolation
             "contained work must route only through the isolated client");
         Require(pool.NormalCurrentRequests == 0 && pool.IsolatedCurrentRequests == 0,
             "all permits must be released after completion");
+        Console.WriteLine("   bulkhead released      → the contained flood drained serially through the 'isolated' client");
 
-        Console.WriteLine($"   measured normal peak:    {pool.NormalPeakRequests}");
-        Console.WriteLine($"   measured contained peak: {pool.IsolatedPeakRequests}");
+        Console.WriteLine("\n   Effect ledger                Observed   Expected");
+        Console.WriteLine($"   normal concurrency peak      {pool.NormalPeakRequests}          3 (all permits kept)");
+        Console.WriteLine($"   contained concurrency peak   {pool.IsolatedPeakRequests}          1 (bulkhead held)");
+        Console.WriteLine($"   permits leaked at the end    {pool.NormalCurrentRequests + pool.IsolatedCurrentRequests}          0");
         Console.WriteLine("   ✅ contained saturation stayed inside its one-permit bulkhead while normal work used three independent permits.");
     }
 

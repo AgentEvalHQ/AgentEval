@@ -23,7 +23,8 @@ public static class Program
         string Name,
         string Note,
         IReadOnlyList<SampleEntry> Samples,
-        bool Progressive = false);
+        bool Progressive = false,
+        IReadOnlyList<(string Name, string Route)>? Paths = null);
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
@@ -129,37 +130,53 @@ public static class Program
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
-        new('J', "Gatekeeper (Runtime Protection)", "★ 6 recommended · M shows all 29 menu samples",
+        new('J', "Gatekeeper (Runtime Protection)", "★ 15-min tour of 6 · M all 29 · P paths",
+        Paths:
         [
-            new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync, Recommended: true),
-            new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
-            new("MAF Support Agent (exfil)", "A realistic gated MAF support agent: data-exfiltration (read→POST) blocked by SequenceGate", GatekeeperMafHarness.RunAsync),
-            new("Tool Approval (human-in-the-loop)", "Routine calls auto-approve; risky ones pause for a human (MAF UseToolApproval interop)", GatekeeperToolApproval.RunAsync),
-            new("Beachhead + The Tribunal",  "Budget · exfil · rendered-output · a CALIBRATED indirect-injection judge", GatekeeperBeachhead.RunAsync),
-            new("Agent Harness — simple",    "Cap an autonomous, looping MAF Agent Harness agent with RunBudgetGate", GatekeeperAgentHarness.RunAsync),
-            new("Agent Harness — defended",  "Defense-in-depth around a capable harness agent: budget + sequence + exfil", GatekeeperAgentHarnessDefended.RunAsync),
-            new("Defense in Depth",          "One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint + allow-list", GatekeeperDefenseInDepth.RunAsync),
-            new("Output Panel (Stage-2)",    "Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) in a fan-out + the over-refusal utility valve", GatekeeperOutputPanel.RunAsync),
-            new("Monetary + Per-Call Budget", "MonetaryLimitGate + PerToolCallBudgetGate vs. a live refund-spray injection attack", GatekeeperMonetaryAndPerCallBudget.RunAsync),
-            new("Explainability & Trust",    "Why a judge gate blocked (GateProvenance) · counterfactual gate-config replay (GateReplayer) · one honest composite score (TrustScoreCalculator)", GatekeeperExplainabilityAndTrust.RunAsync),
-            new("Real A2A Boundary",          "Calibrate, then guard a consent-gated real remote A2A call (set AGENTEVAL_A2A_BASE_URL)", GatekeeperA2ABoundary.RunAsync),
-            new("Mocked Dangerous Tools",      "Offline SQL/browser/cloud contract fixture — no real side effects", GatekeeperMockedDangerousTools.RunAsync),
-            new("Poisoned Tool Kill Chain",   "Offline fake MCP poison → isolation; bulk read, email, delete, exfil, and worm chain blocked", GatekeeperPoisonedToolKillChain.RunAsync, Recommended: true),
-            new("Harness-Owned Tool Misuse",  "Offline real Agent Harness: weird request cannot misuse its runtime-injected capability", GatekeeperHarnessOwnedToolMisuse.RunAsync),
-            new("Jailbreak + Tool Abuse",      "Offline layered defense: input marker + authoritative shell/customer/email contracts", GatekeeperJailbreakAndToolAbuse.RunAsync, Recommended: true),
-            new("Tool Result Admission",       "Offline result seam: fake secret masking + bounded result truncation before model context", GatekeeperToolResultAdmission.RunAsync),
-            new("Hosted Tool Coverage",        "Offline promotion boundary: hosted code execution stays opaque even when risk is acknowledged", GatekeeperHostedToolCoverageBoundary.RunAsync),
-            new("Bulkhead + Containment",       "Offline measured isolation: contained saturation cannot consume normal HTTP permits", GatekeeperBulkheadIsolation.RunAsync),
-            new("Stateful Gate Timeline",       "Offline call/run/session/durable state transitions, resets, reloads, and containment", GatekeeperStatefulTimeline.RunAsync, Recommended: true),
-            new("Same-Batch Exfil Race",        "Offline concurrent sibling-call seam: SequenceGate vs SameBatchOrderingGate", GatekeeperSameBatchRace.RunAsync),
-            new("Security Graph Incident",      "Offline observations → honest graph → containment → enforced endpoint refusal", GatekeeperSecurityGraphIncident.RunAsync),
-            new("HTTP Wire Boundary",           "Offline redirect, DNS-rebind, SSRF, cancellation, and disclosure enforcement", GatekeeperHttpWireBoundary.RunAsync, Recommended: true),
-            new("Dynamic Context Provider",     "Offline dynamic tool inventory refusal + real provider-boundary filtering", GatekeeperDynamicContextProviderBoundary.RunAsync),
-            new("Crescendo Trajectory",         "Offline gradual escalation → shadow compromise → next-run quarantine", GatekeeperCrescendoTrajectory.RunAsync),
-            new("Session Identity Takeover",    "Offline reload, baseline-poisoning, and concurrent actor-drift defenses", GatekeeperSessionIdentityTakeover.RunAsync),
-            new("Manifest Provenance Drift",    "Offline prompt + MCP schema/provenance construction checks", GatekeeperManifestProvenanceDrift.RunAsync, Recommended: true),
-            new("Approval Decision Matrix",     "Offline routine/escalate/error/reject/approve matrix with fake effects", GatekeeperApprovalDecisionMatrix.RunAsync),
-            new("Result Behavioral Anomaly",    "Offline fixed cap vs per-tool running result-size anomaly detection", GatekeeperToolResultBehavioralAnomaly.RunAsync),
+            ("The 15-minute tour (the recommended six)",
+             "00 → 16 → 14 → 04 → 10 → 23 · smallest gate → detection vs authorization → kill chain → calibrated judges → replay & trust → the wire"),
+            ("Tool and egress",
+             "02 → 17 → 21 → 23 · cross-call policy, result admission, batch ordering, the HTTP wire"),
+            ("State and containment",
+             "20 → 19 → 22 → 26 · lifecycle, Bulkhead isolation, graph response, identity takeover"),
+            ("Construction and dynamic tools",
+             "18 → 24 → 27 · hosted coverage honesty, dynamic providers, manifest drift"),
+            ("Semantic judgment and approval",
+             "03 → 28 → 25 → 04 · human continuation, approval failure modes, Crescendo timing, calibrated judges"),
+            ("Operations and assurance",
+             "10 → 20 → 22 · provenance/replay, lifecycle evidence, incident projection"),
+        ],
+        Samples:
+        [
+            new("00 Hello World",               "★ start here — a red-team check becomes a live gate", GatekeeperHelloWorld.RunAsync, Recommended: true),
+            new("01 Enforcement Walkthrough",   "6-scene tour: deny, moat, canary, shadow judge, gate stack", GatekeeperEnforcement.RunAsync),
+            new("02 MAF Support Agent",         "read→POST exfiltration chain broken by SequenceGate", GatekeeperMafHarness.RunAsync),
+            new("03 Tool Approval",             "routine refunds auto-run; risky ones pause for a human", GatekeeperToolApproval.RunAsync),
+            new("04 Beachhead + The Tribunal",  "calibrated injection judge that must EARN inline promotion", GatekeeperBeachhead.RunAsync, Recommended: true),
+            new("05 Agent Harness — simple",    "cap an autonomous looping harness agent with RunBudgetGate", GatekeeperAgentHarness.RunAsync),
+            new("06 Agent Harness — defended",  "budget + sequence + domain stack around a capable harness", GatekeeperAgentHarnessDefended.RunAsync),
+            new("07 Defense in Depth",          "one campaign, three steps — a different layer catches each", GatekeeperDefenseInDepth.RunAsync),
+            new("08 Output Panel",              "calibrated run-post judge fan-out + over-refusal valve", GatekeeperOutputPanel.RunAsync),
+            new("09 Monetary/Per-Call Budget", "refund-spray injection stopped by monetary + per-call caps", GatekeeperMonetaryAndPerCallBudget.RunAsync),
+            new("10 Explainability & Trust",    "why a gate blocked · replay a config change · trust score", GatekeeperExplainabilityAndTrust.RunAsync, Recommended: true),
+            new("11A Real A2A Boundary",        "calibrate, then guard a consented remote A2A call", GatekeeperA2ABoundary.RunAsync),
+            new("13 Mocked Dangerous Tools",    "SQL/browser/cloud/package contract fixtures, zero effects", GatekeeperMockedDangerousTools.RunAsync),
+            new("14 Poisoned Tool Kill Chain",  "poison, exfil, delete, worm — all zeroed with ledger proof", GatekeeperPoisonedToolKillChain.RunAsync, Recommended: true),
+            new("15 Harness-Owned Tool Misuse", "runtime-injected capability discovered, its misuse blocked", GatekeeperHarnessOwnedToolMisuse.RunAsync),
+            new("16 Jailbreak + Tool Abuse",    "the paraphrase gets through — authorization still holds", GatekeeperJailbreakAndToolAbuse.RunAsync, Recommended: true),
+            new("17 Tool Result Admission",     "secrets masked + oversized results cut before context", GatekeeperToolResultAdmission.RunAsync),
+            new("18 Hosted Tool Coverage",      "honesty: hosted code execution can't claim gate coverage", GatekeeperHostedToolCoverageBoundary.RunAsync),
+            new("19 Bulkhead + Containment",    "contained saturation cannot starve normal work — measured", GatekeeperBulkheadIsolation.RunAsync),
+            new("20 Stateful Gate Timeline",    "call/run/session/durable state resets and containment", GatekeeperStatefulTimeline.RunAsync),
+            new("21 Same-Batch Exfil Race",     "the sibling-call race SequenceGate honestly cannot stop", GatekeeperSameBatchRace.RunAsync),
+            new("22 Security Graph Incident",   "observations → graph → containment; no verdict from gaps", GatekeeperSecurityGraphIncident.RunAsync),
+            new("23 HTTP Wire Boundary",        "DNS rebind + redirect escape blocked at the actual wire", GatekeeperHttpWireBoundary.RunAsync, Recommended: true),
+            new("24 Dynamic Context Provider",  "dynamic tool inventory refused; provider seam filtered", GatekeeperDynamicContextProviderBoundary.RunAsync),
+            new("25 Crescendo Trajectory",      "slow-burn escalation → shadow verdict → quarantine", GatekeeperCrescendoTrajectory.RunAsync),
+            new("26 Session Identity Takeover", "reload, poisoning, and concurrent actor-drift defenses", GatekeeperSessionIdentityTakeover.RunAsync),
+            new("27 Manifest Provenance Drift", "prompt rug-pulls and MCP drift fail construction closed", GatekeeperManifestProvenanceDrift.RunAsync),
+            new("28 Approval Decision Matrix",  "auto/escalate/reject/approve — judge failure escalates", GatekeeperApprovalDecisionMatrix.RunAsync),
+            new("29 Result Behavioral Anomaly", "fixed cap vs per-tool learned result-anomaly baseline", GatekeeperToolResultBehavioralAnomaly.RunAsync),
         ], Progressive: true),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
@@ -205,6 +222,14 @@ public static class Program
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
+        // CI/non-interactive: run every offline-capable Gatekeeper sample and exit non-zero on any failure.
+        if (args.Any(a => string.Equals(a, "--gatekeeper-offline-suite", StringComparison.OrdinalIgnoreCase)))
+        {
+            _interactive = false;
+            Environment.ExitCode = await RunGatekeeperOfflineSuiteAsync();
+            return;
+        }
+
         // Legacy CLI: dotnet run -- <n>  (direct sample number, flattened in group order)
         if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
@@ -228,7 +253,18 @@ public static class Program
                 if (choice == "B") break;
                 if (choice == "Q") goto done;
                 if (choice == "M") { showAll = !showAll; continue; }
+                if (choice == "P") { PrintLearningPaths(group); continue; }
                 if (choice == "A") { foreach (var s in visible) await RunEntry(s); continue; }
+
+                // Stable sample IDs win over menu indices ("00", "16", "11A" — the NN prefix shown in each
+                // name), so the documented tours can be typed verbatim; bare small numbers stay indices.
+                var byId = visible.FirstOrDefault(
+                    sample => sample.Name.StartsWith(choice + " ", StringComparison.OrdinalIgnoreCase));
+                if (byId is not null)
+                {
+                    await RunEntry(byId);
+                    continue;
+                }
 
                 if (int.TryParse(choice, out var idx) && idx >= 1 && idx <= visible.Count)
                     await RunEntry(visible[idx - 1]);
@@ -275,13 +311,18 @@ public static class Program
             if (raw == "Q") return "Q";
             if (raw == "A") return "A";
             if (raw == "M" && group.Progressive) return "M";
+            if (raw == "P" && group.Paths is { Count: > 0 }) return "P";
 
             if (int.TryParse(raw, out var idx) && idx >= 1 && idx <= samples.Count)
                 return raw;
 
+            if (samples.Any(sample => sample.Name.StartsWith(raw + " ", StringComparison.OrdinalIgnoreCase)))
+                return raw;
+
             var toggle = group.Progressive ? ", M to toggle recommended/all" : "";
+            var paths = group.Paths is { Count: > 0 } ? ", P for learning paths" : "";
             Console.WriteLine(
-                $"  Enter 1–{samples.Count}, A to run shown samples{toggle}, B to go back, or Q to quit.\n");
+                $"  Enter 1–{samples.Count} (or a sample ID shown in its name), A to run shown samples{toggle}{paths}, B to go back, or Q to quit.\n");
         }
     }
 
@@ -293,26 +334,34 @@ public static class Program
     //  Menu rendering
     // ──────────────────────────────────────────────────────────
 
+    private const int MenuWidth = 94;
+
+    private static void MenuBorder(char left, char right) =>
+        Console.WriteLine($"  {left}{new string('─', MenuWidth)}{right}");
+
+    private static void MenuRow(string content) =>
+        Console.WriteLine($"  │{Fit(content, MenuWidth).PadRight(MenuWidth)}│");
+
     private static void PrintGroupMenu()
     {
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  ┌─────────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("  │                     SELECT A GROUP                              │");
-        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
+        MenuBorder('┌', '┐');
+        MenuRow($"{new string(' ', 38)}SELECT A GROUP");
+        MenuBorder('├', '┤');
         Console.ResetColor();
 
         foreach (var g in Groups)
         {
             var note = string.IsNullOrEmpty(g.Note) ? "" : $"  {g.Note}";
             var count = $"({g.Samples.Count} samples)";
-            Console.WriteLine($"  │  [{g.Key}] {g.Name,-32} {count,-12}{note,-24}│");
+            MenuRow($"  [{g.Key}] {g.Name,-32} {count,-12}{note}");
         }
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
-        Console.WriteLine("  │  [Q] Quit                                                       │");
-        Console.WriteLine("  └─────────────────────────────────────────────────────────────────┘");
+        MenuBorder('├', '┤');
+        MenuRow("  [Q] Quit");
+        MenuBorder('└', '┘');
         Console.ResetColor();
         Console.Write("\n  Group: ");
     }
@@ -326,30 +375,52 @@ public static class Program
         Console.ForegroundColor = ConsoleColor.Green;
         var view = group.Progressive ? (showAll ? "all" : "recommended") : "all";
         var header = $"{group.Name} — {view} ({samples.Count})";
-        Console.WriteLine($"  ┌─────────────────────────────────────────────────────────────────┐");
-        Console.WriteLine($"  │  {Fit(header, 63),-63}│");
-        Console.WriteLine($"  ├─────────────────────────────────────────────────────────────────┤");
+        MenuBorder('┌', '┐');
+        MenuRow($"  {header}");
+        MenuBorder('├', '┤');
         Console.ResetColor();
 
         for (var i = 0; i < samples.Count; i++)
         {
             var sample = samples[i];
             var marker = sample.Recommended ? "★" : " ";
-            Console.WriteLine(
-                $"  │ {marker}[{i + 1,2}] {Fit(sample.Name, 27),-27} {Fit(sample.Description, 31),-31}│");
+            MenuRow($" {marker}[{i + 1,2}] {Fit(sample.Name, 28),-28} {Fit(sample.Description, 58)}");
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
-        Console.WriteLine("  │  [A] Run shown   [B] Back   [Q] Quit                           │");
+        MenuBorder('├', '┤');
+        var actions = "  [A] Run shown   [B] Back   [Q] Quit";
+        if (group.Paths is { Count: > 0 }) actions += "   [P] Learning paths";
+        MenuRow(actions);
         if (group.Progressive)
         {
             var toggle = showAll ? "[M] Show recommended only" : "[M] Show all samples";
-            Console.WriteLine($"  │  {toggle,-63}│");
+            MenuRow($"  {toggle}");
         }
-        Console.WriteLine("  └─────────────────────────────────────────────────────────────────┘");
+        MenuBorder('└', '┘');
         Console.ResetColor();
         Console.Write("\n  Sample: ");
+    }
+
+    private static void PrintLearningPaths(SampleGroup group)
+    {
+        if (group.Paths is not { Count: > 0 } paths) return;
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  Learning paths — numbers are the stable sample IDs (the NN prefix in each menu name):");
+        Console.ResetColor();
+
+        foreach (var (name, route) in paths)
+        {
+            Console.WriteLine($"\n  • {name}");
+            Console.WriteLine($"    {route}");
+        }
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("\n  Consent-gated live validation lives in a separate runner: samples/AgentEval.Gatekeeper.Validation");
+        Console.WriteLine("  (verbs: calibrate · remote · mock-tools · memory-security).");
+        Console.ResetColor();
     }
 
     private static string Fit(string value, int width) =>
@@ -379,6 +450,76 @@ public static class Program
 
         Console.WriteLine("\n  Press any key to continue...");
         if (_interactive) Console.ReadKey(true);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  Gatekeeper offline suite: dotnet run -- --gatekeeper-offline-suite
+    // ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs every offline-capable Gatekeeper sample non-interactively so CI executes their
+    /// deterministic invariants. Samples 00–10 run their forced-offline oracles; 13–29 are
+    /// offline by design. Sample 11A is excluded because it requires a consented live endpoint.
+    /// </summary>
+    private static async Task<int> RunGatekeeperOfflineSuiteAsync()
+    {
+        Environment.SetEnvironmentVariable("AGENTEVAL_GATEKEEPER_FORCE_OFFLINE", "true");
+
+        var suite = new (string Id, string Name, Func<Task> Run)[]
+        {
+            ("00", "Hello World", GatekeeperHelloWorld.RunAsync),
+            ("01", "Enforcement Walkthrough", GatekeeperEnforcement.RunAsync),
+            ("02", "MAF Support Agent", GatekeeperMafHarness.RunAsync),
+            ("03", "Tool Approval", GatekeeperToolApproval.RunAsync),
+            ("04", "Beachhead + The Tribunal", GatekeeperBeachhead.RunAsync),
+            ("05", "Agent Harness — simple", GatekeeperAgentHarness.RunAsync),
+            ("06", "Agent Harness — defended", GatekeeperAgentHarnessDefended.RunAsync),
+            ("07", "Defense in Depth", GatekeeperDefenseInDepth.RunAsync),
+            ("08", "Output Panel", GatekeeperOutputPanel.RunAsync),
+            ("09", "Monetary + Per-Call Budget", GatekeeperMonetaryAndPerCallBudget.RunAsync),
+            ("10", "Explainability & Trust", GatekeeperExplainabilityAndTrust.RunAsync),
+            ("13", "Mocked Dangerous Tools", GatekeeperMockedDangerousTools.RunAsync),
+            ("14", "Poisoned Tool Kill Chain", GatekeeperPoisonedToolKillChain.RunAsync),
+            ("15", "Harness-Owned Tool Misuse", GatekeeperHarnessOwnedToolMisuse.RunAsync),
+            ("16", "Jailbreak + Tool Abuse", GatekeeperJailbreakAndToolAbuse.RunAsync),
+            ("17", "Tool Result Admission", GatekeeperToolResultAdmission.RunAsync),
+            ("18", "Hosted Tool Coverage", GatekeeperHostedToolCoverageBoundary.RunAsync),
+            ("19", "Bulkhead + Containment", GatekeeperBulkheadIsolation.RunAsync),
+            ("20", "Stateful Gate Timeline", GatekeeperStatefulTimeline.RunAsync),
+            ("21", "Same-Batch Exfil Race", GatekeeperSameBatchRace.RunAsync),
+            ("22", "Security Graph Incident", GatekeeperSecurityGraphIncident.RunAsync),
+            ("23", "HTTP Wire Boundary", GatekeeperHttpWireBoundary.RunAsync),
+            ("24", "Dynamic Context Provider", GatekeeperDynamicContextProviderBoundary.RunAsync),
+            ("25", "Crescendo Trajectory", GatekeeperCrescendoTrajectory.RunAsync),
+            ("26", "Session Identity Takeover", GatekeeperSessionIdentityTakeover.RunAsync),
+            ("27", "Manifest Provenance Drift", GatekeeperManifestProvenanceDrift.RunAsync),
+            ("28", "Approval Decision Matrix", GatekeeperApprovalDecisionMatrix.RunAsync),
+            ("29", "Result Behavioral Anomaly", GatekeeperToolResultBehavioralAnomaly.RunAsync),
+        };
+
+        var failures = new List<string>();
+        foreach (var (id, name, run) in suite)
+        {
+            Console.WriteLine($"\n════════ Gatekeeper offline suite · {id} {name} ════════");
+            try
+            {
+                await run();
+                Console.WriteLine($"  ✔ {id} {name} passed");
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{id} {name}");
+                Console.WriteLine($"  ✘ {id} {name} FAILED:\n{ex}");
+            }
+        }
+
+        Console.WriteLine($"\nGatekeeper offline suite: {suite.Length - failures.Count}/{suite.Length} samples passed.");
+        foreach (var failure in failures)
+        {
+            Console.WriteLine($"  ✘ {failure}");
+        }
+
+        return failures.Count == 0 ? 0 : 1;
     }
 
     // ──────────────────────────────────────────────────────────

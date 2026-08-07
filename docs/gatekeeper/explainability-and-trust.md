@@ -10,8 +10,8 @@ against captured calls, and combine available signals without treating missing e
 | How strong is the available evidence? | `TrustScoreCalculator` | Availability-aware score plus measured/total signal counts |
 
 Start with sample [10](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs). In the
-interactive launcher, open group **J**, press **M** for the complete catalog, and choose **Explainability & Trust**.
-The sample walks through all three APIs; the sections below define their contracts and limits.
+interactive launcher, open group **J** and choose **Explainability & Trust** — it is one of the six recommended
+samples. The sample walks through all three APIs; the sections below define their contracts and limits.
 
 > **Honest scope.** These are C# library APIs. `GateVerdictDto`, the versioned JSON contract emitted by
 > `gatekeeper inspect`, does not expose `Confidence` or `Provenance`; doing so requires a deliberate schema version.
@@ -105,8 +105,8 @@ next step — not built yet.
 
 A single honest composite across gate verdicts and eval scores. The naive approach — average everything,
 including gaps — is exactly the trap `WeightedSumAggregation`'s own comment warns against: *"including
-\[skipped/error] at 0.0 would incorrectly drag the composite below threshold."* `AgentEval.Trust.
-TrustScoreCalculator.Compute` applies the same exclusion discipline already used across this repo's
+\[skipped/error] at 0.0 would incorrectly drag the composite below threshold."*
+`AgentEval.Trust.TrustScoreCalculator.Compute` applies the same exclusion discipline already used across this repo's
 aggregation strategies (`WeightedSumAggregation`/`WeightedMedianAggregation`/`MinAggregation`/
 `MajorityVoteAggregation`) to a cross-cutting mix of signal SOURCES, not just sub-evals of one eval tree.
 
@@ -139,8 +139,8 @@ when nothing could be scored at all.
 
 ## Related
 
-- [Gate reference](gate-reference.md) — every built-in gate, including `CompositeJudgeGate`'s Tribunal role.
-- [Examples](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
+- [Gate reference](gate-reference.md) — the gate-family selection index, including `CompositeJudgeGate`'s Tribunal role.
+- [First recipes](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
 - [Explainability & Trust sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
 - [Capability history](../gatekeeper-whats-new.md) — the compact chronology of Gatekeeper milestones.
 - [CLI Reference — Exit codes](../cli.md#exit-codes) — the benchmark-gate exit-code split

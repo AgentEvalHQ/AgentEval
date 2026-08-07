@@ -6,21 +6,6 @@ failure modes, and composition rules live in the focused references linked below
 Start with [the introduction](introduction.md) if Gatekeeper is new to you. Use
 [the lifecycle guide](gate-lifecycle-and-coordination.md) when several boundaries cooperate.
 
-## How to read the rank
-
-The usefulness rank asks how much unique value a control adds over the simplest alternative: not granting the
-capability, or validating inside the tool itself.
-
-| Rank | Meaning |
-|:---:|---|
-| **5 — Essential** | Unique, broadly reusable protection with no simpler equivalent |
-| **4 — High** | Distinct protection or evidence beyond simpler controls |
-| **3 — Situational** | Valuable for a named threat, with meaningful limits or overlap |
-| **2 — Supplementary** | Defense in depth; a simpler control is usually stronger |
-| **1 — Marginal** | Rarely justified alone |
-
-Rank is not a correctness score. A lower-ranked gate can be exactly right for one deployment.
-
 ## Choose by protected boundary
 
 | Need | Start with | Detailed reference | See it |
@@ -39,6 +24,19 @@ Rank is not a correctness score. A lower-ranked gate can be exactly right for on
 | Protect memory recall/write/promotion/lifecycle | memory protection pipeline and adapters | [Memory security](memory-security.md) | [Memory samples](memory-security-samples.md) |
 
 ## Gate families at a glance
+
+The usefulness rank asks how much unique value a control adds over the simplest alternative: not granting the
+capability, or validating inside the tool itself.
+
+| Rank | Meaning |
+|:---:|---|
+| **5 — Essential** | Unique, broadly reusable protection with no simpler equivalent |
+| **4 — High** | Distinct protection or evidence beyond simpler controls |
+| **3 — Situational** | Valuable for a named threat, with meaningful limits or overlap |
+| **2 — Supplementary** | Defense in depth; a simpler control is usually stronger |
+| **1 — Marginal** | Rarely justified alone |
+
+Rank is not a correctness score. A lower-ranked gate can be exactly right for one deployment.
 
 | Family | Representative controls | Typical rank | Key limit |
 |---|---|:---:|---|
@@ -67,17 +65,19 @@ cannot be silently weakened below that floor. See [lifecycle and coordination](g
 
 ## Shipped Tribunal judges
 
-The shipped semantic axes include indirect injection, outbound goal drift, inbound inter-agent injection,
-exfiltration intent, system-prompt extraction, over-refusal, Crescendo turn shift, and tool-argument/goal
-coherence. Each axis has its own rubric and promotion evidence; they are not interchangeable generic safety scores.
+The shipped semantic axes are indirect injection (the same axis also guards the inbound A2A boundary), outbound
+goal drift, exfiltration intent, system-prompt extraction, over-refusal, intent-action mismatch, goal-hijack
+drift, ungrounded claim, hallucinated citation, Crescendo turn shift, and tool-argument/goal coherence. Each axis
+has its own rubric and promotion evidence; they are not interchangeable generic safety scores.
 
 See [Judges, approval, and shadow](judges-approval-and-shadow.md#tribunal-judges) for placement and calibration.
 
 ## Coverage & telemetry
 
 `GatekeeperCoverageAnalyzer` classifies static local functions separately from provider-hosted opaque tools and can
-refuse an unprotected high-risk static inventory. It cannot prove tools contributed later by every dynamic
-`AIContextProvider`, and acknowledgment does not inflate structural coverage.
+refuse an unprotected high-risk static inventory (the risk classifier is a bounded heuristic the caller may
+override). It cannot prove tools contributed later by every dynamic `AIContextProvider`, and acknowledgment does
+not inflate structural coverage.
 
 `GateTelemetry` records gate verdict counts and latency. The trace records the action actually applied. Use both:
 a gate finding under observation is not an enforced block.
@@ -109,6 +109,7 @@ This classifies the Gatekeeper API surface by its documentation owner.
 | Run and session controls | `IChatGate`, run gates, session identity and gates | [Run, session, and state](run-session-and-state.md) |
 | Approval | `IToolApprovalGate`, approval gates and MAF approval interop | [Judges, approval, and shadow](judges-approval-and-shadow.md#tool-approval) |
 | Semantic and asynchronous judgment | calibration, Tribunal gates, shadow pump, Crescendo | [Judges, approval, and shadow](judges-approval-and-shadow.md) |
+| Explainability and trust | `GateProvenance`, `GateReplayer`, `TrustScoreCalculator` | [Explainability and trust](explainability-and-trust.md) |
 | Containment and resource isolation | store/contracts, signed release, HTTP pool/routing functions | [Resource isolation and containment](resource-isolation-and-containment.md) |
 | Security graph | graph models/store/pump/compute/bridge and read-only projection | [Containment, coverage, and operations](containment-coverage-and-operations.md#security-graph) |
 | Evidence and assurance | evidence, severity, reference ledger/index, telemetry, fingerprints, replay, coverage | [Containment, coverage, and operations](containment-coverage-and-operations.md#coverage-and-evidence) |

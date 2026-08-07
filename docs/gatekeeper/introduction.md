@@ -30,17 +30,20 @@ Use `UseGatekeeper` when more than one Gatekeeper layer participates. It validat
 run scope, run gates, one tool/result pipeline, approval integration, and optional shadow processing in the required
 order.
 
-```csharp
-using AgentEval.MAF.Gatekeeper;
+The snippet below is compiled in the test project and compared mechanically with this page:
 
-var protectedAgent = baseAgent.AsBuilder()
-    .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, options =>
-    {
-        options.Add(new ForbiddenToolGate("delete_all_customers"));
-        options.Add(new RunBudgetGate(maxToolCalls: 20));
-        options.Trace = trace;
-    })
-    .Build();
+<!-- compiled-snippet:coordinated-stack -->
+```csharp
+private static AIAgent BuildProtectedAgent(AIAgent baseAgent, AgentTrace trace) =>
+    baseAgent.AsBuilder()
+        .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, options =>
+        {
+            options.Add(new ForbiddenToolGate("delete_all_customers"));
+            options.Add(new RunBudgetGate(maxToolCalls: 20));
+            options.AddPreGate(new TokenInjectionGate());
+            options.Trace = trace;
+        })
+        .Build();
 ```
 
 Choose the enforcement mode explicitly:
@@ -80,8 +83,8 @@ decision.
 - A tool-result gate protects model context after execution; it cannot undo the tool's side effect.
 - An argument URL check cannot see redirects or DNS answers. Wire-level protection requires the Gatekeeper HTTP
   handler inside the tool's own client.
-- Local Bulkhead pools isolate local connection and concurrency pressure, not a downstream quota shared by the same
-  provider credential.
+- Local [Bulkhead](resource-isolation-and-containment.md) pools isolate local connection and concurrency pressure,
+  not a downstream quota shared by the same provider credential.
 - Containment enforces an existing decision; another trusted control or operator must create that decision.
 - Fail-closed behavior protects safety but can reduce availability. Bound timeouts, queues, evidence, and refusals.
 
@@ -90,10 +93,23 @@ policy is semantically sufficient.
 
 ## Where to go next
 
-- [First recipes](examples.md) — runnable composition patterns.
+**Start here → [First recipes](examples.md)** — compose one stack, then run the first sample:
+
+```bash
+dotnet run --project samples/AgentEval.Samples
+# open group J — Gatekeeper (Runtime Protection)
+```
+
+### Reference
+
 - [Gate reference](gate-reference.md) — choose a gate family and follow its focused reference.
+- [Tool and result gates](tool-and-result-gates.md) — the local tool call and result-admission seams.
+- [Judges, approval, and shadow](judges-approval-and-shadow.md) — Tribunal axes, calibration, approval, shadow lane.
 - [Gate lifecycle and coordination](gate-lifecycle-and-coordination.md) — ordering, authority, and composition.
 - [State ownership and lifecycle](run-session-and-state.md) — run, session, process, and durable state semantics.
 - [Containment and resource isolation operations](resource-isolation-and-containment.md) — routing and Bulkhead use.
-- [Sample index](sample-index.md) — execution modes, boundaries, and mechanically checked sample coverage.
+- [Containment, coverage, and operations](containment-coverage-and-operations.md) — the security graph, coverage, and evidence.
+- [Explainability and trust](explainability-and-trust.md) — provenance, counterfactual replay, and the trust score.
+- [Memory security](memory-security.md) — the memory-protection pipeline and honest coverage levels.
+- [Sample index](sample-index.md) — execution modes, boundaries, and the manifest-backed sample catalog.
 - [Implementation status](implementation-status.md) — shipped, externally gated, and demand-gated scope.

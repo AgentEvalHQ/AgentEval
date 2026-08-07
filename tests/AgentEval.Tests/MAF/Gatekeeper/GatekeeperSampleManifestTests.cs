@@ -121,7 +121,7 @@ public sealed class GatekeeperSampleManifestTests
                 sourceText,
                 StringComparison.Ordinal);
 
-            if (int.TryParse(id, out var numericId) && numericId <= 9)
+            if (int.TryParse(id, out var numericId) && numericId <= 10)
             {
                 Assert.Equal("hybrid", execution);
                 Assert.Contains($"GatekeeperOfflineScenarioSuite.ExecuteAsync(\"{id}\")", sourceText, StringComparison.Ordinal);
@@ -141,13 +141,61 @@ public sealed class GatekeeperSampleManifestTests
             {
                 menuCount++;
                 Assert.Contains($"{handler}.RunAsync", program, StringComparison.Ordinal);
+
+                // The Gatekeeper menu registration line must carry the stable sample ID as the name prefix
+                // and fit the launcher's fixed column widths (name <= 28, description <= 58) without truncation.
+                var registrationIndex = program.IndexOf($"{handler}.RunAsync", StringComparison.Ordinal);
+                var lineStart = program.LastIndexOf('\n', registrationIndex) + 1;
+                var lineEnd = program.IndexOf('\n', registrationIndex);
+                var registrationLine = program[lineStart..(lineEnd < 0 ? program.Length : lineEnd)];
+                var literals = System.Text.RegularExpressions.Regex.Matches(registrationLine, "\"([^\"]*)\"");
+                Assert.True(
+                    literals.Count >= 2,
+                    $"Menu registration for '{handler}' must carry name and description string literals.");
+                var menuName = literals[0].Groups[1].Value;
+                var menuDescription = literals[1].Groups[1].Value;
+                Assert.StartsWith($"{id} ", menuName, StringComparison.Ordinal);
+                Assert.True(
+                    menuName.Length <= 28,
+                    $"Menu name for '{id}' exceeds the 28-char column ({menuName.Length}): '{menuName}'.");
+                Assert.True(
+                    menuDescription.Length <= 58,
+                    $"Menu description for '{id}' exceeds the 58-char column ({menuDescription.Length}): '{menuDescription}'.");
             }
             else
             {
                 directCount++;
             }
 
+            // The non-interactive offline suite must contain exactly the offline-capable samples.
+            var suiteEntry = $"(\"{id}\", \"";
+            if (execution is "offline" or "hybrid")
+            {
+                Assert.Contains(suiteEntry, program, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.DoesNotContain(suiteEntry, program, StringComparison.Ordinal);
+            }
+
             Assert.Contains($"| {id} |", catalog, StringComparison.Ordinal);
+
+            // The first `| {id} |` occurrence is the catalog table row (the boundary matrix comes later
+            // in the document). Its complexity and execution-mode CELLS must equal the manifest values —
+            // cell-scoped so a matching word elsewhere in the row can never mask a wrong column.
+            var catalogRowStart = catalog.IndexOf($"| {id} |", StringComparison.Ordinal);
+            var catalogRowEnd = catalog.IndexOf('\n', catalogRowStart);
+            var catalogRow = catalogRowEnd < 0 ? catalog[catalogRowStart..] : catalog[catalogRowStart..catalogRowEnd];
+            var catalogCells = catalogRow.Split('|');
+            Assert.True(catalogCells.Length > 4, $"Catalog row for '{id}' is missing columns: '{catalogRow}'.");
+            var executionLabel = execution switch
+            {
+                "live-model" => "Live model",
+                "live-boundary" => "Live boundary",
+                _ => execution,
+            };
+            Assert.Equal(complexity, catalogCells[3].Trim(), ignoreCase: true);
+            Assert.Equal(executionLabel, catalogCells[4].Trim(), ignoreCase: true);
         }
 
         Assert.Equal(29, menuCount);
@@ -157,11 +205,11 @@ public sealed class GatekeeperSampleManifestTests
         foreach (var recommendedHandler in new[]
         {
             "GatekeeperHelloWorld",
+            "GatekeeperBeachhead",
+            "GatekeeperExplainabilityAndTrust",
             "GatekeeperPoisonedToolKillChain",
             "GatekeeperJailbreakAndToolAbuse",
-            "GatekeeperStatefulTimeline",
             "GatekeeperHttpWireBoundary",
-            "GatekeeperManifestProvenanceDrift",
         })
         {
             Assert.Contains($"{recommendedHandler}.RunAsync, Recommended: true", program, StringComparison.Ordinal);

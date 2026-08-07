@@ -12,13 +12,21 @@ different corpora.
 
 | Axis | Typical boundary | Purpose |
 |---|---|---|
-| Indirect injection | run-pre or inbound A2A run-post | Separate agent-control instructions from ordinary untrusted content |
-| Outbound goal drift | A2A run-pre | Compare a delegated instruction with a trusted parent goal |
+| Indirect injection | run-pre; the same axis also guards inbound A2A run-post via `InterAgentBoundaryInjectionGate.CreateInbound` | Separate agent-control instructions from ordinary untrusted content |
+| Outbound goal drift | A2A run-pre (`InterAgentBoundaryInjectionGate.CreateOutbound`) | Compare a delegated instruction with a trusted parent goal |
 | Exfiltration intent | run-post | Detect an answer attempting to move protected data outward |
 | System-prompt extraction | run-post | Detect disclosure or reconstruction of protected instructions |
 | Over-refusal | run-post, advisory | Measure utility damage; do not use as a safety block |
+| Intent-action mismatch | run-post | Detect a response whose action diverges from the user's stated intent |
+| Goal-hijack drift | run-post | Detect the working goal drifting toward an injected objective |
+| Ungrounded claim | run-post | Detect assertions not supported by the supplied context |
+| Hallucinated citation | run-post | Deterministic citation-existence check plus a judge support check; a bespoke hybrid gate, not on the CLI judge registry |
 | Crescendo turn shift | shadow | Score one turn's escalation against bounded trajectory context |
 | Tool argument/goal coherence | approval | Decide whether arguments are confidently aligned with a fixed goal |
+
+Inbound inter-agent injection is deliberately not a separate axis: `InterAgentBoundaryInjectionGate.InboundAxis`
+reuses `IndirectInjectionJudge.Axis` because it is the same semantic detector applied at the inter-agent response
+boundary.
 
 ### Calibration is part of the configuration
 
@@ -48,6 +56,8 @@ errors before interpreting accuracy.
 
 A report is promotion evidence only when all required signals are present and the deployment's explicit thresholds
 pass. Never compress “all provider calls failed and therefore blocked” into a reassuring accuracy number.
+
+## Tool approval
 
 Approval is not sanitization. It decides whether a proposed tool call may proceed to a human or auto-approval path;
 tool contracts and validation inside the tool remain authoritative.

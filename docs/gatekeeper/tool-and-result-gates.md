@@ -17,6 +17,10 @@ An `IToolGate` sees one proposed local `AIFunction` call before execution and re
 
 A gate may declare `MinimumPolicy`. Construction fails if the resolved policy would weaken it.
 
+`WarnOnly` is the per-gate `ToolGatePolicy` value that the composition-level `GatekeeperEnforcement.Observe`
+mode resolves to; the names differ because they are different enums at different layers. The normative mode
+semantics live in [gate lifecycle and coordination](gate-lifecycle-and-coordination.md).
+
 ## Declarative tool contracts
 
 `ToolUsageContractGate` is the preferred way to express per-tool argument policy. Build immutable contracts with

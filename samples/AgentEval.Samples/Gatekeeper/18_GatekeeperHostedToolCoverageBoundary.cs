@@ -22,7 +22,14 @@ public static class GatekeeperHostedToolCoverageBoundary
         GatekeeperSampleContractRenderer.Print("18");
         Console.WriteLine("\n=== Gatekeeper — Hosted Tool Coverage Boundary (offline) ===\n");
 
-        var localTool = AIFunctionFactory.Create((string orderId) => $"fake order {orderId}", "lookup_order");
+        var localInvocations = 0;
+        var localTool = AIFunctionFactory.Create(
+            (string orderId) =>
+            {
+                localInvocations++;
+                return $"fake order {orderId}";
+            },
+            "lookup_order");
         var hostedTool = new HostedCodeInterpreterTool();
         IToolGate[] gates = [new ForbiddenToolGate("delete_account")];
         AITool[] tools = [localTool, hostedTool];
@@ -69,8 +76,9 @@ public static class GatekeeperHostedToolCoverageBoundary
 
         Console.WriteLine("② Explicit acknowledgment — admitted, but still visibly opaque");
         Console.WriteLine(Indent(acknowledged.Render(), "   "));
+        Require(localInvocations == 0, "coverage analysis must never execute the tools it classifies");
         Console.WriteLine("   ✅ acknowledgment records risk acceptance; it does not turn a provider-hosted tool into a gated local function");
-        Console.WriteLine("   ✅ no provider, hosted tool, local tool, or model was invoked");
+        Console.WriteLine($"   ✅ coverage analysis executed nothing: measured local-tool invocations = {localInvocations}, and no model client was ever constructed");
         Console.WriteLine("\n=== Hosted Tool Coverage Boundary Complete ===");
 
         return Task.CompletedTask;

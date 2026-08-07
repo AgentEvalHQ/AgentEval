@@ -30,7 +30,7 @@ Run gates implement `IChatGate` and inspect text at a run-pre or run-post bounda
 | `SafetyMetricGate` | run-pre or run-post | Convert a deterministic evaluation into a boundary decision |
 | `RenderedOutputExfilGate` | run-post | Reject rendered-output exfiltration such as image beacons |
 | `CompositeJudgeGate<TRubric>` | run-pre or run-post after calibration | Apply one bounded semantic axis |
-| `InterAgentBoundaryInjectionGate` | A2A run-pre/run-post | Detect outbound goal drift or inbound indirect injection |
+| `InterAgentBoundaryInjectionGate` | A2A run-pre/run-post | Detect outbound goal drift or inbound indirect injection; axis and calibration details live in [Judges, approval, and shadow](judges-approval-and-shadow.md#tribunal-judges) |
 
 A run-pre gate cannot govern tool arguments it has not seen. A run-post gate cannot undo tool effects. Keep
 tool-call authorization independent of run-level attack detection.

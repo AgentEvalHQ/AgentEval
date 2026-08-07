@@ -35,7 +35,8 @@ Treat SDK/API calls as tool or MCP operations unless the provider exposes trustw
 recalled-item hooks. Register search/recall, add/update, delete, and promotion/reconciliation separately.
 Provider metadata is untrusted input; tenant/user scope must come from the host.
 
-If only the external API boundary is visible, claim at most `Boundary`. Use `MemoryProviderNativeGate` and
+If only the external API boundary is visible, claim at most `Boundary` (the coverage levels and their
+promotion rules are defined in [Memory security](memory-security.md)). Use `MemoryProviderNativeGate` and
 claim `FullLifecycle` only when both candidate and recalled-item hooks execute for every relevant path and
 their policy fingerprint matches the composite pipeline. Provider-side security features complement these
 gates but do not replace application scope, influence, and coverage checks.

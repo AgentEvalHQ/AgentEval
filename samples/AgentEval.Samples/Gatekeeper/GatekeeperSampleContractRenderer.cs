@@ -26,9 +26,25 @@ internal static class GatekeeperSampleContractRenderer
             throw new InvalidDataException($"Gatekeeper sample contract '{id}' is not present in the embedded manifest.");
         }
 
+        var showFull = string.Equals(
+            Environment.GetEnvironmentVariable("AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine($"\n--- Gatekeeper sample contract {contract.Id}: {contract.Name} ---");
         Console.ResetColor();
+
+        if (!showFull)
+        {
+            PrintCompactField("Threat:", Join(contract.Threats));
+            PrintCompactField("Guarantee:", contract.Guarantee);
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("   (AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true prints the full audited contract)\n");
+            Console.ResetColor();
+            return;
+        }
+
         Console.WriteLine($"   Threat:           {Join(contract.Threats)}");
         Console.WriteLine($"   Protected seam:   {Join(contract.Boundaries)}");
         Console.WriteLine($"   Gates/mechanisms: {Join(contract.Mechanisms)}");
@@ -76,6 +92,42 @@ internal static class GatekeeperSampleContractRenderer
     }
 
     private static string Join(IReadOnlyList<string> values) => string.Join(", ", values);
+
+    private static void PrintCompactField(string label, string value)
+    {
+        const int WrapWidth = 84;
+        var first = true;
+        foreach (var line in Wrap(value, WrapWidth))
+        {
+            Console.WriteLine(first ? $"   {label,-10} {line}" : $"   {new string(' ', 10)} {line}");
+            first = false;
+        }
+    }
+
+    private static IEnumerable<string> Wrap(string text, int width)
+    {
+        var line = new System.Text.StringBuilder();
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (line.Length > 0 && line.Length + 1 + word.Length > width)
+            {
+                yield return line.ToString();
+                line.Clear();
+            }
+
+            if (line.Length > 0)
+            {
+                line.Append(' ');
+            }
+
+            line.Append(word);
+        }
+
+        if (line.Length > 0)
+        {
+            yield return line.ToString();
+        }
+    }
 
     private sealed class SampleManifest
     {

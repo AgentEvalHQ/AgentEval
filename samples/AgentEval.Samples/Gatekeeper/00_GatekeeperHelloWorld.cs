@@ -34,6 +34,9 @@ public static class GatekeeperHelloWorld
         if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
             await GatekeeperOfflineScenarioSuite.ExecuteAsync("00");
+            Console.WriteLine("\n   That's the whole idea: your red-team oracle runs in the request path and stops the call.");
+            Console.WriteLine("   → Next: the Enforcement Walkthrough adds canary honeypots, dangerous sequences, and more.");
+            Console.WriteLine("\n=== Gatekeeper Hello World Complete ===");
             return;
         }
 
@@ -76,6 +79,8 @@ public static class GatekeeperHelloWorld
         else if (published > 0)
         {
             Console.WriteLine($"   ❌ write_page ran {published}× — the poisoned publish was NOT blocked");
+            throw new InvalidOperationException(
+                "Gatekeeper Hello World failed: the poisoned publish executed without a recorded block.");
         }
         else
         {
