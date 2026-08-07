@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { Compass, Home, ListChecks, ShieldCheck } from "lucide-react";
 
 // Plan-08 portal-review A23 (T2.2, 2026-05-25): when a user lands on a bad

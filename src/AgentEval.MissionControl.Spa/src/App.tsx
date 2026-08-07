@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router";
 import { AppShell } from "@/components/AppShell";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { SubjectDetailPage } from "@/pages/SubjectDetailPage";
