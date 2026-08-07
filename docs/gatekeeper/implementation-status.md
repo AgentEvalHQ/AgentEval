@@ -3,7 +3,7 @@
 > **Status:** implementation complete for the currently approved scope; one live promotion
 > validation remains deferred.
 >
-> **Updated:** 2026-08-05
+> **Updated:** 2026-08-07
 >
 > **Publication target:** the current main branch
 
@@ -31,6 +31,7 @@ implemented.
 | 10 | Architecture showcase | ✅ | Five offline samples expose measured resource isolation, state lifecycle, same-batch ordering, graph escalation, and HTTP wire enforcement |
 | 11 | Specialized showcase | ✅ | Six offline samples cover dynamic providers, Crescendo trajectories, identity takeover, manifest drift, approval edges, and result anomalies |
 | 12 | Documentation and sample usability consolidation | ✅ | Six recommended entry points, curated paths, compiled canonical snippets, architecture maps, current capability history, and measured console summaries are complete |
+| 13 | Sample and documentation usability polish | ✅ | Compact two-line sample contracts, an ID-prefixed launcher with named learning paths, an impact-first recommended six (00/04/10/14/16/23), corrected axis/matrix/README truth, a deterministic offline oracle for sample 10, narrated showcase samples, and a CI workflow executing all 28 offline-capable samples on every pull request |
 
 ## Sample and documentation showcase follow-up
 
@@ -53,7 +54,7 @@ discoverable demonstrations and records review evidence separately.
 
 | Phase | Task | Description | Done | Reviewed | Implementation notes |
 |---|---|---|---:|:---:|---|
-| 8 | 8.0 | Audit and freeze the improvement backlog | 100% | ✅ | Scored 19 core samples and prioritized state, Bulkhead, reliability, and architecture-showcase gaps |
+| 8 | 8.0 | Audit and freeze the improvement backlog | 100% | ✅ | Scored the 19 core samples then registered (30 today) and prioritized state, Bulkhead, reliability, and architecture-showcase gaps |
 | 8 | 8.1 | Correct documentation truth and simplify introductions | 100% | ✅ | Reduced the introduction to protected seams, one quick start, operating principles, architecture tiers, limits, and navigation; corrected stale links and semantics |
 | 8 | 8.2 | Restructure and complete the gate reference | 100% | ✅ | Replaced the encyclopedia entry point with a selection index and four focused references organized by protected boundary and operator concern |
 | 8 | 8.3 | Add state ownership and lifecycle matrix | 100% | ✅ | Documents scope, owner, partitioning, concurrency, reset/release, restart, missing-scope behavior, fingerprinting, and evidence for every stateful mechanism |
@@ -131,6 +132,8 @@ coverage.
   MAF Doctor checks on changed MAF code.
 - The synchronized sample manifest, catalog contracts, offline launcher oracles, Release sample build,
   formatter verification, and DocFX build all pass.
+- The Gatekeeper offline sample suite (all 28 offline-capable samples) runs non-interactively in CI on every
+  pull request; each sample throws on any invariant failure, so the launcher oracles are no longer menu-only.
 - The scoped MAF Doctor review reports grade B with no errors. Its remaining observability and cost findings
   are reviewed fixture limitations, known remote-boundary constraints, or bounded false positives.
 - A repo-root MAF Doctor run is polluted by ignored `.claude/worktrees` and reports duplicate/generated

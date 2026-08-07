@@ -21,16 +21,21 @@ For concepts, start with the [introduction](introduction.md). For gate contracts
 A sample passes only when an internal invariant proves the claimed behavior. Console text, model compliance, or the
 absence of an exception is not a sufficient oracle.
 
-Samples 00–09 choose the deterministic offline path when Azure OpenAI is not configured. Set
+Samples 00–10 choose the deterministic offline path when Azure OpenAI is not configured. Set
 `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true` to force that release oracle even on a configured workstation; otherwise
 the optional live overlay runs. Both paths use fake/local tool effects.
+
+Every sample prints a compact two-line threat/guarantee contract by default; set
+`AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` for the full audited contract. The offline invariants are not
+menu-only: `dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite` executes all 28
+offline-capable samples non-interactively, and CI runs exactly that suite on every pull request.
 
 ## Start small: recommended paths
 
 The repository keeps 30 contracts because each sample owns distinct executable evidence. The interactive launcher
-uses progressive disclosure: group **J** initially shows six recommended samples and **M** reveals all 29 menu
-entries. The direct-only A2A calibration fixture accounts for the thirtieth manifest entry. Legacy numeric execution
-order is unchanged.
+uses progressive disclosure: group **J** initially shows six recommended samples, **M** reveals all 29 menu
+entries, and **P** prints the named learning paths. The direct-only A2A calibration fixture accounts for the
+thirtieth manifest entry. Legacy numeric execution order is unchanged.
 
 Start the launcher with:
 
@@ -42,7 +47,7 @@ dotnet run --project samples/AgentEval.Samples
 |---|---|---|
 | Recommended six (the 15-minute tour) | **00 → 16 → 14 → 04 → 10 → 23** | Smallest gate, detection versus authorization, kill-chain capstone, calibrated judges, replay and trust, the wire |
 
-The full set of named learning paths lives in [Gatekeeper recipes](examples.md#pick-a-learning-path). The catalog
+The full set of named learning paths lives in [First recipes](examples.md#pick-a-learning-path). The catalog
 below remains complete for regression ownership and specialist lookup.
 
 ## Core Gatekeeper catalog
@@ -86,38 +91,38 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 
 A check means the sample executes or directly evaluates the boundary; a type mentioned only in prose does not count.
 
-| ID | Construction | Run pre | Tool | Result | Approval | Run post | Wire | Later run / durable | Harness/A2A | Evidence/replay |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 00 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 01 |  | ✓ | ✓ |  |  | ✓ |  | ✓ |  | ✓ |
-| 02 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 03 |  |  |  |  | ✓ |  |  |  |  |  |
-| 04 |  | ✓ | ✓ |  |  | ✓ |  |  |  | ✓ |
-| 05 |  |  | ✓ |  |  |  |  |  | ✓ | ✓ |
-| 06 |  |  | ✓ |  |  |  |  |  | ✓ | ✓ |
-| 07 |  | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |
-| 08 |  |  |  |  |  | ✓ |  |  |  | ✓ |
-| 09 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 10 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 11A | ✓ | ✓ |  |  |  | ✓ |  |  | ✓ | ✓ |
-| 11B | ✓ |  |  |  |  |  |  |  | ✓ | ✓ |
-| 13 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 14 | ✓ |  | ✓ | ✓ |  |  |  |  |  | ✓ |
-| 15 |  | ✓ | ✓ |  |  |  |  |  | ✓ | ✓ |
-| 16 | ✓ | ✓ | ✓ |  |  |  |  |  |  | ✓ |
-| 17 |  |  |  | ✓ |  |  |  |  |  | ✓ |
-| 18 | ✓ |  |  |  |  |  |  |  |  | ✓ |
-| 19 | ✓ |  | ✓ |  |  |  |  | ✓ |  | ✓ |
-| 20 |  |  | ✓ |  |  |  |  | ✓ |  | ✓ |
-| 21 |  |  | ✓ |  |  |  |  |  |  | ✓ |
-| 22 |  |  | ✓ |  |  |  |  | ✓ |  | ✓ |
-| 23 |  |  |  |  |  |  | ✓ |  |  | ✓ |
-| 24 | ✓ |  | ✓ |  |  |  |  |  |  | ✓ |
-| 25 |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
-| 26 |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
-| 27 | ✓ |  |  |  |  |  |  |  |  | ✓ |
-| 28 |  |  | ✓ |  | ✓ |  |  |  |  | ✓ |
-| 29 |  |  |  | ✓ |  |  |  | ✓ |  | ✓ |
+| ID | Construction | Run pre | Tool | Result | Approval | Run post | Wire | Session | Later run / durable | Harness/A2A | Evidence/replay |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 00 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 01 |  | ✓ | ✓ |  |  | ✓ |  | ✓ | ✓ |  | ✓ |
+| 02 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 03 |  |  |  |  | ✓ |  |  |  |  |  |  |
+| 04 |  | ✓ | ✓ |  |  | ✓ |  |  |  |  | ✓ |
+| 05 |  |  | ✓ |  |  |  |  |  |  | ✓ | ✓ |
+| 06 |  |  | ✓ |  |  |  |  |  |  | ✓ | ✓ |
+| 07 |  | ✓ | ✓ | ✓ |  |  |  |  |  |  | ✓ |
+| 08 |  |  |  |  |  | ✓ |  |  |  |  | ✓ |
+| 09 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 10 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 11A | ✓ | ✓ |  |  |  | ✓ |  |  |  | ✓ | ✓ |
+| 11B | ✓ |  |  |  |  |  |  |  |  | ✓ | ✓ |
+| 13 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 14 | ✓ |  | ✓ | ✓ |  |  |  |  |  |  | ✓ |
+| 15 |  | ✓ | ✓ |  |  |  |  |  |  | ✓ | ✓ |
+| 16 | ✓ | ✓ | ✓ |  |  |  |  |  |  |  | ✓ |
+| 17 |  |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| 18 | ✓ |  |  |  |  |  |  |  |  |  | ✓ |
+| 19 | ✓ |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
+| 20 |  |  | ✓ |  |  |  |  | ✓ | ✓ |  | ✓ |
+| 21 |  |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 22 |  |  | ✓ |  |  |  |  |  | ✓ |  | ✓ |
+| 23 |  |  |  |  |  |  | ✓ |  |  |  | ✓ |
+| 24 | ✓ |  | ✓ |  |  |  |  |  |  |  | ✓ |
+| 25 |  | ✓ |  |  |  |  |  | ✓ | ✓ |  | ✓ |
+| 26 |  | ✓ |  |  |  |  |  | ✓ |  |  | ✓ |
+| 27 | ✓ |  |  |  |  |  |  |  |  |  | ✓ |
+| 28 |  |  | ✓ |  | ✓ |  |  |  |  |  | ✓ |
+| 29 |  |  |  | ✓ |  |  |  |  |  |  | ✓ |
 
 ## Threat and feature coverage
 
@@ -135,7 +140,7 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Repeated-denial escalation/containment | 01, 14 | Shadow quarantine and durable fake-source containment |
 | Remote A2A boundary | 11A, 11B | Implementation/calibration covered; 11A requires a configured endpoint |
 | Provider-hosted coverage honesty | 18 | Strong construction-time boundary |
-| Explainability and replay | 10 | Strong |
+| Explainability and replay | 10 | Strong — concepts in [Explainability and trust](explainability-and-trust.md) |
 | Bulkhead/resource isolation | 19 | Strong measured 3:1 pool isolation with contained saturation |
 | Stateful lifecycle/reset/restart | 01, 09, 14, 20 | Dedicated call/run/session/durable timeline plus focused examples |
 | Same-batch ordering race | 21 | Dedicated five-control race demonstration and fake-effect proof |

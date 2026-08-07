@@ -140,7 +140,7 @@ when nothing could be scored at all.
 ## Related
 
 - [Gate reference](gate-reference.md) — the gate-family selection index, including `CompositeJudgeGate`'s Tribunal role.
-- [Examples](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
+- [First recipes](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
 - [Explainability & Trust sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
 - [Capability history](../gatekeeper-whats-new.md) — the compact chronology of Gatekeeper milestones.
 - [CLI Reference — Exit codes](../cli.md#exit-codes) — the benchmark-gate exit-code split

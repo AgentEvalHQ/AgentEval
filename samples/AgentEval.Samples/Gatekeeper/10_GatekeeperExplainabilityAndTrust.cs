@@ -21,7 +21,8 @@ namespace AgentEval.Samples;
 ///   3. <b>TrustScoreCalculator</b> — combine several signals — including Scene 1's real verdict — into ONE
 ///                                    honest composite score (fully deterministic, no model call)
 ///
-/// 🔑 Scene 1 needs Azure OpenAI credentials; Scenes 2-3 run fully offline either way.
+/// Hybrid: without credentials (or under AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true) a deterministic
+/// replay + trust oracle runs; with credentials, Scene 1 adds a real judge-provenance call.
 /// ⏱️ Time to understand: 4 minutes
 /// </summary>
 public static class GatekeeperExplainabilityAndTrust
@@ -31,17 +32,13 @@ public static class GatekeeperExplainabilityAndTrust
         GatekeeperSampleContractRenderer.Print("10");
         PrintHeader();
 
-        bool? realTurnWasBlocked = null;   // set by Scene 1 if it ran; feeds Scene 3's real-signal row
-        if (AIConfig.IsConfigured)
+        if (GatekeeperOfflineScenarioSuite.ShouldUseOffline)
         {
-            realTurnWasBlocked = await Scene1_GateProvenance();
-        }
-        else
-        {
-            Console.WriteLine("  (Scene 1 needs Azure OpenAI credentials — skipping it. Scenes 2-3 don't need a model.)");
-            AIConfig.PrintMissingCredentialsWarning();
+            await GatekeeperOfflineScenarioSuite.ExecuteAsync("10");
+            return;
         }
 
+        bool? realTurnWasBlocked = await Scene1_GateProvenance();
         await Scene2_CounterfactualReplay();
         Scene3_TrustScore(realTurnWasBlocked);
 
@@ -81,10 +78,20 @@ public static class GatekeeperExplainabilityAndTrust
         if (blockVerdict.Provenance is { } why)
         {
             Console.WriteLine($"    Rule:      {why.RuleName}");
-            Console.WriteLine($"    Threshold: {why.Threshold}   Actual: {why.ActualValue}" +
-                (why.Threshold == why.ActualValue ? "  (this rubric doesn't report a numeric confidence — both read 0; the Block itself is still real evidence, see Evidence below)" : ""));
+            if (why.Threshold != why.ActualValue)
+            {
+                Console.WriteLine($"    Threshold: {why.Threshold}   Actual: {why.ActualValue}");
+            }
+
             Console.WriteLine($"    Evidence:  {(why.Evidence.Count > 0 ? string.Join("; ", why.Evidence) : "(none reported)")}");
-            Console.WriteLine("    ✅ the verdict is reconstructable — not just \"Block\", but WHY, against what threshold, with what evidence");
+            if (why.Evidence.Count > 0 || why.Threshold != why.ActualValue)
+            {
+                Console.WriteLine("    ✅ the verdict is reconstructable — not just \"Block\", but WHY, with the evidence or numbers it saw");
+            }
+            else
+            {
+                Console.WriteLine("    ⚠ this rubric reported neither a numeric confidence nor evidence — the Block stands, but this provenance record adds nothing to explain");
+            }
         }
         else
         {

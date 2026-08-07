@@ -48,7 +48,7 @@
   items:
   - name: Introduction
     href: gatekeeper/introduction.md
-  - name: First Recipes
+  - name: First recipes
     href: gatekeeper/examples.md
   - name: Gate Reference
     href: gatekeeper/gate-reference.md

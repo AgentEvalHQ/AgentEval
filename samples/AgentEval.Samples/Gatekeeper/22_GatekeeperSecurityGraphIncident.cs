@@ -150,9 +150,9 @@ public static class GatekeeperSecurityGraphIncident
             Console.WriteLine("              └ coverage=Incomplete → fleet rate withdrawn → new decision REFUSED (incomplete evidence cannot mint containment)");
 
             Console.WriteLine();
-            Console.WriteLine("   Stage           Measured evidence                                  Security disposition");
-            Console.WriteLine("   ──────────────  ─────────────────────────────────────────────────  ─────────────────────");
-            PrintStage("1  ingest", $"{report.TotalCallCount} calls / {report.TotalBlockedCallCount} blocked / 2 sessions", "DURABLY APPLIED");
+            Console.WriteLine($"   {"Stage",-14} {"Measured evidence",-50} Security disposition");
+            Console.WriteLine($"   {new string('─', 14)} {new string('─', 50)} {new string('─', 20)}");
+            PrintStage("1  ingest", $"{report.TotalCallCount} calls / {report.TotalBlockedCallCount} blocked", "DURABLY APPLIED");
             PrintStage("2  compute", $"coverage={report.Coverage}; fleet block rate={report.FleetBlockRate!.Value:P0}", "DECISION ELIGIBLE");
             PrintStage("3  project", $"{operationsView!.Nodes.Count} nodes / {operationsView.Edges.Count} edge / content-free", "READ ONLY");
             PrintStage("4  enforce", "partner-endpoint containment active", refusal.Action.ToString().ToUpperInvariant());

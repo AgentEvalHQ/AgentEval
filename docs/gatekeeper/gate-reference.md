@@ -65,9 +65,10 @@ cannot be silently weakened below that floor. See [lifecycle and coordination](g
 
 ## Shipped Tribunal judges
 
-The shipped semantic axes include indirect injection, outbound goal drift, inbound inter-agent injection,
-exfiltration intent, system-prompt extraction, over-refusal, Crescendo turn shift, and tool-argument/goal
-coherence. Each axis has its own rubric and promotion evidence; they are not interchangeable generic safety scores.
+The shipped semantic axes are indirect injection (the same axis also guards the inbound A2A boundary), outbound
+goal drift, exfiltration intent, system-prompt extraction, over-refusal, intent-action mismatch, goal-hijack
+drift, ungrounded claim, hallucinated citation, Crescendo turn shift, and tool-argument/goal coherence. Each axis
+has its own rubric and promotion evidence; they are not interchangeable generic safety scores.
 
 See [Judges, approval, and shadow](judges-approval-and-shadow.md#tribunal-judges) for placement and calibration.
 

@@ -11,6 +11,7 @@ using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Gatekeeper;
 using AgentEval.Testing;
 using AgentEval.Tracing;
+using AgentEval.Trust;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
@@ -19,7 +20,7 @@ using RuntimeEnforcement = AgentEval.MAF.Gatekeeper.GatekeeperEnforcement;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Deterministic, no-network release oracles for the live-first Gatekeeper samples 00–09.
+/// Deterministic, no-network release oracles for the live-first Gatekeeper samples 00–10.
 /// Set <c>AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true</c> to exercise these paths even when credentials exist.
 /// </summary>
 internal static class GatekeeperOfflineScenarioSuite
@@ -45,8 +46,44 @@ internal static class GatekeeperOfflineScenarioSuite
         "07" => DefenseInDepthAsync(),
         "08" => OutputPanelAsync(),
         "09" => FinancialBudgetsAsync(),
+        "10" => ExplainabilityReplayAndTrustAsync(),
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "No offline Gatekeeper scenario is registered."),
     };
+
+    private static async Task ExplainabilityReplayAndTrustAsync()
+    {
+        Console.WriteLine("   Offline oracle: counterfactual gate replay + honest trust aggregation (the live judge-provenance scene is the optional overlay).");
+
+        var calls = new[]
+        {
+            OfflineReplayCall("read_customer_record"),
+            OfflineReplayCall("send_email"),
+            OfflineReplayCall("delete_database"),
+        };
+        var baseline = new IToolGate[] { new ForbiddenToolGate("delete_database") };
+        var candidate = new IToolGate[] { new ForbiddenToolGate("delete_database", "send_email") };
+        var comparison = await GateReplayer.CompareAsync(calls, baseline: baseline, candidate: candidate);
+        Require(comparison.Rows.Count == 3, "10 replay must evaluate all three captured calls");
+        Require(comparison.Diverged.Count == 1, "10 exactly one captured call must diverge under the tightened config");
+        Require(
+            comparison.Diverged.Single().Call.FunctionName == "send_email",
+            "10 the diverging call must be the newly-forbidden send_email");
+
+        var signals = new[]
+        {
+            new TrustSignal("gate:indirect-injection (synthetic)", Score: 0.1, Weight: 2),
+            new TrustSignal("eval:groundedness", Score: 0.92, Weight: 1),
+            new TrustSignal("eval:timeout", Score: 0.0, Weight: 5, Label: "error"),
+        };
+        var trust = TrustScoreCalculator.Compute(signals);
+        Require(trust.SignalsMeasured == 2 && trust.SignalsTotal == 3, "10 the errored signal must be excluded from measurement");
+        Require(trust.Score is > 30, "10 the heavily-weighted errored signal must not drag the composite toward zero");
+        PrintPass("10", "replay diverged only on send_email; errored trust signal excluded, never zero-scored");
+    }
+
+    private static GatedToolCall OfflineReplayCall(string functionName) =>
+        new(functionName, Arguments: null, AgentName: "explainability-oracle", Iteration: 0,
+            FunctionCallIndex: 0, FunctionCount: 1, IsStreaming: false, Messages: null);
 
     private static async Task ProbeEvaluatorAsync()
     {

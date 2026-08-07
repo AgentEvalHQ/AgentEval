@@ -1,12 +1,13 @@
-# Gatekeeper recipes
+# First recipes
 
 This page is the shortest path from “I need runtime protection” to one correctly composed Gatekeeper stack.
 Use the [introduction](introduction.md) for the model, the [gate reference](gate-reference.md) to select a
 control family, and the [sample index](sample-index.md) for the complete executable catalog.
 
 Gatekeeper intentionally keeps 30 sample contracts because they prove different boundaries. The interactive
-launcher shows only six recommended samples at first; press **M** to reveal all 29 menu entries. The A2A calibration
-fixture is direct-only, which is why the manifest contains one more entry than the menu.
+launcher shows only six recommended samples at first; press **M** to reveal all 29 menu entries, or **P** to print
+the learning paths below inside the launcher. The A2A calibration fixture is direct-only, which is why the
+manifest contains one more entry than the menu.
 
 ## Pick a learning path
 
@@ -19,7 +20,8 @@ fixture is direct-only, which is why the manifest contains one more entry than t
 | Semantic judgment and approval | **03 → 28 → 25 → 04** | Human continuation, approval failure modes, Crescendo timing, and calibrated judges |
 | Operations and assurance | **10 → 20 → 22** | Provenance/replay, lifecycle evidence, and read-only incident projection |
 
-All paths except the live portion of sample 04 run without credentials. Sample 11A is intentionally absent because
+Every path runs without credentials: the hybrid samples (00–10) execute deterministic offline oracles when Azure
+OpenAI is not configured and add an optional live overlay when it is. Sample 11A is intentionally absent because
 it requires a separately authorized remote A2A endpoint.
 
 Start the interactive launcher and open group **J**:
@@ -48,9 +50,9 @@ private static AIAgent BuildProtectedAgent(AIAgent baseAgent, AgentTrace trace) 
         .Build();
 ```
 
-- `Observe` records findings without applying blocks or mutations.
-- `ReplaceResult` prevents an unsafe local call and lets the model choose a safer alternative.
-- `Terminate` prevents the call and stops the function-calling loop.
+The three enforcement modes (`Observe`, `ReplaceResult`, `Terminate`) are introduced in the
+[introduction](introduction.md#start-with-one-coordinated-stack); the normative semantics table lives in
+[gate lifecycle and coordination](gate-lifecycle-and-coordination.md).
 
 Do not chain separate `UseAgentEvalToolGate(...)` registrations. MAF middleware wraps in registration order, so
 an outer gate can stop forwarding and silently starve an inner list. Use a low-level builder only for one specialist

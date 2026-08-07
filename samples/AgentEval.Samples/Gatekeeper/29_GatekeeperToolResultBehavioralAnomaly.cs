@@ -65,10 +65,10 @@ public static class GatekeeperToolResultBehavioralAnomaly
         Require(freshRun.Action == ToolResultAction.Allow,
             "a new run must start with no per-tool anomaly baseline");
 
-        Console.WriteLine("   fixed 5000-char cap:  file=ALLOW, lookup spike=ALLOW");
-        Console.WriteLine("   per-tool baseline:    routine large file=ALLOW, small lookup spike=REDACT");
-        Console.WriteLine("   baseline integrity:   repeated spike=REDACT (flagged result not learned)");
-        Console.WriteLine("   next run:             first lookup has no prior-run baseline=ALLOW");
+        Console.WriteLine($"   fixed 5000-char cap:  read_large_file(1200)={fixedFile.Action}, lookup_customer(500)={fixedLookupSpike.Action} — a global cap cannot see per-tool norms");
+        Console.WriteLine($"   per-tool baseline:    routine large file={normalFile.Action}; the same 500 chars from lookup_customer={lookupSpike.Action}");
+        Console.WriteLine($"   baseline integrity:   repeated spike={repeatedSpike.Action} (a flagged result is never learned into its own baseline)");
+        Console.WriteLine($"   next run:             first lookup={freshRun.Action} (per-run baselines reset)");
         Console.WriteLine("   ✅ fixed exhaustion limits and behavioral drift detection remained distinct.");
     }
 
