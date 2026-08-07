@@ -159,6 +159,24 @@ judge response is now *inconclusive* — it can no longer be silently counted as
 - Agent-execution failures, judge failures, and explicit `no` are no longer conflated in accuracy
   denominators.
 
+### Gatekeeper sample, launcher, and documentation polish (#152)
+
+- Every Gatekeeper sample now prints a compact two-line threat/guarantee contract by default
+  (`AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` restores the full audited contract), the launcher opens
+  group J on a six-sample 15-minute tour (00 → 16 → 14 → 04 → 10 → 23) with stable ID-prefixed names,
+  ID-based selection, named learning paths behind **[P]**, and self-closing 94-column menus.
+- Four showcase samples gained measured turn-by-turn narration (Crescendo trajectory, approval matrix,
+  Bulkhead isolation, security-graph incident), and samples 21/29 print their real verdict objects.
+- **All 28 offline-capable samples now execute in CI on every PR** via `--gatekeeper-offline-suite`
+  (new `gatekeeper-offline-samples` workflow) — their ~150 deterministic invariants previously ran only
+  when a human clicked through the menu. Sample 10 gained a deterministic replay + trust oracle and now
+  honors `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE`.
+- Documentation truth pass: Tribunal axis tables rebuilt from source (four shipped judge axes were
+  documented nowhere), broken anchors/table fences repaired, boundary matrix corrected (+ Session and
+  Wire columns), READMEs no longer claim group J needs Azure OpenAI (17 of 29 samples are offline by
+  design), and the sync test now enforces catalog cells, menu string budgets, ID prefixes, and
+  offline-suite membership.
+
 ### Docs and dependencies
 
 - Copilot Studio documentation moved out from under Red Team in the site navigation (#138).
