@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { VerdictBadge, type Verdict } from "./VerdictBadge";
 import { Sparkline } from "./charts/Sparkline";
 
