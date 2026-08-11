@@ -32,10 +32,81 @@ public class ExternalBenchmarkOptions
     /// </summary>
     public bool IncludeTimestamps { get; init; } = true;
 
+    /// <summary>Upper bound on <see cref="SyntheticTurnMarker"/>.</summary>
+    public const int MaximumSyntheticTurnMarkerLength = 64;
+
     /// <summary>
     /// Random seed for reproducible sampling. Null = non-deterministic.
     /// </summary>
+    /// <remarks>
+    /// A fixed seed makes a sample reproducible, which also means repeating a run with the same seed
+    /// re-draws the <i>same questions</i> rather than sampling the dataset again. Repeated runs under
+    /// one seed measure that one sample many times; they do not widen coverage. Vary the seed to draw
+    /// a different sample, and see <see cref="IncludeQuestionTypes"/> and
+    /// <see cref="AbstentionPolicy"/> to control composition directly rather than by re-rolling.
+    /// </remarks>
     public int? RandomSeed { get; init; }
+
+    /// <summary>
+    /// Restricts sampling to these question types. Null or empty applies no filter and reproduces
+    /// historical selection exactly. Default: null.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Stratified sampling spreads a budget proportionally across all types, so a 50-question subset
+    /// of LongMemEval yields about 6 <c>single-session-assistant</c> questions — enough to contribute
+    /// to an overall score, not enough to carry a per-type claim. Naming the types moves the whole
+    /// budget onto them: 30 questions of one type instead of 50 questions of which 6 are.
+    /// </para>
+    /// <para>
+    /// Stratification still applies <i>within</i> the requested set, and selection remains
+    /// reproducible under <see cref="RandomSeed"/>. Types are matched ordinally and are case
+    /// sensitive, matching the dataset's own <c>question_type</c> values.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string>? IncludeQuestionTypes { get; init; }
+
+    /// <summary>
+    /// How abstention questions are sampled. Default:
+    /// <see cref="AbstentionSamplingPolicy.AsSampled"/>, which is historical behaviour.
+    /// </summary>
+    public AbstentionSamplingPolicy AbstentionPolicy { get; init; } = AbstentionSamplingPolicy.AsSampled;
+
+    /// <summary>
+    /// Requested abstention share of the sample, 0.0-1.0. Required by — and valid only with —
+    /// <see cref="AbstentionSamplingPolicy.TargetProportion"/>.
+    /// </summary>
+    /// <remarks>
+    /// The share is a request, not a guarantee: when the pool holds fewer abstention questions than
+    /// the target, the shortfall is <i>not</i> topped up with ordinary questions, because that would
+    /// quietly change what the run measured. Compare against
+    /// <see cref="SampleComposition.RealisedAbstentionProportion"/> to see what was actually drawn.
+    /// </remarks>
+    public double? AbstentionTargetProportion { get; init; }
+
+    /// <summary>
+    /// How much provenance is captured onto <see cref="ExternalBenchmarkResult.Provenance"/>.
+    /// Default: <see cref="Models.RunProvenanceMode.None"/>.
+    /// </summary>
+    public RunProvenanceMode RunProvenanceMode { get; init; } = RunProvenanceMode.None;
+
+    /// <summary>
+    /// Prefix applied to every turn AgentEval synthesises when injecting history, making them
+    /// removable by exact prefix match. Null (default) emits the historical text verbatim.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Applies to structured history injection only — see
+    /// <see cref="LongMemEval.LongMemEvalHistoryFormatter.Format"/>. The text-blob format is the
+    /// official LongMemEval prompt and is left byte-for-byte alone.
+    /// </para>
+    /// <para>
+    /// Covers strictly more than <see cref="PreserveSessionBoundaries"/>: that flag removes the
+    /// session-boundary turn pair, but the filler reply synthesised for a user turn with no assistant
+    /// response is emitted either way, and is indistinguishable from real content once retrieved.
+    /// </para>
+    /// </remarks>
+    public string? SyntheticTurnMarker { get; init; }
 
     /// <summary>
     /// Dataset mode identifier. Meaning is benchmark-specific
@@ -151,6 +222,51 @@ public class ExternalBenchmarkOptions
             throw new ArgumentOutOfRangeException(nameof(PredicateCombinationRule));
         if (!Enum.IsDefined(EvidenceCaptureMode))
             throw new ArgumentOutOfRangeException(nameof(EvidenceCaptureMode));
+        if (!Enum.IsDefined(AbstentionPolicy))
+            throw new ArgumentOutOfRangeException(nameof(AbstentionPolicy));
+        if (!Enum.IsDefined(RunProvenanceMode))
+            throw new ArgumentOutOfRangeException(nameof(RunProvenanceMode));
+
+        // A proportion is meaningful under exactly one policy. Accepting it under the others would
+        // let a run look configured for an abstention share it never applied.
+        if (AbstentionPolicy == AbstentionSamplingPolicy.TargetProportion)
+        {
+            if (AbstentionTargetProportion is not { } proportion)
+            {
+                throw new ArgumentException(
+                    "AbstentionTargetProportion is required when AbstentionPolicy is TargetProportion.",
+                    nameof(AbstentionTargetProportion));
+            }
+            if (!double.IsFinite(proportion) || proportion is < 0 or > 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(AbstentionTargetProportion), AbstentionTargetProportion,
+                    "AbstentionTargetProportion must be a finite value between 0 and 1.");
+            }
+        }
+        else if (AbstentionTargetProportion.HasValue)
+        {
+            throw new ArgumentException(
+                $"AbstentionTargetProportion is only valid when AbstentionPolicy is " +
+                $"{nameof(AbstentionSamplingPolicy.TargetProportion)}; it is set while the policy is " +
+                $"{AbstentionPolicy}, where it would be silently ignored.",
+                nameof(AbstentionTargetProportion));
+        }
+
+        if (IncludeQuestionTypes is { Count: > 0 } types &&
+            types.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException(
+                "IncludeQuestionTypes must not contain null or whitespace entries.",
+                nameof(IncludeQuestionTypes));
+        }
+
+        if (SyntheticTurnMarker is { Length: > MaximumSyntheticTurnMarkerLength })
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(SyntheticTurnMarker), SyntheticTurnMarker.Length,
+                $"SyntheticTurnMarker must be at most {MaximumSyntheticTurnMarkerLength} characters.");
+        }
         if (MaxJudgeRetries is < 0 or > MaximumJudgeRetries)
         {
             throw new ArgumentOutOfRangeException(

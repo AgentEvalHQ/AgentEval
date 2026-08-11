@@ -99,11 +99,119 @@ Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o = 57.7%)"
 ```
 
 What's preserved from the official benchmark:
-- **Stratified sampling** across all 6 question types (single-session, multi-session, temporal, knowledge-update, abstention, preference)
+- **Stratified sampling** across all 6 question types (`single-session-user`, `single-session-assistant`, `single-session-preference`, `multi-session`, `temporal-reasoning`, `knowledge-update`)
 - **Type-specific judge prompts** matching the official evaluation
 - **Session boundary + timestamp preservation** in history injection
 - **Binary scoring** (0/1) comparable to published results
 - **2 LLM calls per question** (query + judge) via history injection
+
+> [!IMPORTANT]
+> **Abstention is not one of the six types.** An abstention question carries the same `question_type`
+> as an ordinary one and is identified only by an `_abs` suffix on its id — 30 of the dataset's 500.
+> Stratifying across types therefore says nothing about how many abstention questions a sample holds,
+> and a fixed seed can draw a sample containing none of them, every run. The shipped Subset preset
+> (50 questions, seed 42) draws **zero**. Use `AbstentionPolicy` to control this and
+> `result.Composition` to see what actually ran.
+
+#### Controlling what a sample contains
+
+Sampling defaults are unchanged, so an existing configuration keeps drawing exactly the sample it
+always drew. These options change composition only when set:
+
+```csharp
+var result = await runner.RunAsync(agent, config, new ExternalBenchmarkOptions
+{
+    MaxQuestions = 30,
+    RandomSeed = 42,
+
+    // Spend the whole budget on one type: "30 single-session-assistant questions",
+    // not "50 of which 6 are". Stratification still applies within the requested set.
+    IncludeQuestionTypes = ["single-session-assistant"],
+
+    // Abstention is orthogonal to type, so it is controlled separately.
+    // AsSampled (default) | Exclude | Only | TargetProportion
+    AbstentionPolicy = AbstentionSamplingPolicy.Exclude,
+});
+
+// Realised counts, computed from the questions that actually ran — never from the request.
+var composition = result.Composition!;
+Console.WriteLine($"{composition.TotalQuestions} questions, " +
+                  $"{composition.AbstentionQuestions} abstention " +
+                  $"({composition.RealisedAbstentionProportion:P0})");
+foreach (var (type, counts) in composition.ByQuestionType)
+    Console.WriteLine($"  {type}: {counts.TotalQuestions} ({counts.AbstentionQuestions} abstention)");
+```
+
+`TargetProportion` requests a share via `AbstentionTargetProportion`. When the pool cannot fill it the
+sample is left short rather than topped up with ordinary questions — topping up would silently change
+what the run measured. Compare `RequestedAbstentionProportion` against `RealisedAbstentionProportion`
+to see whether the request was met.
+
+> A fixed `RandomSeed` makes a sample reproducible, which also means repeating a run re-draws the
+> **same questions**. Repeated runs under one seed measure one sample many times; they do not widen
+> coverage.
+
+#### Reconciling judge calls
+
+`JudgeLlmCallCount` counts every provider call including retries, so a validity gate asserting an exact
+call count can reject a good run whose only anomaly was an internal retry. The two halves are now
+reported separately, on each question and for the run:
+
+```csharp
+foreach (var q in result.QuestionResults)
+    Console.WriteLine($"{q.QuestionId}: {q.JudgePrimaryLlmCallCount} primary " +
+                      $"+ {q.JudgeRetryLlmCallCount} retry ({q.JudgeAttemptsUsed} attempts)");
+
+Console.WriteLine($"Retries across the run: {result.TotalJudgeRetryLlmCalls}");
+```
+
+`JudgeLlmCallCount` always equals primary + retry. One attempt can cost more than one call when the
+provider rejects a response format, and those fallback calls count as primary — they are the cost of
+the attempt, not a retry.
+
+#### Provenance: proving two runs are comparable
+
+A sealed baseline is comparable to a later run only if the dataset and judge prompts are unchanged.
+Neither is pinned by the package version. Capture is opt-in:
+
+```csharp
+var options = new ExternalBenchmarkOptions
+{
+    // None (default) | PromptsOnly (free) | Full (adds a SHA-256 over the dataset file)
+    RunProvenanceMode = RunProvenanceMode.Full,
+};
+
+var p = result.Provenance!;
+Console.WriteLine($"judge prompts: {p.JudgePromptFingerprint}");   // changes if any template is edited
+Console.WriteLine($"dataset:       {p.DatasetSha256}");
+Console.WriteLine($"sample:        {p.SelectedQuestionIdFingerprint}");  // same value ⇒ same questions
+```
+
+Provenance also enables capture of the provider's backend build id (`system_fingerprint`) when the
+provider returns one, on `QuestionResult.JudgeSystemFingerprint` and de-duplicated on
+`result.JudgeSystemFingerprints`. More than one value means the run itself spanned backend builds.
+Absence is reported as `null` — never as a placeholder, because determinism holds only while the build
+is unchanged.
+
+#### Excluding AgentEval's own scaffolding from history
+
+Structured history injection synthesises turns that are not in the dataset: the session-boundary pair
+and a filler reply for a user turn with no assistant response. A memory system ingests and retrieves
+them like any other content, which makes a retrieval set full of scaffolding look like a defect in the
+system under test.
+
+```csharp
+// Remove the session-boundary pair entirely (this option already existed):
+PreserveSessionBoundaries = false,
+
+// Or keep the structure and make every synthesised turn identifiable by exact prefix:
+SyntheticTurnMarker = "[[AGENTEVAL-SYNTHETIC]]",
+```
+
+The exact default strings are public constants —
+`LongMemEvalHistoryFormatter.SessionBoundaryAcknowledgement`, `.UnpairedUserAcknowledgement` and
+`.SessionMarkerPrefix` — so they can be matched without copying a literal out of a log. Both options
+apply to structured injection; the text-blob format is the official prompt and is left untouched.
 
 Sample [G8: LongMemEvalBenchmarkDemo](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) and [G10: LongMemEvalBaselineRepro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
 

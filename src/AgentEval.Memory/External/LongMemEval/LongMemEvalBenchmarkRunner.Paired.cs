@@ -37,7 +37,8 @@ public partial class LongMemEvalBenchmarkRunner
         options.Validate();
         ValidateMatchingAnswerModels(normalConfig, oracleConfig);
 
-        var entries = LoadEntries(options);
+        var loaded = LoadEntries(options);
+        var entries = loaded.Entries;
         var selectedQuestionIds = Array.AsReadOnly(
             entries.Select(entry => entry.QuestionId).ToArray());
 
@@ -48,7 +49,8 @@ public partial class LongMemEvalBenchmarkRunner
             options,
             entries,
             executionLabel: "normal",
-            ct);
+            ct,
+            loaded);
 
         ct.ThrowIfCancellationRequested();
         var oracleEntries = entries
@@ -60,7 +62,8 @@ public partial class LongMemEvalBenchmarkRunner
             options,
             oracleEntries,
             executionLabel: "oracle",
-            ct);
+            ct,
+            loaded with { Entries = oracleEntries });
 
         double? oracleGap =
             normal.OverallAccuracy.HasValue && oracle.OverallAccuracy.HasValue

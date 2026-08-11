@@ -42,8 +42,48 @@ public class ExternalJudgmentResult
     /// <summary>Number of provider calls attempted, including retries.</summary>
     public int LlmCallCount { get; init; }
 
-    /// <summary>Number of provider calls attempted, including retries.</summary>
+    /// <summary>
+    /// Number of provider calls attempted, including retries. Identical to
+    /// <see cref="LlmCallCount"/> despite the name — it counts calls, not attempts. Use
+    /// <see cref="AttemptsUsed"/> for the number of logical judge attempts.
+    /// </summary>
     public int AttemptCount => LlmCallCount;
+
+    /// <summary>
+    /// Provider calls made by the first judge attempt, including any response-format fallback calls
+    /// that attempt needed.
+    /// </summary>
+    public int PrimaryLlmCallCount { get; init; }
+
+    /// <summary>
+    /// Provider calls made by retry attempts — the calls AgentEval chose to make after the first
+    /// attempt failed to produce a binary verdict. Zero on a clean judgment.
+    /// </summary>
+    /// <remarks>
+    /// Always equal to <see cref="LlmCallCount"/> minus <see cref="PrimaryLlmCallCount"/>. Reported
+    /// so a caller reconciling an exact expected call count can subtract retries instead of
+    /// rejecting a run whose only sin was that AgentEval retried internally.
+    /// </remarks>
+    public int RetryLlmCallCount { get; init; }
+
+    /// <summary>
+    /// Logical judge attempts made: 1 when the first attempt produced a verdict, more when retries
+    /// were used. Distinct from <see cref="LlmCallCount"/>, which one attempt can increase by more
+    /// than one when the provider rejects a response format.
+    /// </summary>
+    public int AttemptsUsed { get; init; }
+
+    /// <summary>
+    /// The provider's backend build identifier for the judge call (OpenAI's
+    /// <c>system_fingerprint</c>), or null when the provider did not return one.
+    /// </summary>
+    /// <remarks>
+    /// Null means "not reported", never "unchanged". Determinism holds only while the backend build
+    /// is unchanged, so two runs that differ here were not comparable however identical their
+    /// configuration looked.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SystemFingerprint { get; init; }
 
     /// <summary>Bounded AgentEval-owned failure code; never provider exception text.</summary>
     public string? SafeFailureCode { get; init; }

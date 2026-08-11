@@ -71,7 +71,10 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             attempt.Tokens,
             options,
             attempt.FailureCode,
-            attempt.Reasoning);
+            attempt.Reasoning,
+            primaryCalls: attempt.PrimaryCalls,
+            attemptsUsed: attempt.AttemptsUsed,
+            systemFingerprint: attempt.SystemFingerprint);
     }
 
     private async Task<ExternalJudgmentResult> JudgePerPredicateAsync(
@@ -92,6 +95,9 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
         var predicateResults = new List<JudgePredicateResult>(predicates.Count);
         var totalTokens = 0;
         var totalCalls = 0;
+        var totalPrimaryCalls = 0;
+        var totalAttempts = 0;
+        string? lastFingerprint = null;
 
         for (var index = 0; index < predicates.Count; index++)
         {
@@ -103,6 +109,9 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
 
             totalTokens += attempt.Tokens;
             totalCalls += attempt.ProviderCalls;
+            totalPrimaryCalls += attempt.PrimaryCalls;
+            totalAttempts += attempt.AttemptsUsed;
+            lastFingerprint = attempt.SystemFingerprint ?? lastFingerprint;
             predicateResults.Add(new JudgePredicateResult
             {
                 Index = index,
@@ -127,7 +136,10 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             failureCode,
             reasoning: null,
             predicateResults,
-            options.PredicateCombinationRule);
+            options.PredicateCombinationRule,
+            primaryCalls: totalPrimaryCalls,
+            attemptsUsed: totalAttempts,
+            systemFingerprint: lastFingerprint);
     }
 
     /// <summary>
@@ -182,13 +194,22 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
         string? Reasoning,
         string? FailureCode,
         int ProviderCalls,
-        int Tokens);
+        int PrimaryCalls,
+        int AttemptsUsed,
+        int Tokens,
+        string? SystemFingerprint);
 
     /// <summary>
     /// Runs one judge question to a conclusive outcome or to the retry bound. Provider calls are counted
     /// individually, including response-format fallback calls, so reported spend is what was actually
     /// paid for rather than the number of logical attempts.
     /// </summary>
+    /// <remarks>
+    /// Calls made by the first attempt are counted separately from calls made by retries. The two are
+    /// not interchangeable to a caller reconciling spend: a retry is AgentEval deciding on its own to
+    /// pay for another call, and a caller whose validity gate asserts an exact call count needs to see
+    /// that decision rather than infer it from a total that silently grew.
+    /// </remarks>
     private async Task<JudgeAttempt> RunJudgeLoopAsync(
         string judgePrompt,
         ExternalBenchmarkQuestion question,
@@ -197,33 +218,43 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
     {
         var totalTokens = 0;
         var providerCalls = 0;
+        var primaryCalls = 0;
         var attempts = 0;
         JudgeAttempt last = default;
 
         while (attempts <= options.MaxJudgeRetries)
         {
             attempts++;
+
+            JudgeOutcomeStatus status;
+            string? raw = null;
+            string? reasoning = null;
+            string? failureCode;
+            string? systemFingerprint = null;
+
             try
             {
                 var response = await InvokeProviderAsync(judgePrompt, options, ct, callCount: () => providerCalls++)
                     .ConfigureAwait(false);
 
                 totalTokens += (int)(response.Usage?.TotalTokenCount ?? 0);
+                // Provenance is opt-in, so a default run neither collects nor reports the backend
+                // build — keeping the default result shape and the default observations unchanged.
+                systemFingerprint = options.RunProvenanceMode != RunProvenanceMode.None
+                    ? ProviderFingerprint.FromChatResponse(response)
+                    : null;
                 var finishReason = response.FinishReason?.Value;
+                raw = response.Text;
 
                 if (options.JudgeVerdictProtocol == JudgeVerdictProtocol.StructuredJson)
                 {
-                    var (status, reasoning, failureCode) =
+                    (status, reasoning, failureCode) =
                         LongMemEvalStructuredVerdict.Parse(response.Text, finishReason);
-                    last = new JudgeAttempt(
-                        status, response.Text, reasoning, failureCode, providerCalls, totalTokens);
                 }
                 else
                 {
-                    var status = ParseResponse(response.Text, finishReason);
-                    last = new JudgeAttempt(
-                        status, response.Text, null, FreeTextFailureCode(status, finishReason),
-                        providerCalls, totalTokens);
+                    status = ParseResponse(response.Text, finishReason);
+                    failureCode = FreeTextFailureCode(status, finishReason);
                 }
             }
             catch (OperationCanceledException)
@@ -237,9 +268,20 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
                     "LongMemEval judge provider failure for question {QuestionId}: {FailureCode}",
                     question.QuestionId,
                     safeCode);
-                last = new JudgeAttempt(
-                    JudgeOutcomeStatus.ProviderError, null, null, safeCode, providerCalls, totalTokens);
+                status = JudgeOutcomeStatus.ProviderError;
+                raw = null;
+                reasoning = null;
+                failureCode = safeCode;
             }
+
+            // Recorded after the attempt so a first attempt that threw still counts the call it paid
+            // for, and so response-format fallback calls land on the attempt that made them.
+            if (attempts == 1)
+                primaryCalls = providerCalls;
+
+            last = new JudgeAttempt(
+                status, raw, reasoning, failureCode,
+                providerCalls, primaryCalls, attempts, totalTokens, systemFingerprint);
 
             if (last.Status is JudgeOutcomeStatus.Yes or JudgeOutcomeStatus.No)
                 return last;
@@ -426,7 +468,10 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
         string? safeFailureCode = null,
         string? reasoning = null,
         IReadOnlyList<JudgePredicateResult>? predicateResults = null,
-        PredicateCombinationRule? combinationRule = null)
+        PredicateCombinationRule? combinationRule = null,
+        int primaryCalls = 0,
+        int attemptsUsed = 0,
+        string? systemFingerprint = null)
     {
         var evidenceMode = options.JudgeEvidenceMode;
         var normalized = raw?.Trim();
@@ -455,6 +500,11 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             Explanation = explanation,
             TokensUsed = totalTokens,
             LlmCallCount = providerCalls,
+            PrimaryLlmCallCount = primaryCalls,
+            // Derived rather than accumulated separately, so the two halves always sum to the total.
+            RetryLlmCallCount = providerCalls - primaryCalls,
+            AttemptsUsed = attemptsUsed,
+            SystemFingerprint = systemFingerprint,
             SafeFailureCode = safeFailureCode,
             RawResponse = evidenceMode == JudgeEvidenceMode.Raw || options.RetainRawJudgeResponse
                 ? boundedRaw

@@ -76,8 +76,24 @@ public class LongMemEvalJudgeDiagnosticsTests
         Assert.Null(result.RawResponse);
     }
 
+    /// <summary>
+    /// Pins the serialized shape of a default-options judgment.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// v0.20.0-beta adds three always-present integers — PrimaryLlmCallCount, RetryLlmCallCount and
+    /// AttemptsUsed — so this shape is NOT identical to v0.19.0-beta's. The addition is deliberate
+    /// and additive: a call-accounting field that only appears when opted in is useless to a validity
+    /// gate that has to run on every result. System.Text.Json ignores unknown properties on
+    /// deserialization, so a consumer reading these results keeps working; a consumer asserting an
+    /// exact property set does not, which is why the change is called out rather than absorbed.
+    /// </para>
+    /// <para>
+    /// Everything else added in this release stays WhenWritingNull or opt-in and is absent here.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task RetainRawJudgeResponse_DefaultOff_SerializesByteIdenticallyToTodaysShape()
+    public async Task DefaultOptions_SerializeToThePinnedShape()
     {
         var judge = CreateJudge(Response(JudgeText));
 
@@ -89,13 +105,48 @@ public class LongMemEvalJudgeDiagnosticsTests
 
         var json = JsonSerializer.Serialize(result);
 
-        // Every field added by this change is WhenWritingNull, so a default-options judgment serializes
-        // to exactly the property set a 0.18.0-beta consumer already parses.
         Assert.Equal(
             """
-            {"Status":0,"Correct":true,"RawScore":100,"Explanation":"Judge outcome: Yes","TokensUsed":0,"LlmCallCount":1,"AttemptCount":1,"SafeFailureCode":null}
+            {"Status":0,"Correct":true,"RawScore":100,"Explanation":"Judge outcome: Yes","TokensUsed":0,"LlmCallCount":1,"AttemptCount":1,"PrimaryLlmCallCount":1,"RetryLlmCallCount":0,"AttemptsUsed":1,"SafeFailureCode":null}
             """,
             json);
+    }
+
+    /// <summary>
+    /// The v0.19.0-beta property set must still be present, unchanged in name and value. This is the
+    /// half of the previous guarantee that still holds and still matters: the addition is additive,
+    /// and nothing a 0.19 consumer already reads has moved or changed meaning.
+    /// </summary>
+    [Fact]
+    public async Task DefaultOptions_PreserveEveryPropertyV019Emitted()
+    {
+        var judge = CreateJudge(Response(JudgeText));
+
+        var result = await judge.JudgeAsync("answer", Question(), new ExternalBenchmarkOptions
+        {
+            MaxJudgeRetries = 0,
+            JudgeEvidenceMode = JudgeEvidenceMode.Outcome
+        });
+
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(result));
+        var root = document.RootElement;
+
+        Assert.Equal(0, root.GetProperty("Status").GetInt32());
+        Assert.True(root.GetProperty("Correct").GetBoolean());
+        Assert.Equal(100, root.GetProperty("RawScore").GetDouble());
+        Assert.Equal("Judge outcome: Yes", root.GetProperty("Explanation").GetString());
+        Assert.Equal(0, root.GetProperty("TokensUsed").GetInt32());
+        Assert.Equal(1, root.GetProperty("LlmCallCount").GetInt32());
+        Assert.Equal(1, root.GetProperty("AttemptCount").GetInt32());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("SafeFailureCode").ValueKind);
+
+        // And the only additions are the three call-accounting counters.
+        var added = root.EnumerateObject()
+            .Select(p => p.Name)
+            .Except(["Status", "Correct", "RawScore", "Explanation", "TokensUsed", "LlmCallCount", "AttemptCount", "SafeFailureCode"])
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(["AttemptsUsed", "PrimaryLlmCallCount", "RetryLlmCallCount"], added);
     }
 
     [Fact]

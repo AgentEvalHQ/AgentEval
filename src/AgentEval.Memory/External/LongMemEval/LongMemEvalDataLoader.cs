@@ -51,6 +51,21 @@ public static class LongMemEvalDataLoader
     /// <returns>List of entries, sampled proportionally by question type if options specify.</returns>
     /// <exception cref="LongMemEvalDatasetNotFoundException">When the file does not exist on disk.</exception>
     public static IReadOnlyList<LongMemEvalEntry> LoadFromFile(string path, ExternalBenchmarkOptions options)
+        => LoadFromFile(path, options, out _);
+
+    /// <summary>
+    /// Loads entries as <see cref="LoadFromFile(string, ExternalBenchmarkOptions)"/> does, additionally
+    /// reporting how many questions the file held <i>before</i> sampling.
+    /// </summary>
+    /// <param name="path">Path to the dataset (oracle, S, or M format).</param>
+    /// <param name="options">Benchmark options controlling sampling.</param>
+    /// <param name="totalQuestionsInFile">
+    /// Questions present in the file, before any type filter, abstention policy or budget was applied.
+    /// Recorded so a run can state what it sampled <i>from</i> and not only what it sampled.
+    /// </param>
+    /// <exception cref="LongMemEvalDatasetNotFoundException">When the file does not exist on disk.</exception>
+    public static IReadOnlyList<LongMemEvalEntry> LoadFromFile(
+        string path, ExternalBenchmarkOptions options, out int totalQuestionsInFile)
     {
         ArgumentNullException.ThrowIfNull(path);
         if (!File.Exists(path))
@@ -60,6 +75,7 @@ public static class LongMemEvalDataLoader
         var entries = JsonSerializer.Deserialize<List<LongMemEvalEntry>>(json)
             ?? throw new InvalidOperationException("Failed to deserialize LongMemEval dataset.");
 
+        totalQuestionsInFile = entries.Count;
         return Sample(entries, options);
     }
 
@@ -170,23 +186,129 @@ public static class LongMemEvalDataLoader
         return null;
     }
 
+    /// <summary>
+    /// True when the caller asked for a specific sample composition. When false the historical
+    /// selection path runs untouched, so a default run draws exactly the sample it always drew.
+    /// </summary>
+    private static bool HasCompositionFilter(ExternalBenchmarkOptions options)
+        => options.IncludeQuestionTypes is { Count: > 0 }
+            || options.AbstentionPolicy != AbstentionSamplingPolicy.AsSampled;
+
     private static IReadOnlyList<LongMemEvalEntry> Sample(
         List<LongMemEvalEntry> entries, ExternalBenchmarkOptions options)
+        => HasCompositionFilter(options)
+            ? SampleWithComposition(entries, options)
+            : SelectBudgeted(entries, options.MaxQuestions, options.StratifiedSampling, options.RandomSeed);
+
+    /// <summary>
+    /// The historical selection rule, unchanged: no budget returns everything, a budget at or above
+    /// the pool size returns everything, and otherwise the pool is stratified or shuffled.
+    /// </summary>
+    private static IReadOnlyList<LongMemEvalEntry> SelectBudgeted(
+        List<LongMemEvalEntry> entries, int? maxQuestions, bool stratified, int? seed)
     {
-        if (!options.MaxQuestions.HasValue)
+        if (!maxQuestions.HasValue)
             return entries;
 
-        var max = options.MaxQuestions.Value;
+        var max = maxQuestions.Value;
         if (max <= 0)
             return [];
         if (max >= entries.Count)
             return entries;
 
-        if (options.StratifiedSampling)
-            return StratifiedSample(entries, max, options.RandomSeed);
+        // Created here, exactly where it was created before, so the draw for a given seed is
+        // unchanged by this refactor.
+        var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared;
+        return SelectBudgeted(entries, max, stratified, rng);
+    }
+
+    private static IReadOnlyList<LongMemEvalEntry> SelectBudgeted(
+        List<LongMemEvalEntry> entries, int maxQuestions, bool stratified, Random rng)
+    {
+        if (maxQuestions <= 0)
+            return [];
+        if (maxQuestions >= entries.Count)
+            return entries;
+
+        if (stratified)
+            return StratifiedSample(entries, maxQuestions, rng);
 
         // Shuffle then take (avoids the sorted-by-type bias)
-        return ShuffledSample(entries, max, options.RandomSeed);
+        return ShuffledSample(entries, maxQuestions, rng);
+    }
+
+    /// <summary>
+    /// Applies the requested type filter and abstention policy, then samples within the resulting
+    /// pool. Filtering preserves the dataset's original order, so grouping and therefore selection
+    /// stay reproducible under a seed.
+    /// </summary>
+    private static IReadOnlyList<LongMemEvalEntry> SampleWithComposition(
+        List<LongMemEvalEntry> entries, ExternalBenchmarkOptions options)
+    {
+        var pool = entries;
+
+        if (options.IncludeQuestionTypes is { Count: > 0 } requestedTypes)
+        {
+            var allowed = new HashSet<string>(requestedTypes, StringComparer.Ordinal);
+            pool = pool.Where(e => allowed.Contains(e.QuestionType)).ToList();
+        }
+
+        switch (options.AbstentionPolicy)
+        {
+            case AbstentionSamplingPolicy.Exclude:
+                pool = pool.Where(e => !e.IsAbstention).ToList();
+                break;
+
+            case AbstentionSamplingPolicy.Only:
+                pool = pool.Where(e => e.IsAbstention).ToList();
+                break;
+
+            case AbstentionSamplingPolicy.TargetProportion:
+                return SampleToAbstentionTarget(pool, options);
+
+            case AbstentionSamplingPolicy.AsSampled:
+            default:
+                break;
+        }
+
+        return SelectBudgeted(pool, options.MaxQuestions, options.StratifiedSampling, options.RandomSeed);
+    }
+
+    /// <summary>
+    /// Splits the budget between abstention and ordinary questions and samples each side
+    /// independently. A side that cannot fill its allocation is left short rather than topped up from
+    /// the other: topping up would silently change the composition the caller asked to measure.
+    /// </summary>
+    private static IReadOnlyList<LongMemEvalEntry> SampleToAbstentionTarget(
+        List<LongMemEvalEntry> pool, ExternalBenchmarkOptions options)
+    {
+        var abstention = pool.Where(e => e.IsAbstention).ToList();
+        var ordinary = pool.Where(e => !e.IsAbstention).ToList();
+
+        // No budget means "every question in the filtered pool", so the proportion has nothing to
+        // ration and the pool is returned as-is.
+        if (!options.MaxQuestions.HasValue)
+            return pool;
+
+        var max = options.MaxQuestions.Value;
+        if (max <= 0)
+            return [];
+
+        var proportion = options.AbstentionTargetProportion
+            ?? throw new InvalidOperationException(
+                "AbstentionTargetProportion is required for TargetProportion sampling; " +
+                "ExternalBenchmarkOptions.Validate() enforces this.");
+
+        var abstentionSlots = (int)Math.Round(max * proportion, MidpointRounding.AwayFromZero);
+        var ordinarySlots = max - abstentionSlots;
+
+        // One generator drives both draws so the pair is reproducible as a unit under the seed.
+        var rng = options.RandomSeed.HasValue ? new Random(options.RandomSeed.Value) : Random.Shared;
+
+        var selected = new List<LongMemEvalEntry>(max);
+        selected.AddRange(SelectBudgeted(abstention, abstentionSlots, options.StratifiedSampling, rng));
+        selected.AddRange(SelectBudgeted(ordinary, ordinarySlots, options.StratifiedSampling, rng));
+        return selected;
     }
 
     /// <summary>
@@ -195,9 +317,8 @@ public static class LongMemEvalDataLoader
     /// the number of types, randomly selects which types to include.
     /// </summary>
     private static IReadOnlyList<LongMemEvalEntry> StratifiedSample(
-        List<LongMemEvalEntry> entries, int maxQuestions, int? seed)
+        List<LongMemEvalEntry> entries, int maxQuestions, Random rng)
     {
-        var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared;
         var groups = entries.GroupBy(e => e.QuestionType).ToList();
         var totalEntries = entries.Count;
 
@@ -262,9 +383,8 @@ public static class LongMemEvalDataLoader
     }
 
     private static IReadOnlyList<LongMemEvalEntry> ShuffledSample(
-        List<LongMemEvalEntry> entries, int maxQuestions, int? seed)
+        List<LongMemEvalEntry> entries, int maxQuestions, Random rng)
     {
-        var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared;
         var pool = entries.ToList();
         FisherYatesShuffle(pool, maxQuestions, rng);
         return pool.Take(maxQuestions).ToList();

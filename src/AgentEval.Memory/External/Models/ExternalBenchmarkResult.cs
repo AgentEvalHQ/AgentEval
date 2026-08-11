@@ -68,8 +68,39 @@ public class ExternalBenchmarkResult
     /// <summary>Total LLM calls made (query + judge per question).</summary>
     public int TotalLlmCalls { get; init; }
 
+    /// <summary>
+    /// Judge provider calls across the run that were retries rather than first attempts. Subtract
+    /// from <see cref="TotalLlmCalls"/> to reconcile against an expected two-calls-per-question
+    /// budget without having to guess how often AgentEval retried.
+    /// </summary>
+    public int TotalJudgeRetryLlmCalls { get; init; }
+
     /// <summary>Estimated cost in USD.</summary>
     public double? EstimatedCostUsd { get; init; }
+
+    /// <summary>
+    /// What the run actually contained, by question type and abstention flag, counted from
+    /// <see cref="QuestionResults"/>.
+    /// </summary>
+    public SampleComposition? Composition { get; init; }
+
+    /// <summary>
+    /// Dataset and judge-prompt fingerprints; null unless
+    /// <see cref="ExternalBenchmarkOptions.RunProvenanceMode"/> requested them.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkRunProvenance? Provenance { get; init; }
+
+    /// <summary>
+    /// Distinct judge backend build identifiers observed across the run, sorted; null when no
+    /// provider returned one.
+    /// </summary>
+    /// <remarks>
+    /// More than one entry means the run itself spanned backend builds, so its own questions were
+    /// not all answered under the same conditions.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? JudgeSystemFingerprints { get; init; }
 
     /// <summary>Options used for this run.</summary>
     public required ExternalBenchmarkOptions Options { get; init; }
@@ -119,6 +150,7 @@ public class TypeResult
 public class QuestionResult
 {
     private JudgeOutcomeStatus? _judgeStatus;
+    private bool? _isAbstention;
 
     /// <summary>Question identifier from the dataset.</summary>
     public required string QuestionId { get; init; }
@@ -159,11 +191,48 @@ public class QuestionResult
         init => _judgeStatus = value;
     }
 
+    /// <summary>
+    /// Whether this was an abstention question. Falls back to the LongMemEval convention — a
+    /// <c>_abs</c> suffix on the question id — so results stored before this field existed still
+    /// report it correctly rather than reporting every question as non-abstention.
+    /// </summary>
+    public bool IsAbstention
+    {
+        get => _isAbstention ?? QuestionId.EndsWith("_abs", StringComparison.Ordinal);
+        init => _isAbstention = value;
+    }
+
     /// <summary>Agent provider calls attempted for this question.</summary>
     public int AgentLlmCallCount { get; init; }
 
     /// <summary>Judge provider calls attempted for this question, including retries.</summary>
     public int JudgeLlmCallCount { get; init; }
+
+    /// <summary>Judge provider calls made by the first attempt.</summary>
+    public int JudgePrimaryLlmCallCount { get; init; }
+
+    /// <summary>
+    /// Judge provider calls made by retries. <see cref="JudgeLlmCallCount"/> always equals
+    /// <see cref="JudgePrimaryLlmCallCount"/> plus this.
+    /// </summary>
+    public int JudgeRetryLlmCallCount { get; init; }
+
+    /// <summary>Logical judge attempts used; 1 when the first attempt produced a verdict.</summary>
+    public int JudgeAttemptsUsed { get; init; }
+
+    /// <summary>
+    /// Provider backend build identifier for the judge call, or null when none was returned.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeSystemFingerprint { get; init; }
+
+    /// <summary>
+    /// Provider backend build identifier reported by the agent under test, or null when the agent
+    /// did not surface one. AgentEval sees only what the agent adapter puts in
+    /// <c>AgentResponse.AdditionalProperties</c>, so null here means "not reported by the agent".
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AgentSystemFingerprint { get; init; }
 
     /// <summary>Judge tokens consumed across attempts.</summary>
     public int JudgeTokensUsed { get; init; }

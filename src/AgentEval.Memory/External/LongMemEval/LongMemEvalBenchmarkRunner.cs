@@ -105,8 +105,8 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         options.Validate();
 
         // 1. Load data
-        var entries = LoadEntries(options);
-        return await RunSelectedAsync(agent, options, entries, executionLabel: null, ct);
+        var loaded = LoadEntries(options);
+        return await RunSelectedAsync(agent, options, loaded.Entries, executionLabel: null, ct, loaded);
     }
 
     private async Task<ExternalBenchmarkResult> RunSelectedAsync(
@@ -114,7 +114,8 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         ExternalBenchmarkOptions options,
         IReadOnlyList<LongMemEvalEntry> entries,
         string? executionLabel,
-        CancellationToken ct)
+        CancellationToken ct,
+        LoadedDataset? dataset = null)
     {
         _logger.LogInformation(
             "LongMemEval: loaded {Count} questions ({Mode} mode, stratified={Stratified})",
@@ -210,8 +211,12 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     RawScore = null,
                     ExecutionStatus = QuestionExecutionStatus.AgentError,
                     JudgeStatus = null,
+                    IsAbstention = entry.IsAbstention,
                     AgentLlmCallCount = 1,
                     JudgeLlmCallCount = 0,
+                    JudgePrimaryLlmCallCount = 0,
+                    JudgeRetryLlmCallCount = 0,
+                    JudgeAttemptsUsed = 0,
                     SafeFailureCode = safeCode,
                     JudgeExplanation = "Agent execution did not complete.",
                     Duration = qStopwatch.Elapsed
@@ -251,8 +256,19 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 RawScore = judgment.RawScore,
                 ExecutionStatus = QuestionExecutionStatus.Completed,
                 JudgeStatus = judgment.Status,
+                IsAbstention = entry.IsAbstention,
                 AgentLlmCallCount = 1,
                 JudgeLlmCallCount = judgment.LlmCallCount,
+                JudgePrimaryLlmCallCount = judgment.PrimaryLlmCallCount,
+                JudgeRetryLlmCallCount = judgment.RetryLlmCallCount,
+                JudgeAttemptsUsed = judgment.AttemptsUsed,
+                JudgeSystemFingerprint = judgment.SystemFingerprint,
+                // Reading the agent's property bag is itself an observation of the agent, and with
+                // provenance off AgentEval must not touch it at all — see
+                // LongMemEvalEvidenceRunnerIntegrationTests.RunAsync_EvidenceCaptureNone_DoesNotInspectOrSerializeEvidence.
+                AgentSystemFingerprint = options.RunProvenanceMode != RunProvenanceMode.None
+                    ? ProviderFingerprint.FromAgentResponse(response.AdditionalProperties)
+                    : null,
                 JudgeTokensUsed = judgment.TokensUsed,
                 SafeFailureCode = judgment.SafeFailureCode,
                 JudgeExplanation = judgment.Explanation,
@@ -282,10 +298,19 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         totalStopwatch.Stop();
 
         // 3. Aggregate results
-        return AggregateResults(questionResults, options, totalStopwatch.Elapsed, executionLabel);
+        return AggregateResults(questionResults, options, totalStopwatch.Elapsed, executionLabel, dataset);
     }
 
-    private IReadOnlyList<LongMemEvalEntry> LoadEntries(ExternalBenchmarkOptions options)
+    /// <summary>
+    /// A loaded dataset together with what it was loaded from, so a run can report the file it
+    /// sampled and how many questions that file held before sampling.
+    /// </summary>
+    private readonly record struct LoadedDataset(
+        IReadOnlyList<LongMemEvalEntry> Entries,
+        string ResolvedPath,
+        int TotalQuestionsInFile);
+
+    private LoadedDataset LoadEntries(ExternalBenchmarkOptions options)
     {
         // v0.10.1-beta: no embedded fallback any more. Resolution order:
         // explicit options.DatasetPath -> runner-baked _datasetPath -> LONGMEMEVAL_DATASET_PATH env var
@@ -295,14 +320,16 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         if (resolved == null)
             throw LongMemEvalDatasetNotFoundException.ForResolutionFailure();
 
-        return LongMemEvalDataLoader.LoadFromFile(resolved, options);
+        var entries = LongMemEvalDataLoader.LoadFromFile(resolved, options, out var totalInFile);
+        return new LoadedDataset(entries, resolved, totalInFile);
     }
 
     private ExternalBenchmarkResult AggregateResults(
         List<QuestionResult> questionResults,
         ExternalBenchmarkOptions options,
         TimeSpan duration,
-        string? executionLabel)
+        string? executionLabel,
+        LoadedDataset? dataset = null)
     {
         bool IsScored(QuestionResult question) =>
             question.Correct.HasValue ||
@@ -356,6 +383,46 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         var agentFailures = questionResults.Count - agentCompleted;
         var totalLlmCalls = questionResults.Sum(q =>
             q.AgentLlmCallCount + q.JudgeLlmCallCount);
+        var totalJudgeRetryCalls = questionResults.Sum(q => q.JudgeRetryLlmCallCount);
+
+        // Counted from questionResults — the same list the accuracy denominators above are counted
+        // from — so a composition and a denominator can never disagree about what ran.
+        var composition = new SampleComposition
+        {
+            TotalQuestions = questionResults.Count,
+            AbstentionQuestions = questionResults.Count(q => q.IsAbstention),
+            NonAbstentionQuestions = questionResults.Count(q => !q.IsAbstention),
+            ByQuestionType = questionResults
+                .GroupBy(q => q.QuestionType)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new QuestionTypeComposition
+                    {
+                        TotalQuestions = g.Count(),
+                        AbstentionQuestions = g.Count(q => q.IsAbstention)
+                    }),
+            RequestedQuestionTypes = options.IncludeQuestionTypes is { Count: > 0 } requested
+                ? requested.ToArray()
+                : null,
+            RequestedAbstentionPolicy = options.AbstentionPolicy,
+            RequestedAbstentionProportion = options.AbstentionTargetProportion
+        };
+
+        var judgeFingerprints = questionResults
+            .Select(q => q.JudgeSystemFingerprint)
+            .Where(f => !string.IsNullOrEmpty(f))
+            .Select(f => f!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToArray();
+
+        var provenance = LongMemEvalProvenance.Capture(
+            options.RunProvenanceMode,
+            dataset?.ResolvedPath,
+            dataset?.TotalQuestionsInFile,
+            // Only meaningful when the ids came from a real load; a caller-supplied entry list has no
+            // dataset file behind it.
+            dataset is null ? null : questionResults.Select(q => q.QuestionId));
 
         var benchmarkName = options.DatasetMode != null
             ? $"LongMemEval-{options.DatasetMode} {questionResults.Count}q"
@@ -382,6 +449,10 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             ScoredTypeCount = scoredTypeAccuracies.Count,
             Duration = duration,
             TotalLlmCalls = totalLlmCalls,
+            TotalJudgeRetryLlmCalls = totalJudgeRetryCalls,
+            Composition = composition,
+            Provenance = provenance,
+            JudgeSystemFingerprints = judgeFingerprints.Length > 0 ? judgeFingerprints : null,
             Options = options
         };
     }
