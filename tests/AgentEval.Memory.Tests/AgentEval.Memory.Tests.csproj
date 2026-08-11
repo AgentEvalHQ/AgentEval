@@ -14,6 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Question-id/type metadata only (no dataset content), in the real dataset's order, so
+         sampling determinism is testable in CI where longmemeval_s_cleaned.json is gitignored. -->
+    <Content Include="DataLoading\longmemeval-sampling-fixture.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />

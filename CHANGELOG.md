@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0-beta] - 2026-08-12
+
+The measurable-sample release. LongMemEval learns to draw the sample you asked for, report the sample
+it actually drew, and prove that two runs were comparable. No default changes what a run selects or
+how it is scored — the v0.19.0-beta sampling path is pinned byte-for-byte by golden tests generated
+from the released code.
+
+### LongMemEval: controlling and reporting what a run contained
+
+#### Added
+- **`IncludeQuestionTypes`** — restrict sampling to named question types, stratified *within* them and
+  reproducible under the seed. A 50-question stratified subset yields about 6
+  `single-session-assistant` questions, which is enough to move an overall score and not enough to
+  carry a per-type claim. Null or empty applies no filter and reproduces historical selection exactly.
+- **`AbstentionPolicy`** (`AsSampled` / `Exclude` / `Only` / `TargetProportion`) and
+  **`AbstentionTargetProportion`** — abstention questions are the dataset's only meta-memory signal,
+  and they are *orthogonal to question type*: an abstention question carries the same `question_type`
+  as an ordinary one and is identified only by the `_abs` suffix on its id. Stratifying across types
+  therefore says nothing about abstention coverage. Measured: the shipped Subset preset (50 questions,
+  seed 42) draws **zero** of the dataset's 30 abstention questions — and because the seed is fixed,
+  it draws the same zero every run.
+- **`ExternalBenchmarkResult.Composition`** — realised counts by question type and abstention flag,
+  computed from `QuestionResults`, the same list the accuracy denominators come from. A composition
+  and a denominator therefore cannot disagree. The requested configuration is echoed alongside, so a
+  request the pool could not satisfy is visible rather than silently topped up.
+- **`QuestionResult.IsAbstention`** — falls back to the `_abs` convention, so results stored before
+  this field existed still report it correctly instead of reporting everything as non-abstention.
+- **`JudgePrimaryLlmCallCount` / `JudgeRetryLlmCallCount` / `JudgeAttemptsUsed`** on `QuestionResult`,
+  and **`TotalJudgeRetryLlmCalls`** on the result — `JudgeLlmCallCount` counts retries too, so a
+  validity gate asserting an exact provider-call count rejects runs whose only anomaly was an internal
+  retry. Total always equals primary + retry. Response-format fallback calls count as primary: they
+  are the cost of one attempt, not a retry.
+- **`RunProvenanceMode`** (`None` / `PromptsOnly` / `Full`) and
+  **`ExternalBenchmarkResult.Provenance`** — SHA-256 over the judge prompt templates (rendered with
+  fixed sentinels, so it depends on template text alone), over the dataset file, and over the ordered
+  selected question ids. A sealed baseline is comparable to a later run only while the dataset and
+  prompts are unchanged, and neither is pinned by the package version; verifying that by hand-diffing
+  library source between releases is work a hash does exactly.
+  The prompt hash is **newline-normalized**, because the templates are C# raw string literals that
+  carry their source file's line terminators into the compiled string and `.gitattributes` does not
+  pin `*.cs` to LF. The same commit therefore compiles to CRLF prompts on a Windows checkout and LF
+  prompts on Linux — caught by this fingerprint failing on Linux CI while passing locally on its first
+  run. Normalizing keeps the value meaningful across platforms; the corollary, stated plainly, is that
+  the prompt **bytes** on the wire are platform-dependent today and the fingerprint deliberately does
+  not flag that.
+- **`system_fingerprint` capture** — `QuestionResult.JudgeSystemFingerprint`,
+  `AgentSystemFingerprint`, and the de-duplicated `ExternalBenchmarkResult.JudgeSystemFingerprints`.
+  `ChatResponse` in Microsoft.Extensions.AI.Abstractions 10.7.0 has no such property, so the value is
+  recovered from `AdditionalProperties` and then by reflection over `RawRepresentation`. Absence is
+  reported as `null`, never as a placeholder: determinism holds only while the backend build is
+  unchanged, so more than one value in a run means its own questions were not answered under equal
+  conditions. Gated on `RunProvenanceMode` so a default run does not read the agent's property bag.
+- **`SyntheticTurnMarker`** — prefixes every turn AgentEval synthesises during structured history
+  injection, making scaffolding removable by exact prefix instead of by pattern-matching a literal
+  copied out of a log. The exact default strings are now public constants on
+  `LongMemEvalHistoryFormatter`. Covers strictly more than `PreserveSessionBoundaries`, which removes
+  the session-boundary pair but not the filler reply synthesised for an unpaired user turn.
+- **`LongMemEvalDataLoader.LoadFromFile(path, options, out int totalQuestionsInFile)`** — reports how
+  many questions the file held before sampling, distinct from how many were drawn.
+
+#### Changed
+- **`ExternalJudgmentResult` and `QuestionResult` gain always-present properties**, so their serialized
+  shape is not identical to v0.19.0-beta's. The addition is additive and `System.Text.Json` ignores
+  unknown properties, so a consumer reading these results keeps working; a consumer asserting an exact
+  property set does not. Call accounting is deliberately not opt-in — a counter that only appears when
+  requested is useless to a validity gate that has to run on every result.
+- Sampling internals refactored so the composition-filtered path shares the historical selection rule.
+  The unfiltered path is unchanged, and four golden samples generated from the released v0.19.0-beta
+  loader are pinned as tests.
+
+#### Fixed
+- **Documentation error**: `docs/memory-evaluation.md` listed abstention as one of the six question
+  types. It is not, and describing it as one implies a coverage guarantee that stratification cannot
+  provide.
+- **`PreserveSessionBoundaries` documented as structured-injection only.** It is read by
+  `LongMemEvalHistoryFormatter.Format` and never by `FormatAsTextBlob`, and `HistoryInjectionMode`
+  defaults to `TextBlob` — so setting it to `false` on otherwise-default options changes nothing, with
+  no way to notice. The behaviour is deliberately unchanged (honouring it in the text blob would alter
+  the official paper-methodology prompt); the silence about it is what was fixed, on the option itself
+  and in a characterization test.
+- `ExternalBenchmarkOptions.Validate` now rejects `AbstentionTargetProportion` set under a policy that
+  would ignore it, rather than accepting a run that looks configured for a share it never applied.
+
 ## [0.19.0-beta] - 2026-08-11
 
 The honest-measurement release. Three independent pieces of work, none of which changes a default:

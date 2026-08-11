@@ -12,9 +12,45 @@ namespace AgentEval.Memory.External.LongMemEval;
 public static class LongMemEvalHistoryFormatter
 {
     /// <summary>
+    /// The assistant turn synthesised to answer a session-boundary marker. Emitted only when
+    /// <see cref="ExternalBenchmarkOptions.PreserveSessionBoundaries"/> is set.
+    /// </summary>
+    /// <remarks>
+    /// Exposed as a constant because this text is not from the dataset — it is scaffolding AgentEval
+    /// adds — and a memory system that retrieves it will surface it as though it were conversation.
+    /// Matching against this constant beats pattern-matching a string copied out of a log.
+    /// </remarks>
+    public const string SessionBoundaryAcknowledgement = "Understood. Starting a new conversation session.";
+
+    /// <summary>
+    /// The assistant turn synthesised for a user turn that has no assistant reply in the dataset.
+    /// </summary>
+    /// <remarks>
+    /// Emitted regardless of <see cref="ExternalBenchmarkOptions.PreserveSessionBoundaries"/>: that
+    /// option governs session boundaries, and this filler is not one. Set
+    /// <see cref="ExternalBenchmarkOptions.SyntheticTurnMarker"/> to make it identifiable.
+    /// </remarks>
+    public const string UnpairedUserAcknowledgement = "I understand.";
+
+    /// <summary>The prefix of every synthesised session-boundary user turn.</summary>
+    public const string SessionMarkerPrefix = "--- Session ";
+
+    /// <summary>
     /// Formats a LongMemEval entry's haystack sessions as injectable conversation turns.
     /// Inserts session boundary markers and timestamps to preserve structural context.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two kinds of turn here are synthesised rather than drawn from the dataset: the
+    /// session-boundary pair (suppressed entirely by setting
+    /// <see cref="ExternalBenchmarkOptions.PreserveSessionBoundaries"/> to false) and the
+    /// <see cref="UnpairedUserAcknowledgement"/> filler. Both are indistinguishable from real
+    /// content once a memory system has ingested and retrieved them, which makes a retrieval set
+    /// full of scaffolding look like a defect in the system under test. Setting
+    /// <see cref="ExternalBenchmarkOptions.SyntheticTurnMarker"/> prefixes every synthesised turn so
+    /// they can be excluded by exact prefix instead of by guesswork.
+    /// </para>
+    /// </remarks>
     /// <param name="entry">The LongMemEval entry with haystack sessions.</param>
     /// <param name="options">Options controlling boundary and timestamp inclusion.</param>
     /// <returns>Conversation turns suitable for IHistoryInjectableAgent.InjectConversationHistory.</returns>
@@ -36,7 +72,9 @@ public static class LongMemEvalHistoryFormatter
             if (options.PreserveSessionBoundaries)
             {
                 var marker = BuildSessionMarker(sessionIdx + 1, entry, sessionIdx, options);
-                turns.Add((marker, "Understood. Starting a new conversation session."));
+                turns.Add((
+                    Mark(marker, options.SyntheticTurnMarker),
+                    Mark(SessionBoundaryAcknowledgement, options.SyntheticTurnMarker)));
             }
 
             // Add turns within this session, stripping has_answer metadata
@@ -46,7 +84,7 @@ public static class LongMemEvalHistoryFormatter
                 if (turn.Role == "user")
                 {
                     if (pendingUser != null)
-                        turns.Add((pendingUser, "I understand."));
+                        turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
                     pendingUser = turn.Content;
                 }
                 else if (turn.Role == "assistant" && pendingUser != null)
@@ -57,7 +95,7 @@ public static class LongMemEvalHistoryFormatter
             }
 
             if (pendingUser != null)
-                turns.Add((pendingUser, "I understand."));
+                turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
         }
 
         return turns;
@@ -106,10 +144,17 @@ public static class LongMemEvalHistoryFormatter
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Prepends the caller's marker verbatim — no separator is inserted, so a caller who wants one
+    /// includes it in the marker and an exact prefix match stays exact.
+    /// </summary>
+    private static string Mark(string text, string? marker)
+        => string.IsNullOrEmpty(marker) ? text : marker + text;
+
     private static string BuildSessionMarker(
         int sessionNumber, LongMemEvalEntry entry, int sessionIdx, ExternalBenchmarkOptions options)
     {
-        var marker = $"--- Session {sessionNumber}";
+        var marker = $"{SessionMarkerPrefix}{sessionNumber}";
 
         if (options.IncludeTimestamps && entry.HaystackDates != null && sessionIdx < entry.HaystackDates.Count)
             marker += $" ({entry.HaystackDates[sessionIdx]})";
