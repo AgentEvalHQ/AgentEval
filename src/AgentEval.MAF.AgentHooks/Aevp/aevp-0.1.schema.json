@@ -1,0 +1,85 @@
+{
+  "$id": "https://github.com/joslat/AgentEval/schema/aevp/0.1/aevp.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AEVP 0.1 — Agent Evidence Profile",
+  "description": "The document an AGENT-HOOKS-0.1 verdict.evidence.artefact content address resolves to. AGENT-HOOKS-0.1 §5.3 defines the POINTER to an 'offline-verifiable artefact supporting the verdict' but never defines the artefact's contents; this profile does, for the one question the contract leaves unanswerable: how much should this verdict be trusted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aevp",
+    "evaluated",
+    "enforcement_capability"
+  ],
+  "properties": {
+    "aevp": {
+      "const": "aevp/0.1",
+      "description": "Profile version. A consumer that does not recognise it MUST reject the document rather than partially interpret it."
+    },
+    "evaluated": {
+      "type": "boolean",
+      "description": "Whether the interceptor actually evaluated this call, or returned a default. false means the verdict carries NO evidence of safety. This is the abstention signal the AGENT-HOOKS decision enum (allow|deny|transform) cannot express: the verdict may say 'allow' while this says nobody checked."
+    },
+    "evidence_tier": {
+      "enum": ["verbal", "intent_to_act", "behavioral"],
+      "description": "What kind of evidence backs the verdict. 'verbal' = the subject only said something; 'intent_to_act' = an action was attempted but not carried out; 'behavioral' = a real action crossed a real boundary. MUST be absent when evaluated is false."
+    },
+    "enforcement_capability": {
+      "enum": ["observe", "block", "transform"],
+      "description": "What this interception point could PHYSICALLY have done, not what it chose to do. A permit from an 'observe' seam means nothing could have stopped the call."
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "Who produced the verdict. Absent for a purely deterministic decision.",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] },
+        "model": {
+          "type": ["string", "null"],
+          "description": "The model backing an LLM judge. Absent/null for deterministic deciders."
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kappa", "decisive_accuracy", "dangerous_errors", "n", "baseline_beaten"],
+      "description": "Whether the judge is fit to decide. ABSENT MEANS UNCALIBRATED — a consumer must treat that as a weaker claim, not a neutral one.",
+      "properties": {
+        "kappa": {
+          "type": "number", "minimum": -1, "maximum": 1,
+          "description": "Cohen's kappa against a gold set."
+        },
+        "decisive_accuracy": {
+          "type": "number", "minimum": 0, "maximum": 1,
+          "description": "Accuracy over CONCLUSIVE cases only. Inconclusive cases are a coverage gap and are excluded from the denominator, never counted as correct."
+        },
+        "dangerous_errors": {
+          "type": "integer", "minimum": 0,
+          "description": "False negatives — the class of error that matters most for a safety gate."
+        },
+        "n": {
+          "type": "integer", "minimum": 0,
+          "description": "Cases the calibration ran over. A small n weakens every other number here."
+        },
+        "baseline_beaten": {
+          "type": "boolean",
+          "description": "Whether the judge beat a NAMED deterministic baseline. A judge that cannot beat a regex is not fit to block traffic."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "An unevaluated call has no evidence tier — claiming one would assert evidence that was never gathered.",
+      "if": {
+        "properties": { "evaluated": { "const": false } },
+        "required": ["evaluated"]
+      },
+      "then": {
+        "not": { "required": ["evidence_tier"] }
+      }
+    }
+  ]
+}

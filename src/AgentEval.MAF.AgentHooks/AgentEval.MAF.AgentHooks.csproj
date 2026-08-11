@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    S1 — the AGENT-HOOKS-0.1 interceptor adapter.
+
+    Per AGENT-HOOKS-0.1 §2, Gatekeeper is an INTERCEPTOR ("a component registered with the host that receives
+    an AgentContext and returns a Verdict"), not a HOST ("a framework, SDK, or runtime that executes an agent
+    loop and dispatches to interceptors"). This project exposes the existing gate pipeline through that
+    contract so any conformant host can run it.
+
+    Deliberately a SEPARATE assembly: AgentEval.MAF must not take a dependency on the alpha
+    ResponsibleAI.AgentHooks package (which carries a native FFI core for 4 RIDs). Nothing under
+    src/AgentEval.MAF/Gatekeeper is modified by this project — that is an S1 acceptance condition.
+
+    net8.0 only: ResponsibleAI.AgentHooks 0.1.0-alpha.5 ships lib/net8.0 exclusively (verified by inspecting
+    the .nupkg). net8.0 assemblies load fine on net9/net10 hosts.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.MAF.AgentHooks</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ResponsibleAI.AgentHooks" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The AEVP schema is a shipped artefact: consumers validate emitted profiles against it, and the
+         conformance vectors evaluate it directly. Copied to output so it is resolvable at runtime. -->
+    <Content Include="Aevp/aevp-0.1.schema.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Aevp/aevp-0.1.schema.json</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>

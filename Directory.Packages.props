@@ -39,6 +39,14 @@
     <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.23.0-preview.260928.1" /><!-- preview-only; sample-only -->
     <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.23.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
     <PackageVersion Include="Azure.AI.Projects" Version="3.0.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry 1.23.0-preview.260928.1, whose nuspec declares exactly 3.0.0-beta.3 (a major beta with breaking changes; referenced only by the Foundry SAMPLES, which build against it) -->
+    <!-- S1: AGENT-HOOKS-0.1 interceptor contract (MIT, zero dependencies, lib/net8.0 + native FFI for
+         win-x64/linux-x64/osx-x64/osx-arm64). Used ONLY by src/AgentEval.MAF.AgentHooks; deliberately not
+         referenced by AgentEval.MAF so the core package never takes an alpha/native dependency. -->
+    <PackageVersion Include="ResponsibleAI.AgentHooks" Version="0.1.0-alpha.5" />
+    <!-- Microsoft's AgentHooks HOST (alpha, shipped with MAF since 1.19). TESTS and SAMPLES ONLY: it proves that
+         GatekeeperInterceptor runs inside MAF's own host. It depends on the same ResponsibleAI.AgentHooks
+         0.1.0-alpha.5 pinned above, so there is no diamond. No shipped package references it. -->
+    <PackageVersion Include="Microsoft.Agents.AI.AgentHooks" Version="1.23.0-alpha.260928.1" />
     
     <!-- Microsoft Extensions AI — 10.10.0 is the floor Microsoft.Agents.AI 1.23.0 requires.
          Microsoft.Extensions.AI.OpenAI is pinned to 10.10.1, NOT 10.10.0: Microsoft.Agents.AI.OpenAI 1.23.0 and the
