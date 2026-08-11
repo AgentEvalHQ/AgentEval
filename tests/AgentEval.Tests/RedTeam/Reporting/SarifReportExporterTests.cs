@@ -92,10 +92,18 @@ public class SarifReportExporterTests
     }
 
     [Fact]
-    public void Export_InconclusiveProbe_BecomesNoteLevelResult_NotDropped()
+    public void Export_InconclusiveProbe_BecomesOpenKindResult_NotDropped()
     {
-        // W-E5 honesty: an inconclusive probe is a coverage gap, not a pass — SARIF must surface it as a low-noise
-        // "note" so a CI consumer (GitHub code-scanning) sees it, instead of silently dropping it.
+        // W-E5 honesty: an inconclusive probe is a coverage gap, not a pass — SARIF must surface it, not drop it.
+        //
+        // S0: it is surfaced on the EVALUATION-STATE axis (`kind`), not the SEVERITY axis (`level`).
+        // SARIF 2.1.0 §3.27.9 defines "open" as: "The specified rule was evaluated, and the tool concluded that
+        // there was insufficient information to decide whether a problem exists." — a verbatim description of
+        // EvaluationOutcome.Inconclusive.
+        // §3.27.10 then requires: if `kind` "has any value other than \"fail\", then if level is absent, it SHALL
+        // default to \"none\", and if it is present, it SHALL have the value \"none\"."
+        // The previous encoding (level="note", no kind) conflated "we could not measure this" with "a low-severity
+        // problem", which is exactly the coverage-gap-as-pass failure this exporter exists to prevent.
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -120,11 +128,50 @@ public class SarifReportExporterTests
         var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
 
         Assert.Equal(1, results.GetArrayLength());
-        var note = results[0];
-        Assert.Equal("note", note.GetProperty("level").GetString());
-        Assert.Equal("SystemPromptExtraction", note.GetProperty("ruleId").GetString());
-        Assert.Equal(0, note.GetProperty("ruleIndex").GetInt32());   // references the (only) rule in tool.driver.rules
-        Assert.Contains("INCONCLUSIVE", note.GetProperty("message").GetProperty("text").GetString());
+        var gap = results[0];
+        Assert.Equal("open", gap.GetProperty("kind").GetString());     // evaluation state: insufficient information
+        Assert.Equal("none", gap.GetProperty("level").GetString());    // §3.27.10 SHALL, given kind != "fail"
+        Assert.Equal("SystemPromptExtraction", gap.GetProperty("ruleId").GetString());
+        Assert.Equal(0, gap.GetProperty("ruleIndex").GetInt32());      // references the (only) rule in tool.driver.rules
+        // The human-readable coverage-gap statement must survive on `message.text`, which is a GitHub
+        // code-scanning REQUIRED property — GitHub's SARIF docs do not mention `kind` at all, so its handling of
+        // non-"fail" results is undocumented and must not be relied on to carry this meaning.
+        Assert.Contains("INCONCLUSIVE", gap.GetProperty("message").GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public void Export_SucceededProbe_IsExplicitlyKindFail_WithSeverityOnLevel()
+    {
+        // S0: `kind` is emitted explicitly rather than relying on the SARIF default of "fail". The point of the
+        // fix is that evaluation state is a first-class axis; leaving it implicit on the vulnerability path would
+        // reproduce the ambiguity being removed. Severity stays on `level`, which is only meaningful when
+        // kind == "fail".
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-1), CompletedAt = DateTimeOffset.UtcNow, Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 1, ResistedProbes = 0, SucceededProbes = 1, InconclusiveProbes = 0,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", AttackDisplayName = "Prompt Injection",
+                    OwaspId = "LLM01", Severity = Severity.Critical, ResistedCount = 0, SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult { ProbeId = "PI-001", Prompt = "x", Response = "leaked", Outcome = EvaluationOutcome.Succeeded, Reason = "leaked the system prompt", Difficulty = Difficulty.Easy, Technique = "direct" },
+                    ],
+                }
+            ],
+        };
+
+        var doc = JsonDocument.Parse(new SarifReportExporter().Export(result));
+        var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
+
+        Assert.Equal(1, results.GetArrayLength());
+        var finding = results[0];
+        Assert.Equal("fail", finding.GetProperty("kind").GetString());
+        Assert.Equal("error", finding.GetProperty("level").GetString());   // Severity.Critical → "error"
     }
 
     [Fact]

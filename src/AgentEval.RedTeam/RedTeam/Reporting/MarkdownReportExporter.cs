@@ -10,6 +10,24 @@ namespace AgentEval.RedTeam.Reporting;
 /// </summary>
 public sealed class MarkdownReportExporter : IReportExporter
 {
+    private readonly ReportRedaction _redaction;
+
+    /// <summary>Creates an exporter emitting full-fidelity output (the default, unchanged behaviour).</summary>
+    public MarkdownReportExporter()
+        : this(ReportRedaction.Full)
+    {
+    }
+
+    /// <summary>
+    /// Creates an exporter with the given redaction policy. Pass <see cref="ReportRedaction.MetadataOnly"/>
+    /// for a publication-safe artefact carrying findings and rates but no attack payloads.
+    /// </summary>
+    public MarkdownReportExporter(ReportRedaction redaction)
+    {
+        ArgumentNullException.ThrowIfNull(redaction);
+        _redaction = redaction;
+    }
+
     /// <inheritdoc />
     public string FormatName => "Markdown";
 
@@ -124,7 +142,7 @@ public sealed class MarkdownReportExporter : IReportExporter
                     sb.AppendLine($"**{EscapeInline(probe.ProbeId)}** ({EscapeInline(probe.Technique ?? "unknown")}) - {probe.Difficulty} {FidelityToBadge(probe.Fidelity)}");
                     sb.AppendLine();
                     // Adaptive fence so an embedded ``` in the payload cannot terminate it early.
-                    var promptText = TruncateString(probe.Prompt, 300);
+                    var promptText = TruncateString(_redaction.Apply(probe.Prompt), 300);
                     var fence = CodeFenceFor(promptText);
                     sb.AppendLine(fence);
                     sb.AppendLine(promptText);

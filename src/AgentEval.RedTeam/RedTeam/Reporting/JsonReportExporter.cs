@@ -19,6 +19,24 @@ namespace AgentEval.RedTeam.Reporting;
 /// </remarks>
 public sealed class JsonReportExporter : IReportExporter
 {
+    private readonly ReportRedaction _redaction;
+
+    /// <summary>Creates an exporter emitting full-fidelity output (the default, unchanged behaviour).</summary>
+    public JsonReportExporter()
+        : this(ReportRedaction.Full)
+    {
+    }
+
+    /// <summary>
+    /// Creates an exporter with the given redaction policy. Pass <see cref="ReportRedaction.MetadataOnly"/>
+    /// for a publication-safe artefact carrying findings and rates but no attack payloads.
+    /// </summary>
+    public JsonReportExporter(ReportRedaction redaction)
+    {
+        ArgumentNullException.ThrowIfNull(redaction);
+        _redaction = redaction;
+    }
+
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -90,8 +108,8 @@ public sealed class JsonReportExporter : IReportExporter
                     {
                         Attack = a.AttackName,
                         ProbeId = p.ProbeId,
-                        Prompt = p.Prompt,
-                        Response = p.Response,
+                        Prompt = _redaction.Apply(p.Prompt),
+                        Response = _redaction.Apply(p.Response),
                         Technique = p.Technique,
                         Difficulty = p.Difficulty.ToString(),
                         Reason = p.Reason,

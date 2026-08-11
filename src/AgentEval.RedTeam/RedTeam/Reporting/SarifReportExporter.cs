@@ -18,6 +18,25 @@ namespace AgentEval.RedTeam.Reporting;
 /// </remarks>
 public sealed class SarifReportExporter : IReportExporter
 {
+    private readonly ReportRedaction _redaction;
+
+    /// <summary>Creates an exporter emitting full-fidelity output (the default, unchanged behaviour).</summary>
+    public SarifReportExporter()
+        : this(ReportRedaction.Full)
+    {
+    }
+
+    /// <summary>
+    /// Creates an exporter with the given redaction policy. Pass <see cref="ReportRedaction.MetadataOnly"/>
+    /// to produce a publication-safe artifact that carries findings and rates but no attack payloads —
+    /// relevant because SARIF is the format uploaded to code scanning.
+    /// </summary>
+    public SarifReportExporter(ReportRedaction redaction)
+    {
+        ArgumentNullException.ThrowIfNull(redaction);
+        _redaction = redaction;
+    }
+
     private const string SarifVersion = "2.1.0";
     private const string ToolName = "AgentEval RedTeam";
     private const string ToolVersion = "0.2.0";
@@ -120,7 +139,7 @@ public sealed class SarifReportExporter : IReportExporter
         }).ToList();
     }
 
-    private static List<SarifResult> GetResults(RedTeamResult result)
+    private List<SarifResult> GetResults(RedTeamResult result)
     {
         var results = new List<SarifResult>();
 
@@ -135,6 +154,7 @@ public sealed class SarifReportExporter : IReportExporter
                 {
                     RuleId = attack.AttackName,
                     RuleIndex = attackIndex,
+                    Kind = "fail",                                  // a succeeded probe IS the vulnerability
                     Level = SeverityToLevel(attack.Severity),
                     Message = new SarifMessage
                     {
@@ -161,8 +181,8 @@ public sealed class SarifReportExporter : IReportExporter
                     },
                     Properties = new SarifResultProperties
                     {
-                        Prompt = probe.Prompt,
-                        Response = probe.Response,
+                        Prompt = _redaction.Apply(probe.Prompt),
+                        Response = _redaction.Apply(probe.Response),
                         Technique = probe.Technique,
                         Difficulty = probe.Difficulty.ToString(),
                         Fidelity = probe.Fidelity.ToString(),
@@ -174,16 +194,27 @@ public sealed class SarifReportExporter : IReportExporter
                 });
             }
 
-            // An INCONCLUSIVE probe is a coverage gap, not a pass. Surface it as a low-noise SARIF "note" so a CI
-            // consumer (e.g. GitHub code-scanning) sees the category was not conclusively measured, instead of
-            // silently dropping it — which would under-report risk (RC-6 honesty discipline).
+            // An INCONCLUSIVE probe is a coverage gap, not a pass. Surface it, never drop it — dropping would
+            // under-report risk (RC-6 honesty discipline).
+            //
+            // It is surfaced on the EVALUATION-STATE axis (`kind`), not the SEVERITY axis (`level`). SARIF 2.1.0
+            // §3.27.9 defines "open" as "the specified rule was evaluated, and the tool concluded that there was
+            // insufficient information to decide whether a problem exists" — a verbatim description of
+            // Inconclusive. §3.27.10 then requires `level` to be "none" whenever `kind` is not "fail".
+            // The previous encoding (level="note", no kind) conflated "we could not measure this" with "a
+            // low-severity problem" — the coverage-gap-as-finding confusion this exporter exists to prevent.
+            //
+            // The coverage-gap statement is ALSO kept in `message.text`, which GitHub code-scanning lists as a
+            // required property. GitHub's SARIF documentation does not mention `kind` at all, so its handling of
+            // non-"fail" results is undocumented and is not relied on to carry this meaning.
             foreach (var probe in attack.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Inconclusive))
             {
                 results.Add(new SarifResult
                 {
                     RuleId = attack.AttackName,
                     RuleIndex = attackIndex,
-                    Level = "note",
+                    Kind = "open",                                  // evaluated; insufficient information to decide
+                    Level = "none",                                 // §3.27.10 SHALL, given kind != "fail"
                     Message = new SarifMessage
                     {
                         Text = $"[{probe.ProbeId}] INCONCLUSIVE (coverage gap, not a pass): {probe.Reason}"
@@ -290,6 +321,21 @@ public sealed class SarifReportExporter : IReportExporter
     {
         public string RuleId { get; init; } = "";
         public int? RuleIndex { get; init; }
+
+        /// <summary>
+        /// SARIF 2.1.0 §3.27.9 — the EVALUATION-STATE axis, orthogonal to <see cref="Level"/> (severity).
+        /// <c>"fail"</c> = a problem was found; <c>"open"</c> = "the specified rule was evaluated, and the tool
+        /// concluded that there was insufficient information to decide whether a problem exists" (verbatim), which
+        /// is exactly <c>EvaluationOutcome.Inconclusive</c>. Emitted explicitly rather than relying on the
+        /// <c>"fail"</c> default, because keeping the state implicit is the ambiguity this property removes.
+        /// </summary>
+        public string Kind { get; init; } = "";
+
+        /// <summary>
+        /// SARIF 2.1.0 §3.27.10 — severity. Only meaningful when <see cref="Kind"/> is <c>"fail"</c>: the spec
+        /// requires that if <c>kind</c> "has any value other than \"fail\" … <c>level</c> … SHALL have the value
+        /// \"none\"".
+        /// </summary>
         public string Level { get; init; } = "";
         public SarifMessage Message { get; init; } = new();
         public List<SarifLocation>? Locations { get; init; }
