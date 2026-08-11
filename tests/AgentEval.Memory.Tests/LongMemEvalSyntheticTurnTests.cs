@@ -86,6 +86,30 @@ public class LongMemEvalSyntheticTurnTests
             t.AssistantResponse == LongMemEvalHistoryFormatter.UnpairedUserAcknowledgement);
     }
 
+    /// <summary>
+    /// The second gap, and the sharper one: <c>PreserveSessionBoundaries</c> is read only by
+    /// structured injection, while <c>HistoryInjectionMode</c> defaults to <c>TextBlob</c>. On
+    /// otherwise-default options, setting it to false therefore changes nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// Characterization, not aspiration: the text blob is the official LongMemEval prompt format, and
+    /// stripping its <c>### Session N:</c> headers would change what the paper methodology sends to
+    /// the model. The behaviour is correct and the silence about it was not.
+    /// </remarks>
+    [Fact]
+    public void PreserveSessionBoundaries_IsIgnoredByTheTextBlobFormat()
+    {
+        var withBoundaries = LongMemEvalHistoryFormatter.FormatAsTextBlob(
+            Entry(), new ExternalBenchmarkOptions { PreserveSessionBoundaries = true });
+        var withoutBoundaries = LongMemEvalHistoryFormatter.FormatAsTextBlob(
+            Entry(), new ExternalBenchmarkOptions { PreserveSessionBoundaries = false });
+
+        Assert.Equal(withBoundaries, withoutBoundaries);
+        Assert.Contains("### Session 1:", withoutBoundaries);
+        // And TextBlob is what a default run uses, so the option is inert unless injection mode changes.
+        Assert.Equal(HistoryInjectionMode.TextBlob, new ExternalBenchmarkOptions().HistoryInjectionMode);
+    }
+
     // ── New in this release: every synthetic turn can be marked ───────────────
 
     [Fact]

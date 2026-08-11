@@ -24,6 +24,29 @@ public class ExternalBenchmarkOptions
     /// Preserve session boundaries when formatting history for injection.
     /// Default: true.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Setting this to false removes the synthesised session-boundary turn pair — the
+    /// <c>"--- Session N ---"</c> user turn and its
+    /// <see cref="LongMemEval.LongMemEvalHistoryFormatter.SessionBoundaryAcknowledgement"/> reply.
+    /// </para>
+    /// <para>
+    /// <b>Applies to structured history injection only.</b> It is read by
+    /// <see cref="LongMemEval.LongMemEvalHistoryFormatter.Format"/> and <i>not</i> by
+    /// <see cref="LongMemEval.LongMemEvalHistoryFormatter.FormatAsTextBlob"/>, which always emits its
+    /// own <c>"### Session N:"</c> headers because that is the official LongMemEval prompt format.
+    /// Since <see cref="HistoryInjectionMode"/> defaults to
+    /// <see cref="Models.HistoryInjectionMode.TextBlob"/>, setting this to false on otherwise-default
+    /// options has no effect — set <see cref="HistoryInjectionMode"/> to
+    /// <see cref="Models.HistoryInjectionMode.StructuredChatHistory"/> for it to apply.
+    /// </para>
+    /// <para>
+    /// It also does not suppress
+    /// <see cref="LongMemEval.LongMemEvalHistoryFormatter.UnpairedUserAcknowledgement"/>, the filler
+    /// reply synthesised for a user turn the dataset leaves unanswered. Use
+    /// <see cref="SyntheticTurnMarker"/> to make every synthesised turn identifiable.
+    /// </para>
+    /// </remarks>
     public bool PreserveSessionBoundaries { get; init; } = true;
 
     /// <summary>
