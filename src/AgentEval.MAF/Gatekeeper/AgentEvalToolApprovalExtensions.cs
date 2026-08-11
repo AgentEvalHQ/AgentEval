@@ -18,11 +18,11 @@ namespace AgentEval.MAF.Gatekeeper;
 /// auto-approves ONLY when EVERY gate agrees the call is safe; any escalation — or a gate that throws — sends the
 /// call to a human (fail-closed). Only tools wrapped as <c>ApprovalRequiredAIFunction</c> (see
 /// <see cref="RequiresApproval"/>) enter the approval flow; every other tool runs normally.</para>
-/// <para><b>Experimental (AEGK001):</b> this interop is built on MAF's evaluation-only approval API
-/// (<c>MAAI001</c>: <c>UseToolApproval</c> / <c>ToolApprovalAgentOptions</c>), which may change or be removed in a
-/// future MAF release. Suppress <c>AEGK001</c> to opt in.</para>
+/// <para>Built on MAF's <c>UseToolApproval</c> / <c>ToolApprovalAgentOptions</c>. These graduated from
+/// <c>[Experimental("MAAI001")]</c> to stable in MAF 1.14.0 (PR #7107), which is why this interop is no longer
+/// marked <c>[Experimental("AEGK001")]</c> — verified on MAF 1.17.0 by removing the <c>MAAI001</c> suppression
+/// and confirming the compiler emits no experimental diagnostic.</para>
 /// </summary>
-[Experimental("AEGK001")]
 public static class AgentEvalToolApprovalExtensions
 {
     /// <summary>
@@ -65,8 +65,16 @@ public static class AgentEvalToolApprovalExtensions
         // A single MAF auto-approval rule that returns true (auto-approve, no human) only when EVERY gate agrees
         // the call is routine. Any escalation — or a gate that throws — returns false, which MAF turns into a
         // human approval prompt (a ToolApprovalRequestContent surfaced to the caller).
-        async ValueTask<bool> AutoApproveWhenAllGatesAgree(FunctionCallContent call)
+        //
+        // MAF 1.14.0 (PR #7107, "[BREAKING] Graduate ToolApprovalAgent and add ToolAutoApprovalRuleContext")
+        // changed AutoApprovalRules from Func<FunctionCallContent, ValueTask<bool>> to
+        // Func<ToolAutoApprovalRuleContext, ValueTask<bool>>. The new context is a strict SUPERSET — it carries
+        // the same FunctionCallContent plus the surrounding run context (Agent, Session, RequestMessages,
+        // RunOptions) — so unwrapping it here is non-lossy and the gate contract below is unchanged.
+        async ValueTask<bool> AutoApproveWhenAllGatesAgree(ToolAutoApprovalRuleContext context)
         {
+            var call = context.FunctionCallContent;
+
             foreach (var gate in frozen)
             {
                 bool autoApprovable;
@@ -93,12 +101,10 @@ public static class AgentEvalToolApprovalExtensions
             return true;   // every gate agreed the call is routine ⇒ auto-approve (no human prompt)
         }
 
-#pragma warning disable MAAI001 // UseToolApproval / ToolApprovalAgentOptions are evaluation-only MAF APIs — deliberately adopted.
         return builder.UseToolApproval(new ToolApprovalAgentOptions
         {
             AutoApprovalRules = [AutoApproveWhenAllGatesAgree],
         });
-#pragma warning restore MAAI001
     }
 
     // Build-time gate-list validation: empty-list fail-closed rejection, null elements, and well-formed

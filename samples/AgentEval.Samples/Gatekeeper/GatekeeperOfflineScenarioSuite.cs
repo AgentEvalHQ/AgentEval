@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-#pragma warning disable AEGK001 // Offline approval fixture intentionally demonstrates the MAF approval bridge.
 #pragma warning disable MAAI001 // Offline Harness fixtures intentionally use the experimental MAF Harness.
 
 using AgentEval.Guardrails;
@@ -508,7 +507,9 @@ internal static class GatekeeperOfflineScenarioSuite
         Description = "Deterministic offline Gatekeeper Harness release oracle.",
         MaxOutputTokens = MaxOutputTokens,
         MaximumIterationsPerRequest = 2,
-        DisableFileAccess = true,
+        // MAF 1.17.0: DisableFileAccess removed — file access is now opt-in via FileAccessStore
+        // ("When null (the default), no provider is added and the agent has no file access tools"),
+        // so leaving FileAccessStore unset preserves this sample's original intent.
         DisableFileMemory = true,
         DisableWebSearch = true,
         DisableAgentSkillsProvider = true,

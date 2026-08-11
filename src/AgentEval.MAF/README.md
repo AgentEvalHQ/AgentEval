@@ -20,7 +20,7 @@ AgentEval stops being an offline evaluation harness and plugs into a live agent 
   - **Shadow judge** — `UseAgentEvalShadowJudge` runs the expensive LLM/network checks the inline gates reject,
     off the hot path, arming quarantine for a *later* run.
   - **Tool approval** — `UseAgentEvalToolApproval` routes a *borderline* call to a human over MAF's native
-    `UseToolApproval` (experimental, `AEGK001`).
+    `UseToolApproval` (stable since MAF 1.14.0).
   - The **moat** (red-team probes as gates) lives in the sibling `AgentEval.RedTeam.Gatekeeper`.
 - **Agent adapters** — bridge a MAF `AIAgent` to AgentEval's evaluable-agent surface so the same evaluation
   suites run against a real MAF agent.

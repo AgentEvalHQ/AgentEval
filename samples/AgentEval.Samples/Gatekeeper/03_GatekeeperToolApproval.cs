@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-#pragma warning disable AEGK001 // UseAgentEvalToolApproval rides MAF's evaluation-only approval API — fine for a demo.
-
 using AgentEval.MAF.Gatekeeper;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;

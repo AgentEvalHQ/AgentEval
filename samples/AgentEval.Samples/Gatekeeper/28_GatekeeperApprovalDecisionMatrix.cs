@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-#pragma warning disable AEGK001 // Sample intentionally demonstrates the current MAF approval continuation API.
-
 using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.Testing;

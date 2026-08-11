@@ -144,7 +144,9 @@ public static class GatekeeperHarnessOwnedToolMisuse
         Description = "Offline Harness capability-boundary demonstration.",
         MaxOutputTokens = 256,
         MaximumIterationsPerRequest = 2,
-        DisableFileAccess = true,
+        // MAF 1.17.0: DisableFileAccess removed — file access is now opt-in via FileAccessStore
+        // ("When null (the default), no provider is added and the agent has no file access tools"),
+        // so leaving FileAccessStore unset preserves this sample's original intent.
         DisableFileMemory = true,
         DisableWebSearch = true,
         DisableAgentSkillsProvider = true,

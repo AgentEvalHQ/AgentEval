@@ -55,7 +55,9 @@ public static class GatekeeperAgentHarness
             Description = "An autonomous research agent that plans and executes.",
             MaxContextWindowTokens = 120_000,
             MaxOutputTokens = 1_024,
-            DisableFileAccess = true,
+            // MAF 1.17.0: DisableFileAccess removed — file access is now opt-in via FileAccessStore
+            // ("When null (the default), no provider is added and the agent has no file access tools"),
+            // so leaving FileAccessStore unset preserves this sample's original intent.
             DisableWebSearch = true,   // gpt-4o-mini (chat completions) doesn't support the harness's built-in web_search_options
             DisableFileMemory = true,  // keep the demo self-contained (no on-disk agent-files/ working dir)
             // In "execute" mode the harness keeps re-invoking itself (its loop) until its todos are done.
