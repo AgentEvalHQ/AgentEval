@@ -23,8 +23,9 @@ public class LongMemEvalProvenanceTests
     /// signal that sealed bases recorded under the old prompts are no longer comparable — the thing
     /// that otherwise requires hand-diffing library source between releases.
     /// </summary>
+    // Not a secret: a SHA-256 over publicly-shipped judge prompt text.
     private const string ExpectedJudgePromptFingerprint =
-        "cc06b7d368439206428559be7f29939c1a943aae59a07e0b8eb858456f4255bc";
+        "cc06b7d368439206428559be7f29939c1a943aae59a07e0b8eb858456f4255bc"; // DevSkim: ignore DS173237
 
     [Fact]
     public void JudgePromptFingerprint_IsStableAcrossCalls()

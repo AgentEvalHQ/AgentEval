@@ -218,7 +218,10 @@ public static class LongMemEvalDataLoader
 
         // Created here, exactly where it was created before, so the draw for a given seed is
         // unchanged by this refactor.
-        var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared;
+        // Deliberately not a cryptographic generator: benchmark sampling is not a security function,
+        // and reproducibility under a seed is the whole requirement. A CSPRNG cannot be seeded to
+        // replay a draw, which is exactly what a sealed benchmark baseline depends on.
+        var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared; // DevSkim: ignore DS148264
         return SelectBudgeted(entries, max, stratified, rng);
     }
 
@@ -303,7 +306,10 @@ public static class LongMemEvalDataLoader
         var ordinarySlots = max - abstentionSlots;
 
         // One generator drives both draws so the pair is reproducible as a unit under the seed.
-        var rng = options.RandomSeed.HasValue ? new Random(options.RandomSeed.Value) : Random.Shared;
+        // Non-cryptographic for the same reason as the seeded draw above: replayability is required.
+        var rng = options.RandomSeed.HasValue
+            ? new Random(options.RandomSeed.Value) // DevSkim: ignore DS148264
+            : Random.Shared;
 
         var selected = new List<LongMemEvalEntry>(max);
         selected.AddRange(SelectBudgeted(abstention, abstentionSlots, options.StratifiedSampling, rng));
