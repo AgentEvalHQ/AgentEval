@@ -256,6 +256,12 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 JudgeTokensUsed = judgment.TokensUsed,
                 SafeFailureCode = judgment.SafeFailureCode,
                 JudgeExplanation = judgment.Explanation,
+                // Carried through so a stored run is diagnosable without re-running the question. All
+                // four are null unless the caller opted in, so default output is unchanged.
+                JudgeRawResponse = judgment.RawResponse,
+                JudgeReasoning = judgment.Reasoning,
+                JudgePredicateResults = judgment.PredicateResults,
+                JudgePredicateCombinationRule = judgment.PredicateCombinationRule,
                 Evidence = evidenceCapture.Envelope,
                 EvidenceDiagnostics = evidenceCapture.Diagnostics,
                 Duration = qStopwatch.Elapsed

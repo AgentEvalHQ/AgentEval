@@ -182,6 +182,39 @@ public class QuestionResult
     /// <summary>Judge's explanation.</summary>
     public string? JudgeExplanation { get; init; }
 
+    /// <summary>
+    /// Bounded raw judge response, carried through from the judgment when
+    /// <see cref="ExternalBenchmarkOptions.JudgeEvidenceMode"/> is <see cref="JudgeEvidenceMode.Raw"/> or
+    /// <see cref="ExternalBenchmarkOptions.RetainRawJudgeResponse"/> is set.
+    /// </summary>
+    /// <remarks>
+    /// Present on the question result, not only on the judgment, because diagnosis happens against a
+    /// stored run: without it, telling a judge that was WRONG from a wrapper that could not PARSE
+    /// requires re-running the question.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeRawResponse { get; init; }
+
+    /// <summary>
+    /// Judge reasoning recovered from its own field under
+    /// <see cref="JudgeVerdictProtocol.StructuredJson"/>; null under the free-text protocol.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeReasoning { get; init; }
+
+    /// <summary>
+    /// Per-predicate outcomes under <see cref="JudgeDecompositionMode.PerPredicate"/>; null otherwise.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<JudgePredicateResult>? JudgePredicateResults { get; init; }
+
+    /// <summary>
+    /// The rule that combined <see cref="JudgePredicateResults"/> into <see cref="JudgeStatus"/>; null
+    /// when the verdict came from a single judge call.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PredicateCombinationRule? JudgePredicateCombinationRule { get; init; }
+
     /// <summary>Execution time for this question.</summary>
     public TimeSpan Duration { get; init; }
 }

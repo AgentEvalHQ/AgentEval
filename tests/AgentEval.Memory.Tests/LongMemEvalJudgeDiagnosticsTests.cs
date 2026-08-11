@@ -132,6 +132,36 @@ public class LongMemEvalJudgeDiagnosticsTests
         Assert.Equal("Correct — the response matches.", result.RawResponse);
     }
 
+    /// <summary>
+    /// Documents why "the explanation starts with Judge" is not a usable failure signature: EVERY
+    /// rendered explanation starts with "Judge", whatever the outcome. The discriminator is
+    /// <see cref="ExternalJudgmentResult.SafeFailureCode"/>, which is null on a clean verdict.
+    /// </summary>
+    [Theory]
+    [InlineData("yes", JudgeOutcomeStatus.Yes, null)]
+    [InlineData("no", JudgeOutcomeStatus.No, null)]
+    [InlineData("maybe", JudgeOutcomeStatus.Invalid, "invalid_response")]
+    [InlineData("   ", JudgeOutcomeStatus.Empty, "empty_response")]
+    public async Task ExplanationPrefix_IsNotAFailureSignature_SafeFailureCodeIs(
+        string judgeText,
+        JudgeOutcomeStatus expectedStatus,
+        string? expectedFailureCode)
+    {
+        var judge = CreateJudge(Response(judgeText));
+
+        var result = await judge.JudgeAsync("answer", Question(), new ExternalBenchmarkOptions
+        {
+            MaxJudgeRetries = 0,
+            JudgeEvidenceMode = JudgeEvidenceMode.Outcome
+        });
+
+        Assert.Equal(expectedStatus, result.Status);
+        // True on success AND on failure — so it discriminates nothing.
+        Assert.StartsWith("Judge", result.Explanation, StringComparison.Ordinal);
+        // This is the field that actually separates them.
+        Assert.Equal(expectedFailureCode, result.SafeFailureCode);
+    }
+
     [Fact]
     public async Task JudgeTemperature_DefaultsToNull_WhichIsProviderDefaultNotZero()
     {
