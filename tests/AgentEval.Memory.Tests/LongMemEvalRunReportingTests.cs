@@ -110,6 +110,34 @@ public class LongMemEvalRunReportingTests
         Assert.All(result.QuestionResults, q => Assert.True(q.IsAbstention));
     }
 
+    [Fact]
+    public async Task Composition_TargetProportion_ReportsRequestedAndRealisedSeparately()
+    {
+        using var dataset = MixedDataset.Create();
+        var runner = LongMemEvalBenchmarkRunner.Create(Judge("yes"), dataset.Path);
+
+        // Half of 8 is 4 abstention questions; the pool holds 3. The run is left short.
+        var result = await runner.RunAsync(Agent(), Config(), new ExternalBenchmarkOptions
+        {
+            DatasetPath = dataset.Path,
+            MaxQuestions = 8,
+            AbstentionPolicy = AbstentionSamplingPolicy.TargetProportion,
+            AbstentionTargetProportion = 0.5,
+            RandomSeed = 42
+        });
+
+        var composition = result.Composition!;
+        Assert.Equal(0.5, composition.RequestedAbstentionProportion);
+        // The request was not met, and the report says so rather than implying a 50/50 run.
+        Assert.Equal(3, composition.AbstentionQuestions);
+        Assert.Equal(4, composition.NonAbstentionQuestions);
+        Assert.Equal(7, composition.TotalQuestions);
+        Assert.Equal(3.0 / 7, composition.RealisedAbstentionProportion!.Value, 10);
+        Assert.NotEqual(
+            composition.RequestedAbstentionProportion!.Value,
+            composition.RealisedAbstentionProportion!.Value);
+    }
+
     // ── Ask 3 proof: retry attribution survives to the result ─────────────────
 
     [Fact]
