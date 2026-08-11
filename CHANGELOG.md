@@ -74,6 +74,12 @@ from the released code.
 - **Documentation error**: `docs/memory-evaluation.md` listed abstention as one of the six question
   types. It is not, and describing it as one implies a coverage guarantee that stratification cannot
   provide.
+- **`PreserveSessionBoundaries` documented as structured-injection only.** It is read by
+  `LongMemEvalHistoryFormatter.Format` and never by `FormatAsTextBlob`, and `HistoryInjectionMode`
+  defaults to `TextBlob` — so setting it to `false` on otherwise-default options changes nothing, with
+  no way to notice. The behaviour is deliberately unchanged (honouring it in the text blob would alter
+  the official paper-methodology prompt); the silence about it is what was fixed, on the option itself
+  and in a characterization test.
 - `ExternalBenchmarkOptions.Validate` now rejects `AbstentionTargetProportion` set under a policy that
   would ignore it, rather than accepting a run that looks configured for a share it never applied.
 
