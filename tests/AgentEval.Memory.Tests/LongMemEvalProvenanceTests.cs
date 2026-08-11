@@ -23,9 +23,10 @@ public class LongMemEvalProvenanceTests
     /// signal that sealed bases recorded under the old prompts are no longer comparable — the thing
     /// that otherwise requires hand-diffing library source between releases.
     /// </summary>
-    // Not a secret: a SHA-256 over publicly-shipped judge prompt text.
+    // Not a secret: a SHA-256 over publicly-shipped judge prompt text, newline-normalized so the
+    // value is the same on a CRLF checkout and an LF one.
     private const string ExpectedJudgePromptFingerprint =
-        "cc06b7d368439206428559be7f29939c1a943aae59a07e0b8eb858456f4255bc"; // DevSkim: ignore DS173237
+        "61b09f0147582d0ce7e16ff5acb82310d719676d6627d773a8f0263dfcefe3e4"; // DevSkim: ignore DS173237
 
     [Fact]
     public void JudgePromptFingerprint_IsStableAcrossCalls()
@@ -39,6 +40,26 @@ public class LongMemEvalProvenanceTests
     public void JudgePromptFingerprint_MatchesThePinnedValue()
     {
         Assert.Equal(ExpectedJudgePromptFingerprint, LongMemEvalProvenance.ComputeJudgePromptFingerprint());
+    }
+
+    /// <summary>
+    /// The fingerprint must not change because the repository was checked out on a different OS.
+    /// </summary>
+    /// <remarks>
+    /// The judge templates are C# raw string literals, so they carry their source file's line
+    /// terminators into the compiled string, and <c>.gitattributes</c> does not pin <c>*.cs</c> to LF.
+    /// The same commit therefore compiles to CRLF prompts on Windows and LF prompts on Linux — which
+    /// this test's earlier, unnormalized version caught by failing on Linux CI while passing locally.
+    /// Asserting the hashed input has no carriage returns is what makes the pinned value below
+    /// meaningful on every platform.
+    /// </remarks>
+    [Fact]
+    public void JudgePromptFingerprint_HashesNewlineNormalizedContent()
+    {
+        var canonical = LongMemEvalProvenance.BuildCanonicalJudgePromptContent();
+
+        Assert.DoesNotContain('\r', canonical);
+        Assert.Contains('\n', canonical);
     }
 
     [Fact]

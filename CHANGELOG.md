@@ -45,6 +45,13 @@ from the released code.
   selected question ids. A sealed baseline is comparable to a later run only while the dataset and
   prompts are unchanged, and neither is pinned by the package version; verifying that by hand-diffing
   library source between releases is work a hash does exactly.
+  The prompt hash is **newline-normalized**, because the templates are C# raw string literals that
+  carry their source file's line terminators into the compiled string and `.gitattributes` does not
+  pin `*.cs` to LF. The same commit therefore compiles to CRLF prompts on a Windows checkout and LF
+  prompts on Linux — caught by this fingerprint failing on Linux CI while passing locally on its first
+  run. Normalizing keeps the value meaningful across platforms; the corollary, stated plainly, is that
+  the prompt **bytes** on the wire are platform-dependent today and the fingerprint deliberately does
+  not flag that.
 - **`system_fingerprint` capture** — `QuestionResult.JudgeSystemFingerprint`,
   `AgentSystemFingerprint`, and the de-duplicated `ExternalBenchmarkResult.JudgeSystemFingerprints`.
   `ChatResponse` in Microsoft.Extensions.AI.Abstractions 10.7.0 has no such property, so the value is

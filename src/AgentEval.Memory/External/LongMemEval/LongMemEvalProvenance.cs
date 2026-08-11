@@ -40,7 +40,31 @@ internal static class LongMemEvalProvenance
     /// SHA-256 over every judge prompt template, each rendered with fixed sentinels and labelled by
     /// name. Editing any template — or adding one to <see cref="TemplateNames"/> — changes the hash.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Line endings are normalized to <c>\n</c> before hashing, so the value identifies the prompt
+    /// <i>text</i> rather than the checkout it was compiled from. The templates are C# raw string
+    /// literals, which carry their source file's line terminators into the compiled string, and
+    /// <c>.gitattributes</c> does not pin <c>*.cs</c> to LF — so the same commit yields CRLF prompts
+    /// on a Windows checkout and LF prompts on Linux. Without normalization this fingerprint would
+    /// report "prompts changed" for a run that merely moved between a developer machine and CI,
+    /// which is noise, not drift.
+    /// </para>
+    /// <para>
+    /// The consequence is worth stating plainly: the prompt <i>bytes</i> sent to the judge are
+    /// platform-dependent today, and this fingerprint deliberately does not detect that. It answers
+    /// "are these the same templates?", not "were these the same bytes on the wire?".
+    /// </para>
+    /// </remarks>
     internal static string ComputeJudgePromptFingerprint()
+        => ManifestFingerprint.Hash(BuildCanonicalJudgePromptContent());
+
+    /// <summary>
+    /// The exact text <see cref="ComputeJudgePromptFingerprint"/> hashes, newline-normalized. Exposed
+    /// so a test can assert the hashed input carries no carriage returns, which is what makes the
+    /// fingerprint identical on a CRLF checkout and an LF one.
+    /// </summary>
+    internal static string BuildCanonicalJudgePromptContent()
     {
         var canonical = string.Join(
             "\n\n",
@@ -56,8 +80,12 @@ internal static class LongMemEvalProvenance
                 "StructuredOutputSuffix" + LongMemEvalStructuredVerdict.PromptSuffix
             ]);
 
-        return ManifestFingerprint.Hash(canonical);
+        return NormalizeLineEndings(canonical);
     }
+
+    /// <summary>Collapses CRLF to LF so a hash does not depend on the checkout's line endings.</summary>
+    private static string NormalizeLineEndings(string text)
+        => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     /// <summary>SHA-256 over the ordered selected question ids.</summary>
     internal static string ComputeSelectedIdFingerprint(IEnumerable<string> orderedQuestionIds)
