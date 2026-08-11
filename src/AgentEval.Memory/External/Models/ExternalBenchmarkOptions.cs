@@ -86,6 +86,47 @@ public class ExternalBenchmarkOptions
     /// <summary>Controls diagnostic evidence retained from judge responses.</summary>
     public JudgeEvidenceMode JudgeEvidenceMode { get; init; } = JudgeEvidenceMode.Outcome;
 
+    /// <summary>
+    /// How the judge verdict is requested and recovered. Default:
+    /// <see cref="JudgeVerdictProtocol.FreeText"/>, which reproduces historical scoring exactly.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="JudgeVerdictProtocol.StructuredJson"/> is opt-in because it changes verdicts on the
+    /// questions the free-text parser mis-scored — that is the point of it, and it is also why enabling
+    /// it makes results non-comparable with a base recorded under the free-text protocol.
+    /// </remarks>
+    public JudgeVerdictProtocol JudgeVerdictProtocol { get; init; } = JudgeVerdictProtocol.FreeText;
+
+    /// <summary>
+    /// Retains the bounded raw judge response regardless of <see cref="JudgeEvidenceMode"/>.
+    /// Default: false, which leaves existing behaviour unchanged.
+    /// </summary>
+    /// <remarks>
+    /// Separates "how much do we render" from "what do we keep": without it, diagnosing whether a failed
+    /// verdict was the judge being wrong or the wrapper being unparseable requires raising the evidence
+    /// mode, which also changes the rendered explanation.
+    /// </remarks>
+    public bool RetainRawJudgeResponse { get; init; }
+
+    /// <summary>
+    /// Whether one judge call decides the whole question or each gold-answer predicate is judged
+    /// separately. Default: <see cref="JudgeDecompositionMode.None"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="JudgeDecompositionMode.PerPredicate"/> costs one provider call per extracted predicate
+    /// (bounded by <c>LongMemEvalPredicateExtractor.MaximumPredicates</c>), so a run's judge spend rises
+    /// by the mean predicate count.
+    /// </remarks>
+    public JudgeDecompositionMode JudgeDecompositionMode { get; init; } = JudgeDecompositionMode.None;
+
+    /// <summary>
+    /// How per-predicate outcomes combine when <see cref="JudgeDecompositionMode.PerPredicate"/> is
+    /// active. Default: <see cref="Models.PredicateCombinationRule.AllMustHold"/>, matching official
+    /// LongMemEval scoring, where a partial answer is incorrect.
+    /// </summary>
+    public PredicateCombinationRule PredicateCombinationRule { get; init; }
+        = PredicateCombinationRule.AllMustHold;
+
     /// <summary>Controls normalized retrieval-evidence capture. Default: None.</summary>
     public EvidenceCaptureMode EvidenceCaptureMode { get; init; } = EvidenceCaptureMode.None;
 
@@ -102,6 +143,12 @@ public class ExternalBenchmarkOptions
             throw new ArgumentOutOfRangeException(nameof(JudgeFailurePolicy));
         if (!Enum.IsDefined(JudgeEvidenceMode))
             throw new ArgumentOutOfRangeException(nameof(JudgeEvidenceMode));
+        if (!Enum.IsDefined(JudgeVerdictProtocol))
+            throw new ArgumentOutOfRangeException(nameof(JudgeVerdictProtocol));
+        if (!Enum.IsDefined(JudgeDecompositionMode))
+            throw new ArgumentOutOfRangeException(nameof(JudgeDecompositionMode));
+        if (!Enum.IsDefined(PredicateCombinationRule))
+            throw new ArgumentOutOfRangeException(nameof(PredicateCombinationRule));
         if (!Enum.IsDefined(EvidenceCaptureMode))
             throw new ArgumentOutOfRangeException(nameof(EvidenceCaptureMode));
         if (MaxJudgeRetries is < 0 or > MaximumJudgeRetries)

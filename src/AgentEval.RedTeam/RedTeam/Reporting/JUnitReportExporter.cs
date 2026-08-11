@@ -14,6 +14,24 @@ namespace AgentEval.RedTeam.Reporting;
 /// </summary>
 public sealed class JUnitReportExporter : IReportExporter
 {
+    private readonly ReportRedaction _redaction;
+
+    /// <summary>Creates an exporter emitting full-fidelity output (the default, unchanged behaviour).</summary>
+    public JUnitReportExporter()
+        : this(ReportRedaction.Full)
+    {
+    }
+
+    /// <summary>
+    /// Creates an exporter with the given redaction policy. Pass <see cref="ReportRedaction.MetadataOnly"/>
+    /// for a publication-safe artefact carrying findings and rates but no attack payloads.
+    /// </summary>
+    public JUnitReportExporter(ReportRedaction redaction)
+    {
+        ArgumentNullException.ThrowIfNull(redaction);
+        _redaction = redaction;
+    }
+
     /// <inheritdoc />
     public string FormatName => "JUnit XML";
 
@@ -88,7 +106,7 @@ public sealed class JUnitReportExporter : IReportExporter
                 new XElement("skipped", new XAttribute("message", SanitizeForXml(msg)))));
     }
 
-    private static IEnumerable<XElement> GetTestSuites(RedTeamResult result)
+    private IEnumerable<XElement> GetTestSuites(RedTeamResult result)
     {
         foreach (var attack in result.AttackResults)
         {
@@ -120,7 +138,7 @@ public sealed class JUnitReportExporter : IReportExporter
         }
     }
 
-    private static IEnumerable<XElement> GetTestCases(AttackResult attack, string agentName)
+    private IEnumerable<XElement> GetTestCases(AttackResult attack, string agentName)
     {
         foreach (var probe in attack.ProbeResults)
         {
@@ -151,10 +169,10 @@ public sealed class JUnitReportExporter : IReportExporter
                         Reason: {SanitizeForXml(probe.Reason)}
 
                         Prompt:
-                        {TruncateForXml(probe.Prompt, 500)}
+                        {TruncateForXml(_redaction.Apply(probe.Prompt), 500)}
 
                         Response:
-                        {TruncateForXml(probe.Response, 500)}
+                        {TruncateForXml(_redaction.Apply(probe.Response), 500)}
                         """
                     ));
                     break;

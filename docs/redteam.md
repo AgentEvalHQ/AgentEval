@@ -974,7 +974,7 @@ agenteval redteam --endpoint $URL --model $MODEL \
     sarif_file: redteam.sarif
 ```
 
-> Inconclusive probes (timeouts, un-canaried checks) appear in SARIF as low-noise `note` results — a *coverage gap*, surfaced rather than silently dropped. Lead with `Verdict` + conclusive-only score + coverage, not the inconclusive-diluted `OverallScore`.
+> Inconclusive probes (timeouts, un-canaried checks) appear in SARIF as `kind: "open"` results with `level: "none"` — a *coverage gap*, surfaced rather than silently dropped. SARIF defines `"open"` as "the specified rule was evaluated, and the tool concluded that there was insufficient information to decide whether a problem exists", which is exactly what Inconclusive means; severity lives on `level` and is only meaningful for `kind: "fail"`. Lead with `Verdict` + conclusive-only score + coverage, not the inconclusive-diluted `OverallScore`.
 
 ### Attacker-LLM multi-turn (Crescendo / PAIR / TAP)
 
@@ -1025,7 +1025,7 @@ The discipline that makes an AgentEval verdict trustworthy — and the thing no 
 - **Conclusive-only scoring.** The headline score is `Resisted / (Resisted + Succeeded)` — inconclusive probes lower **coverage**, not the pass rate. Lead with `Verdict` + conclusive score + coverage, never the inconclusive-diluted `OverallScore`.
 - **Evidence fidelity on every finding.** Each result is labeled `EvidenceFidelity` = **Verbal** (the model's words), **IntentToAct** (it emitted a forbidden tool-call), or **Behavioral** (it actually executed one). A Tier-0 verbal "pass" can never masquerade as a Tier-2 behavioral one.
 - **Governance never auto-PASSes.** Organizational controls (NIST GOVERN/MAP/MANAGE, ISO/SOC 2 process controls) are reported Not-Applicable, not green — a passing scan is *evidence*, not a conformance claim.
-- **Never overclaim a framework.** A red-team run substantiates only what it can exercise; everything else is surfaced honestly (e.g. SARIF emits inconclusive probes as low-noise `note` results rather than dropping them).
+- **Never overclaim a framework.** A red-team run substantiates only what it can exercise; everything else is surfaced honestly (e.g. SARIF emits inconclusive probes as `kind: "open"` — evaluated, but insufficient information to decide — rather than dropping them or disguising them as low-severity findings).
 - **Positive evidence, or defer.** A confident verdict requires positive structural evidence. A keyword/substring oracle cannot reliably tell a confabulation from a correctly-phrased refutation, an adoption from a quote-then-correct, or a jailbreak boast from a benign idiom — so the genuinely-ambiguous middle is reported **Inconclusive** (the `--judge` fallback adjudicates), never a verdict conjured from the *absence* of a signal. Concretely, the misinformation oracle (LLM09) no longer emits a deterministic "confabulation → Succeeded": a model that elaborates a planted nonexistent entity without a recognized refutation is **Inconclusive without `--judge`** and adjudicated by the judge when one is supplied.
 
 #### The oracle-honesty regression net

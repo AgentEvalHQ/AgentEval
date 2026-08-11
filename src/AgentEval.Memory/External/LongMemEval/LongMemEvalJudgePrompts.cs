@@ -83,4 +83,38 @@ internal static class LongMemEvalJudgePrompts
 
         Does the model correctly identify the question as unanswerable? Answer yes or no only.
         """;
+
+    /// <summary>
+    /// The trailing instruction every template above shares. Removed before the structured-output
+    /// contract is appended, so the prompt does not simultaneously demand bare prose and a JSON object.
+    /// </summary>
+    internal const string FreeTextClosingInstruction = "Answer yes or no only.";
+
+    /// <summary>
+    /// Rewrites a free-text judge prompt into its structured-output form: drops the bare-prose
+    /// instruction and appends the JSON contract.
+    /// </summary>
+    internal static string ForStructuredOutput(string freeTextPrompt)
+    {
+        var withoutClosing = freeTextPrompt
+            .Replace(FreeTextClosingInstruction, string.Empty, StringComparison.Ordinal)
+            .TrimEnd();
+
+        return withoutClosing + Environment.NewLine + LongMemEvalStructuredVerdict.PromptSuffix;
+    }
+
+    /// <summary>
+    /// Single-predicate prompt used by <see cref="Models.JudgeDecompositionMode.PerPredicate"/>. Asks one
+    /// narrow supported/not-supported question instead of an overall correctness judgment, so a long
+    /// multi-part answer is not collapsed into a single decision.
+    /// </summary>
+    public static string Predicate(string question, string predicate, string hypothesis) => $"""
+        I will give you a question, ONE required fact drawn from the correct answer, and a response from a model. Decide only whether the response supports that one required fact. Ignore anything else the response does or does not contain — other facts are judged separately. Answer yes if the response states the required fact, is equivalent to it, or contains all the intermediate steps to reach it. Answer no if it is absent, contradicted, or only partially present.
+
+        Question: {question}
+        Required Fact: {predicate}
+        Model Response: {hypothesis}
+
+        Does the model response support the required fact? Answer yes or no only.
+        """;
 }

@@ -206,9 +206,7 @@ public static class AgentEvalGatekeeperExtensions
         // `result` (== `builder`).
         if (options.ApprovalGates.Count > 0)
         {
-#pragma warning disable AEGK001 // validating, not yet composing — same experimental-opt-in reasoning as the actual UseAgentEvalToolApproval call below.
             AgentEvalToolApprovalExtensions.ValidateApprovalGates(options.ApprovalGates.ToArray());
-#pragma warning restore AEGK001
         }
 
         // SkillGate Tier 1 enforcement (the actual check-and-possibly-persist-to-disk call) — regression fix:
@@ -302,9 +300,7 @@ public static class AgentEvalGatekeeperExtensions
 
         if (options.ApprovalGates.Count > 0)
         {
-#pragma warning disable AEGK001 // Gatekeeper ⇄ MAF tool-approval interop is itself an AgentEval-experimental API — deliberately composed here when the caller opts in by registering an approval gate.
             result = result.UseAgentEvalToolApproval(options.ApprovalGates.ToArray(), options.Trace);
-#pragma warning restore AEGK001
         }
 
         if (options.ShadowJudgePump is not null)

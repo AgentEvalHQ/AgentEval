@@ -22,4 +22,24 @@ public interface IExternalBenchmarkJudge
         string agentResponse,
         ExternalBenchmarkQuestion question,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Judges a response with explicit judge options.
+    /// </summary>
+    /// <remarks>
+    /// Supplied as a default implementation that discards <paramref name="options"/> and forwards to the
+    /// three-argument overload, so existing implementers keep compiling and keep their current
+    /// behaviour — they never received options before either. Implementations that honour options, such
+    /// as <see cref="LongMemEval.LongMemEvalJudge"/>, provide their own.
+    /// </remarks>
+    /// <param name="agentResponse">The agent's response text.</param>
+    /// <param name="question">The benchmark question with gold answer and type metadata.</param>
+    /// <param name="options">Judge configuration.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<ExternalJudgmentResult> JudgeAsync(
+        string agentResponse,
+        ExternalBenchmarkQuestion question,
+        ExternalBenchmarkOptions options,
+        CancellationToken ct = default)
+        => JudgeAsync(agentResponse, question, ct);
 }

@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0-beta] - 2026-08-11
+
+The honest-measurement release. Three independent pieces of work, none of which changes a default:
+red-team reports learn to state their own uncertainty (Wilson intervals, over-refusal against benign
+controls, SARIF `kind: "open"` for coverage gaps), the Microsoft Agent Framework moves 1.13.0 → 1.17.0,
+and the LongMemEval judge gains a verdict protocol that cannot be corrupted by its own reasoning prose.
+Every new option is opt-in, so sealed benchmark bases stay comparable.
+
+### RedTeam: reports that state their own uncertainty
+
+#### Added
+- **`WilsonInterval`** — score confidence bounds. Wilson rather than Wald, because Wald degenerates to a
+  zero-width interval at p=0 and p=1: it claims total certainty exactly where the sample is emptiest.
+- **`BenignControlCorpus`** — 18 probes across 7 classes that use attack vocabulary in legitimate
+  contexts. `Resisted` on one of these is a **false positive**, not a success. A test enforces that every
+  probe shares vocabulary with the hostile corpus, so the corpus cannot drift into being trivially
+  separable and flattering.
+- **`FalsePositiveRate`** — over-refusal measured against those controls, so an agent that refuses
+  everything no longer scores as safe.
+- **`BypassClassBreakdown`** — which class of defence failed, not just how many probes got through.
+- **`ProbeLabelSource`** — records whether a label came from a canary, an oracle, or a judge, so evidence
+  tiers cannot be silently conflated.
+- **`ReportRedaction`** — keeps attack payloads out of exported artefacts.
+
+#### Fixed
+- **Inconclusive probes were exported as SARIF `note` results**, which reads as a low-severity finding.
+  They are now `kind: "open"` with `level: "none"` — SARIF 2.1.0 defines `"open"` as *"the specified rule
+  was evaluated, and the tool concluded that there was insufficient information to decide whether a
+  problem exists"*, which is exactly what Inconclusive means. Per §3.27.10, `level` SHALL be `"none"`
+  when `kind` is not `"fail"`. The JUnit, JSON and Markdown exporters carry the same distinction.
+
+### Microsoft Agent Framework 1.13.0 → 1.17.0
+
+#### Changed
+- Three upstream breaking changes required source changes: `AgentHarnessOptions.DisableFileAccess` was
+  removed (file access is now opt-in via `FileAccessStore`); `ToolApprovalAgentOptions.AutoApprovalRules`
+  now takes a `ToolAutoApprovalRuleContext` (a strict superset, unwrapped non-lossily); and
+  `UseToolApproval` / `ToolApprovalAgentOptions` graduated from `[Experimental("MAAI001")]` to stable in
+  1.14.0.
+- **`AgentEvalToolApprovalExtensions` is no longer `[Experimental("AEGK001")]`.** The marker existed only
+  because the interop rode an evaluation-only MAF API; that API is now stable.
+- `Microsoft.Extensions.AI` 10.6.0 → 10.7.0 (the floor 1.17.0 requires, pinned to exactly that floor to
+  keep the upgrade one variable). `Microsoft.Agents.AI.Harness` reaches its first stable release.
+
+### LongMemEval judge: structured verdicts, retained diagnostics, and judge-noise measurement
+
+Driven by a downstream consumer (`agent-memory-dotnet`) whose paired 50-question runs were being
+invalidated roughly once per run by a judge verdict that could not be parsed — systematically, on the
+same question across separate runs.
+
+**Every addition below is opt-in and defaults to today's behaviour**, because sealed benchmark bases
+must stay comparable. A default-options judgment still serializes to exactly the property set a
+0.18.0-beta consumer parses.
+
+#### Added
+- **`JudgeVerdictProtocol.StructuredJson`** (`ExternalBenchmarkOptions.JudgeVerdictProtocol`,
+  default `FreeText`) — requests a JSON object with a closed `verdict` field
+  (`yes` / `no` / `cannot-determine`) and a **separate** `reasoning` field, via
+  `ChatResponseFormat.ForJsonSchema`. Degrades through plain JSON mode to an unconstrained call when
+  a provider rejects the constraint (the prompt carries the contract either way), and counts every
+  provider call it actually spends. An unusable response is `JudgeOutcomeStatus.Invalid` with a
+  diagnostic `SafeFailureCode` — never an exception, a silent `No`, or a guess. An explicit
+  `cannot-determine` is `Invalid` with its own `judge_cannot_determine` code, so "the judge declined"
+  stays separable from "the wrapper could not parse".
+- **`ExternalBenchmarkOptions.RetainRawJudgeResponse`** (default `false`) — populates
+  `ExternalJudgmentResult.RawResponse` regardless of `JudgeEvidenceMode`, still bounded to 4096
+  characters, so a short explanation can be rendered while the full text stays available to tell a
+  *wrong* judge apart from an *unparseable* one.
+- **`JudgeDecompositionMode.PerPredicate`** (default `None`) — judges each gold-answer predicate
+  separately and combines with an explicit `PredicateCombinationRule` (`AllMustHold` default,
+  matching official LongMemEval scoring, or `Majority`). Per-predicate outcomes are reported on
+  `ExternalJudgmentResult.PredicateResults`, and the rule that produced the verdict is recorded on
+  the result rather than implied.
+- **`JudgeAgreementHarness`** — runs a judge repeatedly over identical inputs and reports the
+  self-disagreement rate, alongside the temperature and protocol the measurement was taken under.
+  Separates "the memory system got worse" from "the judge is noisy". An empty run reports a `null`
+  rate, not `0`.
+- **`IExternalBenchmarkJudge.JudgeAsync(..., ExternalBenchmarkOptions, ...)`** — added as a default
+  interface method forwarding to the existing overload, so current implementers keep compiling and
+  keep their current behaviour.
+
+#### Fixed
+- **The free-text verdict parser vetoed valid verdicts.** It recovered the verdict from the leading
+  token, then discarded it if the word "no" appeared anywhere later — which fires on ordinary
+  reasoning prose such as *"there is no discrepancy"*. Deterministic per input, so an affected
+  question failed on every run rather than intermittently. The free-text path is unchanged (it is
+  still the default); `StructuredJson` routes around it by never recovering a verdict from prose.
+
+#### Notes
+- Per-predicate decomposition **barely engages on LongMemEval**: measured over both shipped
+  500-question datasets, 6 answers (1.20%) decompose, for a **1.0140x** judge-call multiplier and at
+  most 3 predicates on any one question. LongMemEval gold answers are overwhelmingly single facts.
+- Gold answers that offer *alternatives* (`"7 days. 8 days ... is also acceptable."`), enumerated
+  lists, and decimals are judged whole — splitting them would manufacture failures out of correct
+  responses. Abstention questions are never decomposed, because the abstention judge asks a different
+  question than a per-predicate judge does.
+- **The judge is not deterministic by default and this release does not change that.**
+  `JudgeTemperature` defaults to `null` (provider default) deliberately, for reasoning-model
+  deployments that reject an explicit temperature. Set `JudgeTemperature = 0` for determinism.
+
+### Validation evidence
+
+- Full suite green in Release configuration on all three TFMs: `AgentEval.Tests` 9,229 passed
+  (net8.0, net9.0) and 9,447 passed (net10.0); `AgentEval.Memory.Tests` 680 passed on each.
+- `samples/AgentEval.NuGetConsumer.Tests` contains a live-service integration test that depends on a
+  real Azure OpenAI endpoint and is intermittently rejected by the provider's content filter
+  (measured 2 pass / 1 fail across three runs of identical binaries). It consumes the **published**
+  `AgentEval` package rather than this source tree, so it is independent of the changes above.
+
 ## [0.18.0-beta] - 2026-08-06
 
 The security release. The headline is **Memory Security**: a provider-neutral memory-protection

@@ -48,7 +48,33 @@ public class ExternalJudgmentResult
     /// <summary>Bounded AgentEval-owned failure code; never provider exception text.</summary>
     public string? SafeFailureCode { get; init; }
 
-    /// <summary>Bounded raw response, emitted only when JudgeEvidenceMode.Raw is enabled.</summary>
+    /// <summary>
+    /// Bounded raw response. Emitted when <see cref="JudgeEvidenceMode.Raw"/> is enabled, or when
+    /// <see cref="ExternalBenchmarkOptions.RetainRawJudgeResponse"/> is set independently of evidence
+    /// mode so a short explanation can be rendered while the full text stays available for diagnosis.
+    /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RawResponse { get; init; }
+
+    /// <summary>
+    /// Judge reasoning recovered from its own field under
+    /// <see cref="JudgeVerdictProtocol.StructuredJson"/>. Null under the free-text protocol, where
+    /// reasoning and verdict are not separable.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reasoning { get; init; }
+
+    /// <summary>
+    /// Per-predicate outcomes under <see cref="JudgeDecompositionMode.PerPredicate"/>; null otherwise.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<JudgePredicateResult>? PredicateResults { get; init; }
+
+    /// <summary>
+    /// The rule that combined <see cref="PredicateResults"/> into <see cref="Status"/>; null when the
+    /// verdict came from a single judge call. Recorded rather than implied so a stored result carries
+    /// the rule that produced it.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PredicateCombinationRule? PredicateCombinationRule { get; init; }
 }
