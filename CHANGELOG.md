@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### LongMemEval judge: structured verdicts, retained diagnostics, and judge-noise measurement
+
+Driven by a downstream consumer (`agent-memory-dotnet`) whose paired 50-question runs were being
+invalidated roughly once per run by a judge verdict that could not be parsed — systematically, on the
+same question across separate runs.
+
+**Every addition below is opt-in and defaults to today's behaviour**, because sealed benchmark bases
+must stay comparable. A default-options judgment still serializes to exactly the property set a
+0.18.0-beta consumer parses.
+
+#### Added
+- **`JudgeVerdictProtocol.StructuredJson`** (`ExternalBenchmarkOptions.JudgeVerdictProtocol`,
+  default `FreeText`) — requests a JSON object with a closed `verdict` field
+  (`yes` / `no` / `cannot-determine`) and a **separate** `reasoning` field, via
+  `ChatResponseFormat.ForJsonSchema`. Degrades through plain JSON mode to an unconstrained call when
+  a provider rejects the constraint (the prompt carries the contract either way), and counts every
+  provider call it actually spends. An unusable response is `JudgeOutcomeStatus.Invalid` with a
+  diagnostic `SafeFailureCode` — never an exception, a silent `No`, or a guess. An explicit
+  `cannot-determine` is `Invalid` with its own `judge_cannot_determine` code, so "the judge declined"
+  stays separable from "the wrapper could not parse".
+- **`ExternalBenchmarkOptions.RetainRawJudgeResponse`** (default `false`) — populates
+  `ExternalJudgmentResult.RawResponse` regardless of `JudgeEvidenceMode`, still bounded to 4096
+  characters, so a short explanation can be rendered while the full text stays available to tell a
+  *wrong* judge apart from an *unparseable* one.
+- **`JudgeDecompositionMode.PerPredicate`** (default `None`) — judges each gold-answer predicate
+  separately and combines with an explicit `PredicateCombinationRule` (`AllMustHold` default,
+  matching official LongMemEval scoring, or `Majority`). Per-predicate outcomes are reported on
+  `ExternalJudgmentResult.PredicateResults`, and the rule that produced the verdict is recorded on
+  the result rather than implied.
+- **`JudgeAgreementHarness`** — runs a judge repeatedly over identical inputs and reports the
+  self-disagreement rate, alongside the temperature and protocol the measurement was taken under.
+  Separates "the memory system got worse" from "the judge is noisy". An empty run reports a `null`
+  rate, not `0`.
+- **`IExternalBenchmarkJudge.JudgeAsync(..., ExternalBenchmarkOptions, ...)`** — added as a default
+  interface method forwarding to the existing overload, so current implementers keep compiling and
+  keep their current behaviour.
+
+#### Fixed
+- **The free-text verdict parser vetoed valid verdicts.** It recovered the verdict from the leading
+  token, then discarded it if the word "no" appeared anywhere later — which fires on ordinary
+  reasoning prose such as *"there is no discrepancy"*. Deterministic per input, so an affected
+  question failed on every run rather than intermittently. The free-text path is unchanged (it is
+  still the default); `StructuredJson` routes around it by never recovering a verdict from prose.
+
+#### Notes
+- Per-predicate decomposition **barely engages on LongMemEval**: measured over both shipped
+  500-question datasets, 6 answers (1.20%) decompose, for a **1.0140x** judge-call multiplier and at
+  most 3 predicates on any one question. LongMemEval gold answers are overwhelmingly single facts.
+- Gold answers that offer *alternatives* (`"7 days. 8 days ... is also acceptable."`), enumerated
+  lists, and decimals are judged whole — splitting them would manufacture failures out of correct
+  responses. Abstention questions are never decomposed, because the abstention judge asks a different
+  question than a per-predicate judge does.
+- **The judge is not deterministic by default and this release does not change that.**
+  `JudgeTemperature` defaults to `null` (provider default) deliberately, for reasoning-model
+  deployments that reject an explicit temperature. Set `JudgeTemperature = 0` for determinism.
+
 ## [0.18.0-beta] - 2026-08-06
 
 The security release. The headline is **Memory Security**: a provider-neutral memory-protection
