@@ -385,6 +385,13 @@ values when the caller left them unset. The run then reports
 `NotSupportedByAgent`, which stays accurate: AgentEval's request did not reach the
 call, and something else pinned it.
 
+**To find out empirically whether the seed took effect**, run the same sample twice
+under the same `RandomSeed` and diff `QuestionResult.AgentResponse` across the two
+results. Identical text on identical inputs is evidence the seed was honoured;
+differing text on identical inputs is proof it was not. That is a stronger claim
+than any disposition here can make, and it costs a second run —
+`JudgeAgreementHarness` does the same thing for the judge side.
+
 ## The oracle arm on its own
 
 `RunPairedAsync` runs the normal arm and the ceiling together. `RunOracleAsync`

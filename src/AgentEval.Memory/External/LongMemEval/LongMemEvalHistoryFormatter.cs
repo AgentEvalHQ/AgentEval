@@ -79,24 +79,10 @@ public static class LongMemEvalHistoryFormatter
             }
 
             // Add turns within this session, stripping has_answer metadata
-            string? pendingUser = null;
-            foreach (var turn in session)
-            {
-                if (turn.Role == "user")
-                {
-                    if (pendingUser != null)
-                        turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
-                    pendingUser = turn.Content;
-                }
-                else if (turn.Role == "assistant" && pendingUser != null)
-                {
-                    turns.Add((pendingUser, turn.Content));
-                    pendingUser = null;
-                }
-            }
-
-            if (pendingUser != null)
-                turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
+            EmitSessionTurns(
+                session,
+                options.SyntheticTurnMarker,
+                (user, assistant) => turns.Add((user, assistant)));
         }
 
         return turns;
@@ -157,27 +143,44 @@ public static class LongMemEvalHistoryFormatter
                     Mark(SessionBoundaryAcknowledgement, options.SyntheticTurnMarker));
             }
 
-            string? pendingUser = null;
-            foreach (var turn in sessions[sessionIdx])
-            {
-                if (turn.Role == "user")
-                {
-                    if (pendingUser != null)
-                        Add(pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker));
-                    pendingUser = turn.Content;
-                }
-                else if (turn.Role == "assistant" && pendingUser != null)
-                {
-                    Add(pendingUser, turn.Content);
-                    pendingUser = null;
-                }
-            }
-
-            if (pendingUser != null)
-                Add(pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker));
+            EmitSessionTurns(sessions[sessionIdx], options.SyntheticTurnMarker, Add);
         }
 
         return new TimestampedConversationHistory { Turns = turns, QueryTime = queryTime };
+    }
+
+    /// <summary>
+    /// Walks one session, pairing each user turn with the assistant reply that answered it and
+    /// synthesising <see cref="UnpairedUserAcknowledgement"/> for one the dataset leaves unanswered.
+    /// </summary>
+    /// <remarks>
+    /// Shared by both injection formats deliberately: the pairing rule decides what a memory system
+    /// ingests, and a fix applied to only one format would make the two arms disagree about the same
+    /// corpus.
+    /// </remarks>
+    private static void EmitSessionTurns(
+        IReadOnlyList<LongMemEvalTurn> session,
+        string? syntheticMarker,
+        Action<string, string> emit)
+    {
+        string? pendingUser = null;
+        foreach (var turn in session)
+        {
+            if (turn.Role == "user")
+            {
+                if (pendingUser != null)
+                    emit(pendingUser, Mark(UnpairedUserAcknowledgement, syntheticMarker));
+                pendingUser = turn.Content;
+            }
+            else if (turn.Role == "assistant" && pendingUser != null)
+            {
+                emit(pendingUser, turn.Content);
+                pendingUser = null;
+            }
+        }
+
+        if (pendingUser != null)
+            emit(pendingUser, Mark(UnpairedUserAcknowledgement, syntheticMarker));
     }
 
     /// <summary>
