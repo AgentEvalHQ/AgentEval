@@ -47,11 +47,16 @@ public sealed class LongMemEvalTimeGroundedTests
         var lf = json.Replace("\r\n", "\n", StringComparison.Ordinal);
         var crlf = lf.Replace("\n", "\r\n", StringComparison.Ordinal);
 
+        // DS197836 reads "TimeGrounded…Sha256" as hashing a time value. What is hashed is a 22 KB
+        // corpus, and the hash identifies a dataset rather than protecting a secret, so brute-force
+        // entropy is not the property at stake.
+        var lfHash = LongMemEvalTimeGroundedCorpus.ComputeSha256(lf); // DevSkim: ignore DS197836
+        var crlfHash = LongMemEvalTimeGroundedCorpus.ComputeSha256(crlf); // DevSkim: ignore DS197836
+        var shippedHash = LongMemEvalTimeGroundedCorpus.Sha256(); // DevSkim: ignore DS197836
+
         Assert.NotEqual(lf, crlf);
-        Assert.Equal(
-            LongMemEvalTimeGroundedCorpus.ComputeSha256(lf),
-            LongMemEvalTimeGroundedCorpus.ComputeSha256(crlf));
-        Assert.Equal(LongMemEvalTimeGroundedCorpus.ComputeSha256(lf), LongMemEvalTimeGroundedCorpus.Sha256());
+        Assert.Equal(lfHash, crlfHash);
+        Assert.Equal(lfHash, shippedHash);
     }
 
     [Fact]

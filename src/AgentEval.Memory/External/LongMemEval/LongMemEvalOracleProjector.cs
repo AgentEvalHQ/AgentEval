@@ -174,7 +174,7 @@ public static class LongMemEvalOracleProjector
 
     internal static int DeriveSeed(int seed, string questionId)
     {
-        var payload = Encoding.UTF8.GetBytes($"{seed} {questionId}");
+        var payload = Encoding.UTF8.GetBytes($"{seed}|{questionId}");
         var hash = SHA256.HashData(payload);
         // Masked to a non-negative int: Random's constructor treats int.MinValue specially and a
         // stable positive value keeps the derivation obvious in a repro.
