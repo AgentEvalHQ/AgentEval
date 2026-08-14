@@ -87,9 +87,16 @@ public static class LongMemEvalTimeGroundedCorpus
     /// Windows machine to a Linux runner would report "different corpus" for a run that used the
     /// same one. It identifies the corpus <i>text</i>, not the bytes of one checkout.
     /// </remarks>
-    public static string Sha256()
+    public static string Sha256() => ComputeSha256(ReadJson());
+
+    /// <summary>
+    /// The hash of a given corpus text. Exposed so a test can feed the same corpus in both line-ending
+    /// conventions and fix the property, rather than pinning a literal value that would itself differ
+    /// between checkouts.
+    /// </summary>
+    internal static string ComputeSha256(string json)
     {
-        var normalized = ReadJson().Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalized = json.Replace("\r\n", "\n", StringComparison.Ordinal);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
     }
 
