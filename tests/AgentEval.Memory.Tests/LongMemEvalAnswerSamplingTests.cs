@@ -172,6 +172,27 @@ public sealed class LongMemEvalAnswerSamplingTests
     }
 
     [Fact]
+    public async Task RunAsync_AgentsOwnTemperatureRejected_IsNotReportedAsAgentEvalsRequest()
+    {
+        using var dataset = Dataset.Create();
+        // The agent cannot carry AgentEval's request, so nothing AgentEval asked for was on this
+        // call. A 400 that names a temperature is then the agent's own setting being refused, and
+        // labelling it as AgentEval's rejection would put a failure code on a request never sent.
+        var agent = new PlainAgent(() => throw new InvalidOperationException(
+            "HTTP 400 (invalid_request_error) Unsupported value: 'temperature'."));
+
+        var result = await RunAsync(dataset, agent, Options(dataset, temperature: 0.2, seed: 7));
+
+        var question = Assert.Single(result.QuestionResults);
+        Assert.Equal("agent_error", question.SafeFailureCode);
+        Assert.Equal(
+            AnswerSamplingDisposition.NotSupportedByAgent,
+            question.AnswerSampling!.TemperatureDisposition);
+        Assert.False(question.AnswerSampling.WasRejectedByProvider);
+        Assert.Equal(0, result.AnswerSampling!.Temperature.RejectedByProviderQuestions);
+    }
+
+    [Fact]
     public void Validate_AnswerTemperatureOutOfRange_Throws()
     {
         var error = Assert.Throws<ArgumentOutOfRangeException>(() =>

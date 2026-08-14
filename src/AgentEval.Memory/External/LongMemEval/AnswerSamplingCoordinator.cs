@@ -146,16 +146,6 @@ internal sealed class AnswerSamplingCoordinator
     }
 
     /// <summary>
-    /// True when a failed answer call was rejected <i>because of</i> a sampling parameter, so the
-    /// question can carry its own failure code instead of a generic agent error.
-    /// </summary>
-    internal static bool IsSamplingRejection(Exception exception)
-    {
-        var (namesTemperature, namesSeed) = ClassifyRejection(exception);
-        return namesTemperature || namesSeed;
-    }
-
-    /// <summary>
     /// A provider that refuses a sampling parameter surfaces an HTTP 400 invalid-request error naming
     /// it. Recognising that, and only that, keeps a genuine agent failure (network, timeout, overload)
     /// from being mislabelled as a rejected parameter.

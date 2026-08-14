@@ -242,12 +242,17 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 qStopwatch.Stop();
+                var samplingOutcome = samplingAttachment is { } failedAttachment
+                    ? answerSampling!.Fail(failedAttachment, ex)
+                    : null;
+                // Derived from the same record the result carries, so the code and the disposition
+                // cannot disagree, and neither fires unless AgentEval's own request was on the call
+                // that failed. A provider that refuses the requested sampling gets its own code
+                // rather than a generic agent error: AgentEval never retries without the parameter,
+                // because a silent downgrade would produce a run that looks pinned and is not.
                 var safeCode = ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
                     ? "content_filter"
-                    // A provider that refuses the requested sampling gets its own code rather than a
-                    // generic agent error: AgentEval never retries without the parameter, because a
-                    // silent downgrade would produce a run that looks pinned and is not.
-                    : samplingAttachment is not null && AnswerSamplingCoordinator.IsSamplingRejection(ex)
+                    : samplingOutcome is not null && samplingOutcome.WasRejectedByProvider
                         ? "answer_sampling_rejected"
                         : "agent_error";
 
@@ -268,9 +273,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     JudgePrimaryLlmCallCount = 0,
                     JudgeRetryLlmCallCount = 0,
                     JudgeAttemptsUsed = 0,
-                    AnswerSampling = samplingAttachment is { } failedAttachment
-                        ? answerSampling!.Fail(failedAttachment, ex)
-                        : null,
+                    AnswerSampling = samplingOutcome,
                     SafeFailureCode = safeCode,
                     JudgeExplanation = "Agent execution did not complete.",
                     Duration = qStopwatch.Elapsed

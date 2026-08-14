@@ -80,6 +80,15 @@ public sealed class AnswerSamplingOutcome
 
     /// <summary>Seed the provider echoed back, when it echoed one.</summary>
     public int? EchoedSeed { get; init; }
+
+    /// <summary>
+    /// True when the provider refused the call because of a parameter AgentEval sent. The question's
+    /// <see cref="QuestionResult.SafeFailureCode"/> is derived from this, so a failure code and a
+    /// disposition can never tell two different stories about the same question.
+    /// </summary>
+    public bool WasRejectedByProvider =>
+        TemperatureDisposition == AnswerSamplingDisposition.RejectedByProvider ||
+        SeedDisposition == AnswerSamplingDisposition.RejectedByProvider;
 }
 
 /// <summary>
