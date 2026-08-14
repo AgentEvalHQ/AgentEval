@@ -361,7 +361,7 @@ actually achieved, per question:
 | `NotRequested` | You did not ask for it. |
 | `NotSupportedByAgent` | The agent does not implement the interface. The run is **not** pinned. |
 | `DeclinedByAgent` | The agent took the request and declined this parameter. |
-| `SentUnverified` | Attached to the call; the provider did not reject it. It may still have been ignored. |
+| `SentUnverified` | The agent reported attaching it and the provider did not reject it. Both halves are weak: the attachment is the adapter's own claim, and a provider that ignores a parameter answers exactly like one that used it. |
 | `SentAndEchoed` | The provider echoed the same value back — the strongest available confirmation. |
 | `EchoedDifferentValue` | The provider echoed a *different* value. Not reproducible on this parameter. |
 | `RejectedByProvider` | The provider refused the call because of it. |

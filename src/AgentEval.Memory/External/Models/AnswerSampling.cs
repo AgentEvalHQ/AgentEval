@@ -32,8 +32,10 @@ public enum AnswerSamplingDisposition
     DeclinedByAgent = 2,
 
     /// <summary>
-    /// The value was attached to the outbound call and the provider did not reject it. It may still
-    /// have been ignored: this is "sent", not "honoured".
+    /// The agent reported attaching the value to its outbound call, and the provider did not reject
+    /// it. Two limits, both deliberate: the attachment is the agent's own claim — AgentEval cannot
+    /// see inside an adapter it does not own — and a provider that ignores a parameter answers
+    /// exactly like one that used it. This is "sent", not "honoured".
     /// </summary>
     SentUnverified = 3,
 
