@@ -530,7 +530,14 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             "single-session-preference" =>
                 LongMemEvalJudgePrompts.Preference(question.Question, question.GoldAnswer, hypothesis),
 
-            "temporal-reasoning" =>
+            // The time-grounded probe's three types judge like temporal-reasoning: their answers are
+            // dates and intervals derived from timestamps, so the off-by-one-day tolerance applies
+            // for the same reason. They reuse the existing template rather than adding one, which
+            // keeps the judge-prompt fingerprint — and therefore every sealed baseline — unchanged.
+            "temporal-reasoning" or
+            LongMemEvalTimeGroundedCorpus.AsOfQuestionType or
+            LongMemEvalTimeGroundedCorpus.CurrentQuestionType or
+            LongMemEvalTimeGroundedCorpus.ProspectiveQuestionType =>
                 LongMemEvalJudgePrompts.Temporal(question.Question, question.GoldAnswer, hypothesis),
 
             "knowledge-update" =>

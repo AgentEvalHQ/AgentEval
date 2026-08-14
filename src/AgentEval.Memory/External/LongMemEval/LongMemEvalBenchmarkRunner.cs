@@ -115,13 +115,34 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         IReadOnlyList<LongMemEvalEntry> entries,
         string? executionLabel,
         CancellationToken ct,
-        LoadedDataset? dataset = null)
+        LoadedDataset? dataset = null,
+        OracleProjectionReport? oracleProjection = null)
     {
         _logger.LogInformation(
             "LongMemEval: loaded {Count} questions ({Mode} mode, stratified={Stratified})",
             entries.Count, options.DatasetMode, options.StratifiedSampling);
 
         var judge = new LongMemEvalJudge(_chatClient, NullLogger<LongMemEvalJudge>.Instance);
+        // Null unless the caller asked to pin the answer model, so a default run neither touches the
+        // agent's capability surface nor reads its property bag.
+        var answerSampling = AnswerSamplingCoordinator.Create(options);
+
+        // Time-grounding is refused rather than approximated. Falling back to text injection would
+        // answer temporal questions from the very scaffolding this mode removes, and would report a
+        // score for a measurement that never happened.
+        ITimestampedHistoryInjectableAgent? timestampedAgent = null;
+        TemporalGroundingAccumulator? grounding = null;
+        if (options.TemporalGrounding != TemporalGroundingMode.None)
+        {
+            timestampedAgent = agent as ITimestampedHistoryInjectableAgent
+                ?? throw new ArgumentException(
+                    $"TemporalGrounding is {options.TemporalGrounding}, which delivers session dates " +
+                    $"as real timestamps, but agent '{agent.Name}' does not implement " +
+                    $"ITimestampedHistoryInjectableAgent. There is no text fallback for this mode: " +
+                    $"the dates the fallback would use are the ones the mode exists to take away.",
+                    nameof(agent));
+            grounding = new TemporalGroundingAccumulator(options.TemporalGrounding);
+        }
         var totalStopwatch = Stopwatch.StartNew();
         var questionResults = new List<QuestionResult>();
 
@@ -141,6 +162,20 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             if (agent is ISessionResettableAgent resettable)
                 await resettable.ResetSessionAsync(ct);
 
+            // Applied after the reset, per question: an agent that clears state on reset would
+            // otherwise be configured once and answer every later question unpinned.
+            var samplingAttachment = answerSampling?.Configure(agent);
+            if (samplingAttachment is { } attachment && i == 0 &&
+                (attachment.Temperature == AnswerSamplingDisposition.NotSupportedByAgent ||
+                 attachment.Seed == AnswerSamplingDisposition.NotSupportedByAgent))
+            {
+                _logger.LogWarning(
+                    "Answer sampling was requested but {AgentName} does not implement " +
+                    "IAnswerSamplingConfigurableAgent — the answer model runs at the provider " +
+                    "default and the run is not pinned. See ExternalBenchmarkResult.AnswerSampling.",
+                    agent.Name);
+            }
+
             // Inject history (0 LLM calls) or fall back to text blob prepended to query
             string? textBlobPrefix = null;
             var injectionMode = options.HistoryInjectionMode;
@@ -152,7 +187,13 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 _ => agent is IHistoryInjectableAgent // Auto: use structured if available
             };
 
-            if (useStructured && agent is IHistoryInjectableAgent injectable)
+            if (timestampedAgent is not null)
+            {
+                var timestampedHistory = LongMemEvalHistoryFormatter.FormatTimestamped(entry, options);
+                timestampedAgent.InjectTimestampedConversationHistory(timestampedHistory);
+                grounding!.Observe(entry, timestampedHistory);
+            }
+            else if (useStructured && agent is IHistoryInjectableAgent injectable)
             {
                 var history = LongMemEvalHistoryFormatter.Format(entry, options);
                 injectable.InjectConversationHistory(history);
@@ -185,8 +226,13 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             var queryPrompt = textBlobPrefix != null
                 ? $"{textBlobPrefix}\nQuestion: {entry.Question}\nAnswer:"
                 : entry.Question;
-            if (textBlobPrefix == null && !string.IsNullOrEmpty(entry.QuestionDate))
+            // Under TimestampsOnly the query time arrives as TimestampedConversationHistory.QueryTime,
+            // so printing it here would hand back the crutch that mode removes.
+            if (textBlobPrefix == null && !string.IsNullOrEmpty(entry.QuestionDate) &&
+                options.TemporalGrounding != TemporalGroundingMode.TimestampsOnly)
+            {
                 queryPrompt = $"Current Date: {entry.QuestionDate}\n\n{queryPrompt}";
+            }
 
             AgentResponse response;
             try
@@ -196,9 +242,19 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 qStopwatch.Stop();
+                var samplingOutcome = samplingAttachment is { } failedAttachment
+                    ? answerSampling!.Fail(failedAttachment, ex)
+                    : null;
+                // Derived from the same record the result carries, so the code and the disposition
+                // cannot disagree, and neither fires unless AgentEval's own request was on the call
+                // that failed. A provider that refuses the requested sampling gets its own code
+                // rather than a generic agent error: AgentEval never retries without the parameter,
+                // because a silent downgrade would produce a run that looks pinned and is not.
                 var safeCode = ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
                     ? "content_filter"
-                    : "agent_error";
+                    : samplingOutcome is not null && samplingOutcome.WasRejectedByProvider
+                        ? "answer_sampling_rejected"
+                        : "agent_error";
 
                 questionResults.Add(new QuestionResult
                 {
@@ -217,6 +273,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     JudgePrimaryLlmCallCount = 0,
                     JudgeRetryLlmCallCount = 0,
                     JudgeAttemptsUsed = 0,
+                    AnswerSampling = samplingOutcome,
                     SafeFailureCode = safeCode,
                     JudgeExplanation = "Agent execution did not complete.",
                     Duration = qStopwatch.Elapsed
@@ -270,6 +327,9 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     ? ProviderFingerprint.FromAgentResponse(response.AdditionalProperties)
                     : null,
                 JudgeTokensUsed = judgment.TokensUsed,
+                AnswerSampling = samplingAttachment is { } completedAttachment
+                    ? answerSampling!.Complete(completedAttachment, response)
+                    : null,
                 SafeFailureCode = judgment.SafeFailureCode,
                 JudgeExplanation = judgment.Explanation,
                 // Carried through so a stored run is diagnosable without re-running the question. All
@@ -298,17 +358,28 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         totalStopwatch.Stop();
 
         // 3. Aggregate results
-        return AggregateResults(questionResults, options, totalStopwatch.Elapsed, executionLabel, dataset);
+        return AggregateResults(
+            questionResults, options, totalStopwatch.Elapsed, executionLabel, dataset, oracleProjection,
+            grounding?.Build());
     }
 
     /// <summary>
     /// A loaded dataset together with what it was loaded from, so a run can report the file it
     /// sampled and how many questions that file held before sampling.
     /// </summary>
+    /// <param name="Entries">The sampled entries.</param>
+    /// <param name="ResolvedPath">The file the entries came from, or null for an embedded corpus.</param>
+    /// <param name="TotalQuestionsInFile">Questions the source held before sampling.</param>
+    /// <param name="Identifier">Name and version of a corpus that has no path.</param>
+    /// <param name="PrecomputedSha256">
+    /// Hash of a source with no file to stream, so a pathless corpus is still pinned.
+    /// </param>
     private readonly record struct LoadedDataset(
         IReadOnlyList<LongMemEvalEntry> Entries,
-        string ResolvedPath,
-        int TotalQuestionsInFile);
+        string? ResolvedPath,
+        int TotalQuestionsInFile,
+        string? Identifier = null,
+        string? PrecomputedSha256 = null);
 
     private LoadedDataset LoadEntries(ExternalBenchmarkOptions options)
     {
@@ -329,7 +400,9 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         ExternalBenchmarkOptions options,
         TimeSpan duration,
         string? executionLabel,
-        LoadedDataset? dataset = null)
+        LoadedDataset? dataset = null,
+        OracleProjectionReport? oracleProjection = null,
+        TemporalGroundingReport? temporalGrounding = null)
     {
         bool IsScored(QuestionResult question) =>
             question.Correct.HasValue ||
@@ -408,6 +481,11 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             RequestedAbstentionProportion = options.AbstentionTargetProportion
         };
 
+        // Null unless the caller requested answer sampling, so the default result shape is unchanged.
+        var answerSamplingReport = AnswerSamplingReport.From(
+            options,
+            questionResults.Select(q => q.AnswerSampling).ToList());
+
         var judgeFingerprints = questionResults
             .Select(q => q.JudgeSystemFingerprint)
             .Where(f => !string.IsNullOrEmpty(f))
@@ -422,7 +500,9 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             dataset?.TotalQuestionsInFile,
             // Only meaningful when the ids came from a real load; a caller-supplied entry list has no
             // dataset file behind it.
-            dataset is null ? null : questionResults.Select(q => q.QuestionId));
+            dataset is null ? null : questionResults.Select(q => q.QuestionId),
+            dataset?.Identifier,
+            dataset?.PrecomputedSha256);
 
         var benchmarkName = options.DatasetMode != null
             ? $"LongMemEval-{options.DatasetMode} {questionResults.Count}q"
@@ -451,6 +531,9 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             TotalLlmCalls = totalLlmCalls,
             TotalJudgeRetryLlmCalls = totalJudgeRetryCalls,
             Composition = composition,
+            AnswerSampling = answerSamplingReport,
+            OracleProjection = oracleProjection,
+            TemporalGrounding = temporalGrounding,
             Provenance = provenance,
             JudgeSystemFingerprints = judgeFingerprints.Length > 0 ? judgeFingerprints : null,
             Options = options

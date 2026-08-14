@@ -311,6 +311,153 @@ Interpretation:
 - low normal and low oracle suggests answer-model, prompt, or task difficulty dominates;
 - a negative gap warrants investigation; it is not automatically a normal-path win.
 
+## Pinning the answer model
+
+`JudgeTemperature` pins the grader. `AnswerTemperature` and `AnswerSeed` pin the
+call being graded:
+
+```csharp
+var options = new ExternalBenchmarkOptions
+{
+    MaxQuestions = 50,
+    RandomSeed = 42,
+    AnswerTemperature = 0.0,   // passed through as given — see the note below
+    AnswerSeed = 4242,
+};
+```
+
+Why it matters: left at the provider default the answer model disagrees with
+itself, and that disagreement is the floor beneath which no memory improvement is
+detectable. Repeats of one configuration can flip verdicts with byte-identical
+retrieval — same sessions, same config, same retrieved items — and nothing in a
+default result says so.
+
+**AgentEval cannot set sampling on an agent it does not own.** `IEvaluableAgent`
+is prompt-in/text-out with no provider surface. Your adapter opts in:
+
+```csharp
+public sealed class MyAgent : IEvaluableAgent, IAnswerSamplingConfigurableAgent
+{
+    private ChatOptions _options = new();
+
+    public AnswerSamplingAcknowledgement ConfigureAnswerSampling(AnswerSamplingRequest request)
+    {
+        _options = new ChatOptions { Temperature = (float?)request.Temperature, Seed = request.Seed };
+        return AnswerSamplingAcknowledgement.AppliedFrom(request);   // only claim what you applied
+    }
+    // ...
+}
+```
+
+`ChatClientAgentAdapter` (what `chatClient.AsEvaluableAgent(...)` returns) and
+`LongMemEvalOracleReader` already implement it, so AgentEval's own agents and the
+oracle arm are pinnable without extra code.
+
+`ExternalBenchmarkResult.AnswerSampling` reports what each parameter's request
+actually achieved, per question:
+
+| Disposition | Means |
+|---|---|
+| `NotRequested` | You did not ask for it. |
+| `NotSupportedByAgent` | The agent does not implement the interface. The run is **not** pinned. |
+| `DeclinedByAgent` | The agent took the request and declined this parameter. |
+| `SentUnverified` | The agent reported attaching it and the provider did not reject it. Both halves are weak: the attachment is the adapter's own claim, and a provider that ignores a parameter answers exactly like one that used it. |
+| `SentAndEchoed` | The provider echoed the same value back — the strongest available confirmation. |
+| `EchoedDifferentValue` | The provider echoed a *different* value. Not reproducible on this parameter. |
+| `RejectedByProvider` | The provider refused the call because of it. |
+
+Two deliberate behaviours:
+
+- **Values pass through as given.** AgentEval does not assume `0` works; some
+  deployments reject an explicit temperature, and some reject `0` specifically.
+- **A rejection fails the question** with `SafeFailureCode ==
+  "answer_sampling_rejected"` rather than being retried without the parameter.
+  A silent downgrade would produce a run that looks pinned and is not.
+
+`SentUnverified` is never rounded up to "honoured". A provider that ignores a seed
+answers exactly like one that used it, and only an echo distinguishes them —
+surface one on `AgentResponse.AdditionalProperties` under `"seed"` or
+`"temperature"` if your provider returns it.
+
+If you cannot change the adapter, you can still pin the call one layer down by
+wrapping the agent's `IChatClient` in a `DelegatingChatClient` that fills the
+values when the caller left them unset. The run then reports
+`NotSupportedByAgent`, which stays accurate: AgentEval's request did not reach the
+call, and something else pinned it.
+
+**To find out empirically whether the seed took effect**, run the same sample twice
+under the same `RandomSeed` and diff `QuestionResult.AgentResponse` across the two
+results. Identical text on identical inputs is evidence the seed was honoured;
+differing text on identical inputs is proof it was not. That is a stronger claim
+than any disposition here can make, and it costs a second run —
+`JudgeAgreementHarness` does the same thing for the judge side.
+
+## The oracle arm on its own
+
+`RunPairedAsync` runs the normal arm and the ceiling together. `RunOracleAsync`
+runs just the ceiling, and returns the ordinary result shape — a `QuestionResult`
+per question, `SampleComposition`, the usual counters:
+
+```csharp
+var runner = LongMemEvalBenchmark.Subset(judgeClient);
+var ceiling = await runner.RunOracleAsync(answerClient, options);
+
+Console.WriteLine($"Ceiling: {ceiling.OverallAccuracy:F1}%");
+```
+
+The arm measures the dataset and the answer model, not a memory system: nothing is
+stored and nothing is retrieved. Its number is the ceiling every other arm is read
+against, which is a reason for everyone to run the *same* one rather than each
+re-deriving it — `LongMemEvalOracleProjector` and `LongMemEvalOracleReader` are
+public for that purpose.
+
+Two controls move it off the ceiling deliberately:
+
+```csharp
+var stressed = await runner.RunOracleAsync(answerClient, options, new LongMemEvalOracleOptions
+{
+    DistractorSessions = 25,     // non-evidence sessions from the question's OWN haystack
+    GoldSessionFraction = 0.5,   // keep half the evidence, rounded up
+});
+
+var realised = stressed.OracleProjection!;
+Console.WriteLine($"evidence kept {realised.GoldSessionsKept}/{realised.GoldSessionsAvailable}");
+Console.WriteLine($"distractors added {realised.DistractorSessionsAdded} " +
+                  $"(request fully met: {realised.DistractorRequestFullyMet})");
+```
+
+- Distractors come from the question's own haystack. Sessions borrowed from another
+  question are about another user's life and are trivially ignorable, so padding
+  with them measures a strawman.
+- `GoldSessionFraction` rounds **up** and never to zero: rounding a
+  one-evidence-session question to zero makes it unanswerable by construction, and
+  the score would then measure the arithmetic. `0` is rejected outright.
+- Both draws are reproducible under `RandomSeed`, derived per question id, so
+  adding a question does not re-roll another question's sessions.
+- The realised counts are reported because a level that degraded nothing and a
+  level whose degradation did not matter are different findings that look identical
+  in a score. They also differ from the request more often than you would expect:
+  over the real oracle corpus, `GoldSessionFraction = 0.5` keeps **588 of 948**
+  evidence sessions — a realised **0.62**, not 0.5 — because most questions have one
+  or two evidence sessions and the round-up floor of one session binds on nearly all
+  of them.
+- Distractors come from the file you loaded. The **oracle-mode** dataset contains only
+  evidence sessions, so `DistractorSessions` has nothing to draw from there and
+  reports 0 added; run it against the S-mode dataset, whose haystacks carry the
+  non-evidence sessions.
+- Selected sessions keep their dataset order. Appending distractors after the
+  evidence would put the gold first in every question and measure position.
+
+## Time-grounded runs
+
+`TemporalGrounding` delivers session dates as real `DateTimeOffset` values through
+`ITimestampedHistoryInjectableAgent`, and under `TimestampsOnly` removes the
+harness's in-text date scaffolding, so a system that does not place messages in
+time has nothing left to read. It applies to any LongMemEval-shaped dataset, and
+ships with a small authored corpus of clock-dependent questions.
+
+See [Time-grounded probe](time-grounded-probe.md).
+
 ## Safe report projection
 
 Use `LongMemEvalEvalResultAdapter.ToEvalResult` when an `EvalResult` tree is
@@ -371,6 +518,13 @@ application's responsibility.
   inspect or attest the memory store.
 - The oracle is an upper-bound diagnostic for the selected answer sessions, not a
   replacement for normal-path evaluation.
+- Answer-sampling dispositions record what reached the provider, not what the
+  provider did with it. `SentUnverified` is the honest ceiling of that claim, and
+  even `SentAndEchoed` is confirmation of receipt rather than proof of determinism.
+- Time-grounding removes the date scaffolding *AgentEval* adds. Dates the speakers
+  themselves wrote stay in the conversation;
+  `TemporalGroundingReport.SessionsWithDateLikeContent` counts how many sessions
+  still contain one.
 
 See also [Memory benchmark](../memory/getting-started.md), the
 [CLI reference](../../cli.md), and the

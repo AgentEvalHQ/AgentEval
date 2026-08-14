@@ -85,6 +85,31 @@ public class ExternalBenchmarkResult
     public SampleComposition? Composition { get; init; }
 
     /// <summary>
+    /// What the run did with <see cref="ExternalBenchmarkOptions.AnswerTemperature"/> and
+    /// <see cref="ExternalBenchmarkOptions.AnswerSeed"/>; null when neither was requested.
+    /// </summary>
+    /// <remarks>
+    /// Requesting a value and reaching the provider with it are different things, and the difference
+    /// decides whether two runs are comparable. Both are recorded, per parameter, counted from
+    /// <see cref="QuestionResults"/>.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnswerSamplingReport? AnswerSampling { get; init; }
+
+    /// <summary>
+    /// What time-grounding did to the corpus, or null when the run was not time-grounded.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TemporalGroundingReport? TemporalGrounding { get; init; }
+
+    /// <summary>
+    /// What the oracle projection realised — evidence kept of evidence available, distractors added
+    /// of distractors requested — or null when the run was not an oracle arm.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OracleProjectionReport? OracleProjection { get; init; }
+
+    /// <summary>
     /// Dataset and judge-prompt fingerprints; null unless
     /// <see cref="ExternalBenchmarkOptions.RunProvenanceMode"/> requested them.
     /// </summary>
@@ -236,6 +261,13 @@ public class QuestionResult
 
     /// <summary>Judge tokens consumed across attempts.</summary>
     public int JudgeTokensUsed { get; init; }
+
+    /// <summary>
+    /// What happened to the requested answer-sampling parameters on this question; null when none
+    /// were requested.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnswerSamplingOutcome? AnswerSampling { get; init; }
 
     /// <summary>Validated, copy-owned normalized evidence when capture is enabled.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

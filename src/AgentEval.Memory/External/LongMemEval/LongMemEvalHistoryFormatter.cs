@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using AgentEval.Core;
 using AgentEval.Memory.External.Models;
 
 namespace AgentEval.Memory.External.LongMemEval;
@@ -78,27 +79,108 @@ public static class LongMemEvalHistoryFormatter
             }
 
             // Add turns within this session, stripping has_answer metadata
-            string? pendingUser = null;
-            foreach (var turn in session)
-            {
-                if (turn.Role == "user")
-                {
-                    if (pendingUser != null)
-                        turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
-                    pendingUser = turn.Content;
-                }
-                else if (turn.Role == "assistant" && pendingUser != null)
-                {
-                    turns.Add((pendingUser, turn.Content));
-                    pendingUser = null;
-                }
-            }
-
-            if (pendingUser != null)
-                turns.Add((pendingUser, Mark(UnpairedUserAcknowledgement, options.SyntheticTurnMarker)));
+            EmitSessionTurns(
+                session,
+                options.SyntheticTurnMarker,
+                (user, assistant) => turns.Add((user, assistant)));
         }
 
         return turns;
+    }
+
+    /// <summary>
+    /// Formats an entry's haystack as turns that carry real timestamps, for
+    /// <see cref="AgentEval.Core.ITimestampedHistoryInjectableAgent"/>.
+    /// </summary>
+    /// <param name="entry">The entry to format. Every session date must be parseable.</param>
+    /// <param name="options">
+    /// Options; <see cref="ExternalBenchmarkOptions.TemporalGrounding"/> decides whether the
+    /// session-boundary marker still carries its date as text.
+    /// </param>
+    /// <returns>The timestamped turns together with the instant the question is asked.</returns>
+    /// <exception cref="LongMemEvalTemporalGroundingException">
+    /// When a session date or the question date cannot be parsed. Nothing is substituted: an
+    /// invented timestamp is indistinguishable from a real one to everything downstream, which is
+    /// precisely the confusion time-grounding exists to remove.
+    /// </exception>
+    /// <remarks>
+    /// Under <see cref="TemporalGroundingMode.TimestampsOnly"/> the session-boundary marker drops its
+    /// date, so the only remaining source of dates is
+    /// <see cref="AgentEval.Core.TimestampedConversationTurn.Timestamp"/>. The structural marker
+    /// itself stays, because session structure is not a date crutch.
+    /// </remarks>
+    public static TimestampedConversationHistory FormatTimestamped(
+        LongMemEvalEntry entry,
+        ExternalBenchmarkOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var queryTime = LongMemEvalTimestamps.Require(
+            entry.QuestionDate, entry.QuestionId, "question_date");
+        var keepDateInText =
+            options.TemporalGrounding == TemporalGroundingMode.TimestampsAndText &&
+            options.IncludeTimestamps;
+        var turns = new List<TimestampedConversationTurn>();
+        var sessions = entry.HaystackSessions ?? [];
+
+        for (var sessionIdx = 0; sessionIdx < sessions.Count; sessionIdx++)
+        {
+            var sessionDate = entry.HaystackDates is not null && sessionIdx < entry.HaystackDates.Count
+                ? entry.HaystackDates[sessionIdx]
+                : null;
+            var timestamp = LongMemEvalTimestamps.Require(
+                sessionDate, entry.QuestionId, $"haystack_dates[{sessionIdx}]");
+
+            void Add(string user, string assistant) =>
+                turns.Add(new TimestampedConversationTurn(user, assistant, timestamp, sessionIdx));
+
+            if (options.PreserveSessionBoundaries)
+            {
+                var marker = BuildSessionMarker(sessionIdx + 1, entry, sessionIdx, keepDateInText);
+                Add(
+                    Mark(marker, options.SyntheticTurnMarker),
+                    Mark(SessionBoundaryAcknowledgement, options.SyntheticTurnMarker));
+            }
+
+            EmitSessionTurns(sessions[sessionIdx], options.SyntheticTurnMarker, Add);
+        }
+
+        return new TimestampedConversationHistory { Turns = turns, QueryTime = queryTime };
+    }
+
+    /// <summary>
+    /// Walks one session, pairing each user turn with the assistant reply that answered it and
+    /// synthesising <see cref="UnpairedUserAcknowledgement"/> for one the dataset leaves unanswered.
+    /// </summary>
+    /// <remarks>
+    /// Shared by both injection formats deliberately: the pairing rule decides what a memory system
+    /// ingests, and a fix applied to only one format would make the two arms disagree about the same
+    /// corpus.
+    /// </remarks>
+    private static void EmitSessionTurns(
+        IReadOnlyList<LongMemEvalTurn> session,
+        string? syntheticMarker,
+        Action<string, string> emit)
+    {
+        string? pendingUser = null;
+        foreach (var turn in session)
+        {
+            if (turn.Role == "user")
+            {
+                if (pendingUser != null)
+                    emit(pendingUser, Mark(UnpairedUserAcknowledgement, syntheticMarker));
+                pendingUser = turn.Content;
+            }
+            else if (turn.Role == "assistant" && pendingUser != null)
+            {
+                emit(pendingUser, turn.Content);
+                pendingUser = null;
+            }
+        }
+
+        if (pendingUser != null)
+            emit(pendingUser, Mark(UnpairedUserAcknowledgement, syntheticMarker));
     }
 
     /// <summary>
@@ -153,10 +235,14 @@ public static class LongMemEvalHistoryFormatter
 
     private static string BuildSessionMarker(
         int sessionNumber, LongMemEvalEntry entry, int sessionIdx, ExternalBenchmarkOptions options)
+        => BuildSessionMarker(sessionNumber, entry, sessionIdx, options.IncludeTimestamps);
+
+    private static string BuildSessionMarker(
+        int sessionNumber, LongMemEvalEntry entry, int sessionIdx, bool includeDate)
     {
         var marker = $"{SessionMarkerPrefix}{sessionNumber}";
 
-        if (options.IncludeTimestamps && entry.HaystackDates != null && sessionIdx < entry.HaystackDates.Count)
+        if (includeDate && entry.HaystackDates != null && sessionIdx < entry.HaystackDates.Count)
             marker += $" ({entry.HaystackDates[sessionIdx]})";
 
         marker += " ---";

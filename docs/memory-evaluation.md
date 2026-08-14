@@ -213,6 +213,31 @@ The exact default strings are public constants —
 `.SessionMarkerPrefix` — so they can be matched without copying a literal out of a log. Both options
 apply to structured injection; the text-blob format is the official prompt and is left untouched.
 
+#### Pinning the answer model, the ceiling arm, and time-grounding
+
+Three controls that decide what a run can resolve, all opt-in:
+
+```csharp
+// The graded call, not just the grader. Requires the agent to implement
+// IAnswerSamplingConfigurableAgent; the result reports whether it reached the provider.
+AnswerTemperature = 0.0,
+AnswerSeed = 4242,
+
+// Session dates as real instants, with AgentEval's in-text date scaffolding removed, so a
+// system that stamps messages with ingestion time has nothing left to read.
+TemporalGrounding = TemporalGroundingMode.TimestampsOnly,
+HistoryInjectionMode = HistoryInjectionMode.StructuredChatHistory,
+```
+
+```csharp
+// The ceiling arm on its own — a property of the dataset, not of any memory system.
+var ceiling = await runner.RunOracleAsync(answerClient, options);
+```
+
+See [Pinning the answer model](benchmarks/longmemeval/getting-started.md#pinning-the-answer-model),
+[The oracle arm on its own](benchmarks/longmemeval/getting-started.md#the-oracle-arm-on-its-own), and the
+[time-grounded probe](benchmarks/longmemeval/time-grounded-probe.md).
+
 Sample [G8: LongMemEvalBenchmarkDemo](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) and [G10: LongMemEvalBaselineRepro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
 
 ### ✍️ Fluent Memory Assertions

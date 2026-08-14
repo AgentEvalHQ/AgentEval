@@ -19,7 +19,7 @@ public sealed class LongMemEvalOracleProjectionTests
             [Session("distractor", false), Session("answer evidence", true)],
             ["date-1", "date-2"]);
 
-        var projected = LongMemEvalOracleProjector.Project(source);
+        var projected = LongMemEvalOracleProjector.Project(source).Entry;
 
         Assert.Equal("q-single", projected.QuestionId);
         var projectedSession = Assert.Single(projected.HaystackSessions!);
@@ -46,7 +46,7 @@ public sealed class LongMemEvalOracleProjectionTests
             ],
             ["date-a2", "date-d", "date-a1"]);
 
-        var projected = LongMemEvalOracleProjector.Project(source);
+        var projected = LongMemEvalOracleProjector.Project(source).Entry;
 
         Assert.Equal(2, projected.HaystackSessions!.Count);
         Assert.Equal(
@@ -70,7 +70,7 @@ public sealed class LongMemEvalOracleProjectionTests
         source.QuestionType = "temporal-reasoning";
         source.QuestionDate = "2026/02/01";
 
-        var projected = LongMemEvalOracleProjector.Project(source);
+        var projected = LongMemEvalOracleProjector.Project(source).Entry;
 
         Assert.Equal("2026/02/01", projected.QuestionDate);
         Assert.Equal(["2026/01/01"], projected.HaystackDates);
@@ -87,7 +87,7 @@ public sealed class LongMemEvalOracleProjectionTests
             [Session("distractor", false)],
             ["date-1"]);
 
-        var projected = LongMemEvalOracleProjector.Project(source);
+        var projected = LongMemEvalOracleProjector.Project(source).Entry;
 
         Assert.True(projected.IsAbstention);
         Assert.Empty(projected.HaystackSessions!);

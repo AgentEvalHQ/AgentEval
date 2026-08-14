@@ -7,6 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-beta] - 2026-08-14
+
+The discriminating-power release. A benchmark cannot resolve a difference smaller than its own noise,
+cannot compare an arm to a ceiling nobody else can build, and cannot test a capability its corpus has
+no questions for. This release addresses all three, and no default changes what a run selects, injects,
+or scores.
+
+### LongMemEval: pinning the answer model
+
+#### Added
+- **`AnswerTemperature` and `AnswerSeed`** on `ExternalBenchmarkOptions`. `JudgeTemperature` pinned the
+  grader; nothing pinned the call being graded, so the answer model ran at the provider default — 1.0 on
+  most deployments. That self-disagreement is the floor beneath which no memory improvement is
+  detectable, and it is invisible in a result: repeats of one configuration can flip verdicts with
+  byte-identical retrieval — same corpus, same config, same items retrieved.
+- **`IAnswerSamplingConfigurableAgent`** (in `AgentEval.Abstractions`) — how the values reach an agent
+  AgentEval does not own. `IEvaluableAgent` is prompt-in/text-out with no provider surface, so a
+  benchmark that claimed to pin an opaque agent would be claiming something it cannot do.
+  `ChatClientAgentAdapter` and `LongMemEvalOracleReader` implement it, so AgentEval's own agents and the
+  oracle arm are pinnable without extra code.
+- **`ExternalBenchmarkResult.AnswerSampling` and `QuestionResult.AnswerSampling`** — each parameter's
+  fate, per question: `NotRequested`, `NotSupportedByAgent`, `DeclinedByAgent`, `SentUnverified`,
+  `SentAndEchoed`, `EchoedDifferentValue`, `RejectedByProvider`. A seed a provider silently ignores is
+  worse than no seed, because the run looks reproducible and is not — so a successful call earns
+  `SentUnverified` and nothing stronger. Only the provider echoing the value back upgrades it to
+  `SentAndEchoed`, and an echo that disagrees gets its own value rather than being folded into "applied".
+  Values pass through as given: no assumption that `0` works, because some deployments reject an explicit
+  temperature and some reject `0` specifically. A rejection fails the question with
+  `SafeFailureCode == "answer_sampling_rejected"` rather than being retried without the parameter, since
+  a silent downgrade produces a run that looks pinned and is not. The agent's property bag is read only
+  when a value was actually sent, so a default run observes nothing.
+
+### LongMemEval: a public, controllable oracle arm
+
+#### Added
+- **`RunOracleAsync`** — the ceiling arm on its own, returning the ordinary result shape: a
+  `QuestionResult` per question plus `SampleComposition`. **`LongMemEvalOracleProjector` and
+  `LongMemEvalOracleReader` are now public.** The arm is a property of the dataset and the answer model —
+  no store, no retrieval — and it is the ceiling every other arm is read against, so a ceiling each
+  caller re-implements is the one thing a ceiling must not be: a different number per caller.
+- **`LongMemEvalOracleOptions`** with two controls, on their own options object because they mean nothing
+  outside this arm. `DistractorSessions` adds K non-evidence sessions **from the question's own
+  haystack** — sessions borrowed from another question are about another user's life and are trivially
+  ignorable, so padding with them measures a strawman. `GoldSessionFraction` keeps part of the evidence,
+  rounding **up** and never below one session for a question that has any; `0` is rejected, because
+  rounding a one-evidence-session question to zero makes it unanswerable by construction and scores it
+  anyway. Both draws are reproducible under `RandomSeed` through a per-question derived stream, so adding
+  a question does not re-roll another question's sessions, and lowering the evidence fraction does not
+  change which distractors were drawn.
+- **`ExternalBenchmarkResult.OracleProjection`** — realised counts per run and per question: evidence
+  kept of evidence available, distractors added of distractors requested. A level that degraded nothing
+  and a level whose degradation did not matter are different findings, and a score alone cannot tell them
+  apart. The realised number also differs from the request more often than expected: measured over the
+  real oracle corpus, `GoldSessionFraction = 0.5` keeps 588 of 948 evidence sessions — a realised
+  **0.62** — because most questions have one or two evidence sessions and the round-up floor binds on
+  nearly all of them. Distractors are drawn from the loaded file, and the oracle-mode dataset holds only
+  evidence sessions, so that file reports 0 added. Selected sessions keep their dataset order; appending distractors after the evidence would put
+  the gold first in every question and measure position rather than retrieval.
+
+### LongMemEval: a time-grounded corpus variant
+
+#### Added
+- **`TemporalGrounding`** (`None` / `TimestampsAndText` / `TimestampsOnly`) and
+  **`ITimestampedHistoryInjectableAgent`** — session dates delivered as real `DateTimeOffset` values,
+  with the query time alongside them. In the original corpus a date exists in metadata and in the text
+  AgentEval renders, and nothing forces an ingesting system to place messages in time: a system that
+  stamps everything with ingestion time still scores well, because the model reads the dates out of the
+  prompt. `TimestampsOnly` removes the harness's own scaffolding — session-date headers and the
+  `Current Date:` prefix — so that system has nothing left to read. The two modes are meant to be run as
+  a pair; the difference between the scores is the measurement.
+- **Refusal instead of approximation.** Any mode other than `None` requires the agent to implement the
+  interface, and the run fails before its first provider call otherwise. A text fallback would answer
+  temporal questions from exactly the scaffolding the mode takes away. A session date the harness cannot
+  parse fails the run (`LongMemEvalTemporalGroundingException`) rather than being replaced by a
+  placeholder.
+- **`LongMemEvalTimeGroundedCorpus`** — 12 authored questions embedded in the package (no download),
+  four each of `temporal-as-of`, `temporal-current` and `prospective-memory`. **Not LongMemEval and not
+  comparable with it.** The rule that gives it teeth: no message content contains an absolute date or a
+  four-digit year, so every temporal expression is relative — "eight weeks from today", "the first Monday
+  of next month" — and resolving one requires the session's own timestamp. Enforced by test, not by good
+  intentions. Ordering is not enough: knowing that session B followed session A cannot say whether a
+  switch happened before the 1st of March, or whether a thirty-day trial has expired. Generated by
+  `tools/gen_timegrounded_corpus.py`, which derives every absolute date in every gold answer from the
+  session timestamps so the arithmetic in the answers cannot drift from the arithmetic in the
+  conversations.
+- **`ExternalBenchmarkResult.TemporalGrounding`** — mode, sessions and turns timestamped, the earliest
+  and latest instant, whether in-text dates were removed, and `SessionsWithDateLikeContent`: how many
+  sessions still contain a date the mode could not take away, because it was written by a speaker rather
+  than by the harness. Measured over the real oracle corpus (500 questions, 948 sessions, 6,427 turns):
+  **159 of 948 sessions — 16.8% — still carry a date-like string in the message text**. On the original
+  corpus `TimestampsOnly` therefore weakens the crutch rather than removing it, which is precisely why
+  the authored corpus below is written under a rule the original never had to follow.
+- **`RunTimeGroundedAsync` / `RunTimeGroundedOracleAsync`**, **`LongMemEvalDataLoader.LoadFromJson`**,
+  **`LongMemEvalHistoryFormatter.FormatTimestamped`**, **`LongMemEvalTimestamps`**, and
+  `BenchmarkRunProvenance.DatasetIdentifier` — an embedded corpus has no file to hash, and is pinned by
+  identifier and content hash instead of being reported as unmeasured.
+
+#### Changed
+- `ExternalBenchmarkOptions.Validate` rejects `TemporalGrounding` set alongside
+  `HistoryInjectionMode.TextBlob`. `TextBlob` is the default, so this is usually a forgotten line rather
+  than a wrong one — and saying so beats silently overriding it.
+- The three time-grounded question types judge with the existing `Temporal` template, since their answers
+  are dates and intervals. No judge prompt was added or edited, so the judge-prompt fingerprint — and
+  every baseline sealed against it — is unchanged.
+
 ## [0.20.0-beta] - 2026-08-12
 
 The measurable-sample release. LongMemEval learns to draw the sample you asked for, report the sample

@@ -1,0 +1,750 @@
+[
+  {
+    "question_id": "tg-asof-001",
+    "question_type": "temporal-as-of",
+    "question": "Which gym was I a member of at the start of March?",
+    "answer": "Riverside Fitness. You joined Riverside in mid-January and did not move to Northgate Athletic until the week of 16 March 2026, so at the start of March you were still at Riverside.",
+    "question_date": "2026/05/04 (Mon) 09:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Signed up at Riverside Fitness this evening — three months up front.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Nice, three months is a decent commitment. What made you pick Riverside?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "It is two streets away and the rowing machines are never busy.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Proximity beats everything for keeping a habit. Enjoy it.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Any advice for keeping oat milk from splitting in hot coffee?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Warm the milk gently first and pour the coffee into it rather than the other way round.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "I switched to Northgate Athletic last week — Riverside got far too crowded in the evenings.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "How is Northgate compared with what you had?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Quieter, and the pool is a real bonus.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Sounds like the right move.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/01/12 (Mon) 18:30",
+      "2026/02/09 (Mon) 07:45",
+      "2026/03/23 (Mon) 19:10"
+    ],
+    "haystack_session_ids": [
+      "tg-asof-001-s1",
+      "tg-asof-001-s2",
+      "tg-asof-001-s3"
+    ],
+    "answer_session_ids": [
+      "tg-asof-001-s1",
+      "tg-asof-001-s3"
+    ]
+  },
+  {
+    "question_id": "tg-asof-002",
+    "question_type": "temporal-as-of",
+    "question": "How many allergy tablets was I taking each morning during March?",
+    "answer": "One tablet each morning. The dose only went up to two after the appointment on 6 April 2026, so throughout March you were still taking one.",
+    "question_date": "2026/05/15 (Fri) 11:30",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Started the new allergy tablets this morning — one tablet with breakfast.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Any side effects so far?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "A bit drowsy, otherwise fine.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Drowsiness usually settles after the first week or so.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Recommend me a film for a quiet Friday night?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Something slow and warm — a road-trip drama, if you are in that mood.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "The doctor doubled my allergy dose at yesterday's appointment — two tablets each morning now.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Did they say how long you would stay on the higher dose?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Until the pollen drops off, so most of the summer.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Worth setting a reminder to review it after that.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/02/03 (Tue) 09:15",
+      "2026/02/20 (Fri) 20:00",
+      "2026/04/07 (Tue) 08:40"
+    ],
+    "haystack_session_ids": [
+      "tg-asof-002-s1",
+      "tg-asof-002-s2",
+      "tg-asof-002-s3"
+    ],
+    "answer_session_ids": [
+      "tg-asof-002-s1",
+      "tg-asof-002-s3"
+    ]
+  },
+  {
+    "question_id": "tg-asof-003",
+    "question_type": "temporal-as-of",
+    "question": "What delivery date were we working to on the Harbour project before the client moved it?",
+    "answer": "27 April 2026 — eight weeks from the kick-off on 2 March 2026. The three-week slip the client asked for at the end of March pushed it later than that.",
+    "question_date": "2026/05/20 (Wed) 10:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Harbour project kicked off this morning. The client wants delivery eight weeks from today.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Eight weeks is tight for a project of that size. What is the biggest unknown?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Their data export. Nobody has seen it yet.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Get a sample early — that is where the schedule usually goes.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Client pushed Harbour delivery back by three weeks — the export was worse than anyone expected.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Called it. Does the extra time cover the cleanup?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Just about.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Then take it and do not give the slack back.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Is it worth servicing a bike myself or paying a shop?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Learn brakes and gears yourself; leave wheel truing and bearings to a shop.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/03/02 (Mon) 11:00",
+      "2026/03/30 (Mon) 16:20",
+      "2026/04/15 (Wed) 12:05"
+    ],
+    "haystack_session_ids": [
+      "tg-asof-003-s1",
+      "tg-asof-003-s2",
+      "tg-asof-003-s3"
+    ],
+    "answer_session_ids": [
+      "tg-asof-003-s1",
+      "tg-asof-003-s2"
+    ]
+  },
+  {
+    "question_id": "tg-asof-004",
+    "question_type": "temporal-as-of",
+    "question": "How long had I been going to physio by the time I told you my shoulder felt better?",
+    "answer": "About four weeks — physio started on 20 January 2026 and you said the shoulder felt better on 17 February 2026, which is 28 days later.",
+    "question_date": "2026/03/10 (Tue) 08:30",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "First physio session for the shoulder tonight. Twice a week from here.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "What did they have you doing?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Band work and a lot of very slow raises.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Slow and boring is usually the part that works.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "What is a reasonable amount to spend on a first pair of running shoes?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Mid-range and properly fitted beats expensive and guessed.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Shoulder genuinely feels better tonight — first session where nothing pinched.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "That is a good marker. Are you keeping the twice-a-week rhythm?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "For another month at least.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Sensible.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/01/20 (Tue) 19:00",
+      "2026/02/02 (Mon) 13:15",
+      "2026/02/17 (Tue) 19:05"
+    ],
+    "haystack_session_ids": [
+      "tg-asof-004-s1",
+      "tg-asof-004-s2",
+      "tg-asof-004-s3"
+    ],
+    "answer_session_ids": [
+      "tg-asof-004-s1",
+      "tg-asof-004-s3"
+    ]
+  },
+  {
+    "question_id": "tg-current-001",
+    "question_type": "temporal-current",
+    "question": "Is my Lumen trial still running?",
+    "answer": "No. The thirty-day trial started on 28 April 2026 and ran out on 28 May 2026, which is already past.",
+    "question_date": "2026/06/03 (Wed) 09:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Started the Lumen analytics free trial this morning — thirty days.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "What are you hoping to get out of it?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Mostly whether the funnel reports are worth the price.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Give yourself a checkpoint before the trial runs out so the decision is not rushed.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "The cat has started sleeping on my keyboard. Any ideas?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Give her a warmer, better spot right next to it — cats take the upgrade.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/04/28 (Tue) 10:00",
+      "2026/05/06 (Wed) 18:40"
+    ],
+    "haystack_session_ids": [
+      "tg-current-001-s1",
+      "tg-current-001-s2"
+    ],
+    "answer_session_ids": [
+      "tg-current-001-s1"
+    ]
+  },
+  {
+    "question_id": "tg-current-002",
+    "question_type": "temporal-current",
+    "question": "Have I started at Halcyon Systems yet?",
+    "answer": "Yes. You started on 2 March 2026 — the first Monday of the month after you accepted — so by now you have been there about 7 weeks.",
+    "question_date": "2026/04/20 (Mon) 09:30",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "I accepted the Halcyon Systems offer tonight. I start the first Monday of next month.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Congratulations. How much notice did you have to give?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Two weeks, which just about fits.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Then you get a short breather in between. Take it.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Is it rude to decline a meeting with no agenda?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Not if you ask for the agenda first — most of them then quietly disappear.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/02/16 (Mon) 21:00",
+      "2026/03/09 (Mon) 07:55"
+    ],
+    "haystack_session_ids": [
+      "tg-current-002-s1",
+      "tg-current-002-s2"
+    ],
+    "answer_session_ids": [
+      "tg-current-002-s1"
+    ]
+  },
+  {
+    "question_id": "tg-current-003",
+    "question_type": "temporal-current",
+    "question": "How old is the puppy now?",
+    "answer": "About 20 weeks old — she was eight weeks old when you brought her home on 15 March 2026, which was roughly 12 weeks ago.",
+    "question_date": "2026/06/07 (Sun) 11:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "We brought the puppy home today. She is eight weeks old and completely fearless.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Eight weeks is right at the start of the socialisation window — meet as many people as you can.",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Noted. She has already met the whole street.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Then you are ahead.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Best way to get red wine out of a rug?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Blot, never rub, then cold water and a little washing-up liquid.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/03/15 (Sun) 15:20",
+      "2026/04/26 (Sun) 20:10"
+    ],
+    "haystack_session_ids": [
+      "tg-current-003-s1",
+      "tg-current-003-s2"
+    ],
+    "answer_session_ids": [
+      "tg-current-003-s1"
+    ]
+  },
+  {
+    "question_id": "tg-current-004",
+    "question_type": "temporal-current",
+    "question": "Is my car service due yet?",
+    "answer": "Not yet. The car was serviced on 29 January 2026 and the interval is six months, so the next one falls due around 29 July 2026 — still a few weeks away.",
+    "question_date": "2026/06/20 (Sat) 10:15",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Car went in for its service this afternoon. They do it every six months.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Anything unexpected?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Rear pads, which I half expected.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Better found on a service than on a hill.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Is it worth learning to make bread with a starter?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Only if you enjoy the routine — the starter needs feeding whether you bake or not.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/01/29 (Thu) 16:00",
+      "2026/03/04 (Wed) 19:30"
+    ],
+    "haystack_session_ids": [
+      "tg-current-004-s1",
+      "tg-current-004-s2"
+    ],
+    "answer_session_ids": [
+      "tg-current-004-s1"
+    ]
+  },
+  {
+    "question_id": "tg-prospective-001",
+    "question_type": "prospective-memory",
+    "question": "Have I started at Meridian Health yet?",
+    "answer": "No, not yet. You start on 1 June 2026 — the first Monday of next month as of that conversation — which is still about 5 days away.",
+    "question_date": "2026/05/27 (Wed) 09:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Signed the Meridian Health contract tonight. First Monday of next month is day one.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "How are you feeling about it?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Mostly relieved. It has been a long process.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Take the gap between jobs seriously — it does not come round often.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Quick one: does resting dough in the fridge overnight actually help?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Yes — slower fermentation, better flavour, easier to shape cold.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/05/11 (Mon) 20:15",
+      "2026/05/19 (Tue) 12:40"
+    ],
+    "haystack_session_ids": [
+      "tg-prospective-001-s1",
+      "tg-prospective-001-s2"
+    ],
+    "answer_session_ids": [
+      "tg-prospective-001-s1"
+    ]
+  },
+  {
+    "question_id": "tg-prospective-002",
+    "question_type": "prospective-memory",
+    "question": "Should I have heard back about the visa application by now?",
+    "answer": "No. They quoted eight weeks from the application on 14 April 2026, which puts the decision around 9 June 2026 — roughly 2 weeks after the date you are asking.",
+    "question_date": "2026/05/26 (Tue) 08:20",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Visa application went in today. They said to allow eight weeks for a decision.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Did they give you a reference to track it?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "Yes, and an email address that I suspect nobody reads.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Keep the reference somewhere you will find it in two months.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "What is a good present for someone who says they want nothing?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Something consumable and slightly too nice to buy for yourself.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/04/14 (Tue) 14:50",
+      "2026/05/02 (Sat) 17:05"
+    ],
+    "haystack_session_ids": [
+      "tg-prospective-002-s1",
+      "tg-prospective-002-s2"
+    ],
+    "answer_session_ids": [
+      "tg-prospective-002-s1"
+    ]
+  },
+  {
+    "question_id": "tg-prospective-003",
+    "question_type": "prospective-memory",
+    "question": "Is the flat inspection still coming up?",
+    "answer": "No, it has already happened. A fortnight from the day after that conversation puts it on 20 March 2026, which is now in the past.",
+    "question_date": "2026/04/02 (Thu) 09:45",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "The letting agent booked the flat inspection for a fortnight from tomorrow.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Anything you need to fix before then?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "The bathroom extractor, mostly.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Worth doing — extractors are the first thing they look at.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Any tips for sleeping on a long flight?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Aisle seat, no screens for the last hour, and accept that broken sleep is still sleep.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/03/05 (Thu) 18:00",
+      "2026/03/24 (Tue) 21:30"
+    ],
+    "haystack_session_ids": [
+      "tg-prospective-003-s1",
+      "tg-prospective-003-s2"
+    ],
+    "answer_session_ids": [
+      "tg-prospective-003-s1"
+    ]
+  },
+  {
+    "question_id": "tg-prospective-004",
+    "question_type": "prospective-memory",
+    "question": "Can I renew the season ticket at the members' rate yet?",
+    "answer": "Not yet. You joined the club on 24 February 2026 and the members' rate needs six months of membership, so you become eligible around 24 August 2026.",
+    "question_date": "2026/06/15 (Mon) 13:00",
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "Joined the rowing club tonight. The members' rate on season tickets only kicks in after six months.",
+          "has_answer": true
+        },
+        {
+          "role": "assistant",
+          "content": "Is the season ticket much cheaper at that rate?",
+          "has_answer": false
+        },
+        {
+          "role": "user",
+          "content": "About a third off, so worth waiting for.",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "Then plan the renewal around it rather than the other way round.",
+          "has_answer": false
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Does cold water actually make you more alert or is that a myth?",
+          "has_answer": false
+        },
+        {
+          "role": "assistant",
+          "content": "The jolt is real but short — it is the routine around it that does the work.",
+          "has_answer": false
+        }
+      ]
+    ],
+    "haystack_dates": [
+      "2026/02/24 (Tue) 19:45",
+      "2026/04/08 (Wed) 07:20"
+    ],
+    "haystack_session_ids": [
+      "tg-prospective-004-s1",
+      "tg-prospective-004-s2"
+    ],
+    "answer_session_ids": [
+      "tg-prospective-004-s1"
+    ]
+  }
+]

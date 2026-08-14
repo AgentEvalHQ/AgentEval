@@ -53,9 +53,12 @@ public partial class LongMemEvalBenchmarkRunner
             loaded);
 
         ct.ThrowIfCancellationRequested();
-        var oracleEntries = entries
+        // The paired oracle is always the gold-only ceiling: it exists to bound the normal arm, and
+        // a degraded ceiling would not bound anything. RunOracleAsync is where the controls live.
+        var projections = entries
             .Select(LongMemEvalOracleProjector.Project)
             .ToArray();
+        var oracleEntries = projections.Select(projection => projection.Entry).ToArray();
         var oracleReader = new LongMemEvalOracleReader(oracleAnswerClient);
         var oracle = await RunSelectedAsync(
             oracleReader,
@@ -63,7 +66,10 @@ public partial class LongMemEvalBenchmarkRunner
             oracleEntries,
             executionLabel: "oracle",
             ct,
-            loaded with { Entries = oracleEntries });
+            loaded with { Entries = oracleEntries },
+            OracleProjectionReport.From(
+                LongMemEvalOracleOptions.GoldOnly,
+                projections.Select(projection => projection.Realised).ToArray()));
 
         double? oracleGap =
             normal.OverallAccuracy.HasValue && oracle.OverallAccuracy.HasValue

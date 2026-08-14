@@ -123,7 +123,9 @@ internal static class LongMemEvalProvenance
         RunProvenanceMode mode,
         string? datasetPath,
         int? datasetQuestionCount,
-        IEnumerable<string>? selectedQuestionIds)
+        IEnumerable<string>? selectedQuestionIds,
+        string? datasetIdentifier = null,
+        string? precomputedDatasetSha256 = null)
     {
         if (mode == RunProvenanceMode.None)
             return null;
@@ -143,8 +145,11 @@ internal static class LongMemEvalProvenance
         }
 
         long? sizeBytes = null;
-        string? datasetHash = null;
-        if (!string.IsNullOrWhiteSpace(datasetPath) && File.Exists(datasetPath))
+        // An embedded corpus has no file to stream, and its hash is computed from the resource text
+        // instead. Preferred when supplied, so a pathless dataset is still pinned rather than
+        // reported as unmeasured.
+        string? datasetHash = precomputedDatasetSha256;
+        if (datasetHash is null && !string.IsNullOrWhiteSpace(datasetPath) && File.Exists(datasetPath))
         {
             datasetHash = TryComputeFileSha256(datasetPath);
             try
@@ -164,6 +169,7 @@ internal static class LongMemEvalProvenance
             JudgePromptTemplateNames = TemplateNames,
             AgentEvalVersion = version,
             DatasetPath = datasetPath,
+            DatasetIdentifier = datasetIdentifier,
             DatasetSha256 = datasetHash,
             DatasetSizeBytes = sizeBytes,
             DatasetQuestionCount = datasetQuestionCount,

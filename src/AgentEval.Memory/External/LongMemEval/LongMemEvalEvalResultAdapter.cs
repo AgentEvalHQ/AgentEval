@@ -121,6 +121,41 @@ public static class LongMemEvalEvalResultAdapter
         };
         if (result.Options.JudgeTemperature is { } judgeTemperature)
             rootDimensions["judgeTemperature"] = judgeTemperature;
+
+        // Whether the graded call was pinned, alongside whether the grader was. A report that states
+        // one and not the other invites the reader to assume both.
+        if (result.AnswerSampling is { } answerSampling)
+        {
+            rootDimensions["answerTemperatureRequested"] = answerSampling.RequestedTemperature.HasValue ? 1 : 0;
+            rootDimensions["answerSeedRequested"] = answerSampling.RequestedSeed.HasValue ? 1 : 0;
+            rootDimensions["answerTemperatureReachedProviderQuestions"] =
+                answerSampling.Temperature.ReachedProviderQuestions;
+            rootDimensions["answerSeedReachedProviderQuestions"] = answerSampling.Seed.ReachedProviderQuestions;
+            rootDimensions["answerSamplingRejectedQuestions"] =
+                answerSampling.Temperature.RejectedByProviderQuestions +
+                answerSampling.Seed.RejectedByProviderQuestions;
+            if (answerSampling.RequestedTemperature is { } answerTemperature)
+                rootDimensions["answerTemperature"] = answerTemperature;
+            if (answerSampling.RequestedSeed is { } answerSeed)
+                rootDimensions["answerSeed"] = answerSeed;
+        }
+
+        if (result.TemporalGrounding is { } temporalGrounding)
+        {
+            rootDimensions["temporalGroundingMode"] = (int)temporalGrounding.Mode;
+            rootDimensions["temporalGroundingSessionsTimestamped"] = temporalGrounding.SessionsTimestamped;
+            rootDimensions["temporalGroundingSessionsWithDateLikeContent"] =
+                temporalGrounding.SessionsWithDateLikeContent;
+        }
+
+        if (result.OracleProjection is { } oracleProjection)
+        {
+            rootDimensions["oracleGoldSessionsAvailable"] = oracleProjection.GoldSessionsAvailable;
+            rootDimensions["oracleGoldSessionsKept"] = oracleProjection.GoldSessionsKept;
+            rootDimensions["oracleDistractorSessionsAdded"] = oracleProjection.DistractorSessionsAdded;
+            rootDimensions["oracleDistractorSessionsRequested"] =
+                oracleProjection.RequestedDistractorSessions * oracleProjection.Questions;
+        }
         if (overallAccuracy is { } overallAccuracyPercent)
             rootDimensions["overallAccuracyPercent"] = overallAccuracyPercent;
         if (result.TaskAveragedAccuracy is { } taskAveragedAccuracyPercent)

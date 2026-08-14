@@ -132,6 +132,68 @@ public class ExternalBenchmarkOptions
     public string? SyntheticTurnMarker { get; init; }
 
     /// <summary>
+    /// Optional sampling temperature for the <i>answer</i> call. Null (default) leaves the answer
+    /// model at whatever the provider defaults to — on most deployments, 1.0.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the noise floor of every number the benchmark produces. Repeats of one configuration
+    /// over an identical corpus can flip verdicts with byte-identical retrieval — same sessions, same
+    /// config, same retrieved items — which is the answer model disagreeing with itself, not the
+    /// memory system behaving differently. Below that floor no memory change is detectable, and
+    /// nothing in a default result says the floor is there.
+    /// </para>
+    /// <para>
+    /// The value is passed through as given. AgentEval does not assume 0 works: reasoning-model
+    /// deployments reject an explicit temperature, and some reject 0 specifically. What the provider
+    /// did with it is recorded on <see cref="ExternalBenchmarkResult.AnswerSampling"/> — including
+    /// the case where the agent under test could not carry it at all.
+    /// </para>
+    /// <para>
+    /// Reaching the answer call requires the agent to implement
+    /// <see cref="AgentEval.Core.IAnswerSamplingConfigurableAgent"/>. AgentEval owns the judge client
+    /// and can pin the judge directly (<see cref="JudgeTemperature"/>); the agent under test is the
+    /// caller's, and a benchmark that quietly did nothing here would be worse than one that never
+    /// offered the option.
+    /// </para>
+    /// </remarks>
+    public double? AnswerTemperature { get; init; }
+
+    /// <summary>
+    /// Optional sampling seed for the <i>answer</i> call. Null (default) sends no seed.
+    /// </summary>
+    /// <remarks>
+    /// A seed that a provider silently ignores is worse than no seed at all, because the run looks
+    /// reproducible while it is not. So the seed's fate is reported per parameter on
+    /// <see cref="ExternalBenchmarkResult.AnswerSampling"/>, and the strongest claim AgentEval will
+    /// make from a successful call is <see cref="AnswerSamplingDisposition.SentUnverified"/> —
+    /// <see cref="AnswerSamplingDisposition.SentAndEchoed"/> requires the provider to echo the value
+    /// back. See <see cref="AnswerTemperature"/> for how the value reaches the agent.
+    /// </remarks>
+    public int? AnswerSeed { get; init; }
+
+    /// <summary>
+    /// Whether session dates reach the agent as real timestamps, and whether the harness keeps its
+    /// own in-text date scaffolding. Default: <see cref="TemporalGroundingMode.None"/> — historical
+    /// behaviour.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Any mode other than <see cref="TemporalGroundingMode.None"/> requires the agent to implement
+    /// <see cref="AgentEval.Core.ITimestampedHistoryInjectableAgent"/>, and the run fails before its
+    /// first provider call if it does not. Falling back to text injection would answer temporal
+    /// questions from the very scaffolding this option exists to take away, and would report a score
+    /// for a measurement that never happened.
+    /// </para>
+    /// <para>
+    /// It applies to any LongMemEval-shaped dataset, so the same flag turns the real corpus into a
+    /// time-grounded corpus. <c>LongMemEvalTimeGroundedCorpus</c> adds questions whose answers depend
+    /// on the clock, which the original corpus does not contain.
+    /// </para>
+    /// </remarks>
+    public TemporalGroundingMode TemporalGrounding { get; init; } = TemporalGroundingMode.None;
+
+    /// <summary>
     /// Dataset mode identifier. Meaning is benchmark-specific
     /// (e.g., "Oracle", "S", "M" for LongMemEval). Default: null.
     /// </summary>
@@ -249,6 +311,8 @@ public class ExternalBenchmarkOptions
             throw new ArgumentOutOfRangeException(nameof(AbstentionPolicy));
         if (!Enum.IsDefined(RunProvenanceMode))
             throw new ArgumentOutOfRangeException(nameof(RunProvenanceMode));
+        if (!Enum.IsDefined(TemporalGrounding))
+            throw new ArgumentOutOfRangeException(nameof(TemporalGrounding));
 
         // A proportion is meaningful under exactly one policy. Accepting it under the others would
         // let a run look configured for an abstention share it never applied.
@@ -274,6 +338,21 @@ public class ExternalBenchmarkOptions
                 $"{nameof(AbstentionSamplingPolicy.TargetProportion)}; it is set while the policy is " +
                 $"{AbstentionPolicy}, where it would be silently ignored.",
                 nameof(AbstentionTargetProportion));
+        }
+
+        // Time-grounding replaces history injection entirely — the turns go through the timestamped
+        // channel — so a TextBlob setting alongside it describes an injection that never happens.
+        // TextBlob is also the default, so this is usually a forgotten line rather than a wrong one,
+        // and saying so beats silently overriding it.
+        if (TemporalGrounding != TemporalGroundingMode.None &&
+            HistoryInjectionMode == HistoryInjectionMode.TextBlob)
+        {
+            throw new ArgumentException(
+                $"TemporalGrounding is {TemporalGrounding}, which injects history through " +
+                $"ITimestampedHistoryInjectableAgent, but HistoryInjectionMode is TextBlob — the " +
+                $"blob would never be built. Set HistoryInjectionMode to StructuredChatHistory or " +
+                $"Auto for a time-grounded run.",
+                nameof(HistoryInjectionMode));
         }
 
         if (IncludeQuestionTypes is { Count: > 0 } types &&
@@ -302,6 +381,13 @@ public class ExternalBenchmarkOptions
             throw new ArgumentOutOfRangeException(
                 nameof(JudgeTemperature), JudgeTemperature,
                 "JudgeTemperature must be null or a finite value between 0 and 2.");
+        }
+        if (AnswerTemperature is { } answerTemperature &&
+            (!double.IsFinite(answerTemperature) || answerTemperature is < 0 or > 2))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(AnswerTemperature), AnswerTemperature,
+                "AnswerTemperature must be null or a finite value between 0 and 2.");
         }
         if (JudgeMaxOutputTokens is < 1 or > 4096)
         {
