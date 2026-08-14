@@ -81,8 +81,17 @@ public static class LongMemEvalTimeGroundedCorpus
     /// <summary>
     /// SHA-256 over the corpus text, so a run can record which probe produced its numbers.
     /// </summary>
+    /// <remarks>
+    /// Newline-normalized before hashing, for the same reason the judge-prompt fingerprint is: the
+    /// file is embedded from a git checkout, and a value that changed when a run moved from a
+    /// Windows machine to a Linux runner would report "different corpus" for a run that used the
+    /// same one. It identifies the corpus <i>text</i>, not the bytes of one checkout.
+    /// </remarks>
     public static string Sha256()
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(ReadJson()))).ToLowerInvariant();
+    {
+        var normalized = ReadJson().Replace("\r\n", "\n", StringComparison.Ordinal);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
+    }
 
     /// <summary>
     /// Loads the corpus, applying the same selection rules any dataset gets — budget, stratification,

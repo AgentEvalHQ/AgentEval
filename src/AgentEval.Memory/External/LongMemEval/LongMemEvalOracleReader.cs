@@ -32,12 +32,6 @@ public sealed class LongMemEvalOracleReader
     : IEvaluableAgent, IHistoryInjectableAgent, ITimestampedHistoryInjectableAgent,
       ISessionResettableAgent, IAnswerSamplingConfigurableAgent
 {
-    // Turns are stamped in text on purpose. The reader is a system that places messages in time
-    // perfectly, by construction — it receives the instants through the typed channel and chooses to
-    // put them where its model can use them. That is an implementation of the time-grounding
-    // contract, not a leak of the scaffolding the contract removes: nothing in the corpus text told
-    // it these dates. It shares the rendering with ChatClientAgentAdapter so the ceiling arm and the
-    // in-context baseline are not accidentally measured under two different formats.
     private readonly IChatClient _answerClient;
     private readonly List<(string UserMessage, string AssistantResponse)> _history = [];
     private double? _temperature;
@@ -131,6 +125,17 @@ public sealed class LongMemEvalOracleReader
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Writes a turn's instant into the text the model reads.
+    /// </summary>
+    /// <remarks>
+    /// Deliberate. The reader is a system that places messages in time perfectly, by construction:
+    /// it receives the instants through the typed channel and puts them where its model can use
+    /// them. That is an implementation of the time-grounding contract, not a leak of the scaffolding
+    /// the contract removes — nothing in the corpus text told it these dates. The rendering is
+    /// shared with <see cref="ChatClientAgentAdapter"/> so the ceiling arm and the in-context
+    /// baseline are never measured under two different formats.
+    /// </remarks>
     private static string Stamp(DateTimeOffset timestamp, string text)
         => ChatClientAgentAdapter.Stamp(timestamp, text);
 

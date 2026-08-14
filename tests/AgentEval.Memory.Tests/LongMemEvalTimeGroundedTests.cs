@@ -39,6 +39,27 @@ public sealed class LongMemEvalTimeGroundedTests
     }
 
     [Fact]
+    public void Corpus_Sha256_DoesNotDependOnTheCheckoutsLineEndings()
+    {
+        // The corpus is embedded from a git checkout. A hash that changed when a run moved from a
+        // Windows machine to a Linux runner would report "different corpus" for the same corpus.
+        var json = LongMemEvalTimeGroundedCorpus.ReadJson();
+        var normalized = json.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var crlf = normalized.Replace("\n", "\r\n", StringComparison.Ordinal);
+
+        Assert.Equal(Sha256Of(normalized), Sha256Of(crlf));
+        Assert.Equal(Sha256Of(normalized), LongMemEvalTimeGroundedCorpus.Sha256());
+
+        static string Sha256Of(string text)
+        {
+            var canonical = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+            return Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+        }
+    }
+
+    [Fact]
     public void Corpus_ContainsNoAbsoluteDateInAnyMessage()
     {
         // The property the whole probe rests on. A single "March 2026" in a conversation would let a

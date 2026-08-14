@@ -379,6 +379,12 @@ answers exactly like one that used it, and only an echo distinguishes them —
 surface one on `AgentResponse.AdditionalProperties` under `"seed"` or
 `"temperature"` if your provider returns it.
 
+If you cannot change the adapter, you can still pin the call one layer down by
+wrapping the agent's `IChatClient` in a `DelegatingChatClient` that fills the
+values when the caller left them unset. The run then reports
+`NotSupportedByAgent`, which stays accurate: AgentEval's request did not reach the
+call, and something else pinned it.
+
 ## The oracle arm on its own
 
 `RunPairedAsync` runs the normal arm and the ceiling together. `RunOracleAsync`
