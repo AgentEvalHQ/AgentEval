@@ -19,6 +19,9 @@
     <EmbeddedResource Include="Report\archetypes.json" />
     <EmbeddedResource Include="Data\corpus\*.json" />
     <EmbeddedResource Include="Data\scenarios\*.json" />
+    <!-- Small enough to embed, unlike the LongMemEval datasets: a consumer can run the
+         time-grounded probe with no download and no path resolution. -->
+    <EmbeddedResource Include="Data\longmemeval\timegrounded\*.json" />
   </ItemGroup>
 
   <ItemGroup>

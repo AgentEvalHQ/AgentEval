@@ -71,7 +71,32 @@ public static class LongMemEvalDataLoader
         if (!File.Exists(path))
             throw LongMemEvalDatasetNotFoundException.ForPath(path);
 
-        var json = File.ReadAllText(path);
+        return LoadFromJson(File.ReadAllText(path), options, out totalQuestionsInFile);
+    }
+
+    /// <summary>
+    /// Loads and samples entries from LongMemEval-shaped JSON already in memory — an embedded
+    /// corpus, a download held in a stream, or a caller's own file read.
+    /// </summary>
+    /// <param name="json">The dataset JSON: an array of LongMemEval entries.</param>
+    /// <param name="options">Benchmark options controlling sampling.</param>
+    public static IReadOnlyList<LongMemEvalEntry> LoadFromJson(
+        string json, ExternalBenchmarkOptions options)
+        => LoadFromJson(json, options, out _);
+
+    /// <summary>
+    /// Loads and samples entries from LongMemEval-shaped JSON already in memory, additionally
+    /// reporting how many questions it held before sampling.
+    /// </summary>
+    /// <param name="json">The dataset JSON: an array of LongMemEval entries.</param>
+    /// <param name="options">Benchmark options controlling sampling.</param>
+    /// <param name="totalQuestionsInFile">Questions present before any filter or budget was applied.</param>
+    public static IReadOnlyList<LongMemEvalEntry> LoadFromJson(
+        string json, ExternalBenchmarkOptions options, out int totalQuestionsInFile)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        ArgumentNullException.ThrowIfNull(options);
+
         var entries = JsonSerializer.Deserialize<List<LongMemEvalEntry>>(json)
             ?? throw new InvalidOperationException("Failed to deserialize LongMemEval dataset.");
 
