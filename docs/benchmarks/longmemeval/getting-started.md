@@ -436,7 +436,15 @@ Console.WriteLine($"distractors added {realised.DistractorSessionsAdded} " +
   adding a question does not re-roll another question's sessions.
 - The realised counts are reported because a level that degraded nothing and a
   level whose degradation did not matter are different findings that look identical
-  in a score.
+  in a score. They also differ from the request more often than you would expect:
+  over the real oracle corpus, `GoldSessionFraction = 0.5` keeps **588 of 948**
+  evidence sessions — a realised **0.62**, not 0.5 — because most questions have one
+  or two evidence sessions and the round-up floor of one session binds on nearly all
+  of them.
+- Distractors come from the file you loaded. The **oracle-mode** dataset contains only
+  evidence sessions, so `DistractorSessions` has nothing to draw from there and
+  reports 0 added; run it against the S-mode dataset, whose haystacks carry the
+  non-evidence sessions.
 - Selected sessions keep their dataset order. Appending distractors after the
   evidence would put the gold first in every question and measure position.
 

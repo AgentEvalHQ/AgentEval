@@ -88,6 +88,18 @@ var ceiling = await runner.RunTimeGroundedOracleAsync(answerClient);
 questions, sessions and turns timestamped, the earliest and latest instant, whether
 the in-text scaffolding was removed, and `SessionsWithDateLikeContent`.
 
+### What `TimestampsOnly` cannot remove
+
+Measured over the real LongMemEval oracle corpus (500 questions, 948 sessions, 6,427
+turns, dates spanning 2021-06 to 2024-02), **159 of 948 sessions — 16.8% — still
+contain a date-like string in the message text itself.** Those are dates the speakers
+wrote, not scaffolding the harness added, and no mode can take them away.
+
+So on the original corpus `TimestampsOnly` weakens the crutch rather than removing it,
+and a system that ignores timestamps can still answer some questions from the text.
+That is the reason the authored corpus below exists: it is written under a rule the
+original corpus never had to follow.
+
 ## The corpus
 
 `LongMemEvalTimeGroundedCorpus` — id `agenteval-timegrounded-v1`, 12 questions,

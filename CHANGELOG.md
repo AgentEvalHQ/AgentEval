@@ -59,7 +59,11 @@ or scores.
 - **`ExternalBenchmarkResult.OracleProjection`** — realised counts per run and per question: evidence
   kept of evidence available, distractors added of distractors requested. A level that degraded nothing
   and a level whose degradation did not matter are different findings, and a score alone cannot tell them
-  apart. Selected sessions keep their dataset order; appending distractors after the evidence would put
+  apart. The realised number also differs from the request more often than expected: measured over the
+  real oracle corpus, `GoldSessionFraction = 0.5` keeps 588 of 948 evidence sessions — a realised
+  **0.62** — because most questions have one or two evidence sessions and the round-up floor binds on
+  nearly all of them. Distractors are drawn from the loaded file, and the oracle-mode dataset holds only
+  evidence sessions, so that file reports 0 added. Selected sessions keep their dataset order; appending distractors after the evidence would put
   the gold first in every question and measure position rather than retrieval.
 
 ### LongMemEval: a time-grounded corpus variant
@@ -91,7 +95,10 @@ or scores.
 - **`ExternalBenchmarkResult.TemporalGrounding`** — mode, sessions and turns timestamped, the earliest
   and latest instant, whether in-text dates were removed, and `SessionsWithDateLikeContent`: how many
   sessions still contain a date the mode could not take away, because it was written by a speaker rather
-  than by the harness.
+  than by the harness. Measured over the real oracle corpus (500 questions, 948 sessions, 6,427 turns):
+  **159 of 948 sessions — 16.8% — still carry a date-like string in the message text**. On the original
+  corpus `TimestampsOnly` therefore weakens the crutch rather than removing it, which is precisely why
+  the authored corpus below is written under a rule the original never had to follow.
 - **`RunTimeGroundedAsync` / `RunTimeGroundedOracleAsync`**, **`LongMemEvalDataLoader.LoadFromJson`**,
   **`LongMemEvalHistoryFormatter.FormatTimestamped`**, **`LongMemEvalTimestamps`**, and
   `BenchmarkRunProvenance.DatasetIdentifier` — an embedded corpus has no file to hash, and is pinned by
