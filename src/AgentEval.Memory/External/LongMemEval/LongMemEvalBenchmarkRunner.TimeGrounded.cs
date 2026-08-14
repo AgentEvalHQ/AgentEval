@@ -45,8 +45,8 @@ public partial class LongMemEvalBenchmarkRunner
         options ??= LongMemEvalTimeGroundedCorpus.ProbeOptions;
         options.Validate();
 
-        var entries = LongMemEvalTimeGroundedCorpus.Load(options);
-        return await RunSelectedAsync(agent, options, entries, executionLabel: null, ct);
+        var loaded = LoadTimeGroundedCorpus(options);
+        return await RunSelectedAsync(agent, options, loaded.Entries, executionLabel: null, ct, loaded);
     }
 
     /// <summary>
@@ -78,19 +78,37 @@ public partial class LongMemEvalBenchmarkRunner
         oracleOptions ??= LongMemEvalOracleOptions.GoldOnly;
         oracleOptions.Validate();
 
-        var projections = LongMemEvalTimeGroundedCorpus.Load(options)
+        var loaded = LoadTimeGroundedCorpus(options);
+        var projections = loaded.Entries
             .Select(entry => LongMemEvalOracleProjector.Project(entry, oracleOptions, options.RandomSeed))
             .ToArray();
+        var projectedEntries = projections.Select(projection => projection.Entry).ToArray();
 
         return await RunSelectedAsync(
             new LongMemEvalOracleReader(answerClient),
             options,
-            projections.Select(projection => projection.Entry).ToArray(),
+            projectedEntries,
             executionLabel: "oracle",
             ct,
-            dataset: null,
+            loaded with { Entries = projectedEntries },
             OracleProjectionReport.From(
                 oracleOptions,
                 projections.Select(projection => projection.Realised).ToArray()));
+    }
+
+    /// <summary>
+    /// Loads the embedded corpus with the provenance an embedded corpus can carry: no path, but a
+    /// versioned identifier and a hash over the shipped text.
+    /// </summary>
+    private static LoadedDataset LoadTimeGroundedCorpus(ExternalBenchmarkOptions options)
+    {
+        var json = LongMemEvalTimeGroundedCorpus.ReadJson();
+        var entries = LongMemEvalDataLoader.LoadFromJson(json, options, out var totalInCorpus);
+        return new LoadedDataset(
+            entries,
+            ResolvedPath: null,
+            totalInCorpus,
+            LongMemEvalTimeGroundedCorpus.CorpusId,
+            LongMemEvalTimeGroundedCorpus.Sha256());
     }
 }

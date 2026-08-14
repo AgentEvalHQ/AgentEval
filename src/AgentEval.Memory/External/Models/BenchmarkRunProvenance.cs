@@ -49,6 +49,14 @@ public sealed class BenchmarkRunProvenance
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DatasetPath { get; init; }
 
+    /// <summary>
+    /// Name and version of a dataset that has no path — an embedded corpus such as
+    /// <c>agenteval-timegrounded-v1</c>. Null for datasets read from disk, which
+    /// <see cref="DatasetPath"/> identifies instead.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DatasetIdentifier { get; init; }
+
     /// <summary>SHA-256 over the dataset file bytes; null unless <see cref="RunProvenanceMode.Full"/>.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DatasetSha256 { get; init; }

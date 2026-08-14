@@ -139,10 +139,11 @@ public sealed class OracleProjectionReport
 
     /// <summary>
     /// True when every question received the requested number of distractors. False means at least
-    /// one haystack ran out, and the run measured a smaller context than it asked for.
+    /// one haystack ran out, and the run measured a smaller context than it asked for. An empty run
+    /// met nothing: reporting true for zero questions would let "nothing ran" read as "all met".
     /// </summary>
     public bool DistractorRequestFullyMet =>
-        DistractorSessionsAdded == RequestedDistractorSessions * Questions;
+        Questions > 0 && DistractorSessionsAdded == RequestedDistractorSessions * Questions;
 
     internal static OracleProjectionReport From(
         LongMemEvalOracleOptions options,

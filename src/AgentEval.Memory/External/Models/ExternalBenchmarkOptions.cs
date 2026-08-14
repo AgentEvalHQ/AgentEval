@@ -340,6 +340,21 @@ public class ExternalBenchmarkOptions
                 nameof(AbstentionTargetProportion));
         }
 
+        // Time-grounding replaces history injection entirely — the turns go through the timestamped
+        // channel — so a TextBlob setting alongside it describes an injection that never happens.
+        // TextBlob is also the default, so this is usually a forgotten line rather than a wrong one,
+        // and saying so beats silently overriding it.
+        if (TemporalGrounding != TemporalGroundingMode.None &&
+            HistoryInjectionMode == HistoryInjectionMode.TextBlob)
+        {
+            throw new ArgumentException(
+                $"TemporalGrounding is {TemporalGrounding}, which injects history through " +
+                $"ITimestampedHistoryInjectableAgent, but HistoryInjectionMode is TextBlob — the " +
+                $"blob would never be built. Set HistoryInjectionMode to StructuredChatHistory or " +
+                $"Auto for a time-grounded run.",
+                nameof(HistoryInjectionMode));
+        }
+
         if (IncludeQuestionTypes is { Count: > 0 } types &&
             types.Any(string.IsNullOrWhiteSpace))
         {

@@ -364,10 +364,19 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     /// A loaded dataset together with what it was loaded from, so a run can report the file it
     /// sampled and how many questions that file held before sampling.
     /// </summary>
+    /// <param name="Entries">The sampled entries.</param>
+    /// <param name="ResolvedPath">The file the entries came from, or null for an embedded corpus.</param>
+    /// <param name="TotalQuestionsInFile">Questions the source held before sampling.</param>
+    /// <param name="Identifier">Name and version of a corpus that has no path.</param>
+    /// <param name="PrecomputedSha256">
+    /// Hash of a source with no file to stream, so a pathless corpus is still pinned.
+    /// </param>
     private readonly record struct LoadedDataset(
         IReadOnlyList<LongMemEvalEntry> Entries,
-        string ResolvedPath,
-        int TotalQuestionsInFile);
+        string? ResolvedPath,
+        int TotalQuestionsInFile,
+        string? Identifier = null,
+        string? PrecomputedSha256 = null);
 
     private LoadedDataset LoadEntries(ExternalBenchmarkOptions options)
     {
@@ -488,7 +497,9 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             dataset?.TotalQuestionsInFile,
             // Only meaningful when the ids came from a real load; a caller-supplied entry list has no
             // dataset file behind it.
-            dataset is null ? null : questionResults.Select(q => q.QuestionId));
+            dataset is null ? null : questionResults.Select(q => q.QuestionId),
+            dataset?.Identifier,
+            dataset?.PrecomputedSha256);
 
         var benchmarkName = options.DatasetMode != null
             ? $"LongMemEval-{options.DatasetMode} {questionResults.Count}q"

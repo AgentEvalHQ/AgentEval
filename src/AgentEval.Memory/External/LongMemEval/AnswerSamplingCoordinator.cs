@@ -110,7 +110,9 @@ internal sealed class AnswerSamplingCoordinator
                 attachment.Temperature,
                 _request.Temperature,
                 echoedTemperature,
-                static (requested, echoed) => Math.Abs(requested - echoed) < 1e-9),
+                // Loose enough to survive a provider that round-trips the value through a float,
+                // tight enough that 0.2 and 0.3 are never called the same request.
+                static (requested, echoed) => Math.Abs(requested - echoed) < 1e-6),
             SeedDisposition = ResolveEcho(
                 attachment.Seed,
                 _request.Seed,

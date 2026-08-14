@@ -248,6 +248,44 @@ public sealed class LongMemEvalTimeGroundedTests
     }
 
     [Fact]
+    public void Validate_GroundingWithTextBlobInjection_SaysSoInsteadOfSilentlyOverriding()
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            new ExternalBenchmarkOptions
+            {
+                TemporalGrounding = TemporalGroundingMode.TimestampsOnly,
+                HistoryInjectionMode = HistoryInjectionMode.TextBlob
+            }.Validate());
+
+        Assert.Equal(nameof(ExternalBenchmarkOptions.HistoryInjectionMode), error.ParamName);
+    }
+
+    [Fact]
+    public async Task RunTimeGroundedAsync_FullProvenance_PinsTheEmbeddedCorpusWithoutAPath()
+    {
+        var agent = new TimestampedAgent();
+        var runner = LongMemEvalBenchmarkRunner.Create(new RecordingChatClient());
+        var options = new ExternalBenchmarkOptions
+        {
+            TemporalGrounding = TemporalGroundingMode.TimestampsOnly,
+            HistoryInjectionMode = HistoryInjectionMode.StructuredChatHistory,
+            RunProvenanceMode = RunProvenanceMode.Full,
+            MaxJudgeRetries = 0
+        };
+
+        var result = await runner.RunTimeGroundedAsync(agent, options);
+
+        Assert.NotNull(result.Provenance);
+        var provenance = result.Provenance;
+        // A corpus with no file still gets pinned: an identifier and a hash over the shipped text.
+        Assert.Null(provenance.DatasetPath);
+        Assert.Equal(LongMemEvalTimeGroundedCorpus.CorpusId, provenance.DatasetIdentifier);
+        Assert.Equal(LongMemEvalTimeGroundedCorpus.Sha256(), provenance.DatasetSha256);
+        Assert.Equal(LongMemEvalTimeGroundedCorpus.QuestionCount, provenance.DatasetQuestionCount);
+        Assert.NotNull(provenance.SelectedQuestionIdFingerprint);
+    }
+
+    [Fact]
     public async Task RunTimeGroundedOracleAsync_GivesTheCeilingForATimestampOnlyCorpus()
     {
         var answerClient = new RecordingChatClient();
@@ -265,6 +303,52 @@ public sealed class LongMemEvalTimeGroundedTests
         var payload = answerClient.Payloads[0];
         Assert.Contains("Current date and time: 2026/", payload, StringComparison.Ordinal);
         Assert.Contains("] Signed up at Riverside Fitness", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Result_WithAllThreeNewReports_RoundTripsThroughJsonAndProjectsToEvalResult()
+    {
+        var runner = LongMemEvalBenchmarkRunner.Create(new RecordingChatClient());
+        var options = new ExternalBenchmarkOptions
+        {
+            TemporalGrounding = TemporalGroundingMode.TimestampsOnly,
+            HistoryInjectionMode = HistoryInjectionMode.StructuredChatHistory,
+            MaxJudgeRetries = 0,
+            RandomSeed = 42,
+            AnswerTemperature = 0.1,
+            AnswerSeed = 99
+        };
+
+        var result = await runner.RunTimeGroundedOracleAsync(
+            new RecordingChatClient(),
+            options,
+            new LongMemEvalOracleOptions { DistractorSessions = 1, GoldSessionFraction = 0.5 });
+
+        var roundTripped = JsonSerializer.Deserialize<ExternalBenchmarkResult>(
+            JsonSerializer.Serialize(result));
+
+        Assert.NotNull(roundTripped);
+        Assert.Equal(
+            result.AnswerSampling!.Temperature.SentUnverifiedQuestions,
+            roundTripped.AnswerSampling!.Temperature.SentUnverifiedQuestions);
+        Assert.Equal(
+            result.OracleProjection!.GoldSessionsKept,
+            roundTripped.OracleProjection!.GoldSessionsKept);
+        Assert.Equal(result.TemporalGrounding!.Mode, roundTripped.TemporalGrounding!.Mode);
+        Assert.Equal(
+            result.TemporalGrounding.SessionsTimestamped,
+            roundTripped.TemporalGrounding.SessionsTimestamped);
+
+        var projected = LongMemEvalEvalResultAdapter.ToEvalResult(
+            result, presetName: "time-grounded", judgeModel: "judge");
+        var dimensions = projected.Details!.Dimensions!;
+        Assert.Equal(0.1, dimensions["answerTemperature"]);
+        Assert.Equal(99, dimensions["answerSeed"]);
+        Assert.Equal(
+            (double)TemporalGroundingMode.TimestampsOnly, dimensions["temporalGroundingMode"]);
+        Assert.Equal(0, dimensions["temporalGroundingSessionsWithDateLikeContent"]);
+        Assert.Equal(
+            result.OracleProjection.GoldSessionsKept, dimensions["oracleGoldSessionsKept"]);
     }
 
     [Fact]
