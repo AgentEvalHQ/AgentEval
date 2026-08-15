@@ -2,8 +2,13 @@
   "corpus_id": "agenteval-typedmemeval-forgetting-v2",
   "vertical": "forgetting",
   "revision": "v2",
+  "supersedes": {
+    "revision": "v1",
+    "shipped_in": "0.22.0-beta",
+    "reason": "V7 adversarial separability found gold identifiable by cheap shape features carrying no information about the question — capitalisation density reached AUC 0.990 in Forgetting and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable with v2 scores."
+  },
   "question_count": 50,
-  "corpus_sha256": "13a22ca1e0430c7b72a2990fce73671d569e4c23e7ff6cc9b357386094c67106",
+  "corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -14,17 +19,17 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.71,
+    "mean_realised": 0.83,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.31
+        0.35
       ],
       [
         0.5,
-        0.71
+        0.83
       ]
     ],
     "per_question": {
@@ -35,19 +40,19 @@
       "tme-for-005": 1.0,
       "tme-for-006": 1.0,
       "tme-for-007": 1.0,
-      "tme-for-008": 0.0,
-      "tme-for-009": 0.0,
-      "tme-for-010": 0.5,
+      "tme-for-008": 0.5,
+      "tme-for-009": 0.5,
+      "tme-for-010": 1.0,
       "tme-for-011": 0.0,
       "tme-for-012": 0.0,
       "tme-for-013": 1.0,
-      "tme-for-014": 0.5,
+      "tme-for-014": 1.0,
       "tme-for-015": 0.0,
       "tme-for-016": 1.0,
       "tme-for-017": 1.0,
       "tme-for-018": 1.0,
-      "tme-for-019": 0.0,
-      "tme-for-020": 0.5,
+      "tme-for-019": 0.5,
+      "tme-for-020": 1.0,
       "tme-for-021": 0.0,
       "tme-for-022": 1.0,
       "tme-for-023": 1.0,
@@ -56,12 +61,12 @@
       "tme-for-026": 1.0,
       "tme-for-027": 1.0,
       "tme-for-028": 0.0,
-      "tme-for-029": 0.0,
+      "tme-for-029": 1.0,
       "tme-for-030": 1.0,
       "tme-for-031": 0.0,
       "tme-for-032": 1.0,
-      "tme-for-033": 0.0,
-      "tme-for-034": 0.0,
+      "tme-for-033": 1.0,
+      "tme-for-034": 1.0,
       "tme-for-035": 0.0,
       "tme-for-036_abs": 1.0,
       "tme-for-037_abs": 1.0,
@@ -104,20 +109,58 @@
   },
   "probes": {
     "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "digit_density",
+        "position_in_haystack",
+        "session_length_chars",
+        "turn_count",
+        "uppercase_density"
+      ],
+      "exempt_features": [],
+      "reported_only_features": [
+        "boilerplate_ngram"
+      ],
+      "features": {
+        "session_length_chars": 0.6162,
+        "turn_count": 0.5,
+        "position_in_haystack": 0.5494,
+        "digit_density": 0.5,
+        "uppercase_density": 0.7132,
+        "boilerplate_ngram": 0.8182
+      },
+      "worst_refused_feature": "uppercase_density",
+      "worst_refused_auc": 0.7132,
+      "worst_boilerplate_ngram": "noted down also",
+      "boilerplate_ngram_auc": 0.8182,
+      "passed": true,
+      "status": "run",
+      "measured_at": "2026-08-15T15:58:39Z",
+      "probed_corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d"
+    },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T15:08:23Z",
+    "run_at": "2026-08-15T16:25:30Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
-      "passed": 35,
-      "failed": []
+      "passed": 34,
+      "failed": [
+        "tme-for-012"
+      ]
     },
     "v1_pair_flip": {
       "pairs": 15,
-      "passed": 15,
-      "failed": []
+      "passed": 14,
+      "failed": [
+        "tme-for-p12"
+      ]
     },
     "v2_non_inferability": {
       "samples_per_question": 10,
@@ -227,7 +270,7 @@
         "v6_redundant_components": []
       },
       "tme-for-012": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -494,45 +537,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "13a22ca1e0430c7b72a2990fce73671d569e4c23e7ff6cc9b357386094c67106",
-    "v7_separability": {
-      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
-      "exempt": [
-        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
-      ],
-      "threshold_auc": 0.75,
-      "refused_features": [
-        "digit_density",
-        "position_in_haystack",
-        "session_length_chars",
-        "turn_count",
-        "uppercase_density"
-      ],
-      "exempt_features": [],
-      "reported_only_features": [
-        "boilerplate_ngram"
-      ],
-      "features": {
-        "session_length_chars": 0.6577,
-        "turn_count": 0.5,
-        "position_in_haystack": 0.5494,
-        "digit_density": 0.5,
-        "uppercase_density": 0.6663,
-        "boilerplate_ngram": 0.8182
-      },
-      "worst_refused_feature": "uppercase_density",
-      "worst_refused_auc": 0.6663,
-      "worst_boilerplate_ngram": "down also mind",
-      "boilerplate_ngram_auc": 0.8182,
-      "passed": true,
-      "status": "run",
-      "measured_at": "2026-08-15T15:12:54Z",
-      "probed_corpus_sha256": "13a22ca1e0430c7b72a2990fce73671d569e4c23e7ff6cc9b357386094c67106"
-    }
-  },
-  "supersedes": {
-    "revision": "v1",
-    "shipped_in": "0.22.0-beta",
-    "reason": "V7 separability found gold identifiable by capitalisation density (up to AUC 0.990) and session length (up to 0.992). The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable."
+    "probed_corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d"
   }
 }

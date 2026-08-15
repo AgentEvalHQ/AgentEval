@@ -67,7 +67,7 @@ public sealed class TypedMemEvalVerticalDescriptor
     public required bool RequiresTimestamps { get; init; }
 
     /// <summary>Corpus identifier, revision included.</summary>
-    public string CorpusId => $"agenteval-typedmemeval-{Slug}-v2";
+    public string CorpusId => $"agenteval-typedmemeval-{Slug}-{Revision}";
 
     /// <summary>Benchmark identifier stamped into every result.</summary>
     public string BenchmarkId => $"typedmemeval-{Slug}";
@@ -81,7 +81,14 @@ public sealed class TypedMemEvalVerticalDescriptor
     /// session — so retrieval difficulty moved and a v1 score is not comparable with a v2 score.
     /// v1 results should not be cited.
     /// </remarks>
-    public string Revision => "v2";
+    public string Revision => CorpusRevision;
+
+    /// <summary>
+    /// The shipped dataset revision. One constant, because <see cref="CorpusId"/> derives from it —
+    /// a revision bump that moved the label without moving the id would leave two different question
+    /// sets sharing a name, which is the failure the whole identity rule exists to prevent.
+    /// </summary>
+    public const string CorpusRevision = "v2";
 }
 
 /// <summary>Descriptor lookup for the five verticals.</summary>

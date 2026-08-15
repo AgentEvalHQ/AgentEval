@@ -81,7 +81,8 @@ revisable until this ADR's status moves to Accepted.
 ### 1. Name
 
 **TypedMemEval**, subsets **TypedMemEval-Prospective**, **-Episodic**, **-Arithmetic**,
-**-WorkingMemory**, **-Forgetting**. Dataset revision (`v1`) stamped into every result.
+**-WorkingMemory**, **-Forgetting**. The dataset revision is stamped into every result; the shipped
+revision is `v2` (see §13 — `v1` is superseded and should not be cited).
 
 The working name is kept, deliberately. "Typed" does double duty and both duties are the
 design's two pillars: **typed verticals** (each corpus isolates one memory mechanism
@@ -107,8 +108,8 @@ Naming scheme, fixed now so nothing drifts later:
 |---|---|---|
 | Family | `TypedMemEval` | — |
 | Subset | `TypedMemEval-<Vertical>` | `TypedMemEval-Forgetting` |
-| Corpus id | `agenteval-typedmemeval-<vertical>-v<N>` | `agenteval-typedmemeval-prospective-v1` |
-| Control-arm `DatasetMode` label | corpus id + `-control` — an options label over the *same* corpus, never a second corpus file (§5.1; the tg pattern) | `agenteval-typedmemeval-prospective-v1-control` |
+| Corpus id | `agenteval-typedmemeval-<vertical>-v<N>` | `agenteval-typedmemeval-prospective-v2` |
+| Control-arm `DatasetMode` label | corpus id + `-control` — an options label over the *same* corpus, never a second corpus file (§5.1; the tg pattern) | `agenteval-typedmemeval-prospective-v2-control` |
 | Question id | `tme-<abbrev>-<NNN>` | `tme-ari-017` |
 | Pair id | `tme-<abbrev>-p<NN>` | `tme-pro-p07` |
 | Question id abbrevs | `pro`, `epi`, `ari`, `wm`, `for` | — |
@@ -154,10 +155,10 @@ concrete, not aspirational:
 5. **A stated citation rule**, in the family's documentation and repeated in the runner's
    XML docs:
 
-   > Cite results as "TypedMemEval-\<Vertical\> v1 (AgentEval)". TypedMemEval results are
+   > Cite results as "TypedMemEval-\<Vertical\> v2 (AgentEval)". TypedMemEval results are
    > not LongMemEval results and must never be presented as, summed with, or averaged
    > with LongMemEval numbers. The twelve questions seeded from the time-grounded probe
-   > (§5.1) exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v1;
+   > (§5.1) exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v2;
    > a report that runs both must not double-count them.
 
 The relationship is honest in both directions: TypedMemEval **may** state that it uses
@@ -979,11 +980,11 @@ re-measured in CI rather than trusted from the record.
 
 It found real separability in **all five shipped corpora on its first run**: capitalisation density
 reached 0.990 in Forgetting and 0.925 in Arithmetic, session length 0.955 in Episodic and 0.992 in
-WorkingMemory. The cause was structural rather than accidental — gold states an arbitrary *named*
+WorkingMemory. Phrase recurrence is reported at 0.583–0.850 and does not refuse (see below). The cause was structural rather than accidental — gold states an arbitrary *named*
 fact because V2 requires the answer to be unguessable, so gold carries proper nouns and extra text
 that filler does not. A central shape-parity pass now pads every session to a common length and
 capitalisation density using invented names built from syllables that appear in no question; the
-shape converges, the content cannot. Worst refused feature across the family is now 0.666.
+shape converges, the content cannot. Worst refused feature across the family is now 0.713.
 
 Two things V7 does **not** refuse, both stated rather than quietly excluded:
 
@@ -1002,13 +1003,14 @@ Two things V7 does **not** refuse, both stated rather than quietly excluded:
 position separates gold perfectly and is meant to — the construct is how far back the memory sits.
 Declared as an exemption with a reason rather than accommodated by raising a threshold.
 
-**Episodic attribution: a varied-template regeneration is planned for corpus revision v1.1**, not
+**Episodic attribution: a varied-template regeneration is planned for corpus revision v3**, not
 permanent by design. The shape currently emits its statements from a fixed frame, so a system
 storing no speaker label can recover the answer from the framing rather than from memory, and its
 numbers are a floor rather than speaker-attribution accuracy. That is a corpus fix of the same kind
-as the shape-parity pass above, and it ships with the next corpus revision — the same release that
+as the shape-parity pass above, and it ships with the next corpus revision (v3) — the same one that
 addresses phrase recurrence, since both need richer generated language and neither is worth a corpus
-regeneration on its own.
+regeneration on its own. The v2 revision in this release is what the separability finding forced;
+v3 is what the two remaining known limitations are queued behind.
 
 ## Consequences
 

@@ -2,8 +2,13 @@
   "corpus_id": "agenteval-typedmemeval-arithmetic-v2",
   "vertical": "arithmetic",
   "revision": "v2",
+  "supersedes": {
+    "revision": "v1",
+    "shipped_in": "0.22.0-beta",
+    "reason": "V7 adversarial separability found gold identifiable by cheap shape features carrying no information about the question — capitalisation density reached AUC 0.990 in Forgetting and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable with v2 scores."
+  },
   "question_count": 50,
-  "corpus_sha256": "6c0eb8768db661f1e9ab9d883fb18114a9d22337e72b765462f8b820a7558317",
+  "corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9",
   "generator": {
     "tool": "tools/gen_typedmemeval_arithmetic.py",
     "version": "1.0.0",
@@ -14,7 +19,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6427,
+    "mean_realised": 0.6347,
     "echo": 0.25,
     "iterations": 3,
     "search_trace": [
@@ -24,23 +29,23 @@
       ],
       [
         0.5,
-        0.0317
+        0.0333
       ],
       [
         0.25,
-        0.6427
+        0.6347
       ]
     ],
     "per_question": {
       "tme-ari-001": 0.25,
       "tme-ari-002": 0.75,
       "tme-ari-003": 1.0,
-      "tme-ari-004": 0.4,
-      "tme-ari-005": 0.2,
+      "tme-ari-004": 0.6,
+      "tme-ari-005": 0.0,
       "tme-ari-006": 0.1667,
       "tme-ari-007": 1.0,
       "tme-ari-008": 1.0,
-      "tme-ari-009": 0.3333,
+      "tme-ari-009": 0.1667,
       "tme-ari-010": 0.4,
       "tme-ari-011": 1.0,
       "tme-ari-012": 0.6667,
@@ -50,19 +55,19 @@
       "tme-ari-016": 1.0,
       "tme-ari-017": 0.0,
       "tme-ari-018": 1.0,
-      "tme-ari-019": 0.75,
+      "tme-ari-019": 0.25,
       "tme-ari-020": 0.0,
-      "tme-ari-021": 1.0,
+      "tme-ari-021": 0.75,
       "tme-ari-022": 1.0,
-      "tme-ari-023": 0.75,
+      "tme-ari-023": 1.0,
       "tme-ari-024": 0.8,
       "tme-ari-025": 0.0,
       "tme-ari-026": 0.1667,
-      "tme-ari-027": 0.3333,
+      "tme-ari-027": 0.6667,
       "tme-ari-028": 0.0,
       "tme-ari-029": 1.0,
       "tme-ari-030": 1.0,
-      "tme-ari-031": 1.0,
+      "tme-ari-031": 0.6,
       "tme-ari-032": 1.0,
       "tme-ari-033": 0.8333,
       "tme-ari-034": 0.8333,
@@ -72,11 +77,11 @@
       "tme-ari-038": 1.0,
       "tme-ari-039": 0.3333,
       "tme-ari-040": 1.0,
-      "tme-ari-041": 1.0,
+      "tme-ari-041": 0.75,
       "tme-ari-042": 0.3333,
-      "tme-ari-043": 0.0,
+      "tme-ari-043": 0.3333,
       "tme-ari-044": 0.0,
-      "tme-ari-045": 0.5,
+      "tme-ari-045": 0.75,
       "tme-ari-046": 0.1667,
       "tme-ari-047": 1.0,
       "tme-ari-048": 1.0,
@@ -110,20 +115,51 @@
   },
   "probes": {
     "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "digit_density",
+        "position_in_haystack",
+        "session_length_chars",
+        "turn_count",
+        "uppercase_density"
+      ],
+      "exempt_features": [],
+      "reported_only_features": [
+        "boilerplate_ngram"
+      ],
+      "features": {
+        "session_length_chars": 0.664,
+        "turn_count": 0.5,
+        "position_in_haystack": 0.5333,
+        "digit_density": 0.6415,
+        "uppercase_density": 0.5436,
+        "boilerplate_ngram": 0.6607
+      },
+      "worst_refused_feature": "session_length_chars",
+      "worst_refused_auc": 0.664,
+      "worst_boilerplate_ngram": "payment logged against",
+      "boilerplate_ngram_auc": 0.6607,
+      "passed": true,
+      "status": "run",
+      "measured_at": "2026-08-15T15:58:33Z",
+      "probed_corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9"
+    },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T15:01:09Z",
+    "run_at": "2026-08-15T16:18:33Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 45,
+      "passed": 48,
       "failed": [
-        "tme-ari-039",
-        "tme-ari-040",
         "tme-ari-043",
-        "tme-ari-045",
-        "tme-ari-048"
+        "tme-ari-047"
       ]
     },
     "v1_pair_flip": {
@@ -455,7 +491,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-039": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -463,7 +499,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-040": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -503,7 +539,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-045": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -519,7 +555,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-047": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -527,7 +563,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-048": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -551,45 +587,6 @@
         "v6_redundant_components": []
       }
     },
-    "probed_corpus_sha256": "6c0eb8768db661f1e9ab9d883fb18114a9d22337e72b765462f8b820a7558317",
-    "v7_separability": {
-      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
-      "exempt": [
-        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
-      ],
-      "threshold_auc": 0.75,
-      "refused_features": [
-        "digit_density",
-        "position_in_haystack",
-        "session_length_chars",
-        "turn_count",
-        "uppercase_density"
-      ],
-      "exempt_features": [],
-      "reported_only_features": [
-        "boilerplate_ngram"
-      ],
-      "features": {
-        "session_length_chars": 0.5048,
-        "turn_count": 0.5,
-        "position_in_haystack": 0.5333,
-        "digit_density": 0.6414,
-        "uppercase_density": 0.5122,
-        "boilerplate_ngram": 0.6607
-      },
-      "worst_refused_feature": "digit_density",
-      "worst_refused_auc": 0.6414,
-      "worst_boilerplate_ngram": "payment logged against",
-      "boilerplate_ngram_auc": 0.6607,
-      "passed": true,
-      "status": "run",
-      "measured_at": "2026-08-15T15:12:49Z",
-      "probed_corpus_sha256": "6c0eb8768db661f1e9ab9d883fb18114a9d22337e72b765462f8b820a7558317"
-    }
-  },
-  "supersedes": {
-    "revision": "v1",
-    "shipped_in": "0.22.0-beta",
-    "reason": "V7 separability found gold identifiable by capitalisation density (up to AUC 0.990) and session length (up to 0.992). The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable."
+    "probed_corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9"
   }
 }

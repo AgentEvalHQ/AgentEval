@@ -341,7 +341,7 @@ def probe_question(entry: dict, vertical: str) -> dict:
 
 
 def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
-    corpus_id = f"agenteval-typedmemeval-{vertical}-v1"
+    corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
     directory = tmc.DATA_ROOT / vertical
     corpus_text = (directory / f"{corpus_id}.json").read_text(encoding="utf-8")
     entries = json.loads(corpus_text)
@@ -438,7 +438,7 @@ def main() -> None:
     try:
         for vertical in targets:
             probes = probe_vertical(vertical, args.limit, args.workers)
-            corpus_id = f"agenteval-typedmemeval-{vertical}-v1"
+            corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
             meta_path = tmc.DATA_ROOT / vertical / f"{corpus_id}.meta.json"
             metadata = json.loads(meta_path.read_text(encoding="utf-8"))
 

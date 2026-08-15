@@ -35,7 +35,7 @@ def load(vertical: str) -> tuple[list[tmc.Question], str]:
     extension block and answers are irrelevant to a question about whether sessions are separable
     by shape, and rebuilding them would only invite drift.
     """
-    corpus_id = f"agenteval-typedmemeval-{vertical}-v2"
+    corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
     text = (tmc.DATA_ROOT / vertical / f"{corpus_id}.json").read_text(encoding="utf-8")
     questions = []
     for entry in json.loads(text):

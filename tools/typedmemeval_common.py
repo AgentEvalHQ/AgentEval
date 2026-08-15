@@ -56,6 +56,23 @@ from pathlib import Path
 
 GENERATOR_VERSION = "1.0.0"
 
+#: The dataset revision these generators emit. Stamped into every result, so two corpora with
+#: different questions can never wear the same name.
+CORPUS_REVISION = "v2"
+
+#: What this revision replaces and why. A superseded corpus whose replacement does not say what was
+#: wrong with it invites someone to keep citing the old numbers.
+SUPERSEDES = {
+    "revision": "v1",
+    "shipped_in": "0.22.0-beta",
+    "reason": (
+        "V7 adversarial separability found gold identifiable by cheap shape features carrying no "
+        "information about the question — capitalisation density reached AUC 0.990 in Forgetting "
+        "and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so "
+        "retrieval difficulty moved and v1 scores are not comparable with v2 scores."
+    ),
+}
+
 #: Reference retrieval budget, in sessions. Ratified uniform across verticals for v1
 #: (joint review 2026-08-15, §10 Q4): it approximates the consuming project's real
 #: evidence breadth.
@@ -397,7 +414,7 @@ def check_echo_parity(questions: list[Question]) -> list[str]:
 #: here can never accidentally be a question's answer.
 _NAME_HEADS = ["Bram", "Calder", "Denn", "Farrow", "Halden", "Ithe", "Kesse", "Lorrin", "Marth",
                "Norra", "Pell", "Quenn", "Rusk", "Sable", "Thorne", "Velle", "Wend", "Yarrow"]
-_NAME_TAILS = ["qvist", "zell", "xby", "vund", "kjar", "wraith", "zorn", "quay0", "phex", "yrn"]
+_NAME_TAILS = ["qvist", "zell", "xby", "vund", "kjar", "wraith", "zorn", "quorn", "phex", "yrn"]
 #: Raises capitalisation density: mostly names, little connective text.
 _SHAPE_CLAUSES_DENSE = [
     "{a} {b} agreed. {a} {b} would too.",
@@ -417,8 +434,37 @@ def _shape_profile(session: Session) -> tuple[int, int]:
     return len(text), sum(c.isupper() for c in text)
 
 
-_PAD_WORDS = ["noted", "again", "later", "aside", "still", "quite", "there", "about", "under",
-              "since", "along", "after", "while", "among", "these", "those", "given", "taken"]
+#: Grammatical padding. The first version emitted a bag of words to hit an exact character count,
+#: which met the separability target and produced corpora ending in "Still Given These these later
+#: since those those aside" — a corpus nobody would read twice, and one no reviewer would trust.
+#: Sentences instead, chosen to fit, with a tolerance rather than an exact landing.
+_PAD_PLAIN = [
+    "It had been on my mind for a while before that.",
+    "Nothing much came of it either way.",
+    "I keep meaning to write these things down sooner.",
+    "That is roughly where it was left.",
+    "It seemed worth mentioning at the time.",
+    "There was no particular reason for the delay.",
+    "I had half expected it to go the other way.",
+    "It made more sense once I stopped thinking about it.",
+    "The whole thing took less effort than I feared.",
+    "I will probably feel differently about it next week.",
+]
+#: Same register, one invented name each, so capitalisation can be raised without wrecking the prose.
+_PAD_NAMED = [
+    "{n} had said something similar a while back.",
+    "I should really ask {n} about it.",
+    "{n} would have an opinion, naturally.",
+    "That is exactly the sort of thing {n} notices.",
+    "{n} mentioned it again the other day.",
+]
+#: For sessions whose gold sets a high capitalisation target: two names in the same breath, which
+#: is still a sentence rather than a heap of capitalised tokens.
+_PAD_DENSE = [
+    "{n} and {m} had both said as much.",
+    "That came up with {n}, and again with {m}.",
+    "Between {n} and {m} the story was consistent.",
+]
 
 
 def _pad_target(session: Session) -> int:
@@ -430,21 +476,34 @@ def _pad_target(session: Session) -> int:
 
 
 def _padding(chars: int, capitals: int, rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
-    """Neutral text of a given length carrying a given number of capitals.
+    """Neutral prose of roughly a given length carrying roughly a given number of capitals.
 
-    Both knobs matter: length and capitalisation DENSITY are separate separability features, and
-    padding that fixes one while moving the other just relocates the tell.
+    Both knobs matter — length and capitalisation density are separate separability features, and
+    padding that fixes one while moving the other just relocates the tell. So the sentence mix is
+    solved for rather than stumbled into: sentences are about the same length whatever they say, so
+    the count follows from the character budget, and how many of them carry names follows from the
+    capital budget.
+
+    "Roughly" is deliberate. Landing on an exact character count means cutting mid-word, and the
+    first version of this did exactly that — it met every separability target and produced corpora
+    ending in "Still Given These these later since those those aside". A benchmark nobody will read
+    twice is not one anybody should trust.
     """
-    out: list[str] = []
-    total = 0
-    while total < chars:
-        word = rng.choice(_PAD_WORDS)
-        if capitals > 0:
-            word = word.capitalize()
-            capitals -= 1
-        out.append(word)
-        total += len(word) + 1
-    return " ".join(out)[:max(0, chars)].strip() or "noted"
+    def name() -> str:
+        return f"{rng.choice(_NAME_HEADS)} {rng.choice(_NAME_HEADS)}{rng.choice(_NAME_TAILS)}"
+
+    average = 46
+    total_sentences = max(1, round(chars / average))
+    # A plain sentence carries one capital, a named one three, a dense one five. Solve for the mix
+    # closest to the capital budget without exceeding the sentence budget.
+    dense = max(0, min(total_sentences, round((capitals - total_sentences) / 4)))
+    named = max(0, min(total_sentences - dense, round((capitals - total_sentences - 4 * dense) / 2)))
+
+    sentences = [rng.choice(_PAD_DENSE).format(n=name(), m=name()) for _ in range(dense)]
+    sentences += [rng.choice(_PAD_NAMED).format(n=name()) for _ in range(named)]
+    sentences += [rng.choice(_PAD_PLAIN) for _ in range(total_sentences - dense - named)]
+    rng.shuffle(sentences)
+    return " ".join(sentences)
 
 
 def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
@@ -483,7 +542,7 @@ def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # De
         for session in question.sessions:
             length, upper = _shape_profile(session)
             needed = target_len - length
-            if needed <= 0:
+            if needed <= 25:
                 continue
 
             # Padded to the target EXACTLY, with capitals inserted at the target density. Clause-
@@ -799,7 +858,7 @@ def finalise(
     nothing, so they refuse rather than warn.
     """
     abbrev, expected_count = VERTICALS[vertical]
-    corpus_id = f"agenteval-typedmemeval-{vertical}-v2"
+    corpus_id = f"agenteval-typedmemeval-{vertical}-{CORPUS_REVISION}"
 
     questions, calibration = calibrate(build, seed)
 
@@ -837,7 +896,10 @@ def finalise(
     metadata = {
         "corpus_id": corpus_id,
         "vertical": vertical,
-        "revision": "v2",
+        "revision": CORPUS_REVISION,
+        # Carried by the generator, not patched in afterwards. It was patched in once and lost on
+        # the next regeneration, which is exactly how a supersession notice stops being told.
+        "supersedes": SUPERSEDES,
         "question_count": len(questions),
         # Binds this metadata to the exact corpus text it describes. A mismatch means one
         # of the two was regenerated alone, and CI fails rather than trusting either.

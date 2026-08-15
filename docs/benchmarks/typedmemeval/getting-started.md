@@ -233,10 +233,10 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
 | Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.881 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.643 | 3–6 |
+| Episodic | 50 | 0.880 | 1 (×35), 4–7 (×15) |
+| Arithmetic | 50 | 0.635 | 3–6 |
 | WorkingMemory | 48 | 0.896 | 1 |
-| Forgetting | 50 | 0.710 — **0.586 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+| Forgetting | 50 | 0.830 — **0.757 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -269,11 +269,11 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 47/50 | 17/19 | 50/50 | 50/50 | — |
+| Prospective | 47/50 | 17/19 | 50/50 | 49/50 | — |
 | Episodic | 50/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+| Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/20 |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
 
 These are reported as measured. The remaining V1 shortfalls sit where the *answer model*, not the
 memory system, is the limit: the Arithmetic misses are duration questions whose gold requires
@@ -335,7 +335,7 @@ separates gold perfectly and is meant to.
 found gold at AUC 0.990 in Forgetting and session length at 0.992 in WorkingMemory — gold states an
 arbitrary *named* fact, so it carried proper nouns and extra text that filler did not, and counting
 capital letters found the evidence without reading it. The v2 corpora pad every session to a common
-shape; the worst refused feature across the family is now 0.666.
+shape; the worst refused feature across the family is now 0.713.
 
 ## Bands, not points
 

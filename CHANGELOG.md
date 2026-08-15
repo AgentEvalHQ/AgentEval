@@ -31,10 +31,10 @@ separability in all five shipped corpora on its first run.
 
   | Vertical | Worst shape feature | v1 | v2 |
   |---|---|---|---|
-  | Forgetting | capitalisation density | 0.990 | **0.666** |
-  | WorkingMemory | session length | 0.992 | **0.562** |
-  | Episodic | session length | 0.955 | **0.586** |
-  | Arithmetic | capitalisation density | 0.925 | **0.641** |
+  | Forgetting | capitalisation density | 0.990 | **0.713** |
+  | WorkingMemory | session length | 0.992 | **0.612** |
+  | Episodic | session length | 0.955 | **0.620** |
+  | Arithmetic | capitalisation density | 0.925 | **0.664** |
   | Prospective | session length | 0.912 | **0.648** |
 
   The cause was structural, not accidental: gold states an arbitrary *named* fact because V2
@@ -63,11 +63,11 @@ separability in all five shipped corpora on its first run.
 
   | Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
   |---|---|---|---|---|---|
-  | Prospective | 47/50 | 17/19 | 50/50 | 50/50 | — |
+  | Prospective | 47/50 | 17/19 | 50/50 | 49/50 | — |
   | Episodic | 50/50 | — | 50/50 | 50/50 | — |
-  | Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+  | Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
   | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-  | Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/20 |
+  | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
 
   Forgetting reaches a clean ceiling with every pair flipping; Prospective gains one question and one
   pair. Arithmetic loses two, which the per-question records identify as duration questions — the
