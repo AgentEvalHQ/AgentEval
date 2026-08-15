@@ -502,7 +502,7 @@ def _padding(chars: int, capitals: int, rng: random.Random) -> str:  # DevSkim: 
     sentences = [rng.choice(_PAD_DENSE).format(n=name(), m=name()) for _ in range(dense)]
     sentences += [rng.choice(_PAD_NAMED).format(n=name()) for _ in range(named)]
     sentences += [rng.choice(_PAD_PLAIN) for _ in range(total_sentences - dense - named)]
-    rng.shuffle(sentences)
+    rng.shuffle(sentences)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles neutral padding sentences, not secrets.
     return " ".join(sentences)
 
 
