@@ -1,0 +1,228 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+
+using System.Security.Cryptography;
+using System.Text;
+
+namespace AgentEval.Memory.External.TypedMemEval;
+
+/// <summary>
+/// The family's judge templates. Every semantic decision the judge makes is written down here.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The precedence rules below are not stylistic guidance to the model — they are the definitions
+/// the benchmark's numbers mean, ratified in review before any template was written. Leaving
+/// mixed answers ("I'm not sure, but probably X"; "it was a Honda, but you sold it") to template
+/// discretion would let two prompt revisions move a system's reported outcome distribution with no
+/// system change, which is precisely the drift the pinned fingerprint exists to detect.
+/// </para>
+/// <para>
+/// Templates are pinned by <see cref="Fingerprint"/>, disjoint from the frozen LongMemEval
+/// judge-prompt fingerprint. A change here changes the fingerprint, which makes every stored
+/// result carrying the old value visibly non-comparable rather than quietly so.
+/// </para>
+/// </remarks>
+internal static class TypedMemEvalJudgePrompts
+{
+    /// <summary>
+    /// The outcome definitions and precedence rules, identical for every question in the family.
+    /// </summary>
+    internal const string Preamble = """
+        You are grading one answer from a memory system against a gold answer. Choose exactly one
+        outcome. The outcome describes how the answer deviates from gold — not how it is phrased.
+
+        OUTCOMES
+        - correct   : matches gold.
+        - wrong     : commits to a value that does not match gold.
+        - abstained : declines to commit to any value ("I don't know", "I have no record of that").
+        - missed    : confidently asserts that nothing is there ("nothing is due", "you never told
+                      me about that") when gold says something is.
+        - premature : asserts as already true something gold says has not happened yet.
+
+        The line between abstained and missed is uncertainty versus denial. Both differ from wrong,
+        which commits to a value.
+
+        PRECEDENCE RULES — apply these before choosing:
+        1. A stated value outranks hedging. "I'm not sure, but probably X" is graded on X: correct
+           if X matches gold, wrong if it does not. Never abstained. Abstained requires declining to
+           commit to any value at all.
+        2. When gold itself is a negative — nothing is due yet, the fact was never recorded — an
+           answer that correctly says so is CORRECT, not missed and not abstained. Grade against
+           gold, never against the surface form of the sentence.
+        3. Extra correct detail never lowers the outcome. Missing detail that gold treats as part of
+           the answer does.
+        """;
+
+    private const string Closing = """
+
+        QUESTION
+        {0}
+
+        GOLD ANSWER
+        {1}
+
+        MEMORY SYSTEM'S ANSWER
+        {2}
+        """;
+
+    private const string StandardBody = """
+
+        Grade this answer.
+        """;
+
+    private const string ProspectiveBody = """
+
+        This question is about something located in time: a reminder that falls due, a validity that
+        expires, or a change that has not happened yet. The gold answer already accounts for when the
+        question was asked, so grade against gold rather than re-deriving the timing yourself.
+
+        Use "premature" when gold says the thing has not happened yet and the answer says it has —
+        the reminder fired early, the pass is described as expired before it expired, the move is
+        described as done. That is a different failure from being wrong about a date, and it is the
+        one this vertical exists to catch.
+        """;
+
+    private const string ArithmeticBody = """
+
+        This question has a derived numeric answer. Grade the ARITHMETIC, not the phrasing.
+
+        The gold derivation is: {3} of {4} = {5} {6}
+
+        NUMERIC NORMALIZATION — apply exactly, do not improvise:
+        - Extract the numeric value the answer commits to, ignoring currency symbols, thousands
+          separators, and magnitude words ("about", "roughly", "just over").
+        - An exactly-stated value is correct only if it equals the gold value.
+        - An answer that offers only a rounded value is correct if and only if the gold value rounds
+          to the precision the answer offered. "About 130" is correct for a gold of 128.75 to the
+          nearest ten; it is not correct for a gold of 141.
+        - An answer that states no number at all is abstained if it declines, missed if it denies
+          there is anything to count or sum.
+        - A correct number reached by visibly wrong reasoning is still correct: this benchmark scores
+          the answer, and the reasoning field is where you say you noticed.
+        - For a difference, DIRECTION IS PART OF THE VALUE, not phrasing. An answer with the right
+          magnitude and the wrong direction — "went up by 46" where gold is 46 lower — is wrong. The
+          instruction to grade the arithmetic rather than the phrasing means ignore wording and
+          units-of-expression, never ignore a sign.
+        """;
+
+    private const string ListOrderBody = """
+
+        This question asks for the ORDER in which things were mentioned across the conversation.
+
+        Score it conditionally on what the answer actually mentions, because a memory system with a
+        limited retrieval budget may only have seen some of the items, and grading it on items it
+        never saw would measure the budget rather than the ordering:
+        - Consider only items that appear in BOTH gold and the answer.
+        - Count every pair of those items, and count how many are in the correct relative order.
+        - Report both counts in ordered_pairs_total and ordered_pairs_correct.
+        - Outcome is "correct" when at least two items are mentioned and every considered pair is in
+          the right relative order. Any inversion is "wrong".
+        - If the answer mentions fewer than two of the gold items, report zero for both counts and
+          grade as "missed" if it denies knowing the items, "abstained" if it declines, otherwise
+          "wrong".
+        """;
+
+    private const string ForgettingBody = """
+
+        This question is about whether the system knows what it NO LONGER knows. Three states must
+        be held apart, and conflating them is the failure this vertical measures:
+
+        - Gold says a fact was superseded: "correct" means the answer says it is no longer the case.
+          An answer that recalls the old value WHILE MARKING IT SUPERSEDED — "it was a Honda, but you
+          sold it" — is CORRECT. That is ideal memory, not a mistake.
+        - "wrong" with stale_value_asserted = true means the answer states the superseded value as
+          if it were still current. That is the dangerous failure here; set the flag only for that.
+        - Gold says the fact is still valid: an answer claiming it is no longer known is "wrong" —
+          the system is forgetting something it should still hold.
+        - Gold says the fact was never recorded: an answer that says so is "correct". An answer
+          claiming to have once known it and since lost it is "wrong" — it is inventing a history of
+          having known something it never did.
+
+        Set stale_value_asserted to false in every case except the one named above.
+
+        Set claimed_no_longer_known to true whenever the response asserts the fact is no longer
+        known, no longer valid, or no longer held -- whether or not that assertion is correct. It is
+        an observation about what the response said, not a judgement about whether saying it was
+        right, and it is what separates a system that forgot the wrong thing from one that simply
+        answered wrongly.
+        """;
+
+    internal static string Standard(string question, string gold, string answer)
+        => string.Format(Preamble + StandardBody + Closing, question, gold, answer);
+
+    internal static string Prospective(string question, string gold, string answer)
+        => string.Format(Preamble + ProspectiveBody + Closing, question, gold, answer);
+
+    internal static string ListOrder(string question, string gold, string answer)
+        => string.Format(Preamble + ListOrderBody + Closing, question, gold, answer);
+
+    internal static string Forgetting(string question, string gold, string answer)
+        => string.Format(Preamble + ForgettingBody + Closing, question, gold, answer);
+
+    internal static string Arithmetic(
+        string question, string gold, string answer,
+        string operation, string inputs, string value, string unit)
+        => string.Format(
+            Preamble + ArithmeticBody + Closing,
+            question, gold, answer, operation, inputs, value, unit);
+
+    /// <summary>The JSON contract, appended to every prompt.</summary>
+    /// <remarks>
+    /// Sent whether or not the provider honours a response-format constraint, so an unconstrained
+    /// provider still has a chance to comply and the parser still refuses to guess when it does not.
+    /// </remarks>
+    internal static string ContractFor(TypedMemEvalVerdict.Kind kind) => kind switch
+    {
+        TypedMemEvalVerdict.Kind.Forgetting => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "stale_value_asserted": true | false,
+             "claimed_no_longer_known": true | false}
+            """,
+        TypedMemEvalVerdict.Kind.ListOrder => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "ordered_pairs_correct": <integer>,
+             "ordered_pairs_total": <integer>}
+            """,
+        _ => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>"}
+            """
+    };
+
+    /// <summary>
+    /// SHA-256 over every template and contract, newline-normalized.
+    /// </summary>
+    /// <remarks>
+    /// Newline normalization for the same reason the corpus hash uses it: the value must identify
+    /// the prompt <i>text</i>, not the line endings of the checkout that built the assembly.
+    /// </remarks>
+    internal static string Fingerprint { get; } = ComputeFingerprint();
+
+    private static string ComputeFingerprint()
+    {
+        var builder = new StringBuilder()
+            .Append(Preamble).Append('\u001e')
+            .Append(StandardBody).Append('\u001e')
+            .Append(ProspectiveBody).Append('\u001e')
+            .Append(ArithmeticBody).Append('\u001e')
+            .Append(ListOrderBody).Append('\u001e')
+            .Append(ForgettingBody).Append('\u001e')
+            .Append(Closing).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Base)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Forgetting)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.ListOrder));
+
+        var normalized = builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        // Not a security function: this identifies which prompt text produced a verdict.
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
+    }
+}

@@ -1,0 +1,1742 @@
+[
+  {
+    "id": "cal-pro-001",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is there anything I asked you to remind me about right now?",
+    "gold": "No. The only reminder you set is the boiler service, and it is not due for another three days.",
+    "answer": "Yes - your boiler service is due, that is the one you asked me to flag.",
+    "expected": "Premature",
+    "rule": "premature-fires-early",
+    "note": "Gold says the service has not fallen due yet and the answer announces it as due now, which is the reminder firing early rather than a wrong date."
+  },
+  {
+    "id": "cal-pro-002",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is there anything I asked you to remind me about right now?",
+    "gold": "No. The only reminder you set is the boiler service, and it is not due for another three days.",
+    "answer": "Nothing is due today. The boiler service reminder comes up in three days.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "Gold is itself a negative, so an answer that correctly reports nothing due is correct rather than missed."
+  },
+  {
+    "id": "cal-pro-003",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is there anything I asked you to remind me about right now?",
+    "gold": "Yes - the boiler service. Today is the day you asked to be reminded.",
+    "answer": "Yes, today is the boiler service you asked me to remind you about.",
+    "expected": "Correct",
+    "rule": "after-arm-fires-on-time",
+    "note": "The after arm of the same pair: gold says the reminder is due and the answer says so."
+  },
+  {
+    "id": "cal-pro-004",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "What did I ask to be reminded about this week?",
+    "gold": "To renew the car insurance before it lapses.",
+    "answer": "You asked to be reminded to book the dog in for grooming.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A reminder is named, it is simply the wrong one, which is a committed value that does not match gold."
+  },
+  {
+    "id": "cal-pro-005",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is anything I asked to be reminded of due today?",
+    "gold": "Yes - to send the signed lease back to the letting agent.",
+    "answer": "You have nothing outstanding. You never set a reminder for today.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says something is due and the answer denies that anything is there at all, which is denial rather than uncertainty."
+  },
+  {
+    "id": "cal-pro-006",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is anything I asked to be reminded of due today?",
+    "gold": "Yes - to send the signed lease back to the letting agent.",
+    "answer": "I am not able to tell you what is outstanding today; I do not have that to hand.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "The near miss to the denial above: this answer commits to nothing at all, which is the uncertainty side of the uncertainty-versus-denial line."
+  },
+  {
+    "id": "cal-pro-007",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Which day did I say the visa paperwork has to be in by?",
+    "gold": "Thursday.",
+    "answer": "I am not certain, but I think you said Thursday.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The hedge does not remove the stated value, and the stated value matches gold."
+  },
+  {
+    "id": "cal-pro-008",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Which day did I say the visa paperwork has to be in by?",
+    "gold": "Thursday.",
+    "answer": "I am not certain, but I think you said Monday.",
+    "expected": "Wrong",
+    "rule": "hedged-states-value",
+    "note": "Same hedge, different value: it is graded on the value, so this is wrong and never abstained."
+  },
+  {
+    "id": "cal-pro-009",
+    "vertical": "Prospective",
+    "shape": "expiring-validity",
+    "question": "Is my transit pass still good?",
+    "gold": "Yes. It runs out at the end of next month.",
+    "answer": "No, that pass has already run out.",
+    "expected": "Premature",
+    "rule": "premature-fires-early",
+    "note": "Gold says the expiry has not happened yet and the answer describes it as already happened, which is the premature direction."
+  },
+  {
+    "id": "cal-pro-010",
+    "vertical": "Prospective",
+    "shape": "expiring-validity",
+    "question": "Is my transit pass still good?",
+    "gold": "Yes. It runs out at the end of next month.",
+    "answer": "Yes, it is still good - it runs out at the end of next month.",
+    "expected": "Correct",
+    "rule": "still-valid-before-arm",
+    "note": "The before arm answered as gold has it, expiry included."
+  },
+  {
+    "id": "cal-pro-011",
+    "vertical": "Prospective",
+    "shape": "expiring-validity",
+    "question": "Is my transit pass still good?",
+    "gold": "No. It ran out at the end of last month.",
+    "answer": "No - it lapsed at the end of last month.",
+    "expected": "Correct",
+    "rule": "after-arm-fires-on-time",
+    "note": "The after arm of the same pair, where the expiry has happened and the answer says so."
+  },
+  {
+    "id": "cal-pro-012",
+    "vertical": "Prospective",
+    "shape": "expiring-validity",
+    "question": "Is my transit pass still good?",
+    "gold": "No. It ran out at the end of last month.",
+    "answer": "Yes, it is still valid.",
+    "expected": "Wrong",
+    "rule": "stale-after-arm",
+    "note": "Claiming continued validity after gold says it lapsed is a wrong state, not a premature one - premature is the opposite direction."
+  },
+  {
+    "id": "cal-pro-013",
+    "vertical": "Prospective",
+    "shape": "not-yet-true",
+    "question": "Have I moved into the Alder Court flat?",
+    "gold": "Not yet. The move is set for the first weekend of next month.",
+    "answer": "Yes, you moved into Alder Court.",
+    "expected": "Premature",
+    "rule": "premature-fires-early",
+    "note": "Gold says the move has not happened and the answer reports it as done."
+  },
+  {
+    "id": "cal-pro-014",
+    "vertical": "Prospective",
+    "shape": "not-yet-true",
+    "question": "Have I moved into the Alder Court flat?",
+    "gold": "Not yet. The move is set for the first weekend of next month.",
+    "answer": "Not yet - the move is booked for the first weekend of next month.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "The not-yet is gold here, so stating it is correct rather than an abstention."
+  },
+  {
+    "id": "cal-pro-015",
+    "vertical": "Prospective",
+    "shape": "not-yet-true",
+    "question": "Have I moved into the Alder Court flat?",
+    "gold": "Yes. You moved in on the first weekend of this month.",
+    "answer": "Yes, you moved in at the start of this month.",
+    "expected": "Correct",
+    "rule": "after-arm-fires-on-time",
+    "note": "The after arm, where the move has happened and the answer matches gold."
+  },
+  {
+    "id": "cal-pro-016",
+    "vertical": "Prospective",
+    "shape": "seed-carry-over",
+    "question": "As of today, how long have I been on the same phone plan?",
+    "gold": "Eleven months.",
+    "answer": "Eleven months.",
+    "expected": "Correct",
+    "rule": "as-of-elapsed-correct",
+    "note": "An as-of elapsed-time question answered at the gold value."
+  },
+  {
+    "id": "cal-pro-017",
+    "vertical": "Prospective",
+    "shape": "seed-carry-over",
+    "question": "As of today, how long have I been on the same phone plan?",
+    "gold": "Eleven months.",
+    "answer": "About two years.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A committed elapsed time that is not gold at any reasonable rounding."
+  },
+  {
+    "id": "cal-pro-018",
+    "vertical": "Prospective",
+    "shape": "seed-carry-over",
+    "question": "Which address should I be using for deliveries now?",
+    "gold": "Alder Court.",
+    "answer": "Use Alder Court - you moved there from Pike Row, so Pike Row is out of date.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "The extra history around the value is correct detail, and extra correct detail never lowers the outcome."
+  },
+  {
+    "id": "cal-pro-019",
+    "vertical": "Prospective",
+    "shape": "seed-carry-over",
+    "question": "Which address should I be using for deliveries now?",
+    "gold": "Alder Court.",
+    "answer": "Use Pike Row.",
+    "expected": "Wrong",
+    "rule": "superseded-as-current",
+    "note": "The superseded address is offered as the current one, which commits to a value that is not gold."
+  },
+  {
+    "id": "cal-pro-020",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "What am I meant to do today about the vet?",
+    "gold": "Call the vet about Milo's booster.",
+    "answer": "Call the vet today about Milo's booster - that is the one you asked me to flag on the day.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "Gold is stated in full and the surrounding sentence adds nothing that contradicts it."
+  },
+  {
+    "id": "cal-pro-021",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Which day is the vet call, and who is it for?",
+    "gold": "Tuesday, for Milo's booster.",
+    "answer": "It is for Milo's booster.",
+    "expected": "Wrong",
+    "rule": "missing-required-detail",
+    "note": "Gold treats the day as part of the answer, so omitting it is a partial commitment that does not match gold rather than a refusal to commit."
+  },
+  {
+    "id": "cal-pro-022",
+    "vertical": "Prospective",
+    "shape": "expiring-validity",
+    "question": "Has my passport expired?",
+    "gold": "No. It expires next month.",
+    "answer": "I am not completely sure, but I believe it has already expired.",
+    "expected": "Premature",
+    "rule": "premature-fires-early",
+    "note": "A stated value outranks the hedge, and the value stated is that an expiry gold puts in the future has already happened."
+  },
+  {
+    "id": "cal-pro-023",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Is anything from my reminders due today?",
+    "gold": "No. The tyre change you asked about is not due for another week.",
+    "answer": "I cannot say what is due today.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Gold is a negative, but this answer never states it - declining is abstained even when the negative would have been correct."
+  },
+  {
+    "id": "cal-pro-024",
+    "vertical": "Prospective",
+    "shape": "due-later-reminder",
+    "question": "Do I have any reminders left this month?",
+    "gold": "No - none are left this month.",
+    "answer": "You have nothing left this month.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "The denial and gold agree, so the surface negative is the right answer rather than a miss."
+  },
+  {
+    "id": "cal-epi-001",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "You mentioned Ledger Lines first, then Paper Harbour, then Nine Bells, and Slate Garden last.",
+    "expected": "Correct",
+    "rule": "listorder-all-pairs-ordered",
+    "note": "All four items are mentioned and every pair among them is in the right relative order."
+  },
+  {
+    "id": "cal-epi-002",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "I can only see three of them: Ledger Lines came first, then Nine Bells, then Slate Garden.",
+    "expected": "Correct",
+    "rule": "listorder-partial-but-ordered",
+    "note": "Only the mentioned items are considered, and those three are in the right relative order, so a limited retrieval budget is not scored as an ordering failure."
+  },
+  {
+    "id": "cal-epi-003",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "Ledger Lines, then Nine Bells, then Paper Harbour, then Slate Garden.",
+    "expected": "Wrong",
+    "rule": "listorder-inversion",
+    "note": "Paper Harbour precedes Nine Bells in gold, so this answer holds one inverted pair, and any inversion is wrong."
+  },
+  {
+    "id": "cal-epi-004",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "The only album you ever mentioned was Slate Garden; there were no others.",
+    "expected": "Missed",
+    "rule": "listorder-under-two-items-denied",
+    "note": "Fewer than two gold items are mentioned and the answer denies the rest exist, which is the denial branch of the under-two rule."
+  },
+  {
+    "id": "cal-epi-005",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "I can see Slate Garden came up, but I cannot place the others.",
+    "expected": "Abstained",
+    "rule": "listorder-under-two-items-declined",
+    "note": "The same one-item coverage as the case above, but declining rather than denying, which is the other branch of the under-two rule."
+  },
+  {
+    "id": "cal-epi-006",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "Slate Garden, then Nine Bells, then Paper Harbour, then Ledger Lines.",
+    "expected": "Wrong",
+    "rule": "listorder-inversion",
+    "note": "Full coverage with every pair inverted, which is the clearest form of an ordering failure."
+  },
+  {
+    "id": "cal-epi-007",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "From what I can piece together, and I would not swear to it: Ledger Lines, Paper Harbour, Nine Bells, Slate Garden.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "A hedged ordering is still a stated ordering, and this one has no inversions."
+  },
+  {
+    "id": "cal-epi-008",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "Ledger Lines first, then Nine Bells, then Paper Harbour.",
+    "expected": "Wrong",
+    "rule": "listorder-inversion",
+    "note": "The near miss to the partial-but-ordered case: three items again, but this time one considered pair is inverted."
+  },
+  {
+    "id": "cal-epi-009",
+    "vertical": "Episodic",
+    "shape": "list-order",
+    "question": "In what order did I bring up the four albums?",
+    "gold": "Ledger Lines first, then Paper Harbour, then Nine Bells, then Slate Garden.",
+    "answer": "Ledger Lines came up before Slate Garden; the rest I cannot place.",
+    "expected": "Correct",
+    "rule": "listorder-all-pairs-ordered",
+    "note": "Two mentioned items in the right relative order clears the two-item minimum, which is what separates this from the one-item cases."
+  },
+  {
+    "id": "cal-epi-010",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "I suggested a heat gun, used in short passes.",
+    "expected": "Correct",
+    "rule": "assistant-stated-recalled",
+    "note": "The answer was stated by the assistant rather than the user, and it is recalled as gold has it."
+  },
+  {
+    "id": "cal-epi-011",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "I suggested a chemical stripper and a scraper.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A different tool is committed to, so the answer deviates from gold on the value."
+  },
+  {
+    "id": "cal-epi-012",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "I never suggested anything for the bannister.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says the suggestion was made, and the answer asserts nothing is there."
+  },
+  {
+    "id": "cal-epi-013",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "I do not have a record of what I suggested there.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "No value is offered and nothing is denied, which is the abstention side of the line."
+  },
+  {
+    "id": "cal-epi-014",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "I think it was a heat gun, though I am going from memory.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The hedge is on confidence, not on the value, and the value matches gold."
+  },
+  {
+    "id": "cal-epi-015",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "Probably a chemical stripper, though I am going from memory.",
+    "expected": "Wrong",
+    "rule": "hedged-states-value",
+    "note": "The same hedge over a value that is not gold, which is wrong rather than abstained."
+  },
+  {
+    "id": "cal-epi-016",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What did you suggest I use to get the paint off the bannister?",
+    "gold": "A heat gun, worked in short passes.",
+    "answer": "A heat gun, worked in short passes so the wood underneath does not scorch.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "Gold is stated in full and the added clause elaborates it rather than changing it."
+  },
+  {
+    "id": "cal-epi-017",
+    "vertical": "Episodic",
+    "shape": "assistant-stated",
+    "question": "What tool did you suggest for the bannister, and what did you say to do first?",
+    "gold": "A heat gun, and to take the fittings off first.",
+    "answer": "A heat gun.",
+    "expected": "Wrong",
+    "rule": "missing-required-detail",
+    "note": "Gold treats the first step as part of the answer, so half an answer is a mismatch rather than an abstention."
+  },
+  {
+    "id": "cal-epi-018",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who brought up the idea of a shared calendar - me or you?",
+    "gold": "You did.",
+    "answer": "You did - that one came from you, not from me.",
+    "expected": "Correct",
+    "rule": "attribution-correct",
+    "note": "The question asks for the speaker and the speaker named is the one gold names."
+  },
+  {
+    "id": "cal-epi-019",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who brought up the idea of a shared calendar - me or you?",
+    "gold": "You did.",
+    "answer": "I did; it was my suggestion.",
+    "expected": "Wrong",
+    "rule": "attribution-wrong-speaker",
+    "note": "A speaker is committed to and it is the wrong one."
+  },
+  {
+    "id": "cal-epi-020",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who brought up the idea of a shared calendar - me or you?",
+    "gold": "You did.",
+    "answer": "Neither of us ever mentioned a shared calendar.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says it was said, and the answer denies the exchange happened at all."
+  },
+  {
+    "id": "cal-epi-021",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who brought up the idea of a shared calendar - me or you?",
+    "gold": "You did.",
+    "answer": "I cannot tell which of us said it first.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Two candidates and no choice between them is a declined commitment."
+  },
+  {
+    "id": "cal-epi-022",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who brought up the idea of a shared calendar - me or you?",
+    "gold": "You did.",
+    "answer": "I am fairly sure that one was yours.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "Hedged, but a speaker is named, and it is the right one."
+  },
+  {
+    "id": "cal-epi-023",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Who said the flat was north-facing?",
+    "gold": "You did.",
+    "answer": "The flat was described as north-facing, and I was the one who said it.",
+    "expected": "Wrong",
+    "rule": "attribution-wrong-speaker",
+    "note": "The content is right and the speaker is not, and the question asks for the speaker."
+  },
+  {
+    "id": "cal-epi-024",
+    "vertical": "Episodic",
+    "shape": "participant-attribution",
+    "question": "Did either of us put a square-metre figure on the flat, and if so who?",
+    "gold": "No. Neither of you ever gave a square-metre figure.",
+    "answer": "Neither of you gave one - the size never came up as a number.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "Gold is the negative, so saying so is correct rather than a missed retrieval."
+  },
+  {
+    "id": "cal-ari-001",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "You spent 128.75 dollars at Meridian Supply.",
+    "expected": "Correct",
+    "rule": "arith-exact-correct",
+    "note": "The extracted value equals the gold value exactly.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-002",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "About 130 dollars.",
+    "expected": "Correct",
+    "rule": "arith-rounding-matches",
+    "note": "128.75 rounds to 130 at the nearest ten, which is the precision the answer offered.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-003",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did the two garden invoices come to together?",
+    "gold": "141 dollars.",
+    "answer": "About 130 dollars.",
+    "expected": "Wrong",
+    "rule": "arith-rounding-mismatch",
+    "note": "141 does not round to 130 at the nearest ten, so the offered rounding is not a form of the gold value.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 3,
+          "value": 62.0
+        },
+        {
+          "session_index": 8,
+          "value": 79.0
+        }
+      ],
+      "value": 141,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-004",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "42.50 plus 31.00 is 83.50, and adding 55.25 gives 128.75 dollars.",
+    "expected": "Correct",
+    "rule": "arith-correct-number-wrong-reasoning",
+    "note": "The intermediate step is visibly false but the committed value equals gold, and this benchmark scores the answer with the objection recorded in reasoning.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-005",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "97.75 dollars.",
+    "expected": "Wrong",
+    "rule": "arith-missing-input",
+    "note": "One input is missing from the total, which wrongs the answer rather than degrading it.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-006",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "I cannot work out a total from what I have.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "No number is committed to and nothing is denied.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-007",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "You have never bought anything from Meridian Supply, so there is nothing to total.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "The answer denies there is anything to sum, which the arithmetic template separates from declining to sum it.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-008",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "Roughly 128.75 dollars, if I have all the receipts.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The hedge sits next to an exactly stated gold value, so it is graded on that value.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-009",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "How much did I spend at Meridian Supply in total?",
+    "gold": "128.75 dollars.",
+    "answer": "I would guess around 96 dollars.",
+    "expected": "Wrong",
+    "rule": "hedged-states-value",
+    "note": "Gold does not round to 96 at any precision the answer offered, so the guess is a wrong value rather than an abstention.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 42.5
+        },
+        {
+          "session_index": 5,
+          "value": 31.0
+        },
+        {
+          "session_index": 9,
+          "value": 55.25
+        }
+      ],
+      "value": 128.75,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-010",
+    "vertical": "Arithmetic",
+    "shape": "count",
+    "question": "How many times did I put an order in with Bellweather Kitchen?",
+    "gold": "4 times.",
+    "answer": "Four times.",
+    "expected": "Correct",
+    "rule": "arith-exact-correct",
+    "note": "A count spelled as a word is the same extracted value as the digit.",
+    "derivation": {
+      "operation": "count",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 1
+        },
+        {
+          "session_index": 6,
+          "value": 1
+        },
+        {
+          "session_index": 11,
+          "value": 1
+        },
+        {
+          "session_index": 14,
+          "value": 1
+        }
+      ],
+      "value": 4,
+      "unit": "count"
+    }
+  },
+  {
+    "id": "cal-ari-011",
+    "vertical": "Arithmetic",
+    "shape": "count",
+    "question": "How many times did I put an order in with Bellweather Kitchen?",
+    "gold": "4 times.",
+    "answer": "Three times.",
+    "expected": "Wrong",
+    "rule": "arith-off-by-one",
+    "note": "Counts are exact, so one short is wrong rather than close enough.",
+    "derivation": {
+      "operation": "count",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 1
+        },
+        {
+          "session_index": 6,
+          "value": 1
+        },
+        {
+          "session_index": 11,
+          "value": 1
+        },
+        {
+          "session_index": 14,
+          "value": 1
+        }
+      ],
+      "value": 4,
+      "unit": "count"
+    }
+  },
+  {
+    "id": "cal-ari-012",
+    "vertical": "Arithmetic",
+    "shape": "count",
+    "question": "How many times did I put an order in with Bellweather Kitchen?",
+    "gold": "4 times.",
+    "answer": "You have never ordered from Bellweather Kitchen.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Denying there is anything to count is the missed branch of the no-number rule.",
+    "derivation": {
+      "operation": "count",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 1
+        },
+        {
+          "session_index": 6,
+          "value": 1
+        },
+        {
+          "session_index": 11,
+          "value": 1
+        },
+        {
+          "session_index": 14,
+          "value": 1
+        }
+      ],
+      "value": 4,
+      "unit": "count"
+    }
+  },
+  {
+    "id": "cal-ari-013",
+    "vertical": "Arithmetic",
+    "shape": "count",
+    "question": "How many times did I put an order in with Bellweather Kitchen?",
+    "gold": "4 times.",
+    "answer": "I would rather not put a number on it - I cannot see all of the orders.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "The near miss to the denial above: this one declines to count rather than denying there is anything to count.",
+    "derivation": {
+      "operation": "count",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 1
+        },
+        {
+          "session_index": 6,
+          "value": 1
+        },
+        {
+          "session_index": 11,
+          "value": 1
+        },
+        {
+          "session_index": 14,
+          "value": 1
+        }
+      ],
+      "value": 4,
+      "unit": "count"
+    }
+  },
+  {
+    "id": "cal-ari-014",
+    "vertical": "Arithmetic",
+    "shape": "count",
+    "question": "How many times did I put an order in with Bellweather Kitchen?",
+    "gold": "4 times.",
+    "answer": "Four times, and the last of those was the biggest order.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "The count matches gold and the trailing remark is not part of what was asked.",
+    "derivation": {
+      "operation": "count",
+      "inputs": [
+        {
+          "session_index": 2,
+          "value": 1
+        },
+        {
+          "session_index": 6,
+          "value": 1
+        },
+        {
+          "session_index": 11,
+          "value": 1
+        },
+        {
+          "session_index": 14,
+          "value": 1
+        }
+      ],
+      "value": 4,
+      "unit": "count"
+    }
+  },
+  {
+    "id": "cal-ari-015",
+    "vertical": "Arithmetic",
+    "shape": "delta",
+    "question": "How much lower was my second-quarter power bill than my first-quarter one?",
+    "gold": "46 dollars lower.",
+    "answer": "46 dollars lower.",
+    "expected": "Correct",
+    "rule": "arith-exact-correct",
+    "note": "Magnitude and direction both match gold.",
+    "derivation": {
+      "operation": "delta",
+      "inputs": [
+        {
+          "session_index": 3,
+          "value": 412.0
+        },
+        {
+          "session_index": 12,
+          "value": 366.0
+        }
+      ],
+      "value": 46,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-016",
+    "vertical": "Arithmetic",
+    "shape": "delta",
+    "question": "How much lower was my second-quarter power bill than my first-quarter one?",
+    "gold": "46 dollars lower.",
+    "answer": "It went up by 46 dollars.",
+    "expected": "Wrong",
+    "rule": "arith-sign-flipped",
+    "note": "The magnitude matches but gold is a decrease, and direction is part of the value the question asks for.",
+    "derivation": {
+      "operation": "delta",
+      "inputs": [
+        {
+          "session_index": 3,
+          "value": 412.0
+        },
+        {
+          "session_index": 12,
+          "value": 366.0
+        }
+      ],
+      "value": 46,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-017",
+    "vertical": "Arithmetic",
+    "shape": "delta",
+    "question": "How much lower was my second-quarter power bill than my first-quarter one?",
+    "gold": "46 dollars lower.",
+    "answer": "About 50 dollars lower.",
+    "expected": "Correct",
+    "rule": "arith-rounding-matches",
+    "note": "46 rounds to 50 at the nearest ten, which is the precision offered.",
+    "derivation": {
+      "operation": "delta",
+      "inputs": [
+        {
+          "session_index": 3,
+          "value": 412.0
+        },
+        {
+          "session_index": 12,
+          "value": 366.0
+        }
+      ],
+      "value": 46,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-018",
+    "vertical": "Arithmetic",
+    "shape": "delta",
+    "question": "How much lower was my second-quarter water bill than my first-quarter one?",
+    "gold": "34 dollars lower.",
+    "answer": "About 50 dollars lower.",
+    "expected": "Wrong",
+    "rule": "arith-rounding-mismatch",
+    "note": "34 rounds to 30 rather than 50, so the near miss to the case above lands on the other side of the rounding rule.",
+    "derivation": {
+      "operation": "delta",
+      "inputs": [
+        {
+          "session_index": 4,
+          "value": 210.0
+        },
+        {
+          "session_index": 13,
+          "value": 176.0
+        }
+      ],
+      "value": 34,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-019",
+    "vertical": "Arithmetic",
+    "shape": "duration",
+    "question": "How long was the bike in the shop between me dropping it off and picking it up?",
+    "gold": "9 days.",
+    "answer": "Nine days.",
+    "expected": "Correct",
+    "rule": "arith-exact-correct",
+    "note": "The stated duration equals gold at the unit granularity gold uses.",
+    "derivation": {
+      "operation": "duration",
+      "inputs": [
+        {
+          "session_index": 9,
+          "value": 9
+        }
+      ],
+      "value": 9,
+      "unit": "days"
+    }
+  },
+  {
+    "id": "cal-ari-020",
+    "vertical": "Arithmetic",
+    "shape": "duration",
+    "question": "How long was the bike in the shop between me dropping it off and picking it up?",
+    "gold": "9 days.",
+    "answer": "About two weeks.",
+    "expected": "Wrong",
+    "rule": "arith-rounding-mismatch",
+    "note": "Nine days rounds to one week, not two, at the precision the answer offered.",
+    "derivation": {
+      "operation": "duration",
+      "inputs": [
+        {
+          "session_index": 9,
+          "value": 9
+        }
+      ],
+      "value": 9,
+      "unit": "days"
+    }
+  },
+  {
+    "id": "cal-ari-021",
+    "vertical": "Arithmetic",
+    "shape": "duration",
+    "question": "How long was I without power in total across the two cuts?",
+    "gold": "230 minutes.",
+    "answer": "About four hours.",
+    "expected": "Correct",
+    "rule": "arith-rounding-matches",
+    "note": "230 minutes rounds to four hours at the hour precision the answer offered.",
+    "derivation": {
+      "operation": "duration",
+      "inputs": [
+        {
+          "session_index": 4,
+          "value": 145
+        },
+        {
+          "session_index": 7,
+          "value": 85
+        }
+      ],
+      "value": 230,
+      "unit": "minutes"
+    }
+  },
+  {
+    "id": "cal-ari-022",
+    "vertical": "Arithmetic",
+    "shape": "duration",
+    "question": "How long was the lift out of service in total across the two breakdowns?",
+    "gold": "190 minutes.",
+    "answer": "About four hours.",
+    "expected": "Wrong",
+    "rule": "arith-rounding-mismatch",
+    "note": "190 minutes rounds to three hours, so the same phrasing that was correct for 230 minutes is wrong here.",
+    "derivation": {
+      "operation": "duration",
+      "inputs": [
+        {
+          "session_index": 6,
+          "value": 120
+        },
+        {
+          "session_index": 15,
+          "value": 70
+        }
+      ],
+      "value": 190,
+      "unit": "minutes"
+    }
+  },
+  {
+    "id": "cal-ari-023",
+    "vertical": "Arithmetic",
+    "shape": "sum",
+    "question": "What did the two appliance deliveries come to together?",
+    "gold": "1284.40 dollars.",
+    "answer": "$1,284.40 all in.",
+    "expected": "Correct",
+    "rule": "arith-normalization-symbols",
+    "note": "The currency symbol and thousands separator are stripped before comparison, and what remains is the gold value.",
+    "derivation": {
+      "operation": "sum",
+      "inputs": [
+        {
+          "session_index": 3,
+          "value": 899.9
+        },
+        {
+          "session_index": 8,
+          "value": 384.5
+        }
+      ],
+      "value": 1284.4,
+      "unit": "USD"
+    }
+  },
+  {
+    "id": "cal-ari-024",
+    "vertical": "Arithmetic",
+    "shape": "duration",
+    "question": "How long did the second interview run?",
+    "gold": "90 minutes.",
+    "answer": "An hour and a half.",
+    "expected": "Correct",
+    "rule": "arith-unit-equivalent",
+    "note": "The same quantity in another unit is the same value, and the benchmark grades the arithmetic rather than the phrasing.",
+    "derivation": {
+      "operation": "duration",
+      "inputs": [
+        {
+          "session_index": 5,
+          "value": 90
+        }
+      ],
+      "value": 90,
+      "unit": "minutes"
+    }
+  },
+  {
+    "id": "cal-wm-001",
+    "vertical": "WorkingMemory",
+    "shape": "distance-1",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "You work at Halverson Freight.",
+    "expected": "Correct",
+    "rule": "stated-fact-recalled",
+    "note": "The profile fact is returned as gold states it."
+  },
+  {
+    "id": "cal-wm-002",
+    "vertical": "WorkingMemory",
+    "shape": "distance-1",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "At Halverson Foods.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A near neighbour of the gold name is still a different employer, so the value does not match."
+  },
+  {
+    "id": "cal-wm-003",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "I do not have that on hand.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "No employer is named and none is denied."
+  },
+  {
+    "id": "cal-wm-004",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "You have never told me where you work.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "The near miss to the abstention above: this one denies the fact was ever stated, which gold contradicts."
+  },
+  {
+    "id": "cal-wm-005",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "I think it was Halverson Freight.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The employer is named despite the hedge, and it is the gold one."
+  },
+  {
+    "id": "cal-wm-006",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "Where do I work?",
+    "gold": "At Halverson Freight.",
+    "answer": "I think it was Kestrel Freight.",
+    "expected": "Wrong",
+    "rule": "hedged-states-value",
+    "note": "Same hedge, wrong employer, so it is graded on the value and lands on wrong."
+  },
+  {
+    "id": "cal-wm-007",
+    "vertical": "WorkingMemory",
+    "shape": "distance-1",
+    "question": "What is my cat called?",
+    "gold": "Tobias.",
+    "answer": "Tobias. You mentioned him when you were talking about the vet.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "The name matches gold and the provenance remark adds nothing that contradicts it."
+  },
+  {
+    "id": "cal-wm-008",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "Who do I work for, and what do I do there?",
+    "gold": "Halverson Freight, as a route planner.",
+    "answer": "Halverson Freight.",
+    "expected": "Wrong",
+    "rule": "missing-required-detail",
+    "note": "Gold treats the role as part of the answer, so the half that is missing lowers the outcome."
+  },
+  {
+    "id": "cal-wm-009",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "What am I allergic to?",
+    "gold": "Shellfish.",
+    "answer": "You cannot eat shellfish - prawns, crab, that whole family.",
+    "expected": "Correct",
+    "rule": "paraphrase-correct",
+    "note": "The gold value is stated and then illustrated, which is a paraphrase rather than a different answer."
+  },
+  {
+    "id": "cal-wm-010",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What floor is my flat on?",
+    "gold": "The seventh.",
+    "answer": "The seventh floor.",
+    "expected": "Correct",
+    "rule": "stated-fact-recalled",
+    "note": "A numeric profile fact recalled at the far end of the distance ladder."
+  },
+  {
+    "id": "cal-wm-011",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What is my locker number at the pool?",
+    "gold": "Locker 314.",
+    "answer": "Locker 341.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "Transposed digits are a different number, and the question asks for the number."
+  },
+  {
+    "id": "cal-wm-012",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "Which gym did I join?",
+    "gold": "Brightwater.",
+    "answer": "It was either Brightwater or Cobalt Row - I cannot tell which.",
+    "expected": "Abstained",
+    "rule": "declines-between-candidates",
+    "note": "Naming two candidates without choosing is declining to commit to a value."
+  },
+  {
+    "id": "cal-wm-013",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "Which gym did I join?",
+    "gold": "Brightwater.",
+    "answer": "Probably Brightwater, though Cobalt Row also came up.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The near miss to the case above: the same two candidates, but one of them is chosen, and it is gold."
+  },
+  {
+    "id": "cal-wm-014",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "Which gym did I join?",
+    "gold": "Brightwater.",
+    "answer": "Probably Cobalt Row, though Brightwater also came up.",
+    "expected": "Wrong",
+    "rule": "hedged-states-value",
+    "note": "A choice is made and it is the wrong one, which the hedge does not soften into an abstention."
+  },
+  {
+    "id": "cal-wm-015",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What does my sister do for a living?",
+    "gold": "She is a paramedic.",
+    "answer": "You have never mentioned a sister to me.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says the sister was mentioned, so denying she was ever brought up is a confident false negative rather than the no-record phrasing that would be an abstention."
+  },
+  {
+    "id": "cal-wm-016",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "Which shift do I usually work?",
+    "gold": "Nights.",
+    "answer": "Nights - I know because you said you are always asleep by lunchtime.",
+    "expected": "Correct",
+    "rule": "correct-value-wrong-justification",
+    "note": "The justification is an inference the corpus does not support, but the value asked for is gold."
+  },
+  {
+    "id": "cal-wm-017",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "Did I ever tell you my landlord's name?",
+    "gold": "No - the landlord's name never came up.",
+    "answer": "You have not - I have no record of a landlord's name.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "Gold is the negative, so the answer that says so is correct rather than abstained."
+  },
+  {
+    "id": "cal-wm-018",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What kind of car do I drive?",
+    "gold": "A grey estate.",
+    "answer": "A red hatchback - the one your neighbour was talking about.",
+    "expected": "Wrong",
+    "rule": "distractor-value-adopted",
+    "note": "The value belongs to an interference session rather than to the speaker, so it is a committed wrong value."
+  },
+  {
+    "id": "cal-wm-019",
+    "vertical": "WorkingMemory",
+    "shape": "distance-1",
+    "question": "What is my usual coffee order?",
+    "gold": "A flat white, no sugar.",
+    "answer": "A flat white with no sugar. I am less sure whether you take it to go.",
+    "expected": "Correct",
+    "rule": "extra-detail-ignored",
+    "note": "The hedge attaches to something nobody asked about; the asked value is stated in full."
+  },
+  {
+    "id": "cal-wm-020",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "When is my daughter's birthday?",
+    "gold": "The 12th of March.",
+    "answer": "Some time in March.",
+    "expected": "Wrong",
+    "rule": "missing-required-detail",
+    "note": "The month alone is a partial commitment, and gold treats the day as part of the answer."
+  },
+  {
+    "id": "cal-wm-021",
+    "vertical": "WorkingMemory",
+    "shape": "distance-15",
+    "question": "What street do I live on?",
+    "gold": "Marlowe Street.",
+    "answer": "Marlowe St.",
+    "expected": "Correct",
+    "rule": "surface-form-variant-correct",
+    "note": "Outcomes describe deviation from gold rather than surface form, and an abbreviated street type is the same street."
+  },
+  {
+    "id": "cal-wm-022",
+    "vertical": "WorkingMemory",
+    "shape": "distance-5",
+    "question": "What did I say my monthly budget was?",
+    "gold": "Twelve hundred a month.",
+    "answer": "Budget for what - the flat or the car? I do not have a figure I can point to.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Asking for clarification commits to no value and denies nothing."
+  },
+  {
+    "id": "cal-wm-023",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What did I say I was training for?",
+    "gold": "A half marathon in the autumn.",
+    "answer": "A full marathon in the autumn.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "The season is right and the event is not, and the event is what the question asks for."
+  },
+  {
+    "id": "cal-wm-024",
+    "vertical": "WorkingMemory",
+    "shape": "distance-40",
+    "question": "What did I say I was training for?",
+    "gold": "A half marathon in the autumn.",
+    "answer": "A half marathon, in the autumn - you mentioned it a long way back.",
+    "expected": "Correct",
+    "rule": "stated-fact-recalled",
+    "note": "The near miss to the case above, differing only in the event named, which is the whole of the answer."
+  },
+  {
+    "id": "cal-for-001",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "What car do I drive?",
+    "gold": "You no longer have a car - you sold the Honda Civic in the spring.",
+    "answer": "It was a Honda Civic, but you sold it in the spring, so you are not driving anything at the moment.",
+    "expected": "Correct",
+    "rule": "forgetting-invalidation-acknowledged",
+    "note": "Recalling the old value while marking it superseded is ideal memory, not stale recall."
+  },
+  {
+    "id": "cal-for-002",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "What car do I drive?",
+    "gold": "You no longer have a car - you sold the Honda Civic in the spring.",
+    "answer": "You drive a Honda Civic.",
+    "expected": "Wrong",
+    "rule": "forgetting-stale-value-asserted",
+    "note": "The near miss to the case above: the same old value, but stated as current, which is the dangerous failure this vertical exists to catch."
+  },
+  {
+    "id": "cal-for-003",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "What car do I drive?",
+    "gold": "You no longer have a car - you sold the Honda Civic in the spring.",
+    "answer": "You do not have a car any more - it went in the spring.",
+    "expected": "Correct",
+    "rule": "forgetting-invalidation-acknowledged",
+    "note": "The invalidation is acknowledged without repeating the old value, which gold also allows."
+  },
+  {
+    "id": "cal-for-004",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "What car do I drive?",
+    "gold": "You no longer have a car - you sold the Honda Civic in the spring.",
+    "answer": "I could not say what you drive now.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Nothing is committed to and nothing is denied, which is neither the correct no-longer nor a stale value."
+  },
+  {
+    "id": "cal-for-005",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "What car do I drive?",
+    "gold": "You no longer have a car - you sold the Honda Civic in the spring.",
+    "answer": "You have never mentioned owning a car.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says there was a car and it was sold, so denying it ever existed is a confident false negative rather than a stale value."
+  },
+  {
+    "id": "cal-for-006",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Am I still a member at the gym?",
+    "gold": "No - you cancelled the membership in February.",
+    "answer": "You moved over to a different gym.",
+    "expected": "Wrong",
+    "rule": "invented-replacement",
+    "note": "A replacement state nobody stated is a committed value that gold does not carry."
+  },
+  {
+    "id": "cal-for-007",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Do I still have the road bike?",
+    "gold": "No - you gave it to your nephew.",
+    "answer": "I think that one is out of date now: you passed the bike on to your nephew.",
+    "expected": "Correct",
+    "rule": "hedged-states-value",
+    "note": "The hedge sits over a correct no-longer with the right invalidation."
+  },
+  {
+    "id": "cal-for-008",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Do I still have the road bike?",
+    "gold": "No - you gave it to your nephew.",
+    "answer": "Probably still that road bike of yours.",
+    "expected": "Wrong",
+    "rule": "forgetting-stale-value-asserted",
+    "note": "Hedged or not, the superseded value is offered as current, which is stale recall."
+  },
+  {
+    "id": "cal-for-009",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "Ashcroft Dental.",
+    "expected": "Correct",
+    "rule": "still-valid-recalled",
+    "note": "The control arm: the fact is still valid and the answer states it."
+  },
+  {
+    "id": "cal-for-010",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "That is no longer something I hold - it was superseded.",
+    "expected": "Wrong",
+    "rule": "forgetting-over-forgetting",
+    "note": "Gold says the registration still stands, so answering no-longer-known is forgetting something the system should still hold."
+  },
+  {
+    "id": "cal-for-011",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "You used to be with Ashcroft Dental, but that changed.",
+    "expected": "Wrong",
+    "rule": "forgetting-over-forgetting",
+    "note": "The near miss to the correct control answer: the same name, invalidated by an event that gold says never happened."
+  },
+  {
+    "id": "cal-for-012",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "I cannot say which dentist you are with.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Declining is not the same failure as claiming the fact has lapsed, and the two are kept apart."
+  },
+  {
+    "id": "cal-for-013",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "You have never told me about a dentist.",
+    "expected": "Missed",
+    "rule": "confident-denial-missed",
+    "note": "Gold says the registration was stated, so denying it ever came up is a denial rather than an over-forgetting claim."
+  },
+  {
+    "id": "cal-for-014",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Which dentist am I registered with?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "Pellingham Dental.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A still-valid fact answered with a different name is an ordinary wrong value, with no forgetting claim in it."
+  },
+  {
+    "id": "cal-for-015",
+    "vertical": "Forgetting",
+    "shape": "never-known",
+    "question": "What is my landlord's name?",
+    "gold": "You never told me your landlord's name.",
+    "answer": "You have not told me that - I have no record of a landlord's name.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "Gold says the fact was never recorded, so an answer that says so is correct rather than abstained."
+  },
+  {
+    "id": "cal-for-016",
+    "vertical": "Forgetting",
+    "shape": "never-known",
+    "question": "What is my landlord's name?",
+    "gold": "You never told me your landlord's name.",
+    "answer": "I did know that once, but I no longer have it.",
+    "expected": "Wrong",
+    "rule": "forgetting-mis-attributed",
+    "note": "The near miss to the correct never-known answer: this one invents a forgetting event for a fact that was never recorded."
+  },
+  {
+    "id": "cal-for-017",
+    "vertical": "Forgetting",
+    "shape": "never-known",
+    "question": "What is my landlord's name?",
+    "gold": "You never told me your landlord's name.",
+    "answer": "Your landlord is Mr Deverill.",
+    "expected": "Wrong",
+    "rule": "wrong-value",
+    "note": "A name is committed to where gold has none, which is a fabricated value rather than a forgetting error."
+  },
+  {
+    "id": "cal-for-018",
+    "vertical": "Forgetting",
+    "shape": "never-known",
+    "question": "Did I ever give you my sister's address?",
+    "gold": "No - you never gave it.",
+    "answer": "No - her address has never come up in anything you have told me.",
+    "expected": "Correct",
+    "rule": "negative-gold-correct",
+    "note": "The never-known probe answered as gold has it, in a different domain from the landlord pair."
+  },
+  {
+    "id": "cal-for-019",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Where do I live?",
+    "gold": "At Alder Court - you no longer live at Pike Row.",
+    "answer": "You were at 14 Pike Row until June, then you moved to Alder Court, so Alder Court is the current one.",
+    "expected": "Correct",
+    "rule": "forgetting-invalidation-acknowledged",
+    "note": "The old address appears only as history and the current one is named, which is the acknowledged-invalidation pattern."
+  },
+  {
+    "id": "cal-for-020",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Where do I live?",
+    "gold": "At Alder Court - you no longer live at Pike Row.",
+    "answer": "14 Pike Row.",
+    "expected": "Wrong",
+    "rule": "forgetting-stale-value-asserted",
+    "note": "The superseded address is given as the current one with no mark that it changed."
+  },
+  {
+    "id": "cal-for-021",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Do I still have the season pass, and what happened to it?",
+    "gold": "No - you let it lapse in October.",
+    "answer": "No, you do not have it any more - you sold it to a colleague.",
+    "expected": "Wrong",
+    "rule": "invalidation-reason-wrong",
+    "note": "The question asks what happened, so the invented sale replaces detail gold treats as part of the answer."
+  },
+  {
+    "id": "cal-for-022",
+    "vertical": "Forgetting",
+    "shape": "never-known",
+    "question": "Have I ever told you which bank I use?",
+    "gold": "No - you have never mentioned a bank.",
+    "answer": "I am not sure whether you have or not.",
+    "expected": "Abstained",
+    "rule": "genuine-refusal-abstains",
+    "note": "Gold is a negative, but this answer declines to say either way instead of stating it, which is abstained rather than correct."
+  },
+  {
+    "id": "cal-for-023",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Where am I working these days?",
+    "gold": "You left Bramwell Logistics in March, so you are not there any more.",
+    "answer": "You are at Bramwell Logistics, and you have been for years.",
+    "expected": "Wrong",
+    "rule": "forgetting-stale-value-asserted",
+    "note": "The superseded employer is asserted as current and reinforced with confidence, which is the stale-recall class."
+  },
+  {
+    "id": "cal-for-024",
+    "vertical": "Forgetting",
+    "shape": "invalidated",
+    "question": "Is the Tuesday class still in my diary?",
+    "gold": "No - it was dropped when the term ended.",
+    "answer": "No, that one is no longer in your diary.",
+    "expected": "Correct",
+    "rule": "forgetting-invalidation-acknowledged",
+    "note": "Gold is a bare no-longer and the answer gives exactly that."
+  }
+]

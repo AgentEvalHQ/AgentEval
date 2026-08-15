@@ -22,6 +22,11 @@
     <!-- Small enough to embed, unlike the LongMemEval datasets: a consumer can run the
          time-grounded probe with no download and no path resolution. -->
     <EmbeddedResource Include="Data\longmemeval\timegrounded\*.json" />
+    <!-- The TypedMemEval family is embedded-only by design: no dataset path knob exists, so
+         "which corpus produced this number" is answered by the identifier and hash rather than
+         by a path that may or may not still point at the same file. Each vertical ships its
+         corpus plus a .meta.json sidecar carrying calibration and probe records. -->
+    <EmbeddedResource Include="Data\typedmemeval\**\*.json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,25 @@
+{
+  "judge_prompt_fingerprint": "edc5fbaa733cdad29007980165465522177bb0bfdfaa492b85d92fa217523e01",
+  "measured_at": "2026-08-15",
+  "model": "gpt-5.5",
+  "agreement": 0.983,
+  "status": "measured",
+  "cases": 120,
+  "runs": 2,
+  "per_vertical": {
+    "Prospective": 1.0,
+    "Episodic": 1.0,
+    "Arithmetic": 1.0,
+    "WorkingMemory": 1.0,
+    "Forgetting": 0.917
+  },
+  "disagreements": {
+    "every_run": [
+      "cal-for-006"
+    ],
+    "run_varying": [
+      "cal-for-012"
+    ]
+  },
+  "note": "Two runs of the live arm at this fingerprint: 0.992 and 0.983. The lower is recorded, and the per-vertical figures come from that same lower run, so this record never quotes the best of a set. The previous fingerprint's measurement (84bacb9b..., 0.975 over three runs) is superseded and not comparable: ArithmeticBody gained a rule that direction is part of a difference's value, added in response to calibration case cal-ari-016, where the old template's grade-the-arithmetic-not-the-phrasing wording let 'went up by 46' pass against a gold of 46 lower. cal-ari-016 now agrees in both runs and Arithmetic is at 1.0. One case disagrees in every run and was not relabelled to improve the number: cal-for-006, where an answer replaces a cancelled gym membership with an invented move to a different gym; the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry. cal-for-012 disagrees in one run of the two - the Forgetting boundary where the preamble's definition of abstained meets the over-forgetting rule - which is judge noise at the boundary rather than drift, and the reason this file records runs rather than a single point."
+}

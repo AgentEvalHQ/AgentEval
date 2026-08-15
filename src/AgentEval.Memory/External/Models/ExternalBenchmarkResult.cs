@@ -110,6 +110,17 @@ public class ExternalBenchmarkResult
     public OracleProjectionReport? OracleProjection { get; init; }
 
     /// <summary>
+    /// The typed outcome vector for a TypedMemEval run; null for every other benchmark.
+    /// </summary>
+    /// <remarks>
+    /// This is the citable form of a TypedMemEval result. <see cref="OverallAccuracy"/> stays
+    /// populated on family runs so generic tooling keeps working, but it is compatibility
+    /// surface, not a score — see <see cref="TypedMemEvalReport"/> for the citation rule.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TypedMemEvalReport? TypedOutcomes { get; init; }
+
+    /// <summary>
     /// Dataset and judge-prompt fingerprints; null unless
     /// <see cref="ExternalBenchmarkOptions.RunProvenanceMode"/> requested them.
     /// </summary>
@@ -268,6 +279,13 @@ public class QuestionResult
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AnswerSamplingOutcome? AnswerSampling { get; init; }
+
+    /// <summary>
+    /// TypedMemEval's per-question typed outcome and evidence attribution; null for every
+    /// other benchmark.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TypedMemEvalQuestionDetail? TypedOutcome { get; init; }
 
     /// <summary>Validated, copy-owned normalized evidence when capture is enabled.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

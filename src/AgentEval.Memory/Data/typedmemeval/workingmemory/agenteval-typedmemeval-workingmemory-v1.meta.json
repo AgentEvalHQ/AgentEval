@@ -1,0 +1,478 @@
+{
+  "corpus_id": "agenteval-typedmemeval-workingmemory-v1",
+  "vertical": "workingmemory",
+  "revision": "v1",
+  "question_count": 48,
+  "corpus_sha256": "ff3208e3e779ab72c9e0de6f184d9ee9cdf502229d1f62aa4168e8dd57ef9567",
+  "generator": {
+    "tool": "tools/gen_typedmemeval_workingmemory.py",
+    "version": "1.0.0",
+    "seed": 20260815
+  },
+  "k_ref": 5,
+  "coverage": {
+    "retriever": "bm25-okapi-k1.5-b0.75",
+    "band_low": 0.5,
+    "band_high": 0.9,
+    "mean_realised": 0.7292,
+    "echo": 0.75,
+    "iterations": 3,
+    "search_trace": [
+      [
+        1.0,
+        0.25
+      ],
+      [
+        0.5,
+        0.9167
+      ],
+      [
+        0.75,
+        0.7292
+      ]
+    ],
+    "per_question": {
+      "tme-wm-001": 1.0,
+      "tme-wm-002": 0.0,
+      "tme-wm-003": 0.0,
+      "tme-wm-004": 0.0,
+      "tme-wm-005": 1.0,
+      "tme-wm-006": 1.0,
+      "tme-wm-007": 1.0,
+      "tme-wm-008": 1.0,
+      "tme-wm-009": 1.0,
+      "tme-wm-010": 1.0,
+      "tme-wm-011": 1.0,
+      "tme-wm-012": 0.0,
+      "tme-wm-013": 1.0,
+      "tme-wm-014": 1.0,
+      "tme-wm-015": 0.0,
+      "tme-wm-016": 0.0,
+      "tme-wm-017": 1.0,
+      "tme-wm-018": 1.0,
+      "tme-wm-019": 1.0,
+      "tme-wm-020": 0.0,
+      "tme-wm-021": 1.0,
+      "tme-wm-022": 1.0,
+      "tme-wm-023": 1.0,
+      "tme-wm-024": 0.0,
+      "tme-wm-025": 1.0,
+      "tme-wm-026": 1.0,
+      "tme-wm-027": 1.0,
+      "tme-wm-028": 1.0,
+      "tme-wm-029": 1.0,
+      "tme-wm-030": 1.0,
+      "tme-wm-031": 0.0,
+      "tme-wm-032": 0.0,
+      "tme-wm-033": 1.0,
+      "tme-wm-034": 1.0,
+      "tme-wm-035": 0.0,
+      "tme-wm-036": 0.0,
+      "tme-wm-037": 1.0,
+      "tme-wm-038": 1.0,
+      "tme-wm-039": 1.0,
+      "tme-wm-040": 1.0,
+      "tme-wm-041": 1.0,
+      "tme-wm-042": 1.0,
+      "tme-wm-043": 1.0,
+      "tme-wm-044": 1.0,
+      "tme-wm-045": 1.0,
+      "tme-wm-046": 1.0,
+      "tme-wm-047": 1.0,
+      "tme-wm-048": 0.0
+    }
+  },
+  "ceiling": {
+    "k_ref": 5,
+    "by_g": {
+      "1": 1.0
+    },
+    "min": 1.0,
+    "structural_below_one": false
+  },
+  "structure": {
+    "g_distribution": {
+      "1": 48
+    },
+    "h_min": 1,
+    "h_max": 40,
+    "gold_position_shuffled": false,
+    "h_is_independent_variable": true,
+    "no_absolute_dates": false
+  },
+  "probes": {
+    "status": "run",
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-15T12:42:04Z",
+    "questions_probed": 48,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 48,
+      "passed": 48,
+      "failed": []
+    },
+    "v1_pair_flip": {
+      "pairs": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 48,
+      "passed": 48,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 48,
+      "passed": 48,
+      "failed": []
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "per_question": {
+      "tme-wm-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-037": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-039": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-042": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-043": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-045": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-046": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      },
+      "tme-wm-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "ff3208e3e779ab72c9e0de6f184d9ee9cdf502229d1f62aa4168e8dd57ef9567"
+  }
+}
