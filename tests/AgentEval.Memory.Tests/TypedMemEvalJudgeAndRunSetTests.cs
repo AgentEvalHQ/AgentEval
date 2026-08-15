@@ -236,6 +236,39 @@ public sealed class TypedMemEvalJudgeAndRunSetTests
     }
 
     [Fact]
+    public async Task RunSet_WarnsWhenAResultSetWouldDoubleCountTheSeededQuestions()
+    {
+        // The citation rule says the twelve carried questions must not be counted twice. A rule in
+        // prose is one nobody's build enforces, so this is the runtime half.
+        var prospective = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Prospective, 3);
+        var episodic = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Episodic, 3);
+
+        Assert.Null(TypedMemEvalRunSet.DetectSeedOverlap([prospective, episodic]));
+
+        var timeGrounded = new ExternalBenchmarkResult
+        {
+            BenchmarkId = "longmemeval",
+            BenchmarkName = "time-grounded probe",
+            OverallAccuracy = null,
+            TaskAveragedAccuracy = null,
+            PerTypeResults = [],
+            QuestionResults = [],
+            Duration = TimeSpan.Zero,
+            Provenance = new BenchmarkRunProvenance
+            {
+                Mode = RunProvenanceMode.Full,
+                DatasetIdentifier = TypedMemEvalRunSet.TimeGroundedCorpusId
+            },
+            Options = new ExternalBenchmarkOptions()
+        };
+
+        var warning = TypedMemEvalRunSet.DetectSeedOverlap([prospective, timeGrounded]);
+        Assert.NotNull(warning);
+        Assert.Contains("double-counts", warning!, StringComparison.Ordinal);
+        Assert.Contains("SeededFrom", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Adapter_ProjectsTheTypedVectorAndCarriesTheCitationRule()
     {
         var result = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Forgetting, 6);

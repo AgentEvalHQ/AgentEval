@@ -5,10 +5,10 @@ isolation: **prospective memory**, **episodic structure**, **arithmetic over mem
 **working-memory distance**, and **forgetting**. Each vertical is its own corpus, its own
 question types, and its own validity rules.
 
-> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v1 (AgentEval)"**. TypedMemEval
+> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v2 (AgentEval)"**. TypedMemEval
 > results are **not** LongMemEval results and must never be presented as, summed with, or averaged
 > with LongMemEval numbers. The twelve Prospective questions seeded from the time-grounded probe
-> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v1; a report that runs both
+> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v2; a report that runs both
 > must not double-count them.
 
 TypedMemEval reuses LongMemEval's *file format* and AgentEval's LongMemEval harness machinery. That
@@ -232,11 +232,11 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.800 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.865 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.626 | 3–6 |
-| WorkingMemory | 48 | 0.729 | 1 |
-| Forgetting | 50 | 0.700 — **0.571 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+| Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
+| Episodic | 50 | 0.881 | 1 (×35), 4–7 (×15) |
+| Arithmetic | 50 | 0.643 | 3–6 |
+| WorkingMemory | 48 | 0.896 | 1 |
+| Forgetting | 50 | 0.710 — **0.586 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -269,11 +269,11 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 46/50 | 16/19 | 50/50 | 49/50 | — |
+| Prospective | 47/50 | 17/19 | 50/50 | 50/50 | — |
 | Episodic | 50/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 |
+| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/20 |
 
 These are reported as measured. The remaining V1 shortfalls sit where the *answer model*, not the
 memory system, is the limit: the Arithmetic misses are duration questions whose gold requires
@@ -295,6 +295,47 @@ records are stamped into the corpus metadata. The generators
 (`tools/gen_typedmemeval_<vertical>.py`) and the probe runner
 (`tools/run_typedmemeval_probes.py`) are in the repository: the corpora are reproducible, and that
 is what makes them criticizable.
+
+## V7 — can a cheap classifier find the gold without reading it?
+
+Every rule above asks whether a question is *answerable* and whether its evidence is *necessary*.
+None of them asks whether the evidence is **separable** — and a corpus whose gold can be picked out
+by a one-line filter measures nothing, however answerable its questions are.
+
+V7 tries cheap single-feature classifiers at telling gold sessions from distractors and scores each
+as a direction-folded AUC, where 0.5 is chance and 1.0 is a perfect tell:
+
+| Feature | What an adversary would use |
+|---|---|
+| `session_length_chars` | gold sessions being longer or shorter |
+| `turn_count` | gold having more exchanges |
+| `position_in_haystack` | gold sitting early or late |
+| `digit_density` | gold carrying the numbers |
+| `uppercase_density` | gold carrying the proper nouns |
+| `boilerplate_ngram` | a recurring phrase present in one side only |
+
+A corpus is **refused** at 0.75 on any shape feature. The rule runs in the generator, is stamped
+into every corpus's metadata beside V1–V6, and is re-measured in CI rather than trusted from its own
+record — a record nobody re-runs is a claim, not a check.
+
+Two deliberate non-refusals, because hiding them would be the same failure in a different coat:
+
+- **Question relevance is exempt and is not a feature.** Gold is supposed to be more relevant to its
+  question than a distractor is; if it were not, the question would be unanswerable. How *easily*
+  that is exploited is what the BM25 calibration gate bounds.
+- **Phrase recurrence is measured but does not refuse** (0.552–0.850 across the family). Filler is
+  template-generated, so every filler phrase recurs across questions and no gold phrase does. That
+  number says "this filler came from templates", not "this corpus hides a tell", and driving it to
+  chance needs filler with the variety of real conversation — a corpus revision, not a check.
+
+`WorkingMemory` exempts `position_in_haystack`: it pins its fact to session 0 by design, so position
+separates gold perfectly and is meant to.
+
+**This rule earned its keep immediately.** Measured against the v1 corpora, capitalisation density
+found gold at AUC 0.990 in Forgetting and session length at 0.992 in WorkingMemory — gold states an
+arbitrary *named* fact, so it carried proper nouns and extra text that filler did not, and counting
+capital letters found the evidence without reading it. The v2 corpora pad every session to a common
+shape; the worst refused feature across the family is now 0.666.
 
 ## Bands, not points
 

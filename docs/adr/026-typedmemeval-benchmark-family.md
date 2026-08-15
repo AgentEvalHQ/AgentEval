@@ -964,6 +964,52 @@ the pivot from the session's final timestamp and re-checks the arithmetic as a h
 the clearest available argument for the probes existing at all: the corpus looked correct, its own
 generator believed it was correct, and it was wrong.
 
+### 13. V7 — adversarial separability, and the Episodic attribution decision (post-0.22.0-beta)
+
+**V7 is now a standing rule.** The clause-parity check added during the 0.22.0-beta review was
+specific to one marker string, and the consuming project's verification round asked the right
+question: is there a probe that would catch the *next* tell, which will not be a clause? There was
+not. There is now.
+
+V7 tries cheap single-feature classifiers at separating gold sessions from distractors — session
+length, turn count, position, digit density, capitalisation density, and recurring boilerplate
+phrases — and scores each as a direction-folded AUC. It refuses a corpus at 0.75 on any shape
+feature, runs in the generator, is stamped into every corpus's metadata beside V1–V6, and is
+re-measured in CI rather than trusted from the record.
+
+It found real separability in **all five shipped corpora on its first run**: capitalisation density
+reached 0.990 in Forgetting and 0.925 in Arithmetic, session length 0.955 in Episodic and 0.992 in
+WorkingMemory. The cause was structural rather than accidental — gold states an arbitrary *named*
+fact because V2 requires the answer to be unguessable, so gold carries proper nouns and extra text
+that filler does not. A central shape-parity pass now pads every session to a common length and
+capitalisation density using invented names built from syllables that appear in no question; the
+shape converges, the content cannot. Worst refused feature across the family is now 0.666.
+
+Two things V7 does **not** refuse, both stated rather than quietly excluded:
+
+- **Question relevance is exempt and is not a feature.** Gold is supposed to be more relevant to its
+  question than a distractor is — if it were not, the question would be unanswerable. How *easily*
+  that is exploited is bounded by the BM25 calibration gate, a different instrument for a different
+  question.
+- **Phrase recurrence is measured but does not refuse** (0.552–0.850 across the family). Filler is
+  template-generated, so every filler phrase recurs across questions and no gold phrase does, and a
+  phrase-match classifier separates them at an AUC that says "this filler came from templates"
+  rather than "this corpus hides a tell". Driving it to chance needs filler with the variety of real
+  conversation, which is a corpus revision and not a check. Recorded at full value so it can be
+  argued with.
+
+**WorkingMemory exempts `position_in_haystack`.** It pins its fact to session 0 by design (§5.4), so
+position separates gold perfectly and is meant to — the construct is how far back the memory sits.
+Declared as an exemption with a reason rather than accommodated by raising a threshold.
+
+**Episodic attribution: a varied-template regeneration is planned for corpus revision v1.1**, not
+permanent by design. The shape currently emits its statements from a fixed frame, so a system
+storing no speaker label can recover the answer from the framing rather than from memory, and its
+numbers are a floor rather than speaker-attribution accuracy. That is a corpus fix of the same kind
+as the shape-parity pass above, and it ships with the next corpus revision — the same release that
+addresses phrase recurrence, since both need richer generated language and neither is worth a corpus
+regeneration on its own.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in

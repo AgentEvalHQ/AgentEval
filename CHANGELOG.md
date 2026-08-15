@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0-beta] - 2026-08-15
+
+**TypedMemEval corpus revision v2, and V7 — adversarial separability.** The consuming project's
+verification round asked whether the clause-parity check added in 0.22.0-beta would catch the *next*
+tell, which would not be a clause. It would not. V7 is the general probe, and it found real
+separability in all five shipped corpora on its first run.
+
+> **v1 corpora are superseded and should not be cited.** The shape-parity fix rewrites every
+> session, so retrieval difficulty moved — WorkingMemory's calibrated BM25 coverage went 0.729 →
+> 0.896 — and a v1 score is not comparable with a v2 score. Corpus ids are now
+> `agenteval-typedmemeval-<vertical>-v2`; cite as "TypedMemEval-\<Vertical\> **v2** (AgentEval)".
+
+### Added
+
+- **V7, adversarial separability.** Tries cheap single-feature classifiers at telling gold sessions
+  from distractors — session length, turn count, position, digit density, capitalisation density,
+  and recurring boilerplate phrases — scoring each as a direction-folded AUC. It refuses a corpus at
+  0.75 on any shape feature, runs as a generator-refusal rule, is stamped into every corpus's
+  metadata beside V1–V6, and is **re-measured in CI** rather than trusted from its own record.
+
+  What it found, measured against the corpora 0.22.0-beta shipped:
+
+  | Vertical | Worst shape feature | v1 | v2 |
+  |---|---|---|---|
+  | Forgetting | capitalisation density | 0.990 | **0.666** |
+  | WorkingMemory | session length | 0.992 | **0.562** |
+  | Episodic | session length | 0.955 | **0.586** |
+  | Arithmetic | capitalisation density | 0.925 | **0.641** |
+  | Prospective | session length | 0.912 | **0.648** |
+
+  The cause was structural, not accidental: gold states an arbitrary *named* fact because V2
+  requires the answer to be unguessable, so gold carried proper nouns and extra text that filler did
+  not. Counting capital letters found the evidence without reading it. A central shape-parity pass
+  now pads every session to a common length and capitalisation density using invented names built
+  from syllables that appear in no question — the shape converges, the content cannot.
+
+  Two things V7 deliberately does not refuse, stated rather than quietly excluded. **Question
+  relevance is exempt and is not a feature**: gold is supposed to be more relevant to its question
+  than a distractor is, and how easily that is exploited is bounded by the BM25 calibration gate.
+  **Phrase recurrence is measured but does not refuse** (0.552–0.850): filler is template-generated,
+  so every filler phrase recurs and no gold phrase does, and driving that to chance needs filler with
+  the variety of real conversation — a corpus revision, not a check. **WorkingMemory exempts
+  `position_in_haystack`**, which separates gold perfectly because §5.4 pins the fact to session 0 by
+  design.
+
+- **`TypedMemEvalRunSet.DetectSeedOverlap`** — the runtime half of the double-count rule. The twelve
+  Prospective seed questions exist in both `agenteval-timegrounded-v1` and the Prospective corpus;
+  until now that was a rule in prose, which is a rule nobody's build enforces. Pass whatever results
+  a report is about to be assembled from and it warns before the numbers are added up.
+
+### Changed
+
+- Re-measured V1–V6 against the v2 corpora. The shape fix improved most of them:
+
+  | Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
+  |---|---|---|---|---|---|
+  | Prospective | 47/50 | 17/19 | 50/50 | 50/50 | — |
+  | Episodic | 50/50 | — | 50/50 | 50/50 | — |
+  | Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+  | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
+  | Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/20 |
+
+  Forgetting reaches a clean ceiling with every pair flipping; Prospective gains one question and one
+  pair. Arithmetic loses two, which the per-question records identify as duration questions — the
+  same shape whose gold requires summing several timestamp-derived intervals.
+
+### Fixed
+
+- The probe runner replaced the whole `probes` block when it wrote its records, silently dropping
+  V7's. A probe that vanishes when a neighbouring probe re-runs is worse than one never taken; it
+  merges now.
+
+Design of record: [ADR-026](docs/adr/026-typedmemeval-benchmark-family.md) §13.
+
 ## [0.22.0-beta] - 2026-08-15
 
 **TypedMemEval** — a new benchmark family that measures five memory mechanisms in isolation. Nothing

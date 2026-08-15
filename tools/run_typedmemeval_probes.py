@@ -448,7 +448,10 @@ def main() -> None:
             corpus_text = (tmc.DATA_ROOT / vertical / f"{corpus_id}.json").read_text(encoding="utf-8")
             probes["probed_corpus_sha256"] = tmc.sha256_normalized(corpus_text)
 
-            metadata["probes"] = probes
+            # Merged, not replaced. V7 is stamped by a separate model-free tool, and replacing the
+            # whole block silently dropped its record — a probe that vanishes when a neighbouring
+            # probe re-runs is worse than one that was never taken.
+            metadata.setdefault("probes", {}).update(probes)
             meta_path.write_text(
                 json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8", newline="\n")

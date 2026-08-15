@@ -409,6 +409,9 @@ if __name__ == "__main__":
             gold_position_shuffled=False,
             no_absolute_dates=False,
             h_is_independent_variable=True,
+            # ADR §5.4 pins the fact to session 0, so position separates gold perfectly and is
+            # meant to: the construct is how far back the memory sits.
+            separability_exempt=frozenset({"position_in_haystack"}),
         ),
         generator_tool="tools/gen_typedmemeval_workingmemory.py",
         extra_checks=check_grid,

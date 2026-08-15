@@ -179,6 +179,11 @@ class StructureSpec:
     #: Set when H is the vertical's independent variable (WorkingMemory) so the
     #: haystack-floor assertion is scoped rather than silently waived.
     h_is_independent_variable: bool = False
+    #: Separability features this vertical is allowed to fail because the ADR pins them by design.
+    #: WorkingMemory states its fact in session 0 on purpose (§5.4), so position separates gold
+    #: perfectly and is supposed to -- the construct IS "how far back the memory sits". Named here
+    #: so the exemption is a declaration with a reason rather than a threshold quietly raised.
+    separability_exempt: frozenset = frozenset()
 
 
 # --------------------------------------------------------------------------------------
@@ -387,6 +392,269 @@ def check_echo_parity(questions: list[Question]) -> list[str]:
                 f"(gold {gold_rate:.2f} vs distractors {other_rate:.2f})")
     return failures
 
+
+#: Syllables for invented names given to distractor sessions. Arbitrary by construction, so a name
+#: here can never accidentally be a question's answer.
+_NAME_HEADS = ["Bram", "Calder", "Denn", "Farrow", "Halden", "Ithe", "Kesse", "Lorrin", "Marth",
+               "Norra", "Pell", "Quenn", "Rusk", "Sable", "Thorne", "Velle", "Wend", "Yarrow"]
+_NAME_TAILS = ["qvist", "zell", "xby", "vund", "kjar", "wraith", "zorn", "quay0", "phex", "yrn"]
+#: Raises capitalisation density: mostly names, little connective text.
+_SHAPE_CLAUSES_DENSE = [
+    "{a} {b} agreed. {a} {b} would too.",
+    "Ask {a} {b} — {a} {b} knows.",
+    "{a} {b}, {a} {b}, same story.",
+]
+#: Lowers it: connective text, no names.
+_SHAPE_CLAUSES_PLAIN = [
+    "it seemed worth putting down somewhere before it slipped away again.",
+    "that is roughly where the thought ended up after turning it over a while.",
+    "nothing much turns on it either way but it stuck in the mind.",
+]
+
+
+def _shape_profile(session: Session) -> tuple[int, int]:
+    text = session.text()
+    return len(text), sum(c.isupper() for c in text)
+
+
+_PAD_WORDS = ["noted", "again", "later", "aside", "still", "quite", "there", "about", "under",
+              "since", "along", "after", "while", "among", "these", "those", "given", "taken"]
+
+
+def _pad_target(session: Session) -> int:
+    """Index of the turn padding lands on -- the last assistant turn where there is one, so an
+    answer-bearing user turn is never rewritten."""
+    return next(
+        (i for i in range(len(session.turns) - 1, -1, -1) if session.turns[i].role == "assistant"),
+        len(session.turns) - 1)
+
+
+def _padding(chars: int, capitals: int, rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """Neutral text of a given length carrying a given number of capitals.
+
+    Both knobs matter: length and capitalisation DENSITY are separate separability features, and
+    padding that fixes one while moving the other just relocates the tell.
+    """
+    out: list[str] = []
+    total = 0
+    while total < chars:
+        word = rng.choice(_PAD_WORDS)
+        if capitals > 0:
+            word = word.capitalize()
+            capitals -= 1
+        out.append(word)
+        total += len(word) + 1
+    return " ".join(out)[:max(0, chars)].strip() or "noted"
+
+
+def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
+    """Pads EVERY session toward a common shape, so no shape feature can tell gold from filler.
+
+    Gold states an arbitrary named fact, because V2 requires the answer to be unguessable; filler
+    states everyday things. Measured across the first five shipped corpora, the consequence was that
+    gold carried visibly more capital letters and more text than its distractors -- Forgetting
+    separated at AUC 0.99 on capitalisation alone and Episodic at 0.96 on length. A classifier that
+    counts capitals finds the evidence without reading a word of it.
+
+    Padding only the filler does not fix it: the metric folds direction, so overshooting separates
+    exactly as well as undershooting. Both sides are therefore padded toward the same per-question
+    target, with invented names built from syllables that appear in no question -- the shape
+    converges, the content cannot. Gold padding lands on an assistant turn so the answer-bearing
+    user turn is never touched.
+    """
+    for question in questions:
+        if len(question.sessions) < 2:
+            continue
+
+        lengths = [_shape_profile(s)[0] for s in question.sessions]
+        uppers = [_shape_profile(s)[1] for s in question.sessions]
+        # Above the longest session, not equal to it. Padding only ever adds text, so a target set
+        # AT the maximum leaves that one session untouched — and an untouched session keeps whatever
+        # capitalisation density made it an outlier, which is the tell surviving its own fix.
+        # A margin means every session gets corrected on both axes.
+        target_len = max(lengths) + 60
+        # The HIGHEST density, not the median. Padding can only add capitals, so a median target
+        # leaves every session above it — which is gold, because gold is where the arbitrary proper
+        # nouns live — permanently above the line. Raising the distractors to meet gold is the only
+        # direction available: lowering gold would mean editing the names that ARE the fact.
+        densities = sorted(u / max(1, l) for l, u in zip(lengths, uppers))
+        target_density = densities[-1]
+
+        for session in question.sessions:
+            length, upper = _shape_profile(session)
+            needed = target_len - length
+            if needed <= 0:
+                continue
+
+            # Padded to the target EXACTLY, with capitals inserted at the target density. Clause-
+            # sized padding leaves an overshoot that varies with how many clauses a session needed,
+            # and that overshoot is itself a shape feature -- the short sessions take more clauses
+            # and land further past the line, so the tell survives its own fix.
+            wanted_upper = max(0, round(target_density * target_len) - upper)
+            session.turns[_pad_target(session)].content += " " + _padding(needed, wanted_upper, rng)
+
+
+# --------------------------------------------------------------------------------------
+# V7 -- adversarial separability
+# --------------------------------------------------------------------------------------
+
+#: A SHAPE feature must not separate gold from distractors better than this. 0.5 is chance; 1.0 is
+#: a perfect tell. The clause defect that survived every other check scored ~0.99 here.
+SEPARABILITY_MAX_AUC = 0.75
+
+#: Shape artifacts: properties a session has regardless of what it is about. A classifier using one
+#: of these finds the evidence without reading it, which is the failure V7 exists to refuse.
+SEPARABILITY_REFUSED_FEATURES = frozenset({
+    "session_length_chars", "turn_count", "position_in_haystack",
+    "digit_density", "uppercase_density",
+})
+
+#: Phrase recurrence is MEASURED but does not refuse, and the distinction is not a convenience.
+#: Filler is template-generated: a few dozen sentence patterns spread across fifty questions, so
+#: every filler phrase recurs and no gold phrase does, and a phrase-match classifier separates them
+#: at an AUC that says "this filler came from templates" rather than "this corpus hides a tell".
+#: Driving it to chance needs filler with the variety of real conversation, which is a corpus
+#: revision and not a check. Recorded at full value so the number is visible and can be argued with.
+SEPARABILITY_REPORTED_FEATURES = frozenset({"boilerplate_ngram"})
+
+#: An n-gram counts as boilerplate -- and therefore as a candidate tell -- only when it recurs
+#: across this share of the corpus's questions. Anything rarer is question CONTENT: "Riverside
+#: Fitness" appears in one question's gold and nowhere else, and flagging that would be flagging
+#: the corpus for being about something.
+BOILERPLATE_MIN_QUESTION_SHARE = 0.20
+
+
+def _auc(gold_values: list[float], other_values: list[float]) -> float:
+    """Probability a random gold session outranks a random distractor on this feature.
+
+    Returned folded to [0.5, 1.0]: a feature that separates in either direction is equally a tell,
+    and which way it points is not the question being asked.
+    """
+    if not gold_values or not other_values:
+        return 0.5
+    wins = ties = 0
+    for g in gold_values:
+        for o in other_values:
+            if g > o:
+                wins += 1
+            elif g == o:
+                ties += 1
+    auc = (wins + 0.5 * ties) / (len(gold_values) * len(other_values))
+    return max(auc, 1.0 - auc)
+
+
+def separability_report(questions: list[Question], exempt: frozenset = frozenset()) -> dict:
+    """Tries cheap single-feature classifiers at telling gold sessions from distractors.
+
+    The clause-parity check that preceded this one was specific to a marker string the generators
+    happened to add. It would not have caught the same defect wearing any other shape -- a gold
+    session that is systematically longer, or always earlier, or the only one with a digit in it.
+    This asks the general question instead: can any cheap feature that carries no information about
+    the QUESTION still find the gold?
+
+    Question relevance is deliberately exempt and is not a feature here. Gold is supposed to be more
+    relevant to its question than a distractor is -- if it were not, the question would be
+    unanswerable -- so a relevance feature separating gold is the benchmark working, not a tell. How
+    *easy* that is to exploit is bounded by the BM25 calibration gate, which is a different
+    instrument for a different question.
+    """
+    features = {
+        "session_length_chars": lambda s, i, n: float(len(s.text())),
+        "turn_count": lambda s, i, n: float(len(s.turns)),
+        "position_in_haystack": lambda s, i, n: i / max(1, n - 1),
+        "digit_density": lambda s, i, n: sum(c.isdigit() for c in s.text()) / max(1, len(s.text())),
+        "uppercase_density": lambda s, i, n: sum(c.isupper() for c in s.text()) / max(1, len(s.text())),
+    }
+
+    scores: dict[str, float] = {}
+    for name, extract in features.items():
+        gold_values, other_values = [], []
+        for q in questions:
+            n = len(q.sessions)
+            for i, session in enumerate(q.sessions):
+                (gold_values if session.is_gold else other_values).append(extract(session, i, n))
+        scores[name] = round(_auc(gold_values, other_values), 4)
+
+    ngram, ngram_score = _worst_boilerplate_ngram(questions)
+    scores["boilerplate_ngram"] = round(ngram_score, 4)
+
+    refused = {k: v for k, v in scores.items()
+               if k in SEPARABILITY_REFUSED_FEATURES and k not in exempt}
+    worst = max(refused, key=refused.get) if refused else max(scores, key=scores.get)
+    return {
+        "method": (
+            "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate "
+            "n-grams restricted to phrases recurring in at least "
+            f"{int(BOILERPLATE_MIN_QUESTION_SHARE * 100)}% of questions so per-question content is "
+            "not mistaken for a marker"
+        ),
+        "exempt": [
+            "question relevance — gold is supposed to be more relevant than a distractor; the BM25 "
+            "calibration gate bounds how easily that is exploited"
+        ],
+        "threshold_auc": SEPARABILITY_MAX_AUC,
+        "refused_features": sorted(SEPARABILITY_REFUSED_FEATURES - exempt),
+        "exempt_features": sorted(exempt),
+        "reported_only_features": sorted(SEPARABILITY_REPORTED_FEATURES),
+        "features": scores,
+        "worst_refused_feature": worst,
+        "worst_refused_auc": scores[worst],
+        "worst_boilerplate_ngram": ngram,
+        "boilerplate_ngram_auc": scores["boilerplate_ngram"],
+        "passed": scores[worst] < SEPARABILITY_MAX_AUC,
+    }
+
+
+def _worst_boilerplate_ngram(questions: list[Question]) -> tuple[str | None, float]:
+    """The recurring phrase that best predicts gold, and how well it does.
+
+    Scored as an AUC on a 0/1 feature so it sits on the same scale as the numeric features: a
+    phrase in every distractor and no gold scores 1.0, exactly as the calibration clause did.
+    """
+    question_count = len(questions) or 1
+    appears_in: Counter[str] = Counter()
+    for q in questions:
+        seen = set()
+        for session in q.sessions:
+            words = tokenize(session.text())
+            for size in (2, 3):
+                for i in range(len(words) - size + 1):
+                    seen.add(" ".join(words[i:i + size]))
+        appears_in.update(seen)
+
+    candidates = [
+        gram for gram, count in appears_in.items()
+        if count / question_count >= BOILERPLATE_MIN_QUESTION_SHARE
+    ]
+    if not candidates:
+        return None, 0.5
+
+    best_gram, best_score = None, 0.5
+    for gram in candidates:
+        gold_values, other_values = [], []
+        for q in questions:
+            for session in q.sessions:
+                value = 1.0 if gram in " ".join(tokenize(session.text())) else 0.0
+                (gold_values if session.is_gold else other_values).append(value)
+        score = _auc(gold_values, other_values)
+        if score > best_score:
+            best_gram, best_score = gram, score
+    return best_gram, best_score
+
+
+def check_separability(questions: list[Question], exempt: frozenset = frozenset()) -> list[str]:
+    """Refuses a corpus any cheap artifact feature can separate (ADR-026 V7)."""
+    report = separability_report(questions, exempt)
+    if report["passed"]:
+        return []
+    return [
+        f"separability: '{report['worst_refused_feature']}' separates gold from distractors at AUC "
+        f"{report['worst_refused_auc']:.3f}, at or above the {SEPARABILITY_MAX_AUC} refusal "
+        f"threshold. "
+        f"Evidence a cheap classifier can find without reading it is evidence the benchmark is not "
+        f"measuring retrieval."
+    ]
+
 # --------------------------------------------------------------------------------------
 # The calibration gate
 # --------------------------------------------------------------------------------------
@@ -465,6 +733,7 @@ def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question
     def attempt(echo: float) -> tuple[list[Question], float, dict[str, float]]:
         questions = build(echo, random.Random(seed))  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this selects filler text, not secrets.
         equalise_echo(questions, echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - deterministic corpus generation
+        equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
         per_q = {q.question_id: realised_coverage(q) for q in questions}
         mean = sum(per_q.values()) / len(per_q) if per_q else 0.0
         trace.append((round(echo, 4), round(mean, 4)))
@@ -530,7 +799,7 @@ def finalise(
     nothing, so they refuse rather than warn.
     """
     abbrev, expected_count = VERTICALS[vertical]
-    corpus_id = f"agenteval-typedmemeval-{vertical}-v1"
+    corpus_id = f"agenteval-typedmemeval-{vertical}-v2"
 
     questions, calibration = calibrate(build, seed)
 
@@ -551,6 +820,7 @@ def finalise(
     failures = check_structure(questions, structure)
     failures += check_answer_not_verbatim(questions)
     failures += check_echo_parity(questions)
+    failures += check_separability(questions, structure.separability_exempt)
     if structure.no_absolute_dates:
         failures += check_no_absolute_dates(questions)
     if extra_checks:
@@ -567,7 +837,7 @@ def finalise(
     metadata = {
         "corpus_id": corpus_id,
         "vertical": vertical,
-        "revision": "v1",
+        "revision": "v2",
         "question_count": len(questions),
         # Binds this metadata to the exact corpus text it describes. A mismatch means one
         # of the two was regenerated alone, and CI fails rather than trusting either.

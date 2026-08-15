@@ -26,7 +26,7 @@ public static class TypedMemEvalEvalResultAdapter
 {
     /// <summary>The citation rule, attached to the root node of every projected result.</summary>
     public const string CitationRule =
-        "Cite as \"TypedMemEval-<Vertical> v1 (AgentEval)\". TypedMemEval results are not " +
+        "Cite as \"TypedMemEval-<Vertical> v2 (AgentEval)\". TypedMemEval results are not " +
         "LongMemEval results and must never be presented as, summed with, or averaged with " +
         "LongMemEval numbers. The typed outcome vector is the citable form; the score value on " +
         "this node exists for tooling compatibility.";

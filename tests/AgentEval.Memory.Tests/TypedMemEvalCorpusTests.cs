@@ -454,6 +454,48 @@ public sealed class TypedMemEvalCorpusTests
 
     [Theory]
     [MemberData(nameof(AllVerticals))]
+    public void NoCheapFeatureSeparatesGoldFromDistractors(TypedMemEvalVertical vertical)
+    {
+        // V7. The clause-parity check that preceded this one was specific to one marker string, and
+        // the next tell would not have been a clause: measured before this rule existed, gold was
+        // findable by capitalisation density at AUC 0.99 in Forgetting and by length at 0.96 in
+        // Episodic. This asserts the recorded measurement is present, describes THIS corpus, and
+        // clears the bar on every feature that is not a declared carve-out.
+        var probes = Metadata(vertical).GetProperty("probes");
+        Assert.True(
+            probes.TryGetProperty("v7_separability", out var v7),
+            $"{vertical} carries no V7 record. Run tools/stamp_typedmemeval_separability.py.");
+
+        Assert.Equal(
+            TypedMemEvalCorpus.Sha256(vertical),                 // DevSkim: ignore DS197836
+            v7.GetProperty("probed_corpus_sha256").GetString());
+
+        var threshold = v7.GetProperty("threshold_auc").GetDouble();
+        var features = v7.GetProperty("features");
+        var exempt = v7.GetProperty("exempt_features")
+            .EnumerateArray().Select(e => e.GetString()).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var name in v7.GetProperty("refused_features").EnumerateArray()
+                     .Select(e => e.GetString()!))
+        {
+            var auc = features.GetProperty(name).GetDouble();
+            Assert.True(
+                auc < threshold,
+                $"{vertical}: '{name}' separates gold from distractors at AUC {auc:F3}, at or above " +
+                $"the {threshold} refusal threshold — a classifier can find the evidence without " +
+                $"reading it.");
+        }
+
+        // WorkingMemory pins its fact to session 0 (ADR §5.4), so position separates gold perfectly
+        // and is meant to. Asserted as a declaration rather than left as an unexplained pass.
+        if (vertical == TypedMemEvalVertical.WorkingMemory)
+            Assert.Contains("position_in_haystack", exempt);
+        else
+            Assert.Empty(exempt);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
     public void Selection_IsDeterministicUnderTheSameSeedAndBudget(TypedMemEvalVertical vertical)
     {
         // A benchmark whose sample moved between runs would make every band meaningless, because

@@ -67,13 +67,21 @@ public sealed class TypedMemEvalVerticalDescriptor
     public required bool RequiresTimestamps { get; init; }
 
     /// <summary>Corpus identifier, revision included.</summary>
-    public string CorpusId => $"agenteval-typedmemeval-{Slug}-v1";
+    public string CorpusId => $"agenteval-typedmemeval-{Slug}-v2";
 
     /// <summary>Benchmark identifier stamped into every result.</summary>
     public string BenchmarkId => $"typedmemeval-{Slug}";
 
-    /// <summary>Dataset revision.</summary>
-    public string Revision => "v1";
+    /// <summary>
+    /// Dataset revision, stamped into every result.
+    /// </summary>
+    /// <remarks>
+    /// v2 supersedes the v1 corpora shipped in 0.22.0-beta. V7 separability found gold identifiable
+    /// by capitalisation density and session length, and the shape-parity fix rewrites every
+    /// session — so retrieval difficulty moved and a v1 score is not comparable with a v2 score.
+    /// v1 results should not be cited.
+    /// </remarks>
+    public string Revision => "v2";
 }
 
 /// <summary>Descriptor lookup for the five verticals.</summary>
