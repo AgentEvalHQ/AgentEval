@@ -113,7 +113,7 @@
   "probes": {
     "status": "run",
     "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:25:13Z",
+    "run_at": "2026-08-15T11:39:54Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -498,6 +498,6 @@
         "v6": null
       }
     },
-    "corpus_sha256_at_probe_time": "751374fa7d340d43f2dad17c976fad2e9c535c52a3cafc8204908205ff2e1b98"
+    "probed_corpus_sha256": "751374fa7d340d43f2dad17c976fad2e9c535c52a3cafc8204908205ff2e1b98"
   }
 }

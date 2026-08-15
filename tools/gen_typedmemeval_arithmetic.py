@@ -409,7 +409,7 @@ def _balanced(rng: random.Random, values: list[int], count: int) -> list[int]:
     in order is a corpus with a guessable answer key (V2).
     """
     out = [values[i % len(values)] for i in range(count)]
-    rng.shuffle(out)
+    rng.shuffle(out)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
     return out
 
 
@@ -419,7 +419,7 @@ def _amount(rng: random.Random) -> float:
 
 def _filler_deck(rng: random.Random, wanted: int) -> list[tuple[str, str]]:
     deck = FILLER * (wanted // len(FILLER) + 1)
-    rng.shuffle(deck)
+    rng.shuffle(deck)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
     return deck[:wanted]
 
 
@@ -437,7 +437,7 @@ def _draw_count_plans(rng: random.Random, start: int) -> list[_Plan]:
         near_miss_slots = sorted(rng.sample(free, near_miss_count))
         kinds = [("other-vendor" if i % 2 == 0 else "mention-only")
                  for i in range(near_miss_count)]
-        rng.shuffle(kinds)
+        rng.shuffle(kinds)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
 
         question = f"How many times did I put an order in with {vendor}?"
         items = [rng.choice(ORDER_ITEMS) for _ in range(g + near_miss_count)]
@@ -558,7 +558,7 @@ def _draw_delta_plans(rng: random.Random, start: int) -> list[_Plan]:
         # Sides are assigned to slots at random rather than in slot order, so a system
         # cannot recover the split from position.
         sides = ["a"] * left + ["b"] * right
-        rng.shuffle(sides)
+        rng.shuffle(sides)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
 
         gold_values, distractor_values = _draw_additive(
             rng, g, NUMERIC_DISTRACTORS, gold_slots, distractor_slots,

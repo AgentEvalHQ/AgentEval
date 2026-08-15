@@ -130,7 +130,7 @@ public sealed class TypedMemEvalCorpusTests
         Assert.Equal("run", status);
         Assert.Equal(
             TypedMemEvalCorpus.Sha256(vertical),                 // DevSkim: ignore DS197836
-            probes.GetProperty("corpus_sha256_at_probe_time").GetString());
+            probes.GetProperty("probed_corpus_sha256").GetString()); // DevSkim: ignore DS197836
         Assert.False(
             string.IsNullOrWhiteSpace(probes.GetProperty("reference_model").GetString()),
             "a probe record must name the model that produced it");

@@ -297,7 +297,7 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
         # free marks for a system that just echoes the question back.
         presented = items[:]
         while True:
-            rng.shuffle(presented)
+            rng.shuffle(presented)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
             if presented != items:
                 break
 
@@ -349,7 +349,7 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
     # (V2), but the majority class is worth 8/15 rather than whatever an unconstrained
     # coin flip happened to produce on this seed.
     speakers = ["user"] * 8 + ["assistant"] * 7
-    rng.shuffle(speakers)
+    rng.shuffle(speakers)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
 
     for offset, ((topic, statement), speaker) in enumerate(zip(chosen, speakers)):
         question_text = (f"Earlier one of us said, about {topic}, that {statement}. "

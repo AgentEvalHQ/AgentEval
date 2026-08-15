@@ -439,7 +439,7 @@ def main() -> None:
             # move the corpus hash, and a metadata file describing a corpus that has since been
             # regenerated must be detectable rather than quietly believed.
             corpus_text = (tmc.DATA_ROOT / vertical / f"{corpus_id}.json").read_text(encoding="utf-8")
-            probes["corpus_sha256_at_probe_time"] = tmc.sha256_normalized(corpus_text)
+            probes["probed_corpus_sha256"] = tmc.sha256_normalized(corpus_text)
 
             metadata["probes"] = probes
             meta_path.write_text(
