@@ -1,27 +1,25 @@
 {
-  "judge_prompt_fingerprint": "84bacb9bb36c598fe3c22878cbe4be8b5e32b7e78aa1f4ce498026732a916dc8",
+  "judge_prompt_fingerprint": "edc5fbaa733cdad29007980165465522177bb0bfdfaa492b85d92fa217523e01",
   "measured_at": "2026-08-15",
   "model": "gpt-5.5",
-  "agreement": 0.975,
+  "agreement": 0.983,
   "status": "measured",
   "cases": 120,
-  "runs": 3,
+  "runs": 2,
   "per_vertical": {
     "Prospective": 1.0,
     "Episodic": 1.0,
-    "Arithmetic": 0.958,
+    "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
     "Forgetting": 0.917
   },
   "disagreements": {
     "every_run": [
-      "cal-ari-016",
       "cal-for-006"
     ],
     "run_varying": [
-      "cal-for-005",
       "cal-for-012"
     ]
   },
-  "note": "Three runs of the live arm at this fingerprint: 0.967, 0.975, 0.975. The figure above is the last two, which agree; the first was taken before two label errors were corrected (cal-wm-015 used the preamble's own example of an abstention while labelled Missed, and cal-wm-021 rested on a spelling similarity no rule ratifies). Two cases disagree in every run and are the sharpest boundaries in the set: cal-ari-016 asks whether a flipped sign is part of a delta's value, which the arithmetic template's grade-the-arithmetic-not-the-phrasing wording arguably answers the other way, and cal-for-006 whether an invented replacement state passes as a correct no-longer. Exactly one of cal-for-005 and cal-for-012 disagrees per run - the same Forgetting boundary between denial, abstention and over-forgetting - which is judge noise at the boundary rather than drift, and the reason this file records runs rather than a single point."
+  "note": "Two runs of the live arm at this fingerprint: 0.992 and 0.983. The lower is recorded, and the per-vertical figures come from that same lower run, so this record never quotes the best of a set. The previous fingerprint's measurement (84bacb9b..., 0.975 over three runs) is superseded and not comparable: ArithmeticBody gained a rule that direction is part of a difference's value, added in response to calibration case cal-ari-016, where the old template's grade-the-arithmetic-not-the-phrasing wording let 'went up by 46' pass against a gold of 46 lower. cal-ari-016 now agrees in both runs and Arithmetic is at 1.0. One case disagrees in every run and was not relabelled to improve the number: cal-for-006, where an answer replaces a cancelled gym membership with an invented move to a different gym; the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry. cal-for-012 disagrees in one run of the two - the Forgetting boundary where the preamble's definition of abstained meets the over-forgetting rule - which is judge noise at the boundary rather than drift, and the reason this file records runs rather than a single point."
 }

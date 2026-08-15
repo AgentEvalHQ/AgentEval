@@ -105,7 +105,7 @@
   "probes": {
     "status": "run",
     "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:20:18Z",
+    "run_at": "2026-08-15T11:25:13Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {

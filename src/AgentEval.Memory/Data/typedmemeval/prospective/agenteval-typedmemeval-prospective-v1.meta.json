@@ -103,71 +103,25 @@
   "probes": {
     "status": "run",
     "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:20:18Z",
+    "run_at": "2026-08-15T11:25:13Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 12,
+      "passed": 44,
       "failed": [
-        "tme-pro-013",
-        "tme-pro-014",
-        "tme-pro-015",
-        "tme-pro-016",
-        "tme-pro-017",
-        "tme-pro-018",
-        "tme-pro-019",
-        "tme-pro-020",
-        "tme-pro-021",
-        "tme-pro-022",
-        "tme-pro-023",
-        "tme-pro-024",
-        "tme-pro-025",
-        "tme-pro-026",
-        "tme-pro-027",
-        "tme-pro-028",
-        "tme-pro-029",
-        "tme-pro-030",
-        "tme-pro-031",
-        "tme-pro-032",
-        "tme-pro-033",
-        "tme-pro-034",
-        "tme-pro-035",
-        "tme-pro-036",
-        "tme-pro-037",
-        "tme-pro-038",
-        "tme-pro-039",
-        "tme-pro-040",
-        "tme-pro-041",
         "tme-pro-042",
-        "tme-pro-043",
         "tme-pro-044",
         "tme-pro-045",
         "tme-pro-046",
-        "tme-pro-047",
         "tme-pro-048",
-        "tme-pro-049",
         "tme-pro-050"
       ]
     },
     "v1_pair_flip": {
       "pairs": 19,
-      "passed": 0,
+      "passed": 14,
       "failed": [
-        "tme-pro-p01",
-        "tme-pro-p02",
-        "tme-pro-p03",
-        "tme-pro-p04",
-        "tme-pro-p05",
-        "tme-pro-p06",
-        "tme-pro-p07",
-        "tme-pro-p08",
-        "tme-pro-p09",
-        "tme-pro-p10",
-        "tme-pro-p11",
-        "tme-pro-p12",
-        "tme-pro-p13",
-        "tme-pro-p14",
         "tme-pro-p15",
         "tme-pro-p16",
         "tme-pro-p17",
@@ -279,203 +233,203 @@
         "v6": null
       },
       "tme-pro-013": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-014": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-015": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-016": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-017": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-018": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-019": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-020": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-021": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-022": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-023": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-024": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-025": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-026": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-027": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-028": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-029": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-030": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-031": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-032": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-033": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-034": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-035": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-036": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-037": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-038": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-039": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-040": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-041": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -489,7 +443,7 @@
         "v6": null
       },
       "tme-pro-043": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -517,7 +471,7 @@
         "v6": null
       },
       "tme-pro-047": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -531,7 +485,7 @@
         "v6": null
       },
       "tme-pro-049": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,

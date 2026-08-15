@@ -97,12 +97,57 @@ model at authoring time, with per-question records stamped into corpus metadata.
 dates in message content) and V5 (gold derived from the emitted sessions, never typed) are enforced
 by the generators and re-checked in CI.
 
-The probes earned their cost immediately. The first Prospective generator computed every due date
-from an anchor timestamp that was then overwritten when the haystack was shuffled and re-stamped, so
-all 38 of its generated pair questions named dates their own conversations could not produce. Every
-structural check passed — none of them re-did the arithmetic — and V1 failed 38 of 50 while all 12
-hand-authored seed questions passed. The generator now derives the pivot from the session's final
-timestamp and re-checks the arithmetic as a hard rule.
+Shipped records, against reference model `gpt-5.5`. Dashes are not-applicable rather than skipped:
+V6 needs multi-component gold, pair-flip needs pairs, and V1/V2 do not apply to a never-known probe
+whose gold is itself an abstention.
+
+| Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
+|---|---|---|---|---|---|
+| Prospective | 44/50 | 14/19 | 50/50 | 50/50 | — |
+| Episodic | 49/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+| WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+
+Reported as measured. The V1 shortfalls sit where the answer model rather than the memory system is
+the limit — all five Arithmetic misses are duration questions summing several timestamp-derived
+intervals, and their arithmetic was verified correct independently of the model — so they are the
+vertical's noise floor, and the per-question records name which ones.
+
+The probes earned their cost immediately, and three times over. The first Prospective generator
+computed every due date from an anchor timestamp that was then overwritten when the haystack was
+shuffled and re-stamped, so all 38 of its generated pair questions named dates their own
+conversations could not produce. Every structural check passed — none of them re-did the arithmetic
+— and V1 failed 38 of 50 while all 12 hand-authored seed questions passed. Fixed, the same corpus
+scores 44/50 with 14 of 19 pairs flipping, and the arithmetic is now a hard generator rule.
+
+Two further findings were flaws in the *probes*, not the corpora, with one root cause: where gold is
+a negative ("no longer valid", "never recorded"), a model given no evidence produces something that
+reads like gold. V2 was rejecting all fifteen never-known probes for being guessable when what it
+had measured was that the corpus asked for a negative and got one; V3 and V6 were reporting leaks
+where there was only an empty context. V2 is now not-applicable to abstention questions, and the
+ablation probes require the specific value rather than accepting a negative — after which Forgetting
+reads 35/35, 35/35 and 20/20 rather than 35/50, 32/35 and 4/20.
+
+### Judge calibration
+
+The five-way outcome judge is new and had no run history, so a hand-labelled calibration set ships
+with it: **120 cases, 24 per vertical**, covering every §6 precedence rule and built in near-miss
+pairs, since a pair that differs minimally with different labels is what detects drift. Measured
+agreement with the shipped templates is **0.983 (118/120)** against `gpt-5.5`, recorded from the
+lower of two runs so the record never quotes the best of a set.
+
+CI does not re-measure — it cannot, without a provider — so the tripwire is a recorded result bound
+to the judge-prompt fingerprint it was measured under. Editing any template changes the fingerprint
+and fails the build until the agreement is measured again. That fired for real during development:
+the calibration set found that the Arithmetic template never said direction is part of a signed
+delta's value, so a flipped sign read as a phrasing difference. Adding the rule moved Arithmetic
+from 0.958 to 1.000 and required a fresh measurement, which is exactly the loop the tripwire exists
+to force.
+
+One case still disagrees and was deliberately not relabelled: an answer that replaces a cancelled
+membership with an invented one reads to the judge as a satisfied "no longer" and to the label as a
+committed value gold does not carry. Fitting the ruler to the reading would defeat the instrument.
 
 ### Guards
 

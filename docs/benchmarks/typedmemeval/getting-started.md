@@ -244,6 +244,33 @@ Written before generation, and re-checked in CI over what actually ships:
 | **V5** Gold derived, not typed | Generators derive every gold answer from the sessions they emitted. |
 | **V6** Component non-redundancy | For Arithmetic and Forgetting, ablating any single gold component must stop the model producing the gold. |
 
+Shipped probe records (reference model `gpt-5.5`, per-question outcomes in each corpus's
+`.meta.json`). Dashes are not-applicable rather than skipped: V6 needs multi-component gold, and
+pair-flip needs pairs.
+
+| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
+|---|---|---|---|---|---|
+| Prospective | 44/50 | 14/19 | 50/50 | 50/50 | — |
+| Episodic | 49/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+| WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+
+These are reported as measured. The V1 shortfalls are concentrated where the *answer model*, not the
+memory system, is the limit: all five Arithmetic misses are duration questions, whose gold requires
+summing several intervals derived from timestamps, and whose arithmetic was verified correct
+independently of the model. Six Prospective questions and five of its pairs sit in the same place.
+A question the ceiling cannot answer measures the ceiling, so treat those as the noise floor of the
+vertical rather than as headroom in the system under test — the per-question records name exactly
+which ones they are.
+
+Three of the rules do not apply to every question, and saying so matters more than a full column.
+V1 and V2 are not applicable to a never-known probe: its gold *is* an abstention, so "I have no way
+of knowing" is both the correct answer and what any model with no context says, and scoring it would
+reject all fifteen for being guessable when what was measured is that the corpus asked for a
+negative and got one. V3 and V6 require the ablated model to reproduce the *specific* value rather
+than merely a negative, for the same reason.
+
 V1, V2, V3 and V6 need a reference model, so they run at authoring time and their per-question
 records are stamped into the corpus metadata. The generators
 (`tools/gen_typedmemeval_<vertical>.py`) and the probe runner
