@@ -109,7 +109,10 @@ FILLER = [
     ("The library wants its overdue atlas back {when}.", "Worth a trip before the fine grows."),
     ("Kit is running a half marathon {when}.", "That takes some training."),
     ("The choir has an extra rehearsal {when}.", "Sounds like a busy stretch."),
-    ("Our landlord is inspecting the gutters {when}.", "Tidy the yard beforehand, maybe."),
+    # Was "inspecting the gutters", which collided with the carried question about a flat
+    # INSPECTION: given only distractors, the reference model found this one, reasoned it was
+    # past, and produced the gold answer without ever seeing the evidence. V3 caught it.
+    ("Our landlord is repointing the brickwork {when}.", "Tidy the yard beforehand, maybe."),
     ("Jo's visa interview is {when}.", "Fingers crossed it goes smoothly."),
     ("The cycling club is doing a night ride {when}.", "Lights charged?"),
     ("I owe Marta a proper reply {when}.", "A short note beats a perfect one that never comes."),

@@ -63,7 +63,7 @@ separability in all five shipped corpora on its first run.
 
   | Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
   |---|---|---|---|---|---|
-  | Prospective | 47/50 | 17/19 | 50/50 | 49/50 | — |
+  | Prospective | 47/50 | 16/19 | 50/50 | 50/50 | — |
   | Episodic | 50/50 | — | 50/50 | 50/50 | — |
   | Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
   | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
@@ -74,6 +74,20 @@ separability in all five shipped corpora on its first run.
   same shape whose gold requires summing several timestamp-derived intervals.
 
 ### Fixed
+
+- **A distractor that let the model produce the gold answer without the evidence.** Prospective's
+  filler bank contained "the landlord is inspecting the gutters", which collided with a carried
+  question about a flat *inspection*: given only distractors, the reference model found that one,
+  reasoned it was already past, and produced gold's "no, it has already happened". V3 caught it —
+  that is precisely the failure V3 exists to detect, and it was invisible to every structural check.
+  Prospective's V3 is 50/50 with the filler reworded.
+- **The ablation probes could not tell "reached the answer" from "said nothing"** when gold is a
+  negative carrying no content the prompt had not already supplied. The distinctive-token screen
+  now excludes tokens the question and current date already gave the model, and V3/V6 abstain in
+  the narrow case where a negative gold leaves nothing decidable — recorded as not-applicable
+  rather than scored. A first attempt at this abstained far too broadly, silently dropping V3 on 56
+  questions, because every list-order gold repeats items the question names and every attribution
+  gold is a role word; both are perfectly decidable by the judge.
 
 - The probe runner replaced the whole `probes` block when it wrote its records, silently dropping
   V7's. A probe that vanishes when a neighbouring probe re-runs is worse than one never taken; it

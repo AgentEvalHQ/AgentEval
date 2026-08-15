@@ -9,7 +9,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: gym, start.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: gym, start.)",
           "has_answer": false
         },
         {
@@ -197,7 +197,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in about ten days. (Also on my mind: gym, start.)",
+          "content": "Our landlord is repointing the brickwork in about ten days. (Also on my mind: gym, start.)",
           "has_answer": false
         },
         {
@@ -1017,7 +1017,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: going, told, long, felt.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: going, told, long, felt.)",
           "has_answer": false
         },
         {
@@ -1631,7 +1631,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: puppy.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: puppy.)",
           "has_answer": false
         },
         {
@@ -1797,7 +1797,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: puppy.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: puppy.)",
           "has_answer": false
         },
         {
@@ -2811,7 +2811,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: up, still.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: up, still.)",
           "has_answer": false
         },
         {
@@ -3032,7 +3032,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: season, yet, ticket.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: season, yet, ticket.)",
           "has_answer": false
         },
         {
@@ -3363,12 +3363,12 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: yet, lease, due, allotment.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: yet, lease, due, allotment.)",
           "has_answer": false
         },
         {
           "role": "assistant",
-          "content": "Tidy the yard beforehand, maybe. I keep meaning to write these things down sooner. It had been on my mind for a while before that.",
+          "content": "Tidy the yard beforehand, maybe. I should really ask Bram Quennvund about it.",
           "has_answer": false
         }
       ],
@@ -3380,7 +3380,7 @@
         },
         {
           "role": "assistant",
-          "content": "Better start early, then. That is roughly where it was left. It seemed worth mentioning at the time.",
+          "content": "Better start early, then. It seemed worth mentioning at the time. I will probably feel differently about it next week.",
           "has_answer": false
         }
       ],
@@ -3595,12 +3595,12 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: yet, lease, due, allotment.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: yet, lease, due, allotment.)",
           "has_answer": false
         },
         {
           "role": "assistant",
-          "content": "Tidy the yard beforehand, maybe. I keep meaning to write these things down sooner. It had been on my mind for a while before that.",
+          "content": "Tidy the yard beforehand, maybe. Halden Haldenxby had said something similar a while back.",
           "has_answer": false
         }
       ],
@@ -3612,7 +3612,7 @@
         },
         {
           "role": "assistant",
-          "content": "Better start early, then. I keep meaning to write these things down sooner. It seemed worth mentioning at the time.",
+          "content": "Better start early, then. It seemed worth mentioning at the time. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
@@ -3624,7 +3624,7 @@
         },
         {
           "role": "assistant",
-          "content": "Earlier starts, but shorter meetings. That is exactly the sort of thing Thorne Pellkjar notices.",
+          "content": "Earlier starts, but shorter meetings. That is exactly the sort of thing Pell Norraphex notices.",
           "has_answer": false
         }
       ],
@@ -3636,7 +3636,7 @@
         },
         {
           "role": "assistant",
-          "content": "Noted — I will keep that in mind. (Also on my mind: boiler, client, wall, priya.) The whole thing took less effort than I feared. It had been on my mind for a while before that.",
+          "content": "Noted — I will keep that in mind. (Also on my mind: boiler, client, wall, priya.) It had been on my mind for a while before that. I had half expected it to go the other way.",
           "has_answer": false
         }
       ],
@@ -3648,7 +3648,7 @@
         },
         {
           "role": "assistant",
-          "content": "Fingers crossed it goes smoothly. I had half expected it to go the other way. That is roughly where it was left.",
+          "content": "Fingers crossed it goes smoothly. It seemed worth mentioning at the time. That is roughly where it was left.",
           "has_answer": false
         }
       ],
@@ -3660,7 +3660,7 @@
         },
         {
           "role": "assistant",
-          "content": "Frustrating, but at least it is booked. I should really ask Kesse Pellyrn about it.",
+          "content": "Frustrating, but at least it is booked. I should really ask Pell Calderzell about it.",
           "has_answer": false
         }
       ],
@@ -3672,7 +3672,7 @@
         },
         {
           "role": "assistant",
-          "content": "Hopefully nothing expensive turns up. It had been on my mind for a while before that. Nothing much came of it either way.",
+          "content": "Hopefully nothing expensive turns up. There was no particular reason for the delay. I had half expected it to go the other way.",
           "has_answer": false
         }
       ]
@@ -3736,7 +3736,7 @@
         },
         {
           "role": "assistant",
-          "content": "Lights charged? There was no particular reason for the delay. That is roughly where it was left.",
+          "content": "Lights charged? I keep meaning to write these things down sooner. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
@@ -3748,7 +3748,7 @@
         },
         {
           "role": "assistant",
-          "content": "Frustrating, but at least it is booked. The whole thing took less effort than I feared. I keep meaning to write these things down sooner.",
+          "content": "Frustrating, but at least it is booked. Nothing much came of it either way. It had been on my mind for a while before that.",
           "has_answer": false
         }
       ],
@@ -3760,7 +3760,7 @@
         },
         {
           "role": "assistant",
-          "content": "That will brighten the whole landing. Denn Farrowphex had said something similar a while back.",
+          "content": "That will brighten the whole landing. Thorne Marthxby mentioned it again the other day.",
           "has_answer": false
         }
       ],
@@ -3772,7 +3772,7 @@
         },
         {
           "role": "assistant",
-          "content": "Worth a trip before the fine grows. It seemed worth mentioning at the time. It made more sense once I stopped thinking about it.",
+          "content": "Worth a trip before the fine grows. I keep meaning to write these things down sooner. The whole thing took less effort than I feared.",
           "has_answer": false
         }
       ],
@@ -3784,7 +3784,7 @@
         },
         {
           "role": "assistant",
-          "content": "That is a favour you will feel the next day. I keep meaning to write these things down sooner. The whole thing took less effort than I feared.",
+          "content": "That is a favour you will feel the next day. That is roughly where it was left. I will probably feel differently about it next week.",
           "has_answer": false
         }
       ],
@@ -3796,7 +3796,7 @@
         },
         {
           "role": "assistant",
-          "content": "Plan around it. That is roughly where it was left. I will probably feel differently about it next week.",
+          "content": "Plan around it. It had been on my mind for a while before that. The whole thing took less effort than I feared.",
           "has_answer": false
         }
       ],
@@ -3808,7 +3808,7 @@
         },
         {
           "role": "assistant",
-          "content": "Fingers crossed it goes smoothly. It had been on my mind for a while before that. The whole thing took less effort than I feared.",
+          "content": "Fingers crossed it goes smoothly. That is roughly where it was left. Nothing much came of it either way.",
           "has_answer": false
         }
       ],
@@ -3820,7 +3820,7 @@
         },
         {
           "role": "assistant",
-          "content": "That will brighten the whole landing. I should really ask Denn Vellezell about it.",
+          "content": "That will brighten the whole landing. Norra Haldenkjar had said something similar a while back.",
           "has_answer": false
         }
       ],
@@ -3832,7 +3832,7 @@
         },
         {
           "role": "assistant",
-          "content": "A short note beats a perfect one that never comes. It seemed worth mentioning at the time. I keep meaning to write these things down sooner.",
+          "content": "A short note beats a perfect one that never comes. It made more sense once I stopped thinking about it. Nothing much came of it either way.",
           "has_answer": false
         }
       ],
@@ -3844,19 +3844,19 @@
         },
         {
           "role": "assistant",
-          "content": "Any chance you will go this time? It made more sense once I stopped thinking about it. Nothing much came of it either way.",
+          "content": "Any chance you will go this time? I had half expected it to go the other way. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: yet, boiler, reminder, due.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: yet, boiler, reminder, due.)",
           "has_answer": false
         },
         {
           "role": "assistant",
-          "content": "Tidy the yard beforehand, maybe. I had half expected it to go the other way. It seemed worth mentioning at the time.",
+          "content": "Tidy the yard beforehand, maybe. I will probably feel differently about it next week. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
@@ -3868,7 +3868,7 @@
         },
         {
           "role": "assistant",
-          "content": "Noted — I will keep that in mind. (Also on my mind: back, running, figures, physiotherapy.) I will probably feel differently about it next week. It seemed worth mentioning at the time.",
+          "content": "Noted — I will keep that in mind. (Also on my mind: back, running, figures, physiotherapy.) It seemed worth mentioning at the time. It had been on my mind for a while before that.",
           "has_answer": false
         }
       ],
@@ -3880,7 +3880,7 @@
         },
         {
           "role": "assistant",
-          "content": "Worth buying ahead. It seemed worth mentioning at the time. It had been on my mind for a while before that.",
+          "content": "Worth buying ahead. There was no particular reason for the delay. I will probably feel differently about it next week.",
           "has_answer": false
         }
       ]
@@ -3940,7 +3940,7 @@
         },
         {
           "role": "assistant",
-          "content": "Lights charged? Rusk Thornewraith would have an opinion, naturally. That is roughly where it was left.",
+          "content": "Lights charged? That is exactly the sort of thing Pell Kessephex notices. It made more sense once I stopped thinking about it.",
           "has_answer": false
         }
       ],
@@ -3952,7 +3952,7 @@
         },
         {
           "role": "assistant",
-          "content": "Frustrating, but at least it is booked. That is roughly where it was left. That is exactly the sort of thing Ithe Thornewraith notices.",
+          "content": "Frustrating, but at least it is booked. The whole thing took less effort than I feared. I should really ask Thorne Quennvund about it.",
           "has_answer": false
         }
       ],
@@ -4055,7 +4055,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: yet, boiler, reminder, due.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: yet, boiler, reminder, due.)",
           "has_answer": false
         },
         {
@@ -4235,7 +4235,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: figures, come, reminder, date.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: figures, come, reminder, date.)",
           "has_answer": false
         },
         {
@@ -4467,7 +4467,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: figures, come, reminder, date.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: figures, come, reminder, date.)",
           "has_answer": false
         },
         {
@@ -4603,7 +4603,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4663,7 +4663,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4723,7 +4723,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4747,7 +4747,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4821,7 +4821,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4881,7 +4881,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4941,7 +4941,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -4965,7 +4965,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: reminder, yet, date, come.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: reminder, yet, date, come.)",
           "has_answer": false
         },
         {
@@ -5599,7 +5599,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: due, reminder, yet, conference.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: due, reminder, yet, conference.)",
           "has_answer": false
         },
         {
@@ -5831,7 +5831,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: due, reminder, yet, conference.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: due, reminder, yet, conference.)",
           "has_answer": false
         },
         {
@@ -7151,7 +7151,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in about ten days. (Also on my mind: climbing, run, still, wall.)",
+          "content": "Our landlord is repointing the brickwork in about ten days. (Also on my mind: climbing, run, still, wall.)",
           "has_answer": false
         },
         {
@@ -7425,7 +7425,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in about ten days. (Also on my mind: climbing, run, still, wall.)",
+          "content": "Our landlord is repointing the brickwork in about ten days. (Also on my mind: climbing, run, still, wall.)",
           "has_answer": false
         },
         {
@@ -7555,7 +7555,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: run, ferry, still.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: run, ferry, still.)",
           "has_answer": false
         },
         {
@@ -7801,7 +7801,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: run, ferry, still.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: run, ferry, still.)",
           "has_answer": false
         },
         {
@@ -8083,7 +8083,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: out, valid, run.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: out, valid, run.)",
           "has_answer": false
         },
         {
@@ -8119,7 +8119,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: out, valid, run.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: out, valid, run.)",
           "has_answer": false
         },
         {
@@ -8287,7 +8287,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: out, valid, run.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: out, valid, run.)",
           "has_answer": false
         },
         {
@@ -8323,7 +8323,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: out, valid, run.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: out, valid, run.)",
           "has_answer": false
         },
         {
@@ -8467,7 +8467,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: run, still, permit.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: run, still, permit.)",
           "has_answer": false
         },
         {
@@ -8699,7 +8699,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: run, still, permit.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: run, still, permit.)",
           "has_answer": false
         },
         {
@@ -9587,7 +9587,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: valid, physiotherapy, referral.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: valid, physiotherapy, referral.)",
           "has_answer": false
         },
         {
@@ -9611,7 +9611,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: valid, physiotherapy, referral.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: valid, physiotherapy, referral.)",
           "has_answer": false
         },
         {
@@ -9861,7 +9861,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters late next month. (Also on my mind: valid, physiotherapy, referral.)",
+          "content": "Our landlord is repointing the brickwork late next month. (Also on my mind: valid, physiotherapy, referral.)",
           "has_answer": false
         },
         {
@@ -9885,7 +9885,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters early next month. (Also on my mind: valid, physiotherapy, referral.)",
+          "content": "Our landlord is repointing the brickwork early next month. (Also on my mind: valid, physiotherapy, referral.)",
           "has_answer": false
         },
         {
@@ -10183,7 +10183,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, started, date.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, started, date.)",
           "has_answer": false
         },
         {
@@ -10443,7 +10443,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, started, date.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, started, date.)",
           "has_answer": false
         },
         {
@@ -10535,7 +10535,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, flat, ferrier, moved.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, flat, ferrier, moved.)",
           "has_answer": false
         },
         {
@@ -10781,7 +10781,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, flat, ferrier, moved.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, flat, ferrier, moved.)",
           "has_answer": false
         },
         {
@@ -11147,7 +11147,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: class, pottery, date, yet.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: class, pottery, date, yet.)",
           "has_answer": false
         },
         {
@@ -11231,7 +11231,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: class, pottery, date, yet.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: class, pottery, date, yet.)",
           "has_answer": false
         },
         {
@@ -11421,7 +11421,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters in a fortnight. (Also on my mind: class, pottery, date, yet.)",
+          "content": "Our landlord is repointing the brickwork in a fortnight. (Also on my mind: class, pottery, date, yet.)",
           "has_answer": false
         },
         {
@@ -11505,7 +11505,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters next week. (Also on my mind: class, pottery, date, yet.)",
+          "content": "Our landlord is repointing the brickwork next week. (Also on my mind: class, pottery, date, yet.)",
           "has_answer": false
         },
         {
@@ -11683,7 +11683,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, week, day, happen.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, week, day, happen.)",
           "has_answer": false
         },
         {
@@ -11943,7 +11943,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: yet, week, day, happen.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: yet, week, day, happen.)",
           "has_answer": false
         },
         {
@@ -12119,7 +12119,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: nadia, happen, date.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: nadia, happen, date.)",
           "has_answer": false
         },
         {
@@ -12167,7 +12167,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: nadia, happen, date.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: nadia, happen, date.)",
           "has_answer": false
         },
         {
@@ -12337,7 +12337,7 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters sometime soon. (Also on my mind: nadia, happen, date.)",
+          "content": "Our landlord is repointing the brickwork sometime soon. (Also on my mind: nadia, happen, date.)",
           "has_answer": false
         },
         {
@@ -12385,12 +12385,12 @@
       [
         {
           "role": "user",
-          "content": "Our landlord is inspecting the gutters the week after next. (Also on my mind: nadia, happen, date.)",
+          "content": "Our landlord is repointing the brickwork the week after next. (Also on my mind: nadia, happen, date.)",
           "has_answer": false
         },
         {
           "role": "assistant",
-          "content": "Tidy the yard beforehand, maybe. I will probably feel differently about it next week. It seemed worth mentioning at the time.",
+          "content": "Tidy the yard beforehand, maybe. Halden Bramzorn would have an opinion, naturally.",
           "has_answer": false
         }
       ],
@@ -12402,7 +12402,7 @@
         },
         {
           "role": "assistant",
-          "content": "Earlier starts, but shorter meetings. Sable Farrowqvist had said something similar a while back.",
+          "content": "Earlier starts, but shorter meetings. Bram Sablekjar had said something similar a while back.",
           "has_answer": false
         }
       ],
@@ -12414,7 +12414,7 @@
         },
         {
           "role": "assistant",
-          "content": "Earlier starts, but shorter meetings. That is exactly the sort of thing Norra Ithezell notices.",
+          "content": "Earlier starts, but shorter meetings. I should really ask Denn Haldenquorn about it.",
           "has_answer": false
         }
       ],
@@ -12426,7 +12426,7 @@
         },
         {
           "role": "assistant",
-          "content": "A short note beats a perfect one that never comes. I keep meaning to write these things down sooner.",
+          "content": "A short note beats a perfect one that never comes. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
@@ -12438,7 +12438,7 @@
         },
         {
           "role": "assistant",
-          "content": "Frustrating, but at least it is booked. It made more sense once I stopped thinking about it. It seemed worth mentioning at the time.",
+          "content": "Frustrating, but at least it is booked. That is roughly where it was left. It seemed worth mentioning at the time.",
           "has_answer": false
         }
       ],
@@ -12450,7 +12450,7 @@
         },
         {
           "role": "assistant",
-          "content": "Worth buying ahead. That is roughly where it was left. I keep meaning to write these things down sooner.",
+          "content": "Worth buying ahead. There was no particular reason for the delay. I will probably feel differently about it next week.",
           "has_answer": false
         }
       ],
@@ -12462,7 +12462,7 @@
         },
         {
           "role": "assistant",
-          "content": "A short note beats a perfect one that never comes. I will probably feel differently about it next week. I will probably feel differently about it next week.",
+          "content": "A short note beats a perfect one that never comes. Nothing much came of it either way. That is roughly where it was left.",
           "has_answer": false
         }
       ],
@@ -12474,7 +12474,7 @@
         },
         {
           "role": "assistant",
-          "content": "Worth a trip before the fine grows. I should really ask Denn Dennxby about it.",
+          "content": "Worth a trip before the fine grows. I should really ask Farrow Sablekjar about it.",
           "has_answer": false
         }
       ]

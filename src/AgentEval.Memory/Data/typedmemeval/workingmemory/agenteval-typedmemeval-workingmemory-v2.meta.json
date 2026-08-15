@@ -144,7 +144,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T16:23:00Z",
+    "run_at": "2026-08-15T17:53:34Z",
     "questions_probed": 48,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -168,7 +168,9 @@
     "v3_gold_ablated": {
       "applicable": 48,
       "passed": 48,
-      "failed": []
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
       "applicable": 0,

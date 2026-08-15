@@ -167,21 +167,32 @@ _NUMBER = re.compile(r"\d[\d,]*\.?\d*")
 _PROPER = re.compile(r"\b[A-Z][a-z]{3,}\b")
 
 
-def distinctive(gold: str) -> list[str]:
+def distinctive(gold: str, already_known: str = "") -> list[str]:
     """Tokens whose presence in a response is evidence it reached the gold fact.
 
     Numbers and proper nouns, because those are what the generators randomize -- they are the part
     of an answer that cannot be produced by knowing the world, only by knowing the corpus.
+
+    Tokens the model was ALREADY given are removed. The question and the current date are in every
+    prompt, so a gold answer reading "...on 20 March 2026" shares "2026" with the prompt itself; a
+    model with no evidence that echoes the year would clear a screen meant to detect that it had
+    reached the answer. That is how the ablation probes reported a leak on a question whose gold is
+    simply a negative.
     """
+    known = set(_NUMBER.findall(already_known))
+    known |= {w.lower() for w in _PROPER.findall(already_known)}
+
     tokens = set(_NUMBER.findall(gold))
     tokens |= {w for w in _PROPER.findall(gold) if w.lower() not in tmc.STOPWORDS}
-    return sorted(t for t in tokens if len(t) > 2)
+    return sorted(
+        t for t in tokens
+        if len(t) > 2 and t not in known and t.lower() not in known)
 
 
-def lexically_possible(response: str, gold: str) -> bool:
+def lexically_possible(response: str, gold: str, already_known: str = "") -> bool:
     """Over-sensitive on purpose: a false positive costs one judge call, a false negative would
     silently pass an invalid question."""
-    tokens = distinctive(gold)
+    tokens = distinctive(gold, already_known)
     if not tokens:
         # No distinctive token to key on, so the screen cannot rule anything out and every response
         # must be judged. Rare, and erring toward more judging is the safe direction.
@@ -215,6 +226,7 @@ def produced_gold(
     *,
     screen: bool = False,
     require_distinctive: bool = False,
+    already_known: str = "",
 ) -> bool:
     """Whether a response reached the gold fact.
 
@@ -226,7 +238,7 @@ def produced_gold(
     """
     if not response:
         return False
-    if screen and not lexically_possible(response, gold):
+    if screen and not lexically_possible(response, gold, already_known):
         _stats["screen_rejected"] += 1
         return False
     # Ablation probes (V3, V6) ask whether removing evidence removes the answer. Where gold names a
@@ -234,7 +246,8 @@ def produced_gold(
     # phrased as a negative ("no longer valid", "no current car on record") is satisfied by a model
     # that saw nothing and said so, and the probe reports a leak where there is only an empty
     # context. The judge still decides; this only refuses to call a value-free answer a reproduction.
-    if require_distinctive and distinctive(gold) and not lexically_possible(response, gold):
+    if (require_distinctive and distinctive(gold, already_known)
+            and not lexically_possible(response, gold, already_known)):
         _stats["distinctive_absent"] += 1
         return False
     _stats["escalated"] += 1
@@ -244,6 +257,29 @@ def produced_gold(
 # --------------------------------------------------------------------------------------
 # Probes
 # --------------------------------------------------------------------------------------
+
+_NEGATIVE_GOLD = re.compile(
+    r"^\s*(no|not|none)|no longer|already happened|not yet|no record|never (told|mentioned|recorded)",
+    re.IGNORECASE)
+
+
+def _v3_decidable(gold: str, already_known: str) -> bool:
+    """Whether an ablation probe can tell "reached the answer" from "said nothing" for this gold.
+
+    It cannot when BOTH are true: the gold carries no content the prompt did not already supply,
+    and the gold is itself a negative. "No, it has already happened" is what a model with no
+    evidence says when it has no record either, so a match proves nothing and a leak report would
+    assert something the probe cannot see.
+
+    Deliberately narrow. An earlier version abstained whenever the distinctive set was empty, which
+    silently dropped V3 on 56 questions -- every list-order gold repeats items the question already
+    named, and every attribution gold is a role word. Those are perfectly decidable by the judge,
+    because "I don't know" is not equivalent to "the assistant said it".
+    """
+    if distinctive(gold, already_known):
+        return True
+    return not _NEGATIVE_GOLD.search(gold.strip())
+
 
 def gold_indices(entry: dict) -> list[int]:
     ids = entry.get("haystack_session_ids", [])
@@ -303,7 +339,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
         hits = 0
         for k in range(V2_SAMPLES):
             answer = complete(ask(question, date, ""), cache_key=f"{key}:v2:{k}", max_tokens=700)
-            if produced_gold(question, gold, answer, f"{key}:v2:{k}:judge", screen=True):
+            if produced_gold(question, gold, answer, f"{key}:v2:{k}:judge", screen=True,
+                         already_known=f"{question} {date}"):
                 hits += 1
         record["v2_hits"] = hits
         record["v2"] = hits < V2_REJECT_AT
@@ -311,10 +348,18 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v2"] = None
 
     # V3 -- gold-ablated. The dual of V1: with every gold session removed, the answer must be gone.
-    if non_gold and golds:
+    #
+    # Not applicable when gold carries no content the prompt did not already supply. A gold answer
+    # that is purely a negative -- "no, it has already happened" -- is indistinguishable from a model
+    # with no evidence saying it has no record, and reporting that as a leak would assert something
+    # this probe cannot see. Recorded as not-applicable, exactly as V1 and V2 are on a never-known
+    # probe.
+    decidable = _v3_decidable(gold, f"{question} {date}")
+    if non_gold and golds and decidable:
         answer = complete(ask(question, date, subset(entry, non_gold)), cache_key=f"{key}:v3")
         record["v3"] = not produced_gold(
-            question, gold, answer, f"{key}:v3:judge", require_distinctive=True)
+            question, gold, answer, f"{key}:v3:judge", require_distinctive=True,
+            already_known=f"{question} {date}")
     else:
         record["v3"] = None
 
@@ -323,7 +368,7 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # coverage echo depends on every component being load-bearing. Elsewhere a question can have
     # two gold sessions without the design claiming both are individually necessary, and applying
     # the rule there would report a corpus defect the corpus never promised not to have.
-    if len(golds) > 1 and vertical in ("arithmetic", "forgetting"):
+    if len(golds) > 1 and vertical in ("arithmetic", "forgetting") and decidable:
         survived = []
         for dropped in golds:
             keep = [i for i in everything if i != dropped]
@@ -413,7 +458,16 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "temperature": "provider default",
             **tally("v2"),
         },
-        "v3_gold_ablated": tally("v3"),
+        "v3_gold_ablated": {
+            **tally("v3"),
+            "not_decidable": sorted(
+                r["question_id"] for r in records
+                if r.get("v3") is None and r.get("v1") is not None),
+            "not_decidable_reason": (
+                "gold carries no content the prompt did not already supply, so a no-evidence answer "
+                "and a correct one are indistinguishable to this probe"
+            ),
+        },
         "v6_leave_one_out": tally("v6"),
         "per_question": {
             r["question_id"]: {k: v for k, v in r.items()

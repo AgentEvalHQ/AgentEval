@@ -8,7 +8,7 @@
     "reason": "V7 adversarial separability found gold identifiable by cheap shape features carrying no information about the question — capitalisation density reached AUC 0.990 in Forgetting and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable with v2 scores."
   },
   "question_count": 50,
-  "corpus_sha256": "53e2f2e1fe00c71cd4dd3ea87e867c05561221264a15f172a07b73de808b4357",
+  "corpus_sha256": "1ea86df325f29d107f5fbaec716a8857554b5c3a03a1cdf6ff63b448b7ffffa2",
   "generator": {
     "tool": "tools/gen_typedmemeval_prospective.py",
     "version": "1.0.0",
@@ -125,40 +125,41 @@
         "boilerplate_ngram"
       ],
       "features": {
-        "session_length_chars": 0.5702,
+        "session_length_chars": 0.5727,
         "turn_count": 0.6481,
         "position_in_haystack": 0.5321,
         "digit_density": 0.5,
-        "uppercase_density": 0.5689,
+        "uppercase_density": 0.5642,
         "boilerplate_ngram": 0.6481
       },
       "worst_refused_feature": "turn_count",
       "worst_refused_auc": 0.6481,
-      "worst_boilerplate_ngram": "mind also",
+      "worst_boilerplate_ngram": "weeks noted",
       "boilerplate_ngram_auc": 0.6481,
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-15T15:58:11Z",
-      "probed_corpus_sha256": "53e2f2e1fe00c71cd4dd3ea87e867c05561221264a15f172a07b73de808b4357"
+      "measured_at": "2026-08-15T17:54:22Z",
+      "probed_corpus_sha256": "1ea86df325f29d107f5fbaec716a8857554b5c3a03a1cdf6ff63b448b7ffffa2"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T16:03:30Z",
+    "run_at": "2026-08-15T17:58:11Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
       "passed": 47,
       "failed": [
-        "tme-pro-045",
+        "tme-pro-042",
         "tme-pro-046",
         "tme-pro-048"
       ]
     },
     "v1_pair_flip": {
       "pairs": 19,
-      "passed": 17,
+      "passed": 16,
       "failed": [
+        "tme-pro-p15",
         "tme-pro-p17",
         "tme-pro-p18"
       ]
@@ -173,10 +174,10 @@
     },
     "v3_gold_ablated": {
       "applicable": 50,
-      "passed": 49,
-      "failed": [
-        "tme-pro-011"
-      ]
+      "passed": 50,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
       "applicable": 0,
@@ -258,7 +259,7 @@
         "v1": true,
         "v2_hits": 0,
         "v2": true,
-        "v3": false,
+        "v3": true,
         "v6": null
       },
       "tme-pro-012": {
@@ -472,7 +473,7 @@
         "v6": null
       },
       "tme-pro-042": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -493,7 +494,7 @@
         "v6": null
       },
       "tme-pro-045": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -535,6 +536,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "53e2f2e1fe00c71cd4dd3ea87e867c05561221264a15f172a07b73de808b4357"
+    "probed_corpus_sha256": "1ea86df325f29d107f5fbaec716a8857554b5c3a03a1cdf6ff63b448b7ffffa2"
   }
 }

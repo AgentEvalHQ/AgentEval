@@ -269,7 +269,7 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 47/50 | 17/19 | 50/50 | 49/50 | — |
+| Prospective | 47/50 | 16/19 | 50/50 | 50/50 | — |
 | Episodic | 50/50 | — | 50/50 | 50/50 | — |
 | Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
