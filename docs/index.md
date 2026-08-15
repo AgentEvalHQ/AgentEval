@@ -351,6 +351,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 [MITRE →](benchmarks/mitre/getting-started.md) ·
 [Performance →](benchmarks/perf/getting-started.md) ·
 [LongMemEval →](benchmarks/longmemeval/getting-started.md) ·
+[TypedMemEval →](benchmarks/typedmemeval/getting-started.md) ·
 [Memory →](benchmarks/memory/getting-started.md)
 
 ---

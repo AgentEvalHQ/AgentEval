@@ -448,3 +448,9 @@ src/AgentEval.Memory/Data/longmemeval/longmemeval_oracle.json
 samples/AgentEval.Samples/output/
 # MafEvalLightPath sample emits its HTML reports here at runtime.
 samples/AgentEval.MafEvalLightPath/output/
+
+# TypedMemEval probe runner: a local response cache so an interrupted probe run resumes
+# instead of re-paying for calls it already made. Reference-model output, not a deliverable —
+# the probe *records* ship in each corpus's .meta.json.
+tools/.typedmemeval_probe_cache.json
+tools/__pycache__/

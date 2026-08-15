@@ -1,8 +1,19 @@
 # ADR-026: TypedMemEval — A Mechanism-Isolating Memory Benchmark Family
 
-**Status:** Proposed (design-review gate — nothing in this document is implemented; implementation begins only after joint review with the consuming project)
+**Status:** **Accepted** — reviewed jointly with the consuming project on 2026-08-15 and implemented in v0.22.0-beta. All five §9 pushbacks were accepted, including pushback 1 (the reframing of "coverage 0.5–0.9 by construction" into published ceiling tables plus a calibration gate plus runtime echo), and guard 6 (WorkingMemory rehearsal confound → independent per-question haystacks) was ratified as load-bearing.
 
-**Date:** 2026-08-15
+The §10 open questions were settled as follows, and the design below is to be read with these answers applied:
+
+1. **Name** — keep `TypedMemEval`. The .NET homonym is accepted; docs introduce it as a benchmark name first. FacetMemEval is retired.
+2. **`Missed` semantics** — the two-axis proposal (§6) is ratified as written: verbal outcome from the judge, evidence attribution as necessary-but-not-sufficient, `Unobserved` never guessed.
+3. **"Participant attributes"** — confirmed as speaker *attribution*. The §5.2 reading is what was meant; attributes-of-participants stays WorkingMemory territory.
+4. **`K_ref`** — 5 sessions, uniform across verticals for v1, approximating the consumer's real evidence breadth. Revisited per-vertical only if v1 data demands it. Addition: the **per-question** BM25 realised-coverage distribution is stamped into corpus metadata, not only the mean, so an embedding retriever's realised coverage can be correlated against the lexical floor.
+5. **Control arms** — Prospective only, via the tg option-pair mechanism over one corpus file.
+6. **MemoryBaseline** — a single-score pentagon is **not** endorsed. `ToBaseline` compatibility is mechanical, not endorsed, and the family docs say so; a typed-outcome-aware mapping must exist before any baseline visualization is published.
+7. **Per-cell sizing** — v1 ships as designed (48–50 per vertical). Promoting the WorkingMemory distance curve to n ≥ 30 per rung is a v2 decision, taken only after v1 shows which cells carry signal.
+8. **Phasing** — ratified as proposed. All three milestones landed in one release; the family was not documented publicly until all five verticals existed.
+
+**Date:** 2026-08-15 (proposed and accepted)
 
 **Relates to:** ADR-009 (benchmark strategy), ADR-017 (unified benchmarks namespace), the LongMemEval harness (0.19–0.21), the time-grounded probe corpus (`agenteval-timegrounded-v1`)
 
@@ -887,6 +898,49 @@ And one design guard the ask did not mention but the review should ratify:
 | `ExternalBenchmarkResult.TypedOutcomes`, `QuestionResult.TypedOutcome` | extended (additive) | nullable, `WhenWritingNull` |
 | Serialization guard test, prompt-leak guard test (no `typedmemeval` block in any assembled prompt; derivation-literal check scoped per §3), corpus structural tests, V1–V3/V6 probe records | new | CI |
 | Docs: `docs/benchmarks/typedmemeval/` getting-started + citation rule | new | after implementation |
+
+### 12. Implementation record (v0.22.0-beta)
+
+Where the built thing differs from the design above, with reasons. Nothing here changes what the
+benchmark measures; each is a placement or scoping decision the design did not settle.
+
+1. **Result models live in `AgentEval.Memory.External.Models`**, not the family namespace. Every
+   peer report type on `ExternalBenchmarkResult` (`AnswerSamplingReport`, `OracleProjectionReport`,
+   `TemporalGroundingReport`) lives there, and it removes the member/namespace shadowing §6 flagged.
+   The family's *machinery* is in `AgentEval.Memory.External.TypedMemEval` as designed.
+2. **One `TypedMemEvalCorpus` class keyed by vertical**, rather than five near-identical constants
+   classes. Same capability, one place to change; `ProspectiveProbeOptions`/`ProspectiveControlOptions`
+   sit on it.
+3. **Realised coverage lives on `TypedMemEvalQuestionDetail`, not on `QuestionEvidenceDiagnostics`.**
+   §7 proposed extending the shared diagnostics; §6 put it on the family detail. The family surface
+   won because coverage is computed against *family* gold components that only the family knows, and
+   a field on the shared type would imply LongMemEval runs populate it. Carrying it in both places
+   would invite the two to drift.
+4. **The extension block carries more than §3's sketch.** `shape` is required — §6 mandates
+   per-shape reporting and nothing else could key it. Verticals added what their own scoring needs:
+   `list_order` (items, presented order, session indices), `count_predicate` + `candidates`,
+   `fact_family`, `stated_by`. All of it is answer-key material and all of it is covered by the
+   prompt-leak guard.
+5. **Arithmetic `delta` is the difference of two side-totals**, and duration inputs carry a
+   `from_session_index`. §5.3 pins `G` ∈ 3..6 with one input per gold session, which a two-value
+   delta cannot reach; a side-total delta keeps both the dispersion and the operation.
+6. **V6 is scoped to Arithmetic and Forgetting**, the two verticals §5 defines it for. Applied
+   corpus-wide it fired on Prospective's incidental two-gold questions, where the design never
+   claimed both components were individually load-bearing.
+7. **`TypedMemEvalOptions.IncludeTimestamps` was added** so §5.3's unrun path is reachable and
+   testable rather than dead code.
+8. **`TypedMemEvalEvalResultAdapter` takes an explicit `passThresholdPercent`.** `EvalScore.Passed`
+   is not nullable and the family defines no pass mark, so the threshold is stated by the caller
+   rather than hidden in the adapter.
+
+**What the validity probes actually caught.** The first Prospective generator computed every due
+date from an anchor timestamp that was then overwritten when the haystack was shuffled and
+re-stamped, so all 38 generated pair questions named dates their own conversations could not
+produce. Every structural check passed — none of them re-did the arithmetic — and the V1 oracle
+probe failed 38 of 50 while all 12 hand-authored seed questions passed. The generator now derives
+the pivot from the session's final timestamp and re-checks the arithmetic as a hard rule. This is
+the clearest available argument for the probes existing at all: the corpus looked correct, its own
+generator believed it was correct, and it was wrong.
 
 ## Consequences
 

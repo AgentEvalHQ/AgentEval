@@ -10,3 +10,7 @@ src/AgentEval.DataLoaders/Output/Schema/v1/*.json text eol=lf
 # bytes must not depend on which platform checked it out. LongMemEvalTimeGroundedCorpus
 # also normalizes newlines before hashing; this keeps the two from ever disagreeing.
 src/AgentEval.Memory/Data/longmemeval/timegrounded/*.json text eol=lf
+# Same reason for the TypedMemEval family corpora: each one is content-hashed into run
+# provenance, and its metadata sidecar records the hash it describes, so a CRLF checkout must
+# not make the two disagree.
+src/AgentEval.Memory/Data/typedmemeval/**/*.json text eol=lf

@@ -467,6 +467,36 @@ benchCmd.Add(benchNistCmd);
         benchCmd.Add(benchLmeCmd);
     }
 
+    // bench typedmemeval — closes the same CLI ↔ registry gap for the TypedMemEval family.
+    {
+        var benchTmeVerticalOpt = new Option<string?>("--vertical") { Description = "prospective | episodic | arithmetic | workingmemory | forgetting. REQUIRED — the verticals measure different mechanisms, so there is no default." };
+        var benchTmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
+        var benchTmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchTmeCmd = new Command("typedmemeval", "Run one TypedMemEval v1 (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
+        benchTmeCmd.Add(benchTmeVerticalOpt);
+        benchTmeCmd.Add(benchTmeSubjectOpt);
+        benchTmeCmd.Add(benchTmeRootOpt);
+        benchTmeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var vertical = parseResult.GetValue(benchTmeVerticalOpt);
+            if (string.IsNullOrWhiteSpace(vertical))
+            {
+                Console.Error.WriteLine("Error: --vertical is required. Known: prospective, episodic, arithmetic, workingmemory, forgetting.");
+                return 1;
+            }
+            var subject = parseResult.GetValue(benchTmeSubjectOpt);
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+            var root = parseResult.GetValue(benchTmeRootOpt);
+            return await BenchTypedMemEvalCommand.RunAsync(vertical, subject, root, ct);
+        });
+        benchCmd.Add(benchTmeCmd);
+    }
+
     // bench memory — T0.6 (v1.1): closes CLI ↔ registry gap.
     {
         var benchMemPresetOpt = new Option<string?>("--preset") { Description = "quick | standard | full | diagnostic | overflow. Default: quick." };

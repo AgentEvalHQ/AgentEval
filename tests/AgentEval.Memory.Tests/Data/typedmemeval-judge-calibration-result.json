@@ -1,0 +1,27 @@
+{
+  "judge_prompt_fingerprint": "84bacb9bb36c598fe3c22878cbe4be8b5e32b7e78aa1f4ce498026732a916dc8",
+  "measured_at": "2026-08-15",
+  "model": "gpt-5.5",
+  "agreement": 0.975,
+  "status": "measured",
+  "cases": 120,
+  "runs": 3,
+  "per_vertical": {
+    "Prospective": 1.0,
+    "Episodic": 1.0,
+    "Arithmetic": 0.958,
+    "WorkingMemory": 1.0,
+    "Forgetting": 0.917
+  },
+  "disagreements": {
+    "every_run": [
+      "cal-ari-016",
+      "cal-for-006"
+    ],
+    "run_varying": [
+      "cal-for-005",
+      "cal-for-012"
+    ]
+  },
+  "note": "Three runs of the live arm at this fingerprint: 0.967, 0.975, 0.975. The figure above is the last two, which agree; the first was taken before two label errors were corrected (cal-wm-015 used the preamble's own example of an abstention while labelled Missed, and cal-wm-021 rested on a spelling similarity no rule ratifies). Two cases disagree in every run and are the sharpest boundaries in the set: cal-ari-016 asks whether a flipped sign is part of a delta's value, which the arithmetic template's grade-the-arithmetic-not-the-phrasing wording arguably answers the other way, and cal-for-006 whether an invented replacement state passes as a correct no-longer. Exactly one of cal-for-005 and cal-for-012 disagrees per run - the same Forgetting boundary between denial, abstention and over-forgetting - which is judge noise at the boundary rather than drift, and the reason this file records runs rather than a single point."
+}

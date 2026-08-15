@@ -20,6 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The TypedMemEval judge calibration set and its recorded result. Embedded rather than copied
+         so the tripwire reads the same bytes on every target framework and on any runner, whatever
+         the working directory of the test host happens to be. -->
+    <EmbeddedResource Include="Data\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />

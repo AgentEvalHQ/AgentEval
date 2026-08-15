@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0-beta] - 2026-08-15
+
+**TypedMemEval** — a new benchmark family that measures five memory mechanisms in isolation. Nothing
+in LongMemEval changes: every 0.19–0.21 surface and the time-grounded corpus are untouched, and no
+default anywhere changes what a run selects, injects, or scores.
+
+LongMemEval-S cannot measure prospective memory (no questions), episodic structure (no list-order or
+speaker-attribution questions), derived answers in isolation, working-memory distance, or forgetting
+(no question types for either). It is also saturated for a competent retrieval stack — realised gold
+coverage of 0.965–0.980 — and at that coverage every retrieval-side mechanism is invisible. The gap
+is in the dataset, and a benchmark's dataset is its identity, so the answer is a separate family
+rather than more corpora under someone else's name.
+
+> **Citation rule.** Cite results as "TypedMemEval-\<Vertical\> v1 (AgentEval)". TypedMemEval results
+> are **not** LongMemEval results and must never be presented as, summed with, or averaged with
+> LongMemEval numbers. The twelve Prospective questions seeded from the time-grounded probe exist in
+> both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v1; a report that runs both must not
+> double-count them.
+
+### Added
+
+- **`TypedMemEvalRunner`** with `RunAsync` and `RunOracleAsync`, in
+  `AgentEval.Memory.External.TypedMemEval`. The oracle arm reuses the shipped
+  `LongMemEvalOracleProjector`, `LongMemEvalOracleReader` and `LongMemEvalOracleOptions` unchanged,
+  so a consuming project's ceiling and this one are the same number from the same knobs.
+- **Five embedded corpora, 248 authored questions.** No dataset path, no download, and no path knob
+  — "which corpus produced this number" is answered by the identifier and hash in the run's
+  provenance rather than by a path that may since have moved.
+
+  | Corpus | n | Shapes | BM25 @ K_ref=5 mean coverage |
+  |---|---|---|---|
+  | `agenteval-typedmemeval-prospective-v1` | 50 | seed carry-over 12, due-later 16, expiring validity 12, not-yet-true 10 | 0.820 |
+  | `agenteval-typedmemeval-episodic-v1` | 50 | assistant-stated 20, list-order 15, attribution 15 | 0.801 |
+  | `agenteval-typedmemeval-arithmetic-v1` | 50 | counts 14, sums 14, deltas 10, durations 12 | 0.820 |
+  | `agenteval-typedmemeval-workingmemory-v1` | 48 | 12 fact families × distances 1/5/15/40 | 0.667 |
+  | `agenteval-typedmemeval-forgetting-v1` | 50 | invalidated 20, still-valid 15, never-known 15 | 0.820 |
+
+- **Typed outcomes, never one percentage.** `ExternalBenchmarkResult.TypedOutcomes` and
+  `QuestionResult.TypedOutcome` (both additive and nullable) report
+  correct / wrong / abstained / missed / premature per vertical and per shape, always with `n`.
+  Two further members — `Inconclusive` and `Unrun` — exist so a judge outage or a skipped question
+  can never be quietly absorbed into `Wrong` and make a system look worse than the evidence shows.
+- **Evidence attribution**, a second orthogonal axis computed from the existing
+  `agenteval.question_evidence.v1` envelope: `EvidencePresent`, `EvidenceAbsent`, `Unobserved`.
+  Named for what it is — reference-level presence, necessary but not sufficient. Exactly one causal
+  reading is stated as fact (`Wrong` with `EvidenceAbsent` *is* a retrieval-side failure); the
+  mirror reading is labelled an inference, because a compression loss inside a memory store looks
+  identical from outside. Missing telemetry reports `Unobserved` and is never guessed.
+- **`TypedMemEvalJudge`** — a five-way outcome judge, structured-JSON only, with per-vertical
+  templates and its own pinned prompt fingerprint disjoint from the frozen LongMemEval one. The §6
+  precedence rules for mixed answers are written into the templates rather than left to judge
+  discretion: a stated value outranks hedging, a correct negative answer to a negative gold is
+  `Correct`, recalling a superseded value while marking it superseded is `Correct`, and rounded
+  numerics are correct exactly when gold rounds to the offered precision.
+- **`TypedMemEvalRunSet.Summarize`** — bands over repeated runs, with per-question flip counts. It
+  **refuses** to band runs differing in corpus, judge fingerprint, configuration, or what the
+  provider did with the requested answer sampling, because averaging those manufactures a stability
+  nothing measured. Two runs can agree by coincidence and band to zero width, so
+  `AtMinimumRunCount` says when you have only two and three are recommended.
+- **`TypedMemEvalEvalResultAdapter`** projecting `typedmemeval.*` dimensions, carrying the citation
+  rule on its root node.
+- **Generators and probe runner** — `tools/gen_typedmemeval_<vertical>.py` and
+  `tools/run_typedmemeval_probes.py`. The corpora are reproducible, which is what makes them
+  criticizable.
+
+### Coverage: what the corpora guarantee, and what they do not
+
+The consumer's original ask was corpora "sized so realised gold coverage lands ~0.5–0.9 by
+construction". Realised coverage is a property of system × corpus, so no corpus can place an
+arbitrary system in a band — and being precise about the arithmetic, a structural `min(1, K/G)`
+ceiling below 1.0 exists only where `G > K_ref`. That is Arithmetic and Episodic list-order. For
+Prospective, Forgetting and WorkingMemory the mechanism under test fixes `G` at 1 or 2, the ceiling
+is exactly 1.0, and presenting that as a band would be numerology.
+
+So non-saturation comes from a **calibration gate** instead: a corpus does not freeze until a
+deterministic BM25 retriever at `K_ref = 5` realises mean gold coverage inside 0.5–0.9, and the
+generator iterates until it does. The realised value, the **per-question distribution**, the
+iteration count and the tool version are stamped into each corpus's metadata sidecar. BM25 is
+explicitly a floor proxy — a stronger retriever will exceed it, which is what the per-question
+runtime echo is for. The consuming project reviewed this reframing and adopted it.
+
+### Validity probes
+
+V1 (oracle answerability, plus a pair-flip check), V2 (non-inferability, k=10, reject at 2 hits),
+V3 (gold-ablated — the dual of V1, and the only real defence against a distractor that accidentally
+contains the answer) and V6 (leave-one-out component non-redundancy) run against a stated reference
+model at authoring time, with per-question records stamped into corpus metadata. V4 (no absolute
+dates in message content) and V5 (gold derived from the emitted sessions, never typed) are enforced
+by the generators and re-checked in CI.
+
+The probes earned their cost immediately. The first Prospective generator computed every due date
+from an anchor timestamp that was then overwritten when the haystack was shuffled and re-stamped, so
+all 38 of its generated pair questions named dates their own conversations could not produce. Every
+structural check passed — none of them re-did the arithmetic — and V1 failed 38 of 50 while all 12
+hand-authored seed questions passed. The generator now derives the pivot from the session's final
+timestamp and re-checks the arithmetic as a hard rule.
+
+### Guards
+
+- **Serialization guard** — CI asserts that a TypedMemEval result's JSON contains no
+  case-insensitive `longmemeval` token, which makes the identity rule a regression test rather than
+  a review comment.
+- **Prompt-leak guard** — the corpus's `typedmemeval` block is an answer key (gold derivations,
+  component indices, pair arms). `LongMemEvalEntry` has no member for it, so it cannot reach a
+  formatted prompt even by accident; CI asserts that structurally *and* over the assembled prompt
+  text, plus that no diagnosable derivation value appears as a literal.
+- **Corpus/metadata integrity** — each sidecar names the corpus hash it describes, so re-running the
+  probes never moves the corpus hash and a stale pairing is detectable rather than silent.
+- **Selection determinism** — identical corpus revision, `RandomSeed` and `MaxQuestions` draw
+  identical questions in identical order.
+
+### Scope
+
+No Procedural vertical (consumer-side, agentic). No cross-family composite score and no headline
+single number: `OverallAccuracy` stays populated as a registered compatibility exception and is not
+citable. No endorsed MemoryBaseline pentagon — `ToBaseline` accepts a family result mechanically,
+which is not an endorsement, and a typed-outcome-aware mapping must exist before any baseline
+visualization of these results is published. With 48–50 questions per vertical and 5–20 per shape,
+v1 is an instrument for comparing configurations of one system and for regression-testing memory
+mechanisms; every stratum publishes its `n` because at those sizes they support diagnosis, not
+claims.
+
+Design of record: [ADR-026](docs/adr/026-typedmemeval-benchmark-family.md), accepted 2026-08-15.
+
 ## [0.21.0-beta] - 2026-08-14
 
 The discriminating-power release. A benchmark cannot resolve a difference smaller than its own noise,

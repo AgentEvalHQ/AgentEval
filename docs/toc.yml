@@ -173,6 +173,10 @@
       href: benchmarks/longmemeval/time-grounded-probe.md
     - name: Live Validation — 2026-07-29
       href: benchmarks/longmemeval/live-validation-2026-07-29.md
+  - name: TypedMemEval Benchmark Family
+    items:
+    - name: Getting Started
+      href: benchmarks/typedmemeval/getting-started.md
   - name: Memory Benchmark
     items:
     - name: Getting Started
