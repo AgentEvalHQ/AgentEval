@@ -197,7 +197,8 @@ def _pair(
 
     # Written only now that the phrase is known, so the words in the conversation and the date in
     # the answer are two views of the same arithmetic.
-    sessions[gold_index].turns[0].content = gold_user_template.format(phrase=phrase)
+    sessions[gold_index].turns[0].content = gold_user_template.format(
+        phrase=phrase, span=phrase.removeprefix("in "))
     answer_before = answer_before_template.format(date=_fmt(pivot))
     answer_after = answer_after_template.format(date=_fmt(pivot))
 
@@ -246,10 +247,21 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
 
         # Pad up to the declared H range with same-domain filler, timestamped strictly
         # inside the original span so the carried gold keeps its position in time.
+        # Padding is spread on BOTH sides of the carried block, not stacked before it. Stacking it
+        # earlier pinned every carried question's gold to the tail of its haystack, which the
+        # metadata then described as position-shuffled -- a position artefact and a false claim in
+        # one. The carried gold keeps its own timestamps either way, so the answers stay correct.
+        question_date = datetime.strptime(entry["question_date"], tmc.DATE_FORMAT)
         earliest = min(s.timestamp for s in sessions)
+        latest = max(s.timestamp for s in sessions)
         wanted = rng.randint(12, 18) - sum(1 for s in sessions if not s.is_gold)
         for i in range(max(0, wanted)):
-            sessions.append(_filler_session(rng, echoed, earliest - timedelta(hours=30 * (i + 1))))
+            # Later padding has to stay strictly before the question is asked; a carried question's
+            # query time is fixed by the corpus it came from and cannot be pushed out to make room.
+            later = latest + timedelta(hours=30 * (i + 1))
+            stamp = (later if rng.random() < 0.5 and later < question_date - timedelta(days=1)
+                     else earliest - timedelta(hours=30 * (i + 1)))
+            sessions.append(_filler_session(rng, echoed, stamp))
         sessions.sort(key=lambda s: s.timestamp)
 
         out.append(tmc.Question(
@@ -257,7 +269,7 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             entry["question_type"],
             question_text,
             entry["answer"],
-            datetime.strptime(entry["question_date"], tmc.DATE_FORMAT),
+            question_date,
             sessions,
             {"shape": SHAPE_SEED, "seeded_from": entry["question_id"]},
         ))
@@ -296,7 +308,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
             SHAPE_VALIDITY, TYPE_VALIDITY,
             f"Is {noun} still valid, and when does or did it run out?",
-            f"I picked up a {thing} today — it stays valid for {{phrase}} from today.",
+            f"I picked up a {thing} today — it stays valid for {{span}} from today.",
             "Good to know. Enjoy it while it lasts.",
             f"Yes, still valid. The {thing} runs out on {{date}}.",
             f"No, it has expired. The {thing} ran out on {{date}}.",
@@ -315,7 +327,8 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"I am due to {future} {{phrase}}.",
             "That is a real change — good luck with it.",
             f"Not yet. You are due to {future} on {{date}}, which has not arrived.",
-            f"Yes. You {past} on {{date}}.",
+            f"That date has passed. You were due to {future} on {{date}}, so it is no longer ahead of "
+            f"you — though nothing since then records whether it went ahead.",
             base + timedelta(days=13 * i + 2), rng, echo, filler_count=rng.randint(12, 17),
         )
         index += 2

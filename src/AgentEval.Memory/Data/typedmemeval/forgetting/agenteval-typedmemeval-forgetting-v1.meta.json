@@ -3,7 +3,7 @@
   "vertical": "forgetting",
   "revision": "v1",
   "question_count": 50,
-  "corpus_sha256": "7c9e53a94a4676ac46b779410ac741e353911878985d541e3649cf7881728ccb",
+  "corpus_sha256": "bd82b1f6049c4ee9e03a6120d04bb04aba844756f81e6a19d4102984d718ccf2",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -14,40 +14,40 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.82,
+    "mean_realised": 0.7,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.35
+        0.3
       ],
       [
         0.5,
-        0.82
+        0.7
       ]
     ],
     "per_question": {
       "tme-for-001": 1.0,
       "tme-for-002": 1.0,
       "tme-for-003": 1.0,
-      "tme-for-004": 1.0,
+      "tme-for-004": 0.5,
       "tme-for-005": 1.0,
       "tme-for-006": 1.0,
       "tme-for-007": 1.0,
       "tme-for-008": 0.0,
-      "tme-for-009": 1.0,
-      "tme-for-010": 0.5,
+      "tme-for-009": 0.0,
+      "tme-for-010": 0.0,
       "tme-for-011": 0.0,
-      "tme-for-012": 0.5,
+      "tme-for-012": 0.0,
       "tme-for-013": 1.0,
-      "tme-for-014": 0.5,
+      "tme-for-014": 0.0,
       "tme-for-015": 0.0,
       "tme-for-016": 1.0,
       "tme-for-017": 1.0,
       "tme-for-018": 1.0,
-      "tme-for-019": 0.5,
-      "tme-for-020": 1.0,
+      "tme-for-019": 0.0,
+      "tme-for-020": 0.5,
       "tme-for-021": 0.0,
       "tme-for-022": 1.0,
       "tme-for-023": 1.0,
@@ -56,12 +56,12 @@
       "tme-for-026": 1.0,
       "tme-for-027": 1.0,
       "tme-for-028": 0.0,
-      "tme-for-029": 1.0,
+      "tme-for-029": 0.0,
       "tme-for-030": 1.0,
       "tme-for-031": 0.0,
       "tme-for-032": 1.0,
       "tme-for-033": 1.0,
-      "tme-for-034": 1.0,
+      "tme-for-034": 0.0,
       "tme-for-035": 0.0,
       "tme-for-036_abs": 1.0,
       "tme-for-037_abs": 1.0,
@@ -104,15 +104,16 @@
   },
   "probes": {
     "status": "run",
-    "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:39:54Z",
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-15T12:42:04Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
       "passed": 34,
       "failed": [
-        "tme-for-032"
+        "tme-for-012"
       ]
     },
     "v1_pair_flip": {
@@ -230,7 +231,7 @@
         "v6_redundant_components": []
       },
       "tme-for-012": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -379,7 +380,7 @@
         "v6": null
       },
       "tme-for-032": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -497,6 +498,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "7c9e53a94a4676ac46b779410ac741e353911878985d541e3649cf7881728ccb"
+    "probed_corpus_sha256": "bd82b1f6049c4ee9e03a6120d04bb04aba844756f81e6a19d4102984d718ccf2"
   }
 }

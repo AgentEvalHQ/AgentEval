@@ -3,7 +3,7 @@
   "vertical": "episodic",
   "revision": "v1",
   "question_count": 50,
-  "corpus_sha256": "751374fa7d340d43f2dad17c976fad2e9c535c52a3cafc8204908205ff2e1b98",
+  "corpus_sha256": "e31e198b3bb2cd28b54d59ad996933262668b38a24aeb7db591b3cfc0849a881",
   "generator": {
     "tool": "tools/gen_typedmemeval_episodic.py",
     "version": "1.0.0",
@@ -14,21 +14,17 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.8014,
-    "echo": 0.75,
-    "iterations": 3,
+    "mean_realised": 0.8646,
+    "echo": 0.5,
+    "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.2795
+        0.2767
       ],
       [
         0.5,
-        0.9638
-      ],
-      [
-        0.75,
-        0.8014
+        0.8646
       ]
     ],
     "per_question": {
@@ -36,37 +32,37 @@
       "tme-epi-002": 1.0,
       "tme-epi-003": 1.0,
       "tme-epi-004": 1.0,
-      "tme-epi-005": 0.0,
-      "tme-epi-006": 0.0,
+      "tme-epi-005": 1.0,
+      "tme-epi-006": 1.0,
       "tme-epi-007": 1.0,
       "tme-epi-008": 1.0,
       "tme-epi-009": 1.0,
       "tme-epi-010": 1.0,
       "tme-epi-011": 1.0,
       "tme-epi-012": 1.0,
-      "tme-epi-013": 0.0,
-      "tme-epi-014": 0.0,
-      "tme-epi-015": 0.0,
+      "tme-epi-013": 1.0,
+      "tme-epi-014": 1.0,
+      "tme-epi-015": 1.0,
       "tme-epi-016": 1.0,
       "tme-epi-017": 1.0,
       "tme-epi-018": 1.0,
-      "tme-epi-019": 0.0,
+      "tme-epi-019": 1.0,
       "tme-epi-020": 1.0,
       "tme-epi-021": 1.0,
       "tme-epi-022": 1.0,
-      "tme-epi-023": 0.7143,
+      "tme-epi-023": 0.6667,
       "tme-epi-024": 1.0,
-      "tme-epi-025": 0.8333,
-      "tme-epi-026": 0.7143,
-      "tme-epi-027": 0.7143,
-      "tme-epi-028": 1.0,
-      "tme-epi-029": 0.7143,
+      "tme-epi-025": 0.0,
+      "tme-epi-026": 0.0,
+      "tme-epi-027": 0.0,
+      "tme-epi-028": 0.2,
+      "tme-epi-029": 0.5,
       "tme-epi-030": 1.0,
       "tme-epi-031": 1.0,
-      "tme-epi-032": 1.0,
-      "tme-epi-033": 0.7143,
-      "tme-epi-034": 0.8333,
-      "tme-epi-035": 0.8333,
+      "tme-epi-032": 0.75,
+      "tme-epi-033": 0.2857,
+      "tme-epi-034": 0.4,
+      "tme-epi-035": 0.4286,
       "tme-epi-036": 1.0,
       "tme-epi-037": 1.0,
       "tme-epi-038": 1.0,
@@ -75,10 +71,10 @@
       "tme-epi-041": 1.0,
       "tme-epi-042": 1.0,
       "tme-epi-043": 1.0,
-      "tme-epi-044": 0.0,
+      "tme-epi-044": 1.0,
       "tme-epi-045": 1.0,
       "tme-epi-046": 1.0,
-      "tme-epi-047": 0.0,
+      "tme-epi-047": 1.0,
       "tme-epi-048": 1.0,
       "tme-epi-049": 1.0,
       "tme-epi-050": 1.0
@@ -100,9 +96,9 @@
     "g_distribution": {
       "1": 35,
       "4": 4,
-      "5": 3,
+      "5": 4,
       "6": 3,
-      "7": 5
+      "7": 4
     },
     "h_min": 15,
     "h_max": 25,
@@ -112,16 +108,15 @@
   },
   "probes": {
     "status": "run",
-    "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:39:54Z",
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-15T12:42:04Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 49,
-      "failed": [
-        "tme-epi-049"
-      ]
+      "passed": 50,
+      "failed": []
     },
     "v1_pair_flip": {
       "pairs": 0,
@@ -484,7 +479,7 @@
         "v6": null
       },
       "tme-epi-049": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -498,6 +493,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "751374fa7d340d43f2dad17c976fad2e9c535c52a3cafc8204908205ff2e1b98"
+    "probed_corpus_sha256": "e31e198b3bb2cd28b54d59ad996933262668b38a24aeb7db591b3cfc0849a881"
   }
 }

@@ -387,7 +387,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
 
     return {
         "status": "run",
-        "reference_model": os.environ.get("AZURE_OPENAI_DEPLOYMENT", "unknown"),
+        # The deployment NAME, which is what the caller controls and not a model identity: a
+        # deployment can be renamed or repointed at a different model without the record changing.
+        # Stated as what it is so nobody reads it as a pinned model version.
+        "reference_deployment": os.environ.get("AZURE_OPENAI_DEPLOYMENT", "unknown"),
+        "reference_model_note": (
+            "Azure deployment name, not a model identity — a deployment may be repointed at a "
+            "different model without this value changing."
+        ),
         "run_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "questions_probed": len(entries),
         "match_detection": (

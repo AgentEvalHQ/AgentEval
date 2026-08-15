@@ -3,7 +3,7 @@
   "vertical": "prospective",
   "revision": "v1",
   "question_count": 50,
-  "corpus_sha256": "4e045d4d9c32e9055209f55016c1b6ac3b4640c3fdb211c4229524f4eb624d8b",
+  "corpus_sha256": "f66fcd61cffeedb8286f06a988fa4bed674b6399fb392704d1f2f45a4150e861",
   "generator": {
     "tool": "tools/gen_typedmemeval_prospective.py",
     "version": "1.0.0",
@@ -14,7 +14,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.82,
+    "mean_realised": 0.8,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
@@ -24,24 +24,24 @@
       ],
       [
         0.5,
-        0.82
+        0.8
       ]
     ],
     "per_question": {
       "tme-pro-001": 0.0,
-      "tme-pro-002": 0.0,
+      "tme-pro-002": 1.0,
       "tme-pro-003": 1.0,
-      "tme-pro-004": 0.0,
+      "tme-pro-004": 1.0,
       "tme-pro-005": 1.0,
       "tme-pro-006": 1.0,
       "tme-pro-007": 1.0,
-      "tme-pro-008": 1.0,
+      "tme-pro-008": 0.0,
       "tme-pro-009": 1.0,
       "tme-pro-010": 1.0,
       "tme-pro-011": 1.0,
       "tme-pro-012": 1.0,
-      "tme-pro-013": 1.0,
-      "tme-pro-014": 1.0,
+      "tme-pro-013": 0.0,
+      "tme-pro-014": 0.0,
       "tme-pro-015": 1.0,
       "tme-pro-016": 1.0,
       "tme-pro-017": 1.0,
@@ -52,24 +52,24 @@
       "tme-pro-022": 0.0,
       "tme-pro-023": 1.0,
       "tme-pro-024": 1.0,
-      "tme-pro-025": 1.0,
-      "tme-pro-026": 1.0,
+      "tme-pro-025": 0.0,
+      "tme-pro-026": 0.0,
       "tme-pro-027": 1.0,
       "tme-pro-028": 1.0,
       "tme-pro-029": 1.0,
       "tme-pro-030": 1.0,
-      "tme-pro-031": 0.0,
-      "tme-pro-032": 0.0,
+      "tme-pro-031": 1.0,
+      "tme-pro-032": 1.0,
       "tme-pro-033": 1.0,
       "tme-pro-034": 1.0,
       "tme-pro-035": 1.0,
       "tme-pro-036": 1.0,
       "tme-pro-037": 1.0,
       "tme-pro-038": 1.0,
-      "tme-pro-039": 1.0,
-      "tme-pro-040": 1.0,
-      "tme-pro-041": 0.0,
-      "tme-pro-042": 0.0,
+      "tme-pro-039": 0.0,
+      "tme-pro-040": 0.0,
+      "tme-pro-041": 1.0,
+      "tme-pro-042": 1.0,
       "tme-pro-043": 1.0,
       "tme-pro-044": 1.0,
       "tme-pro-045": 1.0,
@@ -102,31 +102,28 @@
   },
   "probes": {
     "status": "run",
-    "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:39:54Z",
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-15T12:42:04Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 44,
+      "passed": 46,
       "failed": [
+        "tme-pro-006",
         "tme-pro-042",
-        "tme-pro-044",
-        "tme-pro-045",
         "tme-pro-046",
-        "tme-pro-048",
-        "tme-pro-050"
+        "tme-pro-048"
       ]
     },
     "v1_pair_flip": {
       "pairs": 19,
-      "passed": 14,
+      "passed": 16,
       "failed": [
         "tme-pro-p15",
-        "tme-pro-p16",
         "tme-pro-p17",
-        "tme-pro-p18",
-        "tme-pro-p19"
+        "tme-pro-p18"
       ]
     },
     "v2_non_inferability": {
@@ -139,8 +136,10 @@
     },
     "v3_gold_ablated": {
       "applicable": 50,
-      "passed": 50,
-      "failed": []
+      "passed": 49,
+      "failed": [
+        "tme-pro-011"
+      ]
     },
     "v6_leave_one_out": {
       "applicable": 0,
@@ -184,7 +183,7 @@
         "v6": null
       },
       "tme-pro-006": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -222,7 +221,7 @@
         "v1": true,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
+        "v3": false,
         "v6": null
       },
       "tme-pro-012": {
@@ -450,14 +449,14 @@
         "v6": null
       },
       "tme-pro-044": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       },
       "tme-pro-045": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -492,13 +491,13 @@
         "v6": null
       },
       "tme-pro-050": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "v6": null
       }
     },
-    "probed_corpus_sha256": "4e045d4d9c32e9055209f55016c1b6ac3b4640c3fdb211c4229524f4eb624d8b"
+    "probed_corpus_sha256": "f66fcd61cffeedb8286f06a988fa4bed674b6399fb392704d1f2f45a4150e861"
   }
 }

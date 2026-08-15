@@ -237,7 +237,7 @@ public static class BenchTypedMemEvalCommand
                 metrics["pairs_both_arms_correct"] = pairs.BothArmsCorrect;
                 metrics["pairs_premature_before"] = pairs.PrematureBefore;
                 metrics["pairs_missed_after"] = pairs.MissedAfter;
-                metrics["pairs_both_arms_same_outcome"] = pairs.BothArmsSameOutcome;
+                metrics["pairs_both_arms_same_outcome"] = pairs.TimeBlindPattern;
             }
 
             var summary = new RunSummary(
@@ -270,7 +270,10 @@ public static class BenchTypedMemEvalCommand
 
         PrintTypedReport(descriptor, result, typed, runId, runDir);
 
-        return measured > 0 ? ExitCodes.Success : ExitCodes.GateInconclusive;
+        // GateIndeterminate (11) is the documented bench code for "no verdict"; 6 belongs to
+        // `gatekeeper inspect`, and reusing it would make a script keyed on exit codes read a
+        // TypedMemEval run that measured nothing as a gatekeeper result.
+        return measured > 0 ? ExitCodes.Success : ExitCodes.GateIndeterminate;
     }
 
     private static void PrintTypedReport(
@@ -312,7 +315,7 @@ public static class BenchTypedMemEvalCommand
             Console.WriteLine($"     both arms correct        {pairs.BothArmsCorrect}");
             Console.WriteLine($"     premature before-arm     {pairs.PrematureBefore}");
             Console.WriteLine($"     missed after-arm         {pairs.MissedAfter}");
-            Console.WriteLine($"     both arms same outcome   {pairs.BothArmsSameOutcome}");
+            Console.WriteLine($"     time-blind pattern   {pairs.TimeBlindPattern}");
             Console.WriteLine("       gold flips between the arms by construction, so the excess over both-arms-correct");
             Console.WriteLine("       is the signature of a system that never received the query time.");
         }

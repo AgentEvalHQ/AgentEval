@@ -81,12 +81,26 @@ public sealed class TypedMemEvalPairConsistency
     public int MissedAfter { get; init; }
 
     /// <summary>
-    /// Pairs whose two arms produced the same outcome despite gold flipping between them.
-    /// The signature of a system that never received the query time — or ignored it and read a
-    /// wall clock instead. Surfaced as its own count so that finding reads as systematic rather
-    /// than dissolving into random error.
+    /// Pairs whose two arms are consistent with one fixed answer given to both — the signature of
+    /// a system that never received the query time, or ignored it and read a wall clock instead.
     /// </summary>
-    public int BothArmsSameOutcome { get; init; }
+    /// <remarks>
+    /// <para>
+    /// Not "the same outcome on both arms". Outcomes are measured against gold, and gold flips
+    /// between the arms, so a system that always says "nothing is due yet" scores
+    /// <see cref="TypedMemEvalOutcome.Correct"/> on the before-arm and
+    /// <see cref="TypedMemEvalOutcome.Missed"/> on the after-arm — two different labels for one
+    /// unchanging answer. Counting identical labels would have missed exactly the system this
+    /// count exists to find.
+    /// </para>
+    /// <para>
+    /// The two patterns are: correct-then-missed (always "not yet") and premature-then-correct
+    /// (always "it happened"). Both are <i>consistent with</i> time-blindness rather than proof of
+    /// it — a system can produce one by chance on a single pair — which is why this is a count over
+    /// pairs and not a verdict.
+    /// </para>
+    /// </remarks>
+    public int TimeBlindPattern { get; init; }
 }
 
 /// <summary>Evidence-attribution totals, with the honesty fields that keep them readable.</summary>
@@ -118,8 +132,27 @@ public sealed class TypedMemEvalCoverageSummary
     /// <summary>Questions for which coverage could be computed.</summary>
     public required int Observed { get; init; }
 
+    /// <summary>
+    /// Observed questions that actually have gold to retrieve.
+    /// </summary>
+    /// <remarks>
+    /// A never-known probe has no gold, so its coverage is vacuously 1.0 — it cannot miss what was
+    /// never there. Forgetting is 30% such questions, enough to lift a mean noticeably, so the
+    /// denominator that excludes them travels beside the one that does not.
+    /// </remarks>
+    public int ObservedWithGold { get; init; }
+
     /// <summary>Mean realised coverage over observed questions; null when none were observed.</summary>
+    /// <remarks>
+    /// Includes the vacuous 1.0s. Read <see cref="MeanOverGoldBearing"/> for the measured figure.
+    /// </remarks>
     public double? Mean { get; init; }
+
+    /// <summary>
+    /// Mean realised coverage over observed questions that have gold; null when there are none.
+    /// This is the number that describes retrieval.
+    /// </summary>
+    public double? MeanOverGoldBearing { get; init; }
 
     /// <summary>Lowest realised coverage observed.</summary>
     public double? Minimum { get; init; }
@@ -132,6 +165,11 @@ public sealed class TypedMemEvalCoverageSummary
     /// realised coverage can be read against the number the corpus was calibrated to. A system
     /// below the lexical floor is retrieving worse than word matching.
     /// </summary>
+    /// <remarks>
+    /// Computed over the same gold-bearing questions as <see cref="MeanOverGoldBearing"/>, so the
+    /// two are comparable. Comparing a run's measured coverage against a floor that included
+    /// vacuous 1.0s would flatter every system by the share of no-gold questions in the corpus.
+    /// </remarks>
     public double? CalibratedFloorMean { get; init; }
 }
 

@@ -52,10 +52,17 @@ internal static class TypedMemEvalReportBuilder
                     InconclusiveQuestions = g.Count(q =>
                         q.ExecutionStatus == QuestionExecutionStatus.Completed && !q.Correct.HasValue),
                     AgentFailureQuestions = g.Count(q =>
-                        q.ExecutionStatus == QuestionExecutionStatus.AgentError),
+                        q.ExecutionStatus == QuestionExecutionStatus.AgentError &&
+                        !string.Equals(
+                            q.SafeFailureCode, TypedMemEvalRunner.UnrunFailureCode,
+                            StringComparison.Ordinal)),
                     Duration = TimeSpan.FromTicks(g.Sum(q => q.Duration.Ticks))
                 });
 
+        // A question the runner declined to ask is not a failure of the agent. Counting it as one
+        // would report the harness's own decision as a defect in the system under test.
+        var unrun = results.Count(q =>
+            string.Equals(q.SafeFailureCode, TypedMemEvalRunner.UnrunFailureCode, StringComparison.Ordinal));
         var correct = results.Count(q => q.Correct is true);
         var incorrect = results.Count(q => q.Correct is false);
         var scored = results.Count(q => q.Correct.HasValue);
@@ -89,7 +96,7 @@ internal static class TypedMemEvalReportBuilder
             CorrectQuestions = correct,
             IncorrectQuestions = incorrect,
             InconclusiveQuestions = inconclusive,
-            AgentFailureQuestions = results.Count - completed,
+            AgentFailureQuestions = results.Count - completed - unrun,
             JudgeFailureRate = completed > 0 ? (double)inconclusive / completed : null,
             ScoredTypeCount = typeAccuracies.Count,
             Duration = duration,
@@ -162,6 +169,10 @@ internal static class TypedMemEvalReportBuilder
             : null;
 
         var observed = ordered.Where(d => d.RealisedGoldCoverage.HasValue).ToArray();
+        // A question with no gold cannot miss anything, so its coverage is vacuously 1.0. Averaging
+        // those in would lift the figure by the share of no-gold questions — 30% of Forgetting — and
+        // report retrieval quality the run never measured.
+        var goldBearing = observed.Where(d => d.HasGold).ToArray();
 
         return new TypedMemEvalReport
         {
@@ -206,7 +217,11 @@ internal static class TypedMemEvalReportBuilder
             Coverage = new TypedMemEvalCoverageSummary
             {
                 Observed = observed.Length,
+                ObservedWithGold = goldBearing.Length,
                 Mean = observed.Length > 0 ? observed.Average(d => d.RealisedGoldCoverage!.Value) : null,
+                MeanOverGoldBearing = goldBearing.Length > 0
+                    ? goldBearing.Average(d => d.RealisedGoldCoverage!.Value)
+                    : null,
                 Minimum = observed.Length > 0 ? observed.Min(d => d.RealisedGoldCoverage!.Value) : null,
                 Maximum = observed.Length > 0 ? observed.Max(d => d.RealisedGoldCoverage!.Value) : null,
                 CalibratedFloorMean = calibratedFloorMean
@@ -232,7 +247,7 @@ internal static class TypedMemEvalReportBuilder
         var bothCorrect = 0;
         var premature = 0;
         var missedAfter = 0;
-        var bothSame = 0;
+        var timeBlind = 0;
 
         foreach (var pair in pairs)
         {
@@ -247,11 +262,16 @@ internal static class TypedMemEvalReportBuilder
                 premature++;
             if (after.Outcome == TypedMemEvalOutcome.Missed)
                 missedAfter++;
-            // Gold flips between the arms by construction, so identical outcomes on both arms is
-            // the fingerprint of a system that never received the query time — or ignored it. Named
-            // so that finding reads as systematic rather than dissolving into random error.
-            if (before.Outcome == after.Outcome)
-                bothSame++;
+            // Gold flips between the arms, so one unchanging answer produces two DIFFERENT labels:
+            // "nothing is due yet" reads Correct then Missed, "it already happened" reads Premature
+            // then Correct. Those two patterns are what a time-blind system looks like; counting
+            // identical labels would have missed it entirely.
+            var alwaysNotYet = before.Outcome == TypedMemEvalOutcome.Correct &&
+                               after.Outcome == TypedMemEvalOutcome.Missed;
+            var alwaysFired = before.Outcome == TypedMemEvalOutcome.Premature &&
+                              after.Outcome == TypedMemEvalOutcome.Correct;
+            if (alwaysNotYet || alwaysFired)
+                timeBlind++;
         }
 
         return new TypedMemEvalPairConsistency
@@ -260,7 +280,7 @@ internal static class TypedMemEvalReportBuilder
             BothArmsCorrect = bothCorrect,
             PrematureBefore = premature,
             MissedAfter = missedAfter,
-            BothArmsSameOutcome = bothSame
+            TimeBlindPattern = timeBlind
         };
     }
 

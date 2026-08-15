@@ -266,6 +266,9 @@ def echo_terms(question_text: str, echo: float, rng: random.Random) -> list[str]
     return rng.sample(terms, take)
 
 
+ECHO_LEAD = "Also on my mind:"
+
+
 def weave_echo(sentence: str, terms: list[str]) -> str:
     """Appends echoed vocabulary as a natural-sounding trailing clause.
 
@@ -274,7 +277,7 @@ def weave_echo(sentence: str, terms: list[str]) -> str:
     """
     if not terms:
         return sentence
-    return f"{sentence} (Also on my mind: {', '.join(terms)}.)"
+    return f"{sentence} ({ECHO_LEAD} {', '.join(terms)}.)"
 
 
 # --------------------------------------------------------------------------------------
@@ -362,6 +365,28 @@ def check_answer_not_verbatim(questions: list[Question]) -> list[str]:
     return failures
 
 
+
+def check_echo_parity(questions: list[Question]) -> list[str]:
+    """Refuses a corpus where the calibration clause separates gold from distractors.
+
+    This is the check that would have caught the first shipped build, where gold carried the clause
+    in 0 of 501 sessions and distractors in ~99%. Parity is required per question, not per corpus:
+    a corpus-wide average can look balanced while every individual question is still separable.
+    """
+    failures = []
+    for q in questions:
+        gold = [s for s in q.sessions if s.is_gold]
+        other = [s for s in q.sessions if not s.is_gold]
+        if not gold or not other:
+            continue
+        gold_rate = sum(ECHO_LEAD in s.text() for s in gold) / len(gold)
+        other_rate = sum(ECHO_LEAD in s.text() for s in other) / len(other)
+        if abs(gold_rate - other_rate) > 0.5:
+            failures.append(
+                f"{q.question_id}: the calibration clause is a gold tell "
+                f"(gold {gold_rate:.2f} vs distractors {other_rate:.2f})")
+    return failures
+
 # --------------------------------------------------------------------------------------
 # The calibration gate
 # --------------------------------------------------------------------------------------
@@ -373,6 +398,54 @@ class Calibration:
     iterations: int
     per_question: dict[str, float]
     trace: list[tuple[float, float]]
+
+
+
+def equalise_echo(questions: list[Question], echo: float, rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
+    """Gives gold sessions the same calibration clause the distractors carry, with NEUTRAL terms.
+
+    Generators weave the clause into filler only, which is the natural way to write them and is a
+    fatal mistake: it makes the clause a perfect gold/distractor tell. Measured on the first shipped
+    build, gold carried it 0 times in 501 sessions while distractors carried it in ~99%, so
+    `ECHO_LEAD not in session` isolated every piece of gold evidence in every corpus with a one-line
+    string filter. A benchmark whose evidence is separable without reading it measures nothing.
+
+    The terms matter as much as the clause. Echoing the question's OWN vocabulary into gold removes
+    the tell but hands gold the query's keywords, which lifts its retrieval score -- every corpus
+    busted the calibration ceiling when it was tried that way. So gold receives the same scaffolding
+    built from OTHER questions' vocabulary: the marker stops discriminating, and gold gains no
+    advantage it did not already have.
+
+    Applied centrally, after build and before scoring, so no generator can reintroduce the tell by
+    forgetting it.
+    """
+    pool = sorted({term for q in questions for term in tokenize(q.question)})
+    if not pool:
+        return
+
+    for question in questions:
+        marked = sum(
+            1 for s in question.sessions if not s.is_gold and ECHO_LEAD in s.text())
+        rate = marked / max(1, question.h)
+        own = set(tokenize(question.question))
+        neutral = [term for term in pool if term not in own]
+        if not neutral:
+            continue
+
+        for session in question.sessions:
+            if not session.is_gold or ECHO_LEAD in session.text():
+                continue
+            if rng.random() > rate:
+                continue
+            take = max(1, min(len(neutral), round(len(own) * echo)))
+            terms = rng.sample(neutral, take)
+            # Appended to the assistant turn where there is one, so the clause never lands inside
+            # the user sentence a question's answer is derived from.
+            index = next(
+                (i for i in range(len(session.turns) - 1, -1, -1)
+                 if session.turns[i].role == "assistant"),
+                len(session.turns) - 1)
+            session.turns[index].content = weave_echo(session.turns[index].content, terms)
 
 
 def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question], Calibration]:
@@ -391,6 +464,7 @@ def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question
 
     def attempt(echo: float) -> tuple[list[Question], float, dict[str, float]]:
         questions = build(echo, random.Random(seed))  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this selects filler text, not secrets.
+        equalise_echo(questions, echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - deterministic corpus generation
         per_q = {q.question_id: realised_coverage(q) for q in questions}
         mean = sum(per_q.values()) / len(per_q) if per_q else 0.0
         trace.append((round(echo, 4), round(mean, 4)))
@@ -476,6 +550,7 @@ def finalise(
 
     failures = check_structure(questions, structure)
     failures += check_answer_not_verbatim(questions)
+    failures += check_echo_parity(questions)
     if structure.no_absolute_dates:
         failures += check_no_absolute_dates(questions)
     if extra_checks:

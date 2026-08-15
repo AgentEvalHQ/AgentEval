@@ -132,8 +132,8 @@ public sealed class TypedMemEvalCorpusTests
             TypedMemEvalCorpus.Sha256(vertical),                 // DevSkim: ignore DS197836
             probes.GetProperty("probed_corpus_sha256").GetString()); // DevSkim: ignore DS197836
         Assert.False(
-            string.IsNullOrWhiteSpace(probes.GetProperty("reference_model").GetString()),
-            "a probe record must name the model that produced it");
+            string.IsNullOrWhiteSpace(probes.GetProperty("reference_deployment").GetString()),
+            "a probe record must name the deployment that produced it");
 
         foreach (var probe in new[]
                  {
@@ -302,6 +302,103 @@ public sealed class TypedMemEvalCorpusTests
                     Assert.DoesNotContain("_abs", questionId, StringComparison.Ordinal);
                     Assert.Single(extension.GoldSessionIndices);
                     break;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(TypedMemEvalVertical.Prospective)]
+    [InlineData(TypedMemEvalVertical.Arithmetic)]
+    public void TimeDependentCorpora_StateNoAbsoluteDateInAnyMessage(TypedMemEvalVertical vertical)
+    {
+        // V4, and the property the time-dependent verticals rest on. A single printed date in a
+        // conversation lets a system that stores no time at all answer from the text, which is
+        // exactly the hole these corpora exist to close. The generators enforce it at authoring
+        // time; this is the half that runs over what actually ships.
+        foreach (var entry in TypedMemEvalCorpus.Load(vertical))
+        {
+            foreach (var turn in entry.HaystackSessions!.SelectMany(session => session))
+            {
+                Assert.False(
+                    LongMemEvalTimestamps.LooksDated(turn.Content),
+                    $"{entry.QuestionId}: message content carries an absolute date: {turn.Content}");
+            }
+        }
+    }
+
+    [Fact]
+    public void ArithmeticDeltasAndDurations_RecomputeFromTheirOwnInputs()
+    {
+        // V5 for the two operations the sum/count check cannot cover. A duration's inputs each span
+        // a pair of sessions, so this also pins the from/to pairing that the per-component coverage
+        // breakdown is built from.
+        var extensions = TypedMemEvalExtensions.Parse(
+            TypedMemEvalCorpus.ReadJson(TypedMemEvalVertical.Arithmetic));
+
+        var checkedDurations = 0;
+        var checkedDeltas = 0;
+        foreach (var (questionId, extension) in extensions)
+        {
+            var derivation = extension.Derivation!;
+            switch (derivation.Operation)
+            {
+                case "duration":
+                    // Every input must name the session it started from, or half its gold is
+                    // unaccounted for and the component list silently describes a shorter question.
+                    Assert.All(
+                        derivation.Inputs,
+                        input => Assert.NotNull(input.FromSessionIndex));
+                    Assert.True(
+                        Math.Abs(derivation.Inputs.Sum(i => i.Value) - derivation.Value) < 0.005,
+                        $"{questionId}: intervals sum to {derivation.Inputs.Sum(i => i.Value)}, " +
+                        $"recorded {derivation.Value}");
+                    checkedDurations++;
+                    break;
+
+                case "delta":
+                    Assert.True(
+                        derivation.Inputs.Count >= 2,
+                        $"{questionId}: a difference needs at least two inputs");
+                    checkedDeltas++;
+                    break;
+            }
+        }
+
+        // A check that silently covered nothing would be worse than no check.
+        Assert.Equal(12, checkedDurations);
+        Assert.Equal(10, checkedDeltas);
+    }
+
+    [Fact]
+    public void CalibrationClause_IsNotAGoldTell()
+    {
+        // The scaffolding the calibration gate appends must not separate gold from distractors.
+        // The first build of these corpora had it on distractors only — gold carried it 0 times in
+        // 501 sessions — so `clause not present` isolated every piece of gold evidence in every
+        // corpus with a one-line string filter. A benchmark whose evidence is separable without
+        // reading it measures nothing.
+        const string clause = "Also on my mind";
+
+        foreach (var descriptor in TypedMemEvalVerticals.All)
+        {
+            var extensions = TypedMemEvalExtensions.Parse(
+                TypedMemEvalCorpus.ReadJson(descriptor.Vertical));
+
+            foreach (var entry in TypedMemEvalCorpus.Load(descriptor.Vertical))
+            {
+                var gold = extensions[entry.QuestionId].GoldSessionIndices.ToHashSet();
+                var sessions = entry.HaystackSessions!;
+                if (gold.Count == 0 || gold.Count == sessions.Count)
+                    continue;
+
+                double Rate(bool wantGold) => sessions
+                    .Where((_, i) => gold.Contains(i) == wantGold)
+                    .Average(s => s.Any(turn => turn.Content.Contains(clause, StringComparison.Ordinal)) ? 1.0 : 0.0);
+
+                Assert.True(
+                    Math.Abs(Rate(true) - Rate(false)) <= 0.5,
+                    $"{entry.QuestionId}: the calibration clause separates gold from distractors " +
+                    $"(gold {Rate(true):F2} vs distractors {Rate(false):F2}).");
             }
         }
     }

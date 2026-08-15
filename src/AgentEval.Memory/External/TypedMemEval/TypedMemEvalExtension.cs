@@ -6,7 +6,19 @@ using System.Text.Json;
 namespace AgentEval.Memory.External.TypedMemEval;
 
 /// <summary>One input to a gold arithmetic derivation.</summary>
-public sealed record TypedMemEvalDerivationInput(int SessionIndex, double Value);
+public sealed record TypedMemEvalDerivationInput(
+    int SessionIndex,
+    double Value,
+    int? FromSessionIndex = null)
+{
+    /// <summary>
+    /// Every gold session this input depends on. A duration input spans a pair of sessions — the
+    /// event it started at and the one it ended at — and reporting only the end would leave half of
+    /// a duration question's gold out of its own component list.
+    /// </summary>
+    public IEnumerable<int> SessionIndices =>
+        FromSessionIndex is { } from ? [from, SessionIndex] : [SessionIndex];
+}
 
 /// <summary>
 /// The recorded gold derivation for an Arithmetic question: what was combined, how, and to what.
@@ -163,7 +175,11 @@ public static class TypedMemEvalExtensions
             ? array.EnumerateArray()
                 .Select(input => new TypedMemEvalDerivationInput(
                     input.GetProperty("session_index").GetInt32(),
-                    input.GetProperty("value").GetDouble()))
+                    input.GetProperty("value").GetDouble(),
+                    input.TryGetProperty("from_session_index", out var from) &&
+                    from.ValueKind == JsonValueKind.Number
+                        ? from.GetInt32()
+                        : null))
                 .ToArray()
             : [];
 

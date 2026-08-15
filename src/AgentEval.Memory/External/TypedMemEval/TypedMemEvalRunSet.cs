@@ -114,6 +114,12 @@ public static class TypedMemEvalRunSet
         RequireSame("judge prompt fingerprint", typed.Select(t => t.JudgePromptFingerprint));
         RequireSame("options fingerprint", results.Select(OptionsFingerprint));
         RequireSame("answer-sampling disposition", results.Select(SamplingFingerprint));
+        // Which questions were drawn, not merely how many. An unseeded run samples afresh every
+        // time, so two such runs would otherwise be banded over whatever their intersection
+        // happened to be — a band across two different experiments wearing one name.
+        RequireSame(
+            "selected questions",
+            results.Select(r => r.Provenance?.SelectedQuestionIdFingerprint ?? "unrecorded"));
 
         // Only questions every run actually ran are compared. A run that sampled a different subset
         // would otherwise contribute flips that are really just absences.
@@ -187,6 +193,9 @@ public static class TypedMemEvalRunSet
             options.DatasetMode ?? "",
             options.TemporalGrounding.ToString(),
             options.HistoryInjectionMode.ToString(),
+            // Whether the agent received session dates at all changes what it was ASKED, not merely
+            // what was recorded, and it is what makes Arithmetic's duration questions answerable.
+            options.IncludeTimestamps.ToString(),
             options.MaxQuestions?.ToString(CultureInfo.InvariantCulture) ?? "",
             options.RandomSeed?.ToString(CultureInfo.InvariantCulture) ?? "",
             options.AnswerTemperature?.ToString("R", CultureInfo.InvariantCulture) ?? "",

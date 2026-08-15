@@ -38,11 +38,11 @@ rather than more corpora under someone else's name.
 
   | Corpus | n | Shapes | BM25 @ K_ref=5 mean coverage |
   |---|---|---|---|
-  | `agenteval-typedmemeval-prospective-v1` | 50 | seed carry-over 12, due-later 16, expiring validity 12, not-yet-true 10 | 0.820 |
-  | `agenteval-typedmemeval-episodic-v1` | 50 | assistant-stated 20, list-order 15, attribution 15 | 0.801 |
-  | `agenteval-typedmemeval-arithmetic-v1` | 50 | counts 14, sums 14, deltas 10, durations 12 | 0.820 |
-  | `agenteval-typedmemeval-workingmemory-v1` | 48 | 12 fact families × distances 1/5/15/40 | 0.667 |
-  | `agenteval-typedmemeval-forgetting-v1` | 50 | invalidated 20, still-valid 15, never-known 15 | 0.820 |
+  | `agenteval-typedmemeval-prospective-v1` | 50 | seed carry-over 12, due-later 16, expiring validity 12, not-yet-true 10 | 0.800 |
+  | `agenteval-typedmemeval-episodic-v1` | 50 | assistant-stated 20, list-order 15, attribution 15 | 0.865 |
+  | `agenteval-typedmemeval-arithmetic-v1` | 50 | counts 14, sums 14, deltas 10, durations 12 | 0.626 |
+  | `agenteval-typedmemeval-workingmemory-v1` | 48 | 12 fact families × distances 1/5/15/40 | 0.729 |
+  | `agenteval-typedmemeval-forgetting-v1` | 50 | invalidated 20, still-valid 15, never-known 15 | 0.700 (0.571 over its 35 gold-bearing questions) |
 
 - **Typed outcomes, never one percentage.** `ExternalBenchmarkResult.TypedOutcomes` and
   `QuestionResult.TypedOutcome` (both additive and nullable) report
@@ -97,20 +97,22 @@ model at authoring time, with per-question records stamped into corpus metadata.
 dates in message content) and V5 (gold derived from the emitted sessions, never typed) are enforced
 by the generators and re-checked in CI.
 
-Shipped records, against reference model `gpt-5.5`. Dashes are not-applicable rather than skipped:
-V6 needs multi-component gold, pair-flip needs pairs, and V1/V2 do not apply to a never-known probe
-whose gold is itself an abstention.
+Shipped records, against reference deployment `gpt-5.5`. Dashes are not-applicable rather than skipped, for a different reason per column. Pair-flip needs
+pairs. V6 is scoped by design to Arithmetic and Forgetting (ADR §12) — not for want of
+multi-component gold elsewhere, since Episodic list-order runs G = 4–7 — but because those two are
+where per-component coverage depends on every component being load-bearing. V1 and V2 do not apply
+to a never-known probe, whose gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
 |---|---|---|---|---|---|
-| Prospective | 44/50 | 14/19 | 50/50 | 50/50 | — |
-| Episodic | 49/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+| Prospective | 46/50 | 16/19 | 50/50 | 49/50 | — |
+| Episodic | 50/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
 | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
 
-Reported as measured. The V1 shortfalls sit where the answer model rather than the memory system is
-the limit — all five Arithmetic misses are duration questions summing several timestamp-derived
+Reported as measured. The remaining V1 shortfalls sit where the answer model rather than the memory
+system is the limit — the Arithmetic misses are duration questions summing several timestamp-derived
 intervals, and their arithmetic was verified correct independently of the model — so they are the
 vertical's noise floor, and the per-question records name which ones.
 
@@ -119,7 +121,17 @@ computed every due date from an anchor timestamp that was then overwritten when 
 shuffled and re-stamped, so all 38 of its generated pair questions named dates their own
 conversations could not produce. Every structural check passed — none of them re-did the arithmetic
 — and V1 failed 38 of 50 while all 12 hand-authored seed questions passed. Fixed, the same corpus
-scores 44/50 with 14 of 19 pairs flipping, and the arithmetic is now a hard generator rule.
+scores 46/50 with 16 of 19 pairs flipping, and the arithmetic is now a hard generator rule.
+
+A pre-release review caught a defect that invalidated all five corpora: the calibration clause the
+gate appends to distractors was never appended to gold, so gold carried it 0 times in 501 sessions
+against ~99% for distractors and a one-line string filter isolated every piece of gold evidence in
+every corpus. Gold now receives the same clause built from *other* questions' vocabulary — the
+marker stops discriminating without handing gold the query's keywords, which was the first attempt
+and pushed every corpus through the calibration ceiling. A parity check now runs in the generator
+and again in CI. The same review found the whole not-yet-true shape asserting an event had happened
+from evidence that only stated a plan, a malformed template in all twelve expiring-validity
+questions, and carried gold pinned to the tail of its haystack while metadata claimed shuffled.
 
 Two further findings were flaws in the *probes*, not the corpora, with one root cause: where gold is
 a negative ("no longer valid", "never recorded"), a model given no evidence produces something that

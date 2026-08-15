@@ -160,6 +160,13 @@ public sealed class TypedMemEvalQuestionDetail
     /// <summary>Which list <see cref="RealisedGoldCoverage"/> came from.</summary>
     public TypedMemEvalCoverageSource CoverageSource { get; init; }
 
+    /// <summary>
+    /// Whether this question has gold evidence at all. False for a never-known probe, whose
+    /// coverage is vacuously complete because there is nothing to retrieve — recorded so a run
+    /// mean can exclude them rather than be quietly lifted by them.
+    /// </summary>
+    public bool HasGold { get; init; }
+
     /// <summary>Per-component presence, where the question has more than one gold component.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<TypedMemEvalComponentCoverage>? ComponentCoverage { get; init; }

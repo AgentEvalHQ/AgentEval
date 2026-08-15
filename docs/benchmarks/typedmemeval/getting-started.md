@@ -69,7 +69,7 @@ round-trip is the correctness signal. Programmatic callers can use any `IChatCli
 It prints the typed vector with every denominator — the run totals, the per-shape strata, coverage
 against the corpus's calibrated floor, and the attribution counts — plus the vertical's own extras
 (pair consistency, the distance curve, the three forgetting sub-counts). It gates on nothing: the
-family publishes no pass threshold, so the run exits `0` when it measured anything and `6` when it
+family publishes no pass threshold, so the run exits `0` when it measured anything and `11` when it
 measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL.
 
 The CLI writes a canonical manifest, summary, and `report-native.json`. The native report preserves
@@ -149,6 +149,13 @@ it and read a wall clock instead.
 Memory of the conversation *as an event*: 20 assistant-stated answers (the user never states them),
 15 list-order questions, 15 speaker-attribution questions.
 
+**Known limitation, v1.** The attribution shape's statements are emitted from matched templates so
+that either speaker could plausibly have said them (that is what stops the answer being inferable
+from content). A consequence is that the surrounding wording is fixed, so a system that stores no
+speaker label at all can still recover the answer from the template rather than from memory. The
+shape therefore measures less than its name promises until v2 varies the framing; read its numbers
+as a floor, not as speaker-attribution accuracy.
+
 List-order is scored **conditionally on coverage**: pairwise-order accuracy over the items the
 answer actually mentions, because a budget-limited system may only have seen some of them and
 grading it on items it never saw would measure the budget rather than the ordering.
@@ -225,11 +232,18 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.801 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.820 | 3–6 |
-| WorkingMemory | 48 | 0.667 | 1 |
-| Forgetting | 50 | 0.820 | 0 (×15), 1 (×15), 2 (×20) |
+| Prospective | 50 | 0.800 | 1 (×46), 2 (×4) |
+| Episodic | 50 | 0.865 | 1 (×35), 4–7 (×15) |
+| Arithmetic | 50 | 0.626 | 3–6 |
+| WorkingMemory | 48 | 0.729 | 1 |
+| Forgetting | 50 | 0.700 — **0.571 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+
+Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
+fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
+scores 1.0 vacuously — it cannot miss what was never there. The headline mean therefore mixes
+measurement with definition, so the gold-bearing figure travels beside it, and the floor a run is
+compared against (`Coverage.CalibratedFloorMean`) is computed over gold-bearing questions only. A
+floor inflated by vacuous ones would flatter every system by the share of no-gold questions.
 
 ## Validity rules
 
@@ -244,22 +258,27 @@ Written before generation, and re-checked in CI over what actually ships:
 | **V5** Gold derived, not typed | Generators derive every gold answer from the sessions they emitted. |
 | **V6** Component non-redundancy | For Arithmetic and Forgetting, ablating any single gold component must stop the model producing the gold. |
 
-Shipped probe records (reference model `gpt-5.5`, per-question outcomes in each corpus's
-`.meta.json`). Dashes are not-applicable rather than skipped: V6 needs multi-component gold, and
-pair-flip needs pairs.
+Shipped probe records (reference deployment `gpt-5.5`, per-question outcomes in each corpus's
+`.meta.json`). Dashes are not-applicable rather than skipped, but for different reasons per column, and the
+difference matters. Pair-flip needs pairs, which only Prospective and Forgetting have. V6 is
+scoped by design to Arithmetic and Forgetting (ADR §12) — not because the other verticals lack
+multi-component gold, since Episodic list-order has G = 4–7 and some Prospective questions have
+G = 2, but because those are the two verticals whose per-component coverage echo depends on every
+component being individually load-bearing. V1 and V2 do not apply to a never-known probe, whose
+gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 44/50 | 14/19 | 50/50 | 50/50 | — |
-| Episodic | 49/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 45/50 | — | 50/50 | 50/50 | 50/50 |
+| Prospective | 46/50 | 16/19 | 50/50 | 49/50 | — |
+| Episodic | 50/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
 | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
 
-These are reported as measured. The V1 shortfalls are concentrated where the *answer model*, not the
-memory system, is the limit: all five Arithmetic misses are duration questions, whose gold requires
-summing several intervals derived from timestamps, and whose arithmetic was verified correct
-independently of the model. Six Prospective questions and five of its pairs sit in the same place.
+These are reported as measured. The remaining V1 shortfalls sit where the *answer model*, not the
+memory system, is the limit: the Arithmetic misses are duration questions whose gold requires
+summing several timestamp-derived intervals, and whose arithmetic was verified correct independently
+of the model. Four Prospective questions and three of its pairs sit in the same place.
 A question the ceiling cannot answer measures the ceiling, so treat those as the noise floor of the
 vertical rather than as headroom in the system under test — the per-question records name exactly
 which ones they are.

@@ -186,7 +186,8 @@ public sealed class TypedMemEvalRunner
                 unrunReasons[entry.QuestionId] = reason;
                 details[entry.QuestionId] = Detail(
                     TypedMemEvalOutcome.Unrun, extension, TypedMemEvalCoverage.Unobserved, null);
-                results.Add(Skipped(entry, extension, reason, questionStopwatch.Elapsed));
+                results.Add(Skipped(
+                    entry, details[entry.QuestionId], reason, questionStopwatch.Elapsed));
                 continue;
             }
 
@@ -441,6 +442,7 @@ public sealed class TypedMemEvalRunner
             AttributionLevel = coverage.Level,
             RealisedGoldCoverage = coverage.Coverage,
             CoverageSource = coverage.Source,
+            HasGold = extension.GoldSessionIndices.Count > 0,
             ComponentCoverage = coverage.Components,
             Shape = extension.Shape,
             PairId = extension.PairId,
@@ -454,8 +456,16 @@ public sealed class TypedMemEvalRunner
         };
     }
 
+    /// <summary>
+    /// The result for a question that was never asked. It carries its typed detail like every other
+    /// result: without it the question is invisible to the per-question surface and to banding, and
+    /// a deliberate skip reads as an absence rather than as the recorded decision it was.
+    /// </summary>
     private static QuestionResult Skipped(
-        LongMemEvalEntry entry, TypedMemEvalExtension extension, string reason, TimeSpan elapsed)
+        LongMemEvalEntry entry,
+        TypedMemEvalQuestionDetail detail,
+        string reason,
+        TimeSpan elapsed)
         => new()
         {
             QuestionId = entry.QuestionId,
@@ -469,8 +479,15 @@ public sealed class TypedMemEvalRunner
             JudgeStatus = null,
             IsAbstention = entry.IsAbstention,
             AgentLlmCallCount = 0,
-            SafeFailureCode = "unrun_requires_timestamps",
+            SafeFailureCode = UnrunFailureCode,
             JudgeExplanation = reason,
+            TypedOutcome = detail,
             Duration = elapsed
         };
+
+    /// <summary>
+    /// Marks a question the runner chose not to ask. Read by the report builder so a deliberate
+    /// skip is not tallied as an agent failure.
+    /// </summary>
+    internal const string UnrunFailureCode = "unrun_requires_timestamps";
 }

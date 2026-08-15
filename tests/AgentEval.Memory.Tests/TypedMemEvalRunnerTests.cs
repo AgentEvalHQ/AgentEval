@@ -99,11 +99,30 @@ public sealed class TypedMemEvalRunnerTests
         Assert.Equal(19, pairs!.Pairs);
         Assert.Equal(19, pairs.BothArmsCorrect);
 
-        // Gold flips between the arms by construction, so a judge that returns the same verdict for
-        // both is the fingerprint of a system that never received the query time. Counted rather
-        // than left to dissolve into random error — here the constant-verdict fake produces exactly
-        // that pattern, which is what the count is for.
-        Assert.Equal(19, pairs.BothArmsSameOutcome);
+        // A fake judge that calls everything correct is NOT a time-blind system: gold flips between
+        // the arms, so a genuinely time-blind answer produces Correct-then-Missed or
+        // Premature-then-Correct, never Correct-then-Correct. This assertion pins that distinction,
+        // because the first version of the metric counted identical outcomes and would have scored
+        // this run 19/19 — reporting a time-blindness finding about a run that has none.
+        Assert.Equal(0, pairs.TimeBlindPattern);
+    }
+
+    [Fact]
+    public async Task Prospective_FlagsATimeBlindSystemByItsPairPattern()
+    {
+        // The finding the pair design exists to produce. This judge answers every question as
+        // though the reminder had not yet fired, which is what a system reading a wall clock (or
+        // receiving no query time at all) does — and because gold flips between the arms, that one
+        // unchanging answer scores Correct on the before-arm and Missed on the after-arm.
+        var runner = new TypedMemEvalRunner(new ArmAwareJudge());
+        var result = await runner.RunAsync(
+            new TypedMemEvalGuardTests.RecordingAgent(), TypedMemEvalVertical.Prospective);
+
+        var pairs = result.TypedOutcomes!.PairConsistency!;
+        Assert.Equal(19, pairs.Pairs);
+        Assert.Equal(19, pairs.TimeBlindPattern);
+        Assert.Equal(0, pairs.BothArmsCorrect);
+        Assert.Equal(19, pairs.MissedAfter);
     }
 
     [Fact]
@@ -306,6 +325,42 @@ public sealed class TypedMemEvalRunnerTests
         Assert.Equal($"{descriptor.CorpusId}-control", control.DatasetMode);
         Assert.Equal(TemporalGroundingMode.TimestampsOnly, probe.TemporalGrounding);
         Assert.Equal(TemporalGroundingMode.TimestampsAndText, control.TemporalGrounding);
+    }
+
+    /// <summary>
+    /// A judge standing in for a time-blind system: it grades every answer as though nothing had
+    /// fired yet, which is Correct on a before-arm and Missed on an after-arm.
+    /// </summary>
+    private sealed class ArmAwareJudge : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            // The gold text is in the prompt, and a before-arm's gold opens with an explicit not-yet.
+            // Matched on the gold's own opening rather than a bare "still valid", which also appears
+            // in the QUESTION of every expiring-validity pair and so matched both arms.
+            var prompt = string.Join(" ", chatMessages.Select(m => m.Text));
+            var beforeArm = prompt.Contains("Not yet.", StringComparison.Ordinal) ||
+                            prompt.Contains("Yes, still valid", StringComparison.Ordinal);
+            var outcome = beforeArm ? "correct" : "missed";
+            return Task.FromResult(new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                $$"""{"outcome": "{{outcome}}", "reasoning": "time-blind stand-in"}""")));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
     }
 
     /// <summary>Answers oracle-projected questions with a fixed string.</summary>

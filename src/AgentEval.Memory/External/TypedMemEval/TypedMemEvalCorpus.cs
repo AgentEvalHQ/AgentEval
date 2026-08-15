@@ -108,11 +108,27 @@ public static class TypedMemEvalCorpus
     internal static double? CalibratedFloorMean(TypedMemEvalVertical vertical)
     {
         using var document = JsonDocument.Parse(ReadMetadataJson(vertical));
-        return document.RootElement.TryGetProperty("coverage", out var coverage) &&
-               coverage.TryGetProperty("mean_realised", out var mean) &&
-               mean.ValueKind == JsonValueKind.Number
-            ? mean.GetDouble()
-            : null;
+        if (!document.RootElement.TryGetProperty("coverage", out var coverage) ||
+            !coverage.TryGetProperty("per_question", out var perQuestion) ||
+            perQuestion.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        // Averaged over gold-bearing questions only. The stamped mean includes never-known probes,
+        // whose coverage is vacuously 1.0 because they have nothing to miss — 30% of the Forgetting
+        // corpus — and a floor inflated by those would flatter every system measured against it.
+        var goldBearing = TypedMemEvalExtensions.Parse(ReadJson(vertical))
+            .Where(kv => kv.Value.GoldSessionIndices.Count > 0)
+            .Select(kv => kv.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var values = perQuestion.EnumerateObject()
+            .Where(p => goldBearing.Contains(p.Name) && p.Value.ValueKind == JsonValueKind.Number)
+            .Select(p => p.Value.GetDouble())
+            .ToArray();
+
+        return values.Length > 0 ? values.Average() : null;
     }
 
     private static string ReadResource(string suffix)

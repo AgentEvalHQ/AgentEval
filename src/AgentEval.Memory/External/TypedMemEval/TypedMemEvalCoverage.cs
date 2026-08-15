@@ -96,14 +96,7 @@ internal static class TypedMemEvalCoverage
             return new Result(
                 0.0, source, TypedMemEvalEvidenceAttribution.EvidenceAbsent,
                 TypedMemEvalAttributionLevel.Reference,
-                extension.GoldComponents?
-                    .Select(c => new TypedMemEvalComponentCoverage
-                    {
-                        Kind = c.Kind,
-                        SessionIndex = c.SessionIndex,
-                        Present = false
-                    })
-                    .ToArray());
+                AbsentComponents(extension));
         }
 
         var contentBySession = references
@@ -114,7 +107,10 @@ internal static class TypedMemEvalCoverage
         // Presence is computed once per gold session and memoised, so the component list and the
         // coverage fraction cannot disagree about the same session.
         var presence = new Dictionary<int, bool>();
-        var contentCheckedAll = true;
+        // Counted rather than flagged. A flag that only clears on the referenced-but-content-free
+        // branch stays true when a gold session is absent from the references entirely, and the run
+        // then advertises a content-level observation nobody made.
+        var contentComparisons = 0;
 
         bool Present(int sessionIndex)
         {
@@ -139,14 +135,11 @@ internal static class TypedMemEvalCoverage
                 {
                     // Content-level: the reference is present AND the gold text survived into what
                     // was surfaced.
+                    contentComparisons++;
                     result = Contains(surfaced, goldText);
                 }
                 else
                 {
-                    // Reference-level only for this component, so the run as a whole cannot claim
-                    // the stronger level. Claiming Content because *some* component carried content
-                    // would advertise an observation the weakest link never made.
-                    contentCheckedAll = false;
                     result = true;
                 }
             }
@@ -157,7 +150,9 @@ internal static class TypedMemEvalCoverage
 
         var present = extension.GoldSessionIndices.Count(Present);
         var coverage = (double)present / extension.GoldSessionIndices.Count;
-        var level = contentCheckedAll
+        // Content only when every gold component was actually compared at content level. Anything
+        // less is a reference-level observation wearing a stronger name.
+        var level = contentComparisons == extension.GoldSessionIndices.Count
             ? TypedMemEvalAttributionLevel.Content
             : TypedMemEvalAttributionLevel.Reference;
 
@@ -179,11 +174,14 @@ internal static class TypedMemEvalCoverage
         else if (extension.Derivation is { Inputs.Count: > 0 } derivation)
         {
             components = derivation.Inputs
-                .Select(i => new TypedMemEvalComponentCoverage
+                .SelectMany(i => i.SessionIndices)
+                .Distinct()
+                .OrderBy(index => index)
+                .Select(index => new TypedMemEvalComponentCoverage
                 {
                     Kind = "input",
-                    SessionIndex = i.SessionIndex,
-                    Present = Present(i.SessionIndex)
+                    SessionIndex = index,
+                    Present = Present(index)
                 })
                 .ToArray();
         }
@@ -193,6 +191,42 @@ internal static class TypedMemEvalCoverage
             : TypedMemEvalEvidenceAttribution.EvidenceAbsent;
 
         return new Result(coverage, source, attribution, level, components);
+    }
+
+    /// <summary>
+    /// The question's components, all absent. Falls back to the derivation's inputs exactly as the
+    /// observed path does, so Arithmetic — which labels inputs rather than gold_components — does
+    /// not lose its per-input breakdown in the one case where every input was missed.
+    /// </summary>
+    private static IReadOnlyList<TypedMemEvalComponentCoverage>? AbsentComponents(
+        TypedMemEvalExtension extension)
+    {
+        if (extension.GoldComponents is { Count: > 0 } declared)
+        {
+            return declared
+                .Select(c => new TypedMemEvalComponentCoverage
+                {
+                    Kind = c.Kind,
+                    SessionIndex = c.SessionIndex,
+                    Present = false
+                })
+                .ToArray();
+        }
+        if (extension.Derivation is { Inputs.Count: > 0 } derivation)
+        {
+            return derivation.Inputs
+                .SelectMany(i => i.SessionIndices)
+                .Distinct()
+                .OrderBy(index => index)
+                .Select(index => new TypedMemEvalComponentCoverage
+                {
+                    Kind = "input",
+                    SessionIndex = index,
+                    Present = false
+                })
+                .ToArray();
+        }
+        return null;
     }
 
     /// <summary>

@@ -3,7 +3,7 @@
   "vertical": "arithmetic",
   "revision": "v1",
   "question_count": 50,
-  "corpus_sha256": "be5ac01fba84926e4d71ee60da77eccf9bd53ae4e02fb4df3885d94af28d4948",
+  "corpus_sha256": "ab69db948db6ee402103ed626877b931172a39b6555f69b7c70af19ea8e5d159",
   "generator": {
     "tool": "tools/gen_typedmemeval_arithmetic.py",
     "version": "1.0.0",
@@ -14,7 +14,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.82,
+    "mean_realised": 0.626,
     "echo": 0.25,
     "iterations": 3,
     "search_trace": [
@@ -24,42 +24,42 @@
       ],
       [
         0.5,
-        0.151
+        0.0267
       ],
       [
         0.25,
-        0.82
+        0.626
       ]
     ],
     "per_question": {
-      "tme-ari-001": 0.5,
-      "tme-ari-002": 1.0,
+      "tme-ari-001": 0.25,
+      "tme-ari-002": 0.75,
       "tme-ari-003": 1.0,
-      "tme-ari-004": 1.0,
-      "tme-ari-005": 0.4,
-      "tme-ari-006": 0.8333,
+      "tme-ari-004": 0.4,
+      "tme-ari-005": 0.2,
+      "tme-ari-006": 0.1667,
       "tme-ari-007": 1.0,
       "tme-ari-008": 1.0,
-      "tme-ari-009": 0.5,
-      "tme-ari-010": 0.6,
+      "tme-ari-009": 0.1667,
+      "tme-ari-010": 0.4,
       "tme-ari-011": 1.0,
       "tme-ari-012": 0.6667,
       "tme-ari-013": 1.0,
       "tme-ari-014": 1.0,
-      "tme-ari-015": 0.8,
+      "tme-ari-015": 0.0,
       "tme-ari-016": 1.0,
-      "tme-ari-017": 0.1667,
+      "tme-ari-017": 0.0,
       "tme-ari-018": 1.0,
-      "tme-ari-019": 1.0,
-      "tme-ari-020": 0.3333,
+      "tme-ari-019": 0.25,
+      "tme-ari-020": 0.0,
       "tme-ari-021": 1.0,
       "tme-ari-022": 1.0,
-      "tme-ari-023": 1.0,
-      "tme-ari-024": 1.0,
-      "tme-ari-025": 0.2,
-      "tme-ari-026": 0.1667,
-      "tme-ari-027": 1.0,
-      "tme-ari-028": 0.5,
+      "tme-ari-023": 0.75,
+      "tme-ari-024": 0.8,
+      "tme-ari-025": 0.0,
+      "tme-ari-026": 0.0,
+      "tme-ari-027": 0.3333,
+      "tme-ari-028": 0.0,
       "tme-ari-029": 1.0,
       "tme-ari-030": 1.0,
       "tme-ari-031": 1.0,
@@ -70,18 +70,18 @@
       "tme-ari-036": 1.0,
       "tme-ari-037": 1.0,
       "tme-ari-038": 1.0,
-      "tme-ari-039": 0.8333,
+      "tme-ari-039": 0.3333,
       "tme-ari-040": 1.0,
       "tme-ari-041": 1.0,
-      "tme-ari-042": 0.8333,
-      "tme-ari-043": 0.5,
-      "tme-ari-044": 0.5,
-      "tme-ari-045": 1.0,
-      "tme-ari-046": 0.5,
+      "tme-ari-042": 0.3333,
+      "tme-ari-043": 0.0,
+      "tme-ari-044": 0.0,
+      "tme-ari-045": 0.5,
+      "tme-ari-046": 0.1667,
       "tme-ari-047": 1.0,
       "tme-ari-048": 1.0,
       "tme-ari-049": 1.0,
-      "tme-ari-050": 0.5
+      "tme-ari-050": 0.1667
     }
   },
   "ceiling": {
@@ -110,19 +110,18 @@
   },
   "probes": {
     "status": "run",
-    "reference_model": "gpt-5.5",
-    "run_at": "2026-08-15T11:39:54Z",
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-15T12:42:04Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 45,
+      "passed": 47,
       "failed": [
-        "tme-ari-040",
+        "tme-ari-039",
         "tme-ari-043",
-        "tme-ari-046",
-        "tme-ari-047",
-        "tme-ari-048"
+        "tme-ari-046"
       ]
     },
     "v1_pair_flip": {
@@ -454,7 +453,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-039": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -462,7 +461,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-040": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -518,7 +517,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-047": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -526,7 +525,7 @@
         "v6_redundant_components": []
       },
       "tme-ari-048": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -550,6 +549,6 @@
         "v6_redundant_components": []
       }
     },
-    "probed_corpus_sha256": "be5ac01fba84926e4d71ee60da77eccf9bd53ae4e02fb4df3885d94af28d4948"
+    "probed_corpus_sha256": "ab69db948db6ee402103ed626877b931172a39b6555f69b7c70af19ea8e5d159"
   }
 }

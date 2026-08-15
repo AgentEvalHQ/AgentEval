@@ -77,6 +77,9 @@ public static class TypedMemEvalEvalResultAdapter
         dimensions["coverage.observed"] = typed.Coverage.Observed;
         if (typed.Coverage.Mean is { } mean)
             dimensions["coverage.mean"] = mean;
+        dimensions["coverage.observedWithGold"] = typed.Coverage.ObservedWithGold;
+        if (typed.Coverage.MeanOverGoldBearing is { } goldMean)
+            dimensions["coverage.meanOverGoldBearing"] = goldMean;
         if (typed.Coverage.CalibratedFloorMean is { } floor)
             dimensions["coverage.calibratedFloorMean"] = floor;
         dimensions["attribution.evidencePresent"] = typed.Attribution.EvidencePresent;
@@ -97,7 +100,7 @@ public static class TypedMemEvalEvalResultAdapter
             dimensions["pairs.bothArmsCorrect"] = pairs.BothArmsCorrect;
             dimensions["pairs.prematureBefore"] = pairs.PrematureBefore;
             dimensions["pairs.missedAfter"] = pairs.MissedAfter;
-            dimensions["pairs.bothArmsSameOutcome"] = pairs.BothArmsSameOutcome;
+            dimensions["pairs.timeBlindPattern"] = pairs.TimeBlindPattern;
         }
 
         if (typed.ByDistance is { } byDistance)
@@ -149,7 +152,33 @@ public static class TypedMemEvalEvalResultAdapter
         // Denominator is measured questions only. Counting the harness's own failures against the
         // system under test would report a judge outage as a memory regression.
         var measured = counts.N - counts.Inconclusive - counts.Unrun;
+
+        // A run that measured nothing gets the report shape's own indeterminate vocabulary, not a
+        // zero. `Value` is not nullable here, so the only honest signal available is the label and
+        // the pass flag: emitting 0.0 as "fail" would make a judge outage indistinguishable from a
+        // system that got every question wrong, which is the exact confusion the Inconclusive and
+        // Unrun members exist to prevent.
         var share = measured > 0 ? (double)counts.Correct / measured : 0;
+        var (label, passed, severity) = measured == 0
+            ? ("inconclusive", false, "low")
+            : share < passThreshold
+                ? ("fail", false, "medium")
+                : share >= 0.7
+                    ? ("pass", true, "none")
+                    : ("warn", true, "low");
+
+        // The vector reads as prose here rather than in Label, which the shipped result contract
+        // restricts to that fixed vocabulary. It belongs somewhere a human sees, because a single
+        // share cannot distinguish a system that abstained from one that confidently denied.
+        var vector = measured == 0
+            ? $"not measured — {counts.Inconclusive} inconclusive, {counts.Unrun} unrun of {counts.N}"
+            : $"correct {counts.Correct}/{measured} · wrong {counts.Wrong} · " +
+              $"abstained {counts.Abstained} · missed {counts.Missed}" +
+              (counts.Premature > 0 ? $" · premature {counts.Premature}" : "");
+
+        var notes = recommendations is null
+            ? new[] { vector }
+            : new[] { vector }.Concat(recommendations).ToArray();
 
         return new EvalResult(
             Metric: new EvalMetadata(
@@ -160,19 +189,15 @@ public static class TypedMemEvalEvalResultAdapter
             Score: new EvalScore(
                 Value: share,
                 Ordinal: null,
-                // The label carries the vector because the value alone cannot: a single share
-                // cannot distinguish a system that abstained from one that confidently denied.
-                Label: $"correct {counts.Correct}/{measured} · wrong {counts.Wrong} · " +
-                       $"abstained {counts.Abstained} · missed {counts.Missed}" +
-                       (counts.Premature > 0 ? $" · premature {counts.Premature}" : ""),
-                Passed: share >= passThreshold,
+                Label: label,
+                Passed: passed,
                 Threshold: passThreshold,
-                Severity: null,
+                Severity: severity,
                 Confidence: null),
             Details: new EvalDetails(
                 Dimensions: extra ?? Vector(counts),
                 Evidence: null,
-                Recommendations: recommendations,
+                Recommendations: notes,
                 SubResults: subResults,
                 AggregationStrategy: "typed-outcome-vector"),
             Provenance: new EvalProvenance(
