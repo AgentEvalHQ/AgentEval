@@ -778,7 +778,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             else:
                 echoed = tmc.echo_terms(plan.question, echo, rng)
                 sessions.append(tmc.make_session(BASE_STAMP,
-                                                 (tmc.weave_echo(user, echoed), assistant),
+                                                 (user, tmc.weave_echo(assistant, echoed)),
                                                  tag="filler"))
         for session, stamp in zip(sessions, tmc.spread(BASE_STAMP, len(sessions), plan.hours)):
             session.timestamp = stamp

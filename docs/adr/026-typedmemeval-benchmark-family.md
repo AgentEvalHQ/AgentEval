@@ -92,7 +92,7 @@ field-style (LongMemEval / LoCoMo / DMR), and shares no stem with "Long", so no
 abbreviation of it collides with LME. It also brands cleanly under AgentEval — as does
 the fallback below — because the branding is carried by the artifact scheme rather than
 the name itself: the corpus-id prefix (`agenteval-typedmemeval-*`) and the citation form
-("TypedMemEval-\<Vertical\> v1 (AgentEval)") tie every result to the project without
+("TypedMemEval-\<Vertical\> v3 (AgentEval)") tie every result to the project without
 needing "AgentEval" inside the family name.
 
 One honest caveat, flagged for the joint review: in a .NET library, "Typed" has a
@@ -108,13 +108,13 @@ Naming scheme, fixed now so nothing drifts later:
 |---|---|---|
 | Family | `TypedMemEval` | — |
 | Subset | `TypedMemEval-<Vertical>` | `TypedMemEval-Forgetting` |
-| Corpus id | `agenteval-typedmemeval-<vertical>-v<N>` | `agenteval-typedmemeval-prospective-v2` |
-| Control-arm `DatasetMode` label | corpus id + `-control` — an options label over the *same* corpus, never a second corpus file (§5.1; the tg pattern) | `agenteval-typedmemeval-prospective-v2-control` |
+| Corpus id | `agenteval-typedmemeval-<vertical>-v<N>` | `agenteval-typedmemeval-prospective-v3` |
+| Control-arm `DatasetMode` label | corpus id + `-control` — an options label over the *same* corpus, never a second corpus file (§5.1; the tg pattern) | `agenteval-typedmemeval-prospective-v3-control` |
 | Question id | `tme-<abbrev>-<NNN>` | `tme-ari-017` |
 | Pair id | `tme-<abbrev>-p<NN>` | `tme-pro-p07` |
 | Question id abbrevs | `pro`, `epi`, `ari`, `wm`, `for` | — |
 | `BenchmarkId` | `typedmemeval-<vertical>` | `typedmemeval-episodic` |
-| `BenchmarkName` | `TypedMemEval-<Vertical> v<N> <n>q` | `TypedMemEval-Episodic v1 50q` |
+| `BenchmarkName` | `TypedMemEval-<Vertical> v<N> <n>q` | `TypedMemEval-Episodic v3 50q` |
 | EvalResult dimensions | `typedmemeval.*` | `typedmemeval.outcome.missed` |
 
 The `_abs` question-id suffix convention is preserved *only* where a question's gold
@@ -155,10 +155,10 @@ concrete, not aspirational:
 5. **A stated citation rule**, in the family's documentation and repeated in the runner's
    XML docs:
 
-   > Cite results as "TypedMemEval-\<Vertical\> v2 (AgentEval)". TypedMemEval results are
+   > Cite results as "TypedMemEval-\<Vertical\> v3 (AgentEval)". TypedMemEval results are
    > not LongMemEval results and must never be presented as, summed with, or averaged
    > with LongMemEval numbers. The twelve questions seeded from the time-grounded probe
-   > (§5.1) exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v2;
+   > (§5.1) exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v3;
    > a report that runs both must not double-count them.
 
 The relationship is honest in both directions: TypedMemEval **may** state that it uses
@@ -323,7 +323,7 @@ pretending otherwise would be numerology. So the family's anti-saturation proper
 on **two mechanisms, stated per corpus**:
 
 - **Structural dispersion**, where dispersion is intrinsic to the vertical (Arithmetic
-  inputs, list items): the ceiling table is published and CI-checked.
+  inputs, list items): the ceiling table is published and recomputed in CI.
 - **Calibrated competition**, everywhere: the haystack must make gold *hard to find*,
   not just legal to miss — which no ceiling formula can show and only a measurement can.
 
@@ -339,11 +339,14 @@ cannot be tuned into its band is redesigned, not shipped with a footnote.
 
 **Verification, three layers:**
 
-1. **Structural, in CI** — model-free assertions over the shipped corpus: per-question
-   `H` ≥ the declared floor (scoped per vertical — WorkingMemory deliberately *varies*
-   `H` as its independent variable, §5.4), `G` matches the declared distribution, the
-   ceiling table under `K_ref` matches the published one for the dispersion verticals,
-   and gold sessions are position-shuffled — with stated per-vertical carve-outs where
+1. **Structural, in CI** — model-free assertions **re-derived from the shipped corpus
+   bytes**, not read back from the sidecar that the generator stamped: per-question `H`
+   against the declared floor and ceiling (scoped per vertical — WorkingMemory
+   deliberately *varies* `H` as its independent variable, §5.4), `G` against the declared
+   distribution, the ceiling table under `K_ref` recomputed as `min(G, K_ref) / G`, the
+   V7 separability AUCs recomputed by a second implementation against a threshold and
+   feature list held as C# constants, session order against timestamp order, and gold
+   sessions are position-shuffled — with stated per-vertical carve-outs where
    position is pinned by design (WorkingMemory pins the fact to the first session,
    §5.4; Forgetting constrains statement-before-invalidation order, §5.5). The oracle
    projector already emits selected sessions in dataset order for the same
@@ -1011,6 +1014,122 @@ as the shape-parity pass above, and it ships with the next corpus revision (v3) 
 addresses phrase recurrence, since both need richer generated language and neither is worth a corpus
 regeneration on its own. The v2 revision in this release is what the separability finding forced;
 v3 is what the two remaining known limitations are queued behind.
+
+### 14. Corpus v3 — the separability check was measuring the wrong thing (round-3 review)
+
+V7 was added in §13 because a corpus-invalidating tell had survived every structural check
+and all four validity probes. The v2 corpora it certified carried the same class of defect,
+and V7 passed them. It was wrong in two independent ways, and each on its own was enough.
+
+**The statistic paired the wrong sessions.** V7 pooled every (gold, distractor) pair in the
+corpus, including pairs drawn from different questions. The attacker being modelled is handed
+one question's haystack and asked which session holds the evidence, so the only comparisons
+that mean anything are between sessions competing with each other. Pooling diluted the number
+two ways. Session lengths drift across questions, so a tell pointing the same way inside every
+question averages out: Forgetting's gold was consistently at the short end of its own haystack,
+which reads as 0.616 pooled and **0.903 within**.
+And questions with no gold at all — Forgetting's 15 never-known probes — contribute
+distractor-only values that pair against every other question's gold, so a pooled metric gets
+*better* the more abstention questions a vertical adds. That one is true by construction rather
+than by measurement: those sessions can only ever appear on the distractor side of a pair.
+
+**The refused-feature list was a list of the tells we had already thought of.** It covered
+length, turn count, position, digit density and capitalisation density — and nothing else. It
+did not cover punctuation, sentence structure, turn shape, vocabulary variety, or phrase
+markers. Measured over the shipped v2 corpora:
+
+| Classifier | Vertical | AUC |
+|---|---|---|
+| `"Noted" in session` | Forgetting | **1.000** |
+| `"—" in session` | Forgetting / Prospective | 0.95 |
+| count of full stops | WorkingMemory | **0.990** |
+| session length, within question | Forgetting | 0.903 |
+
+`ECHO_LEAD not in session` was the v1 defect. `"Noted" in session` is the same defect wearing
+a different string, in the corpus V7 existed to certify. The gold acknowledgement templates
+spelled `"Noted — I have that down."` while no filler sentence used the word or the glyph.
+
+**What changed.** The metric now pairs within a question and folds once after pooling. The
+refused set gains sentence count, punctuation density, em-dash density, mean turn characters
+and type-token ratio. Phrase recurrence is split by *direction* and both halves refuse: a
+phrase carried by gold marks the evidence, and one carried by filler marks it by absence,
+which is neither better nor different. The "reported, not refused" carve-out is gone — its
+reasoning was sound (template filler repeats itself, and real variety is a corpus revision
+rather than a check) but an exemption with no ceiling cannot tell 0.60 from 0.99, and
+Prospective sat at 0.990 underneath it.
+
+**The generators changed more.** Equalising one axis at a time relocated the tell rather than
+removing it: matching characters left capitals-per-character at 0.89, matching capitals left
+sentences-per-character at 1.000. Padding is now chosen by a greedy search over all six raw
+counts the refused features are built from — characters, capitals, sentences, punctuation,
+tokens, distinct tokens — scoring overshoot as harshly as shortfall, because a folded metric
+does not care which side of the target a session lands on. Three levers make the axes
+separable: lower-case tails add characters without a sentence or a capital, short sentences
+add a sentence without characters, and name-bearing tails add a capital without a sentence.
+Gold acknowledgements are drawn from one bank shared with filler, the calibration clause sits
+on the same turn role for both (its *position* was itself a marker — Prospective's
+`weeks also mind` trigram reached 0.990), and gold's share of that clause is now counted
+rather than drawn per session, because a question with one gold session and a 0.92 rate left
+it bare 8% of the time.
+
+**Result.** Worst refused feature per vertical is 0.631–0.737 against the 0.75 bar. The four
+classifiers in the table above — the ones that found v2 — now score 0.500–0.701 across all five
+corpora, against 0.903–1.000 before, and so does every per-role and per-turn slice tried.
+Retrieval difficulty moved again, so
+**no v1 or v2 number is comparable with a v3 number, and neither should be cited.** v2 was
+never released; it existed only on an unmerged branch.
+
+**Balancing an aggregate does not balance its parts, and that took three tries to learn.** The
+shape-parity pass appends its padding to one turn, so equalising the *pooled* session text left
+every other slice exactly as the generator wrote it. Each narrowing was forced by measuring the one
+before it:
+
+| What was equalised | What was still separable | AUC |
+|---|---|---|
+| the pooled session | user-turn length (WorkingMemory) | **1.000** |
+| | user-turn capitals and sentence count (Forgetting) | **1.000** |
+| each role's total | the FIRST user turn's length (WorkingMemory) | **1.000** |
+| each turn slot | — worst over every slice tried | 0.701 |
+
+Every pooled figure sat comfortably under the bar the whole time. The lesson generalises past this
+corpus: a parity check on a sum is not a parity check on its terms, and the attacker picks the
+slice. Padding is now applied per **turn slot** — each (role, position-within-role) pair gets its
+own target — and the refused set carries the per-role and first-turn variants of every numeric
+feature, so the gate can see what the aggregate hides. A uniform empty user/assistant exchange is
+appended to *every* session to absorb that padding; the first attempt added it only where a free
+turn was missing, which meant only to gold, and turn count promptly became a 1.000 tell of its own.
+
+**This is patching, and it has limits worth stating.** Gold and filler are built by different code
+paths and reconciled afterwards, so each fix removes a residue and the next measurement looks for
+the next one. Nothing here proves a finer slice — a first sentence, a first clause — is balanced;
+it proves that the slices we thought to measure are. The durable fix is to generate gold and filler
+from one template machinery so they are identical in shape by construction and differ only in the
+fact asserted. That is a redesign of all five generators, and it is what a v4 should be.
+
+**The C# half now measures rather than reads.** `NoCheapFeatureSeparatesGoldFromDistractors`
+took its threshold *and its list of features to check* from the record it was testing, so a
+trimmed `refused_features` array or a `threshold_auc` of 0.99 would have passed. Both are C#
+constants now, and the AUCs are recomputed from the corpus by a second implementation — which
+is the point, given the first one certified a corpus a substring filter could pick apart. The
+declared `H`, `G` and ceiling table are likewise re-derived from the shipped bytes rather than
+read back from the sidecar the generator stamped.
+
+**Two probe defects, both of which manufactured leaks that did not exist.** The negative-gold
+guard in `run_typedmemeval_probes.py` contained a literal backspace byte (0x08) where a word
+boundary was intended, so its leading-negative alternative could never match any real text and half
+the guard was dead code from the day it was written. And the number pattern was greedy enough to capture `2026,` with its
+trailing comma, which then failed to match the bare `2026` the prompt itself supplied — so a
+year the model had been *handed* counted as evidence it had reached the corpus. Together they
+reported a Prospective leak on an answer that said, in as many words, that the conversations
+did not contain the information. Month and weekday names no longer count as distinctive
+evidence either; in a corpus family made of dates they are world knowledge. The screen is now
+covered by a credential-free `--self-test` that runs in CI, because an instrument that has
+been wrong needs a calibration check of its own.
+
+**V3 and V6 now sample.** Both ran a single ablation, and a single sample can miss a leak that
+is there — the gutter/inspection leak in §12 was caught by one sample and could as easily have
+been missed by it. Three samples each, and unlike V2 there is no hit threshold: one sample
+that reconstructs the answer from distractors alone condemns the question.
 
 ## Consequences
 

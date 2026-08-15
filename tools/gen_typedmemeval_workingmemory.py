@@ -288,7 +288,7 @@ def _interference_session(family: Family, question_text: str, echo: float,
     template, assistant = rng.choice(family.interference)
     other = family.value(rng.choice(OTHER_STEMS))
     terms = tmc.echo_terms(question_text, echo, rng)
-    return tmc.make_session(stamp, (tmc.weave_echo(template.format(other=other), terms), assistant),
+    return tmc.make_session(stamp, (template.format(other=other), tmc.weave_echo(assistant, terms)),
                             tag="interference")
 
 

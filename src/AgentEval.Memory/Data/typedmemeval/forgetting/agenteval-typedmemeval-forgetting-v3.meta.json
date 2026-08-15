@@ -1,14 +1,19 @@
 {
-  "corpus_id": "agenteval-typedmemeval-forgetting-v2",
+  "corpus_id": "agenteval-typedmemeval-forgetting-v3",
   "vertical": "forgetting",
-  "revision": "v2",
+  "revision": "v3",
   "supersedes": {
-    "revision": "v1",
-    "shipped_in": "0.22.0-beta",
-    "reason": "V7 adversarial separability found gold identifiable by cheap shape features carrying no information about the question — capitalisation density reached AUC 0.990 in Forgetting and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable with v2 scores."
+    "revision": "v2",
+    "shipped_in": null,
+    "reason": "v2 was never released; it existed only on an unmerged branch, and it carried the same class of defect it was created to fix. Its own V7 check passed because the check was wrong twice over: it pooled (gold, distractor) pairs ACROSS questions, which diluted a within-question tell in Forgetting from 0.903 to 0.616, and its refused-feature list covered neither punctuation nor sentence structure nor phrase markers on gold. Measured properly, v2 gold was recoverable from Forgetting at AUC 1.000 by the literal substring \"Noted\", at 0.95 on two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting full stops. v3 equalises every session on all six raw counts the refused features are built from, so retrieval difficulty moved again and no v1 or v2 number is comparable with a v3 number. Neither should be cited.",
+    "also_supersedes": {
+      "revision": "v1",
+      "shipped_in": "0.22.0-beta",
+      "reason": "Gold carried the BM25 calibration clause 0 times in 501 sessions against ~99% for distractors, so a one-line string filter isolated every piece of evidence in every corpus."
+    }
   },
   "question_count": 50,
-  "corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d",
+  "corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -19,52 +24,52 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.83,
+    "mean_realised": 0.69,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.35
+        0.33
       ],
       [
         0.5,
-        0.83
+        0.69
       ]
     ],
     "per_question": {
       "tme-for-001": 1.0,
-      "tme-for-002": 1.0,
+      "tme-for-002": 0.5,
       "tme-for-003": 1.0,
       "tme-for-004": 1.0,
       "tme-for-005": 1.0,
       "tme-for-006": 1.0,
       "tme-for-007": 1.0,
-      "tme-for-008": 0.5,
+      "tme-for-008": 0.0,
       "tme-for-009": 0.5,
       "tme-for-010": 1.0,
       "tme-for-011": 0.0,
       "tme-for-012": 0.0,
       "tme-for-013": 1.0,
-      "tme-for-014": 1.0,
+      "tme-for-014": 0.0,
       "tme-for-015": 0.0,
-      "tme-for-016": 1.0,
+      "tme-for-016": 0.0,
       "tme-for-017": 1.0,
       "tme-for-018": 1.0,
-      "tme-for-019": 0.5,
-      "tme-for-020": 1.0,
-      "tme-for-021": 0.0,
-      "tme-for-022": 1.0,
+      "tme-for-019": 1.0,
+      "tme-for-020": 0.5,
+      "tme-for-021": 1.0,
+      "tme-for-022": 0.0,
       "tme-for-023": 1.0,
       "tme-for-024": 1.0,
       "tme-for-025": 1.0,
       "tme-for-026": 1.0,
-      "tme-for-027": 1.0,
+      "tme-for-027": 0.0,
       "tme-for-028": 0.0,
-      "tme-for-029": 1.0,
-      "tme-for-030": 1.0,
+      "tme-for-029": 0.0,
+      "tme-for-030": 0.0,
       "tme-for-031": 0.0,
-      "tme-for-032": 1.0,
+      "tme-for-032": 0.0,
       "tme-for-033": 1.0,
       "tme-for-034": 1.0,
       "tme-for-035": 0.0,
@@ -110,49 +115,98 @@
   "probes": {
     "status": "run",
     "v7_separability": {
-      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
         "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
       ],
       "threshold_auc": 0.75,
       "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
         "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
         "position_in_haystack",
+        "punctuation_density",
+        "sentence_count",
         "session_length_chars",
         "turn_count",
-        "uppercase_density"
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_type_token_ratio",
+        "user_uppercase_density"
       ],
       "exempt_features": [],
-      "reported_only_features": [
-        "boilerplate_ngram"
-      ],
+      "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.6162,
+        "session_length_chars": 0.5589,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5494,
+        "position_in_haystack": 0.5081,
         "digit_density": 0.5,
-        "uppercase_density": 0.7132,
-        "boilerplate_ngram": 0.8182
+        "uppercase_density": 0.6133,
+        "sentence_count": 0.5567,
+        "punctuation_density": 0.5531,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.5589,
+        "type_token_ratio": 0.5202,
+        "first_user_length_chars": 0.6632,
+        "first_user_uppercase_density": 0.5908,
+        "first_user_sentence_count": 0.5148,
+        "first_assistant_length_chars": 0.5886,
+        "first_assistant_uppercase_density": 0.5944,
+        "first_assistant_sentence_count": 0.5697,
+        "user_length_chars": 0.6268,
+        "user_uppercase_density": 0.598,
+        "user_sentence_count": 0.5099,
+        "user_punctuation_density": 0.5621,
+        "user_type_token_ratio": 0.6479,
+        "user_mean_turn_chars": 0.6268,
+        "assistant_length_chars": 0.549,
+        "assistant_uppercase_density": 0.5805,
+        "assistant_sentence_count": 0.5531,
+        "assistant_punctuation_density": 0.5364,
+        "assistant_type_token_ratio": 0.5728,
+        "assistant_mean_turn_chars": 0.549,
+        "gold_marker_ngram": 0.6021,
+        "boilerplate_ngram": 0.5809
       },
-      "worst_refused_feature": "uppercase_density",
-      "worst_refused_auc": 0.7132,
-      "worst_boilerplate_ngram": "noted down also",
-      "boilerplate_ngram_auc": 0.8182,
+      "worst_refused_feature": "first_user_length_chars",
+      "worst_refused_auc": 0.6632,
+      "worst_gold_marker_ngram": "far",
+      "gold_marker_ngram_auc": 0.6021,
+      "worst_boilerplate_ngram": "week",
+      "boilerplate_ngram_auc": 0.5809,
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-15T15:58:39Z",
-      "probed_corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d"
+      "measured_by": "generator",
+      "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T17:53:34Z",
+    "run_at": "2026-08-15T21:31:01Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
       "passed": 34,
       "failed": [
-        "tme-for-012"
+        "tme-for-032"
       ]
     },
     "v1_pair_flip": {
@@ -162,6 +216,7 @@
         "tme-for-p12"
       ]
     },
+    "ablation_samples_per_question": 3,
     "v2_non_inferability": {
       "samples_per_question": 10,
       "reject_at_hits": 2,
@@ -188,6 +243,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -196,6 +252,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -204,6 +261,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -212,6 +270,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -220,6 +279,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -228,6 +288,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -236,6 +297,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -244,6 +306,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -252,6 +315,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -260,6 +324,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -268,14 +333,16 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
       "tme-for-012": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -284,6 +351,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -292,6 +360,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -300,6 +369,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -308,6 +378,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -316,6 +387,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -324,6 +396,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -332,6 +405,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -340,6 +414,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -348,6 +423,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-022": {
@@ -355,6 +431,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-023": {
@@ -362,6 +439,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-024": {
@@ -369,6 +447,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-025": {
@@ -376,6 +455,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-026": {
@@ -383,6 +463,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-027": {
@@ -390,6 +471,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-028": {
@@ -397,6 +479,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-029": {
@@ -404,6 +487,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-030": {
@@ -411,6 +495,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-031": {
@@ -418,13 +503,15 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-032": {
-        "v1": true,
+        "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-033": {
@@ -432,6 +519,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-034": {
@@ -439,6 +527,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-035": {
@@ -446,6 +535,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-for-036_abs": {
@@ -539,6 +629,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "0ace9574c39cd03e4b7ab8ac85352b0dcf39c44fa3b001fb21f8b6bd77a0d93d"
+    "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
   }
 }

@@ -1,14 +1,19 @@
 {
-  "corpus_id": "agenteval-typedmemeval-arithmetic-v2",
+  "corpus_id": "agenteval-typedmemeval-arithmetic-v3",
   "vertical": "arithmetic",
-  "revision": "v2",
+  "revision": "v3",
   "supersedes": {
-    "revision": "v1",
-    "shipped_in": "0.22.0-beta",
-    "reason": "V7 adversarial separability found gold identifiable by cheap shape features carrying no information about the question — capitalisation density reached AUC 0.990 in Forgetting and session length 0.992 in WorkingMemory. The shape-parity fix rewrites every session, so retrieval difficulty moved and v1 scores are not comparable with v2 scores."
+    "revision": "v2",
+    "shipped_in": null,
+    "reason": "v2 was never released; it existed only on an unmerged branch, and it carried the same class of defect it was created to fix. Its own V7 check passed because the check was wrong twice over: it pooled (gold, distractor) pairs ACROSS questions, which diluted a within-question tell in Forgetting from 0.903 to 0.616, and its refused-feature list covered neither punctuation nor sentence structure nor phrase markers on gold. Measured properly, v2 gold was recoverable from Forgetting at AUC 1.000 by the literal substring \"Noted\", at 0.95 on two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting full stops. v3 equalises every session on all six raw counts the refused features are built from, so retrieval difficulty moved again and no v1 or v2 number is comparable with a v3 number. Neither should be cited.",
+    "also_supersedes": {
+      "revision": "v1",
+      "shipped_in": "0.22.0-beta",
+      "reason": "Gold carried the BM25 calibration clause 0 times in 501 sessions against ~99% for distractors, so a one-line string filter isolated every piece of evidence in every corpus."
+    }
   },
   "question_count": 50,
-  "corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9",
+  "corpus_sha256": "4624eb78b21178ab06ab372063d4a41a069269bc841c3289e44db13a899035e2",
   "generator": {
     "tool": "tools/gen_typedmemeval_arithmetic.py",
     "version": "1.0.0",
@@ -19,7 +24,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6347,
+    "mean_realised": 0.6613,
     "echo": 0.25,
     "iterations": 3,
     "search_trace": [
@@ -29,45 +34,45 @@
       ],
       [
         0.5,
-        0.0333
+        0.0317
       ],
       [
         0.25,
-        0.6347
+        0.6613
       ]
     ],
     "per_question": {
       "tme-ari-001": 0.25,
-      "tme-ari-002": 0.75,
+      "tme-ari-002": 0.5,
       "tme-ari-003": 1.0,
-      "tme-ari-004": 0.6,
-      "tme-ari-005": 0.0,
+      "tme-ari-004": 0.4,
+      "tme-ari-005": 0.2,
       "tme-ari-006": 0.1667,
       "tme-ari-007": 1.0,
-      "tme-ari-008": 1.0,
+      "tme-ari-008": 0.6667,
       "tme-ari-009": 0.1667,
-      "tme-ari-010": 0.4,
+      "tme-ari-010": 0.2,
       "tme-ari-011": 1.0,
       "tme-ari-012": 0.6667,
       "tme-ari-013": 1.0,
       "tme-ari-014": 1.0,
-      "tme-ari-015": 0.0,
+      "tme-ari-015": 0.4,
       "tme-ari-016": 1.0,
-      "tme-ari-017": 0.0,
+      "tme-ari-017": 0.1667,
       "tme-ari-018": 1.0,
       "tme-ari-019": 0.25,
-      "tme-ari-020": 0.0,
+      "tme-ari-020": 0.1667,
       "tme-ari-021": 0.75,
       "tme-ari-022": 1.0,
       "tme-ari-023": 1.0,
-      "tme-ari-024": 0.8,
-      "tme-ari-025": 0.0,
-      "tme-ari-026": 0.1667,
+      "tme-ari-024": 1.0,
+      "tme-ari-025": 0.4,
+      "tme-ari-026": 0.3333,
       "tme-ari-027": 0.6667,
-      "tme-ari-028": 0.0,
+      "tme-ari-028": 0.25,
       "tme-ari-029": 1.0,
       "tme-ari-030": 1.0,
-      "tme-ari-031": 0.6,
+      "tme-ari-031": 0.8,
       "tme-ari-032": 1.0,
       "tme-ari-033": 0.8333,
       "tme-ari-034": 0.8333,
@@ -77,16 +82,16 @@
       "tme-ari-038": 1.0,
       "tme-ari-039": 0.3333,
       "tme-ari-040": 1.0,
-      "tme-ari-041": 0.75,
-      "tme-ari-042": 0.3333,
+      "tme-ari-041": 1.0,
+      "tme-ari-042": 0.5,
       "tme-ari-043": 0.3333,
       "tme-ari-044": 0.0,
       "tme-ari-045": 0.75,
-      "tme-ari-046": 0.1667,
+      "tme-ari-046": 0.0,
       "tme-ari-047": 1.0,
-      "tme-ari-048": 1.0,
+      "tme-ari-048": 0.75,
       "tme-ari-049": 1.0,
-      "tme-ari-050": 0.1667
+      "tme-ari-050": 0.3333
     }
   },
   "ceiling": {
@@ -116,42 +121,91 @@
   "probes": {
     "status": "run",
     "v7_separability": {
-      "method": "single-feature AUC over (session, is_gold) pairs, folded to [0.5, 1.0]; boilerplate n-grams restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
         "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
       ],
       "threshold_auc": 0.75,
       "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
         "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
         "position_in_haystack",
+        "punctuation_density",
+        "sentence_count",
         "session_length_chars",
         "turn_count",
-        "uppercase_density"
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_type_token_ratio",
+        "user_uppercase_density"
       ],
       "exempt_features": [],
-      "reported_only_features": [
-        "boilerplate_ngram"
-      ],
+      "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.664,
+        "session_length_chars": 0.5183,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5333,
-        "digit_density": 0.6415,
-        "uppercase_density": 0.5436,
-        "boilerplate_ngram": 0.6607
+        "position_in_haystack": 0.5372,
+        "digit_density": 0.6326,
+        "uppercase_density": 0.5539,
+        "sentence_count": 0.5137,
+        "punctuation_density": 0.5543,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.5183,
+        "type_token_ratio": 0.5667,
+        "first_user_length_chars": 0.5239,
+        "first_user_uppercase_density": 0.5834,
+        "first_user_sentence_count": 0.5349,
+        "first_assistant_length_chars": 0.5349,
+        "first_assistant_uppercase_density": 0.5105,
+        "first_assistant_sentence_count": 0.5083,
+        "user_length_chars": 0.5032,
+        "user_uppercase_density": 0.5804,
+        "user_sentence_count": 0.5273,
+        "user_punctuation_density": 0.5412,
+        "user_type_token_ratio": 0.5922,
+        "user_mean_turn_chars": 0.5032,
+        "assistant_length_chars": 0.5338,
+        "assistant_uppercase_density": 0.5101,
+        "assistant_sentence_count": 0.516,
+        "assistant_punctuation_density": 0.5252,
+        "assistant_type_token_ratio": 0.5111,
+        "assistant_mean_turn_chars": 0.5338,
+        "gold_marker_ngram": 0.7365,
+        "boilerplate_ngram": 0.58
       },
-      "worst_refused_feature": "session_length_chars",
-      "worst_refused_auc": 0.664,
-      "worst_boilerplate_ngram": "payment logged against",
-      "boilerplate_ngram_auc": 0.6607,
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.7365,
+      "worst_gold_marker_ngram": "today",
+      "gold_marker_ngram_auc": 0.7365,
+      "worst_boilerplate_ngram": "every",
+      "boilerplate_ngram_auc": 0.58,
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-15T15:58:33Z",
-      "probed_corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9"
+      "measured_by": "generator",
+      "probed_corpus_sha256": "4624eb78b21178ab06ab372063d4a41a069269bc841c3289e44db13a899035e2"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-15T17:53:34Z",
+    "run_at": "2026-08-15T21:30:15Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -159,7 +213,7 @@
       "passed": 48,
       "failed": [
         "tme-ari-043",
-        "tme-ari-047"
+        "tme-ari-046"
       ]
     },
     "v1_pair_flip": {
@@ -167,6 +221,7 @@
       "passed": 0,
       "failed": []
     },
+    "ablation_samples_per_question": 3,
     "v2_non_inferability": {
       "samples_per_question": 10,
       "reject_at_hits": 2,
@@ -193,6 +248,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -201,6 +257,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -209,6 +266,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -217,6 +275,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -225,6 +284,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -233,6 +293,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -241,6 +302,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -249,6 +311,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -257,6 +320,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -265,6 +329,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -273,6 +338,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -281,6 +347,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -289,6 +356,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -297,6 +365,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -305,6 +374,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -313,6 +383,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -321,6 +392,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -329,6 +401,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -337,6 +410,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -345,6 +419,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -353,6 +428,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -361,6 +437,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -369,6 +446,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -377,6 +455,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -385,6 +464,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -393,6 +473,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -401,6 +482,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -409,6 +491,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -417,6 +500,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -425,6 +509,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -433,6 +518,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -441,6 +527,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -449,6 +536,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -457,6 +545,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -465,6 +554,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -473,6 +563,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -481,6 +572,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -489,6 +581,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -497,6 +590,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -505,6 +599,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -513,6 +608,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -521,6 +617,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -529,6 +626,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -537,6 +635,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -545,22 +644,25 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
       "tme-ari-046": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-ari-047": {
         "v1": false,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -569,6 +671,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -577,6 +680,7 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       },
@@ -585,10 +689,11 @@
         "v2_hits": 0,
         "v2": true,
         "v3": true,
+        "ablation_samples": 3,
         "v6": true,
         "v6_redundant_components": []
       }
     },
-    "probed_corpus_sha256": "f602d9192dd768dd18ccf66ed991b0fc3df219509bf0a141852f5426f30e2bb9"
+    "probed_corpus_sha256": "4624eb78b21178ab06ab372063d4a41a069269bc841c3289e44db13a899035e2"
   }
 }

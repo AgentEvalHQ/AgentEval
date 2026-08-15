@@ -25,8 +25,15 @@ namespace AgentEval.Memory.External.TypedMemEval;
 public static class TypedMemEvalEvalResultAdapter
 {
     /// <summary>The citation rule, attached to the root node of every projected result.</summary>
-    public const string CitationRule =
-        "Cite as \"TypedMemEval-<Vertical> v2 (AgentEval)\". TypedMemEval results are not " +
+    /// <remarks>
+    /// The revision is interpolated from <see cref="TypedMemEvalVerticalDescriptor.CorpusRevision"/>
+    /// rather than typed here. A citation rule that names a revision by hand goes stale at the next
+    /// bump, and this is the copy that reaches a consumer's report — it named v1 while the corpora
+    /// said v2, which is precisely the two-question-sets-one-label failure the rule exists to stop.
+    /// </remarks>
+    public static readonly string CitationRule =
+        $"Cite as \"TypedMemEval-<Vertical> {TypedMemEvalVerticalDescriptor.CorpusRevision} " +
+        "(AgentEval)\". TypedMemEval results are not " +
         "LongMemEval results and must never be presented as, summed with, or averaged with " +
         "LongMemEval numbers. The typed outcome vector is the citable form; the score value on " +
         "this node exists for tooling compatibility.";

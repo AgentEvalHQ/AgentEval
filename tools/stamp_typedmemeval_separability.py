@@ -76,7 +76,7 @@ def main() -> None:
         report["probed_corpus_sha256"] = corpus_sha
 
         worst = (f"{report['worst_refused_feature']} AUC {report['worst_refused_auc']:.3f}"
-                 f" | phrase-recurrence (reported, not refused) "
+                 f" | filler-phrase recurrence "
                  f"{report['boilerplate_ngram_auc']:.3f}")
         print(f"{vertical:14s} {'PASS' if report['passed'] else 'FAIL'}  worst: {worst}"
               f"  [threshold {tmc.SEPARABILITY_MAX_AUC}]")
@@ -86,7 +86,8 @@ def main() -> None:
         if args.check:
             continue
 
-        path = tmc.DATA_ROOT / vertical / f"agenteval-typedmemeval-{vertical}-v2.meta.json"
+        corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
+        path = tmc.DATA_ROOT / vertical / f"{corpus_id}.meta.json"
         metadata = json.loads(path.read_text(encoding="utf-8"))
         metadata.setdefault("probes", {})["v7_separability"] = report
         path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",

@@ -34,14 +34,14 @@ internal static class TypedMemEvalBenchmarkRegistration
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "typedmemeval",
             description:
-                "TypedMemEval v1 (AgentEval) — five embedded corpora isolating prospective, episodic, " +
+                $"TypedMemEval {TypedMemEvalVerticalDescriptor.CorpusRevision} (AgentEval) — five embedded corpora isolating prospective, episodic, " +
                 "arithmetic, working-memory and forgetting behaviour. Not LongMemEval; results are not " +
                 "comparable with LongMemEval numbers.",
             defaultCostTier: CostTier.Medium,
             presets: TypedMemEvalVerticals.All
                 .Select(descriptor => new BenchmarkPreset(
                     descriptor.Slug,
-                    $"{descriptor.DisplayName} v1 — {descriptor.QuestionCount} embedded questions, no download",
+                    $"{descriptor.DisplayName} {descriptor.Revision} — {descriptor.QuestionCount} embedded questions, no download",
                     CostTier.Medium))
                 .ToArray(),
             runnerType: typeof(TypedMemEvalRunner),

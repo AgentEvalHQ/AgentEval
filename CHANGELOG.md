@@ -9,91 +9,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.23.0-beta] - 2026-08-15
 
-**TypedMemEval corpus revision v2, and V7 — adversarial separability.** The consuming project's
-verification round asked whether the clause-parity check added in 0.22.0-beta would catch the *next*
-tell, which would not be a clause. It would not. V7 is the general probe, and it found real
-separability in all five shipped corpora on its first run.
+**TypedMemEval corpus revision v3, and V7 — adversarial separability.** The consuming project's
+verification round asked whether the clause-parity check added in 0.22.0-beta would catch the
+*next* tell, which would not be a clause. It would not. V7 is the general probe. It found real
+separability in all five corpora 0.22.0-beta shipped — and then, on review, in the corpora it had
+itself just certified, because the check was measuring the wrong thing.
 
-> **v1 corpora are superseded and should not be cited.** The shape-parity fix rewrites every
-> session, so retrieval difficulty moved — WorkingMemory's calibrated BM25 coverage went 0.729 →
-> 0.896 — and a v1 score is not comparable with a v2 score. Corpus ids are now
-> `agenteval-typedmemeval-<vertical>-v2`; cite as "TypedMemEval-\<Vertical\> **v2** (AgentEval)".
+> **v1 corpora are superseded and must not be cited.** So is v2, which was never released and
+> existed only on an unmerged branch. Every session is rewritten, so retrieval difficulty moved and
+> no v1 or v2 score is comparable with a v3 score. Corpus ids are now
+> `agenteval-typedmemeval-<vertical>-v3`; cite as "TypedMemEval-\<Vertical\> **v3** (AgentEval)".
 
 ### Added
 
 - **V7, adversarial separability.** Tries cheap single-feature classifiers at telling gold sessions
-  from distractors — session length, turn count, position, digit density, capitalisation density,
-  and recurring boilerplate phrases — scoring each as a direction-folded AUC. It refuses a corpus at
-  0.75 on any shape feature, runs as a generator-refusal rule, is stamped into every corpus's
-  metadata beside V1–V6, and is **re-measured in CI** rather than trusted from its own record.
+  from distractors, scoring each as a direction-folded AUC over (gold, distractor) pairs formed
+  **within a question**. It refuses a corpus at 0.75 on any shape feature, runs as a
+  generator-refusal rule, is stamped into every corpus's metadata beside V1–V6, and is re-measured
+  in CI *and* recomputed independently in C# — a stamped number nothing recomputes is a claim, not
+  a check.
 
-  What it found, measured against the corpora 0.22.0-beta shipped:
+  Refused features: session length, turn count, position, digit density, capitalisation density,
+  sentence count, punctuation density, em-dash density, mean turn characters, type-token ratio, and
+  recurring phrases in **both** directions — one carried by gold marks the evidence, one carried by
+  filler marks it by absence, and those are the same defect.
 
-  | Vertical | Worst shape feature | v1 | v2 |
-  |---|---|---|---|
-  | Forgetting | capitalisation density | 0.990 | **0.713** |
-  | WorkingMemory | session length | 0.992 | **0.612** |
-  | Episodic | session length | 0.955 | **0.620** |
-  | Arithmetic | capitalisation density | 0.925 | **0.664** |
-  | Prospective | session length | 0.912 | **0.648** |
+  Measured against the corpora 0.22.0-beta shipped, under the corrected metric:
 
-  The cause was structural, not accidental: gold states an arbitrary *named* fact because V2
-  requires the answer to be unguessable, so gold carried proper nouns and extra text that filler did
-  not. Counting capital letters found the evidence without reading it. A central shape-parity pass
-  now pads every session to a common length and capitalisation density using invented names built
-  from syllables that appear in no question — the shape converges, the content cannot.
+  | Vertical | worst refused feature (v1) | v3 |
+  |---|---|---|
+  | Prospective | session length **0.903** | 0.715 |
+  | Episodic | session length **0.936** | 0.727 |
+  | Arithmetic | capitalisation density **0.890** | 0.737 |
+  | WorkingMemory | session length **1.000** | 0.728 |
+  | Forgetting | sentence count **1.000** | 0.703 |
 
-  Two things V7 deliberately does not refuse, stated rather than quietly excluded. **Question
-  relevance is exempt and is not a feature**: gold is supposed to be more relevant to its question
-  than a distractor is, and how easily that is exploited is bounded by the BM25 calibration gate.
-  **Phrase recurrence is measured but does not refuse** (0.552–0.850): filler is template-generated,
-  so every filler phrase recurs and no gold phrase does, and driving that to chance needs filler with
-  the variety of real conversation — a corpus revision, not a check. **WorkingMemory exempts
-  `position_in_haystack`**, which separates gold perfectly because §5.4 pins the fact to session 0 by
-  design.
+- **A credential-free `--self-test` for the probe evidence screen**, wired into CI. The screen
+  decides whether a response reached the gold answer, so it decides which questions are valid; it
+  had been wrong twice, and both defects manufactured leaks in corpora that had none.
 
-- **`TypedMemEvalRunSet.DetectSeedOverlap`** — the runtime half of the double-count rule. The twelve
-  Prospective seed questions exist in both `agenteval-timegrounded-v1` and the Prospective corpus;
-  until now that was a rule in prose, which is a rule nobody's build enforces. Pass whatever results
-  a report is about to be assembled from and it warns before the numbers are added up.
+- **Structural re-derivation in CI.** The declared `H`, `G` and ceiling table are now recomputed
+  from the shipped corpus bytes rather than read back from the sidecar the generator stamped, and
+  session order is asserted against timestamp order.
 
 ### Changed
 
-- Re-measured V1–V6 against the v2 corpora. The shape fix improved most of them:
+- **V3 and V6 sample three ablations instead of one.** A single sample can miss a leak that is
+  there — the gutter/inspection leak fixed in 0.22.0-beta was caught by one sample and could as
+  easily have been missed. Unlike V2 there is no hit threshold: one sample that reconstructs the
+  answer from distractors alone condemns the question.
 
-  | Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 |
-  |---|---|---|---|---|---|
-  | Prospective | 47/50 | 16/19 | 50/50 | 50/50 | — |
-  | Episodic | 50/50 | — | 50/50 | 50/50 | — |
-  | Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
-  | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-  | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+- **Shape parity is now a search, not a formula.** Padding is chosen greedily over all six raw
+  counts the refused features are built from, scoring overshoot as harshly as shortfall. Equalising
+  one axis at a time had simply relocated the tell: matching characters left capitals-per-character
+  at 0.89, and matching capitals left sentences-per-character at 1.000.
 
-  Forgetting reaches a clean ceiling with every pair flipping; Prospective gains one question and one
-  pair. Arithmetic loses two, which the per-question records identify as duration questions — the
-  same shape whose gold requires summing several timestamp-derived intervals.
+- **Gold acknowledgements come from one bank shared with filler**, and the calibration clause sits
+  on the same turn role for both. Gold's share of that clause is counted rather than drawn per
+  session — a question with one gold session and a 0.92 rate left it bare 8% of the time.
 
 ### Fixed
 
-- **A distractor that let the model produce the gold answer without the evidence.** Prospective's
-  filler bank contained "the landlord is inspecting the gutters", which collided with a carried
-  question about a flat *inspection*: given only distractors, the reference model found that one,
-  reasoned it was already past, and produced gold's "no, it has already happened". V3 caught it —
-  that is precisely the failure V3 exists to detect, and it was invisible to every structural check.
-  Prospective's V3 is 50/50 with the filler reworded.
-- **The ablation probes could not tell "reached the answer" from "said nothing"** when gold is a
-  negative carrying no content the prompt had not already supplied. The distinctive-token screen
-  now excludes tokens the question and current date already gave the model, and V3/V6 abstain in
-  the narrow case where a negative gold leaves nothing decidable — recorded as not-applicable
-  rather than scored. A first attempt at this abstained far too broadly, silently dropping V3 on 56
-  questions, because every list-order gold repeats items the question names and every attribution
-  gold is a role word; both are perfectly decidable by the judge.
+- **V7 pooled (gold, distractor) pairs across questions**, which is a different and much easier
+  question than the one the threat model asks. It diluted a real within-question tell in Forgetting
+  from 0.903 to 0.616, and it got *better* the more abstention questions a vertical had, because
+  questions with no gold contributed distractor-only values that paired against every other
+  question's gold.
 
-- The probe runner replaced the whole `probes` block when it wrote its records, silently dropping
-  V7's. A probe that vanishes when a neighbouring probe re-runs is worse than one never taken; it
-  merges now.
+- **Balancing an aggregate does not balance its parts.** Padding lands on one turn, so equalising
+  the pooled session left every other slice untouched: gold was recoverable from user-turn length
+  at AUC **1.000** in WorkingMemory and from user-turn sentence count in Forgetting, while every
+  pooled figure sat under the bar. Equalising each role then left the *first* user turn — the one
+  carrying the evidence — separable at 1.000 again. Padding is now applied per turn slot, and the
+  refused set carries the per-role and first-turn variants of every numeric feature. Worst over
+  every slice tried is now 0.701.
 
-Design of record: [ADR-026](docs/adr/026-typedmemeval-benchmark-family.md) §13.
+- **The refused-feature list covered only the tells we had already thought of.** Measured properly,
+  v2 gold was recoverable from Forgetting at AUC **1.000** by the literal substring `"Noted"`, at
+  0.95 on two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting
+  full stops. `ECHO_LEAD not in session` was the v1 defect; `"Noted" in session` is the same defect
+  wearing a different string.
+
+- **A literal backspace byte in the probes' negative-gold guard**, where a word boundary was
+  intended, made its leading-negative alternative unmatchable — half the guard was dead code from
+  the day it was written.
+
+- **A greedy number pattern captured `2026,` with its trailing comma**, which then failed to match
+  the bare `2026` the prompt itself supplied, so a year the model had been *handed* counted as
+  evidence it had reached the corpus. Month and weekday names no longer count as distinctive
+  evidence either; in a corpus family made of dates they are world knowledge. Together these
+  reported a Prospective leak on an answer that said, in as many words, that the conversations did
+  not contain the information.
+
+- **The C# separability test took its threshold and its list of features to check from the record
+  it was testing**, so a trimmed `refused_features` array or a `threshold_auc` of 0.99 would have
+  passed. Both are C# constants now, and the AUCs are recomputed from the corpus.
+
+- **The citation rule is built from the revision constant** instead of retyped beside it. The
+  projected result — the copy that reaches a consumer's report — named a revision the corpora had
+  already left behind.
+
+- Documentation claims corrected where they overstated what is verified: three of four "structural,
+  in CI" assertions did not exist (they do now), the validity-rule table said all seven rules are
+  re-checked in CI when only V4, V5 and V7 can be, the Episodic attribution limitation was labelled
+  v1 and promised a fix in v2 that v2 did not ship, and the CLI told users to run `agenteval init`
+  when the workspace bootstrap is `agenteval init-workspace`.
 
 ## [0.22.0-beta] - 2026-08-15
 

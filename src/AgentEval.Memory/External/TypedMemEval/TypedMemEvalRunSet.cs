@@ -97,7 +97,7 @@ public static class TypedMemEvalRunSet
     /// </summary>
     /// <remarks>
     /// The twelve Prospective seed questions exist in both <see cref="TimeGroundedCorpusId"/> and
-    /// <c>agenteval-typedmemeval-prospective-v2</c>. Until now that was a citation rule in prose,
+    /// <c>agenteval-typedmemeval-prospective-v3</c>. Until now that was a citation rule in prose,
     /// which is a rule nobody's build enforces. This is the cheap runtime half: pass whatever
     /// results a report is about to be assembled from, and if both corpora are present, say so
     /// before the numbers are added up rather than after they are published.

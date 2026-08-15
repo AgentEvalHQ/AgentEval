@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Globalization;
 using System.Text.Json;
 using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
@@ -470,28 +471,267 @@ public sealed class TypedMemEvalCorpusTests
             TypedMemEvalCorpus.Sha256(vertical),                 // DevSkim: ignore DS197836
             v7.GetProperty("probed_corpus_sha256").GetString());
 
-        var threshold = v7.GetProperty("threshold_auc").GetDouble();
-        var features = v7.GetProperty("features");
-        var exempt = v7.GetProperty("exempt_features")
-            .EnumerateArray().Select(e => e.GetString()).ToHashSet(StringComparer.Ordinal);
+        // The bar and the feature list are C# constants, NOT read from the record. Taking either
+        // from the artifact under test would let the artifact define its own passing grade: a
+        // refused_features array trimmed to two entries, or a threshold_auc of 0.99, would sail
+        // through. The record supplies only the corpus hash, which is the one thing it can be
+        // trusted to state about itself.
+        var exempt = vertical == TypedMemEvalVertical.WorkingMemory
+            ? new HashSet<string>(StringComparer.Ordinal) { "position_in_haystack" }
+            : [];
 
-        foreach (var name in v7.GetProperty("refused_features").EnumerateArray()
-                     .Select(e => e.GetString()!))
+        // Re-measured from the corpus text, not read back from `features`. A stamped number that
+        // nothing recomputes is a claim; this is the check. It is also deliberately a SECOND
+        // implementation of the metric — the Python one certified a Forgetting corpus that a
+        // one-line substring filter could pick apart, and the bug was in how it paired sessions.
+        var measured = SeparabilityAucs(vertical, exempt);
+        foreach (var (name, auc) in measured)
         {
-            var auc = features.GetProperty(name).GetDouble();
             Assert.True(
-                auc < threshold,
+                auc < SeparabilityMaxAuc,
                 $"{vertical}: '{name}' separates gold from distractors at AUC {auc:F3}, at or above " +
-                $"the {threshold} refusal threshold — a classifier can find the evidence without " +
-                $"reading it.");
+                $"the {SeparabilityMaxAuc} refusal threshold — a classifier can find the evidence " +
+                $"without reading it.");
         }
 
+        // Every refused feature was actually measured; a silently missing one would pass by absence.
+        Assert.Equal(
+            RefusedFeatures.Except(exempt).OrderBy(n => n, StringComparer.Ordinal),
+            measured.Keys.OrderBy(n => n, StringComparer.Ordinal));
+
         // WorkingMemory pins its fact to session 0 (ADR §5.4), so position separates gold perfectly
-        // and is meant to. Asserted as a declaration rather than left as an unexplained pass.
-        if (vertical == TypedMemEvalVertical.WorkingMemory)
-            Assert.Contains("position_in_haystack", exempt);
-        else
-            Assert.Empty(exempt);
+        // and is meant to. Equality, not containment: containment would let a future exemption be
+        // added to the record and pass unnoticed.
+        var recordedExempt = v7.GetProperty("exempt_features")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(exempt.OrderBy(n => n, StringComparer.Ordinal),
+                     recordedExempt.OrderBy(n => n, StringComparer.Ordinal));
+    }
+
+    /// <summary>The refusal bar, mirroring <c>SEPARABILITY_MAX_AUC</c> in typedmemeval_common.py.</summary>
+    private const double SeparabilityMaxAuc = 0.75;
+
+    /// <summary>
+    /// Numeric shape features a corpus may not be separable by, mirroring the generator's list.
+    /// </summary>
+    /// <remarks>
+    /// The two phrase-recurrence features (<c>gold_marker_ngram</c>, <c>boilerplate_ngram</c>) are
+    /// deliberately absent: they need the n-gram machinery, and re-implementing that here would be
+    /// transcription rather than an independent check. They are re-measured in CI by
+    /// <c>stamp_typedmemeval_separability.py --check</c> instead. Everything numeric is recomputed
+    /// here, including the per-role and first-turn slices — the slices are the ones that matter,
+    /// because a corpus whose pooled totals balance can still have a perfectly separable first turn.
+    /// </remarks>
+    private static readonly string[] RefusedFeatures =
+    [
+        "session_length_chars", "turn_count", "position_in_haystack", "digit_density",
+        "uppercase_density", "sentence_count", "punctuation_density", "em_dash_density",
+        "mean_turn_chars", "type_token_ratio",
+        "user_length_chars", "user_uppercase_density", "user_sentence_count",
+        "user_punctuation_density", "user_type_token_ratio", "user_mean_turn_chars",
+        "assistant_length_chars", "assistant_uppercase_density", "assistant_sentence_count",
+        "assistant_punctuation_density", "assistant_type_token_ratio", "assistant_mean_turn_chars",
+        "first_user_length_chars", "first_user_uppercase_density", "first_user_sentence_count",
+        "first_assistant_length_chars", "first_assistant_uppercase_density",
+        "first_assistant_sentence_count",
+    ];
+
+    /// <summary>
+    /// Single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across
+    /// questions and folded once to [0.5, 1.0].
+    /// </summary>
+    /// <remarks>
+    /// Pairing within the question is the whole point. The attacker is handed one haystack and asked
+    /// which session holds the evidence, so comparisons across questions answer a different and
+    /// much easier question — pooling diluted a real Forgetting tell from 0.903 to 0.616, and
+    /// questions with no gold at all contributed distractor-only values that made the number better
+    /// the more abstention questions the vertical had.
+    /// </remarks>
+    private static Dictionary<string, double> SeparabilityAucs(
+        TypedMemEvalVertical vertical, HashSet<string> exempt)
+    {
+        var entries = TypedMemEvalCorpus.Load(vertical);
+        var results = new Dictionary<string, double>(StringComparer.Ordinal);
+
+        foreach (var name in RefusedFeatures.Where(f => !exempt.Contains(f)))
+        {
+            double wins = 0;
+            long pairs = 0;
+            foreach (var entry in entries)
+            {
+                var sessions = entry.HaystackSessions ?? [];
+                var goldIds = new HashSet<string>(entry.AnswerSessionIds ?? [], StringComparer.Ordinal);
+                var ids = entry.HaystackSessionIds ?? [];
+                List<double> gold = [], other = [];
+                for (var i = 0; i < sessions.Count; i++)
+                {
+                    var value = Feature(name, sessions[i], i, sessions.Count);
+                    if (i < ids.Count && goldIds.Contains(ids[i])) gold.Add(value);
+                    else other.Add(value);
+                }
+                foreach (var g in gold)
+                    foreach (var o in other)
+                        wins += g > o ? 1.0 : g == o ? 0.5 : 0.0;
+                pairs += (long)gold.Count * other.Count;
+            }
+
+            var auc = pairs == 0 ? 0.5 : wins / pairs;
+            results[name] = Math.Max(auc, 1.0 - auc);
+        }
+        return results;
+    }
+
+    private static double Feature(string name, List<LongMemEvalTurn> session, int index, int count)
+    {
+        var text = string.Join(" ", session.Select(t => t.Content ?? string.Empty));
+        double Ratio(double numerator, double denominator) => numerator / Math.Max(1.0, denominator);
+
+        string RoleText(string role) => string.Join(
+            " ", session.Where(t => t.Role == role).Select(t => t.Content ?? string.Empty));
+        int RoleTurns(string role) => session.Count(t => t.Role == role);
+        string SlotText(string role, int ordinal) => session
+            .Where(t => t.Role == role).Select(t => t.Content ?? string.Empty)
+            .Skip(ordinal).FirstOrDefault() ?? string.Empty;
+
+        foreach (var role in new[] { "user", "assistant" })
+        {
+            if (name == $"{role}_length_chars") return RoleText(role).Length;
+            if (name == $"{role}_uppercase_density")
+                return Ratio(RoleText(role).Count(char.IsUpper), RoleText(role).Length);
+            if (name == $"{role}_sentence_count")
+                return RoleText(role).Count(c => c is '.' or '!' or '?');
+            if (name == $"{role}_punctuation_density")
+                return Ratio(
+                    RoleText(role).Count(c => !char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c)),
+                    RoleText(role).Length);
+            if (name == $"{role}_type_token_ratio") return TypeTokenRatio(RoleText(role));
+            if (name == $"{role}_mean_turn_chars")
+                return Ratio(RoleText(role).Length, RoleTurns(role));
+            if (name == $"first_{role}_length_chars") return SlotText(role, 0).Length;
+            if (name == $"first_{role}_uppercase_density")
+                return Ratio(SlotText(role, 0).Count(char.IsUpper), SlotText(role, 0).Length);
+            if (name == $"first_{role}_sentence_count")
+                return SlotText(role, 0).Count(c => c is '.' or '!' or '?');
+        }
+
+        return name switch
+        {
+            "session_length_chars" => text.Length,
+            "turn_count" => session.Count,
+            "position_in_haystack" => index / (double)Math.Max(1, count - 1),
+            "digit_density" => Ratio(text.Count(char.IsDigit), text.Length),
+            "uppercase_density" => Ratio(text.Count(char.IsUpper), text.Length),
+            "sentence_count" => text.Count(c => c is '.' or '!' or '?'),
+            "punctuation_density" =>
+                Ratio(text.Count(c => !char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c)), text.Length),
+            "em_dash_density" => Ratio(text.Count(c => c == '—'), text.Length),
+            "mean_turn_chars" => Ratio(text.Length, session.Count),
+            "type_token_ratio" => TypeTokenRatio(text),
+            _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown V7 feature."),
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void DeclaredStructureIsRederivedFromTheShippedCorpus(TypedMemEvalVertical vertical)
+    {
+        // The ADR lists H, G and the ceiling table as CI-checked. They were stamped by the
+        // generator from the corpus it had just built and then re-read by nothing, which is a
+        // record rather than a check — the same shape of gap as a probe nobody re-runs. Every
+        // number below is derived here from the shipped bytes and compared to what is declared.
+        var metadata = Metadata(vertical);
+        var structure = metadata.GetProperty("structure");
+        var entries = TypedMemEvalCorpus.Load(vertical);
+
+        var goldCounts = new List<int>();
+        var distractorCounts = new List<int>();
+        foreach (var entry in entries)
+        {
+            var ids = entry.HaystackSessionIds ?? [];
+            var gold = (entry.AnswerSessionIds ?? []).Count(id => ids.Contains(id));
+            goldCounts.Add(gold);
+            distractorCounts.Add(ids.Count - gold);
+        }
+
+        // H counts non-gold sessions only (ADR §4), never double-counting G.
+        Assert.Equal(structure.GetProperty("h_min").GetInt32(), distractorCounts.Min());
+        Assert.Equal(structure.GetProperty("h_max").GetInt32(), distractorCounts.Max());
+
+        var declaredG = structure.GetProperty("g_distribution").EnumerateObject()
+            .ToDictionary(p => int.Parse(p.Name, CultureInfo.InvariantCulture), p => p.Value.GetInt32());
+        var actualG = goldCounts.GroupBy(g => g).ToDictionary(g => g.Key, g => g.Count());
+        Assert.Equal(declaredG.OrderBy(p => p.Key), actualG.OrderBy(p => p.Key));
+
+        // The structural ceiling: with a budget of K_ref sessions, a question needing G of them can
+        // at best surface min(G, K_ref)/G. Recomputed rather than trusted.
+        var kRef = metadata.GetProperty("k_ref").GetInt32();
+        var ceiling = metadata.GetProperty("ceiling").GetProperty("by_g");
+        foreach (var g in actualG.Keys.Where(g => g > 0))
+        {
+            var expected = Math.Round(Math.Min(g, kRef) / (double)g, 4);
+            Assert.Equal(expected, ceiling.GetProperty(g.ToString(CultureInfo.InvariantCulture)).GetDouble(), 3);
+        }
+    }
+
+    [Fact]
+    public void EveryRuntimeStringNamesTheShippedRevision()
+    {
+        // Revision drift has now been a defect twice: the runner's citation rule said v2 in one
+        // sentence and v1 in the next, and the projected result — the copy that reaches a
+        // consumer's report — named a revision the corpora had already left behind. Two question
+        // sets sharing a label is the exact failure the family's identity rule exists to prevent,
+        // so the strings a consumer can actually read are checked against the one constant.
+        var revision = TypedMemEvalVerticalDescriptor.CorpusRevision;
+        var citation = TypedMemEvalEvalResultAdapter.CitationRule;
+
+        // Every runtime-visible string, not just the citation rule. The CLI's own `--help` text
+        // still read "TypedMemEval v1" two revisions later, because it was a separate literal that
+        // nothing tied to the constant — which is the same defect in a place a user sees first.
+        var family = AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry.TryGet("typedmemeval");
+        Assert.NotNull(family);
+        var strings = new List<string> { citation, family!.Description };
+        strings.AddRange(family.Presets.Select(p => p.Description));
+
+        foreach (var text in strings)
+        {
+            var named = System.Text.RegularExpressions.Regex.Matches(text, @"\bv\d+\b")
+                .Select(m => m.Value).Distinct(StringComparer.Ordinal).ToArray();
+            Assert.Equal([revision], named);
+        }
+
+        foreach (var descriptor in TypedMemEvalVerticals.All)
+        {
+            Assert.EndsWith($"-{revision}", descriptor.CorpusId, StringComparison.Ordinal);
+            Assert.Equal(revision, descriptor.Revision);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void SessionsAreEmittedInTimestampOrder(TypedMemEvalVertical vertical)
+    {
+        // The ADR states this as a property the corpora have. It was true of the data and asserted
+        // by nothing, which makes it a description rather than a guarantee — and Forgetting depends
+        // on it, because its statement-before-invalidation constraint is stated in both session
+        // order AND timestamp order, so a corpus where the two disagree satisfies one reading while
+        // violating the other.
+        foreach (var entry in TypedMemEvalCorpus.Load(vertical))
+        {
+            var dates = (entry.HaystackDates ?? [])
+                .Select(d => LongMemEvalTimestamps.TryParse(d)
+                    ?? throw new FormatException($"{entry.QuestionId}: unparseable timestamp '{d}'"))
+                .ToList();
+            Assert.Equal(dates.OrderBy(d => d).ToList(), dates);
+        }
+    }
+
+    private static double TypeTokenRatio(string text)
+    {
+        var tokens = text.ToLowerInvariant()
+            .Split((char[])[' ', '\n', '\r', '\t', '.', ',', ';', ':', '!', '?', '(', ')', '"', '\''],
+                   StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+        return tokens.Count == 0 ? 0.0 : tokens.Distinct(StringComparer.Ordinal).Count() / (double)tokens.Count;
     }
 
     [Theory]

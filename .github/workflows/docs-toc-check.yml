@@ -14,6 +14,7 @@ on:
       - 'src/AgentEval.Memory/Data/typedmemeval/**'
       - 'tools/typedmemeval_common.py'
       - 'tools/stamp_typedmemeval_separability.py'
+      - 'tools/run_typedmemeval_probes.py'
 
 permissions:
   contents: read
@@ -35,3 +36,12 @@ jobs:
       - name: Check TypedMemEval corpora are not separable by cheap features
         working-directory: tools
         run: python3 stamp_typedmemeval_separability.py --check
+
+      # The probes decide which questions are valid, so the screen that decides "did this response
+      # reach the gold answer?" is itself load-bearing. It has been wrong twice — a word boundary typed as a
+      # literal backspace byte silenced half its negative-gold guard, and a greedy number pattern
+      # let a year the prompt itself supplied count as evidence — and both defects reported leaks
+      # in corpora that had none. Pure functions, so this runs without credentials.
+      - name: Check the TypedMemEval evidence screen
+        working-directory: tools
+        run: python3 run_typedmemeval_probes.py --self-test

@@ -76,10 +76,12 @@ public sealed class TypedMemEvalVerticalDescriptor
     /// Dataset revision, stamped into every result.
     /// </summary>
     /// <remarks>
-    /// v2 supersedes the v1 corpora shipped in 0.22.0-beta. V7 separability found gold identifiable
-    /// by capitalisation density and session length, and the shape-parity fix rewrites every
-    /// session — so retrieval difficulty moved and a v1 score is not comparable with a v2 score.
-    /// v1 results should not be cited.
+    /// v3 supersedes v1 (shipped in 0.22.0-beta) and v2 (never released). Both were separable:
+    /// v1 gold carried no BM25 calibration clause while ~99% of distractors did, and v2 gold was
+    /// recoverable from Forgetting at AUC 1.000 by the literal substring "Noted" and at 0.990 in
+    /// WorkingMemory by counting full stops. v3 equalises every session on the raw counts those
+    /// features are built from, so retrieval difficulty moved again — a v1 or v2 score is not
+    /// comparable with a v3 score, and neither should be cited.
     /// </remarks>
     public string Revision => CorpusRevision;
 
@@ -88,7 +90,7 @@ public sealed class TypedMemEvalVerticalDescriptor
     /// a revision bump that moved the label without moving the id would leave two different question
     /// sets sharing a name, which is the failure the whole identity rule exists to prevent.
     /// </summary>
-    public const string CorpusRevision = "v2";
+    public const string CorpusRevision = "v3";
 }
 
 /// <summary>Descriptor lookup for the five verticals.</summary>
