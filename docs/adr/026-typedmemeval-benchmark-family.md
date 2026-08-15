@@ -933,6 +933,28 @@ benchmark measures; each is a placement or scoping decision the design did not s
    is not nullable and the family defines no pass mark, so the threshold is stated by the caller
    rather than hidden in the adapter.
 
+**What a pre-merge review caught, after the probes had passed.** A four-lens adversarial review of
+the finished implementation returned 22 findings, and the most serious invalidated all five corpora:
+the calibration clause the gate appends to distractors was never appended to gold. Gold carried it
+0 times in 501 sessions against ~99% for distractors, so `clause absent` isolated every piece of
+gold evidence in every corpus with a one-line string filter. Nothing in the design forbade it,
+every structural check passed, the BM25 gate was satisfied, and all four validity probes were green
+— because none of them ask whether the evidence is *separable*, only whether it is *necessary*. The
+fix had to give gold the same clause built from other questions' vocabulary: the obvious version,
+echoing the question's own words, removed the tell but handed gold the query's keywords and pushed
+every corpus through the calibration ceiling. Parity is now a generator rule and a CI test.
+
+The same review found the whole not-yet-true shape asserting an event had happened from evidence
+that only stated a plan, a malformed template in all twelve expiring-validity questions, carried
+gold pinned to the tail of its haystack while metadata claimed shuffled, a pair-consistency metric
+that measured the opposite of what it documented (outcomes are gold-relative and gold flips, so a
+time-blind system produces *different* labels — the test asserting it scored 19/19 on a run with no
+time-blindness at all), a run that measured nothing projecting as a hard 0.0, a coverage mean 30%
+composed of vacuous 1.0s, and a documented CI check that did not exist. The lesson worth keeping is
+that the probes and the review catch disjoint classes: the probes ask whether a question is
+answerable and its evidence load-bearing, and no amount of that notices that the evidence is
+labelled.
+
 **What the validity probes actually caught.** The first Prospective generator computed every due
 date from an anchor timestamp that was then overwritten when the haystack was shuffled and
 re-stamped, so all 38 generated pair questions named dates their own conversations could not
