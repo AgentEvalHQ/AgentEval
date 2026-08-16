@@ -13,7 +13,7 @@
     }
   },
   "question_count": 50,
-  "corpus_sha256": "6df03f56d383b915bf8c21f3b2cd6983482868fe70daed99f2b3f05cf5e7d88b",
+  "corpus_sha256": "3151795b78f5dc721a3a37568226903fcdd9c693bd5d8ebb9b489329c32b879d",
   "generator": {
     "tool": "tools/gen_typedmemeval_episodic.py",
     "version": "1.0.0",
@@ -159,46 +159,46 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5911,
+        "session_length_chars": 0.5906,
         "turn_count": 0.5,
         "position_in_haystack": 0.542,
         "digit_density": 0.6284,
-        "uppercase_density": 0.5159,
-        "sentence_count": 0.5305,
-        "punctuation_density": 0.5738,
-        "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5911,
-        "type_token_ratio": 0.5177,
-        "first_user_length_chars": 0.5049,
-        "first_user_uppercase_density": 0.5663,
-        "first_user_sentence_count": 0.5374,
-        "first_assistant_length_chars": 0.7341,
-        "first_assistant_uppercase_density": 0.5004,
-        "first_assistant_sentence_count": 0.508,
-        "user_length_chars": 0.5301,
-        "user_uppercase_density": 0.5537,
-        "user_sentence_count": 0.5338,
-        "user_punctuation_density": 0.6227,
-        "user_type_token_ratio": 0.5482,
-        "user_mean_turn_chars": 0.5301,
-        "assistant_length_chars": 0.6205,
-        "assistant_uppercase_density": 0.5356,
-        "assistant_sentence_count": 0.5159,
-        "assistant_punctuation_density": 0.6711,
-        "assistant_type_token_ratio": 0.5939,
-        "assistant_mean_turn_chars": 0.6205,
-        "gold_marker_ngram": 0.6573,
+        "uppercase_density": 0.5102,
+        "sentence_count": 0.5307,
+        "punctuation_density": 0.5884,
+        "em_dash_density": 0.5126,
+        "mean_turn_chars": 0.5906,
+        "type_token_ratio": 0.5164,
+        "first_user_length_chars": 0.5146,
+        "first_user_uppercase_density": 0.5519,
+        "first_user_sentence_count": 0.5371,
+        "first_assistant_length_chars": 0.7345,
+        "first_assistant_uppercase_density": 0.504,
+        "first_assistant_sentence_count": 0.5172,
+        "user_length_chars": 0.5228,
+        "user_uppercase_density": 0.5464,
+        "user_sentence_count": 0.5332,
+        "user_punctuation_density": 0.6196,
+        "user_type_token_ratio": 0.5351,
+        "user_mean_turn_chars": 0.5228,
+        "assistant_length_chars": 0.6202,
+        "assistant_uppercase_density": 0.5345,
+        "assistant_sentence_count": 0.5192,
+        "assistant_punctuation_density": 0.6733,
+        "assistant_type_token_ratio": 0.5895,
+        "assistant_mean_turn_chars": 0.6202,
+        "gold_marker_ngram": 0.6798,
         "boilerplate_ngram": 0.6346
       },
       "worst_refused_feature": "first_assistant_length_chars",
-      "worst_refused_auc": 0.7341,
+      "worst_refused_auc": 0.7345,
       "worst_gold_marker_ngram": "on the",
-      "gold_marker_ngram_auc": 0.6573,
+      "gold_marker_ngram_auc": 0.6798,
       "worst_boilerplate_ngram": "put the",
       "boilerplate_ngram_auc": 0.6346,
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.06,
+          "share": 0.0,
           "chance": 0.0696
         },
         "turn_count": {
@@ -214,27 +214,27 @@
           "chance": 0.0696
         },
         "uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0696
-        },
-        "sentence_count": {
-          "share": 0.02,
-          "chance": 0.0696
-        },
-        "punctuation_density": {
-          "share": 0.12,
-          "chance": 0.0696
-        },
-        "em_dash_density": {
-          "share": 0.0,
-          "chance": 0.0696
-        },
-        "mean_turn_chars": {
           "share": 0.06,
           "chance": 0.0696
         },
+        "sentence_count": {
+          "share": 0.04,
+          "chance": 0.0696
+        },
+        "punctuation_density": {
+          "share": 0.14,
+          "chance": 0.0696
+        },
+        "em_dash_density": {
+          "share": 0.06,
+          "chance": 0.0696
+        },
+        "mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0696
+        },
         "type_token_ratio": {
-          "share": 0.02,
+          "share": 0.06,
           "chance": 0.0696
         },
         "first_user_length_chars": {
@@ -254,7 +254,7 @@
           "chance": 0.0696
         },
         "first_assistant_uppercase_density": {
-          "share": 0.18,
+          "share": 0.16,
           "chance": 0.0696
         },
         "first_assistant_sentence_count": {
@@ -262,7 +262,7 @@
           "chance": 0.0696
         },
         "user_length_chars": {
-          "share": 0.04,
+          "share": 0.0,
           "chance": 0.0696
         },
         "user_uppercase_density": {
@@ -274,39 +274,39 @@
           "chance": 0.0696
         },
         "user_punctuation_density": {
-          "share": 0.08,
-          "chance": 0.0696
-        },
-        "user_type_token_ratio": {
-          "share": 0.08,
-          "chance": 0.0696
-        },
-        "user_mean_turn_chars": {
-          "share": 0.04,
-          "chance": 0.0696
-        },
-        "assistant_length_chars": {
-          "share": 0.02,
-          "chance": 0.0696
-        },
-        "assistant_uppercase_density": {
-          "share": 0.08,
-          "chance": 0.0696
-        },
-        "assistant_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0696
-        },
-        "assistant_punctuation_density": {
           "share": 0.06,
           "chance": 0.0696
         },
-        "assistant_type_token_ratio": {
+        "user_type_token_ratio": {
+          "share": 0.04,
+          "chance": 0.0696
+        },
+        "user_mean_turn_chars": {
           "share": 0.0,
           "chance": 0.0696
         },
-        "assistant_mean_turn_chars": {
+        "assistant_length_chars": {
+          "share": 0.0,
+          "chance": 0.0696
+        },
+        "assistant_uppercase_density": {
+          "share": 0.04,
+          "chance": 0.0696
+        },
+        "assistant_sentence_count": {
           "share": 0.02,
+          "chance": 0.0696
+        },
+        "assistant_punctuation_density": {
+          "share": 0.08,
+          "chance": 0.0696
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.02,
+          "chance": 0.0696
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.0,
           "chance": 0.0696
         }
       },
@@ -314,7 +314,7 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "6df03f56d383b915bf8c21f3b2cd6983482868fe70daed99f2b3f05cf5e7d88b"
+      "probed_corpus_sha256": "3151795b78f5dc721a3a37568226903fcdd9c693bd5d8ebb9b489329c32b879d"
     }
   }
 }

@@ -449,6 +449,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         records = list(pool.map(lambda e: probe_question(e, vertical), entries))
 
     by_id = {r["question_id"]: r for r in records}
+    shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -521,6 +522,24 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             ),
         },
         "v6_leave_one_out": tally("v6"),
+        # Per SHAPE, not only per vertical. A vertical reported at 48/50 hides Arithmetic's
+        # `duration` at 83% and Episodic's `participant-attribution` at 87%, and the consuming
+        # project found a shape running at 50% on their answer model that our per-vertical
+        # figure gave no way to see. Where a shape's V1 is well below the vertical's, its
+        # numbers are answer-model variance more than memory signal, and a reader is entitled
+        # to know that before quoting them.
+        "by_shape": {
+            shape: {
+                "questions": len(group),
+                "v1_applicable": sum(1 for r in group if r.get("v1") is not None),
+                "v1_passed": sum(1 for r in group if r.get("v1") is True),
+                "v3_applicable": sum(1 for r in group if r.get("v3") is not None),
+                "v3_passed": sum(1 for r in group if r.get("v3") is True),
+            }
+            for shape, group in sorted(
+                {s: [r for r in records if shapes.get(r["question_id"]) == s]
+                 for s in sorted({v for v in shapes.values() if v})}.items())
+        },
         "per_question": {
             r["question_id"]: {k: v for k, v in r.items()
                                if k not in ("question_id", "v1_answer")}

@@ -206,6 +206,18 @@ _DECOY_ACKS = (
 )
 
 
+#: Frames for the attribution shape. One per question, held byte-identical across a pair, so
+#: the wording cannot stand in for the speaker label. `prompt` is what the OTHER party says in
+#: the assistant-speaker arm -- it must not hint at who is about to speak.
+ATTRIBUTION_FRAMES = (
+    ("One thing about {topic}, {statement}.", "Anything I should keep in mind about {topic}?"),
+    ("Worth remembering about {topic}: {statement}.", "Is there anything on {topic} worth noting?"),
+    ("About {topic} — {statement}.", "What is the situation with {topic}?"),
+    ("On {topic}, {statement}.", "Where do things stand on {topic}?"),
+    ("The thing with {topic} is that {statement}.", "Remind me about {topic}?"),
+)
+
+
 def _filler_value(rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
     """A value for a decoy detail: same shape as a gold value, belonging to another topic."""
     return f"{rng.choice(_FILLER_VALUE_HEADS)}-{rng.randrange(100, 999)}"
@@ -400,12 +412,19 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
 
         # The statement clause is byte-identical across the two variants; only the role
         # carrying it moves. Anything else that differed would be a cue.
-        said = f"One thing about {topic}, {statement}."
+        # The frame is drawn PER QUESTION from a bank and stays byte-identical across the two
+        # arms. With one frame for all fifteen, a system storing no speaker label could recover
+        # the answer from the wording rather than from memory, so the shape measured less than
+        # its name promised and shipped as a floor (ADR-026 §13, promised for v3 and slipped).
+        # Varying it across questions removes the constant; holding it fixed within a pair
+        # keeps the only thing that differs between the arms the ROLE that carries it.
+        frame, prompt = ATTRIBUTION_FRAMES[offset % len(ATTRIBUTION_FRAMES)]
+        said = frame.format(topic=topic, statement=statement)
         if speaker == "user":
             turns = [tmc.Turn("user", said, has_answer=True),
                      tmc.Turn("assistant", "")]
         else:
-            turns = [tmc.Turn("user", f"Anything I should keep in mind about {topic}?"),
+            turns = [tmc.Turn("user", prompt.format(topic=topic)),
                      tmc.Turn("assistant", said, has_answer=True)]
         gold = tmc.Session(turns, BASE, is_gold=True, tag="attribution")
 
