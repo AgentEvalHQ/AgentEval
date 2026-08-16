@@ -1231,6 +1231,26 @@ separability gate red until a regeneration turns it green honestly, so v4 cannot
 without clearing V7; and the consumer's probe lands as CI test data, so it cannot be skipped by
 forgetting it existed.
 
+**Their acceptance criterion, read before v4 exists, added one rule V7 did not have.** A feature
+can pass on pooled AUC and still separate gold *perfectly* in a large minority of questions — a
+bimodal split a mean cannot show. Measured on v3: Episodic's `assistant_mean_turn_chars` pools to
+0.527 while turn length identifies the gold outright in **54%** of its questions. Twenty-four
+features pass the pooled gate and fail this one.
+
+**Adopted with one correction, because a flat share mis-scores it in both directions.** With one
+gold and H distractors a question's folded AUC is 1.0 whenever gold is strictly top or strictly
+bottom, so the chance rate is a function of the haystack. WorkingMemory varies H as its independent
+variable and a quarter of its questions have H = 1, where the answer is 1.0 by construction: its
+chance rate is **38%**, and the proposed flat 25% bar would refuse thirteen of its features for its
+own design. Episodic's chance rate is 9% against 54% observed. V7 therefore refuses on the *excess*
+— a share at least 0.20 and more than twice chance — which refuses Episodic (+47%) and Prospective
+(+12% to +22%) and correctly clears WorkingMemory's H = 1 stratum at zero.
+
+Post-correction, three of five v3 corpora fail: Prospective and Episodic on the distribution,
+WorkingMemory on `"i have"`. Arithmetic and Forgetting clear both rules.
+
+The fixtures are checked in at `tests/AgentEval.Memory.Tests/Fixtures/consumer-probe/`.
+
 Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
 Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
 

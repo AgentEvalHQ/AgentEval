@@ -1,0 +1,634 @@
+{
+  "corpus_id": "agenteval-typedmemeval-forgetting-v3",
+  "vertical": "forgetting",
+  "revision": "v3",
+  "supersedes": {
+    "revision": "v2",
+    "shipped_in": null,
+    "reason": "v2 was never released; it existed only on an unmerged branch, and it carried the same class of defect it was created to fix. Its own V7 check passed because the check was wrong twice over: it pooled (gold, distractor) pairs ACROSS questions, which diluted a within-question tell in Forgetting from 0.903 to 0.616, and its refused-feature list covered neither punctuation nor sentence structure nor phrase markers on gold. Measured properly, v2 gold was recoverable from Forgetting at AUC 1.000 by the literal substring \"Noted\", at 0.95 on two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting full stops. v3 equalises every session on all six raw counts the refused features are built from, so retrieval difficulty moved again and no v1 or v2 number is comparable with a v3 number. Neither should be cited.",
+    "also_supersedes": {
+      "revision": "v1",
+      "shipped_in": "0.22.0-beta",
+      "reason": "Gold carried the BM25 calibration clause 0 times in 501 sessions against ~99% for distractors, so a one-line string filter isolated every piece of evidence in every corpus."
+    }
+  },
+  "question_count": 50,
+  "corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf",
+  "generator": {
+    "tool": "tools/gen_typedmemeval_forgetting.py",
+    "version": "1.0.0",
+    "seed": 20260815
+  },
+  "k_ref": 5,
+  "coverage": {
+    "retriever": "bm25-okapi-k1.5-b0.75",
+    "band_low": 0.5,
+    "band_high": 0.9,
+    "mean_realised": 0.69,
+    "echo": 0.5,
+    "iterations": 2,
+    "search_trace": [
+      [
+        1.0,
+        0.33
+      ],
+      [
+        0.5,
+        0.69
+      ]
+    ],
+    "per_question": {
+      "tme-for-001": 1.0,
+      "tme-for-002": 0.5,
+      "tme-for-003": 1.0,
+      "tme-for-004": 1.0,
+      "tme-for-005": 1.0,
+      "tme-for-006": 1.0,
+      "tme-for-007": 1.0,
+      "tme-for-008": 0.0,
+      "tme-for-009": 0.5,
+      "tme-for-010": 1.0,
+      "tme-for-011": 0.0,
+      "tme-for-012": 0.0,
+      "tme-for-013": 1.0,
+      "tme-for-014": 0.0,
+      "tme-for-015": 0.0,
+      "tme-for-016": 0.0,
+      "tme-for-017": 1.0,
+      "tme-for-018": 1.0,
+      "tme-for-019": 1.0,
+      "tme-for-020": 0.5,
+      "tme-for-021": 1.0,
+      "tme-for-022": 0.0,
+      "tme-for-023": 1.0,
+      "tme-for-024": 1.0,
+      "tme-for-025": 1.0,
+      "tme-for-026": 1.0,
+      "tme-for-027": 0.0,
+      "tme-for-028": 0.0,
+      "tme-for-029": 0.0,
+      "tme-for-030": 0.0,
+      "tme-for-031": 0.0,
+      "tme-for-032": 0.0,
+      "tme-for-033": 1.0,
+      "tme-for-034": 1.0,
+      "tme-for-035": 0.0,
+      "tme-for-036_abs": 1.0,
+      "tme-for-037_abs": 1.0,
+      "tme-for-038_abs": 1.0,
+      "tme-for-039_abs": 1.0,
+      "tme-for-040_abs": 1.0,
+      "tme-for-041_abs": 1.0,
+      "tme-for-042_abs": 1.0,
+      "tme-for-043_abs": 1.0,
+      "tme-for-044_abs": 1.0,
+      "tme-for-045_abs": 1.0,
+      "tme-for-046_abs": 1.0,
+      "tme-for-047_abs": 1.0,
+      "tme-for-048_abs": 1.0,
+      "tme-for-049_abs": 1.0,
+      "tme-for-050_abs": 1.0
+    }
+  },
+  "ceiling": {
+    "k_ref": 5,
+    "by_g": {
+      "0": 1.0,
+      "1": 1.0,
+      "2": 1.0
+    },
+    "min": 1.0,
+    "structural_below_one": false
+  },
+  "structure": {
+    "g_distribution": {
+      "0": 15,
+      "1": 15,
+      "2": 20
+    },
+    "h_min": 15,
+    "h_max": 25,
+    "gold_position_shuffled": true,
+    "h_is_independent_variable": false,
+    "no_absolute_dates": false
+  },
+  "probes": {
+    "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
+        "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
+        "position_in_haystack",
+        "punctuation_density",
+        "sentence_count",
+        "session_length_chars",
+        "turn_count",
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_type_token_ratio",
+        "user_uppercase_density"
+      ],
+      "exempt_features": [],
+      "reported_only_features": [],
+      "features": {
+        "session_length_chars": 0.5589,
+        "turn_count": 0.5,
+        "position_in_haystack": 0.5081,
+        "digit_density": 0.5,
+        "uppercase_density": 0.6133,
+        "sentence_count": 0.5567,
+        "punctuation_density": 0.5531,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.5589,
+        "type_token_ratio": 0.5202,
+        "first_user_length_chars": 0.6632,
+        "first_user_uppercase_density": 0.5908,
+        "first_user_sentence_count": 0.5148,
+        "first_assistant_length_chars": 0.5886,
+        "first_assistant_uppercase_density": 0.5944,
+        "first_assistant_sentence_count": 0.5697,
+        "user_length_chars": 0.6268,
+        "user_uppercase_density": 0.598,
+        "user_sentence_count": 0.5099,
+        "user_punctuation_density": 0.5621,
+        "user_type_token_ratio": 0.6479,
+        "user_mean_turn_chars": 0.6268,
+        "assistant_length_chars": 0.549,
+        "assistant_uppercase_density": 0.5805,
+        "assistant_sentence_count": 0.5531,
+        "assistant_punctuation_density": 0.5364,
+        "assistant_type_token_ratio": 0.5728,
+        "assistant_mean_turn_chars": 0.549,
+        "gold_marker_ngram": 0.6021,
+        "boilerplate_ngram": 0.5809
+      },
+      "worst_refused_feature": "first_user_length_chars",
+      "worst_refused_auc": 0.6632,
+      "worst_gold_marker_ngram": "far as",
+      "gold_marker_ngram_auc": 0.6021,
+      "worst_boilerplate_ngram": "week",
+      "boilerplate_ngram_auc": 0.5809,
+      "passed": true,
+      "status": "run",
+      "measured_by": "generator",
+      "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-16T09:04:31Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 35,
+      "passed": 34,
+      "failed": [
+        "tme-for-032"
+      ]
+    },
+    "v1_pair_flip": {
+      "pairs": 15,
+      "passed": 14,
+      "failed": [
+        "tme-for-p12"
+      ]
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 35,
+      "passed": 35,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 35,
+      "passed": 35,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 20,
+      "passed": 20,
+      "failed": []
+    },
+    "per_question": {
+      "tme-for-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-for-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-032": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-for-036_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-037_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-038_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-039_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-040_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-041_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-042_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-043_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-044_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-045_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-046_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-047_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-048_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-049_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      },
+      "tme-for-050_abs": {
+        "v1": null,
+        "v2": null,
+        "v3": null,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
+  }
+}

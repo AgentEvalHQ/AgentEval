@@ -897,6 +897,44 @@ def _auc_within(strata: list[tuple[list[float], list[float]]], fold: bool = True
     return max(auc, 1.0 - auc) if fold else auc
 
 
+#: A feature may pass on pooled AUC and still separate gold PERFECTLY in a large minority of
+#: questions -- a bimodal split that a mean cannot show. The consuming project's probe surfaced it:
+#: Episodic's turn_count pools to 0.615 while turn count alone identifies the gold in 54% of its
+#: questions. Refused as a distribution, not a mean.
+#:
+#: Measured against CHANCE rather than a flat share, which matters in both directions. With one gold
+#: and H distractors, a question's folded AUC is 1.0 whenever gold is strictly top or strictly
+#: bottom -- probability 2/(H+1). WorkingMemory varies H as its independent variable and a twelfth
+#: of its questions have H=1, where the answer is 1.0 by construction; its chance rate is 38% and a
+#: flat 25% bar would refuse it for its own design. Episodic's chance rate is 9% against 54%
+#: observed. The excess is the signal.
+PERFECT_SEPARATION_MULTIPLE = 2.0
+PERFECT_SEPARATION_FLOOR = 0.20
+
+
+def _perfect_share(strata: list[tuple[list[float], list[float]]]) -> tuple[float, float]:
+    """Share of questions this feature separates perfectly, and the share expected by chance."""
+    perfect = scored = 0
+    expected = 0.0
+    for gold_values, other_values in strata:
+        if not gold_values or not other_values:
+            continue
+        scored += 1
+        wins = sum(1.0 if g > o else 0.5 if g == o else 0.0
+                   for g in gold_values for o in other_values)
+        auc = wins / (len(gold_values) * len(other_values))
+        if max(auc, 1.0 - auc) >= 1.0:
+            perfect += 1
+        # P(all gold strictly above every distractor, or all strictly below), the two orderings
+        # out of the C(n, g) equally likely rank assignments that give a folded AUC of exactly 1.
+        total = len(gold_values) + len(other_values)
+        ways = math.comb(total, len(gold_values))
+        expected += 2.0 / ways if ways else 1.0
+    if not scored:
+        return 0.0, 0.0
+    return perfect / scored, expected / scored
+
+
 def separability_report(questions: list[Question], exempt: frozenset = frozenset()) -> dict:
     """Tries cheap single-feature classifiers at telling gold sessions from distractors.
 
@@ -980,6 +1018,7 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
     } | role_features
 
     scores: dict[str, float] = {}
+    perfect: dict[str, dict[str, float]] = {}
     for name, extract in features.items():
         strata = []
         for q in questions:
@@ -989,6 +1028,8 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
                 (gold_values if session.is_gold else other_values).append(extract(session, i, n))
             strata.append((gold_values, other_values))
         scores[name] = round(_auc_within(strata), 4)
+        share, chance = _perfect_share(strata)
+        perfect[name] = {"share": round(share, 4), "chance": round(chance, 4)}
 
     gold_gram, gold_gram_score, filler_gram, filler_gram_score = _worst_boilerplate_ngram(questions)
     scores["gold_marker_ngram"] = round(gold_gram_score, 4)
@@ -999,6 +1040,13 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         raise SystemExit(
             f"separability: exemption named a feature that is not refused: {sorted(unknown)}. "
             "A typo here silently exempts nothing while reading as though it exempted something.")
+
+    bimodal = {
+        name: stats for name, stats in perfect.items()
+        if name in SEPARABILITY_REFUSED_FEATURES and name not in exempt
+        and stats["share"] >= PERFECT_SEPARATION_FLOOR
+        and stats["share"] > PERFECT_SEPARATION_MULTIPLE * stats["chance"]
+    }
 
     refused = {k: v for k, v in scores.items()
                if k in SEPARABILITY_REFUSED_FEATURES and k not in exempt}
@@ -1029,7 +1077,12 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         "gold_marker_ngram_auc": scores["gold_marker_ngram"],
         "worst_boilerplate_ngram": filler_gram,
         "boilerplate_ngram_auc": scores["boilerplate_ngram"],
-        "passed": worst is None or scores[worst] < SEPARABILITY_MAX_AUC,
+        "perfect_separation": perfect,
+        "bimodal_features": {
+            name: {**stats, "excess_over_chance": round(stats["share"] - stats["chance"], 4)}
+            for name, stats in sorted(bimodal.items())
+        },
+        "passed": (worst is None or scores[worst] < SEPARABILITY_MAX_AUC) and not bimodal,
     }
 
 
