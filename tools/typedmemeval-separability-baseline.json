@@ -9,7 +9,7 @@
     "is the one thing this file must never be used for -- the numbers below are measurements,",
     "and the corpus is what has to change."
   ],
-  "revision": "v3",
+  "revision": "v4",
   "threshold_auc": 0.75,
   "blocked": {}
 }
