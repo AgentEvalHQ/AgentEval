@@ -1216,6 +1216,21 @@ visible before anyone spent a baseline. Second, the after arm should ask what th
 rather than what happened; that keeps the epistemic distinction the shape exists to test while
 making the target answer unambiguous.
 
+**The v4 acceptance gate, agreed with the consumer.** v4 ships only when it clears **both**
+instruments: our V7, and the consuming project's independent probe, whose fixtures (probe output,
+the five metas, source, and a methodology README carrying the raw-tokenization requirement and
+their proposed acceptance criterion) become checked-in test data under
+`tests/AgentEval.Memory.Tests/Fixtures/consumer-probe/`. Their criterion is to be read **before**
+v4 is generated, not after: a corpus measured against a bar it was not built to clear is how v1,
+v2 and v3 each certified themselves.
+
+Written down here rather than agreed in conversation, because §13 promised the attribution
+regeneration in v3 and it slipped for exactly that reason — the commitment lived in prose and
+nothing failed when it was not met. Two things now enforce it: PR #166 stays open with the
+separability gate red until a regeneration turns it green honestly, so v4 cannot quietly ship
+without clearing V7; and the consumer's probe lands as CI test data, so it cannot be skipped by
+forgetting it existed.
+
 Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
 Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
 
