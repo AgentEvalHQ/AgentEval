@@ -112,7 +112,7 @@
     "no_absolute_dates": false
   },
   "probes": {
-    "status": "not_run",
+    "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -310,6 +310,472 @@
       "status": "run",
       "measured_by": "generator",
       "probed_corpus_sha256": "325c54be914867ee2033134c82d8859a954b99df958c01def01ba815ac543570"
-    }
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-16T19:09:31Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 47,
+      "failed": [
+        "tme-epi-037",
+        "tme-epi-042",
+        "tme-epi-047"
+      ]
+    },
+    "v1_pair_flip": {
+      "pairs": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 50,
+      "passed": 50,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "by_shape": {
+      "assistant-stated": {
+        "questions": 20,
+        "v1_applicable": 20,
+        "v1_passed": 20,
+        "v3_applicable": 20,
+        "v3_passed": 20
+      },
+      "list-order": {
+        "questions": 15,
+        "v1_applicable": 15,
+        "v1_passed": 15,
+        "v3_applicable": 15,
+        "v3_passed": 15
+      },
+      "participant-attribution": {
+        "questions": 15,
+        "v1_applicable": 15,
+        "v1_passed": 12,
+        "v3_applicable": 15,
+        "v3_passed": 15
+      }
+    },
+    "per_question": {
+      "tme-epi-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-037": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-039": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-042": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-043": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-045": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-046": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-047": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-049": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-epi-050": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "325c54be914867ee2033134c82d8859a954b99df958c01def01ba815ac543570"
   }
 }

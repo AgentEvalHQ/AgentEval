@@ -114,7 +114,7 @@
     "no_absolute_dates": true
   },
   "probes": {
-    "status": "not_run",
+    "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -312,6 +312,534 @@
       "status": "run",
       "measured_by": "generator",
       "probed_corpus_sha256": "9f3b4936c00e571599bc0fd3edd0bc2b7fb6b0579d279c7e4a2d818aaa864f33"
-    }
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-16T19:49:23Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 46,
+      "failed": [
+        "tme-ari-039",
+        "tme-ari-043",
+        "tme-ari-045",
+        "tme-ari-046"
+      ]
+    },
+    "v1_pair_flip": {
+      "pairs": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 50,
+      "passed": 50,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 50,
+      "passed": 49,
+      "failed": [
+        "tme-ari-043"
+      ]
+    },
+    "by_shape": {
+      "count": {
+        "questions": 14,
+        "v1_applicable": 14,
+        "v1_passed": 14,
+        "v3_applicable": 14,
+        "v3_passed": 14
+      },
+      "delta": {
+        "questions": 10,
+        "v1_applicable": 10,
+        "v1_passed": 10,
+        "v3_applicable": 10,
+        "v3_passed": 10
+      },
+      "duration": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 8,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      },
+      "sum": {
+        "questions": 14,
+        "v1_applicable": 14,
+        "v1_passed": 14,
+        "v3_applicable": 14,
+        "v3_passed": 14
+      }
+    },
+    "per_question": {
+      "tme-ari-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-037": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-039": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-042": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-043": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          6
+        ]
+      },
+      "tme-ari-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-045": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-046": {
+        "v1": false,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-049": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      },
+      "tme-ari-050": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": true,
+        "v6_redundant_components": []
+      }
+    },
+    "probed_corpus_sha256": "9f3b4936c00e571599bc0fd3edd0bc2b7fb6b0579d279c7e4a2d818aaa864f33"
   }
 }

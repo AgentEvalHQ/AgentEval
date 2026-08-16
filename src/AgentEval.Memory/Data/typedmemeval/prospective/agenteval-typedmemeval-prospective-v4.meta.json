@@ -106,7 +106,7 @@
     "no_absolute_dates": true
   },
   "probes": {
-    "status": "not_run",
+    "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -304,6 +304,476 @@
       "status": "run",
       "measured_by": "generator",
       "probed_corpus_sha256": "1366236a812b2e6e6868973fb17a67a0b4487f84099926e197b5c793e263b6a1"
-    }
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-16T18:58:30Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v1_pair_flip": {
+      "pairs": 19,
+      "passed": 19,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 37,
+      "passed": 37,
+      "failed": [],
+      "not_decidable": [
+        "tme-pro-009",
+        "tme-pro-019",
+        "tme-pro-021",
+        "tme-pro-023",
+        "tme-pro-025",
+        "tme-pro-027",
+        "tme-pro-030",
+        "tme-pro-034",
+        "tme-pro-038",
+        "tme-pro-044",
+        "tme-pro-046",
+        "tme-pro-048",
+        "tme-pro-050"
+      ],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "by_shape": {
+      "due-later-reminder": {
+        "questions": 16,
+        "v1_applicable": 16,
+        "v1_passed": 16,
+        "v3_applicable": 11,
+        "v3_passed": 11
+      },
+      "expiring-validity": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 9,
+        "v3_passed": 9
+      },
+      "not-yet-true": {
+        "questions": 10,
+        "v1_applicable": 10,
+        "v1_passed": 10,
+        "v3_applicable": 6,
+        "v3_passed": 6
+      },
+      "seed-carry-over": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 11,
+        "v3_passed": 11
+      }
+    },
+    "per_question": {
+      "tme-pro-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-037": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-039": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-042": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-043": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-045": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-046": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-049": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-050": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "1366236a812b2e6e6868973fb17a67a0b4487f84099926e197b5c793e263b6a1"
   }
 }
