@@ -565,6 +565,27 @@ def _ensure_padding_turns(session: Session) -> None:
         session.turns.append(Turn(role, ""))
 
 
+def _normalise_turn_counts(question: Question) -> None:
+    """Gives every session in a question the same number of turns, in the same roles.
+
+    Adding a fixed exchange to every session preserves whatever difference was already there:
+    Episodic's assistant-stated and attribution gold carry one more base turn than filler, so
+    27 gold sessions ended on 5 turns against 989 distractors on 4. Pooled turn_count read a
+    harmless 0.615 while the count separated gold PERFECTLY in 54% of questions -- the exact
+    shape of defect the bimodality rule exists to catch, and it was structural rather than
+    incidental.
+    """
+    # Per ROLE, not just per total. Equalising the total alone leaves the composition free:
+    # gold ended (u,a,u,a,a) and filler (u,a,u,a,u) -- the same five turns, different roles --
+    # so gold owned an ('assistant', 2) slot that no distractor had. A slot only one side
+    # possesses cannot be equalised by a per-slot pass, and it separated gold outright.
+    for role in ("user", "assistant"):
+        target = max(sum(1 for t in s.turns if t.role == role) for s in question.sessions)
+        for session in question.sessions:
+            while sum(1 for t in session.turns if t.role == role) < target:
+                session.turns.append(Turn(role, ""))
+
+
 #: Lower-case continuations. A tail lengthens a sentence without starting a new one and without
 #: introducing a capital, which is what makes the three axes independently solvable: sentence count
 #: is set by how many sentences are emitted, capitals by how many of them carry names, and the
@@ -750,6 +771,7 @@ def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # De
 
         for session in question.sessions:
             _ensure_padding_turns(session)
+        _normalise_turn_counts(question)
 
         # Targets are per TURN SLOT -- (role, position within that role) -- not per session and not
         # per role. Each narrowing was forced by the last one failing. Equalising the pooled session
@@ -1156,13 +1178,23 @@ def check_separability(questions: list[Question], exempt: frozenset = frozenset(
     report = separability_report(questions, exempt)
     if report["passed"]:
         return []
-    return [
-        f"separability: '{report['worst_refused_feature']}' separates gold from distractors at AUC "
-        f"{report['worst_refused_auc']:.3f}, at or above the {SEPARABILITY_MAX_AUC} refusal "
-        f"threshold. "
-        f"Evidence a cheap classifier can find without reading it is evidence the benchmark is not "
-        f"measuring retrieval."
-    ]
+
+    failures = []
+    worst, auc = report["worst_refused_feature"], report["worst_refused_auc"]
+    if worst is not None and auc >= SEPARABILITY_MAX_AUC:
+        failures.append(
+            f"separability: '{worst}' separates gold from distractors at AUC {auc:.3f}, at or "
+            f"above the {SEPARABILITY_MAX_AUC} refusal threshold. Evidence a cheap classifier can "
+            f"find without reading it is evidence the benchmark is not measuring retrieval.")
+    # Reported separately, because the pooled AUC can sit comfortably under the bar while the
+    # feature still separates PERFECTLY in a large minority of questions. Naming the pooled
+    # number as the reason for a bimodality failure sends the reader to the wrong measurement.
+    for name, stats in report.get("bimodal_features", {}).items():
+        failures.append(
+            f"separability: '{name}' separates gold perfectly in {stats['share']:.0%} of questions "
+            f"against a chance rate of {stats['chance']:.0%} (pooled AUC "
+            f"{report['features'][name]:.3f} is under the bar; the distribution is not).")
+    return failures
 
 # --------------------------------------------------------------------------------------
 # The calibration gate
@@ -1196,7 +1228,14 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
     Applied centrally, after build and before scoring, so no generator can reintroduce the tell by
     forgetting it.
     """
-    pool = sorted({term for q in questions for term in tokenize(q.question)})
+    # Built from question text, minus every token that appears in ANY question's ANSWER.
+    # Episodic's attribution questions embed the statement they ask about, so a value that is
+    # one question's gold answer can appear in another question's text -- and weaving it into a
+    # user turn makes a filler session state an answer, which the assistant-stated leak guard
+    # then reports against a question that never went near it. Latent since the pool was
+    # introduced; it surfaced when an unrelated change shifted which terms got sampled.
+    answers = {term for q in questions for term in tokenize(q.answer)}
+    pool = sorted({term for q in questions for term in tokenize(q.question)} - answers)
     if not pool:
         return
 
@@ -1230,8 +1269,13 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
             # type-token ratio -- 0.978 against 0.929, separable at AUC 0.869. Repeating gold's own
             # NON-query words restores the repetition without moving its retrieval score, because a
             # term the query never mentions cannot change how well the query matches.
+            # Minus this question's own answer. The session that carries the answer is the one
+            # we are drawing from, so without this the clause can weave the answer into the GOLD
+            # USER turn -- and for Episodic's assistant-stated shape, the whole design is that
+            # only the assistant states it. The generator's leak guard caught it.
+            answer_terms = set(tokenize(question.answer))
             mine = [t for t in sorted(set(tokenize(session.text())))
-                    if t not in own and t not in STOPWORDS]
+                    if t not in own and t not in STOPWORDS and t not in answer_terms]
             # How many of them, solved rather than guessed. A repeated term adds a token but no new
             # type; a foreign one adds both. So with `take` terms of which k are repeats, gold lands
             # at (types + take - k) / (tokens + take), and k follows from the ratio the distractors

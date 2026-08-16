@@ -193,6 +193,27 @@ FILLER = [
 ]
 
 
+#: Items and acknowledgements for decoy shortlists -- deliberately disjoint from the real
+#: shortlist vocabulary, so a decoy can never be mistaken for a listed item.
+_DECOY_ITEMS = (
+    "the Kelder ridge route", "the Vane estuary hide", "the Orrin mill cafe",
+    "the Brackwater crossing", "the Sallow Fields pitch", "the Tarn Head loop",
+    "the Windle bothy", "the Quarry Lane studio", "the Marden ferry", "the Ostler orchard",
+)
+_DECOY_ACKS = (
+    "Added to that one.", "Noted for later.", "That list is getting long.",
+    "Filed under optimism.", "One more for the winter.",
+)
+
+
+def _filler_value(rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """A value for a decoy detail: same shape as a gold value, belonging to another topic."""
+    return f"{rng.choice(_FILLER_VALUE_HEADS)}-{rng.randrange(100, 999)}"
+
+
+_FILLER_VALUE_HEADS = ("QR", "TL", "MV", "HD", "PN", "RS", "BK", "WG")
+
+
 def _filler_session(rng: random.Random, echo_source: str, echo: float, index: int) -> tmc.Session:
     """One filler exchange, with the calibration echo attached to alternating roles.
 
@@ -210,7 +231,29 @@ def _filler_session(rng: random.Random, echo_source: str, echo: float, index: in
     i.e. the calibration knob would quietly become a speaker cue.
     """
     echoed = tmc.echo_terms(echo_source, echo, rng)
-    user, assistant = rng.choice(FILLER)
+    # Half the fillers are built from the SAME detail frames the gold sessions use, on a
+    # different topic. Gold's user turn is question-shaped ("Is there a slot code on the X
+    # booking?") while filler was domestic chatter, and that register split was the tell:
+    # "on the" marked gold at AUC 0.763 against 22% of filler. Sharing the frames means a
+    # reader has to match the TOPIC -- which is the memory task -- rather than notice which
+    # sessions are shaped like questions.
+    draw = rng.random()
+    if draw < 0.35:
+        _, _, ask, answer, _ = rng.choice(DETAILS)
+        topic = rng.choice(TOPICS)
+        user = ask.format(topic=topic)
+        assistant = answer.format(topic=topic, v=_filler_value(rng))
+    elif draw < 0.6:
+        # The list-order frame on a DECOY category. Its gold sessions read "Put X on the Y
+        # shortlist", which put "on the" in 90 gold sessions against a quarter of filler --
+        # the single biggest contributor to that marker. A shortlist the question never asks
+        # about is the same sentence with a different subject, which is what forces a reader
+        # to match the category rather than spot the frame.
+        category = rng.choice(CATEGORIES)
+        user = f"Put {rng.choice(_DECOY_ITEMS)} on the {category} shortlist."
+        assistant = rng.choice(_DECOY_ACKS)
+    else:
+        user, assistant = rng.choice(FILLER)
     if index % 2 == 0:
         user = tmc.weave_echo(user, echoed)
     else:

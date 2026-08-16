@@ -13,7 +13,7 @@
     }
   },
   "question_count": 50,
-  "corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf",
+  "corpus_sha256": "7adc997a34dc1ac2e35e5861df41a060979045ce74292d2212defd87c3347bf9",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -53,13 +53,13 @@
       "tme-for-013": 1.0,
       "tme-for-014": 0.0,
       "tme-for-015": 0.0,
-      "tme-for-016": 0.0,
+      "tme-for-016": 0.5,
       "tme-for-017": 1.0,
       "tme-for-018": 1.0,
       "tme-for-019": 1.0,
-      "tme-for-020": 0.5,
+      "tme-for-020": 1.0,
       "tme-for-021": 1.0,
-      "tme-for-022": 0.0,
+      "tme-for-022": 1.0,
       "tme-for-023": 1.0,
       "tme-for-024": 1.0,
       "tme-for-025": 1.0,
@@ -70,8 +70,8 @@
       "tme-for-030": 0.0,
       "tme-for-031": 0.0,
       "tme-for-032": 0.0,
-      "tme-for-033": 1.0,
-      "tme-for-034": 1.0,
+      "tme-for-033": 0.0,
+      "tme-for-034": 0.0,
       "tme-for-035": 0.0,
       "tme-for-036_abs": 1.0,
       "tme-for-037_abs": 1.0,
@@ -113,7 +113,7 @@
     "no_absolute_dates": false
   },
   "probes": {
-    "status": "run",
+    "status": "not_run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -155,480 +155,162 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5589,
+        "session_length_chars": 0.5841,
         "turn_count": 0.5,
         "position_in_haystack": 0.5081,
         "digit_density": 0.5,
-        "uppercase_density": 0.6133,
+        "uppercase_density": 0.616,
         "sentence_count": 0.5567,
-        "punctuation_density": 0.5531,
+        "punctuation_density": 0.5072,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5589,
-        "type_token_ratio": 0.5202,
-        "first_user_length_chars": 0.6632,
-        "first_user_uppercase_density": 0.5908,
-        "first_user_sentence_count": 0.5148,
-        "first_assistant_length_chars": 0.5886,
-        "first_assistant_uppercase_density": 0.5944,
-        "first_assistant_sentence_count": 0.5697,
-        "user_length_chars": 0.6268,
-        "user_uppercase_density": 0.598,
-        "user_sentence_count": 0.5099,
-        "user_punctuation_density": 0.5621,
-        "user_type_token_ratio": 0.6479,
-        "user_mean_turn_chars": 0.6268,
-        "assistant_length_chars": 0.549,
-        "assistant_uppercase_density": 0.5805,
-        "assistant_sentence_count": 0.5531,
-        "assistant_punctuation_density": 0.5364,
-        "assistant_type_token_ratio": 0.5728,
-        "assistant_mean_turn_chars": 0.549,
-        "gold_marker_ngram": 0.6021,
-        "boilerplate_ngram": 0.5809
+        "mean_turn_chars": 0.5841,
+        "type_token_ratio": 0.5324,
+        "first_user_length_chars": 0.6682,
+        "first_user_uppercase_density": 0.5913,
+        "first_user_sentence_count": 0.5112,
+        "first_assistant_length_chars": 0.6021,
+        "first_assistant_uppercase_density": 0.6183,
+        "first_assistant_sentence_count": 0.5081,
+        "user_length_chars": 0.6488,
+        "user_uppercase_density": 0.558,
+        "user_sentence_count": 0.5504,
+        "user_punctuation_density": 0.5346,
+        "user_type_token_ratio": 0.6322,
+        "user_mean_turn_chars": 0.6488,
+        "assistant_length_chars": 0.5409,
+        "assistant_uppercase_density": 0.5994,
+        "assistant_sentence_count": 0.5297,
+        "assistant_punctuation_density": 0.5674,
+        "assistant_type_token_ratio": 0.5733,
+        "assistant_mean_turn_chars": 0.5409,
+        "gold_marker_ngram": 0.7135,
+        "boilerplate_ngram": 0.5846
       },
-      "worst_refused_feature": "first_user_length_chars",
-      "worst_refused_auc": 0.6632,
-      "worst_gold_marker_ngram": "far as",
-      "gold_marker_ngram_auc": 0.6021,
-      "worst_boilerplate_ngram": "week",
-      "boilerplate_ngram_auc": 0.5809,
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.7135,
+      "worst_gold_marker_ngram": "i",
+      "gold_marker_ngram_auc": 0.7135,
+      "worst_boilerplate_ngram": "of",
+      "boilerplate_ngram_auc": 0.5846,
+      "perfect_separation": {
+        "session_length_chars": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "turn_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "position_in_haystack": {
+          "share": 0.1429,
+          "chance": 0.0458
+        },
+        "digit_density": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "uppercase_density": {
+          "share": 0.0857,
+          "chance": 0.0458
+        },
+        "sentence_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "punctuation_density": {
+          "share": 0.0571,
+          "chance": 0.0458
+        },
+        "em_dash_density": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "type_token_ratio": {
+          "share": 0.0571,
+          "chance": 0.0458
+        },
+        "first_user_length_chars": {
+          "share": 0.0857,
+          "chance": 0.0458
+        },
+        "first_user_uppercase_density": {
+          "share": 0.0857,
+          "chance": 0.0458
+        },
+        "first_user_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "first_assistant_length_chars": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "first_assistant_uppercase_density": {
+          "share": 0.1429,
+          "chance": 0.0458
+        },
+        "first_assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "user_length_chars": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "user_uppercase_density": {
+          "share": 0.1143,
+          "chance": 0.0458
+        },
+        "user_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "user_punctuation_density": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "user_type_token_ratio": {
+          "share": 0.1429,
+          "chance": 0.0458
+        },
+        "user_mean_turn_chars": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "assistant_length_chars": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "assistant_uppercase_density": {
+          "share": 0.0857,
+          "chance": 0.0458
+        },
+        "assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0458
+        },
+        "assistant_punctuation_density": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.0286,
+          "chance": 0.0458
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.0286,
+          "chance": 0.0458
+        }
+      },
+      "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
-    },
-    "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-16T09:04:31Z",
-    "questions_probed": 50,
-    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
-    "v1_oracle_answerability": {
-      "applicable": 35,
-      "passed": 34,
-      "failed": [
-        "tme-for-032"
-      ]
-    },
-    "v1_pair_flip": {
-      "pairs": 15,
-      "passed": 14,
-      "failed": [
-        "tme-for-p12"
-      ]
-    },
-    "ablation_samples_per_question": 3,
-    "v2_non_inferability": {
-      "samples_per_question": 10,
-      "reject_at_hits": 2,
-      "temperature": "provider default",
-      "applicable": 35,
-      "passed": 35,
-      "failed": []
-    },
-    "v3_gold_ablated": {
-      "applicable": 35,
-      "passed": 35,
-      "failed": [],
-      "not_decidable": [],
-      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
-    },
-    "v6_leave_one_out": {
-      "applicable": 20,
-      "passed": 20,
-      "failed": []
-    },
-    "per_question": {
-      "tme-for-001": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-002": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-003": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-004": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-005": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-006": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-007": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-008": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-009": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-010": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-011": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-012": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-013": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-014": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-015": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-016": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-017": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-018": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-019": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-020": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-021": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-022": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-023": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-024": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-025": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-026": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-027": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-028": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-029": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-030": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-031": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-032": {
-        "v1": false,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-033": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-034": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-035": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-for-036_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-037_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-038_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-039_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-040_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-041_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-042_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-043_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-044_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-045_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-046_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-047_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-048_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-049_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-050_abs": {
-        "v1": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      }
-    },
-    "probed_corpus_sha256": "843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf"
+      "probed_corpus_sha256": "7adc997a34dc1ac2e35e5861df41a060979045ce74292d2212defd87c3347bf9"
+    }
   }
 }

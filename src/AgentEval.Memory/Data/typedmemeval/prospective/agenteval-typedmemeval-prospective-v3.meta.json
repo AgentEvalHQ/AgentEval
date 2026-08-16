@@ -13,7 +13,7 @@
     }
   },
   "question_count": 50,
-  "corpus_sha256": "1686919510b1bfccbf66fbb2b5e55f1cdeb1309358c1bfce5b150adc1529a76f",
+  "corpus_sha256": "6d629897acb4d1d2ba4f178ab90daefef13125e5e1c01d1acb8ef378063ba5b2",
   "generator": {
     "tool": "tools/gen_typedmemeval_prospective.py",
     "version": "1.0.0",
@@ -111,7 +111,7 @@
     "no_absolute_dates": true
   },
   "probes": {
-    "status": "run",
+    "status": "not_run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -153,491 +153,162 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.7012,
-        "turn_count": 0.6519,
+        "session_length_chars": 0.5117,
+        "turn_count": 0.5,
         "position_in_haystack": 0.5296,
         "digit_density": 0.5,
-        "uppercase_density": 0.5309,
-        "sentence_count": 0.6574,
-        "punctuation_density": 0.5056,
-        "em_dash_density": 0.5981,
-        "mean_turn_chars": 0.5815,
-        "type_token_ratio": 0.5074,
-        "first_user_length_chars": 0.5617,
-        "first_user_uppercase_density": 0.5228,
-        "first_user_sentence_count": 0.537,
-        "first_assistant_length_chars": 0.5395,
-        "first_assistant_uppercase_density": 0.637,
-        "first_assistant_sentence_count": 0.5562,
-        "user_length_chars": 0.6568,
-        "user_uppercase_density": 0.5599,
-        "user_sentence_count": 0.5475,
-        "user_punctuation_density": 0.5272,
-        "user_type_token_ratio": 0.592,
-        "user_mean_turn_chars": 0.6074,
-        "assistant_length_chars": 0.621,
-        "assistant_uppercase_density": 0.5444,
-        "assistant_sentence_count": 0.6562,
-        "assistant_punctuation_density": 0.5235,
-        "assistant_type_token_ratio": 0.55,
-        "assistant_mean_turn_chars": 0.6093,
+        "uppercase_density": 0.5599,
+        "sentence_count": 0.5185,
+        "punctuation_density": 0.5432,
+        "em_dash_density": 0.6006,
+        "mean_turn_chars": 0.5117,
+        "type_token_ratio": 0.516,
+        "first_user_length_chars": 0.5549,
+        "first_user_uppercase_density": 0.5802,
+        "first_user_sentence_count": 0.5062,
+        "first_assistant_length_chars": 0.5136,
+        "first_assistant_uppercase_density": 0.6198,
+        "first_assistant_sentence_count": 0.5,
+        "user_length_chars": 0.5068,
+        "user_uppercase_density": 0.6136,
+        "user_sentence_count": 0.5222,
+        "user_punctuation_density": 0.5111,
+        "user_type_token_ratio": 0.542,
+        "user_mean_turn_chars": 0.5068,
+        "assistant_length_chars": 0.5123,
+        "assistant_uppercase_density": 0.5111,
+        "assistant_sentence_count": 0.5006,
+        "assistant_punctuation_density": 0.5006,
+        "assistant_type_token_ratio": 0.5506,
+        "assistant_mean_turn_chars": 0.5123,
         "gold_marker_ngram": 0.7154,
-        "boilerplate_ngram": 0.7093
+        "boilerplate_ngram": 0.666
       },
       "worst_refused_feature": "gold_marker_ngram",
       "worst_refused_auc": 0.7154,
       "worst_gold_marker_ngram": "good",
       "gold_marker_ngram_auc": 0.7154,
-      "worst_boilerplate_ngram": "yet",
-      "boilerplate_ngram_auc": 0.7093,
+      "worst_boilerplate_ngram": "in",
+      "boilerplate_ngram_auc": 0.666,
+      "perfect_separation": {
+        "session_length_chars": {
+          "share": 0.08,
+          "chance": 0.1174
+        },
+        "turn_count": {
+          "share": 0.0,
+          "chance": 0.1174
+        },
+        "position_in_haystack": {
+          "share": 0.12,
+          "chance": 0.1174
+        },
+        "digit_density": {
+          "share": 0.0,
+          "chance": 0.1174
+        },
+        "uppercase_density": {
+          "share": 0.16,
+          "chance": 0.1174
+        },
+        "sentence_count": {
+          "share": 0.1,
+          "chance": 0.1174
+        },
+        "punctuation_density": {
+          "share": 0.12,
+          "chance": 0.1174
+        },
+        "em_dash_density": {
+          "share": 0.12,
+          "chance": 0.1174
+        },
+        "mean_turn_chars": {
+          "share": 0.08,
+          "chance": 0.1174
+        },
+        "type_token_ratio": {
+          "share": 0.1,
+          "chance": 0.1174
+        },
+        "first_user_length_chars": {
+          "share": 0.14,
+          "chance": 0.1174
+        },
+        "first_user_uppercase_density": {
+          "share": 0.12,
+          "chance": 0.1174
+        },
+        "first_user_sentence_count": {
+          "share": 0.02,
+          "chance": 0.1174
+        },
+        "first_assistant_length_chars": {
+          "share": 0.18,
+          "chance": 0.1174
+        },
+        "first_assistant_uppercase_density": {
+          "share": 0.14,
+          "chance": 0.1174
+        },
+        "first_assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.1174
+        },
+        "user_length_chars": {
+          "share": 0.02,
+          "chance": 0.1174
+        },
+        "user_uppercase_density": {
+          "share": 0.16,
+          "chance": 0.1174
+        },
+        "user_sentence_count": {
+          "share": 0.02,
+          "chance": 0.1174
+        },
+        "user_punctuation_density": {
+          "share": 0.14,
+          "chance": 0.1174
+        },
+        "user_type_token_ratio": {
+          "share": 0.08,
+          "chance": 0.1174
+        },
+        "user_mean_turn_chars": {
+          "share": 0.02,
+          "chance": 0.1174
+        },
+        "assistant_length_chars": {
+          "share": 0.12,
+          "chance": 0.1174
+        },
+        "assistant_uppercase_density": {
+          "share": 0.14,
+          "chance": 0.1174
+        },
+        "assistant_sentence_count": {
+          "share": 0.04,
+          "chance": 0.1174
+        },
+        "assistant_punctuation_density": {
+          "share": 0.14,
+          "chance": 0.1174
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.04,
+          "chance": 0.1174
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.12,
+          "chance": 0.1174
+        }
+      },
+      "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "1686919510b1bfccbf66fbb2b5e55f1cdeb1309358c1bfce5b150adc1529a76f"
-    },
-    "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-16T09:04:31Z",
-    "questions_probed": 50,
-    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
-    "v1_oracle_answerability": {
-      "applicable": 50,
-      "passed": 49,
-      "failed": [
-        "tme-pro-046"
-      ]
-    },
-    "v1_pair_flip": {
-      "pairs": 19,
-      "passed": 18,
-      "failed": [
-        "tme-pro-p17"
-      ]
-    },
-    "ablation_samples_per_question": 3,
-    "v2_non_inferability": {
-      "samples_per_question": 10,
-      "reject_at_hits": 2,
-      "temperature": "provider default",
-      "applicable": 50,
-      "passed": 50,
-      "failed": []
-    },
-    "v3_gold_ablated": {
-      "applicable": 39,
-      "passed": 39,
-      "failed": [],
-      "not_decidable": [
-        "tme-pro-009",
-        "tme-pro-019",
-        "tme-pro-021",
-        "tme-pro-023",
-        "tme-pro-025",
-        "tme-pro-027",
-        "tme-pro-030",
-        "tme-pro-034",
-        "tme-pro-038",
-        "tme-pro-045",
-        "tme-pro-046"
-      ],
-      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
-    },
-    "v6_leave_one_out": {
-      "applicable": 0,
-      "passed": 0,
-      "failed": []
-    },
-    "per_question": {
-      "tme-pro-001": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-002": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-003": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-004": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-005": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-006": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-007": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-008": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-009": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-010": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-011": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-012": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-013": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-014": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-015": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-016": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-017": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-018": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-019": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-020": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-021": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-022": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-023": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-024": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-025": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-026": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-027": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-028": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-029": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-030": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-031": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-032": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-033": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-034": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-035": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-036": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-037": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-038": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-039": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-040": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-041": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-042": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-043": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-044": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-045": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-046": {
-        "v1": false,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": null,
-        "v6": null
-      },
-      "tme-pro-047": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-048": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-049": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-pro-050": {
-        "v1": true,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      }
-    },
-    "probed_corpus_sha256": "1686919510b1bfccbf66fbb2b5e55f1cdeb1309358c1bfce5b150adc1529a76f"
+      "probed_corpus_sha256": "6d629897acb4d1d2ba4f178ab90daefef13125e5e1c01d1acb8ef378063ba5b2"
+    }
   }
 }
