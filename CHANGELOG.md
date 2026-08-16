@@ -7,39 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**TypedMemEval corpus revision v4.** v1, v2 and v3 were all separable; none should be cited.
+
 > [!CAUTION]
-> **TypedMemEval corpus v3 (shipped in 0.23.0-beta) is BLOCKED and must not be cited.** An
-> independent within-question probe by the consuming project found a gold marker the V7 phrase
-> screen could not represent: `"on the"` separates Episodic's gold at AUC 0.763, above the 0.75
-> refusal bar, through a channel that is not question relevance. Fixing the screen found worse —
-> WorkingMemory's gold carries `"i have"` in 44 of 48 sessions against **0 of 732** distractors,
-> AUC 0.958. Both have been present since v1. v4 is the by-construction redesign; see ADR-026 §15.
+> **v3 (shipped in 0.23.0-beta) must not be cited.** An independent within-question probe by the
+> consuming project found the V7 phrase screen could not represent n-grams made of stopwords, so
+> `"on the"` marked Episodic's gold at AUC 0.763. Fixing the screen found worse: `"i have"` marked
+> WorkingMemory's gold in 44 of 48 sessions against **0 of 732** distractors, and had since v1.
 
 ### Fixed
 
-- **The V7 phrase screen was blind to any n-gram made of stopwords.** Candidates were built from
-  `tokenize()`, which drops them, so `"on the"`, `"have"` and `"i have"` were not scored low —
-  they could not be candidates at all. The screen now uses raw tokens. This is the same blindness
-  fixed one revision earlier for `type_token_ratio` (0.566 filtered vs 0.797 raw) and not
-  propagated to the neighbouring caller.
+- **The defect was statement grammar, not phrases.** Gold asserted a datable first-person fact and
+  filler did not, so `"i have"`, `"on the"` and `"today"` were three symptoms of one cause. v4
+  generates gold and filler from shared frames: filler now states first-person facts in the same
+  construction, differing only in the relation the question asks about. A first attempt matched the
+  person but not the tense and moved `"i have"` only 0.958 → 0.945; matched properly it reads 0.500.
 
-- **The relevance exemption now applies per question rather than corpus-wide.** A gram appearing in
-  *any* question's text used to be dropped everywhere, which hid `"on the"` on the strength of 2
-  questions in 50; applied per question, WorkingMemory's genuinely question-driven `"have"` is
-  still exempt everywhere it should be, and real markers survive.
+- **Turn counts normalise per role.** Gold ended `(u,a,u,a,a)` and filler `(u,a,u,a,u)` — the same
+  five turns in different roles — so gold owned an `('assistant', 2)` slot no distractor had, and a
+  slot only one side possesses cannot be equalised. It separated gold outright in 54% of questions
+  while pooled `turn_count` read a harmless 0.615.
 
+- **The echo pool no longer draws from any question's answer**, and gold's own echo terms exclude
+  its own answer — the latter was weaving the answer into the gold *user* turn, breaking the
+  assistant-stated invariant outright. Both latent since the pool was introduced.
 
-- **Result provenance stamped `AgentEvalVersion: 0.16.0-beta` in every release since 0.16.**
-  The release workflow passed `-p:PackageVersion`, which sets the nupkg's version and nothing
-  else; `AssemblyVersion`, `FileVersion` and `InformationalVersion` all derive from `-p:Version`.
-  `AgentEvalVersion` reads `Assembly.GetName().Version`, so 0.23.0-beta shipped assemblies
-  reporting `0.16.0.0` and every result it produced carries a version that has not been current
-  since 0.16. Found by the consuming project's consumption pass, not by us.
+- **The V7 phrase screen was blind to stopword n-grams** (candidates were built from a tokenizer
+  that drops them, so `"on the"` was not scored low — it was unrepresentable), and the relevance
+  exemption now applies **per question** rather than corpus-wide.
 
-  The pack now sets both properties, and a **pre-push gate** unpacks each `.nupkg` and refuses to
-  publish if any `AgentEval*.dll` disagrees with the release version — placed between pack and
-  push, because a NuGet package cannot be recalled. Takes effect from the next release; packages
-  already published cannot be corrected in place.
+- **Forgetting's control arm carries a re-affirmation**, giving both arms G=2. With G=1 against G=2
+  the arms were not comparable and the control was the hardest retrieval band in the family — on
+  the arm whose job is to be the easy case. Gap +0.28 → −0.07.
+
+- **The `not-yet-true` after arm asks what the record shows**, not whether the thing happened. The
+  old phrasing required withholding an inference models make anyway; it ran 50% and 90% on two
+  answer models while every other Prospective shape scored 100%. Now **10/10**, and the vertical
+  is 50/50 with pair-flip 19/19.
+
+### Added
+
+- **Difficulty bands.** Every question carries `difficulty` (1–5) and `difficulty_dial`, derived
+  from memory dials only. Three verticals are **validated** — reference-retriever coverage slopes
+  down across their bands — and two are not, which is recorded rather than hidden: BM25 has no time
+  component, so a dial measured in days cannot move it. Bands are diagnostics, never claims;
+  per-band n is 4–17 against a citable floor of 30.
+
+- **A five-rung WorkingMemory ladder** (8/15/25/40/60, 60 questions). Two of the old four rungs
+  could not fail at `K_ref` = 5 — `H > K_ref` proved necessary and not sufficient, since H=6 still
+  saturates — so half the vertical sat in a structurally unfailable band.
+
+- **Per-shape probe records.** A vertical reported at 48/50 hid Arithmetic's `duration` at 83% and
+  Episodic's `participant-attribution` at 87%.
+
+- **A ratcheted separability gate.** A blocked revision no longer makes the check uniformly red,
+  which had been hiding whether anything *new* regressed — and was silently skipping the
+  evidence-screen self-test entirely.
 
 ## [0.23.0-beta] - 2026-08-15
 
