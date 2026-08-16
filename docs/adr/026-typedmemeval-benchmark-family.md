@@ -1074,7 +1074,9 @@ it bare 8% of the time.
 
 **Result.** Worst refused feature per vertical is 0.631–0.737 against the 0.75 bar. The four
 classifiers in the table above — the ones that found v2 — now score 0.500–0.701 across all five
-corpora, against 0.903–1.000 before, and so does every per-role and per-turn slice tried.
+corpora, against 0.903–1.000 before, and so does every per-role and per-turn slice tried. Measured
+with this same final metric, the v1 corpora shipped in 0.22.0-beta score **0.973–1.000**, four of
+them perfectly separable by a single count.
 Retrieval difficulty moved again, so
 **no v1 or v2 number is comparable with a v3 number, and neither should be cited.** v2 was
 never released; it existed only on an unmerged branch.

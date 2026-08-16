@@ -64,15 +64,16 @@ benchmark.
   recurring phrases in **both** directions — one carried by gold marks the evidence, one carried by
   filler marks it by absence, and those are the same defect.
 
-  Measured against the corpora 0.22.0-beta shipped, under the corrected metric:
+  Measured against the corpora 0.22.0-beta shipped, under the corrected metric — four of the five
+  are recoverable *perfectly*, by a single cheap count and no model at all:
 
   | Vertical | worst refused feature (v1) | v3 |
   |---|---|---|
-  | Prospective | session length **0.903** | 0.715 |
-  | Episodic | session length **0.936** | 0.727 |
-  | Arithmetic | capitalisation density **0.890** | 0.737 |
-  | WorkingMemory | session length **1.000** | 0.728 |
-  | Forgetting | sentence count **1.000** | 0.703 |
+  | Prospective | assistant-turn length **1.000** | 0.715 |
+  | Episodic | first assistant turn's length **0.973** | 0.724 |
+  | Arithmetic | first assistant turn's sentence count **1.000** | 0.737 |
+  | WorkingMemory | session length **1.000** | 0.631 |
+  | Forgetting | sentence count **1.000** | 0.663 |
 
 - **A credential-free `--self-test` for the probe evidence screen**, wired into CI. The screen
   decides whether a response reached the gold answer, so it decides which questions are valid; it
