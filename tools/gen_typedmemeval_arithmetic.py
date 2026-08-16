@@ -756,6 +756,16 @@ def _draw_plans(rng: random.Random) -> list[_Plan]:
 # Rendering
 # --------------------------------------------------------------------------------------
 
+#: inputs -> band. Two inputs is the floor the duration shape allows; six is the ceiling the
+#: generator emits. Bands are diagnostics rather than claims: cells run 6-17 questions, under
+#: the n >= 30 an individually citable figure needs.
+_INPUT_BANDS = {2: 1, 3: 2, 4: 3, 5: 4, 6: 5}
+
+
+def _difficulty_band(derivation: dict) -> int:
+    return _INPUT_BANDS.get(len(derivation.get("inputs") or []), 3)
+
+
 def build(echo: float, rng: random.Random) -> list[tmc.Question]:
     questions: list[tmc.Question] = []
     for plan in _plans(rng):
@@ -789,7 +799,14 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
         questions.append(tmc.Question(
             plan.qid, plan.qtype, plan.question, plan.answer,
             sessions[-1].timestamp + timedelta(days=2), sessions,
-            deepcopy({"shape": plan.shape, "derivation": plan.derivation, **plan.extra}),
+            deepcopy({"shape": plan.shape, "derivation": plan.derivation,
+                      # Dispersion is this vertical's memory dial: how many places the answer
+                      # has to be assembled from. The ladder already graded realised retrieval
+                      # monotonically (0.92 down to 0.42 across inputs 2-6) and was simply
+                      # never named, which made it the cheapest lever in the family.
+                      "difficulty": _difficulty_band(plan.derivation),
+                      "difficulty_dial": "dispersion",
+                      **plan.extra}),
         ))
     return questions
 

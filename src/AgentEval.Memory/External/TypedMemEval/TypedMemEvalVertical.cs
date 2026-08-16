@@ -136,7 +136,10 @@ public static class TypedMemEvalVerticals
             Slug = "workingmemory",
             Abbreviation = "wm",
             DisplayName = "TypedMemEval-WorkingMemory",
-            QuestionCount = 48,
+            // 12 fact families x 5 distance rungs. The ladder went to five rungs in v4 because
+            // two of the old four could not fail: d=1 (H=2) and d=5 (H=6) both realised BM25@5
+            // coverage of 1.00, so half the vertical sat in a structurally unfailable band.
+            QuestionCount = 60,
             RequiredGrounding = TemporalGroundingMode.None,
             RequiresTimestamps = false
         },

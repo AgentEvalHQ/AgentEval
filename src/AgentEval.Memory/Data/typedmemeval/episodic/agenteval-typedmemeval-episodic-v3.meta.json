@@ -13,7 +13,7 @@
     }
   },
   "question_count": 50,
-  "corpus_sha256": "3151795b78f5dc721a3a37568226903fcdd9c693bd5d8ebb9b489329c32b879d",
+  "corpus_sha256": "0cb1166e9bcfda53c6eaa7d0a9b596abfe34095662c1774a7c37d71f2da4bf12",
   "generator": {
     "tool": "tools/gen_typedmemeval_episodic.py",
     "version": "1.0.0",
@@ -24,7 +24,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.7114,
+    "mean_realised": 0.7194,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
@@ -34,7 +34,7 @@
       ],
       [
         0.5,
-        0.7114
+        0.7194
       ]
     ],
     "per_question": {
@@ -43,7 +43,7 @@
       "tme-epi-003": 0.0,
       "tme-epi-004": 1.0,
       "tme-epi-005": 1.0,
-      "tme-epi-006": 0.0,
+      "tme-epi-006": 1.0,
       "tme-epi-007": 0.0,
       "tme-epi-008": 1.0,
       "tme-epi-009": 1.0,
@@ -59,20 +59,20 @@
       "tme-epi-019": 1.0,
       "tme-epi-020": 1.0,
       "tme-epi-021": 0.4,
-      "tme-epi-022": 0.1667,
+      "tme-epi-022": 0.0,
       "tme-epi-023": 0.1667,
-      "tme-epi-024": 0.6667,
+      "tme-epi-024": 0.5,
       "tme-epi-025": 0.1429,
       "tme-epi-026": 0.1429,
-      "tme-epi-027": 0.5,
-      "tme-epi-028": 0.3333,
-      "tme-epi-029": 0.2,
+      "tme-epi-027": 0.25,
+      "tme-epi-028": 0.1667,
+      "tme-epi-029": 0.6,
       "tme-epi-030": 0.4,
       "tme-epi-031": 0.2,
-      "tme-epi-032": 0.25,
-      "tme-epi-033": 0.25,
+      "tme-epi-032": 0.5,
+      "tme-epi-033": 0.5,
       "tme-epi-034": 0.25,
-      "tme-epi-035": 0.5,
+      "tme-epi-035": 0.75,
       "tme-epi-036": 1.0,
       "tme-epi-037": 1.0,
       "tme-epi-038": 1.0,
@@ -85,7 +85,7 @@
       "tme-epi-045": 1.0,
       "tme-epi-046": 1.0,
       "tme-epi-047": 1.0,
-      "tme-epi-048": 1.0,
+      "tme-epi-048": 0.0,
       "tme-epi-049": 1.0,
       "tme-epi-050": 1.0
     }
@@ -159,46 +159,46 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5906,
+        "session_length_chars": 0.6105,
         "turn_count": 0.5,
         "position_in_haystack": 0.542,
-        "digit_density": 0.6284,
-        "uppercase_density": 0.5102,
-        "sentence_count": 0.5307,
-        "punctuation_density": 0.5884,
+        "digit_density": 0.6271,
+        "uppercase_density": 0.5013,
+        "sentence_count": 0.5345,
+        "punctuation_density": 0.5628,
         "em_dash_density": 0.5126,
-        "mean_turn_chars": 0.5906,
-        "type_token_ratio": 0.5164,
-        "first_user_length_chars": 0.5146,
-        "first_user_uppercase_density": 0.5519,
-        "first_user_sentence_count": 0.5371,
-        "first_assistant_length_chars": 0.7345,
-        "first_assistant_uppercase_density": 0.504,
-        "first_assistant_sentence_count": 0.5172,
-        "user_length_chars": 0.5228,
-        "user_uppercase_density": 0.5464,
+        "mean_turn_chars": 0.6105,
+        "type_token_ratio": 0.5221,
+        "first_user_length_chars": 0.5179,
+        "first_user_uppercase_density": 0.6132,
+        "first_user_sentence_count": 0.5267,
+        "first_assistant_length_chars": 0.7135,
+        "first_assistant_uppercase_density": 0.5725,
+        "first_assistant_sentence_count": 0.5093,
+        "user_length_chars": 0.5464,
+        "user_uppercase_density": 0.5928,
         "user_sentence_count": 0.5332,
-        "user_punctuation_density": 0.6196,
-        "user_type_token_ratio": 0.5351,
-        "user_mean_turn_chars": 0.5228,
-        "assistant_length_chars": 0.6202,
-        "assistant_uppercase_density": 0.5345,
-        "assistant_sentence_count": 0.5192,
-        "assistant_punctuation_density": 0.6733,
-        "assistant_type_token_ratio": 0.5895,
-        "assistant_mean_turn_chars": 0.6202,
+        "user_punctuation_density": 0.6348,
+        "user_type_token_ratio": 0.5122,
+        "user_mean_turn_chars": 0.5464,
+        "assistant_length_chars": 0.6284,
+        "assistant_uppercase_density": 0.5908,
+        "assistant_sentence_count": 0.5099,
+        "assistant_punctuation_density": 0.6642,
+        "assistant_type_token_ratio": 0.5548,
+        "assistant_mean_turn_chars": 0.6284,
         "gold_marker_ngram": 0.6798,
-        "boilerplate_ngram": 0.6346
+        "boilerplate_ngram": 0.6355
       },
       "worst_refused_feature": "first_assistant_length_chars",
-      "worst_refused_auc": 0.7345,
+      "worst_refused_auc": 0.7135,
       "worst_gold_marker_ngram": "on the",
       "gold_marker_ngram_auc": 0.6798,
       "worst_boilerplate_ngram": "put the",
-      "boilerplate_ngram_auc": 0.6346,
+      "boilerplate_ngram_auc": 0.6355,
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.0,
+          "share": 0.12,
           "chance": 0.0696
         },
         "turn_count": {
@@ -214,15 +214,15 @@
           "chance": 0.0696
         },
         "uppercase_density": {
-          "share": 0.06,
+          "share": 0.08,
           "chance": 0.0696
         },
         "sentence_count": {
-          "share": 0.04,
+          "share": 0.02,
           "chance": 0.0696
         },
         "punctuation_density": {
-          "share": 0.14,
+          "share": 0.1,
           "chance": 0.0696
         },
         "em_dash_density": {
@@ -230,11 +230,11 @@
           "chance": 0.0696
         },
         "mean_turn_chars": {
-          "share": 0.0,
+          "share": 0.12,
           "chance": 0.0696
         },
         "type_token_ratio": {
-          "share": 0.06,
+          "share": 0.1,
           "chance": 0.0696
         },
         "first_user_length_chars": {
@@ -242,11 +242,11 @@
           "chance": 0.0696
         },
         "first_user_uppercase_density": {
-          "share": 0.06,
+          "share": 0.0,
           "chance": 0.0696
         },
         "first_user_sentence_count": {
-          "share": 0.0,
+          "share": 0.02,
           "chance": 0.0696
         },
         "first_assistant_length_chars": {
@@ -254,7 +254,7 @@
           "chance": 0.0696
         },
         "first_assistant_uppercase_density": {
-          "share": 0.16,
+          "share": 0.04,
           "chance": 0.0696
         },
         "first_assistant_sentence_count": {
@@ -262,7 +262,7 @@
           "chance": 0.0696
         },
         "user_length_chars": {
-          "share": 0.0,
+          "share": 0.06,
           "chance": 0.0696
         },
         "user_uppercase_density": {
@@ -274,19 +274,19 @@
           "chance": 0.0696
         },
         "user_punctuation_density": {
-          "share": 0.06,
+          "share": 0.02,
           "chance": 0.0696
         },
         "user_type_token_ratio": {
-          "share": 0.04,
+          "share": 0.18,
           "chance": 0.0696
         },
         "user_mean_turn_chars": {
-          "share": 0.0,
+          "share": 0.06,
           "chance": 0.0696
         },
         "assistant_length_chars": {
-          "share": 0.0,
+          "share": 0.08,
           "chance": 0.0696
         },
         "assistant_uppercase_density": {
@@ -298,7 +298,7 @@
           "chance": 0.0696
         },
         "assistant_punctuation_density": {
-          "share": 0.08,
+          "share": 0.04,
           "chance": 0.0696
         },
         "assistant_type_token_ratio": {
@@ -306,7 +306,7 @@
           "chance": 0.0696
         },
         "assistant_mean_turn_chars": {
-          "share": 0.0,
+          "share": 0.08,
           "chance": 0.0696
         }
       },
@@ -314,7 +314,7 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "3151795b78f5dc721a3a37568226903fcdd9c693bd5d8ebb9b489329c32b879d"
+      "probed_corpus_sha256": "0cb1166e9bcfda53c6eaa7d0a9b596abfe34095662c1774a7c37d71f2da4bf12"
     }
   }
 }

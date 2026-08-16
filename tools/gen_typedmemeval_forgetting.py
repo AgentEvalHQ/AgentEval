@@ -341,7 +341,19 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     statement = tmc.make_session(
         _BASE, (f"{statement_setup} {rng.choice(CHOICES).format(value=value)}", ""),
         gold_turn=0, tag=f"statement:{value}")
-    sessions.insert(rng.randint(0, h), statement)
+    # A re-affirmation, so the control arm carries G=2 exactly as its invalidated twin does.
+    # Without it the arms were not comparable: the treatment arm earned partial credit for
+    # finding either of two gold sessions while the control's single session scored 0 or 1,
+    # and the control came out as the harder retrieval band in the whole family (0.40 against
+    # 0.68) -- on the arm whose entire job is to be the easy case. It also does the work the
+    # shape wanted anyway: with two mentions and no invalidation, answering requires reading
+    # that nothing cancelled the fact rather than simply finding one statement.
+    reaffirm = tmc.make_session(
+        _BASE, (f"Still the same {noun}, for the record: {value}.", ""),
+        gold_turn=0, tag=f"reaffirmation:{value}")
+    statement_index = rng.randint(0, h)
+    sessions.insert(statement_index, statement)
+    sessions.insert(rng.randint(statement_index + 1, h + 1), reaffirm)
     question_date = _lay_out(sessions, ordinal)
 
     read_value = _derive_value(statement)

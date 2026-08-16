@@ -112,7 +112,7 @@ VERTICALS = {
     "prospective":  ("pro",  50),
     "episodic":     ("epi",  50),
     "arithmetic":   ("ari",  50),
-    "workingmemory": ("wm",  48),
+    "workingmemory": ("wm",  60),
     "forgetting":   ("for",  50),
 }
 
@@ -492,11 +492,11 @@ _PAD_SHORT = [
 _PAD_TAILS = [
     "more or less", "as it turned out", "in the end", "for what it is worth",
     "though it hardly mattered", "at least for now", "one way or another",
-    "which was fine by me", "as far as any of it went", "or so it seemed at the time",
-    "which is roughly how these things tend to go",
+    "and that was fine by me", "as far as any of it went", "or so it seemed at the time",
+    "roughly how these things tend to go",
     "though I doubt anyone else gave it a second thought",
     "and that seemed a reasonable enough place to leave it",
-    "which took rather longer to sort out than it should have",
+    "though it took rather longer to sort out than it should have",
     "though by then the whole business had stopped being interesting",
     "and nobody has raised it with me since, so far as I can remember",
 ]
@@ -506,7 +506,7 @@ _PAD_TAILS = [
 #: one-sentence error is not a trade worth making. That left WorkingMemory's gold one capital light
 #: in almost every question and separable on capitals-per-character at 0.760.
 _PAD_NAME_TAILS = [
-    "as {n} put it", "according to {n}", "which is {n}'s view too", "or so {n} reckons",
+    "as {n} put it", "according to {n}", "and {n} says the same", "or so {n} reckons",
 ]
 
 

@@ -57,7 +57,13 @@ QTYPE = "workingmemory-recall"
 
 #: The distance ladder. Each rung is a diagnostic stratum of n=12 (ADR §5 floor rule), and
 #: the four rungs are the reportable shapes -- `distance-1` ... `distance-40`.
-DISTANCES = (1, 5, 15, 40)
+# Five rungs, every one of which the reference retriever can fail. The old ladder
+# (1, 5, 15, 40) had two that could not: d=1 gives H=2 and d=5 gives H=6, and BM25@K_ref=5
+# realised 1.00 on both, so half the vertical sat in a structurally unfailable band and the
+# ladder graded at three levels rather than four. H>K_ref turns out to be necessary and not
+# sufficient -- H=6 still saturates -- so the bottom rung starts where the measurement showed
+# grading actually begins.
+DISTANCES = (8, 15, 25, 40, 60)
 
 #: One fixed epoch for every cell. Combined with `tmc.spread`'s default interval this makes
 #: session-distance and time-distance a single variable across the whole grid.
@@ -123,9 +129,9 @@ FAMILIES: tuple[Family, ...] = (
         suffix="",
         interference=(
             ("We have nearly called the stray {other} before we changed our minds.", "It suited her less."),
-            ("I have had a cat called {other} when I was small.", "Names come back around."),
+            ("We have had a cat called {other} before.", "Names come back around."),
             ("We have used {other} for the foster kitten last spring.", "Only for a fortnight."),
-            ("I have caught myself calling her {other}.", "Old habits."),
+            ("We have caught ourselves calling her {other}.", "Old habits."),
             ("We have written {other} on the vet form by mistake.", "Easily done."),
         ),
     ),
@@ -330,6 +336,12 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                     "shape": f"distance-{distance}",
                     "distance_sessions": distance,
                     "fact_family": family.key,
+                    # The band variable is the rung, which IS the memory dial for this
+                    # vertical (ADR-026 §16 C): distance between the fact and the question,
+                    # with nothing else varying. Diagnostics, never a claim -- n = 12 per band
+                    # is well under the n >= 30 floor a citable figure needs.
+                    "difficulty": DISTANCES.index(distance) + 1,
+                    "difficulty_dial": "distance",
                 },
             ))
             index += 1
