@@ -1358,6 +1358,32 @@ alternative — quietly dropping the dials the validator cannot see — would le
 claiming that difficulty is only ever lexical, which is the opposite of what this family exists
 to measure.
 
+**The full validation rule, run against real oracle data.** §16 adopted the consuming project's
+test in both halves: reference-retriever coverage must slope DOWN across bands while the oracle
+stays FLAT. Only the first half could be checked before the probes ran. With v4 records stamped:
+
+| Vertical | retriever coverage | oracle V1 by band | verdict |
+|---|---|---|---|
+| WorkingMemory | 0.92 / 0.83 / 0.67 / 0.42 / 0.50 | 1.00 / 1.00 / 1.00 / 1.00 / 1.00 | **memory difficulty** |
+| Episodic | 0.45 / 0.40 / 0.21 / 0.14 | 1.00 / 1.00 / 1.00 / 1.00 | **memory difficulty** |
+| Arithmetic | 0.96 / 0.70 / 0.75 / 0.55 / 0.44 | **0.83 / 0.82** / 1.00 / 1.00 / 1.00 | **confounded** |
+
+WorkingMemory and Episodic pass both halves: retrieval gets harder across the ladder while the
+ceiling does not move, which is what makes the ladder a measurement of memory rather than of the
+answer model. That is the first time anything in this family has been positively demonstrated to
+grade memory difficulty rather than merely asserted to.
+
+Arithmetic fails the second half, and the cause is locatable: its two lowest bands sit at 0.83 and
+0.82 against 1.00 above them, because the `duration` shape lives at two and three inputs and
+`duration` is where the answer model struggles (8/12 on its own). So bands 1-2 mix dispersion with
+answer-step difficulty. Per the rule, that band does not get kept as-is — either `duration` is
+spread across the input ladder rather than concentrated at its foot, or the ladder is cut on
+(inputs x shape) instead of inputs alone. Recorded here rather than fixed, because it needs a
+generation change and this revision is otherwise closed; it is the first item for v5.
+
+The rule earned its place. A dispersion ladder whose easy end is quietly the answer model's hard
+end would have looked like a clean gradient in every number we publish.
+
 **D. Release plumbing.** Already on `main`: the release now stamps `-p:Version`, with a pre-push
 gate that refuses to publish assemblies disagreeing with the tag. v4 is the release that carries it,
 which is why no 0.23.1 was cut.
