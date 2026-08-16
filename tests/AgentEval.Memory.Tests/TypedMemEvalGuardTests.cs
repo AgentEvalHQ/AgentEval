@@ -42,10 +42,10 @@ public sealed class TypedMemEvalGuardTests
         var result = await RunAsync(TypedMemEvalVertical.Forgetting, maxQuestions: 3);
 
         Assert.Equal("typedmemeval-forgetting", result.BenchmarkId);
-        Assert.StartsWith("TypedMemEval-Forgetting v1", result.BenchmarkName, StringComparison.Ordinal);
+        Assert.StartsWith("TypedMemEval-Forgetting v3", result.BenchmarkName, StringComparison.Ordinal);
         Assert.NotNull(result.Provenance);
         Assert.Equal(RunProvenanceMode.Full, result.Provenance!.Mode);
-        Assert.Equal("agenteval-typedmemeval-forgetting-v1", result.Provenance.DatasetIdentifier);
+        Assert.Equal("agenteval-typedmemeval-forgetting-v3", result.Provenance.DatasetIdentifier);
         Assert.Equal(
             TypedMemEvalCorpus.Sha256(TypedMemEvalVertical.Forgetting), // DevSkim: ignore DS197836
             result.Provenance.DatasetSha256);

@@ -288,7 +288,7 @@ def _interference_session(family: Family, question_text: str, echo: float,
     template, assistant = rng.choice(family.interference)
     other = family.value(rng.choice(OTHER_STEMS))
     terms = tmc.echo_terms(question_text, echo, rng)
-    return tmc.make_session(stamp, (tmc.weave_echo(template.format(other=other), terms), assistant),
+    return tmc.make_session(stamp, (template.format(other=other), tmc.weave_echo(assistant, terms)),
                             tag="interference")
 
 
@@ -409,6 +409,9 @@ if __name__ == "__main__":
             gold_position_shuffled=False,
             no_absolute_dates=False,
             h_is_independent_variable=True,
+            # ADR §5.4 pins the fact to session 0, so position separates gold perfectly and is
+            # meant to: the construct is how far back the memory sits.
+            separability_exempt=frozenset({"position_in_haystack"}),
         ),
         generator_tool="tools/gen_typedmemeval_workingmemory.py",
         extra_checks=check_grid,

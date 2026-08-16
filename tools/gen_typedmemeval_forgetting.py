@@ -183,10 +183,10 @@ ABSENT = [
 # noun, or any value token; the checks below would fail the corpus if one did.
 FILLER = [
     ("{who} finally replaced the hallway rug {when}.", "That room needed it."),
-    ("{who} gave up the box-set streaming {when} — never watched it.", "Easy money back, then."),
+    ("{who} gave up the box-set streaming {when}, never watched it.", "Easy money back, then."),
     ("The kettle packed in {when}; we are boiling pans for now.", "Not ideal in the mornings."),
     ("{who} handed the spare printer on to a neighbour {when}.", "Better than it gathering dust."),
-    ("We stopped the veg box {when} — too much of it went off.", "Sensible enough."),
+    ("We stopped the veg box {when}, too much of it went off.", "Sensible enough."),
     ("{who} is still arguing with the doorbell people {when}.", "Some things take a while."),
     ("The stair carpet is being relaid {when}.", "Mind the dust."),
     ("{who} sold the old lawnmower {when} and borrows ours now.", "Neighbourly enough."),
@@ -213,7 +213,21 @@ WHENS = ["last weekend", "the other week", "over the winter", "a few days ago",
 # Read-back patterns. Both anchor at the end of the turn, which is why the gold turns end
 # with the clause that carries the payload: a loose match would happily lift the wrong
 # clause and the corpus would ship a gold answer that quietly disagrees with its sessions.
-_VALUE_RE = re.compile(r"I went with ([^.]+)\.\s*$")
+#: How a gold statement names its value. One phrasing across every gold session made the verb
+#: itself the tell -- the bare token "went" separated gold from filler at AUC 0.775, needing no
+#: more than a substring search. Spread across a bank, no single phrasing reaches the share an
+#: n-gram has to hold before it can discriminate.
+CHOICES = [
+    "I went with {value}.", "I settled on {value}.", "I chose {value}.",
+    "I picked {value}.", "Ended up with {value}.", "It is {value} now.",
+]
+
+#: Derived from CHOICES rather than written alongside it. A hand-kept regex and a hand-kept bank
+#: drift, and the failure mode is silent: the parser stops recognising a phrasing, the generator
+#: raises, and whoever is in a hurry "fixes" it by narrowing the bank back down to one phrasing.
+_VALUE_RE = re.compile(
+    "(?:" + "|".join(
+        re.escape(choice).replace(r"\{value\}", r"([^.]+)") for choice in CHOICES) + r")\s*$")
 _EVENT_RE = re.compile(r"\bI ([^.]+)\.\s*$")
 
 
@@ -226,7 +240,7 @@ def _arbitrary_value(rng: random.Random) -> str:
 def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> tmc.Session:
     user, assistant = rng.choice(FILLER)
     user = user.format(who=rng.choice(PEOPLE), when=rng.choice(WHENS))
-    return tmc.make_session(stamp, (tmc.weave_echo(user, echoed), assistant), tag="filler")
+    return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
 
 
 def _lay_out(sessions: list[tmc.Session], ordinal: int) -> datetime:
@@ -248,7 +262,8 @@ def _derive_value(session: tmc.Session) -> str:
     match = _VALUE_RE.search(turn.content)
     if not match:
         raise AssertionError(f"statement session emits no readable value: {turn.content!r}")
-    return match.group(1)
+    # One capture group per phrasing in the bank; exactly one of them matched.
+    return next(group for group in match.groups() if group is not None)
 
 
 def _derive_event(session: tmc.Session) -> str:
@@ -272,10 +287,10 @@ def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
     # only the invalidation cannot reconstruct the stale answer and a system that surfaces
     # only the statement gives one confidently. Both halves are separately diagnostic.
     statement = tmc.make_session(
-        _BASE, (f"{statement_setup} I went with {value}.", "Noted — I have that down."),
+        _BASE, (f"{statement_setup} {rng.choice(CHOICES).format(value=value)}", ""),
         gold_turn=0, tag=f"statement:{value}")
     invalidation = tmc.make_session(
-        _BASE, (f"{invalidation_setup} I {event}.", "Understood — I will treat that as closed."),
+        _BASE, (f"{invalidation_setup} I {event}.", ""),
         gold_turn=0, tag="invalidation")
 
     # Gap first, then placement. Drawing the statement position first and the invalidation
@@ -324,7 +339,7 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     h = rng.randint(H_MIN, H_MAX)
     sessions = [_filler_session(rng, echoed, _BASE) for _ in range(h)]
     statement = tmc.make_session(
-        _BASE, (f"{statement_setup} I went with {value}.", "Noted — I have that down."),
+        _BASE, (f"{statement_setup} {rng.choice(CHOICES).format(value=value)}", ""),
         gold_turn=0, tag=f"statement:{value}")
     sessions.insert(rng.randint(0, h), statement)
     question_date = _lay_out(sessions, ordinal)

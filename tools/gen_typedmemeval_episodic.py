@@ -98,12 +98,12 @@ DETAILS = [
     ("code",
      "Which bay did you tell me the {topic} sits in?",
      "Can you find out which bay the {topic} sits in?",
-     "I looked it up — the {topic} sits in bay {v}.",
+     "I looked it up, the {topic} sits in bay {v}.",
      "Bay {v}."),
     ("code",
      "What reference did you give me for the {topic}?",
      "Do we have a reference for the {topic} anywhere?",
-     "Yes — the {topic} is filed under reference {v}.",
+     "Yes, the {topic} is filed under reference {v}.",
      "Reference {v}."),
     ("name",
      "Who did you say handles the {topic}?",
@@ -118,7 +118,7 @@ DETAILS = [
     ("code",
      "What slot code did you read out for the {topic}?",
      "Is there a slot code on the {topic} booking?",
-     "There is — the booking for the {topic} carries slot code {v}.",
+     "There is, the booking for the {topic} carries slot code {v}.",
      "Slot code {v}."),
 ]
 
@@ -312,7 +312,7 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
                          f"{', '.join(presented)}. In what order did I add them, earliest first?")
 
         gold = [tmc.make_session(BASE, (f"Put {item} on the {category} shortlist.",
-                                        "Added it to the list."),
+                                        ""),
                                  gold_turn=0, tag="item")
                 for item in items]
         filler = [_filler_session(rng, stem, echo, i) for i in range(rng.randint(15, 25))]
@@ -357,10 +357,10 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
 
         # The statement clause is byte-identical across the two variants; only the role
         # carrying it moves. Anything else that differed would be a cue.
-        said = f"One thing about {topic} — {statement}."
+        said = f"One thing about {topic}, {statement}."
         if speaker == "user":
             turns = [tmc.Turn("user", said, has_answer=True),
-                     tmc.Turn("assistant", f"Noted. I will keep that with {topic}.")]
+                     tmc.Turn("assistant", "")]
         else:
             turns = [tmc.Turn("user", f"Anything I should keep in mind about {topic}?"),
                      tmc.Turn("assistant", said, has_answer=True)]

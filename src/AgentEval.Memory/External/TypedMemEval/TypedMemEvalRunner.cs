@@ -16,11 +16,11 @@ namespace AgentEval.Memory.External.TypedMemEval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v1 (AgentEval)".
+/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v3 (AgentEval)".
 /// TypedMemEval results are <b>not</b> LongMemEval results and must never be presented as, summed
 /// with, or averaged with LongMemEval numbers. The twelve Prospective questions seeded from the
 /// time-grounded probe exist in both <c>agenteval-timegrounded-v1</c> and TypedMemEval-Prospective
-/// v1; a report that runs both must not double-count them.
+/// v3; a report that runs both must not double-count them.
 /// </para>
 /// <para>
 /// A separate class rather than a partial of the LongMemEval runner, deliberately: hanging five

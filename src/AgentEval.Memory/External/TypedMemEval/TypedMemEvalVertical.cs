@@ -67,13 +67,30 @@ public sealed class TypedMemEvalVerticalDescriptor
     public required bool RequiresTimestamps { get; init; }
 
     /// <summary>Corpus identifier, revision included.</summary>
-    public string CorpusId => $"agenteval-typedmemeval-{Slug}-v1";
+    public string CorpusId => $"agenteval-typedmemeval-{Slug}-{Revision}";
 
     /// <summary>Benchmark identifier stamped into every result.</summary>
     public string BenchmarkId => $"typedmemeval-{Slug}";
 
-    /// <summary>Dataset revision.</summary>
-    public string Revision => "v1";
+    /// <summary>
+    /// Dataset revision, stamped into every result.
+    /// </summary>
+    /// <remarks>
+    /// v3 supersedes v1 (shipped in 0.22.0-beta) and v2 (never released). Both were separable:
+    /// v1 gold carried no BM25 calibration clause while ~99% of distractors did, and v2 gold was
+    /// recoverable from Forgetting at AUC 1.000 by the literal substring "Noted" and at 0.990 in
+    /// WorkingMemory by counting full stops. v3 equalises every session on the raw counts those
+    /// features are built from, so retrieval difficulty moved again — a v1 or v2 score is not
+    /// comparable with a v3 score, and neither should be cited.
+    /// </remarks>
+    public string Revision => CorpusRevision;
+
+    /// <summary>
+    /// The shipped dataset revision. One constant, because <see cref="CorpusId"/> derives from it —
+    /// a revision bump that moved the label without moving the id would leave two different question
+    /// sets sharing a name, which is the failure the whole identity rule exists to prevent.
+    /// </summary>
+    public const string CorpusRevision = "v3";
 }
 
 /// <summary>Descriptor lookup for the five verticals.</summary>

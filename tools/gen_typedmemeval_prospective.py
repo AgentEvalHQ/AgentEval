@@ -109,7 +109,10 @@ FILLER = [
     ("The library wants its overdue atlas back {when}.", "Worth a trip before the fine grows."),
     ("Kit is running a half marathon {when}.", "That takes some training."),
     ("The choir has an extra rehearsal {when}.", "Sounds like a busy stretch."),
-    ("Our landlord is inspecting the gutters {when}.", "Tidy the yard beforehand, maybe."),
+    # Was "inspecting the gutters", which collided with the carried question about a flat
+    # INSPECTION: given only distractors, the reference model found this one, reasoned it was
+    # past, and produced the gold answer without ever seeing the evidence. V3 caught it.
+    ("Our landlord is repointing the brickwork {when}.", "Tidy the yard beforehand, maybe."),
     ("Jo's visa interview is {when}.", "Fingers crossed it goes smoothly."),
     ("The cycling club is doing a night ride {when}.", "Lights charged?"),
     ("I owe Marta a proper reply {when}.", "A short note beats a perfect one that never comes."),
@@ -119,14 +122,18 @@ FILLER = [
     ("Ravi asked about borrowing the roof box {when}.", "Only if it comes back clean."),
 ]
 
-WHENS = ["next week", "the week after next", "in a fortnight", "late next month",
-         "in about ten days", "early next month", "in three weeks or so", "sometime soon"]
+#: Every gold reminder is phrased "in N weeks" (see OFFSETS), so filler has to speak the same way.
+#: When only one of these eight said "weeks", the bare token found gold at AUC 0.852 — a classifier
+#: needed no more than a substring search to pick the evidence out of the haystack. The spans stay
+#: relative, never absolute, because V4 forbids a printed date anywhere in a session.
+WHENS = ["in two weeks", "in three weeks or so", "in four weeks", "in six weeks",
+         "in about ten weeks", "in five weeks", "in a couple of weeks", "in seven weeks"]
 
 
 def _filler_session(rng: random.Random, echo_terms: list[str], stamp: datetime) -> tmc.Session:
     user, assistant = rng.choice(FILLER)
     user = user.format(when=rng.choice(WHENS))
-    return tmc.make_session(stamp, (tmc.weave_echo(user, echo_terms), assistant), tag="filler")
+    return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echo_terms)), tag="filler")
 
 
 def _fmt(dt: datetime) -> str:
@@ -292,7 +299,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             SHAPE_REMINDER, TYPE_REMINDER,
             f"Has the reminder about {noun} come due yet, and on what date is or was it due?",
             f"Remind me to {task} {{phrase}}.",
-            "Noted — I will keep that in mind.",
+            "",
             f"Not yet. You asked to be reminded to {task}, and it falls due on {{date}}, "
             f"which is still ahead of you.",
             f"Yes. The reminder to {task} came due on {{date}}, which has now passed.",
@@ -308,7 +315,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
             SHAPE_VALIDITY, TYPE_VALIDITY,
             f"Is {noun} still valid, and when does or did it run out?",
-            f"I picked up a {thing} today — it stays valid for {{span}} from today.",
+            f"I picked up a {thing} today, it stays valid for {{span}} from today.",
             "Good to know. Enjoy it while it lasts.",
             f"Yes, still valid. The {thing} runs out on {{date}}.",
             f"No, it has expired. The {thing} ran out on {{date}}.",
@@ -325,7 +332,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             SHAPE_NOT_YET, TYPE_NOT_YET,
             f"Have I {past} yet, and on what date does or did that happen?",
             f"I am due to {future} {{phrase}}.",
-            "That is a real change — good luck with it.",
+            "That is a real change, good luck with it.",
             f"Not yet. You are due to {future} on {{date}}, which has not arrived.",
             f"That date has passed. You were due to {future} on {{date}}, so it is no longer ahead of "
             f"you — though nothing since then records whether it went ahead.",

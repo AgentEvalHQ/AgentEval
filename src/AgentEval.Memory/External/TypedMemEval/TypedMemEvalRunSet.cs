@@ -85,6 +85,47 @@ public sealed class TypedMemEvalRunSetMismatchException : InvalidOperationExcept
 /// </remarks>
 public static class TypedMemEvalRunSet
 {
+    /// <summary>
+    /// The corpus identifier of the time-grounded probe, whose twelve questions were carried into
+    /// TypedMemEval-Prospective.
+    /// </summary>
+    public const string TimeGroundedCorpusId = "agenteval-timegrounded-v1";
+
+    /// <summary>
+    /// Warns when a set of results would double-count the twelve seeded questions, or null when it
+    /// would not.
+    /// </summary>
+    /// <remarks>
+    /// The twelve Prospective seed questions exist in both <see cref="TimeGroundedCorpusId"/> and
+    /// <c>agenteval-typedmemeval-prospective-v3</c>. Until now that was a citation rule in prose,
+    /// which is a rule nobody's build enforces. This is the cheap runtime half: pass whatever
+    /// results a report is about to be assembled from, and if both corpora are present, say so
+    /// before the numbers are added up rather than after they are published.
+    /// </remarks>
+    /// <param name="results">Every result a report is about to be assembled from.</param>
+    /// <returns>A human-readable warning, or null when no overlap is present.</returns>
+    public static string? DetectSeedOverlap(IEnumerable<ExternalBenchmarkResult> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        var identifiers = results
+            .Select(r => r.Provenance?.DatasetIdentifier)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var prospective = TypedMemEvalVerticals.For(TypedMemEvalVertical.Prospective).CorpusId;
+        if (!identifiers.Contains(TimeGroundedCorpusId) || !identifiers.Contains(prospective))
+            return null;
+
+        return
+            $"This result set contains both '{TimeGroundedCorpusId}' and '{prospective}'. The twelve " +
+            $"time-grounded probe questions were carried into TypedMemEval-Prospective and appear in " +
+            $"both, so any total across the two double-counts them. Report the two separately, or " +
+            $"exclude the carried questions from one side — their per-question details carry a " +
+            $"SeededFrom value naming the tg question they came from.";
+    }
+
     /// <summary>Computes bands across a set of comparable runs.</summary>
     /// <param name="results">Two or more runs of the same vertical under the same configuration.</param>
     /// <exception cref="ArgumentException">When fewer than two runs are supplied.</exception>

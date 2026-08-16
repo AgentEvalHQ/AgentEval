@@ -5,10 +5,10 @@ isolation: **prospective memory**, **episodic structure**, **arithmetic over mem
 **working-memory distance**, and **forgetting**. Each vertical is its own corpus, its own
 question types, and its own validity rules.
 
-> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v1 (AgentEval)"**. TypedMemEval
+> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v3 (AgentEval)"**. TypedMemEval
 > results are **not** LongMemEval results and must never be presented as, summed with, or averaged
 > with LongMemEval numbers. The twelve Prospective questions seeded from the time-grounded probe
-> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v1; a report that runs both
+> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v3; a report that runs both
 > must not double-count them.
 
 TypedMemEval reuses LongMemEval's *file format* and AgentEval's LongMemEval harness machinery. That
@@ -127,7 +127,9 @@ single question can show.
 
 The agent must implement `ITimestampedHistoryInjectableAgent`; a run refuses before its first
 provider call otherwise. There is no text fallback, because the dates a fallback would use are the
-ones this vertical exists to take away.
+ones this vertical exists to take away. The one way round it is to set `TemporalGrounding` to
+`None` yourself, which removes the vertical's premise along with the guard — both shipped option
+sets (`ProspectiveProbeOptions`, `ProspectiveControlOptions`) leave it alone, and so should you.
 
 ```csharp
 // The probe and its control: same corpus, same hash, two option sets.
@@ -149,12 +151,12 @@ it and read a wall clock instead.
 Memory of the conversation *as an event*: 20 assistant-stated answers (the user never states them),
 15 list-order questions, 15 speaker-attribution questions.
 
-**Known limitation, v1.** The attribution shape's statements are emitted from matched templates so
+**Known limitation, still present in v3.** The attribution shape's statements are emitted from matched templates so
 that either speaker could plausibly have said them (that is what stops the answer being inferable
 from content). A consequence is that the surrounding wording is fixed, so a system that stores no
 speaker label at all can still recover the answer from the template rather than from memory. The
-shape therefore measures less than its name promises until v2 varies the framing; read its numbers
-as a floor, not as speaker-attribution accuracy.
+shape therefore measures less than its name promises until a future revision varies the framing;
+read its numbers as a floor, not as speaker-attribution accuracy.
 
 List-order is scored **conditionally on coverage**: pairwise-order accuracy over the items the
 answer actually mentions, because a budget-limited system may only have seen some of them and
@@ -232,11 +234,11 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.800 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.865 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.626 | 3–6 |
-| WorkingMemory | 48 | 0.729 | 1 |
-| Forgetting | 50 | 0.700 — **0.571 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+| Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
+| Episodic | 50 | 0.871 | 1 (×35), 4–7 (×15) |
+| Arithmetic | 50 | 0.661 | 3–6 |
+| WorkingMemory | 48 | 0.792 | 1 |
+| Forgetting | 50 | 0.690 — **0.557 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -247,7 +249,11 @@ floor inflated by vacuous ones would flatter every system by the share of no-gol
 
 ## Validity rules
 
-Written before generation, and re-checked in CI over what actually ships:
+Written before generation. **V4, V5 and V7 are re-measured in CI over the shipped bytes**, along
+with the declared `H`, `G` and ceiling table. **V1, V2, V3 and V6 need a reference model**, so they
+run at authoring time and CI checks only that their records exist and name the corpus hash that
+shipped — which catches a stale record, not a wrong one. The distinction matters: a green build
+means those four were measured against *this* corpus, not that they were measured today.
 
 | Rule | What it requires |
 |---|---|
@@ -269,16 +275,21 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 46/50 | 16/19 | 50/50 | 49/50 | — |
-| Episodic | 50/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 |
+| Prospective | 49/50 | 18/19 | 50/50 | 39/39 | — |
+| Episodic | 48/50 | — | 50/50 | 49/50 | — |
+| Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
 | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+
+V3 and V6 take **three** ablation samples per question, not one. A single sample can miss a leak
+that is there — the distractor collision fixed in 0.22.0-beta was caught by one sample and could as
+easily have been missed by it. Unlike V2 there is no hit threshold: one sample that rebuilds the
+answer from distractors alone condemns the question.
 
 These are reported as measured. The remaining V1 shortfalls sit where the *answer model*, not the
 memory system, is the limit: the Arithmetic misses are duration questions whose gold requires
 summing several timestamp-derived intervals, and whose arithmetic was verified correct independently
-of the model. Four Prospective questions and three of its pairs sit in the same place.
+of the model. One Prospective question and one of its pairs sit in the same place.
 A question the ceiling cannot answer measures the ceiling, so treat those as the noise floor of the
 vertical rather than as headroom in the system under test — the per-question records name exactly
 which ones they are.
@@ -288,13 +299,87 @@ V1 and V2 are not applicable to a never-known probe: its gold *is* an abstention
 of knowing" is both the correct answer and what any model with no context says, and scoring it would
 reject all fifteen for being guessable when what was measured is that the corpus asked for a
 negative and got one. V3 and V6 require the ablated model to reproduce the *specific* value rather
-than merely a negative, for the same reason.
+than merely a negative, for the same reason. Where a gold answer carries no specific value at all —
+Prospective's "not yet", whose content is a date the question already supplies — V3 abstains rather
+than scores, because it cannot tell "reached the evidence" from "said what any model with no
+evidence says". Those abstentions are why Prospective's V3 denominator is 39 and not 50.
+
+**Read Episodic's V3 with the same caution.** Its one failure is a `participant-attribution`
+question, and that shape's answer is one of *two* — "you said it" or "I said it". An ablation probe
+cannot distinguish a model that reached the evidence from one that guessed a coin flip, so V3 is
+weak by construction on that shape. What bounds guessability there is V2, which samples ten times
+with no context at all and passes 50/50. The two Episodic V1 shortfalls are in the same shape, for
+the same reason it is already flagged as a known limitation above.
 
 V1, V2, V3 and V6 need a reference model, so they run at authoring time and their per-question
 records are stamped into the corpus metadata. The generators
 (`tools/gen_typedmemeval_<vertical>.py`) and the probe runner
 (`tools/run_typedmemeval_probes.py`) are in the repository: the corpora are reproducible, and that
 is what makes them criticizable.
+
+## V7 — can a cheap classifier find the gold without reading it?
+
+Every rule above asks whether a question is *answerable* and whether its evidence is *necessary*.
+None of them asks whether the evidence is **separable** — and a corpus whose gold can be picked out
+by a one-line filter measures nothing, however answerable its questions are.
+
+V7 tries cheap single-feature classifiers at telling gold sessions from distractors and scores each
+as a direction-folded AUC, where 0.5 is chance and 1.0 is a perfect tell:
+
+| Feature | What an adversary would use |
+|---|---|
+| `session_length_chars` | gold sessions being longer or shorter |
+| `turn_count` | gold having more exchanges |
+| `position_in_haystack` | gold sitting early or late |
+| `digit_density` | gold carrying the numbers |
+| `uppercase_density` | gold carrying the proper nouns |
+| `sentence_count` | text equalised without its punctuation being equalised |
+| `punctuation_density`, `em_dash_density` | a glyph one side's templates use and the other's do not |
+| `mean_turn_chars` | length, re-expressed per turn |
+| `type_token_ratio` | gold's randomised content against filler's repetition |
+| `gold_marker_ngram` | a recurring phrase carried by gold and not by filler |
+| `boilerplate_ngram` | a recurring phrase carried by filler and not by gold |
+
+Each numeric feature is measured three ways: over the whole session, over each speaker's turns
+alone, and over the **first** turn of each speaker. That is not belt-and-braces. Padding lands on a
+single turn, so equalising the pooled session leaves the other slices exactly as the generator wrote
+them — measured that way, gold was recoverable from user-turn length alone at AUC 1.000 while every
+pooled figure sat comfortably under the bar. A parity check on a sum is not a parity check on its
+terms, and the attacker picks the slice.
+
+A corpus is **refused** at 0.75 on any shape feature. The rule runs in the generator, is stamped
+into every corpus's metadata beside V1–V6, and is re-measured in CI rather than trusted from its own
+record — a record nobody re-runs is a claim, not a check. It is recomputed twice over: once by the
+Python tool in CI, and again by an independent C# implementation in the test suite, which holds the
+threshold and the refused-feature list as its own constants rather than reading them back from the
+record it is checking.
+
+Pairs are formed **within a question** and folded once after pooling. That is not a detail: the
+attacker being modelled is handed one haystack and asked which session holds the evidence, so pairs
+drawn from different questions answer an easier question. Pooling across the corpus diluted a real
+Forgetting tell from 0.903 to 0.616, and it got *better* the more abstention questions a vertical
+had, because questions with no gold contribute distractor-only values.
+
+One deliberate non-refusal, because hiding it would be the same failure in a different coat:
+
+- **Question relevance is exempt and is not a feature.** Gold is supposed to be more relevant to its
+  question than a distractor is; if it were not, the question would be unanswerable. How *easily*
+  that is exploited is what the BM25 calibration gate bounds.
+
+Phrase recurrence used to sit here too, exempted on the grounds that template filler repeats itself
+and real variety is a corpus revision rather than a check. The reasoning was sound and the
+consequence was not: an exemption with no ceiling cannot tell 0.60 from 0.99, and underneath it
+Prospective reached **0.990** on a filler trigram — which is to say its *absence* marked gold. Both
+phrase directions now refuse at the same bar as every other feature.
+
+`WorkingMemory` exempts `position_in_haystack`: it pins its fact to session 0 by design, so position
+separates gold perfectly and is meant to.
+
+**This rule earned its keep immediately.** Measured against the v1 corpora, capitalisation density
+found gold at AUC 0.990 in Forgetting and session length at 0.992 in WorkingMemory — gold states an
+arbitrary *named* fact, so it carried proper nouns and extra text that filler did not, and counting
+capital letters found the evidence without reading it. The v2 corpora pad every session to a common
+shape; the worst refused feature across the family is now 0.713.
 
 ## Bands, not points
 

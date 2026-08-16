@@ -4,6 +4,7 @@
 
 using System.CommandLine;
 using AgentEval.Cli.Commands;
+using AgentEval.Memory.External.TypedMemEval;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Cli.Infrastructure;
 
@@ -473,7 +474,7 @@ benchCmd.Add(benchNistCmd);
         var benchTmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
         var benchTmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 
-        var benchTmeCmd = new Command("typedmemeval", "Run one TypedMemEval v1 (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
+        var benchTmeCmd = new Command("typedmemeval", $"Run one TypedMemEval {TypedMemEvalVerticalDescriptor.CorpusRevision} (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
         benchTmeCmd.Add(benchTmeVerticalOpt);
         benchTmeCmd.Add(benchTmeSubjectOpt);
         benchTmeCmd.Add(benchTmeRootOpt);

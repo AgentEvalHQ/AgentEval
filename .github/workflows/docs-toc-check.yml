@@ -1,4 +1,4 @@
-name: Docs nav completeness
+name: Docs nav + corpus separability
 
 # Catches the exact bug found 2026-07-19: a new docs/**/*.md file that's never added to docs/toc.yml (the
 # real docfx site navigation) ships invisible in the sidebar. Also catches the reverse drift: docs/index.md's
@@ -11,6 +11,10 @@ on:
       - 'docs/**/*.md'
       - 'docs/toc.yml'
       - 'tools/check_docs_toc.py'
+      - 'src/AgentEval.Memory/Data/typedmemeval/**'
+      - 'tools/typedmemeval_common.py'
+      - 'tools/stamp_typedmemeval_separability.py'
+      - 'tools/run_typedmemeval_probes.py'
 
 permissions:
   contents: read
@@ -25,3 +29,19 @@ jobs:
 
       - name: Check every doc file is reachable from toc.yml
         run: python3 tools/check_docs_toc.py
+
+      # ADR-026 V7. Re-measures gold/distractor separability over the shipped corpora rather than
+      # trusting the stamped record — a record nobody re-runs is a claim, not a check. Model-free
+      # and deterministic, so it needs no credentials.
+      - name: Check TypedMemEval corpora are not separable by cheap features
+        working-directory: tools
+        run: python3 stamp_typedmemeval_separability.py --check
+
+      # The probes decide which questions are valid, so the screen that decides "did this response
+      # reach the gold answer?" is itself load-bearing. It has been wrong twice — a word boundary typed as a
+      # literal backspace byte silenced half its negative-gold guard, and a greedy number pattern
+      # let a year the prompt itself supplied count as evidence — and both defects reported leaks
+      # in corpora that had none. Pure functions, so this runs without credentials.
+      - name: Check the TypedMemEval evidence screen
+        working-directory: tools
+        run: python3 run_typedmemeval_probes.py --self-test

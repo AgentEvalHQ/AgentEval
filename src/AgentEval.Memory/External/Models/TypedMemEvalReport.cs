@@ -178,7 +178,7 @@ public sealed class TypedMemEvalCoverageSummary
 /// <see cref="ExternalBenchmarkResult.TypedOutcomes"/>.
 /// </summary>
 /// <remarks>
-/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v1 (AgentEval)".
+/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v3 (AgentEval)".
 /// TypedMemEval results are not LongMemEval results and must never be presented as, summed with,
 /// or averaged with LongMemEval numbers. The twelve Prospective questions seeded from the
 /// time-grounded probe exist in both corpora; a report that runs both must not double-count them.
@@ -191,7 +191,7 @@ public sealed class TypedMemEvalReport
     /// <summary>The vertical this run measured.</summary>
     public required string Vertical { get; init; }
 
-    /// <summary>Corpus identifier, revision included, e.g. <c>agenteval-typedmemeval-prospective-v1</c>.</summary>
+    /// <summary>Corpus identifier, revision included, e.g. <c>agenteval-typedmemeval-prospective-v3</c>.</summary>
     public required string CorpusId { get; init; }
 
     /// <summary>Dataset revision, stamped into every result.</summary>
