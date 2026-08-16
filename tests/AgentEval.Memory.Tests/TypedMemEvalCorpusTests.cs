@@ -300,8 +300,14 @@ public sealed class TypedMemEvalCorpusTests
                     break;
 
                 case "still-valid":
+                    // Two gold sessions since v4 -- a statement and a re-affirmation -- so the
+                    // control arm carries the same G as the invalidated arm it is paired with.
+                    // With G=1 against G=2 the arms were not comparable: the treatment arm
+                    // earned partial credit for finding either session while the control scored
+                    // 0 or 1, and the control came out as the hardest retrieval band in the
+                    // family, on the arm whose whole job is to be the easy case.
                     Assert.DoesNotContain("_abs", questionId, StringComparison.Ordinal);
-                    Assert.Single(extension.GoldSessionIndices);
+                    Assert.Equal(2, extension.GoldSessionIndices.Count);
                     break;
             }
         }
@@ -449,7 +455,10 @@ public sealed class TypedMemEvalCorpusTests
             .GroupBy(e => e.DistanceSessions)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        Assert.Equal(new[] { 1, 5, 15, 40 }, byDistance.Keys.Select(k => k!.Value).Order().ToArray());
+        // Five rungs since v4. The old ladder had two that could not fail -- d=1 gives H=2 and
+        // d=5 gives H=6, and BM25 at K_ref=5 realised 1.00 on both -- so half the vertical sat
+        // in a structurally unfailable band and the ladder graded at three levels, not four.
+        Assert.Equal(new[] { 8, 15, 25, 40, 60 }, byDistance.Keys.Select(k => k!.Value).Order().ToArray());
         Assert.All(byDistance.Values, count => Assert.Equal(12, count));
     }
 

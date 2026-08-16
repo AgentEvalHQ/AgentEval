@@ -274,6 +274,19 @@ def _derive_event(session: tmc.Session) -> str:
     return match.group(1)
 
 
+#: Statement-to-invalidation gap -> band. Cut on the range the generator already emits
+#: (GAP_MIN..GAP_MAX), so banding is bookkeeping over existing spread rather than new
+#: generation. Diagnostics rather than claims: cells are far under the n >= 30 floor.
+_GAP_BANDS = ((5, 1), (7, 2), (10, 3), (13, 4))
+
+
+def _gap_band(gap: int) -> int:
+    for ceiling, band in _GAP_BANDS:
+        if gap <= ceiling:
+            return band
+    return 5
+
+
 def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
                           rng: random.Random, echo: float) -> tmc.Question:
     noun, question, statement_setup, invalidation_setup, event = fact
@@ -315,6 +328,12 @@ def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
             {"kind": "statement", "session_index": statement_index},
             {"kind": "invalidation", "session_index": invalidation_index},
         ],
+        # Discrimination is this vertical's dial: how far apart the statement and the thing
+        # that cancels it sit. The spread was already there and evenly filled (4-15 sessions);
+        # it simply stratified nothing, so a run's score could not be read against it.
+        "difficulty": _gap_band(gap),
+        "difficulty_dial": "discrimination", "difficulty_validated": False,
+        "gap_sessions": gap,
     }
     if pair_id:
         extension["pair_id"] = pair_id

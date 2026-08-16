@@ -13,7 +13,7 @@
     }
   },
   "question_count": 60,
-  "corpus_sha256": "b713b0e47bf96bdc7da74f00ec3de9c4e63d072f2e4586a8cdf00c299d7a505f",
+  "corpus_sha256": "9b9dd2fe46eefbd4b65924580a948004df6feda369b138093e187c21e04050bb",
   "generator": {
     "tool": "tools/gen_typedmemeval_workingmemory.py",
     "version": "1.0.0",
@@ -325,7 +325,7 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "b713b0e47bf96bdc7da74f00ec3de9c4e63d072f2e4586a8cdf00c299d7a505f"
+      "probed_corpus_sha256": "9b9dd2fe46eefbd4b65924580a948004df6feda369b138093e187c21e04050bb"
     }
   }
 }

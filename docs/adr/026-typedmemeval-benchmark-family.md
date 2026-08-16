@@ -1325,6 +1325,37 @@ than inputs alone, or the inversion is published as-is. It must not be smoothed 
 does not slope gets reclassified, which is the consuming project's own rule and it applies to the
 vertical they called best-calibrated.
 
+**C, measured: the validation rule rejects most of the bands, and the reason is structural.**
+All five dials are stamped. Run the consuming project's own acceptance test — reference-retriever
+coverage must slope down across bands — and only one vertical passes cleanly:
+
+| Vertical | dial | bands (coverage) | slopes? |
+|---|---|---|---|
+| Episodic | dispersion (list length) | 0.45 / 0.40 / 0.21 / 0.14 | **yes** |
+| WorkingMemory | distance (sessions) | 0.92 / 0.83 / 0.67 / 0.42 / 0.50 | 4 of 5 |
+| Arithmetic | dispersion (inputs) | 0.96 / 0.70 / 0.75 / 0.55 / 0.44 | 4 of 5 |
+| Forgetting | discrimination (gap) | 0.40 / 1.00 / 0.70 / 0.50 / 0.75 | no |
+| Prospective | distance (days) | 1.00 / 1.00 / 1.00 / 0.20 / 1.00 | no |
+
+**BM25 has no time component.** A dial measured in *days* cannot move a lexical retriever, so
+Prospective's displacement band is unfalsifiable by this validator — not wrong, unvalidatable.
+The dials that do slope are exactly the ones that change lexical competition: list length and
+input count ARE the gold-session count, and WorkingMemory's `d` IS the distractor count.
+Forgetting's gap is a *position* rather than a count, which is why it barely moves anything.
+
+This is a real limit on the proposal as accepted, and it cuts both ways. Defining bands on the
+reference retriever keeps them system-independent, which is why §16 chose it over memory-arm
+outcomes — but it also means the retriever can only certify the subset of memory difficulty that
+is lexical. Time-displacement is a genuine memory dial that this validator is blind to.
+
+So the bands ship in two classes, and the metadata says which: **validated** (Episodic,
+WorkingMemory, Arithmetic — dispersion and session-distance) and **declared but unvalidated**
+(Prospective's time-displacement, Forgetting's gap). An unvalidated band is a description of how
+the corpus was built, not evidence that it is harder, and must not be read as the latter. The
+alternative — quietly dropping the dials the validator cannot see — would leave the family
+claiming that difficulty is only ever lexical, which is the opposite of what this family exists
+to measure.
+
 **D. Release plumbing.** Already on `main`: the release now stamps `-p:Version`, with a pre-push
 gate that refuses to publish assemblies disagreeing with the tag. v4 is the release that carries it,
 which is why no 0.23.1 was cut.

@@ -7535,7 +7535,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p01",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 4,
+      "displacement_days": 78.0,
       "vertical": "prospective"
     }
   },
@@ -7917,7 +7921,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p01",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 4,
+      "displacement_days": 90.0,
       "vertical": "prospective"
     }
   },
@@ -8251,7 +8259,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p02",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 3,
+      "displacement_days": 57.0,
       "vertical": "prospective"
     }
   },
@@ -8585,7 +8597,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p02",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 3,
+      "displacement_days": 69.0,
       "vertical": "prospective"
     }
   },
@@ -8967,7 +8983,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p03",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 4,
+      "displacement_days": 78.0,
       "vertical": "prospective"
     }
   },
@@ -9349,7 +9369,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p03",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 4,
+      "displacement_days": 90.0,
       "vertical": "prospective"
     }
   },
@@ -9707,7 +9731,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p04",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 1,
+      "displacement_days": 15.0,
       "vertical": "prospective"
     }
   },
@@ -10065,7 +10093,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p04",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 27.0,
       "vertical": "prospective"
     }
   },
@@ -10519,7 +10551,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p05",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 4,
+      "displacement_days": 71.0,
       "vertical": "prospective"
     }
   },
@@ -10973,7 +11009,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p05",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 4,
+      "displacement_days": 83.0,
       "vertical": "prospective"
     }
   },
@@ -11355,7 +11395,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p06",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 2,
+      "displacement_days": 43.0,
       "vertical": "prospective"
     }
   },
@@ -11737,7 +11781,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p06",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 3,
+      "displacement_days": 55.0,
       "vertical": "prospective"
     }
   },
@@ -12119,7 +12167,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p07",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 4,
+      "displacement_days": 71.0,
       "vertical": "prospective"
     }
   },
@@ -12501,7 +12553,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p07",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 4,
+      "displacement_days": 83.0,
       "vertical": "prospective"
     }
   },
@@ -12907,7 +12963,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p08",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 3,
+      "displacement_days": 57.0,
       "vertical": "prospective"
     }
   },
@@ -13313,7 +13373,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p08",
       "shape": "due-later-reminder",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 3,
+      "displacement_days": 69.0,
       "vertical": "prospective"
     }
   },
@@ -13767,7 +13831,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p09",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 2,
+      "displacement_days": 36.0,
       "vertical": "prospective"
     }
   },
@@ -14221,7 +14289,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p09",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 3,
+      "displacement_days": 48.0,
       "vertical": "prospective"
     }
   },
@@ -14627,7 +14699,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p10",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 2,
+      "displacement_days": 29.0,
       "vertical": "prospective"
     }
   },
@@ -15033,7 +15109,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p10",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 41.0,
       "vertical": "prospective"
     }
   },
@@ -15367,7 +15447,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p11",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 1,
+      "displacement_days": 22.0,
       "vertical": "prospective"
     }
   },
@@ -15701,7 +15785,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p11",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 34.0,
       "vertical": "prospective"
     }
   },
@@ -16083,7 +16171,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p12",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 2,
+      "displacement_days": 29.0,
       "vertical": "prospective"
     }
   },
@@ -16465,7 +16557,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p12",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 41.0,
       "vertical": "prospective"
     }
   },
@@ -16919,7 +17015,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p13",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 1,
+      "displacement_days": 22.0,
       "vertical": "prospective"
     }
   },
@@ -17373,7 +17473,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p13",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 34.0,
       "vertical": "prospective"
     }
   },
@@ -17827,7 +17931,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p14",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 4,
+      "displacement_days": 71.0,
       "vertical": "prospective"
     }
   },
@@ -18281,7 +18389,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p14",
       "shape": "expiring-validity",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 4,
+      "displacement_days": 83.0,
       "vertical": "prospective"
     }
   },
@@ -18711,7 +18823,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p15",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 5,
+      "displacement_days": 106.0,
       "vertical": "prospective"
     }
   },
@@ -19141,7 +19257,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p15",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 5,
+      "displacement_days": 118.0,
       "vertical": "prospective"
     }
   },
@@ -19523,7 +19643,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p16",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 2,
+      "displacement_days": 29.0,
       "vertical": "prospective"
     }
   },
@@ -19905,7 +20029,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p16",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 41.0,
       "vertical": "prospective"
     }
   },
@@ -20311,7 +20439,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p17",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 1,
+      "displacement_days": 15.0,
       "vertical": "prospective"
     }
   },
@@ -20717,7 +20849,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p17",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 27.0,
       "vertical": "prospective"
     }
   },
@@ -21075,7 +21211,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p18",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 5,
+      "displacement_days": 106.0,
       "vertical": "prospective"
     }
   },
@@ -21433,7 +21573,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p18",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 5,
+      "displacement_days": 118.0,
       "vertical": "prospective"
     }
   },
@@ -21815,7 +21959,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p19",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "before",
+      "difficulty": 1,
+      "displacement_days": 15.0,
       "vertical": "prospective"
     }
   },
@@ -22197,7 +22345,11 @@
     "typedmemeval": {
       "pair_id": "tme-pro-p19",
       "shape": "not-yet-true",
+      "difficulty_dial": "distance",
+      "difficulty_validated": false,
       "arm": "after",
+      "difficulty": 2,
+      "displacement_days": 27.0,
       "vertical": "prospective"
     }
   }

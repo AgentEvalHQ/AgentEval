@@ -341,7 +341,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                     # with nothing else varying. Diagnostics, never a claim -- n = 12 per band
                     # is well under the n >= 30 floor a citable figure needs.
                     "difficulty": DISTANCES.index(distance) + 1,
-                    "difficulty_dial": "distance",
+                    "difficulty_dial": "distance", "difficulty_validated": True,
                 },
             ))
             index += 1

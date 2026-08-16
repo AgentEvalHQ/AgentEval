@@ -531,6 +531,10 @@
           "session_index": 9
         }
       ],
+      "difficulty": 1,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 5,
       "pair_id": "tme-for-p01",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -1212,6 +1216,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 3,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 9,
       "pair_id": "tme-for-p02",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -1653,6 +1661,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 3,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 10,
       "pair_id": "tme-for-p03",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -2214,6 +2226,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 13,
       "pair_id": "tme-for-p04",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -2895,6 +2911,10 @@
           "session_index": 21
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 11,
       "pair_id": "tme-for-p05",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -3408,6 +3428,10 @@
           "session_index": 15
         }
       ],
+      "difficulty": 3,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 9,
       "pair_id": "tme-for-p06",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -3993,6 +4017,10 @@
           "session_index": 20
         }
       ],
+      "difficulty": 2,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 6,
       "pair_id": "tme-for-p07",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -4578,6 +4606,10 @@
           "session_index": 15
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 13,
       "pair_id": "tme-for-p08",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -5019,6 +5051,10 @@
           "session_index": 15
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 12,
       "pair_id": "tme-for-p09",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -5676,6 +5712,10 @@
           "session_index": 17
         }
       ],
+      "difficulty": 5,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 14,
       "pair_id": "tme-for-p10",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -6357,6 +6397,10 @@
           "session_index": 26
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 12,
       "pair_id": "tme-for-p11",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -6990,6 +7034,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 1,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 4,
       "pair_id": "tme-for-p12",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -7431,6 +7479,10 @@
           "session_index": 10
         }
       ],
+      "difficulty": 3,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 8,
       "pair_id": "tme-for-p13",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -8112,6 +8164,10 @@
           "session_index": 8
         }
       ],
+      "difficulty": 1,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 5,
       "pair_id": "tme-for-p14",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -8697,6 +8753,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 1,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 5,
       "pair_id": "tme-for-p15",
       "arm": "invalidated",
       "vertical": "forgetting"
@@ -9330,6 +9390,10 @@
           "session_index": 15
         }
       ],
+      "difficulty": 3,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 9,
       "vertical": "forgetting"
     }
   },
@@ -9865,6 +9929,10 @@
           "session_index": 15
         }
       ],
+      "difficulty": 1,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 4,
       "vertical": "forgetting"
     }
   },
@@ -10328,6 +10396,10 @@
           "session_index": 16
         }
       ],
+      "difficulty": 5,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 15,
       "vertical": "forgetting"
     }
   },
@@ -10767,6 +10839,10 @@
           "session_index": 13
         }
       ],
+      "difficulty": 2,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 7,
       "vertical": "forgetting"
     }
   },
@@ -11230,6 +11306,10 @@
           "session_index": 17
         }
       ],
+      "difficulty": 4,
+      "difficulty_dial": "discrimination",
+      "difficulty_validated": false,
+      "gap_sessions": 12,
       "vertical": "forgetting"
     }
   },

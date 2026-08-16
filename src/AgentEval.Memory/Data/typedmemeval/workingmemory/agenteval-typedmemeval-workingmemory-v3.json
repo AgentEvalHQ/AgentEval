@@ -236,6 +236,7 @@
       "fact_family": "employer",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -644,6 +645,7 @@
       "fact_family": "employer",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -1292,6 +1294,7 @@
       "fact_family": "employer",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -2300,6 +2303,7 @@
       "fact_family": "employer",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -3788,6 +3792,7 @@
       "fact_family": "employer",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -4028,6 +4033,7 @@
       "fact_family": "cat",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -4436,6 +4442,7 @@
       "fact_family": "cat",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -5084,6 +5091,7 @@
       "fact_family": "cat",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -6092,6 +6100,7 @@
       "fact_family": "cat",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -7580,6 +7589,7 @@
       "fact_family": "cat",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -7820,6 +7830,7 @@
       "fact_family": "climbing_wall",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -8228,6 +8239,7 @@
       "fact_family": "climbing_wall",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -8876,6 +8888,7 @@
       "fact_family": "climbing_wall",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -9884,6 +9897,7 @@
       "fact_family": "climbing_wall",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -11372,6 +11386,7 @@
       "fact_family": "climbing_wall",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -11612,6 +11627,7 @@
       "fact_family": "street",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -12020,6 +12036,7 @@
       "fact_family": "street",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -12668,6 +12685,7 @@
       "fact_family": "street",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -13676,6 +13694,7 @@
       "fact_family": "street",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -15164,6 +15183,7 @@
       "fact_family": "street",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -15404,6 +15424,7 @@
       "fact_family": "dental_practice",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -15812,6 +15833,7 @@
       "fact_family": "dental_practice",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -16460,6 +16482,7 @@
       "fact_family": "dental_practice",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -17468,6 +17491,7 @@
       "fact_family": "dental_practice",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -18956,6 +18980,7 @@
       "fact_family": "dental_practice",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -19196,6 +19221,7 @@
       "fact_family": "choir",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -19604,6 +19630,7 @@
       "fact_family": "choir",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -20252,6 +20279,7 @@
       "fact_family": "choir",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -21260,6 +21288,7 @@
       "fact_family": "choir",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -22748,6 +22777,7 @@
       "fact_family": "choir",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -22988,6 +23018,7 @@
       "fact_family": "bike",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -23396,6 +23427,7 @@
       "fact_family": "bike",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -24044,6 +24076,7 @@
       "fact_family": "bike",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -25052,6 +25085,7 @@
       "fact_family": "bike",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -26540,6 +26574,7 @@
       "fact_family": "bike",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -26780,6 +26815,7 @@
       "fact_family": "broadband",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -27188,6 +27224,7 @@
       "fact_family": "broadband",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -27836,6 +27873,7 @@
       "fact_family": "broadband",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -28844,6 +28882,7 @@
       "fact_family": "broadband",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -30332,6 +30371,7 @@
       "fact_family": "broadband",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -30572,6 +30612,7 @@
       "fact_family": "allotment",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -30980,6 +31021,7 @@
       "fact_family": "allotment",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -31628,6 +31670,7 @@
       "fact_family": "allotment",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -32636,6 +32679,7 @@
       "fact_family": "allotment",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -34124,6 +34168,7 @@
       "fact_family": "allotment",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -34364,6 +34409,7 @@
       "fact_family": "cello_teacher",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -34772,6 +34818,7 @@
       "fact_family": "cello_teacher",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -35420,6 +35467,7 @@
       "fact_family": "cello_teacher",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -36428,6 +36476,7 @@
       "fact_family": "cello_teacher",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -37916,6 +37965,7 @@
       "fact_family": "cello_teacher",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -38156,6 +38206,7 @@
       "fact_family": "bakery",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -38564,6 +38615,7 @@
       "fact_family": "bakery",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -39212,6 +39264,7 @@
       "fact_family": "bakery",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -40220,6 +40273,7 @@
       "fact_family": "bakery",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -41708,6 +41762,7 @@
       "fact_family": "bakery",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -41948,6 +42003,7 @@
       "fact_family": "reading_circle",
       "difficulty": 1,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -42356,6 +42412,7 @@
       "fact_family": "reading_circle",
       "difficulty": 2,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -43004,6 +43061,7 @@
       "fact_family": "reading_circle",
       "difficulty": 3,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -44012,6 +44070,7 @@
       "fact_family": "reading_circle",
       "difficulty": 4,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   },
@@ -45500,6 +45559,7 @@
       "fact_family": "reading_circle",
       "difficulty": 5,
       "difficulty_dial": "distance",
+      "difficulty_validated": true,
       "vertical": "workingmemory"
     }
   }

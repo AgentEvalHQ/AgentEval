@@ -13007,6 +13007,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 3,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Dunholt",
@@ -13583,6 +13586,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 4,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Torhow",
@@ -14210,6 +14216,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 4,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Brayholt",
@@ -15005,6 +15014,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 4,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Halholt",
@@ -15777,6 +15789,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 5,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Velcombe",
@@ -16408,6 +16423,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 5,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Ferhow",
@@ -17060,6 +17078,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 2,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Hesthow",
@@ -17657,6 +17678,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 4,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Wexmore",
@@ -18259,6 +18283,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 3,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Ottrel",
@@ -18786,6 +18813,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 3,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Braystow",
@@ -19553,6 +19583,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 3,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Bramstow",
@@ -20223,6 +20256,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 2,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Marmore",
@@ -20938,6 +20974,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 2,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Ottridge",
@@ -21629,6 +21668,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 2,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Brayholt",
@@ -22272,6 +22314,9 @@
     ],
     "typedmemeval": {
       "shape": "list-order",
+      "difficulty": 2,
+      "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "list_order": {
         "items": [
           "Wexstow",

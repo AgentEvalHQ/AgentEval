@@ -548,6 +548,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Stelling Adhesives",
       "candidates": [
         {
@@ -1235,6 +1236,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Thackeray Abrasives",
       "candidates": [
         {
@@ -1818,6 +1820,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Thackeray Abrasives",
       "candidates": [
         {
@@ -2550,6 +2553,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Pettifer Timber",
       "candidates": [
         {
@@ -3122,6 +3126,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Meridian Tools",
       "candidates": [
         {
@@ -3919,6 +3924,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Pettifer Timber",
       "candidates": [
         {
@@ -4581,6 +4587,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Brackenhoe Glazing",
       "candidates": [
         {
@@ -5083,6 +5090,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Naldern Hardware",
       "candidates": [
         {
@@ -5792,6 +5800,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Vindle Fasteners",
       "candidates": [
         {
@@ -6584,6 +6593,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Ilbury Joinery",
       "candidates": [
         {
@@ -7122,6 +7132,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Corbel and Finch",
       "candidates": [
         {
@@ -7931,6 +7942,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Ilbury Joinery",
       "candidates": [
         {
@@ -8573,6 +8585,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Ashgrove Supply",
       "candidates": [
         {
@@ -9320,6 +9333,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "count_predicate": "the speaker put an order in with Pettifer Timber",
       "candidates": [
         {
@@ -10032,6 +10046,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -10699,6 +10714,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -11309,6 +11325,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -11976,6 +11993,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -12552,6 +12570,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -13234,6 +13253,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -13978,6 +13998,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -14645,6 +14666,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -15341,6 +15363,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -16090,6 +16113,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -16839,6 +16863,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -17617,6 +17642,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -18308,6 +18334,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -18956,6 +18983,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -19656,6 +19684,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -20386,6 +20415,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -21140,6 +21170,7 @@
       },
       "difficulty": 4,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -21786,6 +21817,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -22354,6 +22386,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -22970,6 +23003,7 @@
       },
       "difficulty": 5,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -23544,6 +23578,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -24172,6 +24207,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -24794,6 +24830,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -25494,6 +25531,7 @@
       },
       "difficulty": 3,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -26191,6 +26229,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -26809,6 +26848,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -27331,6 +27371,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -27980,6 +28021,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -28701,6 +28743,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -29302,6 +29345,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -29992,6 +30036,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -30713,6 +30758,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -31259,6 +31305,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -31781,6 +31828,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -32303,6 +32351,7 @@
       },
       "difficulty": 1,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   },
@@ -32928,6 +32977,7 @@
       },
       "difficulty": 2,
       "difficulty_dial": "dispersion",
+      "difficulty_validated": true,
       "vertical": "arithmetic"
     }
   }

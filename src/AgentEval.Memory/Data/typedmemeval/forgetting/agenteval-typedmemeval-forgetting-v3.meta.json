@@ -13,7 +13,7 @@
     }
   },
   "question_count": 50,
-  "corpus_sha256": "a34108e45f04b8d69f335b7ef80a67f5981b1b843bb01baefc1adcf9e56c1fcc",
+  "corpus_sha256": "d4b047d6507c31b90bc451e2b103fc0fcbd7ef1aed6a9983e9bfe5a72ee14abc",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -308,7 +308,7 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "a34108e45f04b8d69f335b7ef80a67f5981b1b843bb01baefc1adcf9e56c1fcc"
+      "probed_corpus_sha256": "d4b047d6507c31b90bc451e2b103fc0fcbd7ef1aed6a9983e9bfe5a72ee14abc"
     }
   }
 }

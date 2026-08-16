@@ -805,7 +805,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                       # monotonically (0.92 down to 0.42 across inputs 2-6) and was simply
                       # never named, which made it the cheapest lever in the family.
                       "difficulty": _difficulty_band(plan.derivation),
-                      "difficulty_dial": "dispersion",
+                      "difficulty_dial": "dispersion", "difficulty_validated": True,
                       **plan.extra}),
         ))
     return questions

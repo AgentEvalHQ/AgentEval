@@ -83,7 +83,8 @@ public sealed class TypedMemEvalRunnerTests
 
         var byDistance = result.TypedOutcomes!.ByDistance;
         Assert.NotNull(byDistance);
-        Assert.Equal([1, 5, 15, 40], byDistance!.Keys.Order().ToArray());
+        // Five rungs since v4; the old bottom two could not fail at K_ref = 5.
+        Assert.Equal([8, 15, 25, 40, 60], byDistance!.Keys.Order().ToArray());
         Assert.All(byDistance.Values, counts => Assert.Equal(12, counts.N));
     }
 

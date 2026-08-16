@@ -383,6 +383,12 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
             _asked_after(sessions), sessions,
             {
                 "shape": SHAPE_ORDER,
+                # Dispersion is the dial here: how many places the answer has to be assembled
+                # from. It is the only graded driver Episodic has, and it lives in 30% of the
+                # vertical -- the other 70% sits in a single band (G=1, full coverage), which
+                # is what makes this the flattest vertical in the family.
+                "difficulty": _LIST_BANDS.get(size, 3),
+                "difficulty_dial": "dispersion", "difficulty_validated": True,
                 # The item-to-session map is the answer key §6's conditional scoring needs:
                 # pairwise-order accuracy is computed over the items whose sessions were
                 # actually surfaced, which is unknowable from the answer string alone.
@@ -394,6 +400,11 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
             },
         ))
     return out
+
+
+#: List length -> band. Four to seven is the range the generator emits today; extending it
+#: (3/5/8/12) is on the v4 lever list and needs new generation rather than bookkeeping.
+_LIST_BANDS = {4: 2, 5: 3, 6: 4, 7: 5}
 
 
 def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Question]:
