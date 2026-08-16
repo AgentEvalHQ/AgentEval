@@ -1254,6 +1254,60 @@ The fixtures are checked in at `tests/AgentEval.Memory.Tests/Fixtures/consumer-p
 Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
 Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
 
+### 16. What v4 is (scope, fixed before generation)
+
+"v4" has accumulated four separate meanings across the review rounds. Written down once, because a
+revision whose scope lives in conversation is the same failure as a commitment that lives in prose.
+
+**v4 is one corpus regeneration that must clear four things.** Not four revisions — one, because
+each item below requires regenerating the corpora, and regenerating twice means paying the probe
+bill (~5,000 reference-model calls) and a full consumer verification pass twice for a corpus that
+would be thrown away in between.
+
+**A. Separability — blocking (§15).** The defect is the *statement grammar*: gold states a datable
+first-person fact and filler does not, so `"i have"` marks WorkingMemory's gold in 44 of 48 sessions
+against 0 of 732 distractors, `"on the"` marks Episodic's at 0.763, and `"today"` marks
+Arithmetic's at 0.737. Patching individual n-grams cannot close a difference in how the two sides
+are written, so v4 generates gold and filler from **one template machinery** — identical in shape
+and grammar, differing only in the fact asserted. Acceptance: the strengthened V7 (pooled
+within-question AUC < 0.75 on every non-exempt feature including per-role and per-turn slices;
+raw-token n-grams with the relevance exemption applied per question; no feature separating
+perfectly in more than twice its chance share) **and** the consuming project's probe, both run
+against the published package bytes.
+
+**B. Shape corrections.** Episodic attribution draws its frame per question from a bank while
+staying byte-identical within a pair (§13, slipped once already). The `not-yet-true` after arm asks
+what the **record shows** rather than what happened, which is what makes it a coin flip for answer
+models today. V1 is published **per shape**, not only per vertical — reporting Arithmetic at 48/50
+hides `duration` at 83% and Episodic at 48/50 hides `participant-attribution` at 87%.
+
+**C. Difficulty calibration.** A `difficulty: 1-5` stamp per question, derived from the memory dials
+only — dispersion, distance, interference, discrimination — never answer-step trickiness, which
+confounds the answer model with the memory system. Two constraints settled before generation:
+
+  1. **The reference retriever defines the bands; the memory arm corroborates them.** A ladder
+     validated by "memory-arm outcomes slope down" is calibrated to whichever system validated it,
+     which is a benchmark tuned to the thing it measures. The bands must be derivable from the
+     corpus alone. Where the two disagree, that disagreement is a finding about the system.
+  2. **Per-band n is about 10, so bands are diagnostics and never claims.** Five bands over fifty
+     questions cannot carry the n ≥ 30 floor this ADR sets for a citable figure. Either that is
+     stated as loudly as the per-shape cells already are, or the corpora grow.
+
+  Validation, per the consumer's proposal and adopted: reference-retriever coverage slopes down
+  across bands while the **oracle stays flat**. Oracle-flat plus memory-sloped is the proof that a
+  band measures memory rather than answer difficulty; a band that does not slope is reclassified,
+  not kept. This rule already flags `not-yet-true`, whose V1 runs 50–90% across two answer models —
+  answer-step difficulty wearing a memory-difficulty costume — so B must land before C can band it.
+
+**D. Release plumbing.** Already on `main`: the release now stamps `-p:Version`, with a pre-push
+gate that refuses to publish assemblies disagreeing with the tag. v4 is the release that carries it,
+which is why no 0.23.1 was cut.
+
+**Everything lands on one branch.** v4 is developed on the branch behind PR #166 and merges when the
+gate it carries goes green honestly. The gate, the fixtures, and the corpora that must clear them
+therefore move together, which is the only arrangement in which "read the acceptance criterion
+before generating" is structurally true rather than a good intention.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in
