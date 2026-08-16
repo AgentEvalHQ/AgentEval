@@ -1299,6 +1299,32 @@ confounds the answer model with the memory system. Two constraints settled befor
   not kept. This rule already flags `not-yet-true`, whose V1 runs 50–90% across two answer models —
   answer-step difficulty wearing a memory-difficulty costume — so B must land before C can band it.
 
+**C, in detail: the per-vertical difficulty levers.** From the consuming project's offline profile
+of v3 (checked in beside their probe fixtures), verified here against the corpora. Every lever is a
+memory dial — dispersion, distance, interference, discrimination — never answer-step complexity.
+
+| Vertical | v3 today (verified) | v4 lever |
+|---|---|---|
+| **Arithmetic** | The family's only working gradient: inputs 2→6 realising 0.92 / 0.70 / 0.73 / 0.55 / 0.42 | Publish the inputs ladder as the band variable and even the cells (today 6/17/11/8/8). **Cheapest lever in the family** — the response already exists, it is simply unnamed |
+| **WorkingMemory** | The only *published* ladder, but only three levels grade: H=2 → 1.00, H=6 → 1.00, H=16 → 0.75, H=41 → 0.42 | Re-rung so every band can fail (below). Add a same-family decoy at distance d/2 — today nothing in the haystack ever competes with the gold fact. Break the session-distance ↔ time-distance confound (each rung has exactly one time value today) |
+| **Forgetting** | Control arm is retrieval-*harder* than treatment: still-valid 0.47 (8 zeros of 15) against invalidated 0.62 | **Rebalance the arms first — that is a defect, not a dial.** Then publish the statement→invalidation gap (already evenly spread 4–15 sessions) as the band variable, and give never-known a near-miss neighbour so abstention discriminates rather than merely fails to find |
+| **Prospective** | Displacement spans 15–142 days (a real 9.5× spread) but stratifies nothing; interference is all-or-nothing (76% of questions face 0 competitors, the rest 12–17) | Band the displacement that already exists; parameterise the competing-reminder mechanism at 0/3/6/10/15 and extend it beyond due-later, which is the only shape that has it |
+| **Episodic** | Flattest: 35 of 50 questions (70%) are single-gold *and* full-coverage simultaneously | Decouple list-order from recency (median 1 session and 4.5 days from last item to question). Add a near-miss twin per shape — no shape has any competing material today. Extend the list-length ladder past 4–7 and publish it |
+
+**One refinement to the proposed WorkingMemory re-runging, from the data.** A rung can only grade if
+BM25@`K_ref` can miss, and the observed floor is higher than arithmetic suggests: H = 6 still
+realises 1.00, so `H > K_ref` is necessary and not sufficient. The proposed 2/8/15/25/40 yields
+H = 3/9/16/26/41, whose bottom rung cannot fail at all and whose second sits in the saturated
+regime. A ladder where every band grades wants roughly **d = 8 / 15 / 25 / 40 / 60** (H = 9/16/26/
+41/61). The general rule is worth stating because it will recur: *a difficulty band that the
+reference retriever cannot fail is not a band, it is a label.*
+
+**And one on Arithmetic.** The inputs ladder is monotone in trend but not strictly — 3 → 4 inverts
+(0.70 → 0.73) on cells of 17 and 11. Either the band variable is (inputs × dispersion-days) rather
+than inputs alone, or the inversion is published as-is. It must not be smoothed away: a band that
+does not slope gets reclassified, which is the consuming project's own rule and it applies to the
+vertical they called best-calibrated.
+
 **D. Release plumbing.** Already on `main`: the release now stamps `-p:Version`, with a pre-push
 gate that refuses to publish assemblies disagreeing with the tag. v4 is the release that carries it,
 which is why no 0.23.1 was cut.
