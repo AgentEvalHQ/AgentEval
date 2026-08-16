@@ -443,20 +443,6 @@ def check_echo_parity(questions: list[Question]) -> list[str]:
 _NAME_HEADS = ["Bram", "Calder", "Denn", "Farrow", "Halden", "Ithe", "Kesse", "Lorrin", "Marth",
                "Norra", "Pell", "Quenn", "Rusk", "Sable", "Thorne", "Velle", "Wend", "Yarrow"]
 _NAME_TAILS = ["qvist", "zell", "xby", "vund", "kjar", "wraith", "zorn", "quorn", "phex", "yrn"]
-#: Raises capitalisation density: mostly names, little connective text.
-_SHAPE_CLAUSES_DENSE = [
-    "{a} {b} agreed. {a} {b} would too.",
-    "Ask {a} {b} — {a} {b} knows.",
-    "{a} {b}, {a} {b}, same story.",
-]
-#: Lowers it: connective text, no names.
-_SHAPE_CLAUSES_PLAIN = [
-    "it seemed worth putting down somewhere before it slipped away again.",
-    "that is roughly where the thought ended up after turning it over a while.",
-    "nothing much turns on it either way but it stuck in the mind.",
-]
-
-
 #: Grammatical padding. The first version emitted a bag of words to hit an exact character count,
 #: which met the separability target and produced corpora ending in "Still Given These these later
 #: since those those aside" — a corpus nobody would read twice, and one no reviewer would trust.
@@ -1111,12 +1097,6 @@ def _worst_boilerplate_ngram(
                     seen.add(" ".join(words[i:i + size]))
         appears_in.update(seen)
 
-    # A gram the QUESTION itself uses is the relevance channel, which is the family's one declared
-    # exemption: gold is supposed to be more relevant to its question than a distractor, and how
-    # easily that is exploited is what the BM25 calibration gate bounds, not this screen. Without
-    # this, raw tokens make the screen fire on "have" in WorkingMemory (100% question-driven) while
-    # the thing that actually matters -- "i have", which appears in no question at all -- sits
-    # beside it. Scoring both identically would make the number unreadable.
     # Grams each QUESTION uses itself, indexed per question rather than pooled. Relevance is the
     # family's one declared exemption -- gold is supposed to match its own question, and how easily
     # that is exploited is bounded by the BM25 gate, not by this screen. But the exemption has to be

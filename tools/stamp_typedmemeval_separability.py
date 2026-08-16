@@ -39,6 +39,13 @@ def load(vertical: str) -> tuple[list[tmc.Question], str]:
     text = (tmc.DATA_ROOT / vertical / f"{corpus_id}.json").read_text(encoding="utf-8")
     questions = []
     for entry in json.loads(text):
+        # zip() would silently truncate to the shorter array. A corpus whose sessions and dates
+        # disagree in length is corrupt, and a separability measurement over the surviving prefix
+        # would be a confident number about a corpus nobody has.
+        if len(entry["haystack_sessions"]) != len(entry["haystack_dates"]):
+            raise SystemExit(
+                f"{entry['question_id']}: {len(entry['haystack_sessions'])} sessions against "
+                f"{len(entry['haystack_dates'])} dates -- the corpus is malformed.")
         ids = entry["haystack_session_ids"]
         gold = {ids.index(a) for a in entry["answer_session_ids"] if a in ids}
         sessions = [

@@ -29,8 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still exempt everywhere it should be, and real markers survive.
 
 
-### Fixed
-
 - **Result provenance stamped `AgentEvalVersion: 0.16.0-beta` in every release since 0.16.**
   The release workflow passed `-p:PackageVersion`, which sets the nupkg's version and nothing
   else; `AssemblyVersion`, `FileVersion` and `InformationalVersion` all derive from `-p:Version`.
