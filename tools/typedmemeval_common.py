@@ -1186,7 +1186,9 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
             k = max(0, min(take, len(mine), k))
             from_self = rng.sample(mine, k) if mine and k else []
             terms = from_self + rng.sample(neutral, max(0, take - len(from_self)))
-            rng.shuffle(terms)
+            # Shuffled so the repeated terms are not all at the front, which would itself be a
+            # position tell inside the clause.
+            rng.shuffle(terms)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this orders neutral vocabulary, not secrets.
             # Never inside a turn the answer is derived from, and otherwise on the assistant turn.
             # WHICH turn carries the clause is itself a signal: filler wove it into the user turn
             # while gold always received it on the assistant turn, so in Prospective the trigram
