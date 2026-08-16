@@ -1045,13 +1045,39 @@ def _worst_boilerplate_ngram(
     for q in questions:
         seen = set()
         for session in q.sessions:
-            words = tokenize(session.text())
+            # RAW tokens. `tokenize` drops stopwords, which is right for retrieval and fatal here:
+            # a gram made of stopwords cannot be a candidate at all, so it is not scored low, it is
+            # unrepresentable. "on the" marked Episodic's gold at AUC 0.763 -- above the refusal
+            # bar -- and this screen could not see it in principle. The identical blindness was
+            # found and fixed for type_token_ratio one revision earlier and never propagated here.
+            words = tokenize_raw(session.text())
             # Unigrams included: the single token "noted" scored as high as the best bigram on
             # Forgetting, and a one-word filter is the cheapest classifier there is.
             for size in (1, 2, 3):
                 for i in range(len(words) - size + 1):
                     seen.add(" ".join(words[i:i + size]))
         appears_in.update(seen)
+
+    # A gram the QUESTION itself uses is the relevance channel, which is the family's one declared
+    # exemption: gold is supposed to be more relevant to its question than a distractor, and how
+    # easily that is exploited is what the BM25 calibration gate bounds, not this screen. Without
+    # this, raw tokens make the screen fire on "have" in WorkingMemory (100% question-driven) while
+    # the thing that actually matters -- "i have", which appears in no question at all -- sits
+    # beside it. Scoring both identically would make the number unreadable.
+    # Grams each QUESTION uses itself, indexed per question rather than pooled. Relevance is the
+    # family's one declared exemption -- gold is supposed to match its own question, and how easily
+    # that is exploited is bounded by the BM25 gate, not by this screen. But the exemption has to be
+    # applied where it applies: dropping a gram corpus-wide because ANY question used it hid
+    # Episodic's "on the" (0.763) on the strength of 2 questions in 50, while the case the
+    # exemption exists for -- WorkingMemory's "have", in 100% of its questions -- needs dropping
+    # everywhere. So a question whose own text contains the gram contributes no pairs for it, and
+    # every other question still does.
+    own_grams: list[set[str]] = []
+    for q in questions:
+        words = tokenize_raw(q.question)
+        own_grams.append({" ".join(words[i:i + size])
+                          for size in (1, 2, 3)
+                          for i in range(len(words) - size + 1)})
 
     candidates = [
         gram for gram, count in appears_in.items()
@@ -1069,10 +1095,12 @@ def _worst_boilerplate_ngram(
         # Padded on both sides so "list also" cannot match inside "checklist also".
         needle = f" {gram} "
         strata = []
-        for q in questions:
+        for index, q in enumerate(questions):
+            if gram in own_grams[index]:
+                continue          # relevance channel for THIS question; contributes no pairs
             gold_values, other_values = [], []
             for session in q.sessions:
-                haystack = f" {' '.join(tokenize(session.text()))} "
+                haystack = f" {' '.join(tokenize_raw(session.text()))} "
                 value = 1.0 if needle in haystack else 0.0
                 (gold_values if session.is_gold else other_values).append(value)
             strata.append((gold_values, other_values))

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> [!CAUTION]
+> **TypedMemEval corpus v3 (shipped in 0.23.0-beta) is BLOCKED and must not be cited.** An
+> independent within-question probe by the consuming project found a gold marker the V7 phrase
+> screen could not represent: `"on the"` separates Episodic's gold at AUC 0.763, above the 0.75
+> refusal bar, through a channel that is not question relevance. Fixing the screen found worse —
+> WorkingMemory's gold carries `"i have"` in 44 of 48 sessions against **0 of 732** distractors,
+> AUC 0.958. Both have been present since v1. v4 is the by-construction redesign; see ADR-026 §15.
+
+### Fixed
+
+- **The V7 phrase screen was blind to any n-gram made of stopwords.** Candidates were built from
+  `tokenize()`, which drops them, so `"on the"`, `"have"` and `"i have"` were not scored low —
+  they could not be candidates at all. The screen now uses raw tokens. This is the same blindness
+  fixed one revision earlier for `type_token_ratio` (0.566 filtered vs 0.797 raw) and not
+  propagated to the neighbouring caller.
+
+- **The relevance exemption now applies per question rather than corpus-wide.** A gram appearing in
+  *any* question's text used to be dropped everywhere, which hid `"on the"` on the strength of 2
+  questions in 50; applied per question, WorkingMemory's genuinely question-driven `"have"` is
+  still exempt everywhere it should be, and real markers survive.
+
+
 ### Fixed
 
 - **Result provenance stamped `AgentEvalVersion: 0.16.0-beta` in every release since 0.16.**

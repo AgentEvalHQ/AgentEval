@@ -1146,6 +1146,48 @@ is there — the gutter/inspection leak in §12 was caught by one sample and cou
 been missed by it. Three samples each, and unlike V2 there is no hit threshold: one sample
 that reconstructs the answer from distractors alone condemns the question.
 
+### 15. v3 is blocked: the phrase screen could not represent the tell (consumer finding, 2026-08-16)
+
+The consuming project's independent within-question re-probe found a gold marker in Episodic —
+`"on the"`, AUC **0.763**, gold 76% against distractor 22%, and present in only 4% of question
+text, so not the relevance channel. Every figure they reported replicates here exactly. **v3 fails
+its own gate and must not be cited.**
+
+**Why V7 could not see it.** The phrase screen built its candidate n-grams from `tokenize()`, which
+drops stopwords. `on` and `the` are both stopwords, so `"on the"` was never a candidate: not scored
+low, *unrepresentable*. The same is true of `"have"`, `"has"`, and `"i have"`. This is the identical
+blindness found one revision earlier for `type_token_ratio` — 0.566 filtered against 0.797 raw —
+where `tokenize_raw` was introduced to fix it and then not propagated to the screen next door. A fix
+applied to one caller and not to its neighbour is not a fix; it is a coincidence that held for one
+release.
+
+**Fixing the screen found worse than the report did.** With raw tokens, WorkingMemory's worst gold
+marker is `"i have"` at AUC **0.958** — gold 44 of 48 sessions, distractor **0 of 732** — appearing
+in no question text at all. A single bigram isolates that vertical's evidence almost perfectly, and
+it had been there since v1.
+
+**The relevance exemption had to be made per question to keep both facts visible.** Dropping a gram
+corpus-wide because any question used it hid `"on the"` on the strength of 2 questions in 50, while
+the case the exemption exists for — WorkingMemory's `"have"`, 100% question-driven, which the
+consumer correctly identified as the priced channel — needs dropping everywhere. A question whose
+own text contains the gram now contributes no pairs for it; every other question still does.
+
+**Adjudication: this is v4, not an accepted-and-bounded channel.** Refusing at 0.75 and then
+exempting a 0.958 marker because it has a sympathetic mechanism is the "carve-out with no ceiling"
+this ADR already rejected once for phrase recurrence. The consumer's mechanism hypothesis is right
+and broader than dates: gold states a datable first-person fact and filler does not, so gold's
+*statement grammar* differs — temporal grounding (`"today"`, `"on the"`) and first-person
+declaratives (`"i have"`) are the same effect seen through different n-grams.
+
+That is precisely the diagnosis §14 reached from the other direction. Gold and filler are built by
+different code paths and reconciled afterwards, so each patch removes a residue and the next
+measurement finds the next one. **v4 is the by-construction redesign** — gold and filler emitted by
+one template machinery, identical in shape and grammar, differing only in the fact asserted — and
+the Episodic attribution regeneration (§13) folds into it rather than preceding it.
+
+Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
+Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in
