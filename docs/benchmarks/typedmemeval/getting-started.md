@@ -258,13 +258,19 @@ Every question carries `difficulty` (1–5) and `difficulty_dial` in its `typedm
 band is derived from **memory dials only** — dispersion, distance, interference, discrimination —
 never from answer-step trickiness, which would confound the answer model with the memory system.
 
-| Vertical | dial | what varies | validated? |
-|---|---|---|---|
-| Episodic | dispersion | list length 4–7 | **yes** |
-| WorkingMemory | distance | 8 / 15 / 25 / 40 / 60 intervening sessions | **yes** |
-| Arithmetic | dispersion | 2–6 derivation inputs | **yes** |
-| Forgetting | discrimination | 4–15 sessions between statement and invalidation | no |
-| Prospective | distance | 15–142 days from evidence to question | no |
+| Vertical | dial | what varies | banded | validated? |
+|---|---|---|---|---|
+| WorkingMemory | distance | 8 / 15 / 25 / 40 / 60 intervening sessions | 60/60 | **yes** |
+| Arithmetic | dispersion | 2–6 derivation inputs | 50/50 | **yes** |
+| Episodic | dispersion | list length 4–7 | 15/50 | **yes** |
+| Prospective | distance | 15–142 days from evidence to question | 38/50 | no |
+| Forgetting | discrimination | 4–15 sessions between statement and invalidation | 20/50 | no |
+
+**Not every question carries a band.** A dial only exists where the shape has one: Episodic's
+list length lives in its 15 list-order questions, Forgetting's gap in its 20 invalidated ones, and
+Prospective's displacement in its 38 paired arms. The unbanded remainder is not "difficulty 3" — it
+is unbanded, and it is the flat majority the family's own profile identified. Only WorkingMemory
+and Arithmetic band every question they contain.
 
 **"Validated" means the reference retriever's coverage slopes down across the bands.** That test
 matters more than the labels: a band nothing can fail is a label, not a band. Three verticals pass
