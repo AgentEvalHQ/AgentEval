@@ -34,7 +34,7 @@ namespace AgentEval.Cli.Commands;
 /// answer "which corpus produced this number".
 /// </para>
 /// <para>
-/// <b>Citation rule.</b> Results are cited as "TypedMemEval-&lt;Vertical&gt; v3 (AgentEval)" and are
+/// <b>Citation rule.</b> Results are cited as "TypedMemEval-&lt;Vertical&gt; v4 (AgentEval)" and are
 /// never summed or averaged with LongMemEval numbers. The console prints the typed outcome vector
 /// with its denominators; <see cref="ExternalBenchmarkResult.OverallAccuracy"/> appears only under
 /// an explicit compatibility label, because a single percentage is the thing this family exists to

@@ -1,16 +1,11 @@
 {
-  "corpus_id": "agenteval-typedmemeval-arithmetic-v3",
+  "corpus_id": "agenteval-typedmemeval-arithmetic-v4",
   "vertical": "arithmetic",
-  "revision": "v3",
+  "revision": "v4",
   "supersedes": {
-    "revision": "v2",
-    "shipped_in": null,
-    "reason": "v2 was never released; it existed only on an unmerged branch, and it carried the same class of defect it was created to fix. Its own V7 check passed because the check was wrong twice over: it pooled (gold, distractor) pairs ACROSS questions, which diluted a within-question tell in Forgetting from 0.903 to 0.616, and its refused-feature list covered neither punctuation nor sentence structure nor phrase markers on gold. Measured properly, v2 gold was recoverable from Forgetting at AUC 1.000 by the literal substring \"Noted\", at 0.95 on two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting full stops. v3 equalises every session on all six raw counts the refused features are built from, so retrieval difficulty moved again and no v1 or v2 number is comparable with a v3 number. Neither should be cited.",
-    "also_supersedes": {
-      "revision": "v1",
-      "shipped_in": "0.22.0-beta",
-      "reason": "Gold carried the BM25 calibration clause 0 times in 501 sessions against ~99% for distractors, so a one-line string filter isolated every piece of evidence in every corpus."
-    }
+    "revision": "v3",
+    "shipped_in": "0.23.0-beta",
+    "reason": "v3 shipped separable. An independent within-question probe by the consuming project found the phrase screen could not represent n-grams made of stopwords, so \"on the\" marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 sessions against 0 of 732 distractors -- the latter present since v1. The cause was never a set of phrases: gold asserted a datable first-person fact and filler did not, so the two sides differed in grammar. v4 generates both from shared frames, normalises turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at K_ref (two of the old four could not), gives Forgetting's control arm the same G as its treatment arm, reframes the not-yet-true after arm around what the record shows, varies the Episodic attribution frame per question, and stamps a per-question difficulty band. Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 number is comparable with a v4 number. None of them should be cited."
   },
   "question_count": 50,
   "corpus_sha256": "9f3b4936c00e571599bc0fd3edd0bc2b7fb6b0579d279c7e4a2d818aaa864f33",
