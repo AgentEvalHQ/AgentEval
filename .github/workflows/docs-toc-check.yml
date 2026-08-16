@@ -15,6 +15,7 @@ on:
       - 'tools/typedmemeval_common.py'
       - 'tools/stamp_typedmemeval_separability.py'
       - 'tools/run_typedmemeval_probes.py'
+      - 'tools/typedmemeval-separability-baseline.json'
 
 permissions:
   contents: read
@@ -33,15 +34,26 @@ jobs:
       # ADR-026 V7. Re-measures gold/distractor separability over the shipped corpora rather than
       # trusting the stamped record — a record nobody re-runs is a claim, not a check. Model-free
       # and deterministic, so it needs no credentials.
+      # Ratcheted against a recorded baseline of the features that block the CURRENT corpus
+      # revision. Not an exemption: anything new, or anything worse than its recorded value,
+      # still fails. The baseline can only shrink, and the revision cannot ship until it is
+      # empty. Without this the check is uniformly red for the whole life of a blocked
+      # revision, which means a separability regression introduced while fixing the old one
+      # would land invisibly -- the exact failure mode the check exists to prevent.
       - name: Check TypedMemEval corpora are not separable by cheap features
         working-directory: tools
-        run: python3 stamp_typedmemeval_separability.py --check
+        run: python3 stamp_typedmemeval_separability.py --check --baseline typedmemeval-separability-baseline.json
 
       # The probes decide which questions are valid, so the screen that decides "did this response
       # reach the gold answer?" is itself load-bearing. It has been wrong twice — a word boundary typed as a
       # literal backspace byte silenced half its negative-gold guard, and a greedy number pattern
       # let a year the prompt itself supplied count as evidence — and both defects reported leaks
       # in corpora that had none. Pure functions, so this runs without credentials.
+      # always(): the separability step above can be legitimately red for a whole corpus
+      # revision (a blocked corpus is a finding, not a transient failure), and a sequential
+      # job would then skip this one for weeks. A check that silently stops running is worse
+      # than one that fails, because nothing announces it.
       - name: Check the TypedMemEval evidence screen
+        if: always()
         working-directory: tools
         run: python3 run_typedmemeval_probes.py --self-test

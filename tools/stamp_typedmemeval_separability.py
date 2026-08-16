@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from datetime import datetime, timezone
 
 import typedmemeval_common as tmc
@@ -66,9 +67,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("verticals", nargs="*", default=[])
     parser.add_argument("--check", action="store_true", help="measure and report; write nothing")
+    parser.add_argument(
+        "--baseline", default=None,
+        help="path to a known-blocked baseline; fail only on failures that are new or worse")
     args = parser.parse_args()
 
     failed = False
+    failures: dict[str, dict[str, float]] = {}
     for vertical in (args.verticals or list(tmc.VERTICALS)):
         questions, corpus_sha = load(vertical)
         # WorkingMemory pins its fact to session 0 by design (ADR §5.4), so position separates gold
@@ -88,6 +93,13 @@ def main() -> None:
         print(f"{vertical:14s} {'PASS' if report['passed'] else 'FAIL'}  worst: {worst}"
               f"  [threshold {tmc.SEPARABILITY_MAX_AUC}]")
         print(f"{'':16s}" + "  ".join(f"{k}={v:.3f}" for k, v in sorted(report["features"].items())))
+        failures[vertical] = {
+            name: score for name, score in report["features"].items()
+            if name in tmc.SEPARABILITY_REFUSED_FEATURES and name not in exempt
+            and score >= tmc.SEPARABILITY_MAX_AUC
+        }
+        for name in report.get("bimodal_features", {}):
+            failures[vertical].setdefault(name, report["features"].get(name, 1.0))
         failed |= not report["passed"]
 
         if args.check:
@@ -100,7 +112,41 @@ def main() -> None:
         path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8", newline="\n")
 
-    raise SystemExit(1 if failed else 0)
+    if not args.baseline:
+        raise SystemExit(1 if failed else 0)
+
+    # Ratchet, not an exemption. A corpus revision can be legitimately blocked for weeks (v3 is,
+    # on three verticals), and a check that is uniformly red for that whole period reports nothing
+    # about the work happening on top of it -- a NEW separability regression introduced while
+    # fixing the old one would be invisible. The baseline pins the exact known failures and their
+    # measured values: anything new, or anything worse, still fails. It can only shrink, and the
+    # revision cannot ship until it is empty.
+    baseline_path = Path(args.baseline)
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path.exists() else {}
+    known = {v: dict(f) for v, f in baseline.get("blocked", {}).items()}
+
+    regressions = []
+    for vertical, current in failures.items():
+        for name, score in sorted(current.items()):
+            recorded = known.get(vertical, {}).get(name)
+            if recorded is None:
+                regressions.append(f"{vertical}: NEW blocking feature '{name}' at {score:.3f}")
+            elif score > recorded + 1e-6:
+                regressions.append(
+                    f"{vertical}: '{name}' worsened {recorded:.3f} -> {score:.3f}")
+
+    outstanding = sum(len(f) for f in failures.values())
+    if outstanding:
+        print(f"\nKNOWN-BLOCKED: {outstanding} refused feature(s) across "
+              f"{sum(1 for f in failures.values() if f)} corpora, pinned in {baseline_path.name}.")
+        print("This corpus revision cannot ship until that count reaches zero.")
+    if regressions:
+        print("\nREGRESSION against the recorded baseline:")
+        for line in regressions:
+            print(f"  {line}")
+        raise SystemExit(1)
+    print("\nNo separability regression against the baseline.")
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":

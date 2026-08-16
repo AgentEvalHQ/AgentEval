@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "Known-blocked separability features for corpus revision v3, recorded so the gate can",
+    "still report NEW regressions while the revision is blocked. This is a ratchet, not an",
+    "exemption: any feature that appears here that is not listed, or any listed feature whose",
+    "AUC gets worse, fails the check.",
+    "",
+    "v4 ships only when this list is EMPTY. Deleting an entry without regenerating the corpus",
+    "is the one thing this file must never be used for -- the numbers below are measurements,",
+    "and the corpus is what has to change."
+  ],
+  "revision": "v3",
+  "threshold_auc": 0.75,
+  "blocked": {
+    "prospective": {
+      "assistant_mean_turn_chars": 0.6093,
+      "mean_turn_chars": 0.5815,
+      "session_length_chars": 0.7012,
+      "turn_count": 0.6519,
+      "user_length_chars": 0.6568,
+      "user_mean_turn_chars": 0.6074
+    },
+    "episodic": {
+      "assistant_length_chars": 0.694,
+      "assistant_mean_turn_chars": 0.5021,
+      "digit_density": 0.547,
+      "gold_marker_ngram": 0.7605,
+      "mean_turn_chars": 0.5269,
+      "session_length_chars": 0.6482,
+      "turn_count": 0.6153
+    },
+    "workingmemory": {
+      "gold_marker_ngram": 0.9583
+    }
+  }
+}
