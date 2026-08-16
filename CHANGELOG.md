@@ -20,6 +20,36 @@ itself just certified, because the check was measuring the wrong thing.
 > no v1 or v2 score is comparable with a v3 score. Corpus ids are now
 > `agenteval-typedmemeval-<vertical>-v3`; cite as "TypedMemEval-\<Vertical\> **v3** (AgentEval)".
 
+
+**Shipped v3 corpora — validity probes as measured.** V1/V2/V3/V6 ran against reference
+deployment `gpt-5.5` at authoring time with three ablation samples per question; V7 is model-free
+and re-measured in CI and again by an independent C# implementation.
+
+| Vertical | V1 oracle | V1 pair-flip | V2 | V3 | V6 | V7 worst refused |
+|---|---|---|---|---|---|---|
+| Prospective | 49/50 | 18/19 | 50/50 | 39/39 | — | 0.715 (`gold_marker_ngram`) |
+| Episodic | 48/50 | — | 50/50 | 49/50 | — | 0.724 (`boilerplate_ngram`) |
+| Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 | 0.737 (`gold_marker_ngram`) |
+| WorkingMemory | 48/48 | — | 48/48 | 48/48 | — | 0.631 (`boilerplate_ngram`) |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 | 0.663 (`first_user_length_chars`) |
+
+Prospective's V3 denominator is 39 because V3 abstains where a gold answer carries no value the
+question did not already supply — it cannot tell "reached the evidence" from "said what any model
+with no evidence says". Episodic's V1 and V3 shortfalls are all `participant-attribution`, whose
+answer is one of two; an ablation probe cannot separate reaching the evidence from a coin flip
+there, and V2 (ten zero-context samples) is what bounds guessability for that shape.
+
+**Corpus identity.** Pin these; a run whose provenance names a different hash is a different
+benchmark.
+
+| Corpus id | Coverage @ K_ref = 5 | SHA-256 (newline-normalised) |
+|---|---|---|
+| `agenteval-typedmemeval-prospective-v3` | 0.820 | `1686919510b1bfccbf66fbb2b5e55f1cdeb1309358c1bfce5b150adc1529a76f` |
+| `agenteval-typedmemeval-episodic-v3` | 0.871 | `5f1efa83c197d01335df733c4251ffcf2bf6515421403ec5c5390bb4946bedd5` |
+| `agenteval-typedmemeval-arithmetic-v3` | 0.661 | `4624eb78b21178ab06ab372063d4a41a069269bc841c3289e44db13a899035e2` |
+| `agenteval-typedmemeval-workingmemory-v3` | 0.792 | `c5361ebe47150e7d9e6dbaa9da87b3b1e55d50e450b1d3393b0e70ae29e8ca86` |
+| `agenteval-typedmemeval-forgetting-v3` | 0.690 | `843b176a056e9f03575e01a4bb8cf830ef1999d0955d1c174bd2b50c42a6dcaf` |
+
 ### Added
 
 - **V7, adversarial separability.** Tries cheap single-feature classifiers at telling gold sessions
