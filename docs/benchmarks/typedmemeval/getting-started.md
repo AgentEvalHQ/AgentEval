@@ -240,10 +240,10 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
 | Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.871 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.661 | 3–6 |
-| WorkingMemory | 60 | 0.667 | 1 |
-| Forgetting | 50 | 0.690 — **0.557 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+| Episodic | 50 | 0.719 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
+| Arithmetic | 50 | 0.675 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| WorkingMemory | 60 | 0.667 | 1 (×60) |
+| Forgetting | 50 | 0.740 | 0 (×15), 2 (×35) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -318,11 +318,20 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 39/39 | — |
-| Episodic | 48/50 | — | 50/50 | 49/50 | — |
-| Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
-| WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+| Prospective | 50/50 | 19/19 | 50/50 | 37/37 | — |
+| Episodic | 47/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 46/50 | — | 50/50 | 50/50 | 49/50 |
+| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — |
+| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 |
+
+**Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
+ablating either the statement or the invalidation stops the model producing the gold, so both
+components are load-bearing. Its fifteen still-valid controls fail all fifteen, because their two
+components are a statement and a *re-affirmation of the same value* — ablating either leaves the
+other. That redundancy is deliberate: the control exists to catch over-forgetting, and a system
+that finds either mention has what it needs to say the fact still stands. Those questions carry
+`gold_components_redundant: true`. Read their per-component coverage as "either suffices", never as
+"both were needed".
 
 V3 and V6 take **three** ablation samples per question, not one. A single sample can miss a leak
 that is there — the distractor collision fixed in 0.22.0-beta was caught by one sample and could as

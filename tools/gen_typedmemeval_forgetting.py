@@ -372,14 +372,28 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
         gold_turn=0, tag=f"reaffirmation:{value}")
     statement_index = rng.randint(0, h)
     sessions.insert(statement_index, statement)
-    sessions.insert(rng.randint(statement_index + 1, h + 1), reaffirm)
+    reaffirm_index = rng.randint(statement_index + 1, h + 1)
+    sessions.insert(reaffirm_index, reaffirm)
     question_date = _lay_out(sessions, ordinal)
 
     read_value = _derive_value(statement)
     answer = (f"{read_value}. That is still your {noun} — nothing in the record has cancelled "
               f"or replaced it.")
-    return tmc.Question(qid, TYPE_STILL_VALID, question, answer, question_date, sessions,
-                        {"shape": SHAPE_STILL_VALID, "pair_id": pair_id, "arm": "control"})
+    return tmc.Question(
+        qid, TYPE_STILL_VALID, question, answer, question_date, sessions,
+        {"shape": SHAPE_STILL_VALID, "pair_id": pair_id, "arm": "control",
+         "gold_components": [
+             {"kind": "statement", "session_index": statement_index},
+             {"kind": "reaffirmation", "session_index": reaffirm_index},
+         ],
+         # Declared, because V6 will report it and a reader is entitled to know it was
+         # intended. The re-affirmation restates the same value, so ablating either mention
+         # leaves the other and neither is individually load-bearing -- V6 fails all fifteen
+         # of these by construction. For this arm that is correct: the control exists to catch
+         # over-forgetting, and a system that finds either mention has the evidence it needs to
+         # say the fact still stands. Read per-component coverage here as "either suffices",
+         # never as "both were needed".
+         "gold_components_redundant": True})
 
 
 def _never_known_question(entry, qid: str, ordinal: int,

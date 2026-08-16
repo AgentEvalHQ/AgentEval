@@ -11741,6 +11741,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p01",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 2
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 4
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -12268,6 +12279,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p02",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 0
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 4
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -12867,6 +12889,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p03",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 0
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 20
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -13538,6 +13571,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p04",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 20
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 23
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -14209,6 +14253,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p05",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 25
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 26
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -14664,6 +14719,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p06",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 15
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 17
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -15239,6 +15305,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p07",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 9
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 11
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -15838,6 +15915,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p08",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 22
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 23
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -16461,6 +16549,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p09",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 16
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 20
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -16988,6 +17087,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p10",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 15
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 20
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -17419,6 +17529,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p11",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 6
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 16
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -18042,6 +18163,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p12",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 16
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 19
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -18569,6 +18701,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p13",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 2
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 20
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -19144,6 +19287,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p14",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 20
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 21
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },
@@ -19647,6 +19801,17 @@
       "shape": "still-valid",
       "pair_id": "tme-for-p15",
       "arm": "control",
+      "gold_components": [
+        {
+          "kind": "statement",
+          "session_index": 0
+        },
+        {
+          "kind": "reaffirmation",
+          "session_index": 3
+        }
+      ],
+      "gold_components_redundant": true,
       "vertical": "forgetting"
     }
   },

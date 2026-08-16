@@ -86,7 +86,11 @@ public sealed class TypedMemEvalCoverageTests
             Assert.Contains(components, c => c.Present);
             Assert.Contains(components, c => !c.Present);
             Assert.Contains(components, c => c.Kind == "statement");
-            Assert.Contains(components, c => c.Kind == "invalidation");
+            // Two shapes carry components since v4. The invalidated arm pairs a statement with
+            // an invalidation; the still-valid control pairs it with a re-affirmation of the
+            // same value, added so both arms carry the same G -- without it the control was the
+            // hardest retrieval band in the family, on the arm whose job is to be the easy one.
+            Assert.Contains(components, c => c.Kind is "invalidation" or "reaffirmation");
         }
     }
 
