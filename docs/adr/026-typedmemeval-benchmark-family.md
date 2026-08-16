@@ -1279,7 +1279,9 @@ against the published package bytes.
 staying byte-identical within a pair (§13, slipped once already). The `not-yet-true` after arm asks
 what the **record shows** rather than what happened, which is what makes it a coin flip for answer
 models today. V1 is published **per shape**, not only per vertical — reporting Arithmetic at 48/50
-hides `duration` at 83% and Episodic at 48/50 hides `participant-attribution` at 87%.
+hid `duration` at 83% and Episodic at 48/50 hid `participant-attribution` at 87% — both
+measured on v3, which is what made the case for reporting per shape at all. The v4 records
+carry the current figures per shape, and they are not the same numbers.
 
 **C. Difficulty calibration.** A `difficulty: 1-5` stamp per question, derived from the memory dials
 only — dispersion, distance, interference, discrimination — never answer-step trickiness, which
