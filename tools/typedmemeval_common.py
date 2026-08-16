@@ -1033,8 +1033,9 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
     }
 
 
-def _worst_boilerplate_ngram(questions: list[Question]) -> tuple[str | None, float]:
-    """The recurring phrase that best predicts gold, and how well it does.
+def _worst_boilerplate_ngram(
+        questions: list[Question]) -> tuple[str | None, float, str | None, float]:
+    """The recurring phrases that best predict gold and filler, and how well each does.
 
     Scored as an AUC on a 0/1 feature so it sits on the same scale as the numeric features: a
     phrase in every distractor and no gold scores 1.0, exactly as the calibration clause did.
@@ -1057,7 +1058,10 @@ def _worst_boilerplate_ngram(questions: list[Question]) -> tuple[str | None, flo
         if count / question_count >= BOILERPLATE_MIN_QUESTION_SHARE
     ]
     if not candidates:
-        return None, 0.5
+        # Four values, matching the normal path. Returning two here raised ValueError in the
+        # caller on any corpus small enough that no gram clears the recurrence floor -- a
+        # --limit run, or a unit test, which is exactly where someone checks this code.
+        return None, 0.5, None, 0.5
 
     gold_gram, gold_score = None, 0.5
     filler_gram, filler_score = None, 0.5
