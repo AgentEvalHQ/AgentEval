@@ -60,7 +60,7 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Pack umbrella library
-      run: dotnet pack src/AgentEval/AgentEval.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+      run: dotnet pack src/AgentEval/AgentEval.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
 
     # T1.5 (v1.1): also pack the CLI as a dotnet-tool nupkg so users can
     # `dotnet tool install --global AgentEval.Cli --prerelease`. Multi-TFM
@@ -68,7 +68,39 @@ jobs:
     # AgentEval.Cli.csproj; the dotnet-tool installer picks the highest
     # compatible runtime, so net10 hosts get net10 + net8 hosts get net8).
     - name: Pack CLI as dotnet tool
-      run: dotnet pack src/AgentEval.Cli/AgentEval.Cli.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+      run: dotnet pack src/AgentEval.Cli/AgentEval.Cli.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+
+    # Between the pack and the push, because a NuGet package cannot be recalled. 0.23.0-beta
+    # shipped assemblies stamped 0.16.0.0: the pack passed -p:PackageVersion, which moves the
+    # nupkg's version and nothing else, while AssemblyVersion / FileVersion /
+    # InformationalVersion all derive from -p:Version. `AgentEvalVersion` in result provenance
+    # reads Assembly.GetName().Version, so every result that release produced carried a version
+    # that had not been current since 0.16 — and nothing failed, because nothing looked.
+    - name: Verify the packed assemblies carry the release version
+      shell: pwsh
+      run: |
+        $expected = '${{ steps.version.outputs.version }}'
+        $numeric  = ($expected -split '-')[0]
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $bad = @()
+        foreach ($pkg in Get-ChildItem ./nupkgs/*.nupkg) {
+          $dir = Join-Path $env:RUNNER_TEMP ("x_" + $pkg.BaseName)
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          [IO.Compression.ZipFile]::ExtractToDirectory($pkg.FullName, $dir)
+          foreach ($dll in Get-ChildItem $dir -Recurse -Filter 'AgentEval*.dll') {
+            $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($dll.FullName).ProductVersion
+            $asm  = [Reflection.AssemblyName]::GetAssemblyName($dll.FullName).Version.ToString()
+            if (-not $info.StartsWith($expected) -or -not $asm.StartsWith($numeric)) {
+              $bad += "$($pkg.Name)/$($dll.Name): AssemblyVersion=$asm Informational=$info"
+            }
+          }
+        }
+        if ($bad) {
+          Write-Host "::error::Packed assemblies do not carry $expected. Nothing was pushed."
+          $bad | Select-Object -Unique | ForEach-Object { Write-Host "  $_" }
+          exit 1
+        }
+        Write-Host "All packed AgentEval assemblies report $expected."
 
     - name: Push to NuGet
       run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

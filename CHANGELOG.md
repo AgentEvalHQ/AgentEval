@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Result provenance stamped `AgentEvalVersion: 0.16.0-beta` in every release since 0.16.**
+  The release workflow passed `-p:PackageVersion`, which sets the nupkg's version and nothing
+  else; `AssemblyVersion`, `FileVersion` and `InformationalVersion` all derive from `-p:Version`.
+  `AgentEvalVersion` reads `Assembly.GetName().Version`, so 0.23.0-beta shipped assemblies
+  reporting `0.16.0.0` and every result it produced carries a version that has not been current
+  since 0.16. Found by the consuming project's consumption pass, not by us.
+
+  The pack now sets both properties, and a **pre-push gate** unpacks each `.nupkg` and refuses to
+  publish if any `AgentEval*.dll` disagrees with the release version — placed between pack and
+  push, because a NuGet package cannot be recalled. Takes effect from the next release; packages
+  already published cannot be corrected in place.
+
 ## [0.23.0-beta] - 2026-08-15
 
 **TypedMemEval corpus revision v3, and V7 — adversarial separability.** The consuming project's

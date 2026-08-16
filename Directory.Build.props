@@ -31,7 +31,14 @@
          AgentEval.Cli dotnet tool are built from one source tree and released together on one
          tag, so they version in lockstep. Keeping the number here (and nowhere else) makes that
          parity structural — there is no second number to drift. CI overrides this for releases
-         via `dotnet pack -p:PackageVersion=<tag>`. -->
+         via `dotnet pack -p:Version=<tag> -p:PackageVersion=<tag>`.
+
+         BOTH properties, and the first one is the one that was missing. `PackageVersion` sets the
+         nupkg's version and nothing else; AssemblyVersion, FileVersion and InformationalVersion all
+         derive from `Version`. Overriding only PackageVersion shipped 0.23.0-beta as a package
+         whose assemblies reported 0.16.0.0 — and `AgentEvalVersion` in result provenance reads
+         Assembly.GetName().Version, so every result that release produced was stamped with a
+         version that had not been current since 0.16. The consuming project caught it. -->
     <Version>0.16.0-beta</Version>
 
     <!-- Package icon for NuGet -->
