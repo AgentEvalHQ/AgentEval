@@ -1006,14 +1006,27 @@ Two things V7 does **not** refuse, both stated rather than quietly excluded:
 position separates gold perfectly and is meant to — the construct is how far back the memory sits.
 Declared as an exemption with a reason rather than accommodated by raising a threshold.
 
-**Episodic attribution: a varied-template regeneration is planned for corpus revision v3**, not
-permanent by design. The shape currently emits its statements from a fixed frame, so a system
-storing no speaker label can recover the answer from the framing rather than from memory, and its
-numbers are a floor rather than speaker-attribution accuracy. That is a corpus fix of the same kind
-as the shape-parity pass above, and it ships with the next corpus revision (v3) — the same one that
-addresses phrase recurrence, since both need richer generated language and neither is worth a corpus
-regeneration on its own. The v2 revision in this release is what the separability finding forced;
-v3 is what the two remaining known limitations are queued behind.
+**Episodic attribution: a varied-template regeneration was planned for corpus revision v3, and v3
+shipped without it.** Recorded here as a slip rather than quietly restated, because a plan that
+moves each time the revision moves is indistinguishable from "later". What happened: v3 was forced
+by the separability finding and scoped to shape parity, the attribution framing was never touched,
+and nothing failed when it was not — the commitment lived only in this paragraph.
+
+**The decision, dated: it ships in corpus v4, and the mechanism is named so the scope cannot drift
+again.** Today all fifteen attribution questions share one frame, so a system storing no speaker
+label recovers the answer from the framing rather than from memory. The fix is to draw the frame
+per question from a bank, while keeping it byte-identical *within* a pair — which is what the
+shape's design actually requires, and is a much smaller change than it has been treated as. It does
+**not** depend on the by-construction redesign in §14; it is independent and can land first.
+
+Until then the shape's numbers are a floor and are published as one. Two things now hold the
+commitment rather than this paragraph: the getting-started guide states the limitation against the
+*shipped* revision rather than a future one, and V1/V3 shortfalls in this shape are called out by
+name in the release notes, so the floor is visible in the numbers a reader actually sees.
+
+Phrase recurrence, which §13 originally queued behind the same revision, no longer needs one: both
+directions are refused outright at the 0.75 bar as of v3 (§14), so it is a gate rather than a
+promise.
 
 ### 14. Corpus v3 — the separability check was measuring the wrong thing (round-3 review)
 
