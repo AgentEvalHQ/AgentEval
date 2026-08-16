@@ -1185,6 +1185,37 @@ measurement finds the next one. **v4 is the by-construction redesign** — gold 
 one template machinery, identical in shape and grammar, differing only in the fact asserted — and
 the Episodic attribution regeneration (§13) folds into it rather than preceding it.
 
+**A second v4 input, from the same pass: the not-yet-true after-arm, and per-shape ceilings.** The
+consumer's Prospective oracle read 45/50 against our 49/50, and all five of their failures were
+`not-yet-true` — 50% of that shape — while `expiring-validity` went 12/12. Our own records point
+the same way at a milder magnitude, and converge on the same pair:
+
+| Prospective shape | our V1 |
+|---|---|
+| due-later-reminder | 16/16 |
+| expiring-validity | 12/12 |
+| seed-carry-over | 12/12 |
+| **not-yet-true** | **9/10** |
+
+Our single failure is `tme-pro-046`, the **after** arm of pair `tme-pro-p17` — the pair on which
+they lost *both* arms. Two different answer models, failing the same shape, and the same pair
+hardest.
+
+The mechanism is visible in the gold. The after arm reads: *"That date has passed... so it is no
+longer ahead of you — though nothing since then records whether it went ahead."* That careful
+refusal is the round-1 fix (§12): the shape used to assert the event had happened on evidence that
+stated only a plan. The corrected answer withholds an inference the evidence licenses socially but
+not logically — and an answer model asserts it anyway. Their four after-arm failures are that,
+exactly.
+
+So the shape is measuring something real and hard, and its V1 ceiling is answer-model variance
+more than memory signal: 90% for one model, 50% for another. Two changes follow for v4. First,
+**publish V1 per shape, not only per vertical** — a vertical reported at 48/50 hides Arithmetic's
+`duration` at 83% and Episodic's `participant-attribution` at 87%, and this finding would have been
+visible before anyone spent a baseline. Second, the after arm should ask what the **record** shows
+rather than what happened; that keeps the epistemic distinction the shape exists to test while
+making the target answer unambiguous.
+
 Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
 Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
 
