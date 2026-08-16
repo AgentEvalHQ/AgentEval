@@ -1365,6 +1365,43 @@ gate it carries goes green honestly. The gate, the fixtures, and the corpora tha
 therefore move together, which is the only arrangement in which "read the acceptance criterion
 before generating" is structurally true rather than a good intention.
 
+### 17. v4 as built (implementation record)
+
+§16 fixed the scope before generation. This records what the four conditions actually cost, since
+three of them turned out to be different problems than the plan assumed.
+
+**A landed as predicted in kind and not in detail.** Filler now states first-person facts in the
+same construction gold uses, and `"i have"` fell from 0.958 to 0.500 — but the first attempt
+matched the *person* and not the *tense* and moved it only to 0.945. Gold's present perfect is
+forced by the question form ("Which X **have I** …?"), so the construction had to match, not the
+speaker. The gate then found three structural faults the plan had not anticipated: turn counts
+needed normalising per ROLE rather than in total (gold ended `(u,a,u,a,a)` and filler
+`(u,a,u,a,u)`, so gold owned a slot no distractor had and it separated gold outright in 54% of
+questions while pooled `turn_count` read 0.615); the echo pool was drawing from question ANSWERS
+via Episodic's attribution questions, which embed the statement they ask about; and gold's own echo
+terms included its own answer, weaving it into the gold USER turn and breaking the assistant-stated
+invariant. All three were latent before v4 and none was on the plan.
+
+**B is confirmed by measurement, not assertion.** Reframing the `not-yet-true` after arm around
+what the record shows took that shape from **9/10** (and 5/10 on the consumer's answer model) to
+**10/10**, and Prospective as a whole to V1 50/50 with pair-flip 19/19. Episodic's attribution
+went 13/15 → 12/15, which is the honest cost of varying the frame: the wording no longer supplies
+the answer, so the shape got harder in exactly the way it was supposed to.
+
+**C is implemented and mostly unvalidated, which is the finding.** See the band table above. Three
+dials slope, two cannot, and the reason is that BM25 is blind to time. Banding coverage is also
+partial and stated as such: only WorkingMemory (60/60) and Arithmetic (50/50) band every question
+they contain, because a dial only exists where a shape has one.
+
+**What this revision cost, for the next person deciding whether to regenerate.** Four rounds of
+review found four corpus-invalidating defects, each invisible to the check that preceded it: a
+marker string (v1), a pooled statistic hiding a within-question tell (v2), an aggregate hiding its
+slices (v3), and a tokenizer that could not represent the tell at all (v3, found externally). The
+pattern is not that the checks were bad. It is that every check certifies the corpus against the
+failure its author had already imagined, and the next defect is by construction the one nobody
+imagined. That is the argument for an independent instrument, and it is why the consuming
+project's probe is now checked in beside ours as a required gate rather than a courtesy.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in
