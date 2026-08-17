@@ -33,6 +33,20 @@ import typedmemeval_common as tmc
 #: to its hardest. Not a p-value: per-band n runs 2-17 here, far too small for one, and a threshold
 #: that small samples cannot clear would reclassify every band including the ones that plainly work.
 MIN_RETRIEVER_DROP = 0.15
+#: ...and the fall has to be a TREND, not a difference between two endpoints. Endpoint-difference
+#: alone validated three verticals on noise the moment the corpus was regenerated: Prospective read
+#: 1.00 / 0.67 / 0.80 / 0.70 / 0.79 -- no slope at all, just a high first band with n=1 -- and
+#: Forgetting's second band was 0.00 from a SINGLE question. A rank correlation asks the question the
+#: band labels actually claim: does coverage fall as the dial rises?
+MAX_TREND_RHO = -0.7
+#: Bands thinner than this are reported but cannot carry a verdict. n=1 is not a measurement, and
+#: two of the three false validations above rested on one.
+MIN_BAND_N = 3
+#: And a verdict needs at least this many usable bands. Three points that happen to fall in order do
+#: so one time in six by chance, so rho = -1.00 on three bands is not evidence -- it is what Episodic
+#: and Forgetting produced once the thin bands were excluded. Four points in order is one in
+#: twenty-four, which is the least that can honestly be called a gradient at this n.
+MIN_USABLE_BANDS = 4
 #: ...and the answer model must stay within this of flat across the same bands, or the gradient is
 #: partly the oracle failing rather than retrieval getting harder.
 MAX_ORACLE_SPREAD = 0.15
@@ -94,12 +108,47 @@ def main() -> None:
         oracle_means = {band: statistics.mean(oracle[band]) for band in order if oracle.get(band)}
         spread = (max(oracle_means.values()) - min(oracle_means.values())) if oracle_means else None
 
-        slopes = drop >= MIN_RETRIEVER_DROP
+        # Spearman rank correlation of band index against band mean. Ties averaged; with four or
+        # five bands this is a blunt instrument, which is the point -- it is being asked to reject
+        # noise, not to size an effect.
+        def _ranks(values):
+            order = sorted(range(len(values)), key=lambda i: values[i])
+            ranks = [0.0] * len(values)
+            i = 0
+            while i < len(order):
+                j = i
+                while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+                    j += 1
+                shared = (i + j) / 2 + 1
+                for k in range(i, j + 1):
+                    ranks[order[k]] = shared
+                i = j + 1
+            return ranks
+
+        usable = [b for b in order if len(coverage[b]) >= MIN_BAND_N]
+        if len(usable) >= MIN_USABLE_BANDS:
+            xs = _ranks([float(b) for b in usable])
+            ys = _ranks([means[b] for b in usable])
+            mx, my = statistics.mean(xs), statistics.mean(ys)
+            num = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+            den = (sum((a - mx) ** 2 for a in xs) * sum((b - my) ** 2 for b in ys)) ** 0.5
+            rho = num / den if den else 0.0
+        else:
+            # NOT zero. Printing an uncomputed statistic as 0.00 is how an absence of measurement
+            # becomes a measurement in a table, which is the failure this whole file exists to catch.
+            rho = None
+        thin = [b for b in order if len(coverage[b]) < MIN_BAND_N]
+
+        slopes = (drop >= MIN_RETRIEVER_DROP and rho is not None and rho <= MAX_TREND_RHO
+                  and len(usable) >= MIN_USABLE_BANDS)
         flat = spread is not None and spread <= MAX_ORACLE_SPREAD
         # "Not yet probed" is its own answer and must not collapse into "does not slope". They
         # differ in what to do next: one needs a decision, the other needs a probe run.
         if not slopes:
-            verdict, judged = "does not slope", True
+            verdict, judged = (
+                "does not slope" if len(usable) >= MIN_USABLE_BANDS
+                else f"only {len(usable)} band(s) with n >= {MIN_BAND_N}; "
+                     f"{MIN_USABLE_BANDS} needed to call a gradient"), True
         elif spread is None:
             verdict, judged = "slopes; oracle half NOT YET PROBED", False
         elif not flat:
@@ -109,7 +158,9 @@ def main() -> None:
 
         print(f"{vertical:<14} dial={str(dial):<15} stamped={str(stamped):<5} {verdict}")
         print(f"{'':<14} retriever  " + "  ".join(
-            f"{b}:{means[b]:.2f}(n={len(coverage[b])})" for b in order) + f"   drop {drop:+.2f}")
+            f"{b}:{means[b]:.2f}(n={len(coverage[b])})" for b in order)
+            + f"   drop {drop:+.2f}  rho " + ("n/a" if rho is None else f"{rho:+.2f}")
+            + (f"  [{len(thin)} band(s) under n={MIN_BAND_N}, excluded]" if thin else ""))
         if oracle_means:
             print(f"{'':<14} oracle     " + "  ".join(
                 f"{b}:{oracle_means[b]:.2f}" for b in order if b in oracle_means)

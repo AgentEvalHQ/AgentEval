@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**TypedMemEval corpus revision v5.** v1 through v4 were all separable; none should be cited.
+
+> [!CAUTION]
+> **v4 (shipped in 0.24.0-beta) must not be cited.** The consuming project's per-question probe
+> found constructions only gold ever receives: `"while it lasts"` in 12 Prospective gold sessions
+> and **0** distractors, `"for the record"` and `"still the same"` in 15 Forgetting gold sessions
+> each and 0, `"since the"` in 20 WorkingMemory gold sessions and 0, `"the winter"` in 15 and 0.
+> 0.24.0-beta stays listed — nothing outside the project consumes it — and is marked
+> **do-not-baseline** on both sides.
+
+### Fixed
+
+- **The gate could not see any of it, and the reason was a bypass rather than pooling.** Three
+  features — `role_sequence`, `gold_marker_ngram`, `boilerplate_ngram` — were scored for AUC outside
+  the per-session loop and so were never given the distribution test; 36 of the other 39 features
+  got it. Fixing that catches three of the four reported findings on the existing rule (arithmetic
+  z=76, prospective z=2.7, workingmemory z=6.1). `role_sequence` is the sharpest case and it was
+  ours: it was added in v4 *because* the distribution rule is what catches role order, and it was
+  added on the path that skips the distribution rule — it passed only because the `position_N_is_*`
+  features go through the loop and did the work.
+
+- **Phrase exclusivity is now tested directly**, because no AUC variant expresses it. A phrase
+  recurring in ≥20% of questions that reaches **zero** distractor sessions is refused. Forgetting
+  escaped every AUC variant *and* the distribution rule (0% perfect at z=−0.57) because its G=2 caps
+  a within-question AUC at 0.75 when one of two gold sessions carries the marker. Every such phrase
+  is reported at once rather than one per regeneration cycle.
+
+- **The screen no longer invents phrases.** N-grams were built from a flat token stream, so they
+  crossed sentence and bracket boundaries: it reported `"near enough also"` in 21 Episodic gold
+  sessions and 0 distractors — a perfect tell that does not exist, since the text reads
+  `…(or near enough).  (Also on my mind:`. Acting on it would have meant regenerating a vertical
+  that was already correct. N-grams are built within punctuation segments now.
+
+- **Instance vocabulary is exempt; frames are not.** Gold contains its own answer, so answer
+  vocabulary is gold-exclusive by definition. A plain answer exemption is worse than imprecise
+  though — it is self-cancelling, because the answer paraphrases gold's construction: it dropped
+  `"since the"` in exactly the 20 questions where it leaks. A gram is exempt only if some token in it
+  is named by the question or answer **and** rare corpus-wide (<10% of sessions).
+
+- **Filler states the same KIND of durable fact as gold, in gold's construction, about entities no
+  question asks about** — class parity with instance divergence. Forgetting's re-affirmation comes
+  from one shared frame bank and filler re-affirms its own facts; WorkingMemory's interference
+  carries `since the <event>` clauses; Prospective's filler sets reminders and picks up things that
+  stay valid for a span; Arithmetic's filler says `"today"`. Parity banks are asserted disjoint from
+  the real ones at import — the first run of that assertion caught `"window cleaner"` colliding with
+  the fact noun `"cleaner"`.
+
+- **The echo clause borrowed foreign vocabulary into gold only.** A distractor's clause echoes its
+  question's keywords (that is the calibration mechanism); gold's echoed *other* questions' words,
+  because echoing the query into gold busts the ceiling. So foreign words appeared only in gold —
+  Episodic's `"marrow"`, scaffolding that reads exactly like leaked list content, in 10 gold sessions
+  and 0 distractors. Gold now borrows from **its own question's distractors**: non-query words, so no
+  retrieval advantage, already in the haystack, so not exclusive, and no distractor is touched, so
+  calibration is untouched. Two other fixes were tried and measured first — giving distractors
+  foreign terms as a second clause (length and punctuation to 3.7–4.8 sd), merged into one clause
+  (punctuation density 0.761), and swapped in place (Prospective saturated at 0.980 coverage, over
+  the calibration ceiling).
+
+- **Per-(role, ordinal slot) length** joins the refused set, and separability failures now name the
+  offending **phrase** rather than only the feature.
+
+### Added
+
+- **Citation-revision enforcement.** `sync_typedmemeval_docs.py` fails if the guide's citation rule
+  names anything other than the current revision. The guide told readers to cite `v4` for the whole
+  life of v4 and had to be corrected by hand at v3→v4; a citation rule that lags is the most
+  expensive kind of stale doc, because it names a corpus that was superseded for being wrong.
+
 ## [0.24.0-beta] - 2026-08-17
 
 **TypedMemEval corpus revision v4.** v1, v2 and v3 were all separable; none should be cited.

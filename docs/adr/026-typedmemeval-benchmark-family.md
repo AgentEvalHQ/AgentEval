@@ -1519,6 +1519,88 @@ statistic is load-bearing for *which* defect is the transferable lesson.
 exemption text was a fixed string rather than per-feature. An exemption a reader cannot match to its
 reason is indistinguishable from an unexplained one, and this one waives a feature reading 1.000.
 
+### 19. Round six — v4 shipped separable, and the gate had a bypass (consumer finding, 2026-08-17)
+
+v4 was tagged and published as 0.24.0-beta before the consuming project's probe ran against it, on
+an explicit maintainer decision after the concern was recorded (§0r of the status doc). Their probe
+then failed it. **v5 is the fix; 0.24.0-beta stays listed and is do-not-baseline on both sides.**
+
+**What they found.** Constructions only gold ever receives, hand-inspected rather than trusted from
+a number: `"while it lasts"` in 12 Prospective gold sessions and **0** distractors, `"for the
+record"` and `"still the same"` in 15 Forgetting gold sessions each and 0, `"since the"` in 20
+WorkingMemory gold sessions and 0, `"the winter"` in 15 and 0. v4's central fix made filler state
+first-person facts in gold's construction and reached only the statement verb — the acknowledgement,
+the temporal clause, the retention marker and the reminder frame all stayed gold-only.
+
+**Their diagnosis was pooling; the real cause was a bypass, and the difference mattered.** Their
+prescription was to average per-question AUCs instead of pooling them, keeping 0.75. Measured
+against their own four findings that changes nothing:
+
+| feature | pooled | mean per-question | conditional-on-present |
+|---|---|---|---|
+| arithmetic `'today'` | 0.7365 | **0.7339** | 0.9498 |
+| prospective `'while it lasts'` | 0.6150 | **0.6200** | 1.0000 |
+| workingmemory `'since the'` | 0.6667 | **0.6667** | 1.0000 |
+| forgetting `'for the record'` | 0.6076 | **0.6071** | 0.7500 |
+
+All four pass a 0.75 bar under the prescription. Their headline 0.9498 came from the third column,
+and they later traced it to appending a per-question AUC only when it exceeded 0.5 and averaging the
+survivors — cherry-picking the favourable half. That statistic also cannot be gated on: measured on
+pure noise it reads **0.759** in Prospective and **0.773** in WorkingMemory, above the threshold
+before any signal exists, which is why their structural per-slot table was withdrawn.
+
+The actual defect: `role_sequence`, `gold_marker_ngram` and `boilerplate_ngram` are scored outside
+the per-session loop and were **never given the distribution test** that the other 36 features got.
+Fixing that catches three of the four on the existing rule (z = 76, 2.7, 6.1). `role_sequence` is the
+sharpest case and it is ours — added in §18 *because* the distribution rule catches role order, and
+added on the path that skips it. It passed only because the `position_N_is_*` features go through the
+loop and did the work, so the feature §18 introduced was decoration. The self-test now asserts
+against that specific bypass.
+
+**Forgetting escapes every AUC variant and the distribution rule both** (0% perfect, z = −0.57),
+because G = 2 caps a within-question AUC at 0.75 when one of two gold sessions carries the marker. So
+exclusivity is tested directly now: a phrase recurring in ≥ 20% of questions that reaches zero
+distractor sessions is refused. It is the only one of the three tests that catches all four, and the
+only one a human can check by eye — which is how it was found.
+
+**Two false-positive classes, both caught before acting on them.** This is the §14 lesson inverted:
+the instrument was wrong in the direction of *reporting defects that were not there*, and acting on
+either would have damaged a correct corpus.
+
+- **Phantom phrases.** N-grams were built from a flat token stream and crossed sentence and bracket
+  boundaries. `"near enough also"` measured 21 Episodic gold sessions against 0 distractors — a
+  perfect tell that does not exist; the text reads `…(or near enough).  (Also on my mind:`. Built
+  within punctuation segments now.
+- **Answer content.** Gold contains its own answer. But a plain answer exemption is *self-cancelling*
+  rather than merely imprecise, because the answer paraphrases gold's construction: it dropped
+  `"since the"` in exactly the 20 questions where it leaks. A gram is exempt only if some token in it
+  is named by the question or answer **and** rare corpus-wide (< 10% of sessions) — instance
+  vocabulary exempt, frames never.
+
+**The corpus fix is class parity with instance divergence**, the consuming project's phrasing, and
+the pattern this family had already shipped twice without generalising it. Filler states the same
+KIND of durable fact as gold, in the same construction, about entities no question asks about, so it
+cannot become alternative evidence. Parity banks are asserted disjoint from the real ones at import —
+the first run of that assertion caught `"window cleaner"` colliding with the fact noun `"cleaner"`,
+and the existing leak guard then caught parity values drawn from gold's own value pool.
+
+**The shared cause was the echo pass, and it took three attempts.** A distractor's clause echoes its
+own question's keywords (the calibration mechanism); gold's echoed *other* questions' words, because
+echoing the query into gold busts the ceiling. Both halves are right and the by-product was that
+foreign vocabulary appeared only in gold — Episodic's `"marrow"`, scaffolding that reads exactly like
+leaked list content. Giving the distractors foreign terms is the obvious fix and the calibration gate
+refused two forms of it: appended as a second clause it drove length and punctuation to 3.7–4.8 sd;
+merged into one clause it left every distractor with more echo terms than its gold at punctuation
+density 0.761; swapped in place, keeping counts equal, it cost enough query keywords that Prospective
+**saturated at 0.980 coverage**, over the ceiling. What works costs nothing on either axis: gold
+borrows from **its own question's distractors** — non-query words, so no retrieval advantage; already
+in the haystack, so not exclusive; no distractor touched, so calibration untouched. Fixing that alone
+cleared Episodic.
+
+**Why v5 and not a v4 respin.** v4 is published. Different bytes under a shipped revision label is
+the benchmark-identity violation this family has a rule against, and the rule does not have an
+exception for "the old bytes were wrong" — that is the case it exists for.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in
