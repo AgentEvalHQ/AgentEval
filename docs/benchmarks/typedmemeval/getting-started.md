@@ -151,12 +151,18 @@ it and read a wall clock instead.
 Memory of the conversation *as an event*: 20 assistant-stated answers (the user never states them),
 15 list-order questions, 15 speaker-attribution questions.
 
-**Known limitation, still present in v3.** The attribution shape's statements are emitted from matched templates so
-that either speaker could plausibly have said them (that is what stops the answer being inferable
-from content). A consequence is that the surrounding wording is fixed, so a system that stores no
-speaker label at all can still recover the answer from the template rather than from memory. The
-shape therefore measures less than its name promises until a future revision varies the framing;
-read its numbers as a floor, not as speaker-attribution accuracy.
+**Addressed in v4; read the numbers with one caveat.** The attribution shape's statements are emitted
+from matched templates so that either speaker could plausibly have said them — that is what stops the
+answer being inferable from content. Through v3 the surrounding wording was also *fixed*, so a system
+storing no speaker label could recover the answer from the template rather than from memory. v4 draws
+the framing from a bank of five, selected per question and **independently of which speaker holds the
+answer**, so the wording no longer carries it. The shape got harder in exactly the way that predicts:
+its oracle pass rate moved 13/15 → 12/15, and V2 non-inferability reads 50/50 on a corpus where the
+turn-role sequence also carries nothing (see ADR-026 §18).
+
+The caveat: the frame is fixed *within* a question and there are five of them across fifteen
+questions, so each recurs about three times. That bounds how much framing variety the shape
+demonstrates, not whether the framing leaks the speaker — the selection is independent of it.
 
 List-order is scored **conditionally on coverage**: pairwise-order accuracy over the items the
 answer actually mentions, because a budget-limited system may only have seen some of them and
