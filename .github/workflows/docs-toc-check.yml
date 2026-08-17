@@ -25,7 +25,14 @@ permissions:
 jobs:
   check-toc:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 5 was right when this job only checked the docs nav. The corpus checks have since grown onto
+    # it and now dominate: the separability pass alone runs ~5.7 minutes across the five verticals,
+    # 97% of it in the boilerplate n-gram screen, which scores every phrase recurring in at least a
+    # fifth of questions against every session. Adding the role-order self-test and the difficulty
+    # check tipped an already-marginal job over, and GitHub reports a timed-out job as *cancelled* —
+    # which reads as "someone stopped it", not "your check never finished". That is a bad failure
+    # mode for a gate, so the headroom is generous rather than tight.
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
