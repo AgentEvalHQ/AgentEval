@@ -294,8 +294,46 @@ def _interference_session(family: Family, question_text: str, echo: float,
     template, assistant = rng.choice(family.interference)
     other = family.value(rng.choice(OTHER_STEMS))
     terms = tmc.echo_terms(question_text, echo, rng)
-    return tmc.make_session(stamp, (template.format(other=other), tmc.weave_echo(assistant, terms)),
+    user = template.format(other=other)
+    if rng.random() < PARITY_SINCE_SHARE:  # DevSkim: ignore DS148264 - deterministic corpus generation
+        user = f"{user.rstrip('.')}, {rng.choice(PARITY_SINCE_CLAUSES)}."
+    return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, terms)),
                             tag="interference")
+
+
+#: Temporal clauses for interference statements, in the SAME construction gold uses.
+#:
+#: Gold's statement is "I have <done X>, ..., since the <event>." and the interference statements were
+#: "I have <done Y>, ..." with no time clause at all. So `'since the'` sat in 20 gold sessions and 0
+#: distractors and `'the winter'` in 15 and 0 -- v4's shared-frame fix reached the verb phrase and
+#: stopped short of the temporal clause, which is the consuming project's diagnosis word for word.
+#:
+#: These name events no question asks about, so the clause is class-parity with instance-divergence:
+#: a filler fact acquires a time qualifier of the same shape without becoming a candidate answer,
+#: because what the question asks for is the VALUE, and the clause carries none.
+PARITY_SINCE_CLAUSES = (
+    "since the boiler was replaced",
+    "since the roadworks started",
+    "since the clocks went back",
+    "since the lease was renewed",
+    "since the shop on the corner shut",
+    "since the bus route changed",
+    "since the fence came down in the gales",
+    "since the loft was cleared out",
+    # Seasonal variants, because the families' own clauses are seasonal. Without these the family
+    # phrasing stayed exclusive one level down: `'since the'` came right and `'the winter'` -- from
+    # "since the flat fell through in the winter" -- was still gold-only in 15 questions. A clause
+    # bank that shares the construction but not its vocabulary just moves the tell to the noun.
+    "since the repairs finished in the winter",
+    "since the move fell through in the winter",
+    "since the survey came back in the summer",
+    "since the scaffolding went up in the spring",
+    "since the hedge was cut back in the autumn",
+)
+#: Share of interference sessions that carry one. Matched roughly to how often gold does -- always --
+#: without making every distractor carry it, which would trade a gold-exclusive phrase for a
+#: filler-exclusive one and score exactly as badly in the other direction.
+PARITY_SINCE_SHARE = 0.55
 
 
 def build(echo: float, rng: random.Random) -> list[tmc.Question]:

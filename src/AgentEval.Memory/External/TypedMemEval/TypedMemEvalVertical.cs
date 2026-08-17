@@ -90,7 +90,7 @@ public sealed class TypedMemEvalVerticalDescriptor
     /// a revision bump that moved the label without moving the id would leave two different question
     /// sets sharing a name, which is the failure the whole identity rule exists to prevent.
     /// </summary>
-    public const string CorpusRevision = "v4";
+    public const string CorpusRevision = "v5";
 }
 
 /// <summary>Descriptor lookup for the five verticals.</summary>

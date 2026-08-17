@@ -200,9 +200,15 @@ _DECOY_ITEMS = (
     "the Brackwater crossing", "the Sallow Fields pitch", "the Tarn Head loop",
     "the Windle bothy", "the Quarry Lane studio", "the Marden ferry", "the Ostler orchard",
 )
+# Two of these carried "one" -- "Added to that one." and "One more for the winter." -- and this bank
+# is drawn for DECOY shortlists only, so the token piled up in distractors: 400 distractor sessions
+# against 13 gold, and its ABSENCE marked gold at AUC 0.752, over the bar. The same defect as a
+# gold-only marker with the sign reversed, which is why the phrase screen scores both directions.
+# Rephrased without it rather than adding "one" to gold, because the leak is the concentration and
+# the acknowledgement carries no information either way.
 _DECOY_ACKS = (
-    "Added to that one.", "Noted for later.", "That list is getting long.",
-    "Filed under optimism.", "One more for the winter.",
+    "Added to that list.", "Noted for later.", "That list is getting long.",
+    "Filed under optimism.", "Something for the winter.",
 )
 
 

@@ -231,13 +231,86 @@ _VALUE_RE = re.compile(
 _EVENT_RE = re.compile(r"\bI ([^.]+)\.\s*$")
 
 
+#: Re-affirmation frames, drawn from ONE bank for gold and filler alike.
+#:
+#: The control arm's re-affirmation used a single hardcoded sentence, "Still the same {noun}, for the
+#: record: {value}.", for all fifteen control questions and only ever in gold. So `'still the same'`
+#: and `'for the record'` sat in 15 gold sessions and 0 distractors -- the `REPLIES`/"noted" defect
+#: again, third time, in a construction nobody thought of as a reply. The fix is the one that worked
+#: the first two times: one bank, drawn for both sides.
+REAFFIRM_FRAMES = [
+    "Still the same {noun}, for the record: {value}.",
+    "No change on the {noun} — still {value}.",
+    "For the record the {noun} is unchanged: {value}.",
+    "The {noun} is still {value}, in case it matters.",
+    "Nothing new on the {noun}: {value} as before.",
+    "Same {noun} as ever, still {value}.",
+]
+
+#: Durable things NO question ever asks about, for filler to re-affirm.
+#:
+#: This is class-parity with instance-divergence, the pattern the consuming project pointed out we
+#: had already shipped twice: filler states the same KIND of fact in the same construction, about
+#: entities no question is about, so it cannot become alternative evidence. Deliberately disjoint
+#: from both FACTS and ABSENT -- a parity noun colliding with a fact noun would put a second
+#: candidate value in the haystack, and one colliding with an absent noun would destroy the very
+#: absence that is the gold for a never-known probe. The assertion below enforces both.
+#: Value vocabulary for parity filler, DISJOINT from STEMS/TAILS.
+#:
+#: Reusing the gold pool put a filler session's invented value into the same vocabulary as a gold
+#: answer, and the generator's own leak guard refused the corpus on three questions -- correctly:
+#: a distractor carrying value-shaped words from the answer pool is a distractor that can be read
+#: as the fact. Class-parity means the same CONSTRUCTION, not the same value space.
+PARITY_STEMS = ["Marloe", "Tunbray", "Selwick", "Padstowe", "Herrold", "Cranmere",
+                "Bexley", "Aldmoor", "Ferngate", "Thornbury", "Wrenfield", "Ashcombe"]
+PARITY_TAILS = ["Standard", "Classic", "Regular", "Basic", "Simple", "Plain",
+                "Everyday", "Ordinary", "Common", "Routine"]
+
+PARITY_NOUNS = [
+    "broadband tariff", "bin collection day", "boiler cover", "parking permit",
+    "recycling sack size", "meter reading day", "chimney sweep", "guttering contractor",
+    "hedge cutting slot", "water supplier", "loft insulation depth", "smoke alarm battery",
+]
+
+
+# Enforced, not trusted. A parity noun colliding with a FACT noun would put a second candidate
+# value in the haystack for that question; one colliding with an ABSENT noun would destroy the
+# absence that IS the gold for a never-known probe. Both are silent corpus corruptions, so they are
+# asserted at import rather than left to the reader of the comment above.
+_fact_nouns = {noun for noun, *_ in FACTS}
+_absent_tokens = {token for token, *_ in ABSENT}
+if set(PARITY_STEMS) & set(STEMS) or set(PARITY_TAILS) & set(TAILS):
+    raise AssertionError("parity value vocabulary overlaps the gold value pool")
+for _parity in PARITY_NOUNS:
+    _words = set(_parity.split())
+    if _words & _fact_nouns:
+        raise AssertionError(
+            f"parity noun {_parity!r} collides with a fact noun: {_words & _fact_nouns}")
+    if _words & _absent_tokens:
+        raise AssertionError(
+            f"parity noun {_parity!r} collides with an absent noun: {_words & _absent_tokens}")
+
+
 def _arbitrary_value(rng: random.Random) -> str:
     """Two invented words. Arbitrary by construction (V2) -- nothing about the fact makes
     one value likelier than another, so zero-context guessing has nothing to work with."""
     return f"{rng.choice(STEMS)} {rng.choice(TAILS)}"
 
 
-def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> tmc.Session:
+#: Share of filler sessions that re-affirm a durable fact of their own. Sized so the construction
+#: recurs across distractors at roughly the rate gold uses it, which is what stops the phrase being
+#: a marker; higher would start to crowd out the invalidation-shaped filler V3 needs.
+REAFFIRM_FILLER_SHARE = 0.30
+
+
+def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    if rng.random() < REAFFIRM_FILLER_SHARE:
+        # Same construction as the control arm's re-affirmation, about something no question asks.
+        user = rng.choice(REAFFIRM_FRAMES).format(
+            noun=rng.choice(PARITY_NOUNS),
+            value=f"{rng.choice(PARITY_STEMS)} {rng.choice(PARITY_TAILS)}")
+        assistant = rng.choice(("Noted.", "Right.", "Understood.", "Filed."))
+        return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
     user, assistant = rng.choice(FILLER)
     user = user.format(who=rng.choice(PEOPLE), when=rng.choice(WHENS))
     return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
@@ -368,7 +441,7 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     # shape wanted anyway: with two mentions and no invalidation, answering requires reading
     # that nothing cancelled the fact rather than simply finding one statement.
     reaffirm = tmc.make_session(
-        _BASE, (f"Still the same {noun}, for the record: {value}.", ""),
+        _BASE, (rng.choice(REAFFIRM_FRAMES).format(noun=noun, value=value), ""),
         gold_turn=0, tag=f"reaffirmation:{value}")
     statement_index = rng.randint(0, h)
     sessions.insert(statement_index, statement)

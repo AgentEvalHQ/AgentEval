@@ -57,6 +57,40 @@ def _cell(record: dict, passed: str = "passed", total: str = "applicable") -> st
     return f"{record.get(passed, '—')}/{record[total]}"
 
 
+def check_citation_revisions(revision: str) -> list[str]:
+    """Docs whose citation rule names a revision other than `revision`.
+
+    A hardcoded revision in a citation rule is the most expensive kind of stale doc: it tells every
+    reader to cite a corpus that was superseded precisely because it was wrong. It happened at
+    v3->v4 and was caught by hand; at v4->v5 it was in THREE places -- the guide, docs/cli.md, and
+    the CLI command's own doc comment -- and all three still said v4.
+
+    Keyed on the citation TEMPLATE rather than on prose, so supersession notices keep their
+    historical revision numbers while live instructions cannot lag. Its own function, and called
+    before the tables are built, because a stale citation rule is a real finding and the first
+    version of this check sat behind a probe-status check that masked it.
+    """
+    docs_root = GUIDE.parent.parent.parent
+    stale = []
+    for doc in sorted(docs_root.rglob("*.md")):
+        # ADRs are historical by construction: their numbered sections quote the revision that was
+        # current when each decision was taken, and rewriting those would destroy the record. Skipped
+        # wholesale rather than pattern-matched, because "which quotes are historical" is exactly the
+        # judgement a check should not be making.
+        if "_site" in doc.parts or "adr" in doc.parts:
+            continue
+        for number, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if "TypedMemEval-<Vertical>" not in line and r"TypedMemEval-\<Vertical\>" not in line:
+                continue
+            # Only lines that actually name a revision. A template row -- "| Subset |
+            # `TypedMemEval-<Vertical>` |" -- names none and is not an instruction to cite anything.
+            named = set(re.findall(r"\bv\d+\b", line))
+            if not named or revision in named:
+                continue
+            stale.append(f"{doc.relative_to(docs_root)}:{number}: {line.strip()[:100]}")
+    return stale
+
+
 def build_tables() -> tuple[str, str]:
     probe_rows, coverage_rows = [], []
     for vertical in tmc.VERTICALS:
@@ -91,6 +125,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true", help="fail if the guide is out of date")
     args = parser.parse_args()
+
+    stale = check_citation_revisions(tmc.CORPUS_REVISION)
+    if stale:
+        joined = "\n  ".join(stale)
+        raise SystemExit(
+            f"a citation rule does not name the current revision "
+            f"({tmc.CORPUS_REVISION}):\n  {joined}")
 
     probe_table, coverage_table = build_tables()
     text = original = GUIDE.read_text(encoding="utf-8")

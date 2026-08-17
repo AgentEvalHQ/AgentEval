@@ -130,10 +130,79 @@ WHENS = ["in two weeks", "in three weeks or so", "in four weeks", "in six weeks"
          "in about ten weeks", "in five weeks", "in a couple of weeks", "in seven weeks"]
 
 
-def _filler_session(rng: random.Random, echo_terms: list[str], stamp: datetime) -> tmc.Session:
+#: Filler that uses gold's OWN constructions -- setting a reminder, and picking something up that
+#: stays valid for a span -- about tasks and items no question asks about.
+#:
+#: Gold's two shapes are "Remind me to <task> <phrase>." and "I picked up a <thing> today, it stays
+#: valid for <span> from today.", and no filler session used either, so `'remind me to'` sat in 16
+#: gold sessions and 0 distractors and `'weeks from today'` in 13 and 0. Filler was same-DOMAIN
+#: (other people's appointments) without being same-CONSTRUCTION, which is the distinction v4's
+#: shared-frame work was supposed to close and reached only the statement verb.
+#:
+#: The tasks and items are deliberately foreign to REMINDERS and VALIDITY: a distractor asking to be
+#: reminded about something no question mentions carries the construction without carrying a
+#: candidate answer, because every question names the specific commitment it is about. Asserted below
+#: rather than trusted.
+PARITY_REMINDERS = [
+    "chase the missing recycling bin", "photograph the meter for the landlord",
+    "top up the parking app", "collect the dry cleaning from Hessle Street",
+    "wind the hallway clock", "descale the shower head",
+    "post the birthday card to Aunt Nell", "order more printer paper",
+]
+PARITY_VALIDITY = [
+    "swimming-pool ten-pass", "car-wash loyalty card", "cinema voucher book",
+    "bowling-alley credit", "garden-centre gift card", "canal-boat day licence",
+]
+#: Share of filler sessions built from a gold construction rather than the generic bank. Enough that
+#: the phrases recur across distractors at gold's own rate; not so much that the haystack stops
+#: reading like a life and starts reading like a form.
+PARITY_FILLER_SHARE = 0.22
+
+
+def _filler_session(rng: random.Random, echo_terms: list[str], stamp: datetime) -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    if rng.random() < PARITY_FILLER_SHARE:
+        draw = rng.random()
+        if draw < 0.34:
+            user = f"Remind me to {rng.choice(PARITY_REMINDERS)} {rng.choice(WHENS)}."
+        elif draw < 0.67:
+            user = (f"I picked up a {rng.choice(PARITY_VALIDITY)} today, it stays valid for "
+                    f"{rng.choice(WHENS).replace('in ', '')} from today.")
+        else:
+            # The not-yet-true construction: "due to <thing>". Without it `'due to'` stayed in 10
+            # gold sessions and no distractor after the other two were shared -- each construction
+            # has to be covered on its own, because sharing two of three just relocates the tell.
+            user = (f"I am due to {rng.choice(PARITY_REMINDERS)} "
+                    f"{rng.choice(WHENS)}, going by the letter.")
+        # A trailing sentence from the generic bank. Without it the parity sessions were built from
+        # a small bank in fixed phrasing, so their vocabulary was thinner than gold's and gold's
+        # type/token ratio separated perfectly in 32% of questions at 4.4 sd -- a tell created by
+        # the fix for a different tell, which is this corpus family's whole history in one line.
+        extra, assistant = rng.choice(FILLER)
+        user = f"{user} {extra.format(when=rng.choice(WHENS))}"
+        return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echo_terms)), tag="filler")
+    # TWO sentences, like the parity sessions above. Not cosmetic: gold's type/token ratio is
+    # corrected in equalise_echo against the MEAN of this question's distractors, so a distractor
+    # pool that is bimodal -- one-sentence generic sessions and two-sentence parity ones -- leaves
+    # gold matching a mean that half the pool sits far from, and its ratio separated perfectly in
+    # 24-32% of questions at 2.6-4.4 sd. Lowering the parity share only moved it between those two
+    # numbers, because the spread came from the pool having two modes rather than from how many
+    # sessions were in each.
     user, assistant = rng.choice(FILLER)
-    user = user.format(when=rng.choice(WHENS))
+    extra, _ = rng.choice(FILLER)
+    user = f"{user.format(when=rng.choice(WHENS))} {extra.format(when=rng.choice(WHENS))}"
     return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echo_terms)), tag="filler")
+
+
+# Enforced, not trusted: a parity task or item colliding with a real REMINDERS/VALIDITY entry would
+# put a second candidate commitment in the haystack for that question.
+_real_tasks = {task for task, _ in REMINDERS} | {noun for _, noun in REMINDERS}
+_real_things = {thing for thing, _ in VALIDITY} | {noun for _, noun in VALIDITY}
+for _parity in PARITY_REMINDERS:
+    if _parity in _real_tasks:
+        raise AssertionError(f"parity reminder {_parity!r} collides with a real reminder task")
+for _parity in PARITY_VALIDITY:
+    if _parity in _real_things:
+        raise AssertionError(f"parity validity item {_parity!r} collides with a real one")
 
 
 def _fmt(dt: datetime) -> str:
@@ -344,7 +413,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             SHAPE_VALIDITY, TYPE_VALIDITY,
             f"Is {noun} still valid, and when does or did it run out?",
             f"I picked up a {thing} today, it stays valid for {{span}} from today.",
-            "Good to know. Enjoy it while it lasts.",
+            "",  # shared bank only — see equalise_reply
             f"Yes, still valid. The {thing} runs out on {{date}}.",
             f"No, it has expired. The {thing} ran out on {{date}}.",
             base + timedelta(days=9 * i + 4), rng, echo, filler_count=rng.randint(12, 17),
@@ -369,7 +438,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"What does the record say about when I am due to {future} — is that date still "
             f"ahead of me, and what is it?",
             f"I am due to {future} {{phrase}}.",
-            "That is a real change, good luck with it.",
+            "",  # shared bank only — see equalise_reply
             f"It is still ahead. The record has you due to {future} on {{date}}.",
             f"It is no longer ahead. The record had you due to {future} on {{date}}, which has "
             f"passed; nothing since then records whether it went ahead.",

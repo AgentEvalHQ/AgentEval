@@ -220,6 +220,23 @@ DAY_DISTRACTORS = [
 #: reading the emitted text, so any stray number here would be a number the corpus claims
 #: not to have.
 FILLER = [
+    # Filler that says "today", because gold's statement always does and none of this bank did.
+    # `'today'` sat in gold at 20% perfect separation with a chance rate so low the excess is 76 sd,
+    # and it was invisible for two revisions because the pooled AUC reads 0.7365 -- under the bar.
+    # Still no digits: the audit in `check_arithmetic` recovers the haystack's same-unit values by
+    # reading this text, so a number here would be a number the corpus claims not to have.
+    ("Swept the cut-off station out today before knocking off.",
+     "It gets everywhere otherwise."),
+    ("The yard gate was propped open all day today.",
+     "Someone will say something eventually."),
+    ("Signed for a delivery on the neighbour's behalf today.",
+     "They will owe you a favour."),
+    ("Put the good trestles away today so they stop walking.",
+     "Sensible, given last time."),
+    ("Nobody turned up for the skip exchange today.",
+     "Another morning gone, then."),
+    ("Marked up the plasterboard for cutting today.",
+     "Better than measuring twice on the day."),
     ("The trade counter has moved to the far end of the yard again.",
      "That adds a walk to every collection."),
     ("Spent the morning sorting offcuts back into the rack.",

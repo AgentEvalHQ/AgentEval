@@ -58,26 +58,32 @@ GENERATOR_VERSION = "1.0.0"
 
 #: The dataset revision these generators emit. Stamped into every result, so two corpora with
 #: different questions can never wear the same name.
-CORPUS_REVISION = "v4"
+CORPUS_REVISION = "v5"
 
 #: What this revision replaces and why. A superseded corpus whose replacement does not say what was
 #: wrong with it invites someone to keep citing the old numbers.
 SUPERSEDES = {
-    "revision": "v3",
-    "shipped_in": "0.23.0-beta",
+    "revision": "v4",
+    "shipped_in": "0.24.0-beta",
     "reason": (
-        "v3 shipped separable. An independent within-question probe by the consuming project "
-        "found the phrase screen could not represent n-grams made of stopwords, so \"on the\" "
-        "marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 "
-        "sessions against 0 of 732 distractors -- the latter present since v1. The cause was "
-        "never a set of phrases: gold asserted a datable first-person fact and filler did not, "
-        "so the two sides differed in grammar. v4 generates both from shared frames, normalises "
-        "turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at "
-        "K_ref (two of the old four could not), gives Forgetting's control arm the same G as its "
-        "treatment arm, reframes the not-yet-true after arm around what the record shows, varies "
-        "the Episodic attribution frame per question, and stamps a per-question difficulty band. "
-        "Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 "
-        "number is comparable with a v4 number. None of them should be cited."
+        "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The "
+        "consuming project's per-question probe found constructions that only gold ever receives: "
+        "\"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" "
+        "and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 "
+        "WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made "
+        "filler state first-person facts in gold's construction and reached only the statement "
+        "verb -- the acknowledgement, the temporal clause, the retention marker and the reminder "
+        "frame all stayed gold-only. "
+        "The gate could not see any of it for a reason worth recording: three features, including "
+        "the gold-marker n-gram, were scored for AUC outside the per-session loop and so were "
+        "never given the distribution test that 36 of the other 39 features got. v5 tests phrase "
+        "EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that "
+        "reaches zero distractor sessions is refused, which no AUC variant expresses -- builds "
+        "n-grams within punctuation segments so the screen cannot invent phrases across sentence "
+        "boundaries, and exempts instance vocabulary without exempting the frames that paraphrase "
+        "it. Filler now states the same KIND of durable fact as gold, in the same construction, "
+        "about entities no question asks about. "
+        "Every session is rewritten, so no v4 number is comparable with a v5 number."
     ),
 }
 
@@ -310,6 +316,38 @@ def echo_terms(question_text: str, echo: float, rng: random.Random) -> list[str]
 
 
 ECHO_LEAD = "Also on my mind:"
+
+
+def swap_echo_terms(sentence: str, extra: list[str]) -> str:
+    """REPLACES the last few terms of an existing echo clause with `extra`, keeping the count.
+
+    Adding terms was the obvious move and it failed twice, each time on a different axis. Appending a
+    second clause read badly and pushed turn length, mean turn length and punctuation density to
+    3.7-4.8 sd. Merging into the one clause fixed the prose and still left every distractor carrying
+    more echo terms than its gold, which is more commas: punctuation density 0.761, over the bar.
+
+    So the terms are swapped rather than added. The clause keeps its length, its comma count and its
+    token count; only WHICH words sit in it changes. The distractor gives up a couple of the query
+    keywords it was echoing, which costs a little retrieval competitiveness -- that is a real cost,
+    and it is the one the calibration gate is there to measure, so it gets measured rather than
+    guessed at.
+    """
+    if not extra:
+        return sentence
+    marker = f"({ECHO_LEAD} "
+    start = sentence.rfind(marker)
+    if start < 0:
+        return sentence
+    close = sentence.find(")", start)
+    if close < 0:
+        return sentence
+    inner = sentence[start + len(marker):close].rstrip().rstrip(".")
+    terms = [term.strip() for term in inner.split(",") if term.strip()]
+    if not terms:
+        return sentence
+    keep = terms[:max(1, len(terms) - len(extra))] if len(terms) > len(extra) else terms[:1]
+    merged = keep + extra[:max(0, len(terms) - len(keep))]
+    return f"{sentence[:start]}{marker}{', '.join(merged)}.){sentence[close + 1:]}"
 
 
 def weave_echo(sentence: str, terms: list[str]) -> str:
@@ -1369,6 +1407,11 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
     }
 
 
+#: A token counts as INSTANCE vocabulary -- the specific thing a question is about, and so
+#: legitimately exclusive to the session holding it -- only if it appears in fewer than this share
+#: of all sessions. Common words cannot be instance vocabulary however close they sit to the answer.
+INSTANCE_TOKEN_MAX_SESSION_SHARE = 0.10
+
 #: Boundaries an n-gram may not cross: sentence enders, clause punctuation, and brackets.
 _SEGMENT_BOUNDARY = re.compile(r"[.!?:;()\[\]\"—–]+|\n+")
 
@@ -1440,8 +1483,35 @@ def _worst_boilerplate_ngram(questions: list[Question]) -> tuple:
     # trusted from a number -- because a crude relevance exemption can flag genuine content". This is
     # that judgement made mechanical: content is what the question or its answer names, and anything
     # else recurring across a fifth of the questions and never reaching a distractor is a frame.
-    own_grams: list[set[str]] = [
-        _segment_grams(q.question) | _segment_grams(q.answer or "") for q in questions]
+    # INSTANCE vocabulary is exempt; FRAME vocabulary never is. The distinction matters because a
+    # plain answer exemption is not merely imprecise, it is self-cancelling: the answer paraphrases
+    # gold's construction, so exempting everything the answer says removes the frame too. Measured,
+    # a plain answer exemption dropped WorkingMemory's `'since the'` in exactly the 20 questions
+    # where it leaks and `'the winter'` in exactly the 15 -- the finding vanished from the report
+    # while remaining in the corpus, which is the worst way for an exemption to be wrong.
+    #
+    #   instance -- the specific noun or value the question is about ("Ferrow Row", "marrow").
+    #               Carries the information, legitimately gold-exclusive, EXEMPT.
+    #   frame    -- a construction built of common words ("since the", "for the record", "while it
+    #               lasts"). Carries nothing about WHICH fact, so it is never exempt.
+    #
+    # Operationally a gram is exempt only if some token in it is both named by the question or its
+    # answer AND rare corpus-wide. A phrase made entirely of common tokens cannot buy an exemption
+    # by appearing beside the answer.
+    session_total = sum(len(q.sessions) for q in questions) or 1
+    token_sessions: Counter[str] = Counter()
+    for q in questions:
+        for s in q.sessions:
+            token_sessions.update(set(tokenize_raw(s.text())))
+    rare = {tok for tok, n in token_sessions.items()
+            if n / session_total < INSTANCE_TOKEN_MAX_SESSION_SHARE}
+
+    own_grams: list[set[str]] = []
+    for q in questions:
+        named = set(tokenize_raw(q.question)) | set(tokenize_raw(q.answer or ""))
+        instance = named & rare
+        own_grams.append({gram for gram in _segment_grams(q.question) | _segment_grams(q.answer or "")
+                          if instance & set(gram.split())})
 
     session_grams = {id(s): _segment_grams(s.text())
                      for q in questions for s in q.sessions}
@@ -1517,9 +1587,20 @@ def check_separability(questions: list[Question], exempt: frozenset = frozenset(
 
     failures = []
     worst, auc = report["worst_refused_feature"], report["worst_refused_auc"]
+    # Name the PHRASE for the two n-gram features. "boilerplate_ngram at 0.752" sends the reader to
+    # look at a statistic; "'one' at 0.752" sends them to look at the corpus, which is where the
+    # answer is. Costs one dict lookup and saved a round of guessing.
+    phrase_of = {"gold_marker_ngram": report.get("worst_gold_marker_ngram"),
+                 "boilerplate_ngram": report.get("worst_boilerplate_ngram"),
+                 "role_sequence": report.get("worst_role_sequence")}
+
+    def named(feature: str) -> str:
+        phrase = phrase_of.get(feature)
+        return f"'{feature}' ({phrase!r})" if phrase else f"'{feature}'"
+
     if worst is not None and auc >= SEPARABILITY_MAX_AUC:
         failures.append(
-            f"separability: '{worst}' separates gold from distractors at AUC {auc:.3f}, at or "
+            f"separability: {named(worst)} separates gold from distractors at AUC {auc:.3f}, at or "
             f"above the {SEPARABILITY_MAX_AUC} refusal threshold. Evidence a cheap classifier can "
             f"find without reading it is evidence the benchmark is not measuring retrieval.")
     if report.get("gold_exclusive_ngrams"):
@@ -1536,7 +1617,7 @@ def check_separability(questions: list[Question], exempt: frozenset = frozenset(
     # number as the reason for a bimodality failure sends the reader to the wrong measurement.
     for name, stats in report.get("bimodal_features", {}).items():
         failures.append(
-            f"separability: '{name}' separates gold perfectly in {stats['share']:.0%} of questions "
+            f"separability: {named(name)} separates gold perfectly in {stats['share']:.0%} of questions "
             f"({stats['observed']} against {stats['expected']:.1f} expected by chance, "
             f"{stats['z']:.1f} sd) (pooled AUC {report['features'][name]:.3f} is under the bar; "
             f"the distribution is not).")
@@ -1590,7 +1671,31 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
             1 for s in question.sessions if not s.is_gold and ECHO_LEAD in s.text())
         rate = marked / max(1, question.h)
         own = set(tokenize(question.question))
-        neutral = [term for term in pool if term not in own]
+        # Drawn from THIS question's own distractors, not from a corpus-wide foreign pool.
+        #
+        # The foreign pool was the tell. A distractor's clause echoes this question's keywords --
+        # that is the calibration mechanism -- and gold's echoed OTHER questions' words, because
+        # echoing the query into gold lifts gold's retrieval score and busts the ceiling. Both
+        # halves are right, and the by-product was that foreign vocabulary appeared only in gold:
+        # Episodic's `'marrow'`, a word reaching gold only through this clause, sat in 10 gold
+        # sessions and 0 distractors, looking exactly like leaked list content.
+        #
+        # Two fixes were tried and measured before this one. Giving the DISTRACTORS foreign terms as
+        # well works on paper and fails on the corpus: added as a second clause it pushed length and
+        # punctuation to 3.7-4.8 sd, merged into one clause it left every distractor with more echo
+        # terms than its gold at punctuation density 0.761, and swapped in place -- keeping counts
+        # equal -- it cost the distractors enough query keywords that Prospective saturated at 0.980
+        # coverage, over the calibration ceiling. That last one is the honest version of "a real cost
+        # the gate is there to measure": it measured it, and refused.
+        #
+        # Borrowing from the question's own distractors has neither cost. The terms are non-query
+        # words, so gold gains no retrieval advantage; they already occur in this haystack, so they
+        # cannot be exclusive to gold; and no distractor is touched, so calibration is untouched.
+        answers_all = answers
+        borrowed = {term
+                    for other in question.sessions if not other.is_gold
+                    for term in tokenize(other.text())}
+        neutral = sorted(borrowed - own - answers_all) or [term for term in pool if term not in own]
         if not neutral:
             continue
 
@@ -1606,6 +1711,7 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
         wanted = round(rate * len(unmarked))
         if rate >= 0.5:
             wanted = max(1, wanted)
+        foreign_per_gold: list[int] = []
         for session in rng.sample(unmarked, min(len(unmarked), wanted)):
             take = max(1, min(len(neutral), round(len(own) * echo)))
             # Some terms are drawn from words ALREADY in this gold session, minus the question's own
@@ -1656,6 +1762,8 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
                 (i for i in reversed(free) if session.turns[i].role == "assistant"),
                 free[-1] if free else len(session.turns) - 1)
             session.turns[index].content = weave_echo(session.turns[index].content, terms)
+            foreign_per_gold.append(max(0, take - len(from_self)))
+
 
 
 def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question], Calibration]:

@@ -16,7 +16,7 @@ namespace AgentEval.Memory.External.TypedMemEval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v4 (AgentEval)".
+/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; &lt;revision&gt; (AgentEval)", with the revision from <see cref="TypedMemEvalVerticalDescriptor.CorpusRevision"/> — spelled out rather than hardcoded here, because a citation rule that names a superseded revision tells the reader to cite the corpus that was replaced for being wrong.
 /// TypedMemEval results are <b>not</b> LongMemEval results and must never be presented as, summed
 /// with, or averaged with LongMemEval numbers. The twelve Prospective questions seeded from the
 /// time-grounded probe exist in both <c>agenteval-timegrounded-v1</c> and TypedMemEval-Prospective
