@@ -541,7 +541,25 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "and a correct one are indistinguishable to this probe"
             ),
         },
-        "v6_leave_one_out": tally("v6"),
+        # V6 is defined for Arithmetic and Forgetting only, and only where G > 1. Everywhere else
+        # it is UNDEFINED rather than failed, so a bare `passed: 0` misreports it: Episodic
+        # published 0 beside four verticals reporting real counts, which reads as "every question
+        # failed" when the probe never ran. Says which of the two reasons applies.
+        "v6_leave_one_out": {
+            **tally("v6"),
+            "applies_to": (
+                "Arithmetic and Forgetting, on questions with more than one gold session. Those are "
+                "the verticals whose design claims every gold component is load-bearing; elsewhere "
+                "a question may have several gold sessions without the design promising each one is "
+                "individually necessary, and ablating them would report a defect never promised "
+                "against"
+            ),
+            **({"not_applicable_reason": (
+                f"V6 is not defined for {vertical}" if vertical not in ("arithmetic", "forgetting")
+                else "every question in this corpus has a single gold component, so leave-one-out "
+                     "removes the only evidence there is")}
+               if not [r for r in records if r.get("v6") is not None] else {}),
+        },
         # Per SHAPE, not only per vertical. A vertical reported at 48/50 hides Arithmetic's
         # `duration` at 83% and Episodic's `participant-attribution` at 87%, and the consuming
         # project found a shape running at 50% on their answer model that our per-vertical

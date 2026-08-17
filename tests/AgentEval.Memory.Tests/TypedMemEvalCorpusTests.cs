@@ -531,6 +531,12 @@ public sealed class TypedMemEvalCorpusTests
     /// here, including the per-role and first-turn slices — the slices are the ones that matter,
     /// because a corpus whose pooled totals balance can still have a perfectly separable first turn.
     /// </remarks>
+    /// <summary>
+    /// Ordinal positions the (position, role) occupancy features cover. Mirrors
+    /// <c>_ROLE_ORDER_POSITIONS</c> in <c>tools/typedmemeval_common.py</c>.
+    /// </summary>
+    private const int RoleOrderPositions = 4;
+
     private static readonly string[] RefusedFeatures =
     [
         "session_length_chars", "turn_count", "position_in_haystack", "digit_density",
@@ -543,6 +549,16 @@ public sealed class TypedMemEvalCorpusTests
         "first_user_length_chars", "first_user_uppercase_density", "first_user_sentence_count",
         "first_assistant_length_chars", "first_assistant_uppercase_density",
         "first_assistant_sentence_count",
+        // Turn-role ORDER. Added after the consuming project found Episodic v4 gold identifiable
+        // without reading a word: gold ran u|a|a|u|a while every distractor ran u|a|u|a|a, and the
+        // published feature set had no ordinal slot beyond the first and no (position, role)
+        // occupancy. Per-role COUNTS were all at exactly 0.5000 — a successful equalisation is what
+        // made the residual invisible, because appending to the tail cannot repair a prefix.
+        "role_sequence",
+        "position_0_is_user", "position_0_is_assistant",
+        "position_1_is_user", "position_1_is_assistant",
+        "position_2_is_user", "position_2_is_assistant",
+        "position_3_is_user", "position_3_is_assistant",
     ];
 
     /// <summary>
@@ -564,6 +580,16 @@ public sealed class TypedMemEvalCorpusTests
 
         foreach (var name in RefusedFeatures.Where(f => !exempt.Contains(f)))
         {
+            // Categorical, so it is not a per-session scalar: the score is the best any single
+            // role sequence achieves as a presence indicator. Measured this way a shape whose gold
+            // reads u|a|a|u|a while every distractor reads u|a|u|a|a is caught as ONE feature,
+            // rather than requiring the right ordinal position to have been guessed in advance.
+            if (name == "role_sequence")
+            {
+                results[name] = WorstRoleSequenceAuc(entries);
+                continue;
+            }
+
             double wins = 0;
             long pairs = 0;
             foreach (var entry in entries)
@@ -588,6 +614,47 @@ public sealed class TypedMemEvalCorpusTests
             results[name] = Math.Max(auc, 1.0 - auc);
         }
         return results;
+    }
+
+    /// <summary>The best folded AUC any single turn-role sequence achieves as a gold indicator.</summary>
+    private static double WorstRoleSequenceAuc(IReadOnlyList<LongMemEvalEntry> entries)
+    {
+        static string Signature(List<LongMemEvalTurn> session) =>
+            string.Concat(session.Select(t => (t.Role ?? "?")[0]));
+
+        var candidates = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+            foreach (var session in entry.HaystackSessions ?? [])
+                candidates.Add(Signature(session));
+
+        var worst = 0.5;
+        foreach (var candidate in candidates)
+        {
+            double wins = 0;
+            long pairs = 0;
+            foreach (var entry in entries)
+            {
+                var sessions = entry.HaystackSessions ?? [];
+                var ids = entry.HaystackSessionIds ?? [];
+                var goldIds = new HashSet<string>(entry.AnswerSessionIds ?? [], StringComparer.Ordinal);
+                List<double> gold = [], other = [];
+                for (var i = 0; i < sessions.Count; i++)
+                {
+                    var value = Signature(sessions[i]) == candidate ? 1.0 : 0.0;
+                    if (i < ids.Count && goldIds.Contains(ids[i])) gold.Add(value);
+                    else other.Add(value);
+                }
+                foreach (var g in gold)
+                    foreach (var o in other)
+                        wins += g > o ? 1.0 : g == o ? 0.5 : 0.0;
+                pairs += (long)gold.Count * other.Count;
+            }
+
+            if (pairs == 0) continue;
+            var auc = wins / pairs;
+            worst = Math.Max(worst, Math.Max(auc, 1.0 - auc));
+        }
+        return worst;
     }
 
     private static double Feature(string name, List<LongMemEvalTurn> session, int index, int count)
@@ -621,6 +688,15 @@ public sealed class TypedMemEvalCorpusTests
                 return Ratio(SlotText(role, 0).Count(char.IsUpper), SlotText(role, 0).Length);
             if (name == $"first_{role}_sentence_count")
                 return SlotText(role, 0).Count(c => c is '.' or '!' or '?');
+
+            // (position, role) occupancy. The first four positions only: beyond that the sessions
+            // in a question no longer share a common length, so the feature stops being comparable
+            // rather than becoming safe.
+            for (var position = 0; position < RoleOrderPositions; position++)
+            {
+                if (name != $"position_{position}_is_{role}") continue;
+                return position < session.Count && session[position].Role == role ? 1.0 : 0.0;
+            }
         }
 
         return name switch

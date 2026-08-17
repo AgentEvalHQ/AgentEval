@@ -63,6 +63,74 @@ def load(vertical: str) -> tuple[list[tmc.Question], str]:
     return questions, tmc.sha256_normalized(text)
 
 
+def self_test() -> bool:
+    """Checks the gate refuses a corpus whose ROLE ORDER identifies gold.
+
+    A gate is only worth its green when something is known to turn it red. This reconstructs the
+    exact defect the consuming project found in v4-episodic -- gold running u|a|a|u|a while every
+    distractor ran u|a|u|a|a -- and asserts refusal.
+
+    Two properties it pins, both of which cost a release round to learn:
+
+    - The pooled AUC does NOT catch this. It reads 0.6152, comfortably under the 0.75 threshold,
+      because a tell that is exclusive only WITHIN a question does not move a number pooled across
+      50 of them. What catches it is the bimodality rule, at 27 perfectly-separated questions
+      against 3.48 expected. A future simplification that drops the distribution test in favour of
+      "the AUC is fine" would reopen this, and this test is what says so.
+    - Both halves are exercised: the generator's alignment pass is disabled here so the defect
+      actually reaches the gate. Without disabling it the corpus repairs itself and the test would
+      pass while measuring nothing -- which is how a self-test quietly becomes decoration.
+    """
+    import random
+    import gen_typedmemeval_episodic as episodic
+
+    original_pad, original_normalise = tmc._pad_target, tmc._normalise_role_sequence
+
+    def conditional_pad(session, role="assistant"):
+        """The pre-fix behaviour: reuse the last FREE turn of the role; append only if none is."""
+        free = [i for i, t in enumerate(session.turns)
+                if t.role == role and not getattr(t, "has_answer", False)]
+        if free:
+            return free[-1]
+        session.turns.append(tmc.Turn(role, ""))
+        return len(session.turns) - 1
+
+    try:
+        tmc._pad_target = conditional_pad
+        tmc._normalise_role_sequence = lambda question: None
+        seed = 20260815
+        questions = episodic.build(0.5, random.Random(seed))  # DevSkim: ignore DS148264 - fixture generation
+        tmc.equalise_echo(questions, 0.5, random.Random(seed + 1))  # DevSkim: ignore DS148264
+        tmc.equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264
+        tmc.equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264
+        report = tmc.separability_report(questions)
+    finally:
+        tmc._pad_target, tmc._normalise_role_sequence = original_pad, original_normalise
+
+    bimodal = report.get("bimodal_features", {})
+    pooled = report["features"]["role_sequence"]
+    problems = []
+    if report["passed"]:
+        problems.append("gate PASSED a corpus whose gold is identifiable from role order alone")
+    if not any(name.startswith("position_") for name in bimodal):
+        problems.append(f"no position_* feature flagged as bimodal; got {sorted(bimodal)}")
+    if pooled >= tmc.SEPARABILITY_MAX_AUC:
+        problems.append(
+            f"pooled role_sequence {pooled:.4f} is now above the {tmc.SEPARABILITY_MAX_AUC} "
+            f"threshold, so this no longer tests the distribution rule -- pick a defect the "
+            f"pooled number still misses")
+
+    for problem in problems:
+        print(f"self-test FAILED: {problem}")
+    if not problems:
+        flagged = sorted(n for n in bimodal if n.startswith("position_"))
+        worst = max((bimodal[n]["z"] for n in flagged), default=0.0)
+        print(f"self-test OK  (role-order defect refused: {len(flagged)} position features "
+              f"bimodal, worst z={worst:.1f}; pooled role_sequence {pooled:.4f} would have passed "
+              f"the {tmc.SEPARABILITY_MAX_AUC} threshold)")
+    return not problems
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("verticals", nargs="*", default=[])
@@ -70,7 +138,13 @@ def main() -> None:
     parser.add_argument(
         "--baseline", default=None,
         help="path to a known-blocked baseline; fail only on failures that are new or worse")
+    parser.add_argument(
+        "--self-test", action="store_true",
+        help="check the gate still detects a role-order tell it is known to have missed")
     args = parser.parse_args()
+
+    if args.self_test:
+        raise SystemExit(0 if self_test() else 1)
 
     failed = False
     failures: dict[str, dict[str, float]] = {}

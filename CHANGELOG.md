@@ -23,10 +23,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction, differing only in the relation the question asks about. A first attempt matched the
   person but not the tense and moved `"i have"` only 0.958 → 0.945; matched properly it reads 0.500.
 
-- **Turn counts normalise per role.** Gold ended `(u,a,u,a,a)` and filler `(u,a,u,a,u)` — the same
-  five turns in different roles — so gold owned an `('assistant', 2)` slot no distractor had, and a
-  slot only one side possesses cannot be equalised. It separated gold outright in 54% of questions
-  while pooled `turn_count` read a harmless 0.615.
+- **Turn-role SEQUENCES are aligned, not just counted.** Gold ended `(u,a,u,a,a)` and filler
+  `(u,a,u,a,u)` — the same five turns in different roles — so gold owned an `('assistant', 2)` slot
+  no distractor had, and a slot only one side possesses cannot be equalised. Equalising the *counts*
+  drove `turn_count` and both per-role counts to exactly 0.5000 and left the *order* untouched: the
+  consuming project's probe then found Episodic gold identifiable **without reading a word**, at
+  `u|a|a|u|a` in 27 of 50 questions against `u|a|u|a|a` in every distractor, and 20/20 on
+  `assistant-stated`. On `participant-attribution`, where the question is *who said it*, the
+  sequence gave the speaker 15/15 — leaking the answer, not merely its location. Sessions are now
+  aligned onto a shortest-common-supersequence of their role sequences (inserting empty turns, never
+  reordering), so the acceptance condition — *per question, the set of role sequences in gold equals
+  the set in distractors* — holds for **all five verticals with zero gold-only sequences**, and
+  `role_sequence` and every `position_N_is_*` read exactly 0.5000.
+
+- **Padding scored new vocabulary against words it had already used.** A candidate's `types`
+  contribution was counted from its own distinct words, ignoring overlap with the turn and with
+  sentences appended moments earlier — so repeats were credited as fresh vocabulary. The error grows
+  with how much padding a session needs, which is precisely what padding exists to neutralise:
+  heavily padded sessions finished under target and gold, needing least, finished closest.
+  Type/token ratio separated gold perfectly in 24% of Prospective's questions against a 12% chance
+  rate while the *pooled* ratio read a harmless 0.602.
+
+- **Padding can now add punctuation without spending a sentence.** Gold states a dated, numbered
+  fact and punctuates it; filler does not. Short sentences are punctuation-dense but each costs a
+  sentence, and tails bought one comma apiece — so once the sentence budget was spent there was no
+  lever left. WorkingMemory separated at 14 questions against 6.1 expected (3.5 sd). Fixed with
+  punctuation-carrying tails, deliberately **without em dashes**: that glyph was the original v1
+  tell, and reusing it here is how a fix becomes the next defect.
+
+- **The separability gate's chance model no longer punishes a design.** It refused when the
+  perfectly-separated share was ≥ 0.20 and more than twice the *mean* chance rate — but a question's
+  chance of a folded AUC of exactly 1 is `2/C(n, g)`, which runs 22% at H=8 to 3% at H=60, and
+  WorkingMemory varies H *as its independent variable*. The rule now sums the per-question chances
+  and tests the excess as a Poisson-binomial z (≥ 2.5, keeping the 0.20 floor — ~200 feature tests
+  per family need practical as well as statistical significance). It did not whitewash anything: the
+  punctuation finding above re-refused on the new statistic at 3.5 sd and had to be fixed.
+
+- **Empty turns are declared, not hidden.** Aligning role sequences inserts turns, and one inserted
+  into a slot with no content anywhere at the moment padding computed its targets gets a target of
+  zero and ships empty — 1387 of 30761 turns. It is disclosed rather than fixed because all three
+  fixes measurably made the corpus *worse*: filling from the median real turn put first-assistant
+  length at 3.1 sd and filling from the slot's final peak put user length at 2.7 sd, both refused by
+  the gate. These turns are empty in exactly the sessions that differ, so every character added has
+  to be balanced somewhere. The artifact leaks nothing — perfect separation on blank-turn count runs
+  *below* its chance rate in all five verticals — and `structure.empty_turns` records the count, the
+  cause and `separates_gold: false`.
+
+- **Exemptions state the reason for the feature actually exempted.** WorkingMemory published
+  `exempt_features: ["position_in_haystack"]` beside a paragraph discussing only question relevance
+  — and that feature reads 1.000. **V6 records say when they do not apply**, rather than publishing
+  `passed: 0` for a probe that never ran (it is defined for Arithmetic and Forgetting only).
 
 - **The echo pool no longer draws from any question's answer**, and gold's own echo terms exclude
   its own answer — the latter was weaving the answer into the gold *user* turn, breaking the
@@ -48,10 +94,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Difficulty bands.** Every question carries `difficulty` (1–5) and `difficulty_dial`, derived
-  from memory dials only. Three verticals are **validated** — reference-retriever coverage slopes
-  down across their bands — and two are not, which is recorded rather than hidden: BM25 has no time
-  component, so a dial measured in days cannot move it. Bands are diagnostics, never claims;
-  per-band n is 4–17 against a citable floor of 30.
+  from memory dials only, and validated against both halves of the rule: the reference retriever
+  must slope across the bands *and* the answer model must not. **Exactly one vertical passes** —
+  WorkingMemory, retriever 0.92 → 0.50 with the oracle flat at 1.00 across all five bands. Bands are
+  diagnostics, never claims; per-band n is 2–17 against a citable floor of 30.
+
+  Two stamps came off under the rule, for different reasons:
+
+  - **Episodic — flat.** Stamped validated on a drop of 0.31; the same bands after the role-order
+    regeneration read 0.14, under the bar and flat after the first. Per-band n is 2–5, which is why
+    it moved. A gradient that survives only on one revision's session draw was never evidence.
+  - **Arithmetic — confounded, which is not the same as flat.** Its retriever half is the steepest
+    in the family (0.92 → 0.42). Its oracle half is not flat: bands 1 and 2 read 0.83 and 0.94
+    against 1.00 above. The `duration` shape lives at two and three inputs and is where the answer
+    model struggles, so the easy end of a dispersion ladder is quietly the answer model's hard end,
+    and part of that clean gradient is the oracle failing rather than retrieval getting harder.
+    Fixing it needs a generation change, so v4 declares the band instead of claiming it.
+
+  `validate_typedmemeval_difficulty.py --check` now runs in CI, so a stamp cannot outlive the
+  gradient that justified it. Arithmetic's confound had been written up as a caveat in a prior
+  handoff *while the stamp still said validated* — a declared caveat that does not move the field it
+  caveats is decoration, which is the reason the rule became a check rather than a paragraph.
 
 - **A five-rung WorkingMemory ladder** (8/15/25/40/60, 60 questions). Two of the old four rungs
   could not fail at `K_ref` = 5 — `H > K_ref` proved necessary and not sufficient, since H=6 still
@@ -63,6 +126,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A ratcheted separability gate.** A blocked revision no longer makes the check uniformly red,
   which had been hiding whether anything *new* regressed — and was silently skipping the
   evidence-screen self-test entirely.
+
+- **Corpus identity.** Pin these; a run whose provenance names a different hash is a different
+  benchmark. Every one differs from the v4 hashes circulated before the role-order fix — those
+  bytes were never released.
+
+  | Corpus id | Coverage @ K_ref = 5 | SHA-256 (newline-normalised) |
+  |---|---|---|
+  | `agenteval-typedmemeval-prospective-v4` | 0.820 | `79c6a135ebb4ab19ea1f1cf50edeadf5c58231574535057924a217c5816b6d94` |
+  | `agenteval-typedmemeval-episodic-v4` | 0.658 | `f539f1d28fa283e1333b119f671e4dc91066d7472984a01fcacc0f679ec55c6b` |
+  | `agenteval-typedmemeval-arithmetic-v4` | 0.655 | `ddf165b8032bdef1d29419aabe89cafad90f17e260028202bb805df5522e2589` |
+  | `agenteval-typedmemeval-workingmemory-v4` | 0.767 | `c36d9746490d2df7a694f1643665050b8f3c47b423a32bfd9e29b16c3579b15c` |
+  | `agenteval-typedmemeval-forgetting-v4` | 0.730 | `a8edeb864453ad21bf78b4cb62d6dffc0af21d9780e95d1917741d8fadc4d400` |
+
+- **Role-order features in the gate, and a self-test that proves it catches them.**
+  `role_sequence` and `position_{0..3}_is_{user,assistant}` are measured and refused, in Python and
+  re-derived independently in C#. `stamp_typedmemeval_separability.py --self-test` rebuilds the
+  role-order defect and asserts refusal, in CI. It also pins *which half* refuses it, and the answer
+  is not the obvious one: pooled `role_sequence` reads **0.6152** and would pass the 0.75 threshold,
+  so the distribution rule is load-bearing — 27 questions perfectly separated against 3.48 expected
+  (z = 13.3). A future simplification that keeps only the AUC bar now fails here rather than in a
+  consumer's acceptance probe.
 
 ## [0.23.0-beta] - 2026-08-15
 

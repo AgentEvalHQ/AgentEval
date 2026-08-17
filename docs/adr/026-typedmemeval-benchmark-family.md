@@ -1246,6 +1246,12 @@ own design. Episodic's chance rate is 9% against 54% observed. V7 therefore refu
 — a share at least 0.20 and more than twice chance — which refuses Episodic (+47%) and Prospective
 (+12% to +22%) and correctly clears WorkingMemory's H = 1 stratum at zero.
 
+> **Superseded by §18.** "More than twice chance" compares a corpus-wide share against a
+> corpus-wide *mean* chance rate, which is the same averaging mistake in a smaller form: it charges
+> every rung at the average even when the rungs differ by design. The rule now sums the per-question
+> chances and tests the excess as a Poisson-binomial z ≥ 2.5, keeping the 0.20 floor. The reasoning
+> above about *why* the excess is the right thing to refuse on stands unchanged.
+
 Post-correction, three of five v3 corpora fail: Prospective and Episodic on the distribution,
 WorkingMemory on `"i have"`. Arithmetic and Forgetting clear both rules.
 
@@ -1429,6 +1435,89 @@ pattern is not that the checks were bad. It is that every check certifies the co
 failure its author had already imagined, and the next defect is by construction the one nobody
 imagined. That is the argument for an independent instrument, and it is why the consuming
 project's probe is now checked in beside ours as a required gate rather than a courtesy.
+
+### 18. Round five — role ORDER, and a chance model that punished a design (consumer finding, 2026-08-17)
+
+§17 closed with a prediction: the next defect is the one nobody imagined. It took one round.
+
+**The finding.** The consuming project's probe reported Episodic v4 gold identifiable *without
+reading a word*, from the sequence of turn roles alone — gold ran `u|a|a|u|a` in 27 of 50 questions
+while every distractor ran `u|a|u|a|a`. On `assistant-stated` it was total: 20/20 against 391/391.
+On `participant-attribution`, where the question is **who said it**, the sequence determined the
+speaker 15/15 — so it leaked not the location of the evidence but the answer, making it a V2
+failure as well as V7.
+
+**The cause was the previous fix.** `_pad_target` returned the last *free* turn of a role and
+appended only when every turn of that role was answer-bearing. Episodic is the one vertical that
+puts the answer on an assistant turn, so gold got an appended assistant turn and filler did not.
+`_normalise_turn_counts` then equalised the *counts* — driving `turn_count`, user count and
+assistant count to exactly 0.5000 — while preserving the *prefix* difference that created them.
+Appending to the tail cannot repair a prefix. The count tell was removed and the order tell was
+locked in by the same pass, and three axes at exactly chance is what made the residual invisible.
+
+**The fix is the invariant, not the cause.** Two changes, because fixing only the conditional would
+have left the next vertical to rediscover it:
+
+- `_pad_target` appends unconditionally, so no session's base shape depends on where the answer sits.
+- `_normalise_role_sequence` replaces `_normalise_turn_counts` and aligns every session in a
+  question onto a shortest-common-supersequence of their role sequences, inserting empty turns and
+  never reordering. This is the load-bearing half: it holds whatever a generator does upstream, and
+  re-injecting the old conditional `_pad_target` no longer reproduces the defect.
+
+The acceptance condition — *per question, the set of role sequences in gold equals the set in
+distractors* — now holds for **all five verticals, 0 gold-only sequences**, and `role_sequence` and
+every `position_N_is_*` read exactly 0.5000 family-wide.
+
+**Two more defects surfaced behind it**, both in padding, both of the same family as §14 — a
+statistic computed at a coarser grain than the defect lives at:
+
+- **The types axis double-counted.** A candidate's `types` contribution was scored from its own
+  distinct words, ignoring overlap with the turn and with pieces already appended in the same call.
+  The error compounds with how much padding a session needs, which is exactly what padding exists to
+  neutralise: heavily padded sessions finish under target, gold finishes closest. Type/token ratio
+  separated gold perfectly in 24% of Prospective's questions (chance 12%) on a pooled AUC of 0.602.
+  Scored against live vocabulary now.
+- **Punctuation density had no lever.** Gold states a dated, numbered fact and punctuates it; filler
+  does not. Short sentences are punctuation-dense but each costs a sentence, and tails bought one
+  comma each, so once `sentences` was at target the only way to add punctuation was to overshoot an
+  axis weighted 40. WorkingMemory separated at 14 questions against 6.1 expected (3.5 sd). Fixed by
+  adding punctuation-carrying tails — deliberately **without em dashes**, since that glyph was the
+  original v1 tell and reintroducing it here is how a fix becomes the next defect.
+
+**And the gate's chance model was wrong in a way that punished a design.** The bimodality rule
+refused when the perfectly-separated share was ≥ 0.20 and more than twice the *mean* chance rate.
+But a question's chance of a folded AUC of exactly 1 is `2/C(n, g)`, which runs from 22% at H=8 to
+3% at H=60 — and WorkingMemory varies H *as its independent variable*. Charging its small-haystack
+rungs at the corpus average refused it for having a design. The rule now sums the per-question
+chances and tests the excess as a Poisson-binomial z (≥ 2.5, with the 0.20 floor kept as a
+conjunct, because ~200 feature tests per family need practical as well as statistical significance).
+This is the same correction we asked the consumer to make to their flat 25% bar; it was overdue on
+our own instrument.
+
+The threshold is set at 2.5 because the types defect above sits at **2.67 sd** and must be caught;
+2.5 ≈ p < 0.01 one-tailed, and the floor supplies the practical-significance half. Worth recording
+that the correction was **not** what let WorkingMemory through: the punctuation finding re-refused
+on the new statistic at **3.5 sd** (14 observed against 6.1 expected) and had to be fixed on its
+merits. A hand-diagnostic run alongside the gate read that same feature at 10 observed and 1.73 sd
+by scoping the session text differently — a reminder that the instrument is the gate's own
+measurement, and a scratch script that disagrees with it is evidence about the script.
+
+**What the round changes about the method.** The gate now carries `--self-test`, which rebuilds this
+exact defect and asserts refusal. It pins which half does the refusing, and the answer is not the
+obvious one: pooled `role_sequence` reads **0.6152**, comfortably under the 0.75 threshold, so the
+AUC bar would have passed it. What refuses it is the distribution rule, at 27 observed against 3.48
+expected (z = 13.3). A future simplification that drops the distribution test in favour of "the AUC
+is fine" now fails in CI rather than in a consumer's acceptance probe.
+
+That also reconciles the two instruments: the consumer's 0.7700 is a mean of per-question AUCs and
+ours is pair-weighted, which is why the same defect reads 0.7700 there and 0.6152 here. Neither is
+wrong; the pair-weighted number is simply not the one that catches this, and knowing *which*
+statistic is load-bearing for *which* defect is the transferable lesson.
+
+**A last one, small but the same shape.** WorkingMemory published `exempt_features:
+["position_in_haystack"]` beside a reason paragraph that only discussed question relevance — the
+exemption text was a fixed string rather than per-feature. An exemption a reader cannot match to its
+reason is indistinguishable from an unexplained one, and this one waives a feature reading 1.000.
 
 ## Consequences
 

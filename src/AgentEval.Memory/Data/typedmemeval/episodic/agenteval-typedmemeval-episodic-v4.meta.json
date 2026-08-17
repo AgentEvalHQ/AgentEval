@@ -8,7 +8,7 @@
     "reason": "v3 shipped separable. An independent within-question probe by the consuming project found the phrase screen could not represent n-grams made of stopwords, so \"on the\" marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 sessions against 0 of 732 distractors -- the latter present since v1. The cause was never a set of phrases: gold asserted a datable first-person fact and filler did not, so the two sides differed in grammar. v4 generates both from shared frames, normalises turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at K_ref (two of the old four could not), gives Forgetting's control arm the same G as its treatment arm, reframes the not-yet-true after arm around what the record shows, varies the Episodic attribution frame per question, and stamps a per-question difficulty band. Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 number is comparable with a v4 number. None of them should be cited."
   },
   "question_count": 50,
-  "corpus_sha256": "325c54be914867ee2033134c82d8859a954b99df958c01def01ba815ac543570",
+  "corpus_sha256": "f539f1d28fa283e1333b119f671e4dc91066d7472984a01fcacc0f679ec55c6b",
   "generator": {
     "tool": "tools/gen_typedmemeval_episodic.py",
     "version": "1.0.0",
@@ -19,17 +19,17 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.7194,
+    "mean_realised": 0.6584,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.2762
+        0.2722
       ],
       [
         0.5,
-        0.7194
+        0.6584
       ]
     ],
     "per_question": {
@@ -38,7 +38,7 @@
       "tme-epi-003": 0.0,
       "tme-epi-004": 1.0,
       "tme-epi-005": 1.0,
-      "tme-epi-006": 1.0,
+      "tme-epi-006": 0.0,
       "tme-epi-007": 0.0,
       "tme-epi-008": 1.0,
       "tme-epi-009": 1.0,
@@ -53,21 +53,21 @@
       "tme-epi-018": 1.0,
       "tme-epi-019": 1.0,
       "tme-epi-020": 1.0,
-      "tme-epi-021": 0.4,
+      "tme-epi-021": 0.2,
       "tme-epi-022": 0.0,
       "tme-epi-023": 0.1667,
       "tme-epi-024": 0.5,
-      "tme-epi-025": 0.1429,
-      "tme-epi-026": 0.1429,
-      "tme-epi-027": 0.25,
+      "tme-epi-025": 0.2857,
+      "tme-epi-026": 0.0,
+      "tme-epi-027": 0.75,
       "tme-epi-028": 0.1667,
-      "tme-epi-029": 0.6,
-      "tme-epi-030": 0.4,
+      "tme-epi-029": 0.4,
+      "tme-epi-030": 0.0,
       "tme-epi-031": 0.2,
-      "tme-epi-032": 0.5,
-      "tme-epi-033": 0.5,
-      "tme-epi-034": 0.25,
-      "tme-epi-035": 0.75,
+      "tme-epi-032": 0.0,
+      "tme-epi-033": 0.25,
+      "tme-epi-034": 0.5,
+      "tme-epi-035": 0.5,
       "tme-epi-036": 1.0,
       "tme-epi-037": 1.0,
       "tme-epi-038": 1.0,
@@ -77,7 +77,7 @@
       "tme-epi-042": 1.0,
       "tme-epi-043": 1.0,
       "tme-epi-044": 1.0,
-      "tme-epi-045": 1.0,
+      "tme-epi-045": 0.0,
       "tme-epi-046": 1.0,
       "tme-epi-047": 1.0,
       "tme-epi-048": 0.0,
@@ -109,14 +109,20 @@
     "h_max": 25,
     "gold_position_shuffled": true,
     "h_is_independent_variable": false,
-    "no_absolute_dates": false
+    "no_absolute_dates": false,
+    "empty_turns": {
+      "count": 249,
+      "of_turns": 5510,
+      "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
+      "separates_gold": false
+    }
   },
   "probes": {
     "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
-        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 calibration gate bounds how easily that is exploited"
+        "none"
       ],
       "threshold_auc": 0.75,
       "refused_features": [
@@ -137,8 +143,17 @@
         "first_user_uppercase_density",
         "gold_marker_ngram",
         "mean_turn_chars",
+        "position_0_is_assistant",
+        "position_0_is_user",
+        "position_1_is_assistant",
+        "position_1_is_user",
+        "position_2_is_assistant",
+        "position_2_is_user",
+        "position_3_is_assistant",
+        "position_3_is_user",
         "position_in_haystack",
         "punctuation_density",
+        "role_sequence",
         "sentence_count",
         "session_length_chars",
         "turn_count",
@@ -154,174 +169,324 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.6105,
+        "session_length_chars": 0.5652,
         "turn_count": 0.5,
         "position_in_haystack": 0.542,
-        "digit_density": 0.6271,
-        "uppercase_density": 0.5013,
-        "sentence_count": 0.5345,
-        "punctuation_density": 0.5628,
+        "digit_density": 0.622,
+        "uppercase_density": 0.5221,
+        "sentence_count": 0.5451,
+        "punctuation_density": 0.538,
         "em_dash_density": 0.5126,
-        "mean_turn_chars": 0.6105,
-        "type_token_ratio": 0.5221,
-        "first_user_length_chars": 0.5179,
-        "first_user_uppercase_density": 0.6132,
-        "first_user_sentence_count": 0.5267,
-        "first_assistant_length_chars": 0.7135,
-        "first_assistant_uppercase_density": 0.5725,
-        "first_assistant_sentence_count": 0.5093,
-        "user_length_chars": 0.5464,
-        "user_uppercase_density": 0.5928,
-        "user_sentence_count": 0.5332,
-        "user_punctuation_density": 0.6348,
-        "user_type_token_ratio": 0.5122,
-        "user_mean_turn_chars": 0.5464,
-        "assistant_length_chars": 0.6284,
-        "assistant_uppercase_density": 0.5908,
-        "assistant_sentence_count": 0.5099,
-        "assistant_punctuation_density": 0.6642,
-        "assistant_type_token_ratio": 0.5548,
-        "assistant_mean_turn_chars": 0.6284,
+        "mean_turn_chars": 0.5652,
+        "type_token_ratio": 0.5106,
+        "first_user_length_chars": 0.5902,
+        "first_user_uppercase_density": 0.5002,
+        "first_user_sentence_count": 0.5579,
+        "first_assistant_length_chars": 0.5022,
+        "first_assistant_uppercase_density": 0.5115,
+        "first_assistant_sentence_count": 0.5749,
+        "user_length_chars": 0.582,
+        "user_uppercase_density": 0.5055,
+        "user_sentence_count": 0.5376,
+        "user_punctuation_density": 0.6664,
+        "user_type_token_ratio": 0.5356,
+        "user_mean_turn_chars": 0.582,
+        "assistant_length_chars": 0.5051,
+        "assistant_uppercase_density": 0.5057,
+        "assistant_sentence_count": 0.5208,
+        "assistant_punctuation_density": 0.6532,
+        "assistant_type_token_ratio": 0.5873,
+        "assistant_mean_turn_chars": 0.5051,
+        "position_0_is_user": 0.5,
+        "position_0_is_assistant": 0.5,
+        "position_1_is_user": 0.5,
+        "position_1_is_assistant": 0.5,
+        "position_2_is_user": 0.5,
+        "position_2_is_assistant": 0.5,
+        "position_3_is_user": 0.5,
+        "position_3_is_assistant": 0.5,
+        "role_sequence": 0.5,
         "gold_marker_ngram": 0.6798,
-        "boilerplate_ngram": 0.6355
+        "boilerplate_ngram": 0.6346
       },
-      "worst_refused_feature": "first_assistant_length_chars",
-      "worst_refused_auc": 0.7135,
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.6798,
+      "worst_role_sequence": null,
+      "role_sequence_auc": 0.5,
       "worst_gold_marker_ngram": "on the",
       "gold_marker_ngram_auc": 0.6798,
       "worst_boilerplate_ngram": "put the",
-      "boilerplate_ngram_auc": 0.6355,
+      "boilerplate_ngram_auc": 0.6346,
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.12,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
         },
         "position_in_haystack": {
           "share": 0.04,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
         },
         "digit_density": {
-          "share": 0.04,
-          "chance": 0.0696
+          "share": 0.06,
+          "chance": 0.0696,
+          "observed": 3,
+          "expected": 3.48,
+          "z": -0.27
         },
         "uppercase_density": {
-          "share": 0.08,
-          "chance": 0.0696
+          "share": 0.06,
+          "chance": 0.0696,
+          "observed": 3,
+          "expected": 3.48,
+          "z": -0.27
         },
         "sentence_count": {
           "share": 0.02,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 1,
+          "expected": 3.48,
+          "z": -1.4
         },
         "punctuation_density": {
           "share": 0.1,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 5,
+          "expected": 3.48,
+          "z": 0.86
         },
         "em_dash_density": {
           "share": 0.06,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 3,
+          "expected": 3.48,
+          "z": -0.27
         },
         "mean_turn_chars": {
-          "share": 0.12,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "type_token_ratio": {
-          "share": 0.1,
-          "chance": 0.0696
+          "share": 0.04,
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
         },
         "first_user_length_chars": {
-          "share": 0.08,
-          "chance": 0.0696
+          "share": 0.1,
+          "chance": 0.0696,
+          "observed": 5,
+          "expected": 3.48,
+          "z": 0.86
         },
         "first_user_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0696
+          "share": 0.04,
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
         },
         "first_user_sentence_count": {
-          "share": 0.02,
-          "chance": 0.0696
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
         },
         "first_assistant_length_chars": {
-          "share": 0.04,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "first_assistant_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0696
+          "share": 0.02,
+          "chance": 0.0696,
+          "observed": 1,
+          "expected": 3.48,
+          "z": -1.4
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
         },
         "user_length_chars": {
-          "share": 0.06,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "user_uppercase_density": {
-          "share": 0.08,
-          "chance": 0.0696
+          "share": 0.1,
+          "chance": 0.0696,
+          "observed": 5,
+          "expected": 3.48,
+          "z": 0.86
         },
         "user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0696
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
         },
         "user_punctuation_density": {
-          "share": 0.02,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "user_type_token_ratio": {
-          "share": 0.18,
-          "chance": 0.0696
+          "share": 0.1,
+          "chance": 0.0696,
+          "observed": 5,
+          "expected": 3.48,
+          "z": 0.86
         },
         "user_mean_turn_chars": {
-          "share": 0.06,
-          "chance": 0.0696
+          "share": 0.08,
+          "chance": 0.0696,
+          "observed": 4,
+          "expected": 3.48,
+          "z": 0.29
         },
         "assistant_length_chars": {
-          "share": 0.08,
-          "chance": 0.0696
+          "share": 0.04,
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
         },
         "assistant_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0696
+          "share": 0.06,
+          "chance": 0.0696,
+          "observed": 3,
+          "expected": 3.48,
+          "z": -0.27
         },
         "assistant_sentence_count": {
-          "share": 0.02,
-          "chance": 0.0696
+          "share": 0.04,
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
         },
         "assistant_punctuation_density": {
-          "share": 0.04,
-          "chance": 0.0696
+          "share": 0.1,
+          "chance": 0.0696,
+          "observed": 5,
+          "expected": 3.48,
+          "z": 0.86
         },
         "assistant_type_token_ratio": {
-          "share": 0.02,
-          "chance": 0.0696
+          "share": 0.06,
+          "chance": 0.0696,
+          "observed": 3,
+          "expected": 3.48,
+          "z": -0.27
         },
         "assistant_mean_turn_chars": {
-          "share": 0.08,
-          "chance": 0.0696
+          "share": 0.04,
+          "chance": 0.0696,
+          "observed": 2,
+          "expected": 3.48,
+          "z": -0.84
+        },
+        "position_0_is_user": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_0_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_1_is_user": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_1_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_2_is_user": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_2_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_3_is_user": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
+        },
+        "position_3_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0696,
+          "observed": 0,
+          "expected": 3.48,
+          "z": -1.97
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_by": "generator",
-      "probed_corpus_sha256": "325c54be914867ee2033134c82d8859a954b99df958c01def01ba815ac543570"
+      "measured_at": "2026-08-16T23:51:13Z",
+      "probed_corpus_sha256": "f539f1d28fa283e1333b119f671e4dc91066d7472984a01fcacc0f679ec55c6b"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-16T19:09:31Z",
+    "run_at": "2026-08-17T00:34:58Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 47,
+      "passed": 48,
       "failed": [
         "tme-epi-037",
-        "tme-epi-042",
         "tme-epi-047"
       ]
     },
@@ -349,7 +514,9 @@
     "v6_leave_one_out": {
       "applicable": 0,
       "passed": 0,
-      "failed": []
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for episodic"
     },
     "by_shape": {
       "assistant-stated": {
@@ -369,7 +536,7 @@
       "participant-attribution": {
         "questions": 15,
         "v1_applicable": 15,
-        "v1_passed": 12,
+        "v1_passed": 13,
         "v3_applicable": 15,
         "v3_passed": 15
       }
@@ -704,7 +871,7 @@
         "v6": null
       },
       "tme-epi-042": {
-        "v1": false,
+        "v1": true,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -776,6 +943,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "325c54be914867ee2033134c82d8859a954b99df958c01def01ba815ac543570"
+    "probed_corpus_sha256": "f539f1d28fa283e1333b119f671e4dc91066d7472984a01fcacc0f679ec55c6b"
   }
 }

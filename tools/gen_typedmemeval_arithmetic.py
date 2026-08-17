@@ -805,7 +805,19 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                       # monotonically (0.92 down to 0.42 across inputs 2-6) and was simply
                       # never named, which made it the cheapest lever in the family.
                       "difficulty": _difficulty_band(plan.derivation),
-                      "difficulty_dial": "dispersion", "difficulty_validated": True,
+                      # UNVALIDATED because CONFOUNDED, which is not the same as flat. The
+                      # retriever half passes convincingly -- 0.92 down to 0.42, a drop of 0.50,
+                      # the steepest in the family. The oracle half does not: bands 1 and 2 read
+                      # 0.83 and 0.94 against 1.00 everywhere above, a spread of 0.17. The cause is
+                      # that the `duration` shape lives at two and three inputs and is where the
+                      # answer model struggles on its own, so the easy end of a dispersion ladder is
+                      # quietly the answer model's hard end. Part of that clean gradient is the
+                      # oracle failing rather than retrieval getting harder, and a number built
+                      # partly out of oracle error reads as memory difficulty everywhere downstream.
+                      # Fixing it needs a generation change (spread `duration` across input counts),
+                      # so v4 ships the band declared rather than claimed. Tracked as the first v5
+                      # item.
+                      "difficulty_dial": "dispersion", "difficulty_validated": False,
                       **plan.extra}),
         ))
     return questions

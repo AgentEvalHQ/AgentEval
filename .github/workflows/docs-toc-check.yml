@@ -16,6 +16,8 @@ on:
       - 'tools/stamp_typedmemeval_separability.py'
       - 'tools/run_typedmemeval_probes.py'
       - 'tools/typedmemeval-separability-baseline.json'
+      - 'tools/validate_typedmemeval_difficulty.py'
+      - 'tools/gen_typedmemeval_*.py'
 
 permissions:
   contents: read
@@ -57,3 +59,26 @@ jobs:
         if: always()
         working-directory: tools
         run: python3 run_typedmemeval_probes.py --self-test
+
+      # The separability gate is only worth its green if something is known to turn it red. This
+      # rebuilds the role-order defect the consuming project found in v4-episodic -- gold running
+      # u|a|a|u|a while every distractor ran u|a|u|a|a -- and asserts the gate refuses it. It also
+      # pins WHICH half does the refusing: the pooled AUC reads 0.615 and would pass the 0.75
+      # threshold, so the distribution test is load-bearing and a future simplification that drops
+      # it fails here rather than in a consumer's acceptance probe.
+      # always(), for the same reason as the step above.
+      - name: Check the TypedMemEval separability gate detects a role-order tell
+        if: always()
+        working-directory: tools
+        run: python3 stamp_typedmemeval_separability.py --self-test
+
+      # `difficulty` is a claim that some questions are harder, and the only thing that makes it a
+      # measurement rather than a label is that the reference retriever slopes across the bands
+      # while the answer model does not. Both halves are checked here against the shipped corpus,
+      # so a stamp cannot outlive the gradient that justified it — Episodic's did, surviving on one
+      # revision's session draw and reading validated at a drop of 0.14 after regeneration.
+      # Deterministic: BM25 plus the recorded V1 outcomes, no credentials.
+      - name: Check TypedMemEval difficulty stamps still match their gradients
+        if: always()
+        working-directory: tools
+        run: python3 validate_typedmemeval_difficulty.py --check

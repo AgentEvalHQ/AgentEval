@@ -240,10 +240,10 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
 | Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.719 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
-| Arithmetic | 50 | 0.675 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
-| WorkingMemory | 60 | 0.667 | 1 (×60) |
-| Forgetting | 50 | 0.740 | 0 (×15), 2 (×35) |
+| Episodic | 50 | 0.658 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
+| Arithmetic | 50 | 0.655 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| WorkingMemory | 60 | 0.767 | 1 (×60) |
+| Forgetting | 50 | 0.730 | 0 (×15), 2 (×35) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -319,8 +319,8 @@ gold is itself an abstention.
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
 | Prospective | 50/50 | 19/19 | 50/50 | 37/37 | — |
-| Episodic | 47/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 46/50 | — | 50/50 | 50/50 | 49/50 |
+| Episodic | 48/50 | — | 50/50 | 50/50 | — |
+| Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — |
 | Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 |
 

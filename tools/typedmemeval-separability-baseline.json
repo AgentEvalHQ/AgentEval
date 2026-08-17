@@ -1,6 +1,7 @@
 {
   "_comment": [
-    "Known-blocked separability features for corpus revision v3, recorded so the gate can",
+    "Known-blocked separability features for the corpus revision named below, recorded so the",
+    "gate can",
     "still report NEW regressions while the revision is blocked. This is a ratchet, not an",
     "exemption: any feature that appears here that is not listed, or any listed feature whose",
     "AUC gets worse, fails the check.",

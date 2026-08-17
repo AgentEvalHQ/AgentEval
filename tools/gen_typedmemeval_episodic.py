@@ -388,7 +388,14 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
                 # vertical -- the other 70% sits in a single band (G=1, full coverage), which
                 # is what makes this the flattest vertical in the family.
                 "difficulty": _LIST_BANDS.get(size, 3),
-                "difficulty_dial": "dispersion", "difficulty_validated": True,
+                # UNVALIDATED, and reclassified rather than dropped. It was stamped validated on a
+                # measured drop of 0.31 (0.45 -> 0.14); after the v4 role-order regeneration the
+                # same bands read 0.35 / 0.20 / 0.21 / 0.21 -- a drop of 0.14, under the 0.15 bar
+                # and flat after the first band. The consuming project's rule is that a band which
+                # does not slope gets reclassified, not kept, and a gradient that survives only on
+                # one revision's session draw was never evidence those questions are harder.
+                # n per band is 2-5 here, which is why it moved at all.
+                "difficulty_dial": "dispersion", "difficulty_validated": False,
                 # The item-to-session map is the answer key §6's conditional scoring needs:
                 # pairwise-order accuracy is computed over the items whose sessions were
                 # actually surfaced, which is unknowable from the answer string alone.
