@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0-beta] - 2026-08-17
+
 **TypedMemEval corpus revision v5.** v1 through v4 were all separable; none should be cited.
 
 > [!CAUTION]
@@ -69,6 +71,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offending **phrase** rather than only the feature.
 
 ### Added
+
+- **Corpus identity.** Pin these; a run whose provenance names a different hash is a different
+  benchmark. Every v1–v4 hash is superseded and must not be cited.
+
+  | Corpus id | Coverage @ K_ref = 5 | SHA-256 (newline-normalised) |
+  |---|---|---|
+  | `agenteval-typedmemeval-prospective-v5` | 0.700 | `6ddd3e9bb594816ee866b3255cd8a7beb274b6d46661d19574632299dd7df0f3` |
+  | `agenteval-typedmemeval-episodic-v5` | 0.682 | `2c6000a6912e5ef0464e01d93072c4c02f112b470f664b1381f6b5309a630303` |
+  | `agenteval-typedmemeval-arithmetic-v5` | 0.636 | `efa9add22a2a757b2f0827c00023eb1dd1872812faa8639f76caa345af231475` |
+  | `agenteval-typedmemeval-workingmemory-v5` | 0.867 | `43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933` |
+  | `agenteval-typedmemeval-forgetting-v5` | 0.670 | `ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656` |
 
 - **Citation-revision enforcement.** `sync_typedmemeval_docs.py` fails if the guide's citation rule
   names anything other than the current revision. The guide told readers to cite `v4` for the whole
@@ -3954,7 +3967,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.24.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...HEAD
+[0.25.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.24.0-beta...v0.25.0-beta
 [0.24.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.23.0-beta...v0.24.0-beta
 [0.13.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.1-beta...v0.13.2-beta
 [0.13.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.0-beta...v0.13.1-beta
