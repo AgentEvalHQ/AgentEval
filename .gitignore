@@ -427,6 +427,13 @@ nupkgs/
 # Strategy documents (internal - do not publish)
 strategy/
 
+# Cross-project handoffs from the consuming engine. Belt-and-braces: these live under strategy/
+# (already ignored above), but an untracked-yet-unignored `incoming/` is the worst combination --
+# it looks invisible right up until a broad `git add` sweeps it into a public commit, which is
+# exactly what happened on 2026-08-17 with three consumer handoff documents. Ignored by name so
+# recreating the folder anywhere cannot repeat it.
+incoming/
+
 # MAF source reference (local only - not for distribution)
 /MAF/
 # On-disk dir is MAFVnext (capital V). The old lowercase /MAFvnext/ matched only on
