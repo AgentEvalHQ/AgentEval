@@ -985,6 +985,12 @@ SEPARABILITY_REFUSED_FEATURES = frozenset({
     # ...and the first turn of each role on its own, which is where the evidence actually sits.
     *(f"first_{role}_{axis}" for role in ("user", "assistant")
       for axis in ("length_chars", "uppercase_density", "sentence_count")),
+    # ...and every LATER ordinal slot's length. Requested by the consuming project after it found
+    # per-slot lengths separating where the per-role totals did not: the length equalisation works
+    # on the aggregate, and an aggregate that balances can still leave the SECOND turn of a role
+    # separable. Slot 0 is already covered by `first_*` above; these are slots 1 upward.
+    *(f"{role}_slot{slot}_length_chars" for role in ("user", "assistant")
+      for slot in range(1, _ROLE_ORDER_POSITIONS)),
 })
 
 #: Nothing is measured-but-not-refused any more. The carve-out that used to live here excused
@@ -1127,7 +1133,7 @@ def _perfect_share(strata: list[tuple[list[float], list[float]]]) -> dict[str, f
 
 
 
-def _worst_role_sequence(questions: list[Question]) -> tuple[str | None, float]:
+def _worst_role_sequence(questions: list[Question]) -> tuple[str | None, float, list]:
     """The turn-role sequence that best predicts gold, and how well it does.
 
     Scored as a presence AUC on the whole sequence, so a shape whose gold reads u|a|a|u|a while
@@ -1138,7 +1144,7 @@ def _worst_role_sequence(questions: list[Question]) -> tuple[str | None, float]:
         return "|".join(turn.role[0] for turn in session.turns)
 
     candidates = {signature(s) for q in questions for s in q.sessions}
-    best, best_score = None, 0.5
+    best, best_score, best_strata = None, 0.5, []
     for candidate in sorted(candidates):
         strata = []
         for question in questions:
@@ -1149,8 +1155,8 @@ def _worst_role_sequence(questions: list[Question]) -> tuple[str | None, float]:
             strata.append((gold_values, other_values))
         score = _auc_within(strata)
         if score > best_score:
-            best, best_score = candidate, score
-    return best, best_score
+            best, best_score, best_strata = candidate, score, strata
+    return best, best_score, best_strata
 
 
 def separability_report(questions: list[Question], exempt: frozenset = frozenset()) -> dict:
@@ -1199,6 +1205,10 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
             f"first_{role}_sentence_count": lambda s, i, n, r=role: float(
                 sum(_slot(s, r, 0).count(c) for c in ".!?")),
         }
+    for role in ("user", "assistant"):
+        for slot in range(1, _ROLE_ORDER_POSITIONS):
+            role_features[f"{role}_slot{slot}_length_chars"] = (
+                lambda s, i, n, r=role, k=slot: float(len(_slot(s, r, k))))
     for role in ("user", "assistant"):
         role_features |= {
             f"{role}_length_chars": lambda s, i, n, r=role: float(len(_role(s, r))),
@@ -1269,12 +1279,34 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
             "z": round(stats["z"], 2),
         }
 
-    sequence, sequence_score = _worst_role_sequence(questions)
+    sequence, sequence_score, sequence_strata = _worst_role_sequence(questions)
     scores["role_sequence"] = round(sequence_score, 4)
 
-    gold_gram, gold_gram_score, filler_gram, filler_gram_score = _worst_boilerplate_ngram(questions)
+    (gold_gram, gold_gram_score, filler_gram, filler_gram_score,
+     exclusive_grams, gold_gram_strata) = _worst_boilerplate_ngram(questions)
     scores["gold_marker_ngram"] = round(gold_gram_score, 4)
     scores["boilerplate_ngram"] = round(filler_gram_score, 4)
+
+    # THE BYPASS FIX. These three features are scored for AUC outside the per-session loop above,
+    # and so were never given the distribution test -- 36 of 39 features got it and these did not.
+    # That is what let four verticals ship with gold-exclusive constructions: the consuming project
+    # found `'today'` in Arithmetic at 20% perfect separation against a chance rate so small the
+    # excess is z = 76, and the gate reported it as a passing 0.7365 because the only rule it was
+    # measured against was the threshold.
+    #
+    # `role_sequence` is the sharpest illustration and it is ours: it was added one revision ago
+    # BECAUSE the distribution rule is what caught the role-order defect, and it was added on the
+    # path that skips the distribution rule. It passed only because the `position_N_is_*` features
+    # go through the loop and did the work. A feature on this path was decoration.
+    for name, strata in (("role_sequence", sequence_strata),
+                         ("gold_marker_ngram", gold_gram_strata)):
+        if strata:
+            stats = _perfect_share(strata)
+            perfect[name] = {
+                "share": round(stats["share"], 4), "chance": round(stats["chance"], 4),
+                "observed": stats["observed"], "expected": round(stats["expected"], 2),
+                "z": round(stats["z"], 2),
+            }
 
     unknown = exempt - SEPARABILITY_REFUSED_FEATURES
     if unknown:
@@ -1323,17 +1355,52 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         "gold_marker_ngram_auc": scores["gold_marker_ngram"],
         "worst_boilerplate_ngram": filler_gram,
         "boilerplate_ngram_auc": scores["boilerplate_ngram"],
+        # A phrase recurring in at least the boilerplate share of questions with ZERO distractor
+        # occurrences. Refused on its own, because every AUC variant washes it out and a human
+        # reading the corpus sees it immediately -- which is how it was found.
+        "gold_exclusive_ngrams": exclusive_grams,
         "perfect_separation": perfect,
         "bimodal_features": {
             name: {**stats, "excess_over_chance": round(stats["share"] - stats["chance"], 4)}
             for name, stats in sorted(bimodal.items())
         },
-        "passed": (worst is None or scores[worst] < SEPARABILITY_MAX_AUC) and not bimodal,
+        "passed": ((worst is None or scores[worst] < SEPARABILITY_MAX_AUC)
+                   and not bimodal and not exclusive_grams),
     }
 
 
-def _worst_boilerplate_ngram(
-        questions: list[Question]) -> tuple[str | None, float, str | None, float]:
+#: Boundaries an n-gram may not cross: sentence enders, clause punctuation, and brackets.
+_SEGMENT_BOUNDARY = re.compile(r"[.!?:;()\[\]\"—–]+|\n+")
+
+
+def _segment_grams(text: str, sizes: tuple[int, ...] = (1, 2, 3)) -> set[str]:
+    """Every n-gram in `text`, built WITHIN punctuation segments and never across them.
+
+    Pooling a session's tokens into one flat stream invents phrases no reader ever sees. The screen
+    reported `'near enough also'` as a phrase in 21 Episodic gold sessions and 0 distractors -- a
+    perfect tell by every measure, and it does not exist. The text reads:
+
+        "... had stopped being interesting, (or near enough).  (Also on my mind: breaker, top, ..."
+
+    Two sentences and two brackets apart. `tokenize_raw` drops all punctuation, so the flat stream
+    read "... or near enough also on my mind ...", and the trigram straddling the gap was exclusive
+    to gold only because the ORDER in which padding and the echo were appended differed by side.
+
+    That is a defect in the instrument, not in the corpus, and it is the expensive kind: acting on it
+    would have meant regenerating a vertical that was already correct -- the same mistake as
+    "fixing" the empty turns. A screen that can report a phrase nobody wrote will eventually be
+    believed.
+    """
+    grams: set[str] = set()
+    for segment in _SEGMENT_BOUNDARY.split(text):
+        words = tokenize_raw(segment)
+        for size in sizes:
+            for i in range(len(words) - size + 1):
+                grams.add(" ".join(words[i:i + size]))
+    return grams
+
+
+def _worst_boilerplate_ngram(questions: list[Question]) -> tuple:
     """The recurring phrases that best predict gold and filler, and how well each does.
 
     Scored as an AUC on a 0/1 feature so it sits on the same scale as the numeric features: a
@@ -1349,12 +1416,10 @@ def _worst_boilerplate_ngram(
             # unrepresentable. "on the" marked Episodic's gold at AUC 0.763 -- above the refusal
             # bar -- and this screen could not see it in principle. The identical blindness was
             # found and fixed for type_token_ratio one revision earlier and never propagated here.
-            words = tokenize_raw(session.text())
             # Unigrams included: the single token "noted" scored as high as the best bigram on
-            # Forgetting, and a one-word filter is the cheapest classifier there is.
-            for size in (1, 2, 3):
-                for i in range(len(words) - size + 1):
-                    seen.add(" ".join(words[i:i + size]))
+            # Forgetting, and a one-word filter is the cheapest classifier there is. Built within
+            # punctuation segments -- see _segment_grams for the phantom phrase that forced this.
+            seen |= _segment_grams(session.text())
         appears_in.update(seen)
 
     # Grams each QUESTION uses itself, indexed per question rather than pooled. Relevance is the
@@ -1365,13 +1430,21 @@ def _worst_boilerplate_ngram(
     # exemption exists for -- WorkingMemory's "have", in 100% of its questions -- needs dropping
     # everywhere. So a question whose own text contains the gram contributes no pairs for it, and
     # every other question still does.
-    own_grams: list[set[str]] = []
-    for q in questions:
-        words = tokenize_raw(q.question)
-        own_grams.append({" ".join(words[i:i + size])
-                          for size in (1, 2, 3)
-                          for i in range(len(words) - size + 1)})
+    # The relevance exemption covers the question's own words AND ITS ANSWER'S. Gold containing its
+    # own answer is the definition of gold, not a leak, so answer vocabulary being gold-exclusive is
+    # not a finding -- and left in, it is a loud one: Episodic's list-order answers put `'marrow'` in
+    # 10 gold sessions and no distractor, which is a perfect classifier and completely legitimate.
+    # Sharing it with filler would mean writing the answer into the distractors.
+    #
+    # This is the boundary the consuming project drew by hand when it said "inspected by hand, not
+    # trusted from a number -- because a crude relevance exemption can flag genuine content". This is
+    # that judgement made mechanical: content is what the question or its answer names, and anything
+    # else recurring across a fifth of the questions and never reaching a distractor is a frame.
+    own_grams: list[set[str]] = [
+        _segment_grams(q.question) | _segment_grams(q.answer or "") for q in questions]
 
+    session_grams = {id(s): _segment_grams(s.text())
+                     for q in questions for s in q.sessions}
     candidates = [
         gram for gram, count in appears_in.items()
         if count / question_count >= BOILERPLATE_MIN_QUESTION_SHARE
@@ -1380,21 +1453,20 @@ def _worst_boilerplate_ngram(
         # Four values, matching the normal path. Returning two here raised ValueError in the
         # caller on any corpus small enough that no gram clears the recurrence floor -- a
         # --limit run, or a unit test, which is exactly where someone checks this code.
-        return None, 0.5, None, 0.5
+        return None, 0.5, None, 0.5, [], []
 
-    gold_gram, gold_score = None, 0.5
+    gold_gram, gold_score, gold_strata = None, 0.5, []
     filler_gram, filler_score = None, 0.5
+    exclusive: list[tuple[int, str]] = []
     for gram in candidates:
         # Padded on both sides so "list also" cannot match inside "checklist also".
-        needle = f" {gram} "
         strata = []
         for index, q in enumerate(questions):
             if gram in own_grams[index]:
                 continue          # relevance channel for THIS question; contributes no pairs
             gold_values, other_values = [], []
             for session in q.sessions:
-                haystack = f" {' '.join(tokenize_raw(session.text()))} "
-                value = 1.0 if needle in haystack else 0.0
+                value = 1.0 if gram in session_grams[id(session)] else 0.0
                 (gold_values if session.is_gold else other_values).append(value)
             strata.append((gold_values, other_values))
         raw = _auc_within(strata, fold=False)
@@ -1405,10 +1477,36 @@ def _worst_boilerplate_ngram(
         # calling those two the same number let "Noted" sit at 1.0 under a heading that reads
         # "this filler came from templates".
         if raw > gold_score:
-            gold_gram, gold_score = gram, raw
+            gold_gram, gold_score, gold_strata = gram, raw, strata
         if (1.0 - raw) > filler_score:
             filler_gram, filler_score = gram, 1.0 - raw
-    return gold_gram, gold_score, filler_gram, filler_score
+
+        # EXCLUSIVITY, scored separately from AUC because AUC cannot express it.
+        #
+        # A phrase recurring in a fifth of the questions and appearing in ZERO distractor sessions
+        # is a frame, not content -- no aggregation argument is needed to see that, which is the
+        # point. Every AUC variant washes it out: `'while it lasts'` sits in 12 gold sessions of
+        # Prospective and 0 distractors, and reads 0.615 pooled, 0.620 as a mean of per-question
+        # AUCs, and 0.607 for Forgetting's `'for the record'` (15 gold, 0 distractors). All pass a
+        # 0.75 bar. The reason is structural: a phrase absent from a question entirely makes that
+        # question uninformative, and the uninformative questions outnumber the decisive ones, so
+        # the mean is dragged to chance however the pairs are grouped.
+        #
+        # Forgetting also escapes the perfect-separation rule (0% at z = -0.57) because its G = 2
+        # and only one of the two gold sessions carries the marker, which caps its within-question
+        # AUC at 0.75 and never reaches 1.0. So this is the only test of the three that catches all
+        # four verticals, and it is also the one a human can check by eye.
+        gold_hits = sum(sum(1 for v in g if v) for g, _ in strata)
+        other_hits = sum(sum(1 for v in o if v) for _, o in strata)
+        if other_hits == 0 and gold_hits:
+            exclusive.append((gold_hits, gram))
+
+    # ALL of them, not the worst. Reporting one at a time costs a full regeneration per phrase, and
+    # these come in families -- one statement template usually contributes several overlapping
+    # grams -- so a generator fix wants the whole set in front of it.
+    exclusive.sort(reverse=True)
+    return (gold_gram, gold_score, filler_gram, filler_score,
+            [{"phrase": g, "gold_hits": h} for h, g in exclusive], gold_strata)
 
 
 def check_separability(questions: list[Question], exempt: frozenset = frozenset()) -> list[str]:
@@ -1424,6 +1522,15 @@ def check_separability(questions: list[Question], exempt: frozenset = frozenset(
             f"separability: '{worst}' separates gold from distractors at AUC {auc:.3f}, at or "
             f"above the {SEPARABILITY_MAX_AUC} refusal threshold. Evidence a cheap classifier can "
             f"find without reading it is evidence the benchmark is not measuring retrieval.")
+    if report.get("gold_exclusive_ngrams"):
+        grams = report["gold_exclusive_ngrams"]
+        listed = ", ".join(f"{g['phrase']!r} ({g['gold_hits']} gold)" for g in grams[:8])
+        more = f", and {len(grams) - 8} more" if len(grams) > 8 else ""
+        failures.append(
+            f"separability: {len(grams)} phrase(s) recurring in at least "
+            f"{int(BOILERPLATE_MIN_QUESTION_SHARE * 100)}% of questions appear in GOLD sessions and "
+            f"in ZERO distractor sessions: {listed}{more}. A construction only gold ever receives "
+            f"is a frame, not content, however little it says about the answer.")
     # Reported separately, because the pooled AUC can sit comfortably under the bar while the
     # feature still separates PERFECTLY in a large minority of questions. Naming the pooled
     # number as the reason for a bimodality failure sends the reader to the wrong measurement.

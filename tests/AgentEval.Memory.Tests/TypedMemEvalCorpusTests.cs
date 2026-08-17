@@ -559,6 +559,13 @@ public sealed class TypedMemEvalCorpusTests
         "position_1_is_user", "position_1_is_assistant",
         "position_2_is_user", "position_2_is_assistant",
         "position_3_is_user", "position_3_is_assistant",
+        // Per-(role, ordinal slot) length, for slots after the first. Requested by the consuming
+        // project, which found per-slot lengths separating where the per-role totals did not: the
+        // length equalisation balances the aggregate and can still leave the SECOND turn of a role
+        // separable. Slot 0 is covered by the first_* axes above.
+        "user_slot1_length_chars", "user_slot2_length_chars", "user_slot3_length_chars",
+        "assistant_slot1_length_chars", "assistant_slot2_length_chars",
+        "assistant_slot3_length_chars",
     ];
 
     /// <summary>
@@ -696,6 +703,12 @@ public sealed class TypedMemEvalCorpusTests
             {
                 if (name != $"position_{position}_is_{role}") continue;
                 return position < session.Count && session[position].Role == role ? 1.0 : 0.0;
+            }
+
+            for (var slot = 1; slot < RoleOrderPositions; slot++)
+            {
+                if (name != $"{role}_slot{slot}_length_chars") continue;
+                return SlotText(role, slot).Length;
             }
         }
 

@@ -114,6 +114,19 @@ def self_test() -> bool:
         problems.append("gate PASSED a corpus whose gold is identifiable from role order alone")
     if not any(name.startswith("position_") for name in bimodal):
         problems.append(f"no position_* feature flagged as bimodal; got {sorted(bimodal)}")
+    # role_sequence must be distribution-tested, not merely AUC-scored. It was added one revision
+    # ago BECAUSE the distribution rule catches role order, and it was added on the code path that
+    # skips that rule -- so it was decoration, and this defect was caught only because the
+    # position_* features happen to go through the per-session loop. Four verticals then shipped
+    # with gold-exclusive phrases for the same reason: gold_marker_ngram was on that path too.
+    if "role_sequence" not in report.get("perfect_separation", {}):
+        problems.append(
+            "role_sequence was not given the distribution test — it is being AUC-scored only, "
+            "which is the bypass that let four verticals ship separable")
+    if "role_sequence" not in bimodal:
+        problems.append(
+            f"role_sequence is distribution-tested but not flagged on a corpus whose gold is "
+            f"identifiable from role order; got {sorted(bimodal)}")
     if pooled >= tmc.SEPARABILITY_MAX_AUC:
         problems.append(
             f"pooled role_sequence {pooled:.4f} is now above the {tmc.SEPARABILITY_MAX_AUC} "
@@ -174,6 +187,12 @@ def main() -> None:
         }
         for name in report.get("bimodal_features", {}):
             failures[vertical].setdefault(name, report["features"].get(name, 1.0))
+        # Exclusivity is a count, not an AUC, so it needs its own ratchet entry -- and it needs one,
+        # because it is currently the only test that catches Forgetting's retention markers. Keyed
+        # by phrase so a NEW gold-exclusive phrase fails even while known ones are still blocked.
+        for gram in report.get("gold_exclusive_ngrams", []):
+            failures[vertical].setdefault(f"gold_exclusive:{gram['phrase']}",
+                                          float(gram["gold_hits"]))
         failed |= not report["passed"]
 
         if args.check:
