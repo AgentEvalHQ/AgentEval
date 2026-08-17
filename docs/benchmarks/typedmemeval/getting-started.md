@@ -5,10 +5,10 @@ isolation: **prospective memory**, **episodic structure**, **arithmetic over mem
 **working-memory distance**, and **forgetting**. Each vertical is its own corpus, its own
 question types, and its own validity rules.
 
-> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v3 (AgentEval)"**. TypedMemEval
+> **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v4 (AgentEval)"**. TypedMemEval
 > results are **not** LongMemEval results and must never be presented as, summed with, or averaged
 > with LongMemEval numbers. The twelve Prospective questions seeded from the time-grounded probe
-> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v3; a report that runs both
+> exist in both `agenteval-timegrounded-v1` and TypedMemEval-Prospective v4; a report that runs both
 > must not double-count them.
 
 TypedMemEval reuses LongMemEval's *file format* and AgentEval's LongMemEval harness machinery. That
@@ -173,9 +173,14 @@ Inputs are spread one per session (`G` ∈ 3..6), so a missed input does not deg
 *wrongs* it. Duration answers derive from session timestamps; under a timestamp-free injection mode
 those twelve questions are reported **unrun with a reason**, never counted as failures.
 
-### WorkingMemory (48 questions)
+### WorkingMemory (60 questions)
 
-Twelve fact families × four distances (1, 5, 15, 40 intervening sessions). Every cell is an
+Twelve fact families × five distances (8, 15, 25, 40, 60 intervening sessions). The ladder went
+to five rungs in v4 because two of the old four could not fail: at `K_ref` = 5, a haystack of 2
+or 6 sessions is one BM25 cannot miss in, so half the vertical sat in a structurally unfailable
+band and the ladder graded at three levels rather than four. `H > K_ref` turned out to be
+necessary and not sufficient — H = 6 still saturates — so the bottom rung starts where
+measurement showed grading actually begins. Every cell is an
 **independent question with its own haystack** — probing one stored fact at increasing distances
 would let each probe rehearse the memory, so later distances would measure refreshed memory rather
 than aged memory.
@@ -235,10 +240,10 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
 | Prospective | 50 | 0.820 | 1 (×46), 2 (×4) |
-| Episodic | 50 | 0.871 | 1 (×35), 4–7 (×15) |
-| Arithmetic | 50 | 0.661 | 3–6 |
-| WorkingMemory | 48 | 0.792 | 1 |
-| Forgetting | 50 | 0.690 — **0.557 over the 35 gold-bearing questions** | 0 (×15), 1 (×15), 2 (×20) |
+| Episodic | 50 | 0.658 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
+| Arithmetic | 50 | 0.655 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| WorkingMemory | 60 | 0.767 | 1 (×60) |
+| Forgetting | 50 | 0.730 | 0 (×15), 2 (×35) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -246,6 +251,44 @@ scores 1.0 vacuously — it cannot miss what was never there. The headline mean 
 measurement with definition, so the gold-bearing figure travels beside it, and the floor a run is
 compared against (`Coverage.CalibratedFloorMean`) is computed over gold-bearing questions only. A
 floor inflated by vacuous ones would flatter every system by the share of no-gold questions.
+
+## Difficulty bands
+
+Every question carries `difficulty` (1–5) and `difficulty_dial` in its `typedmemeval` block. The
+band is derived from **memory dials only** — dispersion, distance, interference, discrimination —
+never from answer-step trickiness, which would confound the answer model with the memory system.
+
+| Vertical | dial | what varies | banded | validated? |
+|---|---|---|---|---|
+| WorkingMemory | distance | 8 / 15 / 25 / 40 / 60 intervening sessions | 60/60 | **yes** |
+| Arithmetic | dispersion | 2–6 derivation inputs | 50/50 | **yes** |
+| Episodic | dispersion | list length 4–7 | 15/50 | **yes** |
+| Prospective | distance | 15–142 days from evidence to question | 38/50 | no |
+| Forgetting | discrimination | 4–15 sessions between statement and invalidation | 20/50 | no |
+
+**Not every question carries a band.** A dial only exists where the shape has one: Episodic's
+list length lives in its 15 list-order questions, Forgetting's gap in its 20 invalidated ones, and
+Prospective's displacement in its 38 paired arms. The unbanded remainder is not "difficulty 3" — it
+is unbanded, and it is the flat majority the family's own profile identified. Only WorkingMemory
+and Arithmetic band every question they contain.
+
+**"Validated" means the reference retriever's coverage slopes down across the bands.** That test
+matters more than the labels: a band nothing can fail is a label, not a band. Three verticals pass
+it. Two do not, and the reason is structural rather than a tuning problem — **BM25 has no time
+component**, so a dial measured in days cannot move it, and Forgetting's gap is a *position*
+rather than a count. The dials that do slope are exactly those that change lexical competition:
+list length and input count *are* the gold-session count, and WorkingMemory's distance *is* the
+distractor count.
+
+Read an unvalidated band as a description of how the corpus was built, not as evidence that those
+questions are harder. They are kept rather than dropped because dropping them would leave the
+family implying that memory difficulty is only ever lexical, which is the opposite of what it
+exists to measure — but the corpus marks them `difficulty_validated: false` so you cannot mistake
+one for the other.
+
+**Per-band `n` is 4–17.** These are diagnostics, never claims: the family's n ≥ 30 floor for a
+citable figure is per *vertical*, and no band comes close to it. Report bands to locate where a
+system degrades, and report the vertical when you quote a number.
 
 ## Validity rules
 
@@ -275,11 +318,20 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
 |---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 39/39 | — |
-| Episodic | 48/50 | — | 50/50 | 49/50 | — |
+| Prospective | 50/50 | 19/19 | 50/50 | 37/37 | — |
+| Episodic | 48/50 | — | 50/50 | 50/50 | — |
 | Arithmetic | 48/50 | — | 50/50 | 50/50 | 50/50 |
-| WorkingMemory | 48/48 | — | 48/48 | 48/48 | — |
-| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 |
+| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — |
+| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 |
+
+**Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
+ablating either the statement or the invalidation stops the model producing the gold, so both
+components are load-bearing. Its fifteen still-valid controls fail all fifteen, because their two
+components are a statement and a *re-affirmation of the same value* — ablating either leaves the
+other. That redundancy is deliberate: the control exists to catch over-forgetting, and a system
+that finds either mention has what it needs to say the fact still stands. Those questions carry
+`gold_components_redundant: true`. Read their per-component coverage as "either suffices", never as
+"both were needed".
 
 V3 and V6 take **three** ablation samples per question, not one. A single sample can miss a leak
 that is there — the distractor collision fixed in 0.22.0-beta was caught by one sample and could as
@@ -409,7 +461,7 @@ Pin `AnswerSeed` to measure the memory system's own variance; vary it to measure
 
 - **No cross-family composite score.** The verticals measure different mechanisms; a blend would
   rebuild the one percentage the family exists to replace.
-- **No leaderboard claims.** With 48–50 questions per vertical, v1 is an instrument for comparing
+- **No leaderboard claims.** With 50–60 questions per vertical, TypedMemEval is an instrument for comparing
   configurations of one system and for regression-testing memory mechanisms. Cross-system ranking
   needs the bands above and honest `n` reporting.
 - **No claim beyond the vertical.** The shapes inside a vertical (and WorkingMemory's distance

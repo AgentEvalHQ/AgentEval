@@ -81,7 +81,8 @@ jobs:
       run: |
         $expected = '${{ steps.version.outputs.version }}'
         $numeric  = ($expected -split '-')[0]
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        # No Add-Type: [IO.Compression.ZipFile] resolves natively on PowerShell 7, and the
+        # System.IO.Compression.FileSystem assembly name is a .NET Framework spelling.
         $bad = @()
         foreach ($pkg in Get-ChildItem ./nupkgs/*.nupkg) {
           $dir = Join-Path $env:RUNNER_TEMP ("x_" + $pkg.BaseName)

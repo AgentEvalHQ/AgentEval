@@ -1146,6 +1146,379 @@ is there — the gutter/inspection leak in §12 was caught by one sample and cou
 been missed by it. Three samples each, and unlike V2 there is no hit threshold: one sample
 that reconstructs the answer from distractors alone condemns the question.
 
+### 15. v3 is blocked: the phrase screen could not represent the tell (consumer finding, 2026-08-16)
+
+The consuming project's independent within-question re-probe found a gold marker in Episodic —
+`"on the"`, AUC **0.763**, gold 76% against distractor 22%, and present in only 4% of question
+text, so not the relevance channel. Every figure they reported replicates here exactly. **v3 fails
+its own gate and must not be cited.**
+
+**Why V7 could not see it.** The phrase screen built its candidate n-grams from `tokenize()`, which
+drops stopwords. `on` and `the` are both stopwords, so `"on the"` was never a candidate: not scored
+low, *unrepresentable*. The same is true of `"have"`, `"has"`, and `"i have"`. This is the identical
+blindness found one revision earlier for `type_token_ratio` — 0.566 filtered against 0.797 raw —
+where `tokenize_raw` was introduced to fix it and then not propagated to the screen next door. A fix
+applied to one caller and not to its neighbour is not a fix; it is a coincidence that held for one
+release.
+
+**Fixing the screen found worse than the report did.** With raw tokens, WorkingMemory's worst gold
+marker is `"i have"` at AUC **0.958** — gold 44 of 48 sessions, distractor **0 of 732** — appearing
+in no question text at all. A single bigram isolates that vertical's evidence almost perfectly, and
+it had been there since v1.
+
+**The relevance exemption had to be made per question to keep both facts visible.** Dropping a gram
+corpus-wide because any question used it hid `"on the"` on the strength of 2 questions in 50, while
+the case the exemption exists for — WorkingMemory's `"have"`, 100% question-driven, which the
+consumer correctly identified as the priced channel — needs dropping everywhere. A question whose
+own text contains the gram now contributes no pairs for it; every other question still does.
+
+**Adjudication: this is v4, not an accepted-and-bounded channel.** Refusing at 0.75 and then
+exempting a 0.958 marker because it has a sympathetic mechanism is the "carve-out with no ceiling"
+this ADR already rejected once for phrase recurrence. The consumer's mechanism hypothesis is right
+and broader than dates: gold states a datable first-person fact and filler does not, so gold's
+*statement grammar* differs — temporal grounding (`"today"`, `"on the"`) and first-person
+declaratives (`"i have"`) are the same effect seen through different n-grams.
+
+That is precisely the diagnosis §14 reached from the other direction. Gold and filler are built by
+different code paths and reconciled afterwards, so each patch removes a residue and the next
+measurement finds the next one. **v4 is the by-construction redesign** — gold and filler emitted by
+one template machinery, identical in shape and grammar, differing only in the fact asserted — and
+the Episodic attribution regeneration (§13) folds into it rather than preceding it.
+
+**A second v4 input, from the same pass: the not-yet-true after-arm, and per-shape ceilings.** The
+consumer's Prospective oracle read 45/50 against our 49/50, and all five of their failures were
+`not-yet-true` — 50% of that shape — while `expiring-validity` went 12/12. Our own records point
+the same way at a milder magnitude, and converge on the same pair:
+
+| Prospective shape | our V1 |
+|---|---|
+| due-later-reminder | 16/16 |
+| expiring-validity | 12/12 |
+| seed-carry-over | 12/12 |
+| **not-yet-true** | **9/10** |
+
+Our single failure is `tme-pro-046`, the **after** arm of pair `tme-pro-p17` — the pair on which
+they lost *both* arms. Two different answer models, failing the same shape, and the same pair
+hardest.
+
+The mechanism is visible in the gold. The after arm reads: *"That date has passed... so it is no
+longer ahead of you — though nothing since then records whether it went ahead."* That careful
+refusal is the round-1 fix (§12): the shape used to assert the event had happened on evidence that
+stated only a plan. The corrected answer withholds an inference the evidence licenses socially but
+not logically — and an answer model asserts it anyway. Their four after-arm failures are that,
+exactly.
+
+So the shape is measuring something real and hard, and its V1 ceiling is answer-model variance
+more than memory signal: 90% for one model, 50% for another. Two changes follow for v4. First,
+**publish V1 per shape, not only per vertical** — a vertical reported at 48/50 hides Arithmetic's
+`duration` at 83% and Episodic's `participant-attribution` at 87%, and this finding would have been
+visible before anyone spent a baseline. Second, the after arm should ask what the **record** shows
+rather than what happened; that keeps the epistemic distinction the shape exists to test while
+making the target answer unambiguous.
+
+**The v4 acceptance gate, agreed with the consumer.** v4 ships only when it clears **both**
+instruments: our V7, and the consuming project's independent probe, whose fixtures (probe output,
+the five metas, source, and a methodology README carrying the raw-tokenization requirement and
+their proposed acceptance criterion) become checked-in test data under
+`tests/AgentEval.Memory.Tests/Fixtures/consumer-probe/`. Their criterion is to be read **before**
+v4 is generated, not after: a corpus measured against a bar it was not built to clear is how v1,
+v2 and v3 each certified themselves.
+
+Written down here rather than agreed in conversation, because §13 promised the attribution
+regeneration in v3 and it slipped for exactly that reason — the commitment lived in prose and
+nothing failed when it was not met. Two things now enforce it: PR #166 stays open with the
+separability gate red until a regeneration turns it green honestly, so v4 cannot quietly ship
+without clearing V7; and the consumer's probe lands as CI test data, so it cannot be skipped by
+forgetting it existed.
+
+**Their acceptance criterion, read before v4 exists, added one rule V7 did not have.** A feature
+can pass on pooled AUC and still separate gold *perfectly* in a large minority of questions — a
+bimodal split a mean cannot show. Measured on v3: Episodic's `assistant_mean_turn_chars` pools to
+0.527 while turn length identifies the gold outright in **54%** of its questions. Twenty-four
+features pass the pooled gate and fail this one.
+
+**Adopted with one correction, because a flat share mis-scores it in both directions.** With one
+gold and H distractors a question's folded AUC is 1.0 whenever gold is strictly top or strictly
+bottom, so the chance rate is a function of the haystack. WorkingMemory varies H as its independent
+variable and a quarter of its questions have H = 1, where the answer is 1.0 by construction: its
+chance rate is **38%**, and the proposed flat 25% bar would refuse thirteen of its features for its
+own design. Episodic's chance rate is 9% against 54% observed. V7 therefore refuses on the *excess*
+— a share at least 0.20 and more than twice chance — which refuses Episodic (+47%) and Prospective
+(+12% to +22%) and correctly clears WorkingMemory's H = 1 stratum at zero.
+
+> **Superseded by §18.** "More than twice chance" compares a corpus-wide share against a
+> corpus-wide *mean* chance rate, which is the same averaging mistake in a smaller form: it charges
+> every rung at the average even when the rungs differ by design. The rule now sums the per-question
+> chances and tests the excess as a Poisson-binomial z ≥ 2.5, keeping the 0.20 floor. The reasoning
+> above about *why* the excess is the right thing to refuse on stands unchanged.
+
+Post-correction, three of five v3 corpora fail: Prospective and Episodic on the distribution,
+WorkingMemory on `"i have"`. Arithmetic and Forgetting clear both rules.
+
+The fixtures are checked in at `tests/AgentEval.Memory.Tests/Fixtures/consumer-probe/`.
+
+Post-v3 measurements, with the corrected screen: Prospective 0.715, Episodic **0.760 FAIL**,
+Arithmetic 0.737, WorkingMemory **0.958 FAIL**, Forgetting 0.679.
+
+### 16. What v4 is (scope, fixed before generation)
+
+"v4" has accumulated four separate meanings across the review rounds. Written down once, because a
+revision whose scope lives in conversation is the same failure as a commitment that lives in prose.
+
+**v4 is one corpus regeneration that must clear four things.** Not four revisions — one, because
+each item below requires regenerating the corpora, and regenerating twice means paying the probe
+bill (~5,000 reference-model calls) and a full consumer verification pass twice for a corpus that
+would be thrown away in between.
+
+**A. Separability — blocking (§15).** The defect is the *statement grammar*: gold states a datable
+first-person fact and filler does not, so `"i have"` marks WorkingMemory's gold in 44 of 48 sessions
+against 0 of 732 distractors, `"on the"` marks Episodic's at 0.763, and `"today"` marks
+Arithmetic's at 0.737. Patching individual n-grams cannot close a difference in how the two sides
+are written, so v4 generates gold and filler from **one template machinery** — identical in shape
+and grammar, differing only in the fact asserted. Acceptance: the strengthened V7 (pooled
+within-question AUC < 0.75 on every non-exempt feature including per-role and per-turn slices;
+raw-token n-grams with the relevance exemption applied per question; no feature separating
+perfectly in more than twice its chance share) **and** the consuming project's probe, both run
+against the published package bytes.
+
+**B. Shape corrections.** Episodic attribution draws its frame per question from a bank while
+staying byte-identical within a pair (§13, slipped once already). The `not-yet-true` after arm asks
+what the **record shows** rather than what happened, which is what makes it a coin flip for answer
+models today. V1 is published **per shape**, not only per vertical — reporting Arithmetic at 48/50
+hid `duration` at 83% and Episodic at 48/50 hid `participant-attribution` at 87% — both
+measured on v3, which is what made the case for reporting per shape at all. The v4 records
+carry the current figures per shape, and they are not the same numbers.
+
+**C. Difficulty calibration.** A `difficulty: 1-5` stamp per question, derived from the memory dials
+only — dispersion, distance, interference, discrimination — never answer-step trickiness, which
+confounds the answer model with the memory system. Two constraints settled before generation:
+
+  1. **The reference retriever defines the bands; the memory arm corroborates them.** A ladder
+     validated by "memory-arm outcomes slope down" is calibrated to whichever system validated it,
+     which is a benchmark tuned to the thing it measures. The bands must be derivable from the
+     corpus alone. Where the two disagree, that disagreement is a finding about the system.
+  2. **Per-band n is about 10, so bands are diagnostics and never claims.** Five bands over fifty
+     questions cannot carry the n ≥ 30 floor this ADR sets for a citable figure. Either that is
+     stated as loudly as the per-shape cells already are, or the corpora grow.
+
+  Validation, per the consumer's proposal and adopted: reference-retriever coverage slopes down
+  across bands while the **oracle stays flat**. Oracle-flat plus memory-sloped is the proof that a
+  band measures memory rather than answer difficulty; a band that does not slope is reclassified,
+  not kept. This rule already flags `not-yet-true`, whose V1 runs 50–90% across two answer models —
+  answer-step difficulty wearing a memory-difficulty costume — so B must land before C can band it.
+
+**C, in detail: the per-vertical difficulty levers.** From the consuming project's offline profile
+of v3 (checked in beside their probe fixtures), verified here against the corpora. Every lever is a
+memory dial — dispersion, distance, interference, discrimination — never answer-step complexity.
+
+| Vertical | v3 today (verified) | v4 lever |
+|---|---|---|
+| **Arithmetic** | The family's only working gradient: inputs 2→6 realising 0.92 / 0.70 / 0.73 / 0.55 / 0.42 | Publish the inputs ladder as the band variable and even the cells (today 6/17/11/8/8). **Cheapest lever in the family** — the response already exists, it is simply unnamed |
+| **WorkingMemory** | The only *published* ladder, but only three levels grade: H=2 → 1.00, H=6 → 1.00, H=16 → 0.75, H=41 → 0.42 | Re-rung so every band can fail (below). Add a same-family decoy at distance d/2 — today nothing in the haystack ever competes with the gold fact. Break the session-distance ↔ time-distance confound (each rung has exactly one time value today) |
+| **Forgetting** | Control arm is retrieval-*harder* than treatment: still-valid 0.47 (8 zeros of 15) against invalidated 0.62 | **Rebalance the arms first — that is a defect, not a dial.** Then publish the statement→invalidation gap (already evenly spread 4–15 sessions) as the band variable, and give never-known a near-miss neighbour so abstention discriminates rather than merely fails to find |
+| **Prospective** | Displacement spans 15–142 days (a real 9.5× spread) but stratifies nothing; interference is all-or-nothing (76% of questions face 0 competitors, the rest 12–17) | Band the displacement that already exists; parameterise the competing-reminder mechanism at 0/3/6/10/15 and extend it beyond due-later, which is the only shape that has it |
+| **Episodic** | Flattest: 35 of 50 questions (70%) are single-gold *and* full-coverage simultaneously | Decouple list-order from recency (median 1 session and 4.5 days from last item to question). Add a near-miss twin per shape — no shape has any competing material today. Extend the list-length ladder past 4–7 and publish it |
+
+**One refinement to the proposed WorkingMemory re-runging, from the data.** A rung can only grade if
+BM25@`K_ref` can miss, and the observed floor is higher than arithmetic suggests: H = 6 still
+realises 1.00, so `H > K_ref` is necessary and not sufficient. The proposed 2/8/15/25/40 yields
+H = 3/9/16/26/41, whose bottom rung cannot fail at all and whose second sits in the saturated
+regime. A ladder where every band grades wants roughly **d = 8 / 15 / 25 / 40 / 60** (H = 9/16/26/
+41/61). The general rule is worth stating because it will recur: *a difficulty band that the
+reference retriever cannot fail is not a band, it is a label.*
+
+**And one on Arithmetic.** The inputs ladder is monotone in trend but not strictly — 3 → 4 inverts
+(0.70 → 0.73) on cells of 17 and 11. Either the band variable is (inputs × dispersion-days) rather
+than inputs alone, or the inversion is published as-is. It must not be smoothed away: a band that
+does not slope gets reclassified, which is the consuming project's own rule and it applies to the
+vertical they called best-calibrated.
+
+**C, measured: the validation rule rejects most of the bands, and the reason is structural.**
+All five dials are stamped. Run the consuming project's own acceptance test — reference-retriever
+coverage must slope down across bands — and only one vertical passes cleanly:
+
+| Vertical | dial | bands (coverage) | slopes? |
+|---|---|---|---|
+| Episodic | dispersion (list length) | 0.45 / 0.40 / 0.21 / 0.14 | **yes** |
+| WorkingMemory | distance (sessions) | 0.92 / 0.83 / 0.67 / 0.42 / 0.50 | 4 of 5 |
+| Arithmetic | dispersion (inputs) | 0.96 / 0.70 / 0.75 / 0.55 / 0.44 | 4 of 5 |
+| Forgetting | discrimination (gap) | 0.40 / 1.00 / 0.70 / 0.50 / 0.75 | no |
+| Prospective | distance (days) | 1.00 / 1.00 / 1.00 / 0.20 / 1.00 | no |
+
+**BM25 has no time component.** A dial measured in *days* cannot move a lexical retriever, so
+Prospective's displacement band is unfalsifiable by this validator — not wrong, unvalidatable.
+The dials that do slope are exactly the ones that change lexical competition: list length and
+input count ARE the gold-session count, and WorkingMemory's `d` IS the distractor count.
+Forgetting's gap is a *position* rather than a count, which is why it barely moves anything.
+
+This is a real limit on the proposal as accepted, and it cuts both ways. Defining bands on the
+reference retriever keeps them system-independent, which is why §16 chose it over memory-arm
+outcomes — but it also means the retriever can only certify the subset of memory difficulty that
+is lexical. Time-displacement is a genuine memory dial that this validator is blind to.
+
+So the bands ship in two classes, and the metadata says which: **validated** (Episodic,
+WorkingMemory, Arithmetic — dispersion and session-distance) and **declared but unvalidated**
+(Prospective's time-displacement, Forgetting's gap). An unvalidated band is a description of how
+the corpus was built, not evidence that it is harder, and must not be read as the latter. The
+alternative — quietly dropping the dials the validator cannot see — would leave the family
+claiming that difficulty is only ever lexical, which is the opposite of what this family exists
+to measure.
+
+**The full validation rule, run against real oracle data.** §16 adopted the consuming project's
+test in both halves: reference-retriever coverage must slope DOWN across bands while the oracle
+stays FLAT. Only the first half could be checked before the probes ran. With v4 records stamped:
+
+| Vertical | retriever coverage | oracle V1 by band | verdict |
+|---|---|---|---|
+| WorkingMemory | 0.92 / 0.83 / 0.67 / 0.42 / 0.50 | 1.00 / 1.00 / 1.00 / 1.00 / 1.00 | **memory difficulty** |
+| Episodic | 0.45 / 0.40 / 0.21 / 0.14 | 1.00 / 1.00 / 1.00 / 1.00 | **memory difficulty** |
+| Arithmetic | 0.96 / 0.70 / 0.75 / 0.55 / 0.44 | **0.83 / 0.82** / 1.00 / 1.00 / 1.00 | **confounded** |
+
+WorkingMemory and Episodic pass both halves: retrieval gets harder across the ladder while the
+ceiling does not move, which is what makes the ladder a measurement of memory rather than of the
+answer model. That is the first time anything in this family has been positively demonstrated to
+grade memory difficulty rather than merely asserted to.
+
+Arithmetic fails the second half, and the cause is locatable: its two lowest bands sit at 0.83 and
+0.82 against 1.00 above them, because the `duration` shape lives at two and three inputs and
+`duration` is where the answer model struggles (8/12 on its own). So bands 1-2 mix dispersion with
+answer-step difficulty. Per the rule, that band does not get kept as-is — either `duration` is
+spread across the input ladder rather than concentrated at its foot, or the ladder is cut on
+(inputs x shape) instead of inputs alone. Recorded here rather than fixed, because it needs a
+generation change and this revision is otherwise closed; it is the first item for v5.
+
+The rule earned its place. A dispersion ladder whose easy end is quietly the answer model's hard
+end would have looked like a clean gradient in every number we publish.
+
+**D. Release plumbing.** Already on `main`: the release now stamps `-p:Version`, with a pre-push
+gate that refuses to publish assemblies disagreeing with the tag. v4 is the release that carries it,
+which is why no 0.23.1 was cut.
+
+**Everything lands on one branch.** v4 is developed on the branch behind PR #166 and merges when the
+gate it carries goes green honestly. The gate, the fixtures, and the corpora that must clear them
+therefore move together, which is the only arrangement in which "read the acceptance criterion
+before generating" is structurally true rather than a good intention.
+
+### 17. v4 as built (implementation record)
+
+§16 fixed the scope before generation. This records what the four conditions actually cost, since
+three of them turned out to be different problems than the plan assumed.
+
+**A landed as predicted in kind and not in detail.** Filler now states first-person facts in the
+same construction gold uses, and `"i have"` fell from 0.958 to 0.500 — but the first attempt
+matched the *person* and not the *tense* and moved it only to 0.945. Gold's present perfect is
+forced by the question form ("Which X **have I** …?"), so the construction had to match, not the
+speaker. The gate then found three structural faults the plan had not anticipated: turn counts
+needed normalising per ROLE rather than in total (gold ended `(u,a,u,a,a)` and filler
+`(u,a,u,a,u)`, so gold owned a slot no distractor had and it separated gold outright in 54% of
+questions while pooled `turn_count` read 0.615); the echo pool was drawing from question ANSWERS
+via Episodic's attribution questions, which embed the statement they ask about; and gold's own echo
+terms included its own answer, weaving it into the gold USER turn and breaking the assistant-stated
+invariant. All three were latent before v4 and none was on the plan.
+
+**B is confirmed by measurement, not assertion.** Reframing the `not-yet-true` after arm around
+what the record shows took that shape from **9/10** (and 5/10 on the consumer's answer model) to
+**10/10**, and Prospective as a whole to V1 50/50 with pair-flip 19/19. Episodic's attribution
+went 13/15 → 12/15, which is the honest cost of varying the frame: the wording no longer supplies
+the answer, so the shape got harder in exactly the way it was supposed to.
+
+**C is implemented and mostly unvalidated, which is the finding.** See the band table above. Three
+dials slope, two cannot, and the reason is that BM25 is blind to time. Banding coverage is also
+partial and stated as such: only WorkingMemory (60/60) and Arithmetic (50/50) band every question
+they contain, because a dial only exists where a shape has one.
+
+**What this revision cost, for the next person deciding whether to regenerate.** Four rounds of
+review found four corpus-invalidating defects, each invisible to the check that preceded it: a
+marker string (v1), a pooled statistic hiding a within-question tell (v2), an aggregate hiding its
+slices (v3), and a tokenizer that could not represent the tell at all (v3, found externally). The
+pattern is not that the checks were bad. It is that every check certifies the corpus against the
+failure its author had already imagined, and the next defect is by construction the one nobody
+imagined. That is the argument for an independent instrument, and it is why the consuming
+project's probe is now checked in beside ours as a required gate rather than a courtesy.
+
+### 18. Round five — role ORDER, and a chance model that punished a design (consumer finding, 2026-08-17)
+
+§17 closed with a prediction: the next defect is the one nobody imagined. It took one round.
+
+**The finding.** The consuming project's probe reported Episodic v4 gold identifiable *without
+reading a word*, from the sequence of turn roles alone — gold ran `u|a|a|u|a` in 27 of 50 questions
+while every distractor ran `u|a|u|a|a`. On `assistant-stated` it was total: 20/20 against 391/391.
+On `participant-attribution`, where the question is **who said it**, the sequence determined the
+speaker 15/15 — so it leaked not the location of the evidence but the answer, making it a V2
+failure as well as V7.
+
+**The cause was the previous fix.** `_pad_target` returned the last *free* turn of a role and
+appended only when every turn of that role was answer-bearing. Episodic is the one vertical that
+puts the answer on an assistant turn, so gold got an appended assistant turn and filler did not.
+`_normalise_turn_counts` then equalised the *counts* — driving `turn_count`, user count and
+assistant count to exactly 0.5000 — while preserving the *prefix* difference that created them.
+Appending to the tail cannot repair a prefix. The count tell was removed and the order tell was
+locked in by the same pass, and three axes at exactly chance is what made the residual invisible.
+
+**The fix is the invariant, not the cause.** Two changes, because fixing only the conditional would
+have left the next vertical to rediscover it:
+
+- `_pad_target` appends unconditionally, so no session's base shape depends on where the answer sits.
+- `_normalise_role_sequence` replaces `_normalise_turn_counts` and aligns every session in a
+  question onto a shortest-common-supersequence of their role sequences, inserting empty turns and
+  never reordering. This is the load-bearing half: it holds whatever a generator does upstream, and
+  re-injecting the old conditional `_pad_target` no longer reproduces the defect.
+
+The acceptance condition — *per question, the set of role sequences in gold equals the set in
+distractors* — now holds for **all five verticals, 0 gold-only sequences**, and `role_sequence` and
+every `position_N_is_*` read exactly 0.5000 family-wide.
+
+**Two more defects surfaced behind it**, both in padding, both of the same family as §14 — a
+statistic computed at a coarser grain than the defect lives at:
+
+- **The types axis double-counted.** A candidate's `types` contribution was scored from its own
+  distinct words, ignoring overlap with the turn and with pieces already appended in the same call.
+  The error compounds with how much padding a session needs, which is exactly what padding exists to
+  neutralise: heavily padded sessions finish under target, gold finishes closest. Type/token ratio
+  separated gold perfectly in 24% of Prospective's questions (chance 12%) on a pooled AUC of 0.602.
+  Scored against live vocabulary now.
+- **Punctuation density had no lever.** Gold states a dated, numbered fact and punctuates it; filler
+  does not. Short sentences are punctuation-dense but each costs a sentence, and tails bought one
+  comma each, so once `sentences` was at target the only way to add punctuation was to overshoot an
+  axis weighted 40. WorkingMemory separated at 14 questions against 6.1 expected (3.5 sd). Fixed by
+  adding punctuation-carrying tails — deliberately **without em dashes**, since that glyph was the
+  original v1 tell and reintroducing it here is how a fix becomes the next defect.
+
+**And the gate's chance model was wrong in a way that punished a design.** The bimodality rule
+refused when the perfectly-separated share was ≥ 0.20 and more than twice the *mean* chance rate.
+But a question's chance of a folded AUC of exactly 1 is `2/C(n, g)`, which runs from 22% at H=8 to
+3% at H=60 — and WorkingMemory varies H *as its independent variable*. Charging its small-haystack
+rungs at the corpus average refused it for having a design. The rule now sums the per-question
+chances and tests the excess as a Poisson-binomial z (≥ 2.5, with the 0.20 floor kept as a
+conjunct, because ~200 feature tests per family need practical as well as statistical significance).
+This is the same correction we asked the consumer to make to their flat 25% bar; it was overdue on
+our own instrument.
+
+The threshold is set at 2.5 because the types defect above sits at **2.67 sd** and must be caught;
+2.5 ≈ p < 0.01 one-tailed, and the floor supplies the practical-significance half. Worth recording
+that the correction was **not** what let WorkingMemory through: the punctuation finding re-refused
+on the new statistic at **3.5 sd** (14 observed against 6.1 expected) and had to be fixed on its
+merits. A hand-diagnostic run alongside the gate read that same feature at 10 observed and 1.73 sd
+by scoping the session text differently — a reminder that the instrument is the gate's own
+measurement, and a scratch script that disagrees with it is evidence about the script.
+
+**What the round changes about the method.** The gate now carries `--self-test`, which rebuilds this
+exact defect and asserts refusal. It pins which half does the refusing, and the answer is not the
+obvious one: pooled `role_sequence` reads **0.6152**, comfortably under the 0.75 threshold, so the
+AUC bar would have passed it. What refuses it is the distribution rule, at 27 observed against 3.48
+expected (z = 13.3). A future simplification that drops the distribution test in favour of "the AUC
+is fine" now fails in CI rather than in a consumer's acceptance probe.
+
+That also reconciles the two instruments: the consumer's 0.7700 is a mean of per-question AUCs and
+ours is pair-weighted, which is why the same defect reads 0.7700 there and 0.6152 here. Neither is
+wrong; the pair-weighted number is simply not the one that catches this, and knowing *which*
+statistic is load-bearing for *which* defect is the transferable lesson.
+
+**A last one, small but the same shape.** WorkingMemory published `exempt_features:
+["position_in_haystack"]` beside a reason paragraph that only discussed question relevance — the
+exemption text was a fixed string rather than per-feature. An exemption a reader cannot match to its
+reason is indistinguishable from an unexplained one, and this one waives a feature reading 1.000.
+
 ## Consequences
 
 **Positive.** The five mechanisms the consumer cannot measure become measurable, each in

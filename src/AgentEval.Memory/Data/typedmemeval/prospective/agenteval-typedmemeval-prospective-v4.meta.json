@@ -1,0 +1,947 @@
+{
+  "corpus_id": "agenteval-typedmemeval-prospective-v4",
+  "vertical": "prospective",
+  "revision": "v4",
+  "supersedes": {
+    "revision": "v3",
+    "shipped_in": "0.23.0-beta",
+    "reason": "v3 shipped separable. An independent within-question probe by the consuming project found the phrase screen could not represent n-grams made of stopwords, so \"on the\" marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 sessions against 0 of 732 distractors -- the latter present since v1. The cause was never a set of phrases: gold asserted a datable first-person fact and filler did not, so the two sides differed in grammar. v4 generates both from shared frames, normalises turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at K_ref (two of the old four could not), gives Forgetting's control arm the same G as its treatment arm, reframes the not-yet-true after arm around what the record shows, varies the Episodic attribution frame per question, and stamps a per-question difficulty band. Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 number is comparable with a v4 number. None of them should be cited."
+  },
+  "question_count": 50,
+  "corpus_sha256": "79c6a135ebb4ab19ea1f1cf50edeadf5c58231574535057924a217c5816b6d94",
+  "generator": {
+    "tool": "tools/gen_typedmemeval_prospective.py",
+    "version": "1.0.0",
+    "seed": 20260815
+  },
+  "k_ref": 5,
+  "coverage": {
+    "retriever": "bm25-okapi-k1.5-b0.75",
+    "band_low": 0.5,
+    "band_high": 0.9,
+    "mean_realised": 0.82,
+    "echo": 0.5,
+    "iterations": 2,
+    "search_trace": [
+      [
+        1.0,
+        0.02
+      ],
+      [
+        0.5,
+        0.82
+      ]
+    ],
+    "per_question": {
+      "tme-pro-001": 0.0,
+      "tme-pro-002": 1.0,
+      "tme-pro-003": 1.0,
+      "tme-pro-004": 1.0,
+      "tme-pro-005": 1.0,
+      "tme-pro-006": 1.0,
+      "tme-pro-007": 1.0,
+      "tme-pro-008": 1.0,
+      "tme-pro-009": 1.0,
+      "tme-pro-010": 1.0,
+      "tme-pro-011": 1.0,
+      "tme-pro-012": 1.0,
+      "tme-pro-013": 0.0,
+      "tme-pro-014": 0.0,
+      "tme-pro-015": 1.0,
+      "tme-pro-016": 1.0,
+      "tme-pro-017": 1.0,
+      "tme-pro-018": 1.0,
+      "tme-pro-019": 1.0,
+      "tme-pro-020": 1.0,
+      "tme-pro-021": 0.0,
+      "tme-pro-022": 0.0,
+      "tme-pro-023": 1.0,
+      "tme-pro-024": 1.0,
+      "tme-pro-025": 0.0,
+      "tme-pro-026": 0.0,
+      "tme-pro-027": 1.0,
+      "tme-pro-028": 1.0,
+      "tme-pro-029": 1.0,
+      "tme-pro-030": 1.0,
+      "tme-pro-031": 1.0,
+      "tme-pro-032": 1.0,
+      "tme-pro-033": 1.0,
+      "tme-pro-034": 1.0,
+      "tme-pro-035": 1.0,
+      "tme-pro-036": 1.0,
+      "tme-pro-037": 1.0,
+      "tme-pro-038": 1.0,
+      "tme-pro-039": 0.0,
+      "tme-pro-040": 0.0,
+      "tme-pro-041": 1.0,
+      "tme-pro-042": 1.0,
+      "tme-pro-043": 1.0,
+      "tme-pro-044": 1.0,
+      "tme-pro-045": 1.0,
+      "tme-pro-046": 1.0,
+      "tme-pro-047": 1.0,
+      "tme-pro-048": 1.0,
+      "tme-pro-049": 1.0,
+      "tme-pro-050": 1.0
+    }
+  },
+  "ceiling": {
+    "k_ref": 5,
+    "by_g": {
+      "1": 1.0,
+      "2": 1.0
+    },
+    "min": 1.0,
+    "structural_below_one": false
+  },
+  "structure": {
+    "g_distribution": {
+      "1": 46,
+      "2": 4
+    },
+    "h_min": 12,
+    "h_max": 18,
+    "gold_position_shuffled": true,
+    "h_is_independent_variable": false,
+    "no_absolute_dates": true,
+    "empty_turns": {
+      "count": 199,
+      "of_turns": 4381,
+      "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
+      "separates_gold": false
+    }
+  },
+  "probes": {
+    "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "none"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
+        "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
+        "position_0_is_assistant",
+        "position_0_is_user",
+        "position_1_is_assistant",
+        "position_1_is_user",
+        "position_2_is_assistant",
+        "position_2_is_user",
+        "position_3_is_assistant",
+        "position_3_is_user",
+        "position_in_haystack",
+        "punctuation_density",
+        "role_sequence",
+        "sentence_count",
+        "session_length_chars",
+        "turn_count",
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_type_token_ratio",
+        "user_uppercase_density"
+      ],
+      "exempt_features": [],
+      "reported_only_features": [],
+      "features": {
+        "session_length_chars": 0.5225,
+        "turn_count": 0.5,
+        "position_in_haystack": 0.5962,
+        "digit_density": 0.5,
+        "uppercase_density": 0.5406,
+        "sentence_count": 0.5681,
+        "punctuation_density": 0.5075,
+        "em_dash_density": 0.6019,
+        "mean_turn_chars": 0.5225,
+        "type_token_ratio": 0.5281,
+        "first_user_length_chars": 0.5231,
+        "first_user_uppercase_density": 0.5094,
+        "first_user_sentence_count": 0.5069,
+        "first_assistant_length_chars": 0.6188,
+        "first_assistant_uppercase_density": 0.595,
+        "first_assistant_sentence_count": 0.5537,
+        "user_length_chars": 0.5369,
+        "user_uppercase_density": 0.5194,
+        "user_sentence_count": 0.5012,
+        "user_punctuation_density": 0.5294,
+        "user_type_token_ratio": 0.5631,
+        "user_mean_turn_chars": 0.5369,
+        "assistant_length_chars": 0.5169,
+        "assistant_uppercase_density": 0.5663,
+        "assistant_sentence_count": 0.5794,
+        "assistant_punctuation_density": 0.5044,
+        "assistant_type_token_ratio": 0.5913,
+        "assistant_mean_turn_chars": 0.5169,
+        "position_0_is_user": 0.5,
+        "position_0_is_assistant": 0.5,
+        "position_1_is_user": 0.5,
+        "position_1_is_assistant": 0.5,
+        "position_2_is_user": 0.5,
+        "position_2_is_assistant": 0.5,
+        "position_3_is_user": 0.5,
+        "position_3_is_assistant": 0.5,
+        "role_sequence": 0.5,
+        "gold_marker_ngram": 0.7119,
+        "boilerplate_ngram": 0.6081
+      },
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.7119,
+      "worst_role_sequence": null,
+      "role_sequence_auc": 0.5,
+      "worst_gold_marker_ngram": "good",
+      "gold_marker_ngram_auc": 0.7119,
+      "worst_boilerplate_ngram": "in",
+      "boilerplate_ngram_auc": 0.6081,
+      "perfect_separation": {
+        "session_length_chars": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "turn_count": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_in_haystack": {
+          "share": 0.08,
+          "chance": 0.1189,
+          "observed": 4,
+          "expected": 5.95,
+          "z": -0.85
+        },
+        "digit_density": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "uppercase_density": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "sentence_count": {
+          "share": 0.12,
+          "chance": 0.1189,
+          "observed": 6,
+          "expected": 5.95,
+          "z": 0.02
+        },
+        "punctuation_density": {
+          "share": 0.04,
+          "chance": 0.1189,
+          "observed": 2,
+          "expected": 5.95,
+          "z": -1.73
+        },
+        "em_dash_density": {
+          "share": 0.12,
+          "chance": 0.1189,
+          "observed": 6,
+          "expected": 5.95,
+          "z": 0.02
+        },
+        "mean_turn_chars": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "type_token_ratio": {
+          "share": 0.12,
+          "chance": 0.1189,
+          "observed": 6,
+          "expected": 5.95,
+          "z": 0.02
+        },
+        "first_user_length_chars": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "first_user_uppercase_density": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "first_user_sentence_count": {
+          "share": 0.02,
+          "chance": 0.1189,
+          "observed": 1,
+          "expected": 5.95,
+          "z": -2.17
+        },
+        "first_assistant_length_chars": {
+          "share": 0.14,
+          "chance": 0.1189,
+          "observed": 7,
+          "expected": 5.95,
+          "z": 0.46
+        },
+        "first_assistant_uppercase_density": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "first_assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "user_length_chars": {
+          "share": 0.08,
+          "chance": 0.1189,
+          "observed": 4,
+          "expected": 5.95,
+          "z": -0.85
+        },
+        "user_uppercase_density": {
+          "share": 0.16,
+          "chance": 0.1189,
+          "observed": 8,
+          "expected": 5.95,
+          "z": 0.9
+        },
+        "user_sentence_count": {
+          "share": 0.12,
+          "chance": 0.1189,
+          "observed": 6,
+          "expected": 5.95,
+          "z": 0.02
+        },
+        "user_punctuation_density": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "user_type_token_ratio": {
+          "share": 0.12,
+          "chance": 0.1189,
+          "observed": 6,
+          "expected": 5.95,
+          "z": 0.02
+        },
+        "user_mean_turn_chars": {
+          "share": 0.08,
+          "chance": 0.1189,
+          "observed": 4,
+          "expected": 5.95,
+          "z": -0.85
+        },
+        "assistant_length_chars": {
+          "share": 0.14,
+          "chance": 0.1189,
+          "observed": 7,
+          "expected": 5.95,
+          "z": 0.46
+        },
+        "assistant_uppercase_density": {
+          "share": 0.1,
+          "chance": 0.1189,
+          "observed": 5,
+          "expected": 5.95,
+          "z": -0.42
+        },
+        "assistant_sentence_count": {
+          "share": 0.06,
+          "chance": 0.1189,
+          "observed": 3,
+          "expected": 5.95,
+          "z": -1.29
+        },
+        "assistant_punctuation_density": {
+          "share": 0.06,
+          "chance": 0.1189,
+          "observed": 3,
+          "expected": 5.95,
+          "z": -1.29
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.08,
+          "chance": 0.1189,
+          "observed": 4,
+          "expected": 5.95,
+          "z": -0.85
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.14,
+          "chance": 0.1189,
+          "observed": 7,
+          "expected": 5.95,
+          "z": 0.46
+        },
+        "position_0_is_user": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_0_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_1_is_user": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_1_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_2_is_user": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_2_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_3_is_user": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        },
+        "position_3_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1189,
+          "observed": 0,
+          "expected": 5.95,
+          "z": -2.61
+        }
+      },
+      "bimodal_features": {},
+      "passed": true,
+      "status": "run",
+      "measured_at": "2026-08-16T23:50:05Z",
+      "probed_corpus_sha256": "79c6a135ebb4ab19ea1f1cf50edeadf5c58231574535057924a217c5816b6d94"
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-17T00:34:58Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v1_pair_flip": {
+      "pairs": 19,
+      "passed": 19,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 37,
+      "passed": 37,
+      "failed": [],
+      "not_decidable": [
+        "tme-pro-009",
+        "tme-pro-019",
+        "tme-pro-021",
+        "tme-pro-023",
+        "tme-pro-025",
+        "tme-pro-027",
+        "tme-pro-030",
+        "tme-pro-034",
+        "tme-pro-038",
+        "tme-pro-044",
+        "tme-pro-046",
+        "tme-pro-048",
+        "tme-pro-050"
+      ],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for prospective"
+    },
+    "by_shape": {
+      "due-later-reminder": {
+        "questions": 16,
+        "v1_applicable": 16,
+        "v1_passed": 16,
+        "v3_applicable": 11,
+        "v3_passed": 11
+      },
+      "expiring-validity": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 9,
+        "v3_passed": 9
+      },
+      "not-yet-true": {
+        "questions": 10,
+        "v1_applicable": 10,
+        "v1_passed": 10,
+        "v3_applicable": 6,
+        "v3_passed": 6
+      },
+      "seed-carry-over": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 11,
+        "v3_passed": 11
+      }
+    },
+    "per_question": {
+      "tme-pro-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-037": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-039": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-042": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-043": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-045": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-046": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-049": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-050": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "79c6a135ebb4ab19ea1f1cf50edeadf5c58231574535057924a217c5816b6d94"
+  }
+}

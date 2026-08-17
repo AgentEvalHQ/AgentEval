@@ -1214,7 +1214,7 @@
   {
     "id": "cal-wm-001",
     "vertical": "WorkingMemory",
-    "shape": "distance-1",
+    "shape": "distance-8",
     "question": "Where do I work?",
     "gold": "At Halverson Freight.",
     "answer": "You work at Halverson Freight.",
@@ -1225,7 +1225,7 @@
   {
     "id": "cal-wm-002",
     "vertical": "WorkingMemory",
-    "shape": "distance-1",
+    "shape": "distance-8",
     "question": "Where do I work?",
     "gold": "At Halverson Freight.",
     "answer": "At Halverson Foods.",
@@ -1236,7 +1236,7 @@
   {
     "id": "cal-wm-003",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "Where do I work?",
     "gold": "At Halverson Freight.",
     "answer": "I do not have that on hand.",
@@ -1247,7 +1247,7 @@
   {
     "id": "cal-wm-004",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "Where do I work?",
     "gold": "At Halverson Freight.",
     "answer": "You have never told me where you work.",
@@ -1280,7 +1280,7 @@
   {
     "id": "cal-wm-007",
     "vertical": "WorkingMemory",
-    "shape": "distance-1",
+    "shape": "distance-8",
     "question": "What is my cat called?",
     "gold": "Tobias.",
     "answer": "Tobias. You mentioned him when you were talking about the vet.",
@@ -1291,7 +1291,7 @@
   {
     "id": "cal-wm-008",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "Who do I work for, and what do I do there?",
     "gold": "Halverson Freight, as a route planner.",
     "answer": "Halverson Freight.",
@@ -1379,7 +1379,7 @@
   {
     "id": "cal-wm-016",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "Which shift do I usually work?",
     "gold": "Nights.",
     "answer": "Nights - I know because you said you are always asleep by lunchtime.",
@@ -1390,7 +1390,7 @@
   {
     "id": "cal-wm-017",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "Did I ever tell you my landlord's name?",
     "gold": "No - the landlord's name never came up.",
     "answer": "You have not - I have no record of a landlord's name.",
@@ -1412,7 +1412,7 @@
   {
     "id": "cal-wm-019",
     "vertical": "WorkingMemory",
-    "shape": "distance-1",
+    "shape": "distance-8",
     "question": "What is my usual coffee order?",
     "gold": "A flat white, no sugar.",
     "answer": "A flat white with no sugar. I am less sure whether you take it to go.",
@@ -1445,7 +1445,7 @@
   {
     "id": "cal-wm-022",
     "vertical": "WorkingMemory",
-    "shape": "distance-5",
+    "shape": "distance-15",
     "question": "What did I say my monthly budget was?",
     "gold": "Twelve hundred a month.",
     "answer": "Budget for what - the flat or the car? I do not have a figure I can point to.",

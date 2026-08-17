@@ -58,34 +58,27 @@ GENERATOR_VERSION = "1.0.0"
 
 #: The dataset revision these generators emit. Stamped into every result, so two corpora with
 #: different questions can never wear the same name.
-CORPUS_REVISION = "v3"
+CORPUS_REVISION = "v4"
 
 #: What this revision replaces and why. A superseded corpus whose replacement does not say what was
 #: wrong with it invites someone to keep citing the old numbers.
 SUPERSEDES = {
-    "revision": "v2",
-    "shipped_in": None,
+    "revision": "v3",
+    "shipped_in": "0.23.0-beta",
     "reason": (
-        "v2 was never released; it existed only on an unmerged branch, and it carried the same class "
-        "of defect it was created to fix. Its own V7 check passed because the check was wrong twice "
-        "over: it pooled (gold, distractor) pairs ACROSS questions, which diluted a within-question "
-        "tell in Forgetting from 0.903 to 0.616, and its refused-feature list covered neither "
-        "punctuation nor sentence structure nor phrase markers on gold. Measured properly, v2 gold "
-        "was recoverable from Forgetting at AUC 1.000 by the literal substring \"Noted\", at 0.95 on "
-        "two verticals by the presence of an em dash, and at 0.990 in WorkingMemory by counting full "
-        "stops. v3 equalises every session on all six raw counts the refused features are built "
-        "from, so retrieval difficulty moved again and no v1 or v2 number is comparable with a v3 "
-        "number. Neither should be cited."
+        "v3 shipped separable. An independent within-question probe by the consuming project "
+        "found the phrase screen could not represent n-grams made of stopwords, so \"on the\" "
+        "marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 "
+        "sessions against 0 of 732 distractors -- the latter present since v1. The cause was "
+        "never a set of phrases: gold asserted a datable first-person fact and filler did not, "
+        "so the two sides differed in grammar. v4 generates both from shared frames, normalises "
+        "turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at "
+        "K_ref (two of the old four could not), gives Forgetting's control arm the same G as its "
+        "treatment arm, reframes the not-yet-true after arm around what the record shows, varies "
+        "the Episodic attribution frame per question, and stamps a per-question difficulty band. "
+        "Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 "
+        "number is comparable with a v4 number. None of them should be cited."
     ),
-    "also_supersedes": {
-        "revision": "v1",
-        "shipped_in": "0.22.0-beta",
-        "reason": (
-            "Gold carried the BM25 calibration clause 0 times in 501 sessions against ~99% for "
-            "distractors, so a one-line string filter isolated every piece of evidence in every "
-            "corpus."
-        ),
-    },
 }
 
 #: Reference retrieval budget, in sessions. Ratified uniform across verticals for v1
@@ -112,7 +105,7 @@ VERTICALS = {
     "prospective":  ("pro",  50),
     "episodic":     ("epi",  50),
     "arithmetic":   ("ari",  50),
-    "workingmemory": ("wm",  48),
+    "workingmemory": ("wm",  60),
     "forgetting":   ("for",  50),
 }
 
@@ -443,20 +436,6 @@ def check_echo_parity(questions: list[Question]) -> list[str]:
 _NAME_HEADS = ["Bram", "Calder", "Denn", "Farrow", "Halden", "Ithe", "Kesse", "Lorrin", "Marth",
                "Norra", "Pell", "Quenn", "Rusk", "Sable", "Thorne", "Velle", "Wend", "Yarrow"]
 _NAME_TAILS = ["qvist", "zell", "xby", "vund", "kjar", "wraith", "zorn", "quorn", "phex", "yrn"]
-#: Raises capitalisation density: mostly names, little connective text.
-_SHAPE_CLAUSES_DENSE = [
-    "{a} {b} agreed. {a} {b} would too.",
-    "Ask {a} {b} — {a} {b} knows.",
-    "{a} {b}, {a} {b}, same story.",
-]
-#: Lowers it: connective text, no names.
-_SHAPE_CLAUSES_PLAIN = [
-    "it seemed worth putting down somewhere before it slipped away again.",
-    "that is roughly where the thought ended up after turning it over a while.",
-    "nothing much turns on it either way but it stuck in the mind.",
-]
-
-
 #: Grammatical padding. The first version emitted a bag of words to hit an exact character count,
 #: which met the separability target and produced corpora ending in "Still Given These these later
 #: since those those aside" — a corpus nobody would read twice, and one no reviewer would trust.
@@ -506,11 +485,11 @@ _PAD_SHORT = [
 _PAD_TAILS = [
     "more or less", "as it turned out", "in the end", "for what it is worth",
     "though it hardly mattered", "at least for now", "one way or another",
-    "which was fine by me", "as far as any of it went", "or so it seemed at the time",
-    "which is roughly how these things tend to go",
+    "and that was fine by me", "as far as any of it went", "or so it seemed at the time",
+    "roughly how these things tend to go",
     "though I doubt anyone else gave it a second thought",
     "and that seemed a reasonable enough place to leave it",
-    "which took rather longer to sort out than it should have",
+    "though it took rather longer to sort out than it should have",
     "though by then the whole business had stopped being interesting",
     "and nobody has raised it with me since, so far as I can remember",
 ]
@@ -520,7 +499,30 @@ _PAD_TAILS = [
 #: one-sentence error is not a trade worth making. That left WorkingMemory's gold one capital light
 #: in almost every question and separable on capitals-per-character at 0.760.
 _PAD_NAME_TAILS = [
-    "as {n} put it", "according to {n}", "which is {n}'s view too", "or so {n} reckons",
+    "as {n} put it", "according to {n}", "and {n} says the same", "or so {n} reckons",
+]
+#: Tails that carry punctuation beyond the comma that attaches them, for closing a punctuation
+#: deficit once the sentence budget is already spent.
+#:
+#: Without these the search has no such lever, and the gap it could not close was a real tell:
+#: gold states a dated, numbered fact and punctuates it, filler does not, so gold ran denser. Short
+#: sentences are punctuation-dense but each one costs a sentence, and the plain tails buy exactly
+#: one comma each -- so once `sentences` was at target the only way to add punctuation was to
+#: overshoot an axis weighted 40. WorkingMemory's punctuation density separated gold perfectly in
+#: 14 questions against 6.1 expected (3.5 sd) on a pooled AUC of 0.608.
+#:
+#: No em dashes. The glyph was the original v1 tell -- gold's "Noted — I have that down." against
+#: filler that never used it -- and `em_dash_density` is a refused feature in its own right;
+#: reintroducing it here to fix a different density is how a fix becomes the next defect.
+_PAD_PUNCT_TAILS = [
+    "which, all things considered, was that",
+    "and, as it happens, that was that",
+    "(though not by much)",
+    "(or near enough)",
+    "which, on reflection, seems right",
+    "and, for once, nobody minded",
+    "(it hardly signified)",
+    "which, in fairness, was the point",
 ]
 
 
@@ -557,10 +559,19 @@ def _pad_target(session: Session, role: str = "assistant") -> int:
     byte-identical whichever speaker carries it, and "X and Y had both said as much" appended to a
     who-said-it question's evidence is a cue in the answer itself.
     """
-    free = [i for i, turn in enumerate(session.turns)
-            if turn.role == role and not turn.has_answer]
-    if free:
-        return free[-1]
+    # Unconditionally a FRESH turn, never an existing free one. Appending only when no free turn
+    # of the role existed made a session's shape depend on where `has_answer` sits: Episodic's
+    # assistant-stated gold carries the answer on its only assistant turn, so gold gained an
+    # appended turn and filler did not. Gold became u|a|a and filler u|a, and although
+    # _normalise_turn_counts then equalised the per-role COUNTS to exactly 0.5000, it does so by
+    # appending to the tail -- and a tail append cannot repair a prefix. The surviving order,
+    # gold u|a|a|u|a against filler u|a|u|a|a, identified gold in 27 of 50 questions without
+    # reading a word, and for the attribution shape it encoded WHICH SPEAKER said the answer,
+    # which is the answer. Found by the consuming project, not by us.
+    #
+    # The invariant this restores, and the one worth stating because any future vertical that
+    # puts `has_answer` on an assistant turn reproduces the defect otherwise: per question, the
+    # set of role sequences present in gold must equal the set present in distractors.
     session.turns.append(Turn(role, ""))
     return len(session.turns) - 1
 
@@ -577,6 +588,62 @@ def _ensure_padding_turns(session: Session) -> None:
     """
     for role in ("user", "assistant"):
         session.turns.append(Turn(role, ""))
+
+
+def _shortest_common_supersequence(left: str, right: str) -> str:
+    """Shortest string containing both `left` and `right` as subsequences."""
+    rows, columns = len(left), len(right)
+    lengths = [[0] * (columns + 1) for _ in range(rows + 1)]
+    for i in range(rows - 1, -1, -1):
+        for j in range(columns - 1, -1, -1):
+            lengths[i][j] = (1 + lengths[i + 1][j + 1] if left[i] == right[j]
+                             else max(lengths[i + 1][j], lengths[i][j + 1]))
+    out, i, j = [], 0, 0
+    while i < rows and j < columns:
+        if left[i] == right[j]:
+            out.append(left[i]); i += 1; j += 1
+        elif lengths[i + 1][j] >= lengths[i][j + 1]:
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1
+    return "".join(out) + left[i:] + right[j:]
+
+
+def _normalise_role_sequence(question: Question) -> None:
+    """Gives every session in a question the identical sequence of turn ROLES.
+
+    Equalising per-role counts is not enough, and the difference is not academic. Counts landed on
+    exactly 0.5000 -- a successful equalisation -- while Episodic's gold still read u|a|a|u|a
+    against u|a|u|a|a for every distractor, identifying gold in 27 of 50 questions with no words
+    read, and encoding WHICH SPEAKER said the answer for the attribution shape, which is the
+    answer. Prospective's carried seed questions had the same defect from the other direction:
+    their sessions come from the time-grounded corpus and carry its turn structure, so gold read
+    u|a|u|a|a|u|a against u|a|a|u|a|u|a.
+
+    Turns are only ever INSERTED, never reordered: moving a turn would move the evidence. So the
+    target is the shortest sequence containing every session's own sequence as a subsequence, and
+    each session is aligned to it by inserting empty turns of the missing role. Padding fills them
+    afterwards like any other turn.
+
+    The invariant, worth naming because any vertical that puts `has_answer` on an assistant turn
+    reproduces the defect otherwise: per question, the set of role sequences present in gold must
+    equal the set present in distractors.
+    """
+    signatures = ["".join(turn.role[0] for turn in s.turns) for s in question.sessions]
+    target = signatures[0]
+    for signature in signatures[1:]:
+        target = _shortest_common_supersequence(target, signature)
+
+    for session in question.sessions:
+        aligned: list[Turn] = []
+        position = 0
+        for symbol in target:
+            if position < len(session.turns) and session.turns[position].role[0] == symbol:
+                aligned.append(session.turns[position]); position += 1
+            else:
+                aligned.append(Turn("user" if symbol == "u" else "assistant", ""))
+        aligned.extend(session.turns[position:])
+        session.turns = aligned
 
 
 #: Lower-case continuations. A tail lengthens a sentence without starting a new one and without
@@ -654,7 +721,8 @@ def _profile_vector(text: str) -> dict[str, int]:
 
 
 def _pad_greedy(deficit: dict[str, int],
-                rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
+                rng: random.Random,  # DevSkim: ignore DS148264 - deterministic corpus generation
+                vocabulary: frozenset[str] = frozenset()) -> str:
     """Chooses padding one sentence at a time, closing whichever axis is furthest from its target.
 
     The formula this replaced computed a sentence mix from the capital budget and hoped the other
@@ -667,6 +735,18 @@ def _pad_greedy(deficit: dict[str, int],
     across every axis at once, overshoot counted as harshly as shortfall -- a session padded PAST
     the common target separates exactly as well as one left short of it, because the metric folds
     direction. Whichever candidate leaves the least residual is appended, and the loop re-measures.
+
+    ``types`` is the one axis that cannot be scored on a candidate in isolation, and scoring it that
+    way was a defect rather than an approximation. A word already in the turn -- or in a sentence
+    appended earlier in this same call -- costs a token but NOT a type, so counting a candidate's own
+    distinct words credits repeats as fresh vocabulary. The error compounds with how much padding a
+    session needs, which is exactly the quantity the padding exists to neutralise: a heavily padded
+    session accumulates the most double-counting and finishes UNDER the true target, while gold --
+    which starts near the peak and needs least -- finishes closest to it. That left type/token ratio
+    separating gold perfectly in 24% of Prospective's questions against a 12% chance rate while the
+    POOLED ratio read a harmless 0.602, so it survived every aggregate. The axis is therefore scored
+    against live vocabulary: `vocabulary` is what the turn already holds, and it grows as pieces are
+    committed.
     """
     def name() -> str:
         return f"{rng.choice(_NAME_HEADS)} {rng.choice(_NAME_HEADS)}{rng.choice(_NAME_TAILS)}"
@@ -676,10 +756,15 @@ def _pad_greedy(deficit: dict[str, int],
 
     def minus(remaining: dict[str, float], text: str, joined: bool) -> dict[str, float]:
         added = _profile_vector((" " if joined else "") + text)
+        added["types"] = len(set(tokenize_raw(text)) - seen_words)
         return {axis: remaining[axis] - added[axis] for axis in _PAD_AXES}
+
+    def commit(text: str) -> None:
+        seen_words.update(tokenize_raw(text))
 
     pieces: list[str] = []
     tailed: Counter[int] = Counter()
+    seen_words: set[str] = set(vocabulary)
     remaining = {axis: float(deficit.get(axis, 0)) for axis in _PAD_AXES}
 
     for _ in range(_PAD_MAX_PIECES):
@@ -708,6 +793,7 @@ def _pad_greedy(deficit: dict[str, int],
                 continue
             candidate_tails = [rng.choice(_PAD_TAILS) for _ in range(4)]
             candidate_tails.append(rng.choice(_PAD_NAME_TAILS).format(n=name()))
+            candidate_tails.append(rng.choice(_PAD_PUNCT_TAILS))
             for tail in candidate_tails:
                 after = cost(minus(remaining, f", {tail}", False))
                 if after < best_cost:
@@ -717,15 +803,58 @@ def _pad_greedy(deficit: dict[str, int],
             break
         if best_action[0] == "append":
             remaining = minus(remaining, best_action[1], bool(pieces))
+            commit(best_action[1])
             pieces.append(best_action[1])
         else:
             _, index, tail = best_action
             remaining = minus(remaining, f", {tail}", False)
+            commit(tail)
             pieces[index] = f"{pieces[index][:-1]}, {tail}."
             tailed[index] += 1
 
     rng.shuffle(pieces)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles neutral padding sentences, not secrets.
     return " ".join(pieces)
+
+
+def _drop_universally_empty_slots(question: Question) -> None:
+    """Removes turn slots that ended up empty in EVERY session of a question.
+
+    The role-sequence alignment inserts empty turns to give every session a common sequence, and
+    the slot padding then fills them -- except where a slot is empty in every member. There the
+    slot's peak is zero, and the padding margin is multiplicative, so a zero peak targets zero and
+    the turn ships blank. 1387 of 30761 turns did.
+
+    Removing beats filling. Blank turns separate nothing (their counts are uniform by construction
+    and measured BELOW chance in all five verticals), so this is a readability fix, not a validity
+    one -- and paying for readability with fresh text is not free: filling these slots from the
+    median real turn moved Prospective's first-assistant length to 13 perfectly-separated questions
+    against 6.0 expected (3.1 sd). Every character added is a character the equalisation has to
+    balance somewhere. Dropping a slot that is empty everywhere removes the same position from
+    every session, so the role sequences stay equal and no other target moves.
+    """
+    empty: list[tuple[str, int]] = []
+    occupied: set[tuple[str, int]] = set()
+    for session in question.sessions:
+        seen: Counter[str] = Counter()
+        for turn in session.turns:
+            slot = (turn.role, seen[turn.role])
+            if turn.content.strip():
+                occupied.add(slot)
+            elif slot not in empty:
+                empty.append(slot)
+            seen[turn.role] += 1
+
+    doomed = {slot for slot in empty if slot not in occupied}
+    if not doomed:
+        return
+    for session in question.sessions:
+        kept, seen = [], Counter()
+        for turn in session.turns:
+            slot = (turn.role, seen[turn.role])
+            seen[turn.role] += 1
+            if slot not in doomed:
+                kept.append(turn)
+        session.turns = kept
 
 
 def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
@@ -764,6 +893,7 @@ def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # De
 
         for session in question.sessions:
             _ensure_padding_turns(session)
+        _normalise_role_sequence(question)
 
         # Targets are per TURN SLOT -- (role, position within that role) -- not per session and not
         # per role. Each narrowing was forced by the last one failing. Equalising the pooled session
@@ -801,11 +931,14 @@ def equalise_shape(questions: list[Question], rng: random.Random) -> None:  # De
                                for axis in _PAD_AXES}
                     if all(value <= 0 for value in deficit.values()):
                         break
-                    addition = _pad_greedy(deficit, rng)
+                    addition = _pad_greedy(
+                        deficit, rng, frozenset(tokenize_raw(session.turns[index].content)))
                     if not addition:
                         break
                     joiner = " " if session.turns[index].content else ""
                     session.turns[index].content += joiner + addition
+
+        _drop_universally_empty_slots(question)
 
 
 
@@ -820,6 +953,10 @@ SEPARABILITY_MAX_AUC = 0.75
 
 #: Shape artifacts: properties a session has regardless of what it is about. A classifier using one
 #: of these finds the evidence without reading it, which is the failure V7 exists to refuse.
+#: Turn positions whose role occupancy is measured. Four covers every shape the family emits
+#: today (the longest session is five turns); the sequence feature below catches anything longer.
+_ROLE_ORDER_POSITIONS = 4
+
 SEPARABILITY_REFUSED_FEATURES = frozenset({
     "session_length_chars", "turn_count", "position_in_haystack",
     "digit_density", "uppercase_density",
@@ -838,6 +975,9 @@ SEPARABILITY_REFUSED_FEATURES = frozenset({
     # filler side while every other feature was comfortable, and the only thing keeping that off
     # the gate was a carve-out with no ceiling in it.
     "gold_marker_ngram", "boilerplate_ngram",
+    # Turn-role order, which counts cannot express. See separability_report.
+    "role_sequence",
+    *(f"position_{p}_is_{r}" for p in range(_ROLE_ORDER_POSITIONS) for r in ("user", "assistant")),
     # ...and each of those axes again, sliced by speaker. See separability_report for why.
     *(f"{role}_{axis}" for role in ("user", "assistant")
       for axis in ("length_chars", "uppercase_density", "sentence_count",
@@ -895,6 +1035,122 @@ def _auc_within(strata: list[tuple[list[float], list[float]]], fold: bool = True
         return 0.5
     auc = wins / pairs
     return max(auc, 1.0 - auc) if fold else auc
+
+
+#: A feature may pass on pooled AUC and still separate gold PERFECTLY in a large minority of
+#: questions -- a bimodal split that a mean cannot show. The consuming project's probe surfaced it:
+#: Episodic's turn_count pools to 0.615 while turn count alone identifies the gold in 54% of its
+#: questions. Refused as a distribution, not a mean.
+#:
+#: Measured against CHANCE rather than a flat share, which matters in both directions. With one gold
+#: and H distractors, a question's folded AUC is 1.0 whenever gold is strictly top or strictly
+#: bottom -- probability 2/(H+1). WorkingMemory varies H as its independent variable and a twelfth
+#: of its questions have H=1, where the answer is 1.0 by construction; its chance rate is 38% and a
+#: flat 25% bar would refuse it for its own design. Episodic's chance rate is 9% against 54%
+#: observed. The excess is the signal.
+#: How many standard deviations the count of perfectly-separated questions must sit above its
+#: chance expectation before the distribution is refused. Roughly p < 0.01 one-tailed.
+#:
+#: This replaced a flat "more than twice the mean chance rate", which is wrong whenever haystack
+#: size varies -- and WorkingMemory varies it deliberately, as its independent variable. A
+#: question's chance of a folded AUC of exactly 1 is 2/C(n, g), so it runs from 22% at H=8 to 3%
+#: at H=60 inside one corpus. Comparing the corpus-wide SHARE against the corpus-wide MEAN chance
+#: then charges the small-haystack rungs at the average rate and refuses the design for having a
+#: design: WorkingMemory's punctuation density read 10 separations against a 10% mean, which is
+#: refused as 1.7x chance, while the questions that separated were concentrated at H=8 where two
+#: in nine is what chance looks like. Summed per question the expectation is 6.07 (sd 2.28) and
+#: the excess is 1.7 sd -- noise.
+#:
+#: Set at 2.5 because the type/token defect that padding's types double-count produced sits at
+#: 2.67 sd and must be caught; 2.5 is about p < 0.01 one-tailed. The floor below is kept as a
+#: conjunct because significance alone is not enough at ~200 feature tests per corpus family -- a
+#: refusal needs to be both real and large enough to matter.
+#:
+#: The correction is not what let WorkingMemory's punctuation density through, and it should not be
+#: read that way: that feature re-refused here at 3.5 sd (14 observed against 6.1 expected) and was
+#: fixed on its merits. What the mean-chance rule got wrong was charging small-haystack rungs at the
+#: corpus average, which is a different question from whether any given feature is real.
+PERFECT_SEPARATION_Z = 2.5
+PERFECT_SEPARATION_FLOOR = 0.20
+
+#: Why a refused feature may be waived, keyed by the feature. A benchmark that exempts a feature
+#: owes the reader the reason for THAT feature; see the note at the `exempt` field below.
+_EXEMPTION_REASONS = {
+    "question_relevance":
+        "question relevance — gold is supposed to be more relevant than a distractor; the BM25 "
+        "calibration gate bounds how easily that is exploited",
+    "position_in_haystack":
+        "position in haystack — WorkingMemory pins the gold session at index 0 and varies how many "
+        "sessions follow it (ADR §5.4); that distance IS the independent variable, so gold's "
+        "position separates perfectly (1.000) by construction rather than by defect. A retriever "
+        "scored on this corpus must not use position. The corpus records gold_position_shuffled: "
+        "false and h_is_independent_variable: true, so the exemption is checkable against the data "
+        "rather than merely asserted here",
+}
+
+
+def _perfect_share(strata: list[tuple[list[float], list[float]]]) -> dict[str, float]:
+    """How often this feature separates a question perfectly, against what chance would give.
+
+    Returns the observed count and the Poisson-binomial expectation over the per-question chances,
+    because those chances are not identical across a corpus and summarising them by their mean
+    loses exactly the corpora that vary haystack size on purpose.
+    """
+    perfect = scored = 0
+    expected = variance = 0.0
+    for gold_values, other_values in strata:
+        if not gold_values or not other_values:
+            continue
+        scored += 1
+        wins = sum(1.0 if g > o else 0.5 if g == o else 0.0
+                   for g in gold_values for o in other_values)
+        auc = wins / (len(gold_values) * len(other_values))
+        if max(auc, 1.0 - auc) >= 1.0:
+            perfect += 1
+        # P(all gold strictly above every distractor, or all strictly below), the two orderings
+        # out of the C(n, g) equally likely rank assignments that give a folded AUC of exactly 1.
+        total = len(gold_values) + len(other_values)
+        ways = math.comb(total, len(gold_values))
+        probability = 2.0 / ways if ways else 1.0
+        expected += probability
+        variance += probability * (1.0 - probability)
+    if not scored:
+        return {"share": 0.0, "chance": 0.0, "observed": 0, "expected": 0.0, "z": 0.0}
+    return {
+        "share": perfect / scored,
+        "chance": expected / scored,
+        "observed": perfect,
+        "expected": expected,
+        "z": (perfect - expected) / math.sqrt(variance) if variance > 0 else 0.0,
+    }
+
+
+
+
+def _worst_role_sequence(questions: list[Question]) -> tuple[str | None, float]:
+    """The turn-role sequence that best predicts gold, and how well it does.
+
+    Scored as a presence AUC on the whole sequence, so a shape whose gold reads u|a|a|u|a while
+    every distractor reads u|a|u|a|a is caught as one feature rather than needing the right
+    position to have been guessed in advance.
+    """
+    def signature(session: Session) -> str:
+        return "|".join(turn.role[0] for turn in session.turns)
+
+    candidates = {signature(s) for q in questions for s in q.sessions}
+    best, best_score = None, 0.5
+    for candidate in sorted(candidates):
+        strata = []
+        for question in questions:
+            gold_values, other_values = [], []
+            for session in question.sessions:
+                value = 1.0 if signature(session) == candidate else 0.0
+                (gold_values if session.is_gold else other_values).append(value)
+            strata.append((gold_values, other_values))
+        score = _auc_within(strata)
+        if score > best_score:
+            best, best_score = candidate, score
+    return best, best_score
 
 
 def separability_report(questions: list[Question], exempt: frozenset = frozenset()) -> dict:
@@ -958,6 +1214,22 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
                 len(_role(s, r)), _role_turns(s, r)),
         }
 
+    # Turn-ROLE ORDER. The gate had pooled turn_count and per-role counts, all of which read
+    # exactly 0.5000 -- a successful equalisation -- while the ORDER those roles appear in still
+    # identified gold in 27 of 50 Episodic questions, and for the attribution shape encoded which
+    # speaker said the answer. A gate cannot regress on an axis it does not measure, and counts
+    # are not order. Occupancy is measured per (position, role) rather than only at position 0,
+    # because the defect lived at position 2.
+    def _role_at(session: Session, position: int, role: str) -> float:
+        return float(position < len(session.turns) and session.turns[position].role == role)
+
+    order_features = {
+        f"position_{position}_is_{role}": (
+            lambda s, i, n, p=position, r=role: _role_at(s, p, r))
+        for position in range(_ROLE_ORDER_POSITIONS)
+        for role in ("user", "assistant")
+    }
+
     features = {
         "session_length_chars": lambda s, i, n: float(len(s.text())),
         "turn_count": lambda s, i, n: float(len(s.turns)),
@@ -977,9 +1249,10 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         "mean_turn_chars": lambda s, i, n: _ratio(len(s.text()), len(s.turns)),
         "type_token_ratio": lambda s, i, n: _ratio(
             len(set(tokenize_raw(s.text()))), len(tokenize_raw(s.text()))),
-    } | role_features
+    } | role_features | order_features
 
     scores: dict[str, float] = {}
+    perfect: dict[str, dict[str, float]] = {}
     for name, extract in features.items():
         strata = []
         for q in questions:
@@ -989,6 +1262,15 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
                 (gold_values if session.is_gold else other_values).append(extract(session, i, n))
             strata.append((gold_values, other_values))
         scores[name] = round(_auc_within(strata), 4)
+        stats = _perfect_share(strata)
+        perfect[name] = {
+            "share": round(stats["share"], 4), "chance": round(stats["chance"], 4),
+            "observed": stats["observed"], "expected": round(stats["expected"], 2),
+            "z": round(stats["z"], 2),
+        }
+
+    sequence, sequence_score = _worst_role_sequence(questions)
+    scores["role_sequence"] = round(sequence_score, 4)
 
     gold_gram, gold_gram_score, filler_gram, filler_gram_score = _worst_boilerplate_ngram(questions)
     scores["gold_marker_ngram"] = round(gold_gram_score, 4)
@@ -999,6 +1281,13 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         raise SystemExit(
             f"separability: exemption named a feature that is not refused: {sorted(unknown)}. "
             "A typo here silently exempts nothing while reading as though it exempted something.")
+
+    bimodal = {
+        name: stats for name, stats in perfect.items()
+        if name in SEPARABILITY_REFUSED_FEATURES and name not in exempt
+        and stats["share"] >= PERFECT_SEPARATION_FLOOR
+        and stats["z"] >= PERFECT_SEPARATION_Z
+    }
 
     refused = {k: v for k, v in scores.items()
                if k in SEPARABILITY_REFUSED_FEATURES and k not in exempt}
@@ -1014,10 +1303,13 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
             f"{int(BOILERPLATE_MIN_QUESTION_SHARE * 100)}% of questions so per-question content is "
             "not mistaken for a marker"
         ),
-        "exempt": [
-            "question relevance — gold is supposed to be more relevant than a distractor; the BM25 "
-            "calibration gate bounds how easily that is exploited"
-        ],
+        # One entry per exemption actually taken, not a fixed paragraph. The list previously read
+        # "question relevance ..." whatever was exempt, so WorkingMemory published
+        # exempt_features: ["position_in_haystack"] beside a reason that did not mention position —
+        # and position_in_haystack is 1.000 there. An exemption a reader cannot match to its reason
+        # is indistinguishable from an unexplained one.
+        "exempt": [_EXEMPTION_REASONS.get(feature, f"{feature} — exempted without a stated reason")
+                   for feature in sorted(exempt)] or ["none"],
         "threshold_auc": SEPARABILITY_MAX_AUC,
         "refused_features": sorted(SEPARABILITY_REFUSED_FEATURES - exempt),
         "exempt_features": sorted(exempt),
@@ -1025,11 +1317,18 @@ def separability_report(questions: list[Question], exempt: frozenset = frozenset
         "features": scores,
         "worst_refused_feature": worst,
         "worst_refused_auc": scores[worst] if worst else 0.5,
+        "worst_role_sequence": sequence,
+        "role_sequence_auc": scores["role_sequence"],
         "worst_gold_marker_ngram": gold_gram,
         "gold_marker_ngram_auc": scores["gold_marker_ngram"],
         "worst_boilerplate_ngram": filler_gram,
         "boilerplate_ngram_auc": scores["boilerplate_ngram"],
-        "passed": worst is None or scores[worst] < SEPARABILITY_MAX_AUC,
+        "perfect_separation": perfect,
+        "bimodal_features": {
+            name: {**stats, "excess_over_chance": round(stats["share"] - stats["chance"], 4)}
+            for name, stats in sorted(bimodal.items())
+        },
+        "passed": (worst is None or scores[worst] < SEPARABILITY_MAX_AUC) and not bimodal,
     }
 
 
@@ -1045,13 +1344,33 @@ def _worst_boilerplate_ngram(
     for q in questions:
         seen = set()
         for session in q.sessions:
-            words = tokenize(session.text())
+            # RAW tokens. `tokenize` drops stopwords, which is right for retrieval and fatal here:
+            # a gram made of stopwords cannot be a candidate at all, so it is not scored low, it is
+            # unrepresentable. "on the" marked Episodic's gold at AUC 0.763 -- above the refusal
+            # bar -- and this screen could not see it in principle. The identical blindness was
+            # found and fixed for type_token_ratio one revision earlier and never propagated here.
+            words = tokenize_raw(session.text())
             # Unigrams included: the single token "noted" scored as high as the best bigram on
             # Forgetting, and a one-word filter is the cheapest classifier there is.
             for size in (1, 2, 3):
                 for i in range(len(words) - size + 1):
                     seen.add(" ".join(words[i:i + size]))
         appears_in.update(seen)
+
+    # Grams each QUESTION uses itself, indexed per question rather than pooled. Relevance is the
+    # family's one declared exemption -- gold is supposed to match its own question, and how easily
+    # that is exploited is bounded by the BM25 gate, not by this screen. But the exemption has to be
+    # applied where it applies: dropping a gram corpus-wide because ANY question used it hid
+    # Episodic's "on the" (0.763) on the strength of 2 questions in 50, while the case the
+    # exemption exists for -- WorkingMemory's "have", in 100% of its questions -- needs dropping
+    # everywhere. So a question whose own text contains the gram contributes no pairs for it, and
+    # every other question still does.
+    own_grams: list[set[str]] = []
+    for q in questions:
+        words = tokenize_raw(q.question)
+        own_grams.append({" ".join(words[i:i + size])
+                          for size in (1, 2, 3)
+                          for i in range(len(words) - size + 1)})
 
     candidates = [
         gram for gram, count in appears_in.items()
@@ -1069,10 +1388,12 @@ def _worst_boilerplate_ngram(
         # Padded on both sides so "list also" cannot match inside "checklist also".
         needle = f" {gram} "
         strata = []
-        for q in questions:
+        for index, q in enumerate(questions):
+            if gram in own_grams[index]:
+                continue          # relevance channel for THIS question; contributes no pairs
             gold_values, other_values = [], []
             for session in q.sessions:
-                haystack = f" {' '.join(tokenize(session.text()))} "
+                haystack = f" {' '.join(tokenize_raw(session.text()))} "
                 value = 1.0 if needle in haystack else 0.0
                 (gold_values if session.is_gold else other_values).append(value)
             strata.append((gold_values, other_values))
@@ -1095,13 +1416,24 @@ def check_separability(questions: list[Question], exempt: frozenset = frozenset(
     report = separability_report(questions, exempt)
     if report["passed"]:
         return []
-    return [
-        f"separability: '{report['worst_refused_feature']}' separates gold from distractors at AUC "
-        f"{report['worst_refused_auc']:.3f}, at or above the {SEPARABILITY_MAX_AUC} refusal "
-        f"threshold. "
-        f"Evidence a cheap classifier can find without reading it is evidence the benchmark is not "
-        f"measuring retrieval."
-    ]
+
+    failures = []
+    worst, auc = report["worst_refused_feature"], report["worst_refused_auc"]
+    if worst is not None and auc >= SEPARABILITY_MAX_AUC:
+        failures.append(
+            f"separability: '{worst}' separates gold from distractors at AUC {auc:.3f}, at or "
+            f"above the {SEPARABILITY_MAX_AUC} refusal threshold. Evidence a cheap classifier can "
+            f"find without reading it is evidence the benchmark is not measuring retrieval.")
+    # Reported separately, because the pooled AUC can sit comfortably under the bar while the
+    # feature still separates PERFECTLY in a large minority of questions. Naming the pooled
+    # number as the reason for a bimodality failure sends the reader to the wrong measurement.
+    for name, stats in report.get("bimodal_features", {}).items():
+        failures.append(
+            f"separability: '{name}' separates gold perfectly in {stats['share']:.0%} of questions "
+            f"({stats['observed']} against {stats['expected']:.1f} expected by chance, "
+            f"{stats['z']:.1f} sd) (pooled AUC {report['features'][name]:.3f} is under the bar; "
+            f"the distribution is not).")
+    return failures
 
 # --------------------------------------------------------------------------------------
 # The calibration gate
@@ -1135,7 +1467,14 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
     Applied centrally, after build and before scoring, so no generator can reintroduce the tell by
     forgetting it.
     """
-    pool = sorted({term for q in questions for term in tokenize(q.question)})
+    # Built from question text, minus every token that appears in ANY question's ANSWER.
+    # Episodic's attribution questions embed the statement they ask about, so a value that is
+    # one question's gold answer can appear in another question's text -- and weaving it into a
+    # user turn makes a filler session state an answer, which the assistant-stated leak guard
+    # then reports against a question that never went near it. Latent since the pool was
+    # introduced; it surfaced when an unrelated change shifted which terms got sampled.
+    answers = {term for q in questions for term in tokenize(q.answer)}
+    pool = sorted({term for q in questions for term in tokenize(q.question)} - answers)
     if not pool:
         return
 
@@ -1169,8 +1508,13 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
             # type-token ratio -- 0.978 against 0.929, separable at AUC 0.869. Repeating gold's own
             # NON-query words restores the repetition without moving its retrieval score, because a
             # term the query never mentions cannot change how well the query matches.
+            # Minus this question's own answer. The session that carries the answer is the one
+            # we are drawing from, so without this the clause can weave the answer into the GOLD
+            # USER turn -- and for Episodic's assistant-stated shape, the whole design is that
+            # only the assistant states it. The generator's leak guard caught it.
+            answer_terms = set(tokenize(question.answer))
             mine = [t for t in sorted(set(tokenize(session.text())))
-                    if t not in own and t not in STOPWORDS]
+                    if t not in own and t not in STOPWORDS and t not in answer_terms]
             # How many of them, solved rather than guessed. A repeated term adds a token but no new
             # type; a foreign one adds both. So with `take` terms of which k are repeats, gold lands
             # at (types + take - k) / (tokens + take), and k follows from the ratio the distractors
@@ -1370,6 +1714,26 @@ def finalise(
             "gold_position_shuffled": structure.gold_position_shuffled,
             "h_is_independent_variable": structure.h_is_independent_variable,
             "no_absolute_dates": structure.no_absolute_dates,
+            # Declared, not hidden. Aligning every session in a question onto a common role
+            # sequence inserts turns, and a turn inserted into a slot that was empty everywhere at
+            # the moment padding computed its targets gets a target of zero and ships empty.
+            #
+            # It is disclosed rather than fixed because all three fixes measurably made the corpus
+            # WORSE: filling from the median real turn put first-assistant length at 3.1 sd,
+            # filling from the slot's final peak put user length at 2.7 sd, and both were refused
+            # by the gate. Every character added has to be balanced somewhere, and these turns are
+            # empty in exactly the sessions that differ. The artifact itself leaks nothing — see
+            # `separates_gold`, where perfect separation on blank-turn count runs BELOW its chance
+            # rate in all five verticals — so trading a measured non-tell for a measured tell would
+            # be a bad exchange made for appearances.
+            "empty_turns": {
+                "count": sum(1 for q in questions for s in q.sessions
+                             for t in s.turns if not t.content.strip()),
+                "of_turns": sum(len(s.turns) for q in questions for s in q.sessions),
+                "cause": "turns inserted by role-sequence alignment into a slot with no content "
+                         "anywhere at the time padding targets were computed",
+                "separates_gold": False,
+            },
         },
         # V1-V6 are filled in by tools/run_typedmemeval_probes.py. "not_run" is the honest
         # initial state: those probes need a reference model, and a record that claimed

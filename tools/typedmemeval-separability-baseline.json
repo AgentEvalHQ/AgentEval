@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "Known-blocked separability features for the corpus revision named below, recorded so the",
+    "gate can",
+    "still report NEW regressions while the revision is blocked. This is a ratchet, not an",
+    "exemption: any feature that appears here that is not listed, or any listed feature whose",
+    "AUC gets worse, fails the check.",
+    "",
+    "v4 ships only when this list is EMPTY. Deleting an entry without regenerating the corpus",
+    "is the one thing this file must never be used for -- the numbers below are measurements,",
+    "and the corpus is what has to change."
+  ],
+  "revision": "v4",
+  "threshold_auc": 0.75,
+  "blocked": {}
+}

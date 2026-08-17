@@ -57,7 +57,13 @@ QTYPE = "workingmemory-recall"
 
 #: The distance ladder. Each rung is a diagnostic stratum of n=12 (ADR §5 floor rule), and
 #: the four rungs are the reportable shapes -- `distance-1` ... `distance-40`.
-DISTANCES = (1, 5, 15, 40)
+# Five rungs, every one of which the reference retriever can fail. The old ladder
+# (1, 5, 15, 40) had two that could not: d=1 gives H=2 and d=5 gives H=6, and BM25@K_ref=5
+# realised 1.00 on both, so half the vertical sat in a structurally unfailable band and the
+# ladder graded at three levels rather than four. H>K_ref turns out to be necessary and not
+# sufficient -- H=6 still saturates -- so the bottom rung starts where the measurement showed
+# grading actually begins.
+DISTANCES = (8, 15, 25, 40, 60)
 
 #: One fixed epoch for every cell. Combined with `tmc.spread`'s default interval this makes
 #: session-distance and time-distance a single variable across the whole grid.
@@ -108,11 +114,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="That is a proper change of scene.",
         suffix="Instruments",
         interference=(
-            ("Priya has an offer from the outfit called {other}.", "Worth taking seriously."),
-            ("Dad's old employer, {other}, has switched hands again.", "The end of an era for him."),
-            ("Rosa turned down a new outfit, {other}, over the commute.", "Sensible of her."),
-            ("Kit switched employer in the spring and is at {other} these days.", "And then what?"),
-            ("The quiz team is half staffed by the new outfit at {other} these days.", "Small town, small pool."),
+            ("I have turned down an offer from {other} back in the spring.", "Their loss."),
+            ("I have done a fortnight of contract work at {other} last year.", "Useful to have seen inside."),
+            ("I have interviewed at {other} and never heard back.", "That happens more than it should."),
+            ("I have nearly applied to {other} before the agency called.", "Timing decides most of it."),
+            ("I have known people at {other} from the old days.", "Worth keeping warm."),
         ),
     ),
     Family(
@@ -122,11 +128,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="It suits a stray.",
         suffix="",
         interference=(
-            ("Dan's terrier {other} chewed the doormat again last month.", "Terriers are like that."),
-            ("The neighbours settled on the name {other} for their kitten.", "Bold of them."),
-            ("Rosa took in a stray last month and calls it {other}.", "Brave of her."),
-            ("The vet's own cat, {other}, is enormous.", "An occupational hazard."),
-            ("Kit's rabbit {other} has escaped twice this month.", "Reinforce the hutch."),
+            ("We have nearly called the stray {other} before we changed our minds.", "It suited her less."),
+            ("We have had a cat called {other} before.", "Names come back around."),
+            ("We have used {other} for the foster kitten last spring.", "Only for a fortnight."),
+            ("We have caught ourselves calling her {other}.", "Old habits."),
+            ("We have written {other} on the vet form by mistake.", "Easily done."),
         ),
     ),
     Family(
@@ -136,11 +142,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Use it while the enthusiasm lasts.",
         suffix="Wall",
         interference=(
-            ("Kit has trained at {other} on Thursdays since the summer.", "Different holds, different problems."),
-            ("Rosa cancelled her membership at {other} when the prices went up.", "Everyone is."),
-            ("The bouldering league is hosted by the climbing wall at {other}.", "A busy weekend for them."),
-            ("{other} has resurfaced its slab wall since the spring.", "About time."),
-            ("Dan has taken out a membership at {other} as well.", "He collects them."),
+            ("I have trained at {other} for a season before the prices went up.", "They all creep up."),
+            ("I have let a membership lapse at {other} somewhere.", "Worth cancelling properly."),
+            ("I have climbed at {other} twice and never went back.", "A bad first impression, then."),
+            ("I have got a day pass for {other} and forgot to use it.", "That is the usual fate."),
+            ("I have been meaning to try the bouldering at {other}.", "A different discipline entirely."),
         ),
     ),
     Family(
@@ -150,11 +156,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Somewhere to unpack, at least.",
         suffix="Row",
         interference=(
-            ("Priya moved her studio onto {other} in the spring.", "More light there."),
-            ("The roadworks on {other} have closed the street to traffic.", "The long way round, then."),
-            ("Rosa's sale fell through on {other} in the winter.", "Bruising."),
-            ("The bakery on {other} has a queue through the door.", "It will settle down."),
-            ("Kit has moved onto {other} since the autumn.", "A minor miracle."),
+            ("I have viewed a flat on {other} before this one came up.", "The market moves fast."),
+            ("I have lived on {other} for two years after university.", "Formative, probably."),
+            ("I have nearly taken a place on {other} last winter.", "A close call."),
+            ("I have walked down {other} on the way to the station.", "Habit forms quickly."),
+            ("I have had post redirected from {other} for months.", "Royal Mail's patience."),
         ),
     ),
     Family(
@@ -164,11 +170,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="At least the waiting list is over.",
         suffix="Dental",
         interference=(
-            ("Rosa waited nine months to be registered at {other}.", "That is the state of it."),
-            ("{other} has stopped taking new patients at the practice.", "Everywhere has."),
-            ("Kit's hygienist left the old surgery at {other}.", "They all do eventually."),
-            ("Dad has been on the books at {other} since the merger.", "Lucky him."),
-            ("The surgery next to {other} shut its doors as well.", "Another one."),
+            ("I have been with {other} until the waiting lists got silly.", "Everywhere is the same."),
+            ("I have rung {other} and they were not taking anyone new.", "Predictable."),
+            ("I have had a filling done at {other} years ago.", "It held, at least."),
+            ("I have been referred to {other} once and never went.", "Easy to let slide."),
+            ("I have had reminders from {other} for an appointment I never made.", "Worth telling them."),
         ),
     ),
     Family(
@@ -178,11 +184,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Good to hear you singing again.",
         suffix="Singers",
         interference=(
-            ("Rosa's choir, {other}, rehearse on a Wednesday too.", "Ambitious of them."),
-            ("{other} lost their accompanist this term.", "Hard to replace."),
-            ("Kit auditioned for {other} last term and did not get in.", "Their loss."),
-            ("The hall is double-booked with {other} on a Wednesday evening.", "Someone will have to move."),
-            ("Dad joined {other} decades ago and still talks about it.", "He would."),
+            ("I have sung with {other} for a term and left.", "Not every fit works."),
+            ("I have auditioned for {other} and did not get in.", "Their standard is high."),
+            ("I have been to hear {other} at the cathedral in December.", "Good acoustics there."),
+            ("I have nearly joined {other} instead.", "It came down to the night."),
+            ("I have borrowed a folder of music from {other} and never returned it.", "They always want it back."),
         ),
     ),
     Family(
@@ -192,11 +198,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="That is the deliberating over with.",
         suffix="Cycles",
         interference=(
-            ("Kit's {other} bike cracked at the dropout.", "That is a warranty job."),
-            ("Rosa is selling the {other} she ended up never riding.", "They all say that."),
-            ("The shop is only buying {other} stock this spring.", "A narrow range."),
-            ("Dan rebuilt a {other} bike from a box of parts.", "More patience than sense."),
-            ("The commute is full of {other} riders these days.", "A tribe."),
+            ("I have test ridden a {other} and did not get on with it.", "Geometry is personal."),
+            ("I have had a {other} stolen from outside the library.", "Grim."),
+            ("I have borrowed a {other} for a weekend last summer.", "Enough to know."),
+            ("I have looked at a second-hand {other} and walked away.", "The frame told the story."),
+            ("I have kept the panniers off my old {other}.", "They outlast the bike."),
         ),
     ),
     Family(
@@ -206,11 +212,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Hopefully the speeds hold.",
         suffix="Broadband",
         interference=(
-            ("Rosa's provider, {other}, throttles her in the evenings.", "Typical."),
-            ("{other} is digging up the pavement for fibre.", "Chaos for a month."),
-            ("Kit went through a bad switch to {other} last year.", "Time to haggle."),
-            ("Dad refuses to leave {other} since the merger.", "Loyalty is expensive."),
-            ("The office ended up on {other} and it drops daily.", "Unworkable."),
+            ("I have been with {other} before the contract ran out.", "They all do the same trick."),
+            ("I have been quoted by {other} and it was worse.", "Introductory pricing."),
+            ("I have had an engineer from {other} out twice.", "Twice is a pattern."),
+            ("I have nearly signed with {other} in the spring.", "Glad you did not."),
+            ("I have had post from {other} about an old account.", "Close it properly."),
         ),
     ),
     Family(
@@ -220,11 +226,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Time to buy a fork.",
         suffix="Fields",
         interference=(
-            ("Rosa has been on the list at {other} for a third year.", "Glacial."),
-            ("{other} floods every winter at the bottom of the site.", "Not ideal."),
-            ("Kit finally gave up his plot at {other}.", "It is a lot of work."),
-            ("The committee at {other} has banned bonfires this year.", "Predictable."),
-            ("Dad was given a shed at {other} by the allotment secretary.", "He will fill it."),
+            ("I have been on the waiting list at {other} for three years.", "That is the going rate."),
+            ("I have given up a half plot at {other} when work got busy.", "Sensible."),
+            ("I have helped a friend clear a plot at {other} in the spring.", "Hard work, that."),
+            ("I have been shown round {other} and it was too exposed.", "Wind ruins a season."),
+            ("I have owed {other} a key from years ago.", "Post it back."),
         ),
     ),
     Family(
@@ -234,11 +240,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Back to scales, then.",
         suffix="",
         interference=(
-            ("Rosa's piano teacher, {other}, has moved north.", "She will miss him."),
-            ("Kit has taken on {other} for trumpet at the school.", "A loud house."),
-            ("{other} runs the Saturday strings group this term.", "Good for the little ones."),
-            ("Dad had cello lessons with {other} decades ago.", "He still remembers the scales."),
-            ("The conservatoire lost {other} to a touring job this winter.", "Understandable."),
+            ("I have had lessons with {other} when I was at school.", "Foundations stick."),
+            ("I have asked {other} and they were full for the term.", "Good teachers usually are."),
+            ("I have been recommended {other} by someone at the choir.", "Word of mouth works."),
+            ("I have sat in on a lesson with {other} once.", "Instructive, watching."),
+            ("I have nearly gone with {other} instead.", "It came down to timing."),
         ),
     ),
     Family(
@@ -248,11 +254,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Worth the detour, then.",
         suffix="Bakehouse",
         interference=(
-            ("{other} has put its sourdough prices up again.", "Flour costs."),
-            ("Rosa queues at {other} every Saturday.", "Devotion."),
-            ("Kit says the weekly rye at {other} is heavy.", "Rye usually is."),
-            ("{other} has started closing on Mondays.", "Noted."),
-            ("The market stall is getting its bread from {other}.", "The same loaves, cheaper."),
+            ("I have been getting the seeded rye from {other} on a Thursday.", "A different loaf entirely."),
+            ("I have walked to {other} before they moved.", "A shame about the move."),
+            ("I have stopped buying from {other} when the prices went up.", "Flour costs."),
+            ("I have tried the focaccia at {other} once.", "Once was enough?"),
+            ("I have ordered the Christmas bread from {other} every year.", "A fixed point."),
         ),
     ),
     Family(
@@ -262,11 +268,11 @@ FAMILIES: tuple[Family, ...] = (
         acknowledgement="Long books, dark evenings.",
         suffix="Circle",
         interference=(
-            ("Rosa's group, {other}, only reads translated fiction.", "Narrow, but interesting."),
-            ("{other} meet in the pub these days.", "Better acoustics than the library."),
-            ("Kit signed up to {other} and dropped out after the Proust.", "Fair enough."),
-            ("The library is hosting {other} through the winter.", "A busy room."),
-            ("Dad joined {other} and left within a month.", "He does that."),
+            ("I have been to {other} twice and stopped.", "Not every group fits."),
+            ("I have been invited to {other} and never went.", "Easy to put off."),
+            ("I have read alongside {other} for a while without joining.", "The best of both."),
+            ("I have nearly signed up to {other} instead.", "It came down to the night."),
+            ("I have kept a book that belongs to {other}.", "Return it before winter."),
         ),
     ),
 )
@@ -330,6 +336,12 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                     "shape": f"distance-{distance}",
                     "distance_sessions": distance,
                     "fact_family": family.key,
+                    # The band variable is the rung, which IS the memory dial for this
+                    # vertical (ADR-026 §16 C): distance between the fact and the question,
+                    # with nothing else varying. Diagnostics, never a claim -- n = 12 per band
+                    # is well under the n >= 30 floor a citable figure needs.
+                    "difficulty": DISTANCES.index(distance) + 1,
+                    "difficulty_dial": "distance", "difficulty_validated": True,
                 },
             ))
             index += 1

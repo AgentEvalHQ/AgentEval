@@ -193,6 +193,39 @@ FILLER = [
 ]
 
 
+#: Items and acknowledgements for decoy shortlists -- deliberately disjoint from the real
+#: shortlist vocabulary, so a decoy can never be mistaken for a listed item.
+_DECOY_ITEMS = (
+    "the Kelder ridge route", "the Vane estuary hide", "the Orrin mill cafe",
+    "the Brackwater crossing", "the Sallow Fields pitch", "the Tarn Head loop",
+    "the Windle bothy", "the Quarry Lane studio", "the Marden ferry", "the Ostler orchard",
+)
+_DECOY_ACKS = (
+    "Added to that one.", "Noted for later.", "That list is getting long.",
+    "Filed under optimism.", "One more for the winter.",
+)
+
+
+#: Frames for the attribution shape. One per question, held byte-identical across a pair, so
+#: the wording cannot stand in for the speaker label. `prompt` is what the OTHER party says in
+#: the assistant-speaker arm -- it must not hint at who is about to speak.
+ATTRIBUTION_FRAMES = (
+    ("One thing about {topic}, {statement}.", "Anything I should keep in mind about {topic}?"),
+    ("Worth remembering about {topic}: {statement}.", "Is there anything on {topic} worth noting?"),
+    ("About {topic} — {statement}.", "What is the situation with {topic}?"),
+    ("On {topic}, {statement}.", "Where do things stand on {topic}?"),
+    ("The thing with {topic} is that {statement}.", "Remind me about {topic}?"),
+)
+
+
+def _filler_value(rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """A value for a decoy detail: same shape as a gold value, belonging to another topic."""
+    return f"{rng.choice(_FILLER_VALUE_HEADS)}-{rng.randrange(100, 999)}"
+
+
+_FILLER_VALUE_HEADS = ("QR", "TL", "MV", "HD", "PN", "RS", "BK", "WG")
+
+
 def _filler_session(rng: random.Random, echo_source: str, echo: float, index: int) -> tmc.Session:
     """One filler exchange, with the calibration echo attached to alternating roles.
 
@@ -210,7 +243,29 @@ def _filler_session(rng: random.Random, echo_source: str, echo: float, index: in
     i.e. the calibration knob would quietly become a speaker cue.
     """
     echoed = tmc.echo_terms(echo_source, echo, rng)
-    user, assistant = rng.choice(FILLER)
+    # Half the fillers are built from the SAME detail frames the gold sessions use, on a
+    # different topic. Gold's user turn is question-shaped ("Is there a slot code on the X
+    # booking?") while filler was domestic chatter, and that register split was the tell:
+    # "on the" marked gold at AUC 0.763 against 22% of filler. Sharing the frames means a
+    # reader has to match the TOPIC -- which is the memory task -- rather than notice which
+    # sessions are shaped like questions.
+    draw = rng.random()
+    if draw < 0.35:
+        _, _, ask, answer, _ = rng.choice(DETAILS)
+        topic = rng.choice(TOPICS)
+        user = ask.format(topic=topic)
+        assistant = answer.format(topic=topic, v=_filler_value(rng))
+    elif draw < 0.6:
+        # The list-order frame on a DECOY category. Its gold sessions read "Put X on the Y
+        # shortlist", which put "on the" in 90 gold sessions against a quarter of filler --
+        # the single biggest contributor to that marker. A shortlist the question never asks
+        # about is the same sentence with a different subject, which is what forces a reader
+        # to match the category rather than spot the frame.
+        category = rng.choice(CATEGORIES)
+        user = f"Put {rng.choice(_DECOY_ITEMS)} on the {category} shortlist."
+        assistant = rng.choice(_DECOY_ACKS)
+    else:
+        user, assistant = rng.choice(FILLER)
     if index % 2 == 0:
         user = tmc.weave_echo(user, echoed)
     else:
@@ -328,6 +383,19 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
             _asked_after(sessions), sessions,
             {
                 "shape": SHAPE_ORDER,
+                # Dispersion is the dial here: how many places the answer has to be assembled
+                # from. It is the only graded driver Episodic has, and it lives in 30% of the
+                # vertical -- the other 70% sits in a single band (G=1, full coverage), which
+                # is what makes this the flattest vertical in the family.
+                "difficulty": _LIST_BANDS.get(size, 3),
+                # UNVALIDATED, and reclassified rather than dropped. It was stamped validated on a
+                # measured drop of 0.31 (0.45 -> 0.14); after the v4 role-order regeneration the
+                # same bands read 0.35 / 0.20 / 0.21 / 0.21 -- a drop of 0.14, under the 0.15 bar
+                # and flat after the first band. The consuming project's rule is that a band which
+                # does not slope gets reclassified, not kept, and a gradient that survives only on
+                # one revision's session draw was never evidence those questions are harder.
+                # n per band is 2-5 here, which is why it moved at all.
+                "difficulty_dial": "dispersion", "difficulty_validated": False,
                 # The item-to-session map is the answer key §6's conditional scoring needs:
                 # pairwise-order accuracy is computed over the items whose sessions were
                 # actually surfaced, which is unknowable from the answer string alone.
@@ -339,6 +407,11 @@ def _order_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Qu
             },
         ))
     return out
+
+
+#: List length -> band. Four to seven is the range the generator emits today; extending it
+#: (3/5/8/12) is on the v4 lever list and needs new generation rather than bookkeeping.
+_LIST_BANDS = {4: 2, 5: 3, 6: 4, 7: 5}
 
 
 def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[tmc.Question]:
@@ -357,12 +430,19 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
 
         # The statement clause is byte-identical across the two variants; only the role
         # carrying it moves. Anything else that differed would be a cue.
-        said = f"One thing about {topic}, {statement}."
+        # The frame is drawn PER QUESTION from a bank and stays byte-identical across the two
+        # arms. With one frame for all fifteen, a system storing no speaker label could recover
+        # the answer from the wording rather than from memory, so the shape measured less than
+        # its name promised and shipped as a floor (ADR-026 §13, promised for v3 and slipped).
+        # Varying it across questions removes the constant; holding it fixed within a pair
+        # keeps the only thing that differs between the arms the ROLE that carries it.
+        frame, prompt = ATTRIBUTION_FRAMES[offset % len(ATTRIBUTION_FRAMES)]
+        said = frame.format(topic=topic, statement=statement)
         if speaker == "user":
             turns = [tmc.Turn("user", said, has_answer=True),
                      tmc.Turn("assistant", "")]
         else:
-            turns = [tmc.Turn("user", f"Anything I should keep in mind about {topic}?"),
+            turns = [tmc.Turn("user", prompt.format(topic=topic)),
                      tmc.Turn("assistant", said, has_answer=True)]
         gold = tmc.Session(turns, BASE, is_gold=True, tag="attribution")
 

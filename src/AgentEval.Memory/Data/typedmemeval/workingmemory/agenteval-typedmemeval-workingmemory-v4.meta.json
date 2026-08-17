@@ -1,0 +1,1050 @@
+{
+  "corpus_id": "agenteval-typedmemeval-workingmemory-v4",
+  "vertical": "workingmemory",
+  "revision": "v4",
+  "supersedes": {
+    "revision": "v3",
+    "shipped_in": "0.23.0-beta",
+    "reason": "v3 shipped separable. An independent within-question probe by the consuming project found the phrase screen could not represent n-grams made of stopwords, so \"on the\" marked Episodic's gold at AUC 0.763 and \"i have\" marked WorkingMemory's in 44 of 48 sessions against 0 of 732 distractors -- the latter present since v1. The cause was never a set of phrases: gold asserted a datable first-person fact and filler did not, so the two sides differed in grammar. v4 generates both from shared frames, normalises turn counts per role, re-rungs the WorkingMemory ladder so every band can fail at K_ref (two of the old four could not), gives Forgetting's control arm the same G as its treatment arm, reframes the not-yet-true after arm around what the record shows, varies the Episodic attribution frame per question, and stamps a per-question difficulty band. Every session is rewritten and WorkingMemory's question ids change, so no v1, v2 or v3 number is comparable with a v4 number. None of them should be cited."
+  },
+  "question_count": 60,
+  "corpus_sha256": "c36d9746490d2df7a694f1643665050b8f3c47b423a32bfd9e29b16c3579b15c",
+  "generator": {
+    "tool": "tools/gen_typedmemeval_workingmemory.py",
+    "version": "1.0.0",
+    "seed": 20260815
+  },
+  "k_ref": 5,
+  "coverage": {
+    "retriever": "bm25-okapi-k1.5-b0.75",
+    "band_low": 0.5,
+    "band_high": 0.9,
+    "mean_realised": 0.7667,
+    "echo": 0.875,
+    "iterations": 4,
+    "search_trace": [
+      [
+        1.0,
+        0.0833
+      ],
+      [
+        0.5,
+        1.0
+      ],
+      [
+        0.75,
+        0.9833
+      ],
+      [
+        0.875,
+        0.7667
+      ]
+    ],
+    "per_question": {
+      "tme-wm-001": 0.0,
+      "tme-wm-002": 1.0,
+      "tme-wm-003": 0.0,
+      "tme-wm-004": 0.0,
+      "tme-wm-005": 0.0,
+      "tme-wm-006": 1.0,
+      "tme-wm-007": 1.0,
+      "tme-wm-008": 1.0,
+      "tme-wm-009": 1.0,
+      "tme-wm-010": 1.0,
+      "tme-wm-011": 1.0,
+      "tme-wm-012": 1.0,
+      "tme-wm-013": 0.0,
+      "tme-wm-014": 1.0,
+      "tme-wm-015": 1.0,
+      "tme-wm-016": 1.0,
+      "tme-wm-017": 1.0,
+      "tme-wm-018": 1.0,
+      "tme-wm-019": 1.0,
+      "tme-wm-020": 1.0,
+      "tme-wm-021": 1.0,
+      "tme-wm-022": 1.0,
+      "tme-wm-023": 1.0,
+      "tme-wm-024": 1.0,
+      "tme-wm-025": 1.0,
+      "tme-wm-026": 1.0,
+      "tme-wm-027": 1.0,
+      "tme-wm-028": 1.0,
+      "tme-wm-029": 1.0,
+      "tme-wm-030": 1.0,
+      "tme-wm-031": 1.0,
+      "tme-wm-032": 1.0,
+      "tme-wm-033": 1.0,
+      "tme-wm-034": 0.0,
+      "tme-wm-035": 1.0,
+      "tme-wm-036": 1.0,
+      "tme-wm-037": 1.0,
+      "tme-wm-038": 1.0,
+      "tme-wm-039": 0.0,
+      "tme-wm-040": 0.0,
+      "tme-wm-041": 1.0,
+      "tme-wm-042": 1.0,
+      "tme-wm-043": 1.0,
+      "tme-wm-044": 1.0,
+      "tme-wm-045": 0.0,
+      "tme-wm-046": 1.0,
+      "tme-wm-047": 1.0,
+      "tme-wm-048": 0.0,
+      "tme-wm-049": 0.0,
+      "tme-wm-050": 0.0,
+      "tme-wm-051": 1.0,
+      "tme-wm-052": 1.0,
+      "tme-wm-053": 1.0,
+      "tme-wm-054": 1.0,
+      "tme-wm-055": 1.0,
+      "tme-wm-056": 1.0,
+      "tme-wm-057": 1.0,
+      "tme-wm-058": 1.0,
+      "tme-wm-059": 0.0,
+      "tme-wm-060": 0.0
+    }
+  },
+  "ceiling": {
+    "k_ref": 5,
+    "by_g": {
+      "1": 1.0
+    },
+    "min": 1.0,
+    "structural_below_one": false
+  },
+  "structure": {
+    "g_distribution": {
+      "1": 60
+    },
+    "h_min": 8,
+    "h_max": 60,
+    "gold_position_shuffled": false,
+    "h_is_independent_variable": true,
+    "no_absolute_dates": false,
+    "empty_turns": {
+      "count": 395,
+      "of_turns": 9180,
+      "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
+      "separates_gold": false
+    }
+  },
+  "probes": {
+    "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "position in haystack — WorkingMemory pins the gold session at index 0 and varies how many sessions follow it (ADR §5.4); that distance IS the independent variable, so gold's position separates perfectly (1.000) by construction rather than by defect. A retriever scored on this corpus must not use position. The corpus records gold_position_shuffled: false and h_is_independent_variable: true, so the exemption is checkable against the data rather than merely asserted here"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
+        "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
+        "position_0_is_assistant",
+        "position_0_is_user",
+        "position_1_is_assistant",
+        "position_1_is_user",
+        "position_2_is_assistant",
+        "position_2_is_user",
+        "position_3_is_assistant",
+        "position_3_is_user",
+        "punctuation_density",
+        "role_sequence",
+        "sentence_count",
+        "session_length_chars",
+        "turn_count",
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_type_token_ratio",
+        "user_uppercase_density"
+      ],
+      "exempt_features": [
+        "position_in_haystack"
+      ],
+      "reported_only_features": [],
+      "features": {
+        "session_length_chars": 0.547,
+        "turn_count": 0.5,
+        "position_in_haystack": 1.0,
+        "digit_density": 0.5,
+        "uppercase_density": 0.6073,
+        "sentence_count": 0.5594,
+        "punctuation_density": 0.5363,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.547,
+        "type_token_ratio": 0.5419,
+        "first_user_length_chars": 0.5904,
+        "first_user_uppercase_density": 0.6039,
+        "first_user_sentence_count": 0.5628,
+        "first_assistant_length_chars": 0.5552,
+        "first_assistant_uppercase_density": 0.5633,
+        "first_assistant_sentence_count": 0.5507,
+        "user_length_chars": 0.5177,
+        "user_uppercase_density": 0.5687,
+        "user_sentence_count": 0.5518,
+        "user_punctuation_density": 0.5312,
+        "user_type_token_ratio": 0.5045,
+        "user_mean_turn_chars": 0.5177,
+        "assistant_length_chars": 0.5434,
+        "assistant_uppercase_density": 0.5828,
+        "assistant_sentence_count": 0.5459,
+        "assistant_punctuation_density": 0.5217,
+        "assistant_type_token_ratio": 0.5645,
+        "assistant_mean_turn_chars": 0.5434,
+        "position_0_is_user": 0.5,
+        "position_0_is_assistant": 0.5,
+        "position_1_is_user": 0.5,
+        "position_1_is_assistant": 0.5,
+        "position_2_is_user": 0.5,
+        "position_2_is_assistant": 0.5,
+        "position_3_is_user": 0.5,
+        "position_3_is_assistant": 0.5,
+        "role_sequence": 0.5,
+        "gold_marker_ngram": 0.6537,
+        "boilerplate_ngram": 0.6069
+      },
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.6537,
+      "worst_role_sequence": null,
+      "role_sequence_auc": 0.5,
+      "worst_gold_marker_ngram": "which",
+      "gold_marker_ngram_auc": 0.6537,
+      "worst_boilerplate_ngram": "been",
+      "boilerplate_ngram_auc": 0.6069,
+      "perfect_separation": {
+        "session_length_chars": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "turn_count": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_in_haystack": {
+          "share": 1.0,
+          "chance": 0.1011,
+          "observed": 60,
+          "expected": 6.07,
+          "z": 23.71
+        },
+        "digit_density": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "uppercase_density": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "sentence_count": {
+          "share": 0.05,
+          "chance": 0.1011,
+          "observed": 3,
+          "expected": 6.07,
+          "z": -1.35
+        },
+        "punctuation_density": {
+          "share": 0.0667,
+          "chance": 0.1011,
+          "observed": 4,
+          "expected": 6.07,
+          "z": -0.91
+        },
+        "em_dash_density": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "mean_turn_chars": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "type_token_ratio": {
+          "share": 0.0333,
+          "chance": 0.1011,
+          "observed": 2,
+          "expected": 6.07,
+          "z": -1.79
+        },
+        "first_user_length_chars": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "first_user_uppercase_density": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "first_user_sentence_count": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "first_assistant_length_chars": {
+          "share": 0.1,
+          "chance": 0.1011,
+          "observed": 6,
+          "expected": 6.07,
+          "z": -0.03
+        },
+        "first_assistant_uppercase_density": {
+          "share": 0.1167,
+          "chance": 0.1011,
+          "observed": 7,
+          "expected": 6.07,
+          "z": 0.41
+        },
+        "first_assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "user_length_chars": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "user_uppercase_density": {
+          "share": 0.05,
+          "chance": 0.1011,
+          "observed": 3,
+          "expected": 6.07,
+          "z": -1.35
+        },
+        "user_sentence_count": {
+          "share": 0.0667,
+          "chance": 0.1011,
+          "observed": 4,
+          "expected": 6.07,
+          "z": -0.91
+        },
+        "user_punctuation_density": {
+          "share": 0.1,
+          "chance": 0.1011,
+          "observed": 6,
+          "expected": 6.07,
+          "z": -0.03
+        },
+        "user_type_token_ratio": {
+          "share": 0.15,
+          "chance": 0.1011,
+          "observed": 9,
+          "expected": 6.07,
+          "z": 1.29
+        },
+        "user_mean_turn_chars": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "assistant_length_chars": {
+          "share": 0.1333,
+          "chance": 0.1011,
+          "observed": 8,
+          "expected": 6.07,
+          "z": 0.85
+        },
+        "assistant_uppercase_density": {
+          "share": 0.0833,
+          "chance": 0.1011,
+          "observed": 5,
+          "expected": 6.07,
+          "z": -0.47
+        },
+        "assistant_sentence_count": {
+          "share": 0.05,
+          "chance": 0.1011,
+          "observed": 3,
+          "expected": 6.07,
+          "z": -1.35
+        },
+        "assistant_punctuation_density": {
+          "share": 0.05,
+          "chance": 0.1011,
+          "observed": 3,
+          "expected": 6.07,
+          "z": -1.35
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.0667,
+          "chance": 0.1011,
+          "observed": 4,
+          "expected": 6.07,
+          "z": -0.91
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.1333,
+          "chance": 0.1011,
+          "observed": 8,
+          "expected": 6.07,
+          "z": 0.85
+        },
+        "position_0_is_user": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_0_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_1_is_user": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_1_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_2_is_user": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_2_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_3_is_user": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        },
+        "position_3_is_assistant": {
+          "share": 0.0,
+          "chance": 0.1011,
+          "observed": 0,
+          "expected": 6.07,
+          "z": -2.67
+        }
+      },
+      "bimodal_features": {},
+      "passed": true,
+      "status": "run",
+      "measured_at": "2026-08-16T23:53:38Z",
+      "probed_corpus_sha256": "c36d9746490d2df7a694f1643665050b8f3c47b423a32bfd9e29b16c3579b15c"
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-17T00:34:58Z",
+    "questions_probed": 60,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 60,
+      "passed": 60,
+      "failed": []
+    },
+    "v1_pair_flip": {
+      "pairs": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 60,
+      "passed": 60,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 60,
+      "passed": 60,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for workingmemory"
+    },
+    "by_shape": {
+      "distance-15": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      },
+      "distance-25": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      },
+      "distance-40": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      },
+      "distance-60": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      },
+      "distance-8": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 12,
+        "v3_passed": 12
+      }
+    },
+    "per_question": {
+      "tme-wm-001": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-002": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-003": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-004": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-005": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-006": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-007": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-008": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-009": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-010": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-011": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-012": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-013": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-014": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-015": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-016": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-017": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-018": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-019": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-020": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-021": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-022": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-023": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-024": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-025": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-026": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-027": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-028": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-029": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-030": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-031": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-032": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-033": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-034": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-035": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-036": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-037": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-038": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-039": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-040": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-041": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-042": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-043": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-044": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-045": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-046": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-047": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-048": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-049": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-050": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-051": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-052": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-053": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-054": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-055": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-056": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-057": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-058": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-059": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-wm-060": {
+        "v1": true,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "c36d9746490d2df7a694f1643665050b8f3c47b423a32bfd9e29b16c3579b15c"
+  }
+}

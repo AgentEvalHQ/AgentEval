@@ -83,7 +83,8 @@ public sealed class TypedMemEvalRunnerTests
 
         var byDistance = result.TypedOutcomes!.ByDistance;
         Assert.NotNull(byDistance);
-        Assert.Equal([1, 5, 15, 40], byDistance!.Keys.Order().ToArray());
+        // Five rungs since v4; the old bottom two could not fail at K_ref = 5.
+        Assert.Equal([8, 15, 25, 40, 60], byDistance!.Keys.Order().ToArray());
         Assert.All(byDistance.Values, counts => Assert.Equal(12, counts.N));
     }
 
@@ -342,8 +343,14 @@ public sealed class TypedMemEvalRunnerTests
             // Matched on the gold's own opening rather than a bare "still valid", which also appears
             // in the QUESTION of every expiring-validity pair and so matched both arms.
             var prompt = string.Join(" ", chatMessages.Select(m => m.Text));
+            // The same three markers the generator guarantees on every before-arm gold
+            // (gen_typedmemeval_prospective.check_pairs). "It is still ahead" arrived when the
+            // not-yet-true shape was reframed to ask what the RECORD shows rather than whether
+            // the thing had happened; keeping the sets aligned is what stops this fake from
+            // silently mis-detecting an arm and reporting a time-blindness finding backwards.
             var beforeArm = prompt.Contains("Not yet.", StringComparison.Ordinal) ||
-                            prompt.Contains("Yes, still valid", StringComparison.Ordinal);
+                            prompt.Contains("Yes, still valid", StringComparison.Ordinal) ||
+                            prompt.Contains("It is still ahead", StringComparison.Ordinal);
             var outcome = beforeArm ? "correct" : "missed";
             return Task.FromResult(new ChatResponse(new ChatMessage(
                 ChatRole.Assistant,

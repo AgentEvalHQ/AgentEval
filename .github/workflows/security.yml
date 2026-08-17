@@ -56,13 +56,16 @@ jobs:
         #   must refuse — not code that uses them.
         # - node_modules + docs/_site: generated content.
         # - strategy/: internal-only planning + calibration-baseline reports.
+        # - Fixtures/consumer-probe/: the consuming project's probe output and corpus metadata,
+        #   whose SHA-256 corpus hashes DevSkim reads as tokens. They are dataset identities,
+        #   published in the release notes; there is nothing secret to move elsewhere.
         # - Data/typedmemeval/ + the judge-calibration fixtures: generated benchmark corpora and
         #   their metadata sidecars. JSON cannot carry a suppression comment, and every finding in
         #   them is the same false positive — the 64-hex values DevSkim reads as leaked tokens are
         #   SHA-256 content hashes that exist precisely so a result can name the corpus that
         #   produced it. Data, not code.
         # Real source code under src/ and tests/ remains scanned.
-        ignore-globs: "**/samples/**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json"
+        ignore-globs: "**/samples/**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json,**/Fixtures/consumer-probe/**"
         # Rule exclusions — informational rules that produce only false
         # positives in this codebase. Real-security rules (DS126858 weak
         # hash, DS148264 weak random, DS425040 untrusted deserialize) stay

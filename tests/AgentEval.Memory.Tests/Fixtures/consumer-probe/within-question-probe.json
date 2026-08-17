@@ -1,0 +1,2157 @@
+{
+  "prospective": {
+    "numeric": [
+      {
+        "name": "turn_count",
+        "pooledFolded": 0.6518518518518519,
+        "pooledRaw": 0.6518518518518519,
+        "meanQ": 0.62,
+        "medQ": 0.5,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.24,
+        "shareEq1": 0.24
+      },
+      {
+        "name": "session_chars",
+        "pooledFolded": 0.7012345679012346,
+        "pooledRaw": 0.7012345679012346,
+        "meanQ": 0.808602680815916,
+        "medQ": 0.8461538461538461,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.62,
+        "shareEq1": 0.26
+      },
+      {
+        "name": "mean_turn_chars",
+        "pooledFolded": 0.5814814814814815,
+        "pooledRaw": 0.4185185185185185,
+        "meanQ": 0.8221974520577462,
+        "medQ": 0.8571428571428571,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.64,
+        "shareEq1": 0.34
+      },
+      {
+        "name": "user_turn_count",
+        "pooledFolded": 0.6518518518518519,
+        "pooledRaw": 0.6518518518518519,
+        "meanQ": 0.62,
+        "medQ": 0.5,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.24,
+        "shareEq1": 0.24
+      },
+      {
+        "name": "assistant_turn_count",
+        "pooledFolded": 0.6518518518518519,
+        "pooledRaw": 0.6518518518518519,
+        "meanQ": 0.62,
+        "medQ": 0.5,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.24,
+        "shareEq1": 0.24
+      },
+      {
+        "name": "user_chars",
+        "pooledFolded": 0.6549382716049382,
+        "pooledRaw": 0.6549382716049382,
+        "meanQ": 0.8055714644832291,
+        "medQ": 0.8333333333333334,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.64,
+        "shareEq1": 0.24
+      },
+      {
+        "name": "assistant_chars",
+        "pooledFolded": 0.6160493827160494,
+        "pooledRaw": 0.6160493827160494,
+        "meanQ": 0.7445925895999425,
+        "medQ": 0.7058823529411765,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.44,
+        "shareEq1": 0.18
+      },
+      {
+        "name": "first_turn_chars",
+        "pooledFolded": 0.5617283950617284,
+        "pooledRaw": 0.5617283950617284,
+        "meanQ": 0.7343861326581913,
+        "medQ": 0.7333333333333334,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.48,
+        "shareEq1": 0.12
+      },
+      {
+        "name": "last_turn_chars",
+        "pooledFolded": 0.6061728395061728,
+        "pooledRaw": 0.39382716049382716,
+        "meanQ": 0.8211263197586728,
+        "medQ": 0.875,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.68,
+        "shareEq1": 0.28
+      },
+      {
+        "name": "first_user_chars",
+        "pooledFolded": 0.5617283950617284,
+        "pooledRaw": 0.5617283950617284,
+        "meanQ": 0.7343861326581913,
+        "medQ": 0.7333333333333334,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.48,
+        "shareEq1": 0.12
+      },
+      {
+        "name": "first_assistant_chars",
+        "pooledFolded": 0.5395061728395062,
+        "pooledRaw": 0.5395061728395062,
+        "meanQ": 0.7838675842131724,
+        "medQ": 0.7916666666666666,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6,
+        "shareEq1": 0.14
+      },
+      {
+        "name": "last_assistant_chars",
+        "pooledFolded": 0.6061728395061728,
+        "pooledRaw": 0.39382716049382716,
+        "meanQ": 0.8211263197586728,
+        "medQ": 0.875,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.68,
+        "shareEq1": 0.28
+      },
+      {
+        "name": "full_stop_count",
+        "pooledFolded": 0.6283950617283951,
+        "pooledRaw": 0.6283950617283951,
+        "meanQ": 0.6964442020397901,
+        "medQ": 0.6785714285714286,
+        "p90Q": 0.9230769230769231,
+        "maxQ": 1,
+        "shareGe075": 0.4,
+        "shareEq1": 0.02
+      },
+      {
+        "name": "comma_count",
+        "pooledFolded": 0.5185185185185185,
+        "pooledRaw": 0.5185185185185185,
+        "meanQ": 0.7438039844142784,
+        "medQ": 0.7307692307692308,
+        "p90Q": 0.9705882352941176,
+        "maxQ": 1,
+        "shareGe075": 0.46,
+        "shareEq1": 0.08
+      },
+      {
+        "name": "em_dash_count",
+        "pooledFolded": 0.5993827160493828,
+        "pooledRaw": 0.5993827160493828,
+        "meanQ": 0.5746249999999999,
+        "medQ": 0.5,
+        "p90Q": 0.9583333333333334,
+        "maxQ": 1,
+        "shareGe075": 0.16,
+        "shareEq1": 0.08
+      },
+      {
+        "name": "question_mark_count",
+        "pooledFolded": 0.5802469135802469,
+        "pooledRaw": 0.5802469135802469,
+        "meanQ": 0.6311000323206204,
+        "medQ": 0.5625,
+        "p90Q": 0.9117647058823529,
+        "maxQ": 0.9583333333333334,
+        "shareGe075": 0.22,
+        "shareEq1": 0
+      },
+      {
+        "name": "exclamation_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "semicolon_count",
+        "pooledFolded": 0.5012345679012346,
+        "pooledRaw": 0.49876543209876545,
+        "meanQ": 0.5005882352941177,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5294117647058824,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "colon_count",
+        "pooledFolded": 0.5092592592592593,
+        "pooledRaw": 0.5092592592592593,
+        "meanQ": 0.5072924836601309,
+        "medQ": 0.5,
+        "p90Q": 0.53125,
+        "maxQ": 0.5416666666666666,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "apostrophe_count",
+        "pooledFolded": 0.5024691358024691,
+        "pooledRaw": 0.49753086419753084,
+        "meanQ": 0.6747597141420673,
+        "medQ": 0.6428571428571428,
+        "p90Q": 0.8235294117647058,
+        "maxQ": 0.9583333333333334,
+        "shareGe075": 0.24,
+        "shareEq1": 0
+      },
+      {
+        "name": "punct_density",
+        "pooledFolded": 0.5055555555555555,
+        "pooledRaw": 0.49444444444444446,
+        "meanQ": 0.7975090138619549,
+        "medQ": 0.8235294117647058,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6,
+        "shareEq1": 0.16
+      },
+      {
+        "name": "digit_density",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "uppercase_density",
+        "pooledFolded": 0.5308641975308642,
+        "pooledRaw": 0.4691358024691358,
+        "meanQ": 0.7641508834302948,
+        "medQ": 0.7647058823529411,
+        "p90Q": 0.9411764705882353,
+        "maxQ": 1,
+        "shareGe075": 0.54,
+        "shareEq1": 0.08
+      },
+      {
+        "name": "date_mention_count",
+        "pooledFolded": 0.7438271604938271,
+        "pooledRaw": 0.7438271604938271,
+        "meanQ": 0.8118766250089777,
+        "medQ": 0.90625,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.64,
+        "shareEq1": 0.34
+      },
+      {
+        "name": "position_in_haystack",
+        "pooledFolded": 0.5296296296296297,
+        "pooledRaw": 0.5296296296296297,
+        "meanQ": 0.7139649500825971,
+        "medQ": 0.6923076923076923,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.44,
+        "shareEq1": 0.12
+      }
+    ],
+    "ngramsTop25": [
+      {
+        "ngram": "good",
+        "folded": 0.7154320987654321,
+        "raw": 0.7154320987654321,
+        "inQuestions": 24
+      },
+      {
+        "ngram": "yet",
+        "folded": 0.7092592592592593,
+        "raw": 0.29074074074074074,
+        "inQuestions": 25
+      },
+      {
+        "ngram": "to",
+        "folded": 0.6679012345679012,
+        "raw": 0.6679012345679012,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "today",
+        "folded": 0.645679012345679,
+        "raw": 0.645679012345679,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "from",
+        "folded": 0.6401234567901235,
+        "raw": 0.6401234567901235,
+        "inQuestions": 16
+      },
+      {
+        "ngram": "remind",
+        "folded": 0.6395061728395062,
+        "raw": 0.6395061728395062,
+        "inQuestions": 16
+      },
+      {
+        "ngram": "remind me",
+        "folded": 0.6395061728395062,
+        "raw": 0.6395061728395062,
+        "inQuestions": 16
+      },
+      {
+        "ngram": "me to",
+        "folded": 0.6395061728395062,
+        "raw": 0.6395061728395062,
+        "inQuestions": 16
+      },
+      {
+        "ngram": "in",
+        "folded": 0.632716049382716,
+        "raw": 0.36728395061728397,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "enjoy it",
+        "folded": 0.6246913580246913,
+        "raw": 0.6246913580246913,
+        "inQuestions": 13
+      },
+      {
+        "ngram": "it also",
+        "folded": 0.6246913580246913,
+        "raw": 0.6246913580246913,
+        "inQuestions": 31
+      },
+      {
+        "ngram": "enjoy",
+        "folded": 0.6240740740740741,
+        "raw": 0.6240740740740741,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "weeks from",
+        "folded": 0.6240740740740741,
+        "raw": 0.6240740740740741,
+        "inQuestions": 13
+      },
+      {
+        "ngram": "from today",
+        "folded": 0.6240740740740741,
+        "raw": 0.6240740740740741,
+        "inQuestions": 13
+      },
+      {
+        "ngram": "date",
+        "folded": 0.6179012345679012,
+        "raw": 0.38209876543209875,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "stays",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "know",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "lasts",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "picked up",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "today it",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "it stays",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "stays valid",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "valid for",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "good to",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "to know",
+        "folded": 0.6135802469135803,
+        "raw": 0.6135802469135803,
+        "inQuestions": 12
+      }
+    ]
+  },
+  "episodic": {
+    "numeric": [
+      {
+        "name": "turn_count",
+        "pooledFolded": 0.6152694610778443,
+        "pooledRaw": 0.6152694610778443,
+        "meanQ": 0.77,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.54,
+        "shareEq1": 0.54
+      },
+      {
+        "name": "session_chars",
+        "pooledFolded": 0.6482035928143712,
+        "pooledRaw": 0.6482035928143712,
+        "meanQ": 0.7607312251847553,
+        "medQ": 0.7333333333333334,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.48,
+        "shareEq1": 0.2
+      },
+      {
+        "name": "mean_turn_chars",
+        "pooledFolded": 0.5269461077844311,
+        "pooledRaw": 0.47305389221556887,
+        "meanQ": 0.8429239995866594,
+        "medQ": 0.95,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.66,
+        "shareEq1": 0.44
+      },
+      {
+        "name": "user_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_turn_count",
+        "pooledFolded": 0.6152694610778443,
+        "pooledRaw": 0.6152694610778443,
+        "meanQ": 0.77,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.54,
+        "shareEq1": 0.54
+      },
+      {
+        "name": "user_chars",
+        "pooledFolded": 0.5064157399486741,
+        "pooledRaw": 0.5064157399486741,
+        "meanQ": 0.7138560017419353,
+        "medQ": 0.69375,
+        "p90Q": 0.9583333333333334,
+        "maxQ": 1,
+        "shareGe075": 0.36,
+        "shareEq1": 0.08
+      },
+      {
+        "name": "assistant_chars",
+        "pooledFolded": 0.6922583404619332,
+        "pooledRaw": 0.6922583404619332,
+        "meanQ": 0.7920159056213153,
+        "medQ": 0.782608695652174,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6,
+        "shareEq1": 0.22
+      },
+      {
+        "name": "first_turn_chars",
+        "pooledFolded": 0.5147562018819504,
+        "pooledRaw": 0.5147562018819504,
+        "meanQ": 0.6884737747598867,
+        "medQ": 0.6428571428571428,
+        "p90Q": 0.9166666666666666,
+        "maxQ": 1,
+        "shareGe075": 0.36,
+        "shareEq1": 0.02
+      },
+      {
+        "name": "last_turn_chars",
+        "pooledFolded": 0.5979469632164243,
+        "pooledRaw": 0.4020530367835757,
+        "meanQ": 0.8416514049306013,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.64,
+        "shareEq1": 0.54
+      },
+      {
+        "name": "first_user_chars",
+        "pooledFolded": 0.5147562018819504,
+        "pooledRaw": 0.5147562018819504,
+        "meanQ": 0.6884737747598867,
+        "medQ": 0.6428571428571428,
+        "p90Q": 0.9166666666666666,
+        "maxQ": 1,
+        "shareGe075": 0.36,
+        "shareEq1": 0.02
+      },
+      {
+        "name": "first_assistant_chars",
+        "pooledFolded": 0.695038494439692,
+        "pooledRaw": 0.695038494439692,
+        "meanQ": 0.7852911202044092,
+        "medQ": 0.788235294117647,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.58,
+        "shareEq1": 0.14
+      },
+      {
+        "name": "last_assistant_chars",
+        "pooledFolded": 0.5979469632164243,
+        "pooledRaw": 0.4020530367835757,
+        "meanQ": 0.8416514049306013,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.64,
+        "shareEq1": 0.54
+      },
+      {
+        "name": "full_stop_count",
+        "pooledFolded": 0.5233105218135159,
+        "pooledRaw": 0.47668947818648416,
+        "meanQ": 0.7156708528592078,
+        "medQ": 0.7058823529411764,
+        "p90Q": 0.9166666666666666,
+        "maxQ": 1,
+        "shareGe075": 0.44,
+        "shareEq1": 0.04
+      },
+      {
+        "name": "comma_count",
+        "pooledFolded": 0.7307527801539777,
+        "pooledRaw": 0.7307527801539777,
+        "meanQ": 0.7742046481632663,
+        "medQ": 0.8161764705882353,
+        "p90Q": 0.9545454545454546,
+        "maxQ": 1,
+        "shareGe075": 0.56,
+        "shareEq1": 0.02
+      },
+      {
+        "name": "em_dash_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "question_mark_count",
+        "pooledFolded": 0.6152694610778443,
+        "pooledRaw": 0.6152694610778443,
+        "meanQ": 0.77,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.54,
+        "shareEq1": 0.54
+      },
+      {
+        "name": "exclamation_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "semicolon_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "colon_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "apostrophe_count",
+        "pooledFolded": 0.5053464499572284,
+        "pooledRaw": 0.5053464499572284,
+        "meanQ": 0.5785261463256686,
+        "medQ": 0.5416666666666667,
+        "p90Q": 0.6428571428571429,
+        "maxQ": 0.9791666666666666,
+        "shareGe075": 0.1,
+        "shareEq1": 0
+      },
+      {
+        "name": "punct_density",
+        "pooledFolded": 0.6231822070145423,
+        "pooledRaw": 0.6231822070145423,
+        "meanQ": 0.7532169364646212,
+        "medQ": 0.753968253968254,
+        "p90Q": 0.9545454545454546,
+        "maxQ": 1,
+        "shareGe075": 0.52,
+        "shareEq1": 0.1
+      },
+      {
+        "name": "digit_density",
+        "pooledFolded": 0.5470487596236099,
+        "pooledRaw": 0.5470487596236099,
+        "meanQ": 0.61,
+        "medQ": 0.5,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.22,
+        "shareEq1": 0.22
+      },
+      {
+        "name": "uppercase_density",
+        "pooledFolded": 0.561377245508982,
+        "pooledRaw": 0.561377245508982,
+        "meanQ": 0.6998985585961726,
+        "medQ": 0.6323529411764706,
+        "p90Q": 0.9565217391304348,
+        "maxQ": 1,
+        "shareGe075": 0.38,
+        "shareEq1": 0.06
+      },
+      {
+        "name": "date_mention_count",
+        "pooledFolded": 0.5171086398631308,
+        "pooledRaw": 0.4828913601368691,
+        "meanQ": 0.6222602991751447,
+        "medQ": 0.5952380952380952,
+        "p90Q": 0.7058823529411764,
+        "maxQ": 1,
+        "shareGe075": 0.1,
+        "shareEq1": 0.02
+      },
+      {
+        "name": "position_in_haystack",
+        "pooledFolded": 0.5072711719418306,
+        "pooledRaw": 0.5072711719418306,
+        "meanQ": 0.7229911480534241,
+        "medQ": 0.7058823529411765,
+        "p90Q": 0.9,
+        "maxQ": 1,
+        "shareGe075": 0.44,
+        "shareEq1": 0.02
+      }
+    ],
+    "ngramsTop25": [
+      {
+        "ngram": "on the",
+        "folded": 0.7634730538922155,
+        "raw": 0.7634730538922155,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "first",
+        "folded": 0.7236954662104362,
+        "raw": 0.2763045337895637,
+        "inQuestions": 38
+      },
+      {
+        "ngram": "earliest",
+        "folded": 0.7040205303678357,
+        "raw": 0.29597946963216426,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "add",
+        "folded": 0.7040205303678357,
+        "raw": 0.29597946963216426,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "order",
+        "folded": 0.7033789563729683,
+        "raw": 0.2966210436270317,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "shortlist",
+        "folded": 0.6783575705731394,
+        "raw": 0.6783575705731394,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "time",
+        "folded": 0.6685201026518393,
+        "raw": 0.3314798973481608,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "put",
+        "folded": 0.6621043627031651,
+        "raw": 0.6621043627031651,
+        "inQuestions": 39
+      },
+      {
+        "ngram": "one",
+        "folded": 0.6332335329341318,
+        "raw": 0.36676646706586824,
+        "inQuestions": 48
+      },
+      {
+        "ngram": "shortlist that",
+        "folded": 0.5900342172797263,
+        "raw": 0.5900342172797263,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "before the",
+        "folded": 0.5893926432848589,
+        "raw": 0.41060735671514115,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "of",
+        "folded": 0.58169375534645,
+        "raw": 0.41830624465355004,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "about",
+        "folded": 0.5812660393498716,
+        "raw": 0.5812660393498716,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "about the",
+        "folded": 0.5778443113772455,
+        "raw": 0.5778443113772455,
+        "inQuestions": 18
+      },
+      {
+        "ngram": "noted also",
+        "folded": 0.5774165953806673,
+        "raw": 0.5774165953806673,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "then",
+        "folded": 0.5765611633875107,
+        "raw": 0.4234388366124893,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "usually",
+        "folded": 0.5727117194183062,
+        "raw": 0.42728828058169377,
+        "inQuestions": 47
+      },
+      {
+        "ngram": "anything",
+        "folded": 0.5688622754491018,
+        "raw": 0.5688622754491018,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "no",
+        "folded": 0.5684345594525235,
+        "raw": 0.5684345594525235,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "it before",
+        "folded": 0.5658682634730539,
+        "raw": 0.4341317365269461,
+        "inQuestions": 46
+      },
+      {
+        "ngram": "one thing",
+        "folded": 0.5647989734816082,
+        "raw": 0.5647989734816082,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "thing about",
+        "folded": 0.5647989734816082,
+        "raw": 0.5647989734816082,
+        "inQuestions": 15
+      },
+      {
+        "ngram": "worth",
+        "folded": 0.5643712574850299,
+        "raw": 0.4356287425149701,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "thing",
+        "folded": 0.5598802395209581,
+        "raw": 0.5598802395209581,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "out of",
+        "folded": 0.5594525235243798,
+        "raw": 0.4405474764756202,
+        "inQuestions": 46
+      }
+    ]
+  },
+  "arithmetic": {
+    "numeric": [
+      {
+        "name": "turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "session_chars",
+        "pooledFolded": 0.5182608695652174,
+        "pooledRaw": 0.5182608695652174,
+        "meanQ": 0.6452040014955432,
+        "medQ": 0.6333333333333333,
+        "p90Q": 0.7888888888888889,
+        "maxQ": 0.9393939393939394,
+        "shareGe075": 0.18,
+        "shareEq1": 0
+      },
+      {
+        "name": "mean_turn_chars",
+        "pooledFolded": 0.5182608695652174,
+        "pooledRaw": 0.5182608695652174,
+        "meanQ": 0.6452040014955432,
+        "medQ": 0.6333333333333333,
+        "p90Q": 0.7888888888888889,
+        "maxQ": 0.9393939393939394,
+        "shareGe075": 0.18,
+        "shareEq1": 0
+      },
+      {
+        "name": "user_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "user_chars",
+        "pooledFolded": 0.5031521739130435,
+        "pooledRaw": 0.5031521739130435,
+        "meanQ": 0.6508980227150843,
+        "medQ": 0.64375,
+        "p90Q": 0.8,
+        "maxQ": 0.8888888888888888,
+        "shareGe075": 0.22,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_chars",
+        "pooledFolded": 0.533804347826087,
+        "pooledRaw": 0.533804347826087,
+        "meanQ": 0.6277889737458329,
+        "medQ": 0.6231884057971014,
+        "p90Q": 0.755,
+        "maxQ": 0.7936507936507936,
+        "shareGe075": 0.12,
+        "shareEq1": 0
+      },
+      {
+        "name": "first_turn_chars",
+        "pooledFolded": 0.5239130434782608,
+        "pooledRaw": 0.47608695652173916,
+        "meanQ": 0.6339712725343934,
+        "medQ": 0.6066666666666667,
+        "p90Q": 0.7880434782608696,
+        "maxQ": 0.8571428571428572,
+        "shareGe075": 0.18,
+        "shareEq1": 0
+      },
+      {
+        "name": "last_turn_chars",
+        "pooledFolded": 0.5033695652173913,
+        "pooledRaw": 0.5033695652173913,
+        "meanQ": 0.6146967634082852,
+        "medQ": 0.6086956521739131,
+        "p90Q": 0.725,
+        "maxQ": 0.7843137254901961,
+        "shareGe075": 0.04,
+        "shareEq1": 0
+      },
+      {
+        "name": "first_user_chars",
+        "pooledFolded": 0.5239130434782608,
+        "pooledRaw": 0.47608695652173916,
+        "meanQ": 0.6339712725343934,
+        "medQ": 0.6066666666666667,
+        "p90Q": 0.7880434782608696,
+        "maxQ": 0.8571428571428572,
+        "shareGe075": 0.18,
+        "shareEq1": 0
+      },
+      {
+        "name": "first_assistant_chars",
+        "pooledFolded": 0.5348913043478261,
+        "pooledRaw": 0.5348913043478261,
+        "meanQ": 0.6406049917578733,
+        "medQ": 0.6215277777777778,
+        "p90Q": 0.775,
+        "maxQ": 0.875,
+        "shareGe075": 0.16,
+        "shareEq1": 0
+      },
+      {
+        "name": "last_assistant_chars",
+        "pooledFolded": 0.5033695652173913,
+        "pooledRaw": 0.5033695652173913,
+        "meanQ": 0.6146967634082852,
+        "medQ": 0.6086956521739131,
+        "p90Q": 0.725,
+        "maxQ": 0.7843137254901961,
+        "shareGe075": 0.04,
+        "shareEq1": 0
+      },
+      {
+        "name": "full_stop_count",
+        "pooledFolded": 0.5136956521739131,
+        "pooledRaw": 0.48630434782608695,
+        "meanQ": 0.6231449166985059,
+        "medQ": 0.6014492753623188,
+        "p90Q": 0.7458333333333333,
+        "maxQ": 0.9166666666666666,
+        "shareGe075": 0.1,
+        "shareEq1": 0
+      },
+      {
+        "name": "comma_count",
+        "pooledFolded": 0.5294565217391304,
+        "pooledRaw": 0.5294565217391304,
+        "meanQ": 0.6516584057521029,
+        "medQ": 0.6484375,
+        "p90Q": 0.7916666666666666,
+        "maxQ": 0.8359375,
+        "shareGe075": 0.2,
+        "shareEq1": 0
+      },
+      {
+        "name": "em_dash_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "question_mark_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "exclamation_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "semicolon_count",
+        "pooledFolded": 0.5477173913043478,
+        "pooledRaw": 0.4522826086956522,
+        "meanQ": 0.5484849495182581,
+        "medQ": 0.5416666666666667,
+        "p90Q": 0.59375,
+        "maxQ": 0.6333333333333333,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "colon_count",
+        "pooledFolded": 0.6729347826086957,
+        "pooledRaw": 0.6729347826086957,
+        "meanQ": 0.6719903775364942,
+        "medQ": 0.5,
+        "p90Q": 0.875,
+        "maxQ": 0.88,
+        "shareGe075": 0.48,
+        "shareEq1": 0
+      },
+      {
+        "name": "apostrophe_count",
+        "pooledFolded": 0.5353260869565217,
+        "pooledRaw": 0.46467391304347827,
+        "meanQ": 0.5672105978576508,
+        "medQ": 0.5568181818181819,
+        "p90Q": 0.6304347826086957,
+        "maxQ": 0.7395833333333334,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "punct_density",
+        "pooledFolded": 0.5153260869565217,
+        "pooledRaw": 0.5153260869565217,
+        "meanQ": 0.6638813305594062,
+        "medQ": 0.625,
+        "p90Q": 0.855072463768116,
+        "maxQ": 0.9916666666666667,
+        "shareGe075": 0.22,
+        "shareEq1": 0
+      },
+      {
+        "name": "digit_density",
+        "pooledFolded": 0.6326086956521739,
+        "pooledRaw": 0.6326086956521739,
+        "meanQ": 0.7075821040336251,
+        "medQ": 0.6875,
+        "p90Q": 0.9097222222222222,
+        "maxQ": 0.9565217391304348,
+        "shareGe075": 0.44,
+        "shareEq1": 0
+      },
+      {
+        "name": "uppercase_density",
+        "pooledFolded": 0.5539130434782609,
+        "pooledRaw": 0.5539130434782609,
+        "meanQ": 0.6357145259215491,
+        "medQ": 0.6333333333333333,
+        "p90Q": 0.7738095238095238,
+        "maxQ": 0.8333333333333334,
+        "shareGe075": 0.16,
+        "shareEq1": 0
+      },
+      {
+        "name": "date_mention_count",
+        "pooledFolded": 0.7153260869565218,
+        "pooledRaw": 0.7153260869565218,
+        "meanQ": 0.751874078941784,
+        "medQ": 0.8235294117647058,
+        "p90Q": 0.9649122807017544,
+        "maxQ": 0.9945652173913043,
+        "shareGe075": 0.5,
+        "shareEq1": 0
+      },
+      {
+        "name": "position_in_haystack",
+        "pooledFolded": 0.5371739130434783,
+        "pooledRaw": 0.4628260869565217,
+        "meanQ": 0.6584825049679859,
+        "medQ": 0.6521739130434783,
+        "p90Q": 0.7857142857142857,
+        "maxQ": 0.8529411764705882,
+        "shareGe075": 0.24,
+        "shareEq1": 0
+      }
+    ],
+    "ngramsTop25": [
+      {
+        "ngram": "today",
+        "folded": 0.7365217391304347,
+        "raw": 0.7365217391304347,
+        "inQuestions": 26
+      },
+      {
+        "ngram": "against the",
+        "folded": 0.6729347826086957,
+        "raw": 0.6729347826086957,
+        "inQuestions": 24
+      },
+      {
+        "ngram": "payment logged",
+        "folded": 0.6718478260869565,
+        "raw": 0.6718478260869565,
+        "inQuestions": 24
+      },
+      {
+        "ngram": "logged against",
+        "folded": 0.6716304347826086,
+        "raw": 0.6716304347826086,
+        "inQuestions": 24
+      },
+      {
+        "ngram": "for",
+        "folded": 0.6560869565217391,
+        "raw": 0.6560869565217391,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "payment",
+        "folded": 0.6506521739130435,
+        "raw": 0.6506521739130435,
+        "inQuestions": 25
+      },
+      {
+        "ngram": "logged",
+        "folded": 0.6482608695652174,
+        "raw": 0.6482608695652174,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "for the",
+        "folded": 0.6475,
+        "raw": 0.6475,
+        "inQuestions": 48
+      },
+      {
+        "ngram": "against",
+        "folded": 0.6381521739130435,
+        "raw": 0.6381521739130435,
+        "inQuestions": 26
+      },
+      {
+        "ngram": "put an",
+        "folded": 0.6197826086956522,
+        "raw": 0.6197826086956522,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "an order",
+        "folded": 0.6197826086956522,
+        "raw": 0.6197826086956522,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "order in",
+        "folded": 0.6197826086956522,
+        "raw": 0.6197826086956522,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "in with",
+        "folded": 0.6197826086956522,
+        "raw": 0.6197826086956522,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "today for",
+        "folded": 0.6197826086956522,
+        "raw": 0.6197826086956522,
+        "inQuestions": 14
+      },
+      {
+        "ngram": "order",
+        "folded": 0.5927173913043479,
+        "raw": 0.5927173913043479,
+        "inQuestions": 21
+      },
+      {
+        "ngram": "put",
+        "folded": 0.5914130434782608,
+        "raw": 0.5914130434782608,
+        "inQuestions": 47
+      },
+      {
+        "ngram": "recorded also",
+        "folded": 0.586304347826087,
+        "raw": 0.586304347826087,
+        "inQuestions": 41
+      },
+      {
+        "ngram": "an",
+        "folded": 0.5833695652173913,
+        "raw": 0.5833695652173913,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "recorded",
+        "folded": 0.5807608695652174,
+        "raw": 0.5807608695652174,
+        "inQuestions": 49
+      },
+      {
+        "ngram": "on the",
+        "folded": 0.5804347826086956,
+        "raw": 0.41956521739130437,
+        "inQuestions": 50
+      },
+      {
+        "ngram": "every",
+        "folded": 0.5800000000000001,
+        "raw": 0.42,
+        "inQuestions": 45
+      },
+      {
+        "ngram": "many",
+        "folded": 0.5754347826086956,
+        "raw": 0.4245652173913044,
+        "inQuestions": 27
+      },
+      {
+        "ngram": "days",
+        "folded": 0.5751086956521739,
+        "raw": 0.42489130434782607,
+        "inQuestions": 32
+      },
+      {
+        "ngram": "total",
+        "folded": 0.5703260869565218,
+        "raw": 0.42967391304347824,
+        "inQuestions": 27
+      },
+      {
+        "ngram": "understood",
+        "folded": 0.5647826086956522,
+        "raw": 0.5647826086956522,
+        "inQuestions": 49
+      }
+    ]
+  },
+  "workingmemory": {
+    "numeric": [
+      {
+        "name": "turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "session_chars",
+        "pooledFolded": 0.5396174863387978,
+        "pooledRaw": 0.5396174863387978,
+        "meanQ": 0.8485243055555557,
+        "medQ": 0.925,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6666666666666666,
+        "shareEq1": 0.4166666666666667
+      },
+      {
+        "name": "mean_turn_chars",
+        "pooledFolded": 0.5396174863387978,
+        "pooledRaw": 0.5396174863387978,
+        "meanQ": 0.8485243055555557,
+        "medQ": 0.925,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6666666666666666,
+        "shareEq1": 0.4166666666666667
+      },
+      {
+        "name": "user_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "user_chars",
+        "pooledFolded": 0.5389344262295082,
+        "pooledRaw": 0.5389344262295082,
+        "meanQ": 0.8348090277777778,
+        "medQ": 0.8666666666666667,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6458333333333334,
+        "shareEq1": 0.375
+      },
+      {
+        "name": "assistant_chars",
+        "pooledFolded": 0.505464480874317,
+        "pooledRaw": 0.505464480874317,
+        "meanQ": 0.8406250000000001,
+        "medQ": 0.9,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.7083333333333334,
+        "shareEq1": 0.4375
+      },
+      {
+        "name": "first_turn_chars",
+        "pooledFolded": 0.549863387978142,
+        "pooledRaw": 0.549863387978142,
+        "meanQ": 0.8162326388888888,
+        "medQ": 0.8125,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.5625,
+        "shareEq1": 0.375
+      },
+      {
+        "name": "last_turn_chars",
+        "pooledFolded": 0.5061475409836065,
+        "pooledRaw": 0.49385245901639346,
+        "meanQ": 0.8243055555555555,
+        "medQ": 0.8375,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6458333333333334,
+        "shareEq1": 0.3541666666666667
+      },
+      {
+        "name": "first_user_chars",
+        "pooledFolded": 0.549863387978142,
+        "pooledRaw": 0.549863387978142,
+        "meanQ": 0.8162326388888888,
+        "medQ": 0.8125,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.5625,
+        "shareEq1": 0.375
+      },
+      {
+        "name": "first_assistant_chars",
+        "pooledFolded": 0.5280054644808743,
+        "pooledRaw": 0.5280054644808743,
+        "meanQ": 0.8596354166666668,
+        "medQ": 0.9333333333333333,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.7083333333333334,
+        "shareEq1": 0.4166666666666667
+      },
+      {
+        "name": "last_assistant_chars",
+        "pooledFolded": 0.5061475409836065,
+        "pooledRaw": 0.49385245901639346,
+        "meanQ": 0.8243055555555555,
+        "medQ": 0.8375,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6458333333333334,
+        "shareEq1": 0.3541666666666667
+      },
+      {
+        "name": "full_stop_count",
+        "pooledFolded": 0.5546448087431695,
+        "pooledRaw": 0.4453551912568306,
+        "meanQ": 0.7750868055555555,
+        "medQ": 0.8,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6458333333333334,
+        "shareEq1": 0.2708333333333333
+      },
+      {
+        "name": "comma_count",
+        "pooledFolded": 0.5717213114754098,
+        "pooledRaw": 0.42827868852459017,
+        "meanQ": 0.8243923611111108,
+        "medQ": 0.9,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6666666666666666,
+        "shareEq1": 0.2916666666666667
+      },
+      {
+        "name": "em_dash_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "question_mark_count",
+        "pooledFolded": 0.5095628415300546,
+        "pooledRaw": 0.49043715846994534,
+        "meanQ": 0.5168402777777777,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 1,
+        "shareGe075": 0.020833333333333332,
+        "shareEq1": 0.020833333333333332
+      },
+      {
+        "name": "exclamation_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "semicolon_count",
+        "pooledFolded": 0.5833333333333334,
+        "pooledRaw": 0.5833333333333334,
+        "meanQ": 0.5833333333333334,
+        "medQ": 0.5,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.16666666666666666,
+        "shareEq1": 0.16666666666666666
+      },
+      {
+        "name": "colon_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "apostrophe_count",
+        "pooledFolded": 0.5642076502732241,
+        "pooledRaw": 0.43579234972677594,
+        "meanQ": 0.6628472222222221,
+        "medQ": 0.6,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.20833333333333334,
+        "shareEq1": 0.10416666666666667
+      },
+      {
+        "name": "punct_density",
+        "pooledFolded": 0.5833333333333333,
+        "pooledRaw": 0.4166666666666667,
+        "meanQ": 0.8381076388888892,
+        "medQ": 0.8666666666666667,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.75,
+        "shareEq1": 0.3333333333333333
+      },
+      {
+        "name": "digit_density",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "uppercase_density",
+        "pooledFolded": 0.5580601092896175,
+        "pooledRaw": 0.44193989071038253,
+        "meanQ": 0.8289062500000002,
+        "medQ": 0.8666666666666667,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.6458333333333334,
+        "shareEq1": 0.4375
+      },
+      {
+        "name": "date_mention_count",
+        "pooledFolded": 0.5969945355191257,
+        "pooledRaw": 0.5969945355191257,
+        "meanQ": 0.6308159722222221,
+        "medQ": 0.5375,
+        "p90Q": 0.9666666666666667,
+        "maxQ": 1,
+        "shareGe075": 0.22916666666666666,
+        "shareEq1": 0.08333333333333333
+      },
+      {
+        "name": "position_in_haystack",
+        "pooledFolded": 1,
+        "pooledRaw": 0,
+        "meanQ": 1,
+        "medQ": 1,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 1,
+        "shareEq1": 1
+      }
+    ],
+    "ngramsTop25": [
+      {
+        "ngram": "have",
+        "folded": 0.7909836065573771,
+        "raw": 0.7909836065573771,
+        "inQuestions": 48
+      },
+      {
+        "ngram": "has",
+        "folded": 0.7069672131147541,
+        "raw": 0.2930327868852459,
+        "inQuestions": 40
+      },
+      {
+        "ngram": "so",
+        "folded": 0.6475409836065573,
+        "raw": 0.3524590163934426,
+        "inQuestions": 44
+      },
+      {
+        "ngram": "for the",
+        "folded": 0.6345628415300546,
+        "raw": 0.6345628415300546,
+        "inQuestions": 34
+      },
+      {
+        "ngram": "far",
+        "folded": 0.6311475409836065,
+        "raw": 0.36885245901639346,
+        "inQuestions": 40
+      },
+      {
+        "ngram": "far as",
+        "folded": 0.6311475409836065,
+        "raw": 0.36885245901639346,
+        "inQuestions": 40
+      },
+      {
+        "ngram": "since the",
+        "folded": 0.6284153005464481,
+        "raw": 0.6284153005464481,
+        "inQuestions": 16
+      },
+      {
+        "ngram": "me",
+        "folded": 0.6229508196721312,
+        "raw": 0.3770491803278688,
+        "inQuestions": 44
+      },
+      {
+        "ngram": "end",
+        "folded": 0.6168032786885246,
+        "raw": 0.3831967213114754,
+        "inQuestions": 39
+      },
+      {
+        "ngram": "the end",
+        "folded": 0.6168032786885246,
+        "raw": 0.3831967213114754,
+        "inQuestions": 39
+      },
+      {
+        "ngram": "time",
+        "folded": 0.6140710382513661,
+        "raw": 0.6140710382513661,
+        "inQuestions": 38
+      },
+      {
+        "ngram": "given",
+        "folded": 0.6092896174863388,
+        "raw": 0.6092896174863388,
+        "inQuestions": 11
+      },
+      {
+        "ngram": "the winter",
+        "folded": 0.6065573770491803,
+        "raw": 0.6065573770491803,
+        "inQuestions": 12
+      },
+      {
+        "ngram": "nobody",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "raised",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "can",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "remember",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "and nobody",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "nobody has",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "has raised",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "raised it",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "it with",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "with me",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "me since",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      },
+      {
+        "ngram": "since so",
+        "folded": 0.605191256830601,
+        "raw": 0.3948087431693989,
+        "inQuestions": 36
+      }
+    ]
+  },
+  "forgetting": {
+    "numeric": [
+      {
+        "name": "turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "session_chars",
+        "pooledFolded": 0.5589028776978417,
+        "pooledRaw": 0.44109712230215825,
+        "meanQ": 0.6920285860166133,
+        "medQ": 0.6904761904761905,
+        "p90Q": 0.8947368421052632,
+        "maxQ": 1,
+        "shareGe075": 0.34285714285714286,
+        "shareEq1": 0.02857142857142857
+      },
+      {
+        "name": "mean_turn_chars",
+        "pooledFolded": 0.5589028776978417,
+        "pooledRaw": 0.44109712230215825,
+        "meanQ": 0.6920285860166133,
+        "medQ": 0.6904761904761905,
+        "p90Q": 0.8947368421052632,
+        "maxQ": 1,
+        "shareGe075": 0.34285714285714286,
+        "shareEq1": 0.02857142857142857
+      },
+      {
+        "name": "user_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_turn_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "user_chars",
+        "pooledFolded": 0.6267985611510791,
+        "pooledRaw": 0.3732014388489209,
+        "meanQ": 0.718987132659041,
+        "medQ": 0.7,
+        "p90Q": 0.92,
+        "maxQ": 0.9411764705882353,
+        "shareGe075": 0.4,
+        "shareEq1": 0
+      },
+      {
+        "name": "assistant_chars",
+        "pooledFolded": 0.5490107913669064,
+        "pooledRaw": 0.5490107913669064,
+        "meanQ": 0.725606373296146,
+        "medQ": 0.7,
+        "p90Q": 0.9210526315789473,
+        "maxQ": 1,
+        "shareGe075": 0.42857142857142855,
+        "shareEq1": 0.02857142857142857
+      },
+      {
+        "name": "first_turn_chars",
+        "pooledFolded": 0.6632194244604317,
+        "pooledRaw": 0.33678057553956836,
+        "meanQ": 0.7378605614217117,
+        "medQ": 0.7333333333333334,
+        "p90Q": 0.90625,
+        "maxQ": 1,
+        "shareGe075": 0.45714285714285713,
+        "shareEq1": 0.05714285714285714
+      },
+      {
+        "name": "last_turn_chars",
+        "pooledFolded": 0.516636690647482,
+        "pooledRaw": 0.516636690647482,
+        "meanQ": 0.6771826303262447,
+        "medQ": 0.6666666666666667,
+        "p90Q": 0.8421052631578947,
+        "maxQ": 1,
+        "shareGe075": 0.2571428571428571,
+        "shareEq1": 0.05714285714285714
+      },
+      {
+        "name": "first_user_chars",
+        "pooledFolded": 0.6632194244604317,
+        "pooledRaw": 0.33678057553956836,
+        "meanQ": 0.7378605614217117,
+        "medQ": 0.7333333333333334,
+        "p90Q": 0.90625,
+        "maxQ": 1,
+        "shareGe075": 0.45714285714285713,
+        "shareEq1": 0.05714285714285714
+      },
+      {
+        "name": "first_assistant_chars",
+        "pooledFolded": 0.5885791366906474,
+        "pooledRaw": 0.5885791366906474,
+        "meanQ": 0.7374110026265549,
+        "medQ": 0.6842105263157895,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.42857142857142855,
+        "shareEq1": 0.14285714285714285
+      },
+      {
+        "name": "last_assistant_chars",
+        "pooledFolded": 0.516636690647482,
+        "pooledRaw": 0.516636690647482,
+        "meanQ": 0.6771826303262447,
+        "medQ": 0.6666666666666667,
+        "p90Q": 0.8421052631578947,
+        "maxQ": 1,
+        "shareGe075": 0.2571428571428571,
+        "shareEq1": 0.05714285714285714
+      },
+      {
+        "name": "full_stop_count",
+        "pooledFolded": 0.5566546762589928,
+        "pooledRaw": 0.4433453237410072,
+        "meanQ": 0.6402095348540914,
+        "medQ": 0.6,
+        "p90Q": 0.8421052631578947,
+        "maxQ": 0.9210526315789473,
+        "shareGe075": 0.22857142857142856,
+        "shareEq1": 0
+      },
+      {
+        "name": "comma_count",
+        "pooledFolded": 0.5485611510791367,
+        "pooledRaw": 0.5485611510791367,
+        "meanQ": 0.7073013096022682,
+        "medQ": 0.7,
+        "p90Q": 0.8823529411764706,
+        "maxQ": 0.9473684210526316,
+        "shareGe075": 0.34285714285714286,
+        "shareEq1": 0
+      },
+      {
+        "name": "em_dash_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "question_mark_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "exclamation_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "semicolon_count",
+        "pooledFolded": 0.5242805755395683,
+        "pooledRaw": 0.47571942446043164,
+        "meanQ": 0.5237771352629534,
+        "medQ": 0.5263157894736843,
+        "p90Q": 0.5476190476190477,
+        "maxQ": 0.5652173913043479,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "colon_count",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "apostrophe_count",
+        "pooledFolded": 0.5017985611510791,
+        "pooledRaw": 0.5017985611510791,
+        "meanQ": 0.5453751903507399,
+        "medQ": 0.5263157894736843,
+        "p90Q": 0.6333333333333333,
+        "maxQ": 0.75,
+        "shareGe075": 0.05714285714285714,
+        "shareEq1": 0
+      },
+      {
+        "name": "punct_density",
+        "pooledFolded": 0.5530575539568345,
+        "pooledRaw": 0.5530575539568345,
+        "meanQ": 0.7578445743736784,
+        "medQ": 0.75,
+        "p90Q": 0.9473684210526315,
+        "maxQ": 1,
+        "shareGe075": 0.5142857142857142,
+        "shareEq1": 0.05714285714285714
+      },
+      {
+        "name": "digit_density",
+        "pooledFolded": 0.5,
+        "pooledRaw": 0.5,
+        "meanQ": 0.5,
+        "medQ": 0.5,
+        "p90Q": 0.5,
+        "maxQ": 0.5,
+        "shareGe075": 0,
+        "shareEq1": 0
+      },
+      {
+        "name": "uppercase_density",
+        "pooledFolded": 0.6133093525179856,
+        "pooledRaw": 0.6133093525179856,
+        "meanQ": 0.739520773859783,
+        "medQ": 0.6842105263157895,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.42857142857142855,
+        "shareEq1": 0.11428571428571428
+      },
+      {
+        "name": "date_mention_count",
+        "pooledFolded": 0.5112410071942446,
+        "pooledRaw": 0.5112410071942446,
+        "meanQ": 0.5907938865581597,
+        "medQ": 0.5526315789473684,
+        "p90Q": 0.6847826086956522,
+        "maxQ": 1,
+        "shareGe075": 0.05714285714285714,
+        "shareEq1": 0.02857142857142857
+      },
+      {
+        "name": "position_in_haystack",
+        "pooledFolded": 0.5080935251798561,
+        "pooledRaw": 0.5080935251798561,
+        "meanQ": 0.7163990274218001,
+        "medQ": 0.6799999999999999,
+        "p90Q": 1,
+        "maxQ": 1,
+        "shareGe075": 0.4,
+        "shareEq1": 0.14285714285714285
+      }
+    ],
+    "ngramsTop25": [
+      {
+        "ngram": "far",
+        "folded": 0.602068345323741,
+        "raw": 0.602068345323741,
+        "inQuestions": 32
+      },
+      {
+        "ngram": "far as",
+        "folded": 0.602068345323741,
+        "raw": 0.602068345323741,
+        "inQuestions": 32
+      },
+      {
+        "ngram": "of",
+        "folded": 0.602068345323741,
+        "raw": 0.397931654676259,
+        "inQuestions": 35
+      },
+      {
+        "ngram": "chose",
+        "folded": 0.595773381294964,
+        "raw": 0.595773381294964,
+        "inQuestions": 10
+      },
+      {
+        "ngram": "filed also",
+        "folded": 0.5944244604316546,
+        "raw": 0.5944244604316546,
+        "inQuestions": 10
+      },
+      {
+        "ngram": "has",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "nobody",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "raised",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "since",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "can",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "remember",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "and nobody",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "nobody has",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "has raised",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "raised it",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "it with",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "with me",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "me since",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "since so",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "so far",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "as can",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "can remember",
+        "folded": 0.5912769784172662,
+        "raw": 0.5912769784172662,
+        "inQuestions": 30
+      },
+      {
+        "ngram": "in the",
+        "folded": 0.5822841726618705,
+        "raw": 0.4177158273381295,
+        "inQuestions": 35
+      },
+      {
+        "ngram": "week",
+        "folded": 0.5809352517985611,
+        "raw": 0.41906474820143885,
+        "inQuestions": 35
+      },
+      {
+        "ngram": "end",
+        "folded": 0.5804856115107914,
+        "raw": 0.41951438848920863,
+        "inQuestions": 35
+      }
+    ]
+  }
+}

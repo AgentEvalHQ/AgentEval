@@ -213,13 +213,41 @@ def _pair(
     after_date = pivot + timedelta(days=6)
     assert before_date > latest, f"{pair_id}: before-arm query precedes its own haystack"
 
-    common = {"pair_id": pair_id, "shape": shape}
+    # Distance is this vertical's dial, and it was already there: displacement from the last
+    # gold session to the question runs 15 to 142 days, a 9.5x spread that stratified nothing.
+    # Banded per ARM, because the two arms of a pair sit at different displacements by
+    # construction -- that is what makes them a pair.
+    common = {"pair_id": pair_id, "shape": shape, "difficulty_dial": "distance", "difficulty_validated": False}
     return [
         tmc.Question(qid_before, qtype, question_text, answer_before, before_date,
-                     _copy(sessions), {**common, "arm": "before"}),
+                     _copy(sessions),
+                     {**common, "arm": "before",
+                      "difficulty": _displacement_band(before_date, sessions),
+                      "displacement_days": _displacement_days(before_date, sessions)}),
         tmc.Question(qid_after, qtype, question_text, answer_after, after_date,
-                     _copy(sessions), {**common, "arm": "after"}),
+                     _copy(sessions),
+                     {**common, "arm": "after",
+                      "difficulty": _displacement_band(after_date, sessions),
+                      "displacement_days": _displacement_days(after_date, sessions)}),
     ]
+
+
+#: Days from the last gold session to the question -> band, cut on the spread the generator
+#: already produces. Diagnostics rather than claims: cells are far under the n >= 30 floor.
+_DISPLACEMENT_BANDS = ((25, 1), (45, 2), (70, 3), (105, 4))
+
+
+def _displacement_days(asked: datetime, sessions: list[tmc.Session]) -> float:
+    last_gold = max(s.timestamp for s in sessions if s.is_gold)
+    return round((asked - last_gold).total_seconds() / 86400.0, 1)
+
+
+def _displacement_band(asked: datetime, sessions: list[tmc.Session]) -> int:
+    days = _displacement_days(asked, sessions)
+    for ceiling, band in _DISPLACEMENT_BANDS:
+        if days <= ceiling:
+            return band
+    return 5
 
 
 def _copy(sessions: list[tmc.Session]) -> list[tmc.Session]:
@@ -330,12 +358,21 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
             SHAPE_NOT_YET, TYPE_NOT_YET,
-            f"Have I {past} yet, and on what date does or did that happen?",
+            # Asks what the RECORD shows, not whether the thing happened. The old phrasing
+            # ("Have I {past} yet?") required the model to withhold an inference the evidence
+            # licenses socially but not logically -- a plan plus a passed date does not
+            # establish occurrence -- and answer models assert it anyway. Two of them scored
+            # 50% and 90% on this shape while every other Prospective shape ran at 100%, which
+            # made its V1 answer-model variance rather than memory signal. The temporal
+            # judgement the vertical exists to test ("is the date still ahead?") is preserved;
+            # the occurrence inference, which it never meant to test, is gone.
+            f"What does the record say about when I am due to {future} — is that date still "
+            f"ahead of me, and what is it?",
             f"I am due to {future} {{phrase}}.",
             "That is a real change, good luck with it.",
-            f"Not yet. You are due to {future} on {{date}}, which has not arrived.",
-            f"That date has passed. You were due to {future} on {{date}}, so it is no longer ahead of "
-            f"you — though nothing since then records whether it went ahead.",
+            f"It is still ahead. The record has you due to {future} on {{date}}.",
+            f"It is no longer ahead. The record had you due to {future} on {{date}}, which has "
+            f"passed; nothing since then records whether it went ahead.",
             base + timedelta(days=13 * i + 2), rng, echo, filler_count=rng.randint(12, 17),
         )
         index += 2
@@ -371,8 +408,12 @@ def check_pairs(questions: list[tmc.Question]) -> list[str]:
         if not before.question_date < after.question_date:
             failures.append(f"{pid}: before-arm query time does not precede the after-arm")
         lowered = before.answer.lower()
-        if not any(marker in lowered for marker in ("not yet", "still valid")):
-            failures.append(f"{pid}: before-arm gold is not an explicit not-yet")
+        # "still ahead" joins the list for the not-yet-true shape, which now asks what the
+        # record shows rather than whether the thing happened. The property being checked is
+        # unchanged: the before arm must state, in words, that the moment has not arrived --
+        # so a system that answers it correctly cannot have done so by describing the past.
+        if not any(marker in lowered for marker in ("not yet", "still valid", "still ahead")):
+            failures.append(f"{pid}: before-arm gold does not say the moment is still ahead")
 
     expected = 19
     if len(pairs) != expected:

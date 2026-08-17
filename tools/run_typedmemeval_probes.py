@@ -97,6 +97,19 @@ def _config() -> tuple[str, str, str]:
     return endpoint, key, deployment
 
 
+#: Completions between cache flushes. Small enough that a kill costs a minute of work, large
+#: enough that the write is not itself a cost: the cache is ~1 MB, so this is a megabyte per
+#: fifty calls against calls that take seconds each.
+_CACHE_FLUSH_EVERY = 50
+
+
+def _flush_cache() -> None:
+    """Atomically persist the cache. Caller holds `_cache_lock`."""
+    temporary = CACHE_PATH.with_suffix(".tmp")
+    temporary.write_text(json.dumps(_cache, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(CACHE_PATH)
+
+
 def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     """One chat completion, cached so an interrupted run resumes instead of re-paying."""
     with _cache_lock:
@@ -125,6 +138,13 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             with _cache_lock:
                 _cache[cache_key] = text
                 _stats["call"] += 1
+                # Flushed periodically, not only at exit. A full pass is thousands of calls over
+                # the better part of an hour, and a run that is killed partway -- which has
+                # happened twice -- used to lose every answer it had bought, because the only
+                # write was in the `finally`. Written to a temp file and moved into place so a
+                # kill during the write cannot leave a half-written cache behind either.
+                if _stats["call"] % _CACHE_FLUSH_EVERY == 0:
+                    _flush_cache()
             return text
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")[:400]
@@ -449,6 +469,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         records = list(pool.map(lambda e: probe_question(e, vertical), entries))
 
     by_id = {r["question_id"]: r for r in records}
+    shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -520,7 +541,43 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "and a correct one are indistinguishable to this probe"
             ),
         },
-        "v6_leave_one_out": tally("v6"),
+        # V6 is defined for Arithmetic and Forgetting only, and only where G > 1. Everywhere else
+        # it is UNDEFINED rather than failed, so a bare `passed: 0` misreports it: Episodic
+        # published 0 beside four verticals reporting real counts, which reads as "every question
+        # failed" when the probe never ran. Says which of the two reasons applies.
+        "v6_leave_one_out": {
+            **tally("v6"),
+            "applies_to": (
+                "Arithmetic and Forgetting, on questions with more than one gold session. Those are "
+                "the verticals whose design claims every gold component is load-bearing; elsewhere "
+                "a question may have several gold sessions without the design promising each one is "
+                "individually necessary, and ablating them would report a defect never promised "
+                "against"
+            ),
+            **({"not_applicable_reason": (
+                f"V6 is not defined for {vertical}" if vertical not in ("arithmetic", "forgetting")
+                else "every question in this corpus has a single gold component, so leave-one-out "
+                     "removes the only evidence there is")}
+               if not [r for r in records if r.get("v6") is not None] else {}),
+        },
+        # Per SHAPE, not only per vertical. A vertical reported at 48/50 hides Arithmetic's
+        # `duration` at 83% and Episodic's `participant-attribution` at 87%, and the consuming
+        # project found a shape running at 50% on their answer model that our per-vertical
+        # figure gave no way to see. Where a shape's V1 is well below the vertical's, its
+        # numbers are answer-model variance more than memory signal, and a reader is entitled
+        # to know that before quoting them.
+        "by_shape": {
+            shape: {
+                "questions": len(group),
+                "v1_applicable": sum(1 for r in group if r.get("v1") is not None),
+                "v1_passed": sum(1 for r in group if r.get("v1") is True),
+                "v3_applicable": sum(1 for r in group if r.get("v3") is not None),
+                "v3_passed": sum(1 for r in group if r.get("v3") is True),
+            }
+            for shape, group in sorted(
+                {s: [r for r in records if shapes.get(r["question_id"]) == s]
+                 for s in sorted({v for v in shapes.values() if v})}.items())
+        },
         "per_question": {
             r["question_id"]: {k: v for k, v in r.items()
                                if k not in ("question_id", "v1_answer")}
@@ -649,7 +706,8 @@ def main() -> None:
                 f"V6 {v6['passed']}/{v6['applicable']}",
                 flush=True)
     finally:
-        CACHE_PATH.write_text(json.dumps(_cache, ensure_ascii=False), encoding="utf-8")
+        with _cache_lock:
+            _flush_cache()
         print(f"calls={_stats['call']} cached={_stats['cache_hit']} "
               f"screened-out={_stats['screen_rejected']} escalated={_stats['escalated']}")
 

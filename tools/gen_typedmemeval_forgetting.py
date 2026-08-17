@@ -274,6 +274,19 @@ def _derive_event(session: tmc.Session) -> str:
     return match.group(1)
 
 
+#: Statement-to-invalidation gap -> band. Cut on the range the generator already emits
+#: (GAP_MIN..GAP_MAX), so banding is bookkeeping over existing spread rather than new
+#: generation. Diagnostics rather than claims: cells are far under the n >= 30 floor.
+_GAP_BANDS = ((5, 1), (7, 2), (10, 3), (13, 4))
+
+
+def _gap_band(gap: int) -> int:
+    for ceiling, band in _GAP_BANDS:
+        if gap <= ceiling:
+            return band
+    return 5
+
+
 def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
                           rng: random.Random, echo: float) -> tmc.Question:
     noun, question, statement_setup, invalidation_setup, event = fact
@@ -315,6 +328,12 @@ def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
             {"kind": "statement", "session_index": statement_index},
             {"kind": "invalidation", "session_index": invalidation_index},
         ],
+        # Discrimination is this vertical's dial: how far apart the statement and the thing
+        # that cancels it sit. The spread was already there and evenly filled (4-15 sessions);
+        # it simply stratified nothing, so a run's score could not be read against it.
+        "difficulty": _gap_band(gap),
+        "difficulty_dial": "discrimination", "difficulty_validated": False,
+        "gap_sessions": gap,
     }
     if pair_id:
         extension["pair_id"] = pair_id
@@ -341,14 +360,40 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     statement = tmc.make_session(
         _BASE, (f"{statement_setup} {rng.choice(CHOICES).format(value=value)}", ""),
         gold_turn=0, tag=f"statement:{value}")
-    sessions.insert(rng.randint(0, h), statement)
+    # A re-affirmation, so the control arm carries G=2 exactly as its invalidated twin does.
+    # Without it the arms were not comparable: the treatment arm earned partial credit for
+    # finding either of two gold sessions while the control's single session scored 0 or 1,
+    # and the control came out as the harder retrieval band in the whole family (0.40 against
+    # 0.68) -- on the arm whose entire job is to be the easy case. It also does the work the
+    # shape wanted anyway: with two mentions and no invalidation, answering requires reading
+    # that nothing cancelled the fact rather than simply finding one statement.
+    reaffirm = tmc.make_session(
+        _BASE, (f"Still the same {noun}, for the record: {value}.", ""),
+        gold_turn=0, tag=f"reaffirmation:{value}")
+    statement_index = rng.randint(0, h)
+    sessions.insert(statement_index, statement)
+    reaffirm_index = rng.randint(statement_index + 1, h + 1)
+    sessions.insert(reaffirm_index, reaffirm)
     question_date = _lay_out(sessions, ordinal)
 
     read_value = _derive_value(statement)
     answer = (f"{read_value}. That is still your {noun} — nothing in the record has cancelled "
               f"or replaced it.")
-    return tmc.Question(qid, TYPE_STILL_VALID, question, answer, question_date, sessions,
-                        {"shape": SHAPE_STILL_VALID, "pair_id": pair_id, "arm": "control"})
+    return tmc.Question(
+        qid, TYPE_STILL_VALID, question, answer, question_date, sessions,
+        {"shape": SHAPE_STILL_VALID, "pair_id": pair_id, "arm": "control",
+         "gold_components": [
+             {"kind": "statement", "session_index": statement_index},
+             {"kind": "reaffirmation", "session_index": reaffirm_index},
+         ],
+         # Declared, because V6 will report it and a reader is entitled to know it was
+         # intended. The re-affirmation restates the same value, so ablating either mention
+         # leaves the other and neither is individually load-bearing -- V6 fails all fifteen
+         # of these by construction. For this arm that is correct: the control exists to catch
+         # over-forgetting, and a system that finds either mention has the evidence it needs to
+         # say the fact still stands. Read per-component coverage here as "either suffices",
+         # never as "both were needed".
+         "gold_components_redundant": True})
 
 
 def _never_known_question(entry, qid: str, ordinal: int,
