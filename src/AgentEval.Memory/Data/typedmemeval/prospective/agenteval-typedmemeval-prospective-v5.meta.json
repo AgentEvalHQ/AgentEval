@@ -223,7 +223,7 @@
       "worst_refused_auc": 0.7323,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "remind me",
+      "worst_gold_marker_ngram": "remind me to",
       "gold_marker_ngram_auc": 0.611,
       "worst_boilerplate_ngram": "date",
       "boilerplate_ngram_auc": 0.7323,
@@ -534,7 +534,7 @@
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-17T16:23:09Z",
+      "measured_at": "2026-08-18T21:53:56Z",
       "probed_corpus_sha256": "6ddd3e9bb594816ee866b3255cd8a7beb274b6d46661d19574632299dd7df0f3"
     },
     "reference_deployment": "gpt-5.5",

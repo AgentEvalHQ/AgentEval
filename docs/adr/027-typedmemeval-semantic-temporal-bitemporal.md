@@ -156,6 +156,43 @@ result a capability statement rather than a score.
 **Dials, all temporal and all reasoning-side:** correction **latency** (event-to-record gap),
 **corrections per fact**, and **instant separation** (how far apart the two asked instants sit).
 
+**BUILT AND MEASURED, 2026-08-18.** 60 questions, 30 pairs, corpus
+`agenteval-typedmemeval-bitemporal-v5` (`f5b384d7f0ff`), BM25 coverage 0.800.
+
+| Probe | Result |
+|---|---|
+| V1 oracle answerability | **60/60** |
+| V1 pair-flip | **30/30** — every pair's two clocks give different answers |
+| V2 non-inferability | **60/60** |
+| V3 gold-ablated | **60/60** |
+| V8 full-haystack | 59/60 — **interference cost 0.0167** |
+
+**A prediction in this ADR's first draft, refuted by its own probe.** §3.3 argued Bitemporal would
+carry a large interference cost by construction — a system handed the whole haystack would see the
+correction and answer the corrected value on the transaction arm. It does not: V8 is 59/60. The
+answer model reads session timestamps and reasons about "recorded before the asked instant"
+correctly, unaided.
+
+**That is a better property than the one predicted.** V1 ≈ V8 ≈ 1.0 means the corpus contains
+neither reasoning ambiguity nor retrieval difficulty — a reader given the sessions gets it right
+either way. So a real memory system failing the transaction arm cannot be explained by an
+unanswerable question, an ambiguous frame, or a model that cannot compute "before". It is
+attributable to the store having no way to represent *when it learned a thing*. A full-context score
+of ~1.0 is precisely what makes the structural-ceiling claim testable instead of confounded, and it
+means **Bitemporal is the one vertical in this family whose headline number is about the system under
+test rather than about the answer model.**
+
+**Two defects the probes caught during construction**, both recorded because both were mine:
+
+- **The correction quoted the value it superseded** — "…was at Ardenholm from February, **not
+  Calderwick**" — and `Calderwick` *is* the transaction arm's answer. Ablating that arm's gold left
+  the answer sitting in the correction: V3 failed **28 of 60**, every failure a transaction arm.
+  Corrections no longer name what they replace.
+- **Band and shape were collinear.** Banding on correction depth put `belief-at-instant` entirely in
+  band 2 and gave `correction-depth` bands 3–5 — the Arithmetic confound (ADR-026 §19) rebuilt from
+  scratch. The dial is now **correction latency**, which both shapes vary, and the band × shape
+  cross-tab §6 requires shows no band owned by one shape.
+
 **Boundary vs Prospective.** Prospective tests **firing** — has the thing come due — on one clock,
 with gold flipping as the asked time moves past a due date. Bitemporal tests **belief** on two clocks,
 with gold flipping as the asked *belief instant* moves across a correction while the truth is

@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **TypedMemEval-Bitemporal (ADR-027 §3.3)** — 60 questions, 30 pairs, the first vertical measuring
+  something no other memory benchmark does: **valid time against transaction time**. What was true,
+  versus what the record believed at a named earlier instant. The two diverge only after a
+  retroactive correction, and a store with one clock cannot represent the difference, so its ceiling
+  here is structural rather than a matter of retrieval quality.
+
+  | Probe | Result |
+  |---|---|
+  | V1 oracle answerability | **60/60** |
+  | V1 pair-flip | **30/30** — every pair's two clocks give different answers |
+  | V2 non-inferability | **60/60** |
+  | V3 gold-ablated | **60/60** |
+  | V8 full-haystack | 59/60 — interference cost +0.02 |
+
+  **A prediction the design made and the probe refuted.** ADR-027 argued Bitemporal would carry a
+  large interference cost by construction: a system handed the whole haystack sees the correction and
+  answers the corrected value on the transaction arm. It does not — the answer model reads session
+  timestamps and reasons about "recorded before the asked instant" unaided. That is a *better*
+  property: V1 ≈ V8 ≈ 1.0 means the corpus holds neither reasoning ambiguity nor retrieval
+  difficulty, so a real memory system failing the transaction arm cannot blame an unanswerable
+  question or a model that cannot compute "before". **It is the one vertical whose headline number is
+  about the system under test rather than about the answer model.**
+
+  Two defects the probes caught during construction, both recorded because both were ours: the
+  correction **quoted the value it superseded** ("…was at Ardenholm from February, *not Calderwick*")
+  and `Calderwick` is the transaction arm's answer, so ablating that arm's gold left the answer in
+  plain sight — V3 failed **28 of 60**, every failure a transaction arm. And banding on correction
+  *depth* made band and shape collinear, rebuilding the Arithmetic confound from scratch; the dial is
+  now correction **latency**, which both shapes vary.
+
+  The **as-of precondition** ships with it: every question names its asked instant, and transaction
+  arms record it in metadata, because a transaction-time question is ill-posed unless retrieval can
+  be restricted to what was recorded at or before that moment.
+
+
 - **V8 — interference cost, and it is a finding about the shipped corpora.** `V1` is accuracy given
   the gold sessions alone, `V8` accuracy given the entire haystack, and `V1 − V8` is the room
   retrieval quality has to matter. Measured on v5:

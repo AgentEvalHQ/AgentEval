@@ -27,13 +27,16 @@ import typedmemeval_common as tmc
 
 GUIDE = Path(__file__).resolve().parent.parent / "docs" / "benchmarks" / "typedmemeval" / "getting-started.md"
 
+#: Display names that title-casing gets wrong. Everything else falls back to `.title()`, so adding a
+#: vertical does not require an entry here -- `bitemporal` raised a KeyError on its first sync, which
+#: is a hand-maintained map failing exactly the way hand-maintained things do.
 DISPLAY = {
-    "prospective": "Prospective",
-    "episodic": "Episodic",
-    "arithmetic": "Arithmetic",
     "workingmemory": "WorkingMemory",
-    "forgetting": "Forgetting",
 }
+
+
+def _display(vertical: str) -> str:
+    return DISPLAY.get(vertical, vertical.title())
 
 PROBE_HEADER = (
     "| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | Interference cost |\n"
@@ -114,7 +117,7 @@ def build_tables() -> tuple[str, str]:
                 f"from an unrun probe would read as a measurement. Run "
                 f"tools/run_typedmemeval_probes.py first.")
 
-        name = DISPLAY[vertical]
+        name = _display(vertical)
         probe_rows.append(
             f"| {name} | {_cell(probes.get('v1_oracle_answerability'))} "
             f"| {_cell(probes.get('v1_pair_flip'), total='pairs')} "

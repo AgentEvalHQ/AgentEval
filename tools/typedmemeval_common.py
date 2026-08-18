@@ -113,6 +113,8 @@ VERTICALS = {
     "arithmetic":   ("ari",  50),
     "workingmemory": ("wm",  60),
     "forgetting":   ("for",  50),
+    # ADR-027 SS3.3. 30 pairs, two clocks each.
+    "bitemporal":   ("bit",  60),
 }
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "src" / "AgentEval.Memory" / "Data" / "typedmemeval"

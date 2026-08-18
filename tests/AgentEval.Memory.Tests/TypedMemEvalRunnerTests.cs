@@ -255,7 +255,9 @@ public sealed class TypedMemEvalRunnerTests
         var family = BenchmarkFamilyRegistry.TryGet("typedmemeval");
         Assert.NotNull(family);
         Assert.Equal(typeof(TypedMemEvalRunner), family!.RunnerType);
-        Assert.Equal(5, family.Presets.Count);
+        // Derived, not hardcoded: the presets are built from TypedMemEvalVerticals.All, so a
+        // literal here fails on the day a vertical is added and says nothing about what broke.
+        Assert.Equal(TypedMemEvalVerticals.All.Count, family.Presets.Count);
         foreach (var descriptor in TypedMemEvalVerticals.All)
             Assert.Contains(family.Presets, p => p.Name == descriptor.Slug);
 

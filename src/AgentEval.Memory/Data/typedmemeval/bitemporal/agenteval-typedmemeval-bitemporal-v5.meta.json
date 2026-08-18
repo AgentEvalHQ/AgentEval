@@ -1,6 +1,6 @@
 {
-  "corpus_id": "agenteval-typedmemeval-workingmemory-v5",
-  "vertical": "workingmemory",
+  "corpus_id": "agenteval-typedmemeval-bitemporal-v5",
+  "vertical": "bitemporal",
   "revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -8,9 +8,9 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 60,
-  "corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933",
+  "corpus_sha256": "f5b384d7f0ff9c0fbef8b962a5f4d67865a3e82e3f4e3fe6f770fc82647cb393",
   "generator": {
-    "tool": "tools/gen_typedmemeval_workingmemory.py",
+    "tool": "tools/gen_typedmemeval_bitemporal.py",
     "version": "1.0.0",
     "seed": 20260815
   },
@@ -19,84 +19,80 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.8667,
-    "echo": 0.75,
-    "iterations": 3,
+    "mean_realised": 0.8,
+    "echo": 0.5,
+    "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.1333
+        0.0
       ],
       [
         0.5,
-        1.0
-      ],
-      [
-        0.75,
-        0.8667
+        0.8
       ]
     ],
     "per_question": {
-      "tme-wm-001": 1.0,
-      "tme-wm-002": 1.0,
-      "tme-wm-003": 1.0,
-      "tme-wm-004": 0.0,
-      "tme-wm-005": 0.0,
-      "tme-wm-006": 1.0,
-      "tme-wm-007": 1.0,
-      "tme-wm-008": 1.0,
-      "tme-wm-009": 1.0,
-      "tme-wm-010": 1.0,
-      "tme-wm-011": 1.0,
-      "tme-wm-012": 1.0,
-      "tme-wm-013": 1.0,
-      "tme-wm-014": 1.0,
-      "tme-wm-015": 1.0,
-      "tme-wm-016": 1.0,
-      "tme-wm-017": 1.0,
-      "tme-wm-018": 1.0,
-      "tme-wm-019": 0.0,
-      "tme-wm-020": 1.0,
-      "tme-wm-021": 1.0,
-      "tme-wm-022": 1.0,
-      "tme-wm-023": 1.0,
-      "tme-wm-024": 1.0,
-      "tme-wm-025": 1.0,
-      "tme-wm-026": 1.0,
-      "tme-wm-027": 1.0,
-      "tme-wm-028": 1.0,
-      "tme-wm-029": 1.0,
-      "tme-wm-030": 1.0,
-      "tme-wm-031": 1.0,
-      "tme-wm-032": 1.0,
-      "tme-wm-033": 1.0,
-      "tme-wm-034": 1.0,
-      "tme-wm-035": 1.0,
-      "tme-wm-036": 1.0,
-      "tme-wm-037": 1.0,
-      "tme-wm-038": 1.0,
-      "tme-wm-039": 0.0,
-      "tme-wm-040": 0.0,
-      "tme-wm-041": 1.0,
-      "tme-wm-042": 1.0,
-      "tme-wm-043": 1.0,
-      "tme-wm-044": 1.0,
-      "tme-wm-045": 1.0,
-      "tme-wm-046": 1.0,
-      "tme-wm-047": 1.0,
-      "tme-wm-048": 1.0,
-      "tme-wm-049": 1.0,
-      "tme-wm-050": 1.0,
-      "tme-wm-051": 1.0,
-      "tme-wm-052": 1.0,
-      "tme-wm-053": 1.0,
-      "tme-wm-054": 1.0,
-      "tme-wm-055": 1.0,
-      "tme-wm-056": 1.0,
-      "tme-wm-057": 1.0,
-      "tme-wm-058": 0.0,
-      "tme-wm-059": 0.0,
-      "tme-wm-060": 0.0
+      "tme-bit-001": 1.0,
+      "tme-bit-002": 1.0,
+      "tme-bit-003": 1.0,
+      "tme-bit-004": 1.0,
+      "tme-bit-005": 1.0,
+      "tme-bit-006": 1.0,
+      "tme-bit-007": 0.0,
+      "tme-bit-008": 0.0,
+      "tme-bit-009": 1.0,
+      "tme-bit-010": 1.0,
+      "tme-bit-011": 1.0,
+      "tme-bit-012": 0.0,
+      "tme-bit-013": 1.0,
+      "tme-bit-014": 1.0,
+      "tme-bit-015": 1.0,
+      "tme-bit-016": 1.0,
+      "tme-bit-017": 1.0,
+      "tme-bit-018": 0.0,
+      "tme-bit-019": 1.0,
+      "tme-bit-020": 1.0,
+      "tme-bit-021": 1.0,
+      "tme-bit-022": 1.0,
+      "tme-bit-023": 1.0,
+      "tme-bit-024": 1.0,
+      "tme-bit-025": 1.0,
+      "tme-bit-026": 1.0,
+      "tme-bit-027": 1.0,
+      "tme-bit-028": 1.0,
+      "tme-bit-029": 1.0,
+      "tme-bit-030": 1.0,
+      "tme-bit-031": 1.0,
+      "tme-bit-032": 1.0,
+      "tme-bit-033": 1.0,
+      "tme-bit-034": 1.0,
+      "tme-bit-035": 1.0,
+      "tme-bit-036": 1.0,
+      "tme-bit-037": 1.0,
+      "tme-bit-038": 1.0,
+      "tme-bit-039": 1.0,
+      "tme-bit-040": 1.0,
+      "tme-bit-041": 1.0,
+      "tme-bit-042": 1.0,
+      "tme-bit-043": 0.0,
+      "tme-bit-044": 0.0,
+      "tme-bit-045": 1.0,
+      "tme-bit-046": 1.0,
+      "tme-bit-047": 0.0,
+      "tme-bit-048": 0.0,
+      "tme-bit-049": 1.0,
+      "tme-bit-050": 1.0,
+      "tme-bit-051": 1.0,
+      "tme-bit-052": 1.0,
+      "tme-bit-053": 1.0,
+      "tme-bit-054": 0.0,
+      "tme-bit-055": 1.0,
+      "tme-bit-056": 0.0,
+      "tme-bit-057": 0.0,
+      "tme-bit-058": 0.0,
+      "tme-bit-059": 1.0,
+      "tme-bit-060": 1.0
     }
   },
   "ceiling": {
@@ -111,14 +107,14 @@
     "g_distribution": {
       "1": 60
     },
-    "h_min": 8,
-    "h_max": 60,
-    "gold_position_shuffled": false,
-    "h_is_independent_variable": true,
+    "h_min": 14,
+    "h_max": 24,
+    "gold_position_shuffled": true,
+    "h_is_independent_variable": false,
     "no_absolute_dates": false,
     "empty_turns": {
-      "count": 397,
-      "of_turns": 9180,
+      "count": 300,
+      "of_turns": 6000,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     }
@@ -128,7 +124,7 @@
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
-        "position in haystack — WorkingMemory pins the gold session at index 0 and varies how many sessions follow it (ADR §5.4); that distance IS the independent variable, so gold's position separates perfectly (1.000) by construction rather than by defect. A retriever scored on this corpus must not use position. The corpus records gold_position_shuffled: false and h_is_independent_variable: true, so the exemption is checkable against the data rather than merely asserted here"
+        "none"
       ],
       "threshold_auc": 0.75,
       "refused_features": [
@@ -160,6 +156,7 @@
         "position_2_is_user",
         "position_3_is_assistant",
         "position_3_is_user",
+        "position_in_haystack",
         "punctuation_density",
         "role_sequence",
         "sentence_count",
@@ -177,45 +174,43 @@
         "user_type_token_ratio",
         "user_uppercase_density"
       ],
-      "exempt_features": [
-        "position_in_haystack"
-      ],
+      "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5552,
+        "session_length_chars": 0.525,
         "turn_count": 0.5,
-        "position_in_haystack": 1.0,
+        "position_in_haystack": 0.5114,
         "digit_density": 0.5,
-        "uppercase_density": 0.5363,
-        "sentence_count": 0.5037,
-        "punctuation_density": 0.5099,
+        "uppercase_density": 0.5294,
+        "sentence_count": 0.55,
+        "punctuation_density": 0.5035,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5552,
-        "type_token_ratio": 0.5963,
-        "first_user_length_chars": 0.5788,
-        "first_user_uppercase_density": 0.5301,
-        "first_user_sentence_count": 0.5138,
-        "first_assistant_length_chars": 0.5653,
-        "first_assistant_uppercase_density": 0.5191,
-        "first_assistant_sentence_count": 0.5346,
-        "user_slot1_length_chars": 0.5566,
+        "mean_turn_chars": 0.525,
+        "type_token_ratio": 0.5588,
+        "first_user_length_chars": 0.5825,
+        "first_user_uppercase_density": 0.5825,
+        "first_user_sentence_count": 0.5206,
+        "first_assistant_length_chars": 0.5053,
+        "first_assistant_uppercase_density": 0.5364,
+        "first_assistant_sentence_count": 0.5408,
+        "user_slot1_length_chars": 0.5991,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.529,
-        "assistant_slot2_length_chars": 0.5588,
+        "assistant_slot1_length_chars": 0.5491,
+        "assistant_slot2_length_chars": 0.5048,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5709,
-        "user_uppercase_density": 0.5312,
-        "user_sentence_count": 0.5206,
-        "user_punctuation_density": 0.5158,
-        "user_type_token_ratio": 0.5343,
-        "user_mean_turn_chars": 0.5709,
-        "assistant_length_chars": 0.5037,
-        "assistant_uppercase_density": 0.5259,
-        "assistant_sentence_count": 0.5265,
-        "assistant_punctuation_density": 0.5065,
-        "assistant_type_token_ratio": 0.5549,
-        "assistant_mean_turn_chars": 0.5037,
+        "user_length_chars": 0.5311,
+        "user_uppercase_density": 0.532,
+        "user_sentence_count": 0.5035,
+        "user_punctuation_density": 0.5167,
+        "user_type_token_ratio": 0.5794,
+        "user_mean_turn_chars": 0.5311,
+        "assistant_length_chars": 0.5066,
+        "assistant_uppercase_density": 0.5289,
+        "assistant_sentence_count": 0.5522,
+        "assistant_punctuation_density": 0.5228,
+        "assistant_type_token_ratio": 0.5294,
+        "assistant_mean_turn_chars": 0.5066,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -225,330 +220,330 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6354,
-        "boilerplate_ngram": 0.6137
+        "gold_marker_ngram": 0.6096,
+        "boilerplate_ngram": 0.5934
       },
       "worst_refused_feature": "gold_marker_ngram",
-      "worst_refused_auc": 0.6354,
+      "worst_refused_auc": 0.6096,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "for the",
-      "gold_marker_ngram_auc": 0.6354,
-      "worst_boilerplate_ngram": "since the",
-      "boilerplate_ngram_auc": 0.6137,
+      "worst_gold_marker_ngram": "from",
+      "gold_marker_ngram_auc": 0.6096,
+      "worst_boilerplate_ngram": "has",
+      "boilerplate_ngram_auc": 0.5934,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.0833,
-          "chance": 0.1011,
-          "observed": 5,
-          "expected": 6.07,
-          "z": -0.47
+          "share": 0.05,
+          "chance": 0.1022,
+          "observed": 3,
+          "expected": 6.13,
+          "z": -1.34
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_in_haystack": {
-          "share": 1.0,
-          "chance": 0.1011,
-          "observed": 60,
-          "expected": 6.07,
-          "z": 23.71
+          "share": 0.1,
+          "chance": 0.1022,
+          "observed": 6,
+          "expected": 6.13,
+          "z": -0.06
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "uppercase_density": {
           "share": 0.1,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 6,
-          "expected": 6.07,
-          "z": -0.03
+          "expected": 6.13,
+          "z": -0.06
         },
         "sentence_count": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.0333,
+          "chance": 0.1022,
+          "observed": 2,
+          "expected": 6.13,
+          "z": -1.76
         },
         "punctuation_density": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.15,
+          "chance": 0.1022,
+          "observed": 9,
+          "expected": 6.13,
+          "z": 1.22
         },
         "em_dash_density": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "mean_turn_chars": {
-          "share": 0.0833,
-          "chance": 0.1011,
-          "observed": 5,
-          "expected": 6.07,
-          "z": -0.47
+          "share": 0.05,
+          "chance": 0.1022,
+          "observed": 3,
+          "expected": 6.13,
+          "z": -1.34
         },
         "type_token_ratio": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
+          "share": 0.1,
+          "chance": 0.1022,
+          "observed": 6,
+          "expected": 6.13,
+          "z": -0.06
         },
         "first_user_length_chars": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.0833,
+          "chance": 0.1022,
+          "observed": 5,
+          "expected": 6.13,
+          "z": -0.48
         },
         "first_user_uppercase_density": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.1333,
+          "chance": 0.1022,
+          "observed": 8,
+          "expected": 6.13,
+          "z": 0.8
         },
         "first_user_sentence_count": {
-          "share": 0.0,
-          "chance": 0.1011,
-          "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "share": 0.0333,
+          "chance": 0.1022,
+          "observed": 2,
+          "expected": 6.13,
+          "z": -1.76
         },
         "first_assistant_length_chars": {
-          "share": 0.1333,
-          "chance": 0.1011,
-          "observed": 8,
-          "expected": 6.07,
-          "z": 0.85
+          "share": 0.1,
+          "chance": 0.1022,
+          "observed": 6,
+          "expected": 6.13,
+          "z": -0.06
         },
         "first_assistant_uppercase_density": {
           "share": 0.1333,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 8,
-          "expected": 6.07,
-          "z": 0.85
+          "expected": 6.13,
+          "z": 0.8
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "user_slot1_length_chars": {
-          "share": 0.0833,
-          "chance": 0.1011,
-          "observed": 5,
-          "expected": 6.07,
-          "z": -0.47
+          "share": 0.05,
+          "chance": 0.1022,
+          "observed": 3,
+          "expected": 6.13,
+          "z": -1.34
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "assistant_slot1_length_chars": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
+          "share": 0.1667,
+          "chance": 0.1022,
+          "observed": 10,
+          "expected": 6.13,
+          "z": 1.65
         },
         "assistant_slot2_length_chars": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.1,
+          "chance": 0.1022,
+          "observed": 6,
+          "expected": 6.13,
+          "z": -0.06
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "user_length_chars": {
-          "share": 0.1,
-          "chance": 0.1011,
-          "observed": 6,
-          "expected": 6.07,
-          "z": -0.03
+          "share": 0.0833,
+          "chance": 0.1022,
+          "observed": 5,
+          "expected": 6.13,
+          "z": -0.48
         },
         "user_uppercase_density": {
-          "share": 0.0667,
-          "chance": 0.1011,
-          "observed": 4,
-          "expected": 6.07,
-          "z": -0.91
+          "share": 0.0833,
+          "chance": 0.1022,
+          "observed": 5,
+          "expected": 6.13,
+          "z": -0.48
         },
         "user_sentence_count": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.0333,
+          "chance": 0.1022,
+          "observed": 2,
+          "expected": 6.13,
+          "z": -1.76
         },
         "user_punctuation_density": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
+          "share": 0.1333,
+          "chance": 0.1022,
+          "observed": 8,
+          "expected": 6.13,
+          "z": 0.8
         },
         "user_type_token_ratio": {
-          "share": 0.0833,
-          "chance": 0.1011,
-          "observed": 5,
-          "expected": 6.07,
-          "z": -0.47
+          "share": 0.1333,
+          "chance": 0.1022,
+          "observed": 8,
+          "expected": 6.13,
+          "z": 0.8
         },
         "user_mean_turn_chars": {
-          "share": 0.1,
-          "chance": 0.1011,
-          "observed": 6,
-          "expected": 6.07,
-          "z": -0.03
+          "share": 0.0833,
+          "chance": 0.1022,
+          "observed": 5,
+          "expected": 6.13,
+          "z": -0.48
         },
         "assistant_length_chars": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
-        },
-        "assistant_uppercase_density": {
           "share": 0.0667,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 4,
-          "expected": 6.07,
+          "expected": 6.13,
           "z": -0.91
         },
+        "assistant_uppercase_density": {
+          "share": 0.15,
+          "chance": 0.1022,
+          "observed": 9,
+          "expected": 6.13,
+          "z": 1.22
+        },
         "assistant_sentence_count": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.0167,
+          "chance": 0.1022,
+          "observed": 1,
+          "expected": 6.13,
+          "z": -2.19
         },
         "assistant_punctuation_density": {
-          "share": 0.05,
-          "chance": 0.1011,
-          "observed": 3,
-          "expected": 6.07,
-          "z": -1.35
+          "share": 0.0333,
+          "chance": 0.1022,
+          "observed": 2,
+          "expected": 6.13,
+          "z": -1.76
         },
         "assistant_type_token_ratio": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
+          "share": 0.0833,
+          "chance": 0.1022,
+          "observed": 5,
+          "expected": 6.13,
+          "z": -0.48
         },
         "assistant_mean_turn_chars": {
-          "share": 0.1167,
-          "chance": 0.1011,
-          "observed": 7,
-          "expected": 6.07,
-          "z": 0.41
+          "share": 0.0667,
+          "chance": 0.1022,
+          "observed": 4,
+          "expected": 6.13,
+          "z": -0.91
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.1011,
+          "chance": 0.1022,
           "observed": 0,
-          "expected": 6.07,
-          "z": -2.67
+          "expected": 6.13,
+          "z": -2.62
         },
         "gold_marker_ngram": {
-          "share": 0.0333,
-          "chance": 0.1011,
-          "observed": 2,
-          "expected": 6.07,
-          "z": -1.79
+          "share": 0.0,
+          "chance": 0.1022,
+          "observed": 0,
+          "expected": 6.13,
+          "z": -2.62
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-18T21:54:04Z",
-      "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933"
+      "measured_at": "2026-08-18T21:54:09Z",
+      "probed_corpus_sha256": "f5b384d7f0ff9c0fbef8b962a5f4d67865a3e82e3f4e3fe6f770fc82647cb393"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-18T20:00:43Z",
+    "run_at": "2026-08-18T21:44:01Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -557,8 +552,8 @@
       "failed": []
     },
     "v1_pair_flip": {
-      "pairs": 0,
-      "passed": 0,
+      "pairs": 30,
+      "passed": 30,
       "failed": []
     },
     "ablation_samples_per_question": 3,
@@ -582,655 +577,636 @@
       "passed": 0,
       "failed": [],
       "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
-      "not_applicable_reason": "V6 is not defined for workingmemory"
+      "not_applicable_reason": "V6 is not defined for bitemporal"
     },
-    "by_shape": {
-      "distance-15": {
-        "questions": 12,
-        "v1_applicable": 12,
-        "v1_passed": 12,
-        "v3_applicable": 12,
-        "v3_passed": 12
-      },
-      "distance-25": {
-        "questions": 12,
-        "v1_applicable": 12,
-        "v1_passed": 12,
-        "v3_applicable": 12,
-        "v3_passed": 12
-      },
-      "distance-40": {
-        "questions": 12,
-        "v1_applicable": 12,
-        "v1_passed": 12,
-        "v3_applicable": 12,
-        "v3_passed": 12
-      },
-      "distance-60": {
-        "questions": 12,
-        "v1_applicable": 12,
-        "v1_passed": 12,
-        "v3_applicable": 12,
-        "v3_passed": 12
-      },
-      "distance-8": {
-        "questions": 12,
-        "v1_applicable": 12,
-        "v1_passed": 12,
-        "v3_applicable": 12,
-        "v3_passed": 12
-      }
-    },
-    "per_question": {
-      "tme-wm-001": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You switched to a new employer called **Quillon Instruments**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-002": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You switched to a new employer called **Pomfret Instruments**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-003": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You switched to a new employer called **Ashlore Instruments**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-004": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You switched to a new employer called **Marrowby Instruments**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-005": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You switched to a new employer called **Dunmoor Instruments**. The outfit is called **Dunmoor Instruments** these days.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-006": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ondrey.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-007": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ashlore.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-008": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Dunmoor.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-009": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Vessik.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-010": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halverstock.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-011": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halverstock Wall.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-012": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Marrowby Wall.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-013": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Vessik Wall.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-014": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Pomfret Wall.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-015": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brindlow Wall.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-016": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Pomfret Row.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-017": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Verrick Row.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-018": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halverstock Row.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-019": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Dunmoor Row.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-020": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ashlore Row.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-021": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Vessik Dental.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-022": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ashlore Dental.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-023": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Quillon Dental.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-024": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brindlow Dental.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-025": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Marrowby Dental.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-026": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You have joined the **Pomfret Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-027": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You joined the **Vessik Singers** this term, and they rehearse in the **old chapel** on Wednesday evening.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-028": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You joined the **Halverstock Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-029": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You joined the **Tarraby Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-030": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You joined the **Verrick Singers** choir this term, and they rehearse **in the old chapel** on a Wednesday evening.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-031": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "A Tarraby Cycles bike.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-032": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You ended up buying a **Brindlow Cycles** bike for the commute this spring.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-033": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ashlore Cycles.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-034": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You ended up buying a **Pomfret Cycles** bike for the commute this spring.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-035": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You ended up buying a Vessik Cycles bike for the commute this spring.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-036": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Tarraby Broadband.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-037": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brindlow Broadband.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-038": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ondrey Broadband.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-039": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Pomfret Broadband.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-040": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Vessik Broadband.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-041": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Dunmoor Fields.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-042": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Marrowby Fields.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-043": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Tarraby Fields.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-044": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brindlow Fields.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-045": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ondrey Fields.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-046": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Quillon.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-047": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ashlore.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-048": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ondrey.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-049": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halverstock.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-050": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Marrowby.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-051": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halverstock Bakehouse.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-052": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Quillon Bakehouse.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-053": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Verrick Bakehouse.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-054": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Tarraby Bakehouse.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-055": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brindlow Bakehouse.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-056": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You signed up to the Dunmoor Circle reading circle for the winter, and they meet in the back room.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-057": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You signed up to the **Ashlore Circle** for the winter, and they meet **in the back room**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-058": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You signed up to the **Quillon Circle** reading circle for the winter, and they meet **in the back room**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-059": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You signed up to the Brindlow Circle reading circle for the winter, and they meet in the back room.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-wm-060": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You signed up to the Ondrey Circle reading circle for the winter, and they meet in the back room.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      }
-    },
-    "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933",
     "v8_full_haystack": {
       "applicable": 60,
       "v1_passed": 60,
-      "v8_passed": 60,
-      "interference_cost": 0.0,
-      "regressed_under_interference": [],
+      "v8_passed": 59,
+      "interference_cost": 0.0167,
+      "regressed_under_interference": [
+        "tme-bit-032"
+      ],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
-    }
+    },
+    "by_shape": {
+      "belief-at-instant": {
+        "questions": 36,
+        "v1_applicable": 36,
+        "v1_passed": 36,
+        "v3_applicable": 36,
+        "v3_passed": 36
+      },
+      "correction-depth": {
+        "questions": 24,
+        "v1_applicable": 24,
+        "v1_passed": 24,
+        "v3_applicable": 24,
+        "v3_passed": 24
+      }
+    },
+    "per_question": {
+      "tme-bit-001": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ardenholm.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-002": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 17 January, the record showed Alice Renwick at **Calderwick** in February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-003": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Northolt Bay** for March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-004": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 24 January, Tomas Beddoe was down as at **Lowick** for March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-005": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-006": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 30 January, the file had Priya Nandra at **Halstead Vale** from April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-007": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Colm Whitaker was at **Lowick** in February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-008": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "At 31 January, the file gave **Colm Whitaker as being at Elverton from February**.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-009": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ines Vargas is at **Kelsford**, covering **March**.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-010": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Marchmont.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-011": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Halstead Vale.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-012": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 13 February, the record showed Ravi Ellory at **Orrindale** in April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-013": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nell Cortazar is down as **Ardenholm** for February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-014": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 10 February, Nell Cortazar was down as at **Fenwick Cross** for February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-015": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmarsh.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-016": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ilminster.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-017": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Sara Mbeki was at **Ardenholm** in April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-018": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "At 26 February, the file gave Sara Mbeki’s April region as **Garrowby**.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-019": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-020": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 27 February, the record had Jonas Pfeiffer at **Dunmarsh** in February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-021": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellworth.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-022": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 10 March, the record showed Alice Renwick in **Northolt Bay** in March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-023": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Ardenholm** for April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-024": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 20 March, Tomas Beddoe was down as being at **Jarrow Bank** for April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-025": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Priya Nandra is listed as being at **Ilminster** from February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-026": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-027": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Colm Whitaker was at **Marchmont** in March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-028": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-029": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ines Vargas is listed at **Northolt Bay** from April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-030": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 25 March, the record had Ines Vargas at **Marchmont** from April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-031": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmarsh.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-032": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "As of 01 April, the record showed **Ravi Ellory at Dunmarsh in February**.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-033": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nell Cortazar is down as **Elverton** for March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-034": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 11 April, Nell Cortazar was down as at **Kelsford** for March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-035": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-036": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 11 April, the file had Otto Lindqvist at **Orrindale** from April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-037": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Colm Whitaker was at **Marchmont** in February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-038": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-039": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Kelsford.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-040": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Halstead Vale.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-041": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ravi Ellory is recorded as being at **Orrindale** as of April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-042": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 20 April, the record showed Ravi Ellory at **Jarrow Bank** from **April**.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-043": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nell Cortazar is down as **Ardenholm** for February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-044": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 01 May, Nell Cortazar was down as **Pellworth** for February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-045": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Kelsford.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-046": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Garrowby.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-047": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "According to the latest record, Sara Mbeki was at **Halstead Vale** in April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-048": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ilminster.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-049": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Bank.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-050": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 19 May, Jonas Pfeiffer was recorded as being at **Bexmoor** in February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-051": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-052": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 23 May, the record showed Alice Renwick at **Garrowby** in March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-053": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Elverton** for April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-054": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 30 May, Tomas Beddoe was down as **Calderwick** for April.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-055": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-056": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 30 May, the file had Priya Nandra at **Pellworth** from February.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-057": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "According to the record, Colm Whitaker was at **Ilminster** in March.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-058": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-059": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Calderwick.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-060": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "f5b384d7f0ff9c0fbef8b962a5f4d67865a3e82e3f4e3fe6f770fc82647cb393"
   }
 }

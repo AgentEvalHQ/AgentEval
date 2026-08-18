@@ -31,7 +31,15 @@ public enum TypedMemEvalVertical
     WorkingMemory = 3,
 
     /// <summary>Invalidated facts, still-valid controls, never-known probes.</summary>
-    Forgetting = 4
+    Forgetting = 4,
+
+    /// <summary>
+    /// Valid time against transaction time: what was true, versus what the record believed at a
+    /// named earlier instant. The two diverge only after a retroactive correction, and a store with
+    /// one clock cannot represent the difference — so its ceiling here is structural rather than a
+    /// matter of retrieval quality (ADR-027 §3.3).
+    /// </summary>
+    Bitemporal = 5
 }
 
 /// <summary>What the harness needs to know about one vertical before it runs.</summary>
@@ -152,6 +160,19 @@ public static class TypedMemEvalVerticals
             QuestionCount = 50,
             RequiredGrounding = TemporalGroundingMode.None,
             RequiresTimestamps = false
+        },
+        [TypedMemEvalVertical.Bitemporal] = new()
+        {
+            Vertical = TypedMemEvalVertical.Bitemporal,
+            Slug = "bitemporal",
+            Abbreviation = "bit",
+            DisplayName = "TypedMemEval-Bitemporal",
+            QuestionCount = 60,
+            // Timestamps are the vertical's subject, not its scaffolding: the transaction-time arm
+            // asks what the record showed at a named instant, and answering that requires knowing
+            // when each session was recorded. A run without them is not harder, it is ill-posed.
+            RequiredGrounding = TemporalGroundingMode.TimestampsOnly,
+            RequiresTimestamps = true
         }
     };
 
