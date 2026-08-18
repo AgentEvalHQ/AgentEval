@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **V8 — interference cost, and it is a finding about the shipped corpora.** `V1` is accuracy given
+  the gold sessions alone, `V8` accuracy given the entire haystack, and `V1 − V8` is the room
+  retrieval quality has to matter. Measured on v5:
+
+  | Vertical | V1 | V8 | interference cost |
+  |---|---|---|---|
+  | Prospective | 49/50 | 48/50 | +0.02 |
+  | Episodic | 48/50 | 50/50 | **−0.04** |
+  | Arithmetic | 47/50 | 42/50 | +0.10 |
+  | WorkingMemory | 60/60 | 60/60 | 0.00 |
+  | Forgetting | 35/35 | 35/35 | 0.00 |
+  | **Family** | 239/245 | 235/245 | **+0.016** |
+
+  **Four of five verticals cannot distinguish two retrieval stacks at all** — a perfect retriever and
+  no retriever produce the same answers. That is the explanation for a consuming stack reading
+  realised coverage 1.000 against a calibrated BM25 floor of 0.636: the floor is a construction
+  control, not a difficulty claim. Episodic's negative value is real, not rounding — two questions
+  fail on gold alone and succeed on the whole haystack, so V1 is not the strict ceiling ADR-026 calls
+  it. Published in the guide's probe table with its reading.
+
+- **Arithmetic's difficulty bands are inverted, and V8 shows it plainly.** V8 by band reads
+  0.33 / 0.76 / 1.00 / 1.00 / 1.00: the band labelled *easiest* is where the answer model fails two
+  questions in three. ADR-026 §19 recorded this as an oracle confound at spread 0.17 → 0.33; at
+  0.67 it is not a caveat on a good ladder, it is the ladder pointing backwards. The bands stay
+  stamped unvalidated and the inversion is now recorded rather than described as a confound.
+
+- **ADR-027** — design for the Semantic, Temporal and Bitemporal verticals, with two refusals carried
+  on measurement: plain-fact Semantic (saturated by construction) and recency-decayed BM25 as a
+  time-aware reference retriever (measured: unchanged on Forgetting at every λ, and *worse* on
+  Prospective, rho +0.40 → +0.80).
+
+### Fixed
+
+- **`--limit` no longer writes probe metadata.** A smoke-test run replaced the full record: an
+  8-question run left Forgetting's metadata reading `V1 8/8` where the shipped number is 35/35, with
+  nothing in the file marking it a truncation. Partial measurements are no longer stored where a
+  measurement is expected.
+
 ## [0.25.0-beta] - 2026-08-17
 
 **TypedMemEval corpus revision v5.** v1 through v4 were all separable; none should be cited.

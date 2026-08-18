@@ -543,7 +543,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-17T17:27:41Z",
+    "run_at": "2026-08-18T19:59:35Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -615,6 +615,8 @@
     "per_question": {
       "tme-ari-001": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "4 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -624,6 +626,8 @@
       },
       "tme-ari-002": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "4 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -633,6 +637,8 @@
       },
       "tme-ari-003": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with Meridian Tools **4 times**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -642,6 +648,8 @@
       },
       "tme-ari-004": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "5 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -651,6 +659,8 @@
       },
       "tme-ari-005": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "5 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -660,6 +670,8 @@
       },
       "tme-ari-006": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with Meridian Tools **6 times**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -669,6 +681,8 @@
       },
       "tme-ari-007": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "3 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -678,6 +692,8 @@
       },
       "tme-ari-008": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "3 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -687,6 +703,8 @@
       },
       "tme-ari-009": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "6 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -696,6 +714,8 @@
       },
       "tme-ari-010": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "5 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -705,6 +725,8 @@
       },
       "tme-ari-011": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "3 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -714,6 +736,8 @@
       },
       "tme-ari-012": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with Corbel and Finch **6 times**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -723,6 +747,8 @@
       },
       "tme-ari-013": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "3 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -732,6 +758,8 @@
       },
       "tme-ari-014": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "4 times.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -741,6 +769,8 @@
       },
       "tme-ari-015": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Ockendon Rise glazing payments total **$1,171.51**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -750,6 +780,8 @@
       },
       "tme-ari-016": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The payments logged against the **Ingle Bridge veranda** were:\n\n- $103.38 — render mesh\n- $175.03 — socket faceplates\n- $438.05 — extractor ducting\n\nTotal: **$716.46**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -759,6 +791,8 @@
       },
       "tme-ari-017": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "$1,040.70 total.\n\nThat is from:\n- $475.43\n- $94.24\n- $471.03",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -768,6 +802,8 @@
       },
       "tme-ari-018": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Dunstan Yard roofline payments total **$1,113.71**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -777,6 +813,8 @@
       },
       "tme-ari-019": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Marrow Lane rewire payments logged were:\n\n- $169.74\n- $224.01\n- $96.11\n- $241.87\n\nTotal: **$731.73**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -786,6 +824,8 @@
       },
       "tme-ari-020": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Ferrier Row cellar payments logged were:\n\n- $57.40 — replacement sash cords\n- $377.57 — tile adhesive\n- $228.46 — cavity trays\n- $175.29 — plasterboard\n\nTotal: **$838.72**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -795,6 +835,8 @@
       },
       "tme-ari-021": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Threlkeld Vale staircase payments come to **$1,325.07** in total.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -804,6 +846,8 @@
       },
       "tme-ari-022": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Dunstan Yard roofline payments logged were:\n\n- $96.05\n- $107.10\n- $189.41\n- $453.69\n- $115.97\n- $227.92\n\nTotal: **$1,190.14**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -813,6 +857,8 @@
       },
       "tme-ari-023": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "$717.42 total.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -822,6 +868,8 @@
       },
       "tme-ari-024": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Rushmere Fields brickwork payments come to **$1,432.52** in total.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -831,6 +879,8 @@
       },
       "tme-ari-025": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Threlkeld Vale staircase payments logged were:\n\n- $106.36 — bathroom sealant\n- $363.20 — door furniture\n- $169.98 — primer\n- $279.14 — plasterboard\n- $207.92 — skirting\n\nTotal: **$1,126.60**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -840,6 +890,8 @@
       },
       "tme-ari-026": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Nettlebed Barn studio payments total **$1,096.48**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -849,6 +901,8 @@
       },
       "tme-ari-027": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Dunstan Yard roofline payments logged were:\n\n- $102.29 — roof battens\n- $283.34 — primer\n- $472.71 — plasterboard\n- $181.76 — guttering\n- $315.99 — render mesh\n- $186.40 — stair spindles\n\nTotal: **$1,542.49**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -858,6 +912,8 @@
       },
       "tme-ari-028": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The Nettlebed Barn studio payments total **$1,954.63**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -867,6 +923,8 @@
       },
       "tme-ari-029": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halloway Wharf porch total: **$682.01**  \n- $399.56 loft hatch  \n- $282.45 plasterboard  \n\nThrelkeld Vale staircase total: **$837.32**  \n- $460.07 render mesh  \n- $266.84 skirting  \n- $110.41 underfloor insulation  \n\n**Difference: $155.31** — the Threlkeld Vale staircase total is higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -876,6 +934,8 @@
       },
       "tme-ari-030": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The conversations show:\n\n- **Ingle Bridge veranda:** $175.32\n- **Dunstan Yard roofline:** $231.12 + $71.00 = **$302.12**\n\nSo the **Dunstan Yard roofline total was $126.80 more** than the Ingle Bridge veranda.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -885,6 +945,8 @@
       },
       "tme-ari-031": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You logged:\n\n- **Larkspur Terrace workshop:** $909.58  \n- **Nettlebed Barn studio:** $1,076.51  \n\nThe difference is **$166.93**, with **Nettlebed Barn studio** higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -894,6 +956,8 @@
       },
       "tme-ari-032": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You logged:\n\n- **Crowmarsh Mill dormer:** $92.51  \n- **Bellweather Court attic:** $856.75 total  \n  - $426.90 for replacement sash cords  \n  - $352.49 for guttering  \n  - $77.36 for underfloor insulation  \n\n**Difference:** $856.75 − $92.51 = **$764.24**.  \nSo, **Bellweather Court attic was $764.24 h",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -903,6 +967,8 @@
       },
       "tme-ari-033": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Rushmere Fields brickwork totals **$937.41**:\n\n- $208.40 socket faceplates\n- $327.96 loft hatch\n- $401.05 guttering\n\nFerrier Row cellar totals **$603.68**:\n\n- $169.53 extractor ducting\n- $172.30 skirting\n- $261.85 primer\n\n**Difference: $333.73** — Rushmere Fields brickwork was higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -912,6 +978,8 @@
       },
       "tme-ari-034": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You logged **$243.92** against the **Quarrier Walk screed**.\n\nYou logged three payments against the **Ferrier Row cellar**:\n\n- **$62.71**\n- **$144.03**\n- **$98.14**\n\nTotal for Ferrier Row cellar: **$304.88**\n\nDifference: **$60.96** — the Ferrier Row cellar total is higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -921,6 +989,8 @@
       },
       "tme-ari-035": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Crowmarsh Mill dormer: **$53.00**.\n\nOckendon Rise glazing: **$169.83 + $203.14 = $372.97**.\n\nDifference: **$319.97** more was logged against **Ockendon Rise glazing**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -930,6 +1000,8 @@
       },
       "tme-ari-036": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You logged:\n\n- Marrow Lane rewire: $284.35\n- Ockendon Rise glazing: $238.15 + $150.40 = $388.55\n\nDifference: $104.20 — Ockendon Rise glazing is higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -939,6 +1011,8 @@
       },
       "tme-ari-037": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Crowmarsh Mill dormer total: **$474.95**  \nThrelkeld Vale staircase total: **$1,109.98**\n\nDifference: **$635.03** — the Threlkeld Vale staircase total is higher.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -948,6 +1022,8 @@
       },
       "tme-ari-038": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You logged **$758.09** against the **Ockendon Rise glazing** and **$122.85** against the **Rushmere Fields brickwork**.\n\nThe difference is **$635.24** — Ockendon Rise glazing was higher by that amount.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -957,6 +1033,8 @@
       },
       "tme-ari-039": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -966,6 +1044,8 @@
       },
       "tme-ari-040": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -975,6 +1055,8 @@
       },
       "tme-ari-041": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "15 days total.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -984,6 +1066,8 @@
       },
       "tme-ari-042": {
         "v1": false,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -993,6 +1077,8 @@
       },
       "tme-ari-043": {
         "v1": false,
+        "v8": false,
+        "v8_answer": "13 days.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1002,6 +1088,8 @@
       },
       "tme-ari-044": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "19 days in total.\n\n- 7 Feb to 24 Feb: 17 days  \n- 27 Feb to 1 Mar: 2 days",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1011,6 +1099,8 @@
       },
       "tme-ari-045": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "11 days in total.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1020,6 +1110,8 @@
       },
       "tme-ari-046": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "You had it for **14 days in total**, counting each spell inclusively:\n\n- **Feb 11–Feb 15:** 5 days  \n- **Feb 16–Feb 21:** 6 days  \n- **Feb 23–Feb 25:** 3 days  \n\n**Total: 14 days.**",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1029,6 +1121,8 @@
       },
       "tme-ari-047": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1038,6 +1132,8 @@
       },
       "tme-ari-048": {
         "v1": false,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1047,6 +1143,8 @@
       },
       "tme-ari-049": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1056,6 +1154,8 @@
       },
       "tme-ari-050": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "15 days in total.\n\n- 2 Feb to 9 Feb: 7 days  \n- 12 Feb to 17 Feb: 5 days  \n- 18 Feb to 21 Feb: 3 days  \n\nTotal: 7 + 5 + 3 = 15 days.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1064,6 +1164,20 @@
         "v6_redundant_components": []
       }
     },
-    "probed_corpus_sha256": "efa9add22a2a757b2f0827c00023eb1dd1872812faa8639f76caa345af231475"
+    "probed_corpus_sha256": "efa9add22a2a757b2f0827c00023eb1dd1872812faa8639f76caa345af231475",
+    "v8_full_haystack": {
+      "applicable": 50,
+      "v1_passed": 47,
+      "v8_passed": 42,
+      "interference_cost": 0.1,
+      "regressed_under_interference": [
+        "tme-ari-039",
+        "tme-ari-040",
+        "tme-ari-046",
+        "tme-ari-047",
+        "tme-ari-049"
+      ],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    }
   }
 }

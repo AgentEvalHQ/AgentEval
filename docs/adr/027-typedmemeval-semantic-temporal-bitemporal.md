@@ -219,8 +219,64 @@ property**, and §1.1 shows it does not predict a real stack: coverage 1.000 aga
 **Band validation becomes: V8 slopes across the bands, V1 stays flat.** Both halves are then
 answer-side, neither depends on the reference retriever, and the rule tests the thing the bands claim.
 
-**Feasibility, measured rather than assumed**, because a probe that cannot fit its own prompt is not a
-proposal. Full-haystack sizes on the shipped v5 corpora:
+### 6.1 V8 measured on the shipped five — and it answers the question that prompted it
+
+**Implemented and run** (2026-08-18). V8 is identical to V1 in question, judge, screen and
+applicability; the only difference is the context. Every number below is on the shipped v5 bytes.
+
+| Vertical | V1 (gold only) | V8 (full haystack) | **interference cost** |
+|---|---|---|---|
+| Prospective | 49/50 | 48/50 | **+0.02** |
+| Episodic | 48/50 | 50/50 | **−0.04** |
+| Arithmetic | 47/50 | 42/50 | **+0.10** |
+| WorkingMemory | 60/60 | 60/60 | **0.00** |
+| Forgetting | 35/35 | 35/35 | **0.00** |
+| **Family** | **239/245** | **235/245** | **+0.016** |
+
+**Four of five verticals have an interference cost of essentially zero, and the family figure is
+1.6%.** On WorkingMemory, Forgetting and Episodic a perfect retriever and *no retriever at all*
+produce the same answers. Two consequences, and neither is comfortable:
+
+1. **The shipped family cannot measure retrieval quality**, except on Arithmetic. This is the exact
+   explanation for the consuming project's observation that they read realised coverage 1.000 against
+   a 0.636 calibrated floor: the floor is a BM25 construction control, and above it there is no
+   answering-side headroom for a better retriever to win. Their adaptive-router decision now has a
+   measurement rather than a proxy behind it.
+2. **Episodic's cost is NEGATIVE.** Two questions that fail with gold alone succeed with the whole
+   haystack, so V1 is not a strict ceiling — surrounding sessions supply context the gold alone does
+   not. Worth stating because ADR-026 describes V1 as "the ceiling", and on at least one vertical it
+   is not one.
+
+### 6.2 V8 cannot carry band validation, and on Arithmetic it inverts the labels
+
+§6's proposal was that V8 replace the retriever half of band validation. **Measured, it cannot** —
+there is no headroom to slope on four of five verticals:
+
+| Vertical | V8 by band | spread |
+|---|---|---|
+| WorkingMemory | 1.00 / 1.00 / 1.00 / 1.00 / 1.00 | 0.00 |
+| Forgetting | 1.00 / 1.00 / 1.00 / 1.00 / 1.00 | 0.00 |
+| Episodic | 1.00 / 1.00 / 1.00 / 1.00 | 0.00 |
+| Prospective | 1.00 / 1.00 / 1.00 / 1.00 / 0.86 | 0.14 |
+| **Arithmetic** | **0.33** / 0.76 / 1.00 / 1.00 / 1.00 | **0.67** |
+
+Arithmetic is the only vertical with real spread, and **it runs the wrong way**: the band labelled
+*easiest* is where the answer model fails two questions in three. ADR-026 §19 recorded this as a
+confound from the oracle half (spread 0.17 → 0.33 across revisions); V8 shows it at **0.67** and
+shows what it actually is — **Arithmetic's difficulty labels are anti-correlated with difficulty for
+any system with good retrieval.** Band 1 is the hardest band in the vertical. `duration` living at two
+and three inputs is not a caveat on an otherwise-good ladder; it is the ladder pointing backwards.
+
+**So V8 ships as a diagnostic and an acceptance gate, not as a band validator.** The gate is: a
+vertical whose interference cost is ~0 cannot claim to measure retrieval, and must say so in its
+metadata. Band validation stays as ADR-026 defines it, with the BM25 half demoted to a construction
+control per §6, and the honest position is that **the shipped family validates bands on a retriever
+proxy while having no answering-side headroom to check them against.**
+
+### 6.3 Feasibility
+
+**Measured rather than assumed**, because a probe that cannot fit its own prompt is not a proposal.
+Full-haystack sizes on the shipped v5 corpora:
 
 | Vertical | max H | max ≈tokens | mean ≈tokens |
 |---|---|---|---|
@@ -282,9 +338,10 @@ ones, and this is where the third would go soft.
 
 1. **Gate (c): the consuming project's first baselines on v5 report.** In flight. Extending an
    instrument that has never produced a citable number is how instruments outrun their validation.
-2. **V8 implemented and run on the five shipped verticals**, so `V1 − V8` has a baseline before it
-   becomes an acceptance criterion for new ones. If the shipped five turn out to have V8 ≈ V1, this
-   ADR's §6 is a finding about them too, and they need it before three new corpora are built on it.
+2. ~~V8 implemented and run on the five shipped verticals~~ — **CLEARED 2026-08-18, and it was a
+   finding about them.** Interference cost is ~0 on four of five (§6.1) and Arithmetic's bands are
+   inverted (§6.2). The three new verticals must therefore be built for answering-side headroom from
+   the first draft: a dispersion ladder cannot be repaired into one later.
 3. **Band × shape cross-tab published for each proposed vertical**, with no shape dominating a band.
 4. **The two open v6 items from ADR-026 §19 closed or explicitly deferred with reasons:** Arithmetic's
    widened oracle confound (spread 0.33) and WorkingMemory's coverage drift toward the ceiling

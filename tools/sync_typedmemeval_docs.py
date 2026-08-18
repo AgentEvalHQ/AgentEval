@@ -36,8 +36,8 @@ DISPLAY = {
 }
 
 PROBE_HEADER = (
-    "| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |\n"
-    "|---|---|---|---|---|---|"
+    "| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | Interference cost |\n"
+    "|---|---|---|---|---|---|---|---|"
 )
 COVERAGE_HEADER = (
     "| Vertical | n | Mean realised coverage | `G` distribution |\n"
@@ -55,6 +55,18 @@ def _cell(record: dict, passed: str = "passed", total: str = "applicable") -> st
     if not record or not record.get(total):
         return "—"
     return f"{record.get(passed, '—')}/{record[total]}"
+
+
+def _interference_cell(record: dict | None) -> str:
+    """V1 - V8, rendered WITH its sign, because a negative value is a real result here.
+
+    Episodic reads -0.04: two questions fail on gold alone and succeed on the whole haystack, so V1
+    is not the strict ceiling ADR-026 calls it. Printing that unsigned, or rounding it to 0.00, would
+    hide the one number in this table that contradicts a claim made elsewhere in these docs.
+    """
+    if not record or record.get("interference_cost") is None:
+        return "—"
+    return f"{record['interference_cost']:+.2f}"
 
 
 def check_citation_revisions(revision: str) -> list[str]:
@@ -108,7 +120,9 @@ def build_tables() -> tuple[str, str]:
             f"| {_cell(probes.get('v1_pair_flip'), total='pairs')} "
             f"| {_cell(probes.get('v2_non_inferability'))} "
             f"| {_cell(probes.get('v3_gold_ablated'))} "
-            f"| {_cell(probes.get('v6_leave_one_out'))} |")
+            f"| {_cell(probes.get('v6_leave_one_out'))} "
+            f"| {_cell(probes.get('v8_full_haystack'), passed='v8_passed')} "
+            f"| {_interference_cell(probes.get('v8_full_haystack'))} |")
 
         distribution = ", ".join(
             f"{g} (×{n})" for g, n in sorted(metadata["structure"]["g_distribution"].items(),

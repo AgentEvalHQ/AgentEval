@@ -539,7 +539,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-17T16:34:09Z",
+    "run_at": "2026-08-18T19:55:35Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -618,6 +618,8 @@
     "per_question": {
       "tme-pro-001": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "At the start of March, you were a member of **Riverside Fitness**. You signed up there on 2026/01/12 for three months, and only switched to **Northgate Athletic** around mid-March.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -626,6 +628,8 @@
       },
       "tme-pro-002": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "One allergy tablet each morning during March.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -634,6 +638,8 @@
       },
       "tme-pro-003": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "April 27, 2026.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -642,6 +648,8 @@
       },
       "tme-pro-004": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "About four weeks — from your first physio session on 2026/01/20 to when you said your shoulder felt better on 2026/02/17.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -650,6 +658,8 @@
       },
       "tme-pro-005": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. You started the Lumen analytics free trial on 2026/04/28 for 30 days, so it would have ended around 2026/05/28. Today is 2026/06/03.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -658,6 +668,8 @@
       },
       "tme-pro-006": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. You said on 2026/02/16 that you accepted the Halcyon Systems offer and would start the first Monday of the next month, which was 2026/03/02. Since it is now 2026/04/20, you should have started already.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -666,6 +678,8 @@
       },
       "tme-pro-007": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The puppy is **20 weeks old** now — about **4½ months**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -674,6 +688,8 @@
       },
       "tme-pro-008": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. Your car went in for its service on 2026/01/29, and you said they do it every six months, so it would be due around 2026/07/29. As of 2026/06/20, it is not due yet.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -682,6 +698,8 @@
       },
       "tme-pro-009": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. You signed the Meridian Health contract on 2026/05/11, and day one is the first Monday of next month — 2026/06/01. Current date is 2026/05/27.",
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -689,6 +707,8 @@
       },
       "tme-pro-010": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The visa application went in on 2026/04/14, and they said to allow eight weeks. As of 2026/05/26, it has been about six weeks, so you would not necessarily expect a decision yet. Eight weeks would be around 2026/06/09.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -697,6 +717,8 @@
       },
       "tme-pro-011": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The flat inspection was booked on 2026/03/05 for “a fortnight from tomorrow,” which puts it around 2026/03/20. Since it’s now 2026/04/02, it should already have happened.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -705,6 +727,8 @@
       },
       "tme-pro-012": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. You joined the rowing club on 2026/02/24, and the members’ rate only kicks in after six months — around 2026/08/24. Current date is 2026/06/15, so it is not available yet.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -713,6 +737,8 @@
       },
       "tme-pro-013": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The allotment lease renewal reminder has not come due yet.\n\nIt was set on 2026/03/21 for “in ten weeks,” so it is due on 2026/05/30 (Sat).",
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -720,6 +746,8 @@
       },
       "tme-pro-014": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The allotment lease renewal reminder has come due.\n\nIt was due on **2026/05/30 (Sat)**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -728,6 +756,8 @@
       },
       "tme-pro-015": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The boiler service booking reminder has not come due yet.\n\nIt is due on **2026/05/22 (Fri)**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -736,6 +766,8 @@
       },
       "tme-pro-016": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder to book the boiler service came due on **2026/05/22 (Fri)**, seven weeks after **2026/04/03**. Since today is **2026/05/28**, it is already due.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -744,6 +776,8 @@
       },
       "tme-pro-017": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The reminder to send the quarterly figures to Priya is due on **2026/07/26 (Sun)**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -752,6 +786,8 @@
       },
       "tme-pro-018": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder about sending the quarterly figures to Priya was due on **2026/07/26 (Sun)**.\n\nIt has already come due by the current date, **2026/08/01 (Sat)**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -760,6 +796,8 @@
       },
       "tme-pro-019": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The bike-chain reminder is due on **2026/08/12 (Wed)**, so as of **2026/08/06** it has **not come due yet**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -768,6 +806,8 @@
       },
       "tme-pro-020": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The bike-chain reminder was due on **2026/08/12 (Wed)**, so by **2026/08/18** it has already come due.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -776,6 +816,8 @@
       },
       "tme-pro-021": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The borrowed telescope reminder is due on **2026/05/28 (Thu)**, so as of **2026/05/22** it has **not** come due yet.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -784,6 +826,8 @@
       },
       "tme-pro-022": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder to return the borrowed telescope was due on **2026/05/28 (Thu)**, so it has already come due by **2026/06/03**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -792,6 +836,8 @@
       },
       "tme-pro-023": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The reminder to submit the conference abstract is due on **2026/07/24 (Fri)**, ten weeks after it was mentioned on **2026/05/15**. Current date is **2026/07/18**, so it has **not come due yet**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -800,6 +846,8 @@
       },
       "tme-pro-024": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The conference abstract reminder has come due.\n\nIt was set on 2026/05/15 for ten weeks later, so it was due on 2026/07/24.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -808,6 +856,8 @@
       },
       "tme-pro-025": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The reminder to chase the deposit refund was set on 2026/05/14 for thirteen weeks later, so it is due on 2026/08/13. Current date is 2026/08/07, so it has not come due yet.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -816,6 +866,8 @@
       },
       "tme-pro-026": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder to chase the deposit refund came due on **2026/08/13 (Thu)**, so by **2026/08/19** it is already due.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -824,6 +876,8 @@
       },
       "tme-pro-027": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The smoke-alarm battery reminder has not come due yet.\n\nIt was set on 2026/05/28 for eleven weeks later, so it is due on 2026/08/13.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -832,6 +886,8 @@
       },
       "tme-pro-028": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder to swap the smoke-alarm batteries has come due.\n\nIt was set on 2026/05/28 for eleven weeks later, so it was due on 2026/08/13.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -840,6 +896,8 @@
       },
       "tme-pro-029": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The climbing-wall pass was picked up on 2026/03/07 and was valid for twelve weeks, so it runs out on 2026/05/30. As of 2026/05/24, it is still valid.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -848,6 +906,8 @@
       },
       "tme-pro-030": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The climbing-wall pass was picked up on 2026/03/07 and was valid for twelve weeks, so it ran out on 2026/05/30.",
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -855,6 +915,8 @@
       },
       "tme-pro-031": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The ferry multi-trip ticket is still valid.\n\nIt was bought on 2026/03/21 and was valid for 18 weeks, so it runs out on 2026/07/25. Current date is 2026/07/19, so it has about 6 days left.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -863,6 +925,8 @@
       },
       "tme-pro-032": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The ferry multi-trip ticket is no longer valid.\n\nIt was picked up on **2026/03/21** and was valid for **18 weeks**, so it ran out on **2026/07/25** — about **six days ago** as of 2026/07/31.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -871,6 +935,8 @@
       },
       "tme-pro-033": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The museum membership is still valid.\n\nIt was picked up on **2026/04/02** and was valid for **16 weeks**, so it runs out on **2026/07/23**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -879,6 +945,8 @@
       },
       "tme-pro-034": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The museum membership was picked up on 2026/04/02 and was valid for sixteen weeks, so it ran out on 2026/07/23. As of 2026/07/29, it is no longer valid.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -887,6 +955,8 @@
       },
       "tme-pro-035": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The parking permit is still valid. It runs out on **Saturday, 20 June 2026**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -895,6 +965,8 @@
       },
       "tme-pro-036": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The parking permit was picked up on 2026/04/18 and was valid for nine weeks, so it ran out on 2026/06/20.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -903,6 +975,8 @@
       },
       "tme-pro-037": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The language-app subscription is still valid.\n\nIt was picked up on 2026/04/15 and was valid for six weeks, so it runs out on 2026/05/27.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -911,6 +985,8 @@
       },
       "tme-pro-038": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The language-app subscription was picked up on 2026/04/15 and was valid for six weeks, so it ran out around 2026/05/27.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -919,6 +995,8 @@
       },
       "tme-pro-039": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The physiotherapy referral is still valid.\n\nIt was picked up on 2026/05/06 and was valid for eighteen weeks from that day, so it runs out on 2026/09/09. Since the current date is 2026/09/03, it has not run out yet.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -927,6 +1005,8 @@
       },
       "tme-pro-040": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No. The physiotherapy referral was picked up on 2026/05/06 and was valid for eighteen weeks, so it ran out on 2026/09/09.",
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -934,6 +1014,8 @@
       },
       "tme-pro-041": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you are due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **2026/05/21**.\n\nAs of **2026/05/15**, that date is **still ahead of you** — it is **next Thursday**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -942,6 +1024,8 @@
       },
       "tme-pro-042": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to start at Halloway Instruments **nine weeks after 2026/03/19**, which makes the date **2026/05/21 (Thu)**.\n\nGiven the current date is **2026/05/27 (Wed)**, that start date is **not still ahead of you** — it was **six days ago**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -950,6 +1034,8 @@
       },
       "tme-pro-043": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says that on **2026/03/27** you were due to move into the flat on Ferrier Row **in eleven weeks**.\n\nThat works out to **Friday, 2026/06/12**.\n\nSince the current date is **2026/06/06**, yes — it is still ahead of you, by about **six days**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -958,6 +1044,8 @@
       },
       "tme-pro-044": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to move into the flat on Ferrier Row **eleven weeks after 2026/03/27**, which is **2026/06/12 (Fri)**.\n\nGiven the current date is **2026/06/18 (Thu)**, that date is **not still ahead of you**; it was **six days ago**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -966,6 +1054,8 @@
       },
       "tme-pro-045": {
         "v1": false,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -974,6 +1064,8 @@
       },
       "tme-pro-046": {
         "v1": true,
+        "v8": false,
+        "v8_answer": "",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -982,6 +1074,8 @@
       },
       "tme-pro-047": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says that on **2026/04/25** you were **due to switch to the four-day week in sixteen weeks**.\n\nThat puts the switch date at **2026/08/15 (Sat)**.\n\nGiven the current date is **2026/08/09 (Sun)**, yes — it is **still ahead of you**, by **six days**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -990,6 +1084,8 @@
       },
       "tme-pro-048": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to switch to the four-day week **sixteen weeks after 2026/04/25**, which is **2026/08/15 (Sat)**.\n\nAs of **2026/08/21**, that date is **not still ahead of you**; it was **six days ago**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -998,6 +1094,8 @@
       },
       "tme-pro-049": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you are due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which makes the date **2026/06/21 (Sunday)**.\n\nAs of **2026/06/15**, that date is **still ahead of you** — about **6 days away**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1006,12 +1104,24 @@
       },
       "tme-pro-050": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which is **2026/06/21 (Sun)**.\n\nAs of **2026/06/27**, that date is **not still ahead of you**; it was **six days ago**.",
         "v2_hits": 0,
         "v2": true,
         "v3": null,
         "v6": null
       }
     },
-    "probed_corpus_sha256": "6ddd3e9bb594816ee866b3255cd8a7beb274b6d46661d19574632299dd7df0f3"
+    "probed_corpus_sha256": "6ddd3e9bb594816ee866b3255cd8a7beb274b6d46661d19574632299dd7df0f3",
+    "v8_full_haystack": {
+      "applicable": 50,
+      "v1_passed": 49,
+      "v8_passed": 48,
+      "interference_cost": 0.02,
+      "regressed_under_interference": [
+        "tme-pro-046"
+      ],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    }
   }
 }

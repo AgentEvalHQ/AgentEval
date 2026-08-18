@@ -548,7 +548,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-17T17:01:33Z",
+    "run_at": "2026-08-18T20:00:43Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -624,6 +624,8 @@
     "per_question": {
       "tme-wm-001": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You switched to a new employer called **Quillon Instruments**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -632,6 +634,8 @@
       },
       "tme-wm-002": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You switched to a new employer called **Pomfret Instruments**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -640,6 +644,8 @@
       },
       "tme-wm-003": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You switched to a new employer called **Ashlore Instruments**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -648,6 +654,8 @@
       },
       "tme-wm-004": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You switched to a new employer called **Marrowby Instruments**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -656,6 +664,8 @@
       },
       "tme-wm-005": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You switched to a new employer called **Dunmoor Instruments**. The outfit is called **Dunmoor Instruments** these days.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -664,6 +674,8 @@
       },
       "tme-wm-006": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ondrey.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -672,6 +684,8 @@
       },
       "tme-wm-007": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ashlore.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -680,6 +694,8 @@
       },
       "tme-wm-008": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmoor.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -688,6 +704,8 @@
       },
       "tme-wm-009": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Vessik.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -696,6 +714,8 @@
       },
       "tme-wm-010": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halverstock.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -704,6 +724,8 @@
       },
       "tme-wm-011": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halverstock Wall.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -712,6 +734,8 @@
       },
       "tme-wm-012": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Marrowby Wall.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -720,6 +744,8 @@
       },
       "tme-wm-013": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Vessik Wall.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -728,6 +754,8 @@
       },
       "tme-wm-014": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Pomfret Wall.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -736,6 +764,8 @@
       },
       "tme-wm-015": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Brindlow Wall.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -744,6 +774,8 @@
       },
       "tme-wm-016": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Pomfret Row.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -752,6 +784,8 @@
       },
       "tme-wm-017": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Verrick Row.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -760,6 +794,8 @@
       },
       "tme-wm-018": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halverstock Row.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -768,6 +804,8 @@
       },
       "tme-wm-019": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmoor Row.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -776,6 +814,8 @@
       },
       "tme-wm-020": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ashlore Row.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -784,6 +824,8 @@
       },
       "tme-wm-021": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Vessik Dental.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -792,6 +834,8 @@
       },
       "tme-wm-022": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ashlore Dental.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -800,6 +844,8 @@
       },
       "tme-wm-023": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Quillon Dental.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -808,6 +854,8 @@
       },
       "tme-wm-024": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Brindlow Dental.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -816,6 +864,8 @@
       },
       "tme-wm-025": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Marrowby Dental.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -824,6 +874,8 @@
       },
       "tme-wm-026": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You have joined the **Pomfret Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -832,6 +884,8 @@
       },
       "tme-wm-027": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You joined the **Vessik Singers** this term, and they rehearse in the **old chapel** on Wednesday evening.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -840,6 +894,8 @@
       },
       "tme-wm-028": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You joined the **Halverstock Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -848,6 +904,8 @@
       },
       "tme-wm-029": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You joined the **Tarraby Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -856,6 +914,8 @@
       },
       "tme-wm-030": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You joined the **Verrick Singers** choir this term, and they rehearse **in the old chapel** on a Wednesday evening.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -864,6 +924,8 @@
       },
       "tme-wm-031": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "A Tarraby Cycles bike.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -872,6 +934,8 @@
       },
       "tme-wm-032": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You ended up buying a **Brindlow Cycles** bike for the commute this spring.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -880,6 +944,8 @@
       },
       "tme-wm-033": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ashlore Cycles.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -888,6 +954,8 @@
       },
       "tme-wm-034": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You ended up buying a **Pomfret Cycles** bike for the commute this spring.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -896,6 +964,8 @@
       },
       "tme-wm-035": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You ended up buying a Vessik Cycles bike for the commute this spring.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -904,6 +974,8 @@
       },
       "tme-wm-036": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Tarraby Broadband.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -912,6 +984,8 @@
       },
       "tme-wm-037": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Brindlow Broadband.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -920,6 +994,8 @@
       },
       "tme-wm-038": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ondrey Broadband.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -928,6 +1004,8 @@
       },
       "tme-wm-039": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Pomfret Broadband.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -936,6 +1014,8 @@
       },
       "tme-wm-040": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Vessik Broadband.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -944,6 +1024,8 @@
       },
       "tme-wm-041": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmoor Fields.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -952,6 +1034,8 @@
       },
       "tme-wm-042": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Marrowby Fields.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -960,6 +1044,8 @@
       },
       "tme-wm-043": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Tarraby Fields.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -968,6 +1054,8 @@
       },
       "tme-wm-044": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Brindlow Fields.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -976,6 +1064,8 @@
       },
       "tme-wm-045": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ondrey Fields.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -984,6 +1074,8 @@
       },
       "tme-wm-046": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Quillon.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -992,6 +1084,8 @@
       },
       "tme-wm-047": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ashlore.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1000,6 +1094,8 @@
       },
       "tme-wm-048": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ondrey.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1008,6 +1104,8 @@
       },
       "tme-wm-049": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halverstock.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1016,6 +1114,8 @@
       },
       "tme-wm-050": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Marrowby.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1024,6 +1124,8 @@
       },
       "tme-wm-051": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Halverstock Bakehouse.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1032,6 +1134,8 @@
       },
       "tme-wm-052": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Quillon Bakehouse.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1040,6 +1144,8 @@
       },
       "tme-wm-053": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Verrick Bakehouse.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1048,6 +1154,8 @@
       },
       "tme-wm-054": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Tarraby Bakehouse.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1056,6 +1164,8 @@
       },
       "tme-wm-055": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Brindlow Bakehouse.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1064,6 +1174,8 @@
       },
       "tme-wm-056": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You signed up to the Dunmoor Circle reading circle for the winter, and they meet in the back room.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1072,6 +1184,8 @@
       },
       "tme-wm-057": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You signed up to the **Ashlore Circle** for the winter, and they meet **in the back room**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1080,6 +1194,8 @@
       },
       "tme-wm-058": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You signed up to the **Quillon Circle** reading circle for the winter, and they meet **in the back room**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1088,6 +1204,8 @@
       },
       "tme-wm-059": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You signed up to the Brindlow Circle reading circle for the winter, and they meet in the back room.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1096,6 +1214,8 @@
       },
       "tme-wm-060": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You signed up to the Ondrey Circle reading circle for the winter, and they meet in the back room.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1103,6 +1223,14 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933"
+    "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933",
+    "v8_full_haystack": {
+      "applicable": 60,
+      "v1_passed": 60,
+      "v8_passed": 60,
+      "interference_cost": 0.0,
+      "regressed_under_interference": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    }
   }
 }

@@ -322,13 +322,27 @@ G = 2, but because those are the two verticals whose per-component coverage echo
 component being individually load-bearing. V1 and V2 do not apply to a never-known probe, whose
 gold is itself an abstention.
 
-| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out |
-|---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 45/45 | — |
-| Episodic | 48/50 | — | 50/50 | 50/50 | — |
-| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 |
-| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — |
-| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 |
+| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | Interference cost |
+|---|---|---|---|---|---|---|---|
+| Prospective | 49/50 | 18/19 | 50/50 | 45/45 | — | 48/50 | +0.02 |
+| Episodic | 48/50 | — | 50/50 | 50/50 | — | 50/50 | -0.04 |
+| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 | 42/50 | +0.10 |
+| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | +0.00 |
+| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 | 35/35 | +0.00 |
+
+> **Read the interference cost before citing any of these corpora for retrieval quality.** `V1` is
+> accuracy given the gold sessions alone; `V8` is accuracy given the entire haystack; the cost is
+> `V1 − V8`, and it is **the room retrieval quality has to matter**. Where it is 0.00 a perfect
+> retriever and no retriever produce the same answers, so **no two retrieval stacks can be
+> distinguished on that vertical however good one of them is.** Four of the five read ~0, and the
+> family figure is +0.016 — these corpora measure answering, not retrieval, with Arithmetic the one
+> partial exception at +0.10. This is also why a stack can report realised coverage 1.000 against a
+> calibrated BM25 floor of 0.636 and be telling the truth: the floor is a construction control, not a
+> difficulty claim.
+>
+> Episodic's **−0.04** is not a rounding artefact. Two questions fail on gold alone and succeed on the
+> whole haystack, so V1 is not a strict ceiling there — surrounding sessions supply context the gold
+> does not.
 
 **Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
 ablating either the statement or the invalidation stops the model producing the gold, so both

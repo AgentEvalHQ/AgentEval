@@ -535,7 +535,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-17T16:50:59Z",
+    "run_at": "2026-08-18T19:54:05Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -612,6 +612,8 @@
     "per_question": {
       "tme-for-001": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The conversations say you chose an **Orrindale Vantage** on 2026/01/07.\n\nHowever, on 2026/01/21 you also said “the car has gone” and that you sold it to a dealer, so they do **not plainly confirm what you’re driving now**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -621,6 +623,8 @@
       },
       "tme-for-002": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Your gym membership was with **Brackmoor Quartz**, but later you said you **cancelled the membership outright**, so you don’t currently have one according to the conversations.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -630,6 +634,8 @@
       },
       "tme-for-003": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You’re not currently registered with a dentist. You had settled on Orrindale Ember, but later came off their books when the practice closed.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -639,6 +645,8 @@
       },
       "tme-for-004": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "I don’t know from these conversations.\n\nYou previously said you chose **Ryhope Reverie**, but later said you **left the provider mid-contract** after the third outage. No new broadband provider is mentioned after that.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -648,6 +656,8 @@
       },
       "tme-for-005": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "None now. You took the flat off the letting agent and manage it yourself. Previously, the agent was Neskett Ember.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -657,6 +667,8 @@
       },
       "tme-for-006": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "None now. You had chosen **Neskett Anvil** for the boxes, but later said the storage unit was empty and the account was closed.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -666,6 +678,8 @@
       },
       "tme-for-007": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "None, as far as the record says. You picked a **Vintry Meridian**, but later said there was **no bike here any more** because it was stolen from outside the library and never replaced.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -675,6 +689,8 @@
       },
       "tme-for-008": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No one at the moment — the accounts are unattended. You had gone with Wistan Kindred, but later ended the engagement after the filing mess.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -684,6 +700,8 @@
       },
       "tme-for-009": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You were on **Kelbrick Quartz**, but later you said that tariff was **finished** and you let it lapse when the handset died. So the conversations don’t say you’re currently on any phone tariff.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -693,6 +711,8 @@
       },
       "tme-for-010": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No one — the flat is currently uninsured.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -702,6 +722,8 @@
       },
       "tme-for-011": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Nobody is cleaning the flat now; the cleaner visits were stopped when the rate went up.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -711,6 +733,8 @@
       },
       "tme-for-012": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "They came from **Vantoro Quartz**, but you later **stopped the standing order after the last bad batch**, so no beans are arriving now.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -720,6 +744,8 @@
       },
       "tme-for-013": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You were seeing **Brackmoor Vantage** for the shoulder physio, but the later note says the physio work is over and you were discharged at the final appointment—so you are **not currently seeing a physio**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -729,6 +755,8 @@
       },
       "tme-for-014": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "The conversations don’t say who taught you guitar. They only say you started guitar lessons, picked “Feskin Vantage,” and later gave the lessons up when the teacher moved away.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -738,6 +766,8 @@
       },
       "tme-for-015": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "No firm is doing your windows now. You had chosen **Brackmoor Ember**, but later said the window job was dead and you pulled out before any work started.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -747,6 +777,8 @@
       },
       "tme-for-016": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You don’t currently use a vet. You previously registered the cat with **Kelbrick Vantage**, but later said you took her off their books and have no vet at present.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -756,6 +788,8 @@
       },
       "tme-for-017": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You had settled on **Cambourne Anvil**, but later said that hairdresser was over and you **stopped going after the price rise**. The conversations don’t say which hairdresser you go to now.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -765,6 +799,8 @@
       },
       "tme-for-018": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You’re not in a running club now — you said you’re clubless and let the membership lapse. Earlier, you had chosen Brackmoor Quartz.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -774,6 +810,8 @@
       },
       "tme-for-019": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You went with **Oswent Ember**, but later said you **quit the club** after the third duplicate case—so you’re not currently a member, as far as these conversations say.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -783,6 +821,8 @@
       },
       "tme-for-020": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You saw **Vantoro Ember** — though later you noted there were **no more osteopath appointments** because the course had finished.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -792,6 +832,8 @@
       },
       "tme-for-021": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Orrindale Quartz.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -804,6 +846,8 @@
       },
       "tme-for-022": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Your gym membership is with **Draythe Reverie**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -816,6 +860,8 @@
       },
       "tme-for-023": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You are registered with **Feskin Reverie**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -828,6 +874,8 @@
       },
       "tme-for-024": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Your broadband provider is **Larkmead Vantage**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -840,6 +888,8 @@
       },
       "tme-for-025": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Cambourne Vantage.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -852,6 +902,8 @@
       },
       "tme-for-026": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Neskett Verity.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -864,6 +916,8 @@
       },
       "tme-for-027": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Trellick Pilot.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -876,6 +930,8 @@
       },
       "tme-for-028": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Ulverston Quartz.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -888,6 +944,8 @@
       },
       "tme-for-029": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You are on the **Neskett Kindred** phone tariff.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -900,6 +958,8 @@
       },
       "tme-for-030": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Kelbrick Verity.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -912,6 +972,8 @@
       },
       "tme-for-031": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Orrindale Ardent — they were chosen as the cleaner for fortnightly visits.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -924,6 +986,8 @@
       },
       "tme-for-032": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Your coffee beans come from Brackmoor Quartz.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -936,6 +1000,8 @@
       },
       "tme-for-033": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "You’re seeing **Larkmead Solace**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -948,6 +1014,8 @@
       },
       "tme-for-034": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Vintry Verity teaches you guitar.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -960,6 +1028,8 @@
       },
       "tme-for-035": {
         "v1": true,
+        "v8": true,
+        "v8_answer": "Draythe Ardent.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -972,95 +1042,118 @@
       },
       "tme-for-036_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-037_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-038_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-039_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-040_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-041_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-042_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-043_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-044_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-045_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-046_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-047_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-048_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-049_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       },
       "tme-for-050_abs": {
         "v1": null,
+        "v8": null,
         "v2": null,
         "v3": null,
         "v6": null
       }
     },
-    "probed_corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656"
+    "probed_corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656",
+    "v8_full_haystack": {
+      "applicable": 35,
+      "v1_passed": 35,
+      "v8_passed": 35,
+      "interference_cost": 0.0,
+      "regressed_under_interference": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    }
   }
 }

@@ -387,6 +387,30 @@ def probe_question(entry: dict, vertical: str) -> dict:
         # V1 as written cannot express. Recorded as not-applicable rather than silently passed.
         record["v1"] = None
 
+    # V8 -- interference cost, and the ONLY difference from V1 is the context. Same question, same
+    # judge, same screen, same applicability rule, so V1 - V8 is a like-for-like difference on one
+    # question set rather than two numbers that happen to share a scale.
+    #
+    #   V1  accuracy given the gold sessions alone      -- perfect retrieval
+    #   V8  accuracy given the entire haystack          -- no retrieval at all
+    #   V1 - V8  is the room retrieval quality has to matter.
+    #
+    # Where V8 == V1 a perfect retriever and no retriever produce the same answer, so no two
+    # retrievers can be told apart on that corpus however good one of them is. That is LongMemEval's
+    # saturation stated as a measurement instead of a complaint, and it is the quantity the consuming
+    # project needs: their stack reads realised coverage 1.000 against our calibrated BM25 floor of
+    # 0.636, and coverage is a proxy for exactly this.
+    #
+    # Not applicable wherever V1 is not applicable -- a never-known probe has no gold to reach, so
+    # `produced_gold` has nothing to decide and a bare 0 would read as a failure rather than as an
+    # undefined case.
+    if golds:
+        answer = complete(ask(question, date, subset(entry, everything)), cache_key=f"{key}:v8")
+        record["v8"] = produced_gold(question, gold, answer, f"{key}:v8:judge")
+        record["v8_answer"] = answer[:300]
+    else:
+        record["v8"] = None
+
     # V2 -- non-inferability. Sampled at the provider default temperature, k=10.
     #
     # Not applicable to a never-known probe. Its gold IS an abstention, and "I have no way of
@@ -454,6 +478,27 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v6"] = None
 
     return record
+
+
+def _interference(records: list[dict]) -> dict:
+    """V1 vs V8 on the questions both are defined on, and the gap between them."""
+    both = [r for r in records if r.get("v1") is not None and r.get("v8") is not None]
+    if not both:
+        return {"applicable": 0, "v1_passed": 0, "v8_passed": 0, "interference_cost": None,
+                "not_applicable_reason": "no question in this corpus has gold for V1 to be defined on"}
+    v1 = sum(1 for r in both if r["v1"])
+    v8 = sum(1 for r in both if r["v8"])
+    return {
+        "applicable": len(both),
+        "v1_passed": v1,
+        "v8_passed": v8,
+        "interference_cost": round((v1 - v8) / len(both), 4),
+        "regressed_under_interference": sorted(
+            r["question_id"] for r in both if r["v1"] and not r["v8"]),
+        "reading": ("V1 minus V8 as a share of the questions both are defined on. 0.0 means a "
+                    "perfect retriever and no retriever produce the same answers here, so no two "
+                    "retrievers can be distinguished on this corpus."),
+    }
 
 
 def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
@@ -566,6 +611,9 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # figure gave no way to see. Where a shape's V1 is well below the vertical's, its
         # numbers are answer-model variance more than memory signal, and a reader is entitled
         # to know that before quoting them.
+        # The headline of ADR-027 SS6. `interference_cost` is V1 - V8 as a share of the questions
+        # both are defined on: 0.0 means a perfect retriever buys nothing on this corpus.
+        "v8_full_haystack": _interference(records),
         "by_shape": {
             shape: {
                 "questions": len(group),
@@ -676,6 +724,16 @@ def main() -> None:
     try:
         for vertical in targets:
             probes = probe_vertical(vertical, args.limit, args.workers)
+            # A --limit run is a smoke test, and its record is a partial measurement. Writing it
+            # REPLACED the full record: an 8-question run left Forgetting's metadata reading
+            # "V1 8/8" where the shipped number is 35/35, with nothing in the file to say the
+            # difference was a truncation rather than a corpus that shrank. Same failure as every
+            # other one this family has had -- a partial measurement stored where a measurement is
+            # expected -- so the smoke test now prints and writes nothing.
+            if args.limit:
+                print(f"{vertical}: --limit run, metadata NOT written (partial measurement)",
+                      flush=True)
+                continue
             corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
             meta_path = tmc.DATA_ROOT / vertical / f"{corpus_id}.meta.json"
             metadata = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -703,7 +761,10 @@ def main() -> None:
                 f"V1pair {probes['v1_pair_flip']['passed']}/{probes['v1_pair_flip']['pairs']}  "
                 f"V2 {v2['passed']}/{v2['applicable']}  "
                 f"V3 {v3['passed']}/{v3['applicable']}  "
-                f"V6 {v6['passed']}/{v6['applicable']}",
+                f"V6 {v6['passed']}/{v6['applicable']}  "
+                f"V8 {probes['v8_full_haystack'].get('v8_passed','-')}/"
+                f"{probes['v8_full_haystack'].get('applicable','-')}  "
+                f"interference {probes['v8_full_haystack'].get('interference_cost')}",
                 flush=True)
     finally:
         with _cache_lock:
