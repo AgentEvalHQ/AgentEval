@@ -425,6 +425,36 @@ def probe_question(entry: dict, vertical: str) -> dict:
     else:
         record["v8"] = None
 
+    # V9 -- accuracy under a K-LIMITED reference retrieval, which is the arm that was missing.
+    #
+    # V8 puts the ENTIRE haystack in context. That measures the corpus under an idealised retriever
+    # with unlimited context, and V1 - V8 answers "do distractors confuse the reader?" -- a real but
+    # narrow question. It does NOT answer "can retrieval quality matter here?", and reading it that
+    # way was a mistake with consequences: it produced a no-ship recommendation for a consuming
+    # project's adaptive router, on a corpus where their full pipeline scores 0.21 against our 0.82.
+    # Both numbers were right. They measure different things.
+    #
+    # A real system does not dump the haystack in; it SELECTS k sessions, and selecting the wrong k
+    # is worse than either arm above. So this arm gives the model the top-K_ref sessions a plain BM25
+    # retriever returns -- the same reference retriever the calibration gate uses -- and the useful
+    # quantities become:
+    #
+    #   V1 - V9   what a PERFECT selector buys over a lexical baseline
+    #   V8 - V9   what unlimited context buys over a lexical baseline
+    #
+    # Those are the headroom numbers. V1 - V8 never was one.
+    if golds:
+        texts = [render([session], [date])
+                 for session, date in zip(entry["haystack_sessions"], entry["haystack_dates"])]
+        ranked = tmc.bm25_rank(question, texts)[:tmc.K_REF]
+        answer = complete(ask(question, date, subset(entry, sorted(ranked))),
+                          cache_key=f"{key}:v9")
+        record["v9"] = produced_gold(question, gold, answer, f"{key}:v9:judge")
+        record["v9_answer"] = answer[:300]
+        record["v9_gold_in_context"] = sum(1 for i in ranked if i in golds)
+    else:
+        record["v9"] = None
+
     # V2 -- non-inferability. Sampled at the provider default temperature, k=10.
     #
     # Not applicable to a never-known probe. Its gold IS an abstention, and "I have no way of
@@ -493,6 +523,31 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v6"] = None
 
     return record
+
+
+def _retrieval_headroom(records: list[dict]) -> dict:
+    """What a better retriever could buy, measured against a lexical baseline.
+
+    This is the number that decides whether retrieval work pays on a corpus, and it is NOT V1 - V8.
+    """
+    both = [r for r in records if r.get("v1") is not None and r.get("v9") is not None]
+    if not both:
+        return {"applicable": 0, "not_applicable_reason": "no question with gold"}
+    v1 = sum(1 for r in both if r["v1"])
+    v8 = sum(1 for r in both if r.get("v8"))
+    v9 = sum(1 for r in both if r["v9"])
+    return {
+        "applicable": len(both),
+        "v1_gold_only": v1,
+        "v8_full_haystack": v8,
+        "v9_bm25_top_k": v9,
+        "headroom_over_lexical_retrieval": round((v1 - v9) / len(both), 4),
+        "headroom_unlimited_context_over_lexical": round((v8 - v9) / len(both), 4),
+        "reading": ("V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K "
+                    "selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom "
+                    "number -- it only asks whether distractors confuse a reader who already has "
+                    "everything."),
+    }
 
 
 def _interference(records: list[dict]) -> dict:
@@ -630,6 +685,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # The headline of ADR-027 SS6. `interference_cost` is V1 - V8 as a share of the questions
         # both are defined on: 0.0 means a perfect retriever buys nothing on this corpus.
         "v8_full_haystack": _interference(records),
+        "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
             shape: {
                 "questions": len(group),
@@ -780,7 +836,10 @@ def main() -> None:
                 f"V6 {v6['passed']}/{v6['applicable']}  "
                 f"V8 {probes['v8_full_haystack'].get('v8_passed','-')}/"
                 f"{probes['v8_full_haystack'].get('applicable','-')}  "
-                f"interference {probes['v8_full_haystack'].get('interference_cost')}",
+                f"interference {probes['v8_full_haystack'].get('interference_cost')}  "
+                f"V9 {probes['v9_reference_retrieval'].get('v9_bm25_top_k','-')}/"
+                f"{probes['v9_reference_retrieval'].get('applicable','-')}  "
+                f"headroom {probes['v9_reference_retrieval'].get('headroom_over_lexical_retrieval')}",
                 flush=True)
     finally:
         with _cache_lock:

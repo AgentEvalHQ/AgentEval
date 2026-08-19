@@ -39,8 +39,8 @@ def _display(vertical: str) -> str:
     return DISPLAY.get(vertical, vertical.title())
 
 PROBE_HEADER = (
-    "| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | Interference cost |\n"
-    "|---|---|---|---|---|---|---|---|"
+    "| Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |\n"
+    "|---|---|---|---|---|---|---|---|---|"
 )
 COVERAGE_HEADER = (
     "| Vertical | n | Mean realised coverage | `G` distribution |\n"
@@ -58,6 +58,17 @@ def _cell(record: dict, passed: str = "passed", total: str = "applicable") -> st
     if not record or not record.get(total):
         return "—"
     return f"{record.get(passed, '—')}/{record[total]}"
+
+
+def _headroom_cell(record: dict | None) -> str:
+    """V1 - V9: what a better retriever can buy over a lexical baseline.
+
+    This replaced the interference cost in the published table because the interference cost was
+    being read as a headroom number and is not one. See the guide's own note.
+    """
+    if not record or record.get("headroom_over_lexical_retrieval") is None:
+        return "—"
+    return f"{record['headroom_over_lexical_retrieval']:+.2f}"
 
 
 def _interference_cell(record: dict | None) -> str:
@@ -125,7 +136,8 @@ def build_tables() -> tuple[str, str]:
             f"| {_cell(probes.get('v3_gold_ablated'))} "
             f"| {_cell(probes.get('v6_leave_one_out'))} "
             f"| {_cell(probes.get('v8_full_haystack'), passed='v8_passed')} "
-            f"| {_interference_cell(probes.get('v8_full_haystack'))} |")
+            f"| {_cell(probes.get('v9_reference_retrieval'), passed='v9_bm25_top_k')} "
+            f"| {_headroom_cell(probes.get('v9_reference_retrieval'))} |")
 
         distribution = ", ".join(
             f"{g} (×{n})" for g, n in sorted(metadata["structure"]["g_distribution"].items(),

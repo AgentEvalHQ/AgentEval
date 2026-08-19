@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **RETRACTED: "four of five verticals cannot measure retrieval quality".** That claim shipped in the
+  guide and it was wrong. `V8` puts the **entire haystack** in context, so `V1 − V8 ≈ 0` says only
+  that distractors do not confuse a reader who already has everything — it says nothing about whether
+  *selecting* the right sessions matters, and a real system selects rather than dumps. The consuming
+  project surfaced it: their pipeline reads 0.21 on Arithmetic against our 0.82, and both numbers are
+  right about different things.
+
 ### Added
+
+- **V9 — accuracy under a k-limited reference retrieval**, the arm that was missing. Model sees the
+  top-`K_ref` sessions from the same plain BM25 retriever the calibration gate uses.
+
+  | Vertical | V1 gold-only | V8 whole haystack | V9 BM25 top-K | **headroom (V1 − V9)** |
+  |---|---|---|---|---|
+  | Arithmetic | 0.94 | 0.84 | 0.32 | **+0.62** |
+  | Forgetting | 1.00 | 1.00 | 0.57 | +0.43 |
+  | Episodic | 0.96 | 1.00 | 0.60 | +0.36 |
+  | Prospective | 0.98 | 0.96 | 0.68 | +0.30 |
+  | Bitemporal | 1.00 | 0.98 | 0.80 | +0.20 |
+  | Temporal | 1.00 | 1.00 | 0.82 | +0.18 |
+  | WorkingMemory | 1.00 | 1.00 | 0.88 | +0.12 |
+
+  **Every vertical has substantial retrieval headroom.** `V1 − V9` is the headroom number and is what
+  the guide publishes now; `V1 − V8` keeps its narrow reading as an interference cost. Our V1 of 0.94
+  on Arithmetic matches the consuming project's independently measured 94% gold-only oracle, and
+  their 0.21 pipeline sits in the same regime as our 0.32 lexical baseline — the instruments agree
+  once they measure the same thing.
+
 
 - **TypedMemEval-Temporal (ADR-027 §3.2)** — 50 questions on the order events *occurred*, against the
   order they were *mentioned*.

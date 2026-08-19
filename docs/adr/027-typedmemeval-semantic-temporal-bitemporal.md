@@ -320,6 +320,43 @@ produce the same answers. Two consequences, and neither is comfortable:
    not. Worth stating because ADR-026 describes V1 as "the ceiling", and on at least one vertical it
    is not one.
 
+### 6.1a CORRECTION — V1 − V8 is not a headroom number, and reading it as one was wrong
+
+**Retracted 2026-08-20**, on the consuming project's challenge and our own re-measurement.
+
+§6.1 concluded that four of five verticals "cannot measure retrieval quality" and that an
+adaptive-router feature therefore had a defensible no-ship. **That conclusion was wrong**, and the
+error is precise: `V8` puts the **entire haystack** in context — no `k` limit, no selection. So
+`V1 − V8 ≈ 0` says *distractors do not confuse a reader who already has everything*. It says nothing
+about whether **selecting** the right sessions matters, and a real system never dumps the haystack
+in — it selects `k`, and selecting badly is far worse than either arm.
+
+The consuming project surfaced it as an apparent contradiction: their full pipeline reads 0.20–0.22
+on Arithmetic against our 0.82. Both numbers are right and they measure different things.
+
+**V9 — accuracy under a k-limited reference retrieval** (the top-`K_ref` sessions from the same plain
+BM25 retriever the calibration gate uses) is the arm that was missing:
+
+| Vertical | V1 gold-only | V8 whole haystack | **V9 BM25 top-K** | **V1 − V9 headroom** |
+|---|---|---|---|---|
+| Arithmetic | 0.94 | 0.84 | **0.32** | **+0.62** |
+| Forgetting | 1.00 | 1.00 | 0.57 | +0.43 |
+| Episodic | 0.96 | 1.00 | 0.60 | +0.36 |
+| Prospective | 0.98 | 0.96 | 0.68 | +0.30 |
+| Bitemporal | 1.00 | 0.98 | 0.80 | +0.20 |
+| Temporal | 1.00 | 1.00 | 0.82 | +0.18 |
+| WorkingMemory | 1.00 | 1.00 | 0.88 | +0.12 |
+
+**Every vertical has substantial retrieval headroom, from 0.12 to 0.62.** Our V1 of 0.94 on
+Arithmetic matches their independently measured 94% gold-only oracle exactly, and their 0.21 pipeline
+sits in the same regime as our 0.32 lexical baseline — so the two instruments agree once they are
+measuring the same thing.
+
+**What this cost and what it teaches.** A no-ship recommendation on an L-sized feature, issued from a
+metric that did not measure the quantity the decision needed. The metric was fine; the inference was
+not. `V1 − V9` is the headroom number and is now what the guide publishes; `V1 − V8` remains stamped
+as the interference cost it always was, with its own narrow reading.
+
 ### 6.2 V8 cannot carry band validation, and on Arithmetic it inverts the labels
 
 §6's proposal was that V8 replace the retriever half of band validation. **Measured, it cannot** —
