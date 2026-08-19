@@ -321,6 +321,20 @@ _NEGATIVE_GOLD = re.compile(
     re.IGNORECASE)
 
 
+#: Shapes whose answer is one of a NAMED, closed set small enough that guessing beats the probe.
+#:
+#: An ablation probe cannot tell "reached the evidence" from "flipped a coin" when the question hands
+#: the model the candidates. Temporal's `occurrence-order` names two events and asks which came
+#: first, so a model with the gold removed is right half the time by construction -- and it measured
+#: 6 leaks in 20, BELOW the 50% chance rate, which is the signature of guessing rather than of a
+#: leak. Reporting those as leaks would assert something this probe cannot see.
+#:
+#: The precedent is ADR-026's: Forgetting's two-way shape is bounded by V2 (ten zero-context samples)
+#: rather than by V3, for exactly this reason. Scoped by SHAPE rather than by vertical, because it is
+#: a property of the question form and the next vertical with a two-way shape will inherit it.
+_V3_GUESSABLE_SHAPES = {"occurrence-order"}
+
+
 def _v3_decidable(gold: str, already_known: str) -> bool:
     """Whether an ablation probe can tell "reached the answer" from "said nothing" for this gold.
 
@@ -436,7 +450,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # with no evidence saying it has no record, and reporting that as a leak would assert something
     # this probe cannot see. Recorded as not-applicable, exactly as V1 and V2 are on a never-known
     # probe.
-    decidable = _v3_decidable(gold, f"{question} {date}")
+    decidable = (_v3_decidable(gold, f"{question} {date}")
+                 and (entry.get("typedmemeval") or {}).get("shape") not in _V3_GUESSABLE_SHAPES)
     if non_gold and golds and decidable:
         leaked = False
         for k in range(ABLATION_SAMPLES):
@@ -581,6 +596,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "not_decidable": sorted(
                 r["question_id"] for r in records
                 if r.get("v3") is None and r.get("v1") is not None),
+            "not_decidable_for_guessable_shapes": sorted(_V3_GUESSABLE_SHAPES),
             "not_decidable_reason": (
                 "gold carries no content the prompt did not already supply, so a no-evidence answer "
                 "and a correct one are indistinguishable to this probe"

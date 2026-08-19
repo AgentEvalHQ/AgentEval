@@ -39,7 +39,15 @@ public enum TypedMemEvalVertical
     /// one clock cannot represent the difference — so its ceiling here is structural rather than a
     /// matter of retrieval quality (ADR-027 §3.3).
     /// </summary>
-    Bitemporal = 5
+    Bitemporal = 5,
+
+    /// <summary>
+    /// The order events OCCURRED, against the order they were mentioned. Sessions narrate
+    /// retrospectively and anchor each event to another by a stated relation, so the timestamps
+    /// record when a thing was said rather than when it happened — a system that sorts by date is
+    /// answering a different question (ADR-027 §3.2).
+    /// </summary>
+    Temporal = 6
 }
 
 /// <summary>What the harness needs to know about one vertical before it runs.</summary>
@@ -171,6 +179,19 @@ public static class TypedMemEvalVerticals
             // Timestamps are the vertical's subject, not its scaffolding: the transaction-time arm
             // asks what the record showed at a named instant, and answering that requires knowing
             // when each session was recorded. A run without them is not harder, it is ill-posed.
+            RequiredGrounding = TemporalGroundingMode.TimestampsOnly,
+            RequiresTimestamps = true
+        },
+        [TypedMemEvalVertical.Temporal] = new()
+        {
+            Vertical = TypedMemEvalVertical.Temporal,
+            Slug = "temporal",
+            Abbreviation = "tem",
+            DisplayName = "TypedMemEval-Temporal",
+            QuestionCount = 50,
+            // Timestamps are deliberately MISLEADING here rather than absent: they record when an
+            // event was mentioned, never when it happened. They are supplied because withholding
+            // them would remove the trap the vertical is built around.
             RequiredGrounding = TemporalGroundingMode.TimestampsOnly,
             RequiresTimestamps = true
         }

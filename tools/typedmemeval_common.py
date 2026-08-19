@@ -115,6 +115,8 @@ VERTICALS = {
     "forgetting":   ("for",  50),
     # ADR-027 SS3.3. 30 pairs, two clocks each.
     "bitemporal":   ("bit",  60),
+    # ADR-027 SS3.2. Occurrence order against narration order.
+    "temporal":     ("tem",  50),
 }
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "src" / "AgentEval.Memory" / "Data" / "typedmemeval"

@@ -122,6 +122,42 @@ stated relations rather than read off the index.
 occurrence position, plus the length of the relation chain needed to order them. A reasoning dial by
 construction.
 
+**BUILT AND MEASURED, 2026-08-19.** 50 questions, corpus `agenteval-typedmemeval-temporal-v5`
+(`a6c10b3dfe8c`), BM25 coverage 0.900.
+
+| Probe | Result |
+|---|---|
+| V1 oracle answerability | **50/50** |
+| V2 non-inferability | 49/50 |
+| V3 gold-ablated | **30/30** (scoped — see below) |
+| V8 full-haystack | 50/50 — interference cost 0.00 |
+
+**Every question's narration order contradicts its occurrence order** — zero questions are answerable
+by sorting session dates, enforced by a generator check rather than asserted. **No answer contains a
+digit**, which is the Arithmetic boundary made mechanical.
+
+**V3 is scoped away from `occurrence-order`, and the number says why.** That shape names two events
+and asks which came first, so an ablated model is right half the time by construction. It measured
+**6 leaks in 20 — below the 50% chance rate**, which is the signature of guessing rather than of a
+leak, and reporting it as a leak would assert something the probe cannot see. All 6 leaks and the
+single V2 failure were that one shape; `interval-position` and `recency` are perfect. This follows
+ADR-026's own precedent for Forgetting's two-way shape, and is scoped by SHAPE rather than by
+vertical so the next two-way shape inherits it.
+
+**Gold is necessary AND sufficient per shape**, which pulls against itself: too few chain links and
+the question is not answerable from its own gold (V1 fails, and the corpus measures willingness to
+guess); too many and ablating one leaves the rest (V3 passes on redundant evidence). Each shape is
+therefore scoped to a window it can close alone — `occurrence-order` on two adjacent events (G=1),
+the other two on a three-event window (G=2).
+
+**A check of ours that was wrong at the corpus's expense.** The word-order guard flagged every
+question whose answer happened to be named first, refusing a third of the corpus for behaving as
+designed — the pair is shuffled, so naming the answer first is correct half the time. It measures a
+corpus-wide bias now. Its replacement then read **0%**, which is impossible for a shuffled pair and
+is therefore the tell that the *check* was broken, not the corpus: the answer is sentence-cased and
+the question is not, so a literal comparison never matched. An extreme value from a process that
+cannot produce one is worth more than a plausible value from a process that can.
+
 **Boundary vs Arithmetic.** Arithmetic computes a value from numbers — sums, counts, durations.
 Temporal orders events, and **no Temporal answer may be a number requiring addition**. That rule is
 mechanical enough to enforce in a generator check rather than a review. "How long between" therefore

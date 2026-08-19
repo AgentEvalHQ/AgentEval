@@ -1,6 +1,6 @@
 {
-  "corpus_id": "agenteval-typedmemeval-episodic-v5",
-  "vertical": "episodic",
+  "corpus_id": "agenteval-typedmemeval-temporal-v5",
+  "vertical": "temporal",
   "revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -8,9 +8,9 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "2c6000a6912e5ef0464e01d93072c4c02f112b470f664b1381f6b5309a630303",
+  "corpus_sha256": "a6c10b3dfe8c2a16b54fb8a7b4c3acb8f3537fb7f9d9a6f4feb35af4ff82017e",
   "generator": {
-    "tool": "tools/gen_typedmemeval_episodic.py",
+    "tool": "tools/gen_typedmemeval_temporal.py",
     "version": "1.0.0",
     "seed": 20260815
   },
@@ -19,100 +19,94 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6824,
+    "mean_realised": 0.9,
     "echo": 0.5,
     "iterations": 2,
     "search_trace": [
       [
         1.0,
-        0.2762
+        0.0
       ],
       [
         0.5,
-        0.6824
+        0.9
       ]
     ],
     "per_question": {
-      "tme-epi-001": 1.0,
-      "tme-epi-002": 1.0,
-      "tme-epi-003": 0.0,
-      "tme-epi-004": 1.0,
-      "tme-epi-005": 1.0,
-      "tme-epi-006": 0.0,
-      "tme-epi-007": 0.0,
-      "tme-epi-008": 1.0,
-      "tme-epi-009": 1.0,
-      "tme-epi-010": 0.0,
-      "tme-epi-011": 1.0,
-      "tme-epi-012": 1.0,
-      "tme-epi-013": 1.0,
-      "tme-epi-014": 1.0,
-      "tme-epi-015": 1.0,
-      "tme-epi-016": 1.0,
-      "tme-epi-017": 1.0,
-      "tme-epi-018": 1.0,
-      "tme-epi-019": 1.0,
-      "tme-epi-020": 1.0,
-      "tme-epi-021": 0.4,
-      "tme-epi-022": 0.0,
-      "tme-epi-023": 0.0,
-      "tme-epi-024": 0.5,
-      "tme-epi-025": 0.1429,
-      "tme-epi-026": 0.1429,
-      "tme-epi-027": 0.75,
-      "tme-epi-028": 0.3333,
-      "tme-epi-029": 0.4,
-      "tme-epi-030": 0.2,
-      "tme-epi-031": 0.0,
-      "tme-epi-032": 0.0,
-      "tme-epi-033": 0.5,
-      "tme-epi-034": 0.25,
-      "tme-epi-035": 0.5,
-      "tme-epi-036": 1.0,
-      "tme-epi-037": 1.0,
-      "tme-epi-038": 1.0,
-      "tme-epi-039": 1.0,
-      "tme-epi-040": 1.0,
-      "tme-epi-041": 1.0,
-      "tme-epi-042": 1.0,
-      "tme-epi-043": 1.0,
-      "tme-epi-044": 1.0,
-      "tme-epi-045": 1.0,
-      "tme-epi-046": 1.0,
-      "tme-epi-047": 1.0,
-      "tme-epi-048": 1.0,
-      "tme-epi-049": 0.0,
-      "tme-epi-050": 1.0
+      "tme-tem-001": 1.0,
+      "tme-tem-002": 1.0,
+      "tme-tem-003": 1.0,
+      "tme-tem-004": 1.0,
+      "tme-tem-005": 1.0,
+      "tme-tem-006": 1.0,
+      "tme-tem-007": 1.0,
+      "tme-tem-008": 1.0,
+      "tme-tem-009": 1.0,
+      "tme-tem-010": 1.0,
+      "tme-tem-011": 1.0,
+      "tme-tem-012": 1.0,
+      "tme-tem-013": 1.0,
+      "tme-tem-014": 0.0,
+      "tme-tem-015": 1.0,
+      "tme-tem-016": 1.0,
+      "tme-tem-017": 1.0,
+      "tme-tem-018": 1.0,
+      "tme-tem-019": 1.0,
+      "tme-tem-020": 1.0,
+      "tme-tem-021": 0.5,
+      "tme-tem-022": 1.0,
+      "tme-tem-023": 0.5,
+      "tme-tem-024": 1.0,
+      "tme-tem-025": 1.0,
+      "tme-tem-026": 1.0,
+      "tme-tem-027": 0.5,
+      "tme-tem-028": 1.0,
+      "tme-tem-029": 0.5,
+      "tme-tem-030": 0.5,
+      "tme-tem-031": 1.0,
+      "tme-tem-032": 0.5,
+      "tme-tem-033": 0.5,
+      "tme-tem-034": 1.0,
+      "tme-tem-035": 0.5,
+      "tme-tem-036": 1.0,
+      "tme-tem-037": 1.0,
+      "tme-tem-038": 1.0,
+      "tme-tem-039": 1.0,
+      "tme-tem-040": 1.0,
+      "tme-tem-041": 1.0,
+      "tme-tem-042": 1.0,
+      "tme-tem-043": 1.0,
+      "tme-tem-044": 1.0,
+      "tme-tem-045": 1.0,
+      "tme-tem-046": 1.0,
+      "tme-tem-047": 1.0,
+      "tme-tem-048": 1.0,
+      "tme-tem-049": 1.0,
+      "tme-tem-050": 1.0
     }
   },
   "ceiling": {
     "k_ref": 5,
     "by_g": {
       "1": 1.0,
-      "4": 1.0,
-      "5": 1.0,
-      "6": 0.8333,
-      "7": 0.7143
+      "2": 1.0
     },
-    "min": 0.7143,
-    "structural_below_one": true
+    "min": 1.0,
+    "structural_below_one": false
   },
   "structure": {
     "g_distribution": {
-      "1": 35,
-      "4": 5,
-      "5": 4,
-      "6": 4,
-      "7": 2
+      "1": 20,
+      "2": 30
     },
-    "h_min": 15,
-    "h_max": 25,
+    "h_min": 14,
+    "h_max": 24,
     "gold_position_shuffled": true,
     "h_is_independent_variable": false,
-    "no_absolute_dates": false,
+    "no_absolute_dates": true,
     "empty_turns": {
-      "count": 259,
-      "of_turns": 5510,
+      "count": 212,
+      "of_turns": 5255,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     }
@@ -175,40 +169,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5363,
+        "session_length_chars": 0.5317,
         "turn_count": 0.5,
-        "position_in_haystack": 0.542,
-        "digit_density": 0.5776,
-        "uppercase_density": 0.513,
-        "sentence_count": 0.5124,
-        "punctuation_density": 0.5402,
-        "em_dash_density": 0.5126,
-        "mean_turn_chars": 0.5363,
-        "type_token_ratio": 0.5223,
-        "first_user_length_chars": 0.6041,
-        "first_user_uppercase_density": 0.5276,
-        "first_user_sentence_count": 0.5208,
-        "first_assistant_length_chars": 0.5201,
-        "first_assistant_uppercase_density": 0.5285,
-        "first_assistant_sentence_count": 0.5584,
-        "user_slot1_length_chars": 0.5106,
+        "position_in_haystack": 0.5042,
+        "digit_density": 0.5,
+        "uppercase_density": 0.5104,
+        "sentence_count": 0.544,
+        "punctuation_density": 0.5265,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.5317,
+        "type_token_ratio": 0.5291,
+        "first_user_length_chars": 0.5291,
+        "first_user_uppercase_density": 0.5149,
+        "first_user_sentence_count": 0.5838,
+        "first_assistant_length_chars": 0.5812,
+        "first_assistant_uppercase_density": 0.5045,
+        "first_assistant_sentence_count": 0.5146,
+        "user_slot1_length_chars": 0.5207,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5022,
-        "assistant_slot2_length_chars": 0.5013,
+        "assistant_slot1_length_chars": 0.5583,
+        "assistant_slot2_length_chars": 0.5333,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5681,
-        "user_uppercase_density": 0.5405,
-        "user_sentence_count": 0.5232,
-        "user_punctuation_density": 0.6558,
-        "user_type_token_ratio": 0.5413,
-        "user_mean_turn_chars": 0.5681,
-        "assistant_length_chars": 0.5206,
-        "assistant_uppercase_density": 0.5199,
-        "assistant_sentence_count": 0.5009,
-        "assistant_punctuation_density": 0.6821,
-        "assistant_type_token_ratio": 0.5526,
-        "assistant_mean_turn_chars": 0.5206,
+        "user_length_chars": 0.5382,
+        "user_uppercase_density": 0.5657,
+        "user_sentence_count": 0.5667,
+        "user_punctuation_density": 0.5369,
+        "user_type_token_ratio": 0.5343,
+        "user_mean_turn_chars": 0.5382,
+        "assistant_length_chars": 0.5117,
+        "assistant_uppercase_density": 0.5359,
+        "assistant_sentence_count": 0.5084,
+        "assistant_punctuation_density": 0.5113,
+        "assistant_type_token_ratio": 0.5314,
+        "assistant_mean_turn_chars": 0.5117,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -218,339 +212,336 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6802,
-        "boilerplate_ngram": 0.7206
+        "gold_marker_ngram": 0.6123,
+        "boilerplate_ngram": 0.5968
       },
-      "worst_refused_feature": "boilerplate_ngram",
-      "worst_refused_auc": 0.7206,
+      "worst_refused_feature": "gold_marker_ngram",
+      "worst_refused_auc": 0.6123,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "on the",
-      "gold_marker_ngram_auc": 0.6802,
-      "worst_boilerplate_ngram": "one",
-      "boilerplate_ngram_auc": 0.7206,
+      "worst_gold_marker_ngram": "the kessel",
+      "gold_marker_ngram_auc": 0.6123,
+      "worst_boilerplate_ngram": "ruskin resurfacing",
+      "boilerplate_ngram_auc": 0.5968,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
           "share": 0.06,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "expected": 2.25,
+          "z": 0.52
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_in_haystack": {
-          "share": 0.04,
-          "chance": 0.0696,
-          "observed": 2,
-          "expected": 3.48,
-          "z": -0.84
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "digit_density": {
-          "share": 0.08,
-          "chance": 0.0696,
-          "observed": 4,
-          "expected": 3.48,
-          "z": 0.29
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "uppercase_density": {
-          "share": 0.06,
-          "chance": 0.0696,
-          "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "share": 0.12,
+          "chance": 0.0451,
+          "observed": 6,
+          "expected": 2.25,
+          "z": 2.61
         },
         "sentence_count": {
           "share": 0.02,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "expected": 2.25,
+          "z": -0.87
         },
         "punctuation_density": {
           "share": 0.08,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 4,
-          "expected": 3.48,
-          "z": 0.29
+          "expected": 2.25,
+          "z": 1.22
         },
         "em_dash_density": {
-          "share": 0.06,
-          "chance": 0.0696,
-          "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "mean_turn_chars": {
           "share": 0.06,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "expected": 2.25,
+          "z": 0.52
         },
         "type_token_ratio": {
-          "share": 0.08,
-          "chance": 0.0696,
-          "observed": 4,
-          "expected": 3.48,
-          "z": 0.29
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "first_user_length_chars": {
-          "share": 0.02,
-          "chance": 0.0696,
-          "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "share": 0.04,
+          "chance": 0.0451,
+          "observed": 2,
+          "expected": 2.25,
+          "z": -0.18
         },
         "first_user_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0696,
-          "observed": 2,
-          "expected": 3.48,
-          "z": -0.84
+          "share": 0.06,
+          "chance": 0.0451,
+          "observed": 3,
+          "expected": 2.25,
+          "z": 0.52
         },
         "first_user_sentence_count": {
           "share": 0.02,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "expected": 2.25,
+          "z": -0.87
         },
         "first_assistant_length_chars": {
-          "share": 0.16,
-          "chance": 0.0696,
-          "observed": 8,
-          "expected": 3.48,
-          "z": 2.56
+          "share": 0.08,
+          "chance": 0.0451,
+          "observed": 4,
+          "expected": 2.25,
+          "z": 1.22
         },
         "first_assistant_uppercase_density": {
-          "share": 0.1,
-          "chance": 0.0696,
-          "observed": 5,
-          "expected": 3.48,
-          "z": 0.86
+          "share": 0.08,
+          "chance": 0.0451,
+          "observed": 4,
+          "expected": 2.25,
+          "z": 1.22
         },
         "first_assistant_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0696,
-          "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "share": 0.02,
+          "chance": 0.0451,
+          "observed": 1,
+          "expected": 2.25,
+          "z": -0.87
         },
         "user_slot1_length_chars": {
-          "share": 0.04,
-          "chance": 0.0696,
-          "observed": 2,
-          "expected": 3.48,
-          "z": -0.84
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "assistant_slot1_length_chars": {
           "share": 0.02,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "expected": 2.25,
+          "z": -0.87
         },
         "assistant_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "user_length_chars": {
-          "share": 0.06,
-          "chance": 0.0696,
-          "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "share": 0.04,
+          "chance": 0.0451,
+          "observed": 2,
+          "expected": 2.25,
+          "z": -0.18
         },
         "user_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0696,
-          "observed": 2,
-          "expected": 3.48,
-          "z": -0.84
+          "share": 0.02,
+          "chance": 0.0451,
+          "observed": 1,
+          "expected": 2.25,
+          "z": -0.87
         },
         "user_sentence_count": {
-          "share": 0.02,
-          "chance": 0.0696,
-          "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "user_punctuation_density": {
-          "share": 0.02,
-          "chance": 0.0696,
-          "observed": 1,
-          "expected": 3.48,
-          "z": -1.4
+          "share": 0.06,
+          "chance": 0.0451,
+          "observed": 3,
+          "expected": 2.25,
+          "z": 0.52
         },
         "user_type_token_ratio": {
-          "share": 0.06,
-          "chance": 0.0696,
-          "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "share": 0.04,
+          "chance": 0.0451,
+          "observed": 2,
+          "expected": 2.25,
+          "z": -0.18
         },
         "user_mean_turn_chars": {
-          "share": 0.06,
-          "chance": 0.0696,
-          "observed": 3,
-          "expected": 3.48,
-          "z": -0.27
+          "share": 0.04,
+          "chance": 0.0451,
+          "observed": 2,
+          "expected": 2.25,
+          "z": -0.18
         },
         "assistant_length_chars": {
-          "share": 0.12,
-          "chance": 0.0696,
-          "observed": 6,
-          "expected": 3.48,
-          "z": 1.42
+          "share": 0.08,
+          "chance": 0.0451,
+          "observed": 4,
+          "expected": 2.25,
+          "z": 1.22
         },
         "assistant_uppercase_density": {
           "share": 0.1,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 5,
-          "expected": 3.48,
-          "z": 0.86
+          "expected": 2.25,
+          "z": 1.92
         },
         "assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "assistant_punctuation_density": {
-          "share": 0.1,
-          "chance": 0.0696,
-          "observed": 5,
-          "expected": 3.48,
-          "z": 0.86
+          "share": 0.08,
+          "chance": 0.0451,
+          "observed": 4,
+          "expected": 2.25,
+          "z": 1.22
         },
         "assistant_type_token_ratio": {
-          "share": 0.14,
-          "chance": 0.0696,
-          "observed": 7,
-          "expected": 3.48,
-          "z": 1.99
+          "share": 0.0,
+          "chance": 0.0451,
+          "observed": 0,
+          "expected": 2.25,
+          "z": -1.57
         },
         "assistant_mean_turn_chars": {
-          "share": 0.12,
-          "chance": 0.0696,
-          "observed": 6,
-          "expected": 3.48,
-          "z": 1.42
+          "share": 0.08,
+          "chance": 0.0451,
+          "observed": 4,
+          "expected": 2.25,
+          "z": 1.22
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0696,
+          "chance": 0.0451,
           "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "expected": 2.25,
+          "z": -1.57
         },
         "gold_marker_ngram": {
-          "share": 0.0,
-          "chance": 0.0696,
-          "observed": 0,
-          "expected": 3.48,
-          "z": -1.97
+          "share": 0.16,
+          "chance": 0.0451,
+          "observed": 8,
+          "expected": 2.25,
+          "z": 4.01
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-19T06:22:42Z",
-      "probed_corpus_sha256": "2c6000a6912e5ef0464e01d93072c4c02f112b470f664b1381f6b5309a630303"
+      "measured_at": "2026-08-19T06:22:49Z",
+      "probed_corpus_sha256": "a6c10b3dfe8c2a16b54fb8a7b4c3acb8f3537fb7f9d9a6f4feb35af4ff82017e"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-18T19:58:11Z",
+    "run_at": "2026-08-19T06:22:27Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 48,
-      "failed": [
-        "tme-epi-043",
-        "tme-epi-047"
-      ]
+      "passed": 50,
+      "failed": []
     },
     "v1_pair_flip": {
       "pairs": 0,
@@ -563,14 +554,40 @@
       "reject_at_hits": 2,
       "temperature": "provider default",
       "applicable": 50,
-      "passed": 50,
-      "failed": []
+      "passed": 49,
+      "failed": [
+        "tme-tem-006"
+      ]
     },
     "v3_gold_ablated": {
-      "applicable": 50,
-      "passed": 50,
+      "applicable": 30,
+      "passed": 30,
       "failed": [],
-      "not_decidable": [],
+      "not_decidable": [
+        "tme-tem-001",
+        "tme-tem-002",
+        "tme-tem-003",
+        "tme-tem-004",
+        "tme-tem-005",
+        "tme-tem-006",
+        "tme-tem-007",
+        "tme-tem-008",
+        "tme-tem-009",
+        "tme-tem-010",
+        "tme-tem-011",
+        "tme-tem-012",
+        "tme-tem-013",
+        "tme-tem-014",
+        "tme-tem-015",
+        "tme-tem-016",
+        "tme-tem-017",
+        "tme-tem-018",
+        "tme-tem-019",
+        "tme-tem-020"
+      ],
+      "not_decidable_for_guessable_shapes": [
+        "occurrence-order"
+      ],
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
@@ -578,526 +595,514 @@
       "passed": 0,
       "failed": [],
       "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
-      "not_applicable_reason": "V6 is not defined for episodic"
+      "not_applicable_reason": "V6 is not defined for temporal"
+    },
+    "v8_full_haystack": {
+      "applicable": 50,
+      "v1_passed": 50,
+      "v8_passed": 50,
+      "interference_cost": 0.0,
+      "regressed_under_interference": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
     },
     "by_shape": {
-      "assistant-stated": {
-        "questions": 20,
-        "v1_applicable": 20,
-        "v1_passed": 20,
-        "v3_applicable": 20,
-        "v3_passed": 20
-      },
-      "list-order": {
+      "interval-position": {
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 15,
         "v3_applicable": 15,
         "v3_passed": 15
       },
-      "participant-attribution": {
+      "occurrence-order": {
+        "questions": 20,
+        "v1_applicable": 20,
+        "v1_passed": 20,
+        "v3_applicable": 0,
+        "v3_passed": 0
+      },
+      "recency": {
         "questions": 15,
         "v1_applicable": 15,
-        "v1_passed": 13,
+        "v1_passed": 15,
         "v3_applicable": 15,
         "v3_passed": 15
       }
     },
     "per_question": {
-      "tme-epi-001": {
+      "tme-tem-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "FQ-912",
+        "v8_answer": "The Bellamy rewiring came first, before the Harrow survey.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-002": {
+      "tme-tem-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The loft insulation quote goes through Ardfoot.",
+        "v8_answer": "The Harrow survey came first; the Calder relining came later.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-003": {
+      "tme-tem-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The skip hire booking was being held at the **Halstow yard**.",
+        "v8_answer": "The Kessel handover came first; the Ondrey audit followed it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-004": {
+      "tme-tem-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brayrel handles the stair carpet order.",
+        "v8_answer": "The Bellamy rewiring came first; the Wrenfield sign-off happened after it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-005": {
+      "tme-tem-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "CN-380",
+        "v8_answer": "The Traymoor fit-out came first; the Esker retrofit came after it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-006": {
+      "tme-tem-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The boiler flue check is being held at the **Marstow yard**.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v8_answer": "The Yarrow move came first; the Fenn commissioning came after it.",
+        "v2_hits": 5,
+        "v2": false,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-007": {
+      "tme-tem-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Halfoot.",
+        "v8_answer": "The Harrow survey came first.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-008": {
+      "tme-tem-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "WM-717",
+        "v8_answer": "The Dunmow changeover came first; the Bellamy rewiring came later.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-009": {
+      "tme-tem-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Calrel.",
+        "v8_answer": "The Kessel handover came first.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-010": {
+      "tme-tem-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The greenhouse glass order is being held at the Quinway yard.",
+        "v8_answer": "The Calder relining came first, before the Ondrey audit.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-011": {
+      "tme-tem-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "CG-963",
+        "v8_answer": "The Traymoor fit-out came first, before the Harrow survey.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-012": {
+      "tme-tem-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brayholt handles the kayak trailer hire, going by the file.",
+        "v8_answer": "The Yarrow move came first; the Wrenfield sign-off came later.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-013": {
+      "tme-tem-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "DH-438.",
+        "v8_answer": "The Bellamy rewiring came first; the Kessel handover happened after it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-014": {
+      "tme-tem-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The woodstore delivery sits in bay **BC-170**.",
+        "v8_answer": "The Fenn commissioning came first; the Traymoor fit-out happened after it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-015": {
+      "tme-tem-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "MV-470",
+        "v8_answer": "The Fenn commissioning came first, then the Yarrow move.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-016": {
+      "tme-tem-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "HW-842",
+        "v8_answer": "The Bellamy rewiring came first, before the Kessel handover.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-017": {
+      "tme-tem-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "JV-283.",
+        "v8_answer": "The Fenn commissioning came first, before the Kessel handover.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-018": {
+      "tme-tem-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Torlick yard.",
+        "v8_answer": "The Vance inspection came first, before the Ondrey audit.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-019": {
+      "tme-tem-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The drain survey sits in bay **CQ-151**.",
+        "v8_answer": "The Ondrey audit came first, before the Calder relining.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-020": {
+      "tme-tem-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "DB-133",
+        "v8_answer": "The Yarrow move came first; the Harrow survey came after it.",
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
-      "tme-epi-021": {
+      "tme-tem-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Dunholt → Rushfoot → Nadmore → Ferfoot → Velmore",
+        "v8_answer": "The Dunmow changeover happened in between: it came after the Fenn commissioning and before the Vance inspection.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-022": {
+      "tme-tem-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Torhow  \n2. Calcombe  \n3. Quinrel  \n4. Halcombe  \n5. Velholt  \n6. Torholt",
+        "v8_answer": "The Traymoor fit-out happened in between: the Esker retrofit came before the Traymoor fit-out, and the Traymoor fit-out came before the Dunmow changeover.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-023": {
+      "tme-tem-023": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Brayholt — 2026/01/06  \n2. Hestlick — 2026/01/09  \n3. Glenridge — 2026/01/10  \n4. Ferrel — 2026/01/14  \n5. Penrel — 2026/01/15  \n6. Fercombe — 2026/02/01",
+        "v8_answer": "The Yarrow move happened in between: the Yarrow move came after the Dunmow changeover and before the Vance inspection.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-024": {
+      "tme-tem-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Halholt — 2026/01/05  \n2. Velfoot — 2026/01/11  \n3. Halway — 2026/01/20  \n4. Rushmore — 2026/01/29  \n5. Dunstow — 2026/02/05  \n6. Ottlick — 2026/02/11",
+        "v8_answer": "The Fenn commissioning happened in between: the Yarrow move came first, then the Fenn commissioning, then the Traymoor fit-out.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-025": {
+      "tme-tem-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Velcombe — 2026/01/09  \n2. Marholt — 2026/01/10  \n3. Halholt — 2026/01/20  \n4. Calmore — 2026/01/29  \n5. Rushridge — 2026/02/01  \n6. Rushcombe — 2026/02/06  \n7. Nadridge — 2026/02/10",
+        "v8_answer": "The Kessel handover.\n\nThe notes say the Ondrey audit preceded the Kessel handover, and the Kessel handover was done well ahead of the Yarrow move, so it sits between them.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-026": {
+      "tme-tem-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ferhow → Bramstow → Penrel → Rushstow → Kestmore → Halway → Penway",
+        "v8_answer": "The Dunmow changeover happened in between: it came later than the Kessel handover and before the Esker retrofit.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-027": {
+      "tme-tem-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Hesthow → Hestcombe → Torstow → Glenstow",
+        "v8_answer": "The Harrow survey happened in between: the Yarrow move came before the Harrow survey, and the Harrow survey came before the Bellamy rewiring.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-028": {
+      "tme-tem-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Wexmore — 2026/01/11  \n2. Calholt — 2026/01/15  \n3. Nadridge — 2026/01/19  \n4. Ardcombe — 2026/01/27  \n5. Glencombe — 2026/01/29  \n6. Hestmore — 2026/01/30",
+        "v8_answer": "The Dunmow changeover happened in between.\n\nThe sequence given is: Harrow survey → Dunmow changeover → Vance inspection.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-029": {
+      "tme-tem-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ottrel → Marfoot → Ottlick → Rushstow → Velcombe",
+        "v8_answer": "The Harrow survey happened in between: the records say the Esker retrofit came before the Harrow survey, and the Harrow survey came before the Fenn commissioning.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-030": {
+      "tme-tem-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Braystow → Dunway → Torlick → Hestrel → Kestholt",
+        "v8_answer": "The **Kessel handover** happened in between: the Bellamy rewiring was earlier than the Kessel handover, and the Kessel handover came before the Ondrey audit.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-031": {
+      "tme-tem-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Bramstow → Ferholt → Hestridge → Bramway → Glencombe",
+        "v8_answer": "The Dunmow changeover happened in between: the Vance inspection came first, then the Dunmow changeover, then the Wrenfield sign-off.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-032": {
+      "tme-tem-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Marmore → Penstow → Velstow → Hallick.",
+        "v8_answer": "The Wrenfield sign-off happened in between: the Calder relining came first, then the Wrenfield sign-off, then the Dunmow changeover.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-033": {
+      "tme-tem-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ottridge → Dunridge → Selhow → Sellick",
+        "v8_answer": "The **Ondrey audit** happened in between.\n\nThe sequence given was:\n\n**Esker retrofit → Ondrey audit → Dunmow changeover**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-034": {
+      "tme-tem-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brayholt → Rushcombe → Quinmore → Wexlick.",
+        "v8_answer": "The Dunmow changeover happened in between: the Fenn commissioning came first, then the Dunmow changeover, then the Wrenfield sign-off.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-035": {
+      "tme-tem-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Wexstow → Penstow → Rushhow → Brayholt.",
+        "v8_answer": "The Harrow survey happened in between.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-036": {
+      "tme-tem-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it.",
+        "v8_answer": "The Bellamy rewiring happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-037": {
+      "tme-tem-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me — I said that the bus replacement leaves from the far side of the bridge.",
+        "v8_answer": "The **Calder relining** happened most recently.\n\nThe notes say the **Harrow survey** came before the **Kessel handover**, and the **Kessel handover** came before the **Calder relining**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-038": {
+      "tme-tem-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "That was me.",
+        "v8_answer": "The Vance inspection happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-039": {
+      "tme-tem-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "That was you.",
+        "v8_answer": "The Bellamy rewiring happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-040": {
+      "tme-tem-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — in Session 18 on 2026/01/26.",
+        "v8_answer": "The Bellamy rewiring happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-041": {
+      "tme-tem-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it. In Session 19, your message was: “One thing about the laundrette, the big machines take tokens rather than coins.”",
+        "v8_answer": "The Wrenfield sign-off happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-042": {
+      "tme-tem-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "I said it. In Session 14, the assistant said: “Worth remembering about the canal gate: it gets locked from the far side.”",
+        "v8_answer": "The **Kessel handover** happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-043": {
-        "v1": false,
-        "v8": true,
-        "v8_answer": "That was me — I said: “About the loft hatch — it sticks unless you lift before you push.”",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-epi-044": {
+      "tme-tem-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — in Session 3 on 2026/01/07.",
+        "v8_answer": "The **Harrow survey** happened most recently.\n\nOrder from the notes: **Ondrey audit → Yarrow move → Harrow survey**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-045": {
+      "tme-tem-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it.",
+        "v8_answer": "The Yarrow move happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-046": {
+      "tme-tem-045": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — the assistant did.",
+        "v8_answer": "The **Vance inspection** happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-047": {
-        "v1": false,
-        "v8": true,
-        "v8_answer": "It was me — I said that in Session 4, on 2026/01/09.",
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-epi-048": {
+      "tme-tem-046": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it.",
+        "v8_answer": "The **Vance inspection** happened most recently.\n\nThe conversations establish:\n\n**Wrenfield sign-off → Yarrow move → Vance inspection**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-049": {
+      "tme-tem-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it.",
+        "v8_answer": "The **Ondrey audit** happened most recently.\n\nThe conversations say:\n\n- **Yarrow move** preceded the **Esker retrofit**.\n- **Ondrey audit** came after the **Esker retrofit**.\n\nSo the order is: **Yarrow move → Esker retrofit → Ondrey audit**.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
       },
-      "tme-epi-050": {
+      "tme-tem-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me — I said: “The thing with the bulk-buy account is that it needs two signatures before anything changes.”",
+        "v8_answer": "The **Calder relining** happened most recently.  \nThe notes say Bellamy rewiring came before the Kessel handover, and the Calder relining followed the Kessel handover.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-tem-049": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The Calder relining happened most recently.",
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-tem-050": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The Harrow survey happened most recently.",
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1105,14 +1110,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "2c6000a6912e5ef0464e01d93072c4c02f112b470f664b1381f6b5309a630303",
-    "v8_full_haystack": {
-      "applicable": 50,
-      "v1_passed": 48,
-      "v8_passed": 50,
-      "interference_cost": -0.04,
-      "regressed_under_interference": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
-    }
+    "probed_corpus_sha256": "a6c10b3dfe8c2a16b54fb8a7b4c3acb8f3537fb7f9d9a6f4feb35af4ff82017e"
   }
 }

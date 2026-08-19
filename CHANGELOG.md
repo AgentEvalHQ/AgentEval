@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **TypedMemEval-Temporal (ADR-027 §3.2)** — 50 questions on the order events *occurred*, against the
+  order they were *mentioned*.
+
+  **The construction is the whole design.** If events are narrated chronologically, every ordering
+  question is answerable by sorting the session dates — a metadata sort with no reading and no
+  reasoning. So narration order deliberately contradicts occurrence order: sessions mention events
+  retrospectively and anchor each to another by a stated relation, and the true order is recoverable
+  only by following that chain. **The timestamps are actively misleading, on purpose** — a system
+  that sorts by date gets a confident, checkable, wrong answer.
+
+  | Probe | Result |
+  |---|---|
+  | V1 oracle answerability | **50/50** |
+  | V2 non-inferability | 49/50 |
+  | V3 gold-ablated | **30/30** (scoped) |
+  | V8 full-haystack | 50/50 |
+
+  Zero questions have narration matching occurrence order, and no answer contains a digit — the
+  Arithmetic boundary ("how long between" belongs there, not here) enforced by a generator check
+  rather than by review.
+
+  **V3 is scoped away from `occurrence-order` because the number says to.** That shape names two
+  events and asks which came first, so an ablated model is right half the time by construction; it
+  measured **6 leaks in 20, below the 50% chance rate** — the signature of guessing, not leaking.
+  All 6 leaks and the single V2 failure were that shape. Scoped by *shape* rather than vertical,
+  following ADR-026's precedent for Forgetting's two-way shape.
+
+
 - **TypedMemEval-Bitemporal (ADR-027 §3.3)** — 60 questions, 30 pairs, the first vertical measuring
   something no other memory benchmark does: **valid time against transaction time**. What was true,
   versus what the record believed at a named earlier instant. The two diverge only after a

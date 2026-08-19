@@ -227,7 +227,7 @@
       "worst_refused_auc": 0.6615,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "payment logged against",
+      "worst_gold_marker_ngram": "logged against the",
       "gold_marker_ngram_auc": 0.6615,
       "worst_boilerplate_ngram": "days",
       "boilerplate_ngram_auc": 0.5819,
@@ -538,7 +538,7 @@
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-18T21:54:01Z",
+      "measured_at": "2026-08-19T06:22:44Z",
       "probed_corpus_sha256": "efa9add22a2a757b2f0827c00023eb1dd1872812faa8639f76caa345af231475"
     },
     "reference_deployment": "gpt-5.5",

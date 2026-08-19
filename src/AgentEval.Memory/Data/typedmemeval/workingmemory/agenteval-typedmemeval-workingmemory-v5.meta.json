@@ -543,7 +543,7 @@
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-18T21:54:04Z",
+      "measured_at": "2026-08-19T06:22:45Z",
       "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933"
     },
     "reference_deployment": "gpt-5.5",

@@ -251,6 +251,7 @@ Shipped calibration (BM25 @ K_ref = 5):
 | WorkingMemory | 60 | 0.867 | 1 (×60) |
 | Forgetting | 50 | 0.670 | 0 (×15), 2 (×35) |
 | Bitemporal | 60 | 0.800 | 1 (×60) |
+| Temporal | 50 | 0.900 | 1 (×20), 2 (×30) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -331,6 +332,7 @@ gold is itself an abstention.
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | +0.00 |
 | Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 | 35/35 | +0.00 |
 | Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 59/60 | +0.02 |
+| Temporal | 50/50 | — | 49/50 | 30/30 | — | 50/50 | +0.00 |
 
 > **Read the interference cost before citing any of these corpora for retrieval quality.** `V1` is
 > accuracy given the gold sessions alone; `V8` is accuracy given the entire haystack; the cost is

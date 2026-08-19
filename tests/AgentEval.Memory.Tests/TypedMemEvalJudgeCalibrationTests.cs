@@ -98,7 +98,12 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
     [Fact]
     public void CalibrationSet_ParsesWithUniqueIdsAndUsableLabels()
     {
-        Assert.InRange(Cases.Count, 100, 150);
+        // Scaled to the number of verticals rather than pinned to a literal range. Every vertical
+        // carries at least 20 cases (see EveryVertical_HasEnoughCasesToDiagnoseItsOwnTemplate), so a
+        // fixed upper bound fails on the day a vertical is added and says nothing about what broke —
+        // which it did, at 168 against a ceiling of 150.
+        var verticals = TypedMemEvalVerticals.All.Count;
+        Assert.InRange(Cases.Count, verticals * 20, verticals * 30);
 
         var duplicates = Cases
             .GroupBy(c => c.Id, StringComparer.Ordinal)
