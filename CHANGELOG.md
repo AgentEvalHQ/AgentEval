@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0-beta] - 2026-08-20
+
 ### Fixed
 
 - **RETRACTED: "four of five verticals cannot measure retrieval quality".** That claim shipped in the
@@ -4099,7 +4101,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...HEAD
+[0.26.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...v0.26.0-beta
 [0.25.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.24.0-beta...v0.25.0-beta
 [0.24.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.23.0-beta...v0.24.0-beta
 [0.13.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.1-beta...v0.13.2-beta
