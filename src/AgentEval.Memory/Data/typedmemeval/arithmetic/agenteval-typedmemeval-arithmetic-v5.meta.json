@@ -117,6 +117,12 @@
       "of_turns": 6090,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.637,
+      "bm25_coverage_without_distractor_echo": 0.9533,
+      "dependence": 0.3163,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "probes": {

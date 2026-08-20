@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`V1 − V9` is an upper bound, not an estimate — the caveat is now published beside the number.**
+  The calibration gate manufactures its difficulty by injecting the question's own vocabulary into
+  distractors as a bracketed, labelled clause. Strip that clause **from the distractors** and BM25
+  coverage jumps **+0.10 to +0.34**, to 0.87–1.00; strip it from gold instead and almost nothing
+  moves. So the entire retrieval difficulty of these corpora, for a lexical retriever, is one
+  parenthetical keyword list on the distractors — and any retriever that discounts formulaic
+  scaffolding sees a far easier corpus.
+
+  | Vertical | BM25 as shipped | scaffolding stripped | dependence |
+  |---|---|---|---|
+  | Forgetting | 0.529 | 0.871 | +0.343 |
+  | Arithmetic | 0.637 | 0.953 | +0.316 |
+  | Episodic | 0.687 | 0.975 | +0.288 |
+  | Prospective | 0.700 | 0.980 | +0.280 |
+  | Bitemporal | 0.800 | 1.000 | +0.200 |
+  | WorkingMemory | 0.883 | 1.000 | +0.117 |
+  | Temporal | 0.900 | 1.000 | +0.100 |
+
+  Stamped per corpus as `structure.scaffolding_dependence` by
+  `tools/measure_scaffolding_dependence.py`, and disclosed in the guide beside the headroom table it
+  qualifies. **Difficulty that a one-line regex defeats is not difficulty**; earning it from
+  naturalistic same-domain competition is a generation change and is the next corpus revision.
+
+
 ## [0.26.0-beta] - 2026-08-20
 
 ### Fixed

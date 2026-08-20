@@ -355,6 +355,17 @@ gold is itself an abstention.
 > questions fail on gold alone and succeed on the whole haystack, because gold-only strips the
 > conversational context that identifies a speaker. **V1 is therefore not a strict ceiling for
 > attribution shapes.**
+>
+> **`V1 − V9` is an upper bound, not an estimate, and here is why.** The calibration gate drags BM25
+> coverage into band by injecting the question's own vocabulary into distractors as a bracketed,
+> labelled clause — `(Also on my mind: …)`. Strip that clause from the distractors and BM25 coverage
+> jumps by **+0.10 to +0.34**, to 0.87–1.00; strip it from gold instead and almost nothing moves. So
+> **the entire retrieval difficulty of these corpora, for a lexical retriever, is one parenthetical
+> keyword list**, and any retriever that discounts formulaic scaffolding sees a far easier corpus.
+> V9's baseline is depressed by roughly `scaffolding_dependence` (stamped per corpus in
+> `structure`), and the headroom above is inflated by the same amount. Difficulty that a one-line
+> regex defeats is not difficulty; earning it from naturalistic same-domain competition instead is a
+> generation change and is the family's next corpus revision.
 
 **Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
 ablating either the statement or the invalidation stops the model producing the gold, so both
