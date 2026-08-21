@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Part of the published `V1 − V9` headroom is unreachable by any ranker, and we said otherwise.**
+  Having found that the calibration scaffolding depresses BM25, we told a consuming project to expect
+  a scaffolding-robust retriever near `V8`. That was an extrapolation from a *coverage* figure
+  presented as an expectation about *accuracy*. Measured, it is wrong:
+
+  | Vertical | V9 published | V9 scaffolding-robust | V8 | questions needing > `K_ref` |
+  |---|---|---|---|---|
+  | Arithmetic | 0.320 | **0.680** | 0.840 | **14** |
+  | Episodic | 0.600 | **0.840** | 1.000 | **6** |
+  | Prospective | 0.680 | **0.960** | 0.960 | 0 |
+  | WorkingMemory | 0.883 | **1.000** | 1.000 | 0 |
+  | Forgetting | 0.571 | **0.886** | 1.000 | 0 |
+  | Bitemporal | 0.800 | **0.983** | 0.983 | 0 |
+  | Temporal | 0.820 | **1.000** | 1.000 | 0 |
+
+  Where **questions needing > `K_ref`** is non-zero, a top-`K_ref` retriever cannot physically supply
+  every gold component however well it ranks — one missing input to a derived answer is a wrong
+  answer. It is a `G`-against-`K` property of the corpus, so **a larger `K` buys it more cheaply than
+  a better ranker**. Where it is zero, a scaffolding-robust retriever comes close to `V8`, which is
+  the control that isolates the mechanism. Stamped as `structure.retrieval_ceiling` by
+  `tools/measure_retrieval_ceiling.py` and published in the guide beside the table it qualifies.
+
+- **The probe cache could be destroyed by importing the module.** It was loaded only inside `main()`,
+  so any script that reused `complete()` started with an empty dict and flushed it over the real
+  file — which cost ~30,000 cached completions in one run. Two concurrent probe processes could do
+  the same to each other, last writer winning. `load_cache()` is now lazy and idempotent, and
+  `_flush_cache()` **merges with the on-disk copy**, so a process that knows less than the file
+  cannot subtract from it. No measurement was lost — probe records live in the corpus metadata — but
+  every re-run since is paid for again.
+
+
+### Fixed
+
 - **`V1 − V9` is an upper bound, not an estimate — the caveat is now published beside the number.**
   The calibration gate manufactures its difficulty by injecting the question's own vocabulary into
   distractors as a bracketed, labelled clause. Strip that clause **from the distractors** and BM25

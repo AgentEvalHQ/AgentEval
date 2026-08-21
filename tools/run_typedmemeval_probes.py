@@ -105,13 +105,46 @@ _CACHE_FLUSH_EVERY = 50
 
 def _flush_cache() -> None:
     """Atomically persist the cache. Caller holds `_cache_lock`."""
+    # MERGE, never replace. Two ways this file used to be destroyed, both of which happened:
+    #
+    #   - The cache was loaded only inside main(), so ANY importer -- a one-off measurement script
+    #     reusing complete() -- started with an empty dict and flushed it over the real file. That
+    #     cost ~30,000 cached completions in one run.
+    #   - Two probe processes running at once each flushed their own view, and the last writer won.
+    #
+    # Reading the on-disk copy back before writing makes both harmless: entries only ever accumulate,
+    # and a process that knows less than the file cannot subtract from it.
+    merged: dict[str, str] = {}
+    if CACHE_PATH.exists():
+        try:
+            merged.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            pass                      # a torn file is worth less than what we hold; fall through
+    merged.update(_cache)
     temporary = CACHE_PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(_cache, ensure_ascii=False), encoding="utf-8")
+    temporary.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8")
     temporary.replace(CACHE_PATH)
+
+
+def load_cache() -> None:
+    """Loads the on-disk cache into memory. Idempotent, and safe to call from an importer.
+
+    Exposed and called lazily because the previous arrangement -- load inside main() only -- made
+    the module actively dangerous to import: a script that reused `complete()` got an empty cache,
+    paid for every call again, and then flushed its handful of entries over the real file.
+    """
+    with _cache_lock:
+        if _cache or not CACHE_PATH.exists():
+            return
+        try:
+            _cache.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            return
 
 
 def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     """One chat completion, cached so an interrupted run resumes instead of re-paying."""
+    load_cache()
     with _cache_lock:
         if cache_key in _cache:
             _stats["cache_hit"] += 1
@@ -788,8 +821,8 @@ def main() -> None:
         self_test()
         return
 
-    if CACHE_PATH.exists():
-        _cache.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
+    load_cache()
+    if _cache:
         print(f"resuming with {len(_cache)} cached completions")
 
     targets = args.verticals or list(tmc.VERTICALS)

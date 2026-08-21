@@ -123,6 +123,14 @@
       "bm25_coverage_without_distractor_echo": 0.9533,
       "dependence": 0.3163,
       "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
+    },
+    "retrieval_ceiling": {
+      "k_ref": 5,
+      "coverage_scaffolding_stripped": 0.9533,
+      "questions_needing_more_than_k_ref": 14,
+      "questions_scored": 50,
+      "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever.",
+      "accuracy_scaffolding_stripped": 0.68
     }
   },
   "probes": {

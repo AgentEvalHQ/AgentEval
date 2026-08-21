@@ -366,6 +366,28 @@ gold is itself an abstention.
 > `structure`), and the headroom above is inflated by the same amount. Difficulty that a one-line
 > regex defeats is not difficulty; earning it from naturalistic same-domain competition instead is a
 > generation change and is the family's next corpus revision.
+> **And `V1 − V9` contains a component no ranker can reach.** Having found that the scaffolding
+> depresses BM25, we told a consuming project to expect a scaffolding-robust retriever near `V8`.
+> That was an extrapolation from a *coverage* figure presented as an expectation about *accuracy*,
+> and measuring it refuted it:
+>
+> | Vertical | V9 as published | **V9 scaffolding-robust** | V8 whole haystack | V1 gold-only | questions needing > `K_ref` |
+> |---|---|---|---|---|---|
+> | Arithmetic | 0.320 | **0.680** | 0.840 | 0.940 | **14** |
+> | Episodic | 0.600 | **0.840** | 1.000 | 0.960 | **6** |
+> | Prospective | 0.680 | **0.960** | 0.960 | 0.980 | 0 |
+> | WorkingMemory | 0.883 | **1.000** | 1.000 | 1.000 | 0 |
+> | Forgetting | 0.571 | **0.886** | 1.000 | 1.000 | 0 |
+> | Bitemporal | 0.800 | **0.983** | 0.983 | 1.000 | 0 |
+> | Temporal | 0.820 | **1.000** | 1.000 | 1.000 | 0 |
+>
+> Where **questions needing > `K_ref`** is non-zero, a top-`K_ref` retriever cannot physically supply
+> every gold component however well it ranks, and one missing input to a derived answer is a wrong
+> answer. That is a `G`-against-`K` property of the corpus, not a property of any retriever — **a
+> larger `K` buys it more cheaply than a better ranker.** Where it is zero, a scaffolding-robust
+> retriever comes close to `V8`, which is the control that isolates the mechanism.
+>
+> Stamped per corpus as `structure.retrieval_ceiling`.
 
 **Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
 ablating either the statement or the invalidation stops the model producing the gold, so both
