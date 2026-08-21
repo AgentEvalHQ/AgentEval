@@ -24,10 +24,14 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import re
 import statistics
 import sys
 
 import typedmemeval_common as tmc
+
+#: The calibration scaffolding, stripped from distractors before ranking.
+_ECHO_CLAUSE = re.compile(re.escape(f"({tmc.ECHO_LEAD}") + r"[^)]*\)")
 
 #: A validated dial must lose at least this much reference-retriever coverage from its easiest band
 #: to its hardest. Not a p-value: per-band n runs 2-17 here, far too small for one, and a threshold
@@ -52,7 +56,7 @@ MIN_USABLE_BANDS = 4
 MAX_ORACLE_SPREAD = 0.15
 
 
-def bands(vertical: str) -> tuple[dict[int, list[float]], dict[int, list[bool]], str | None, bool]:
+def bands(vertical: str) -> tuple:
     """Per band: reference-retriever coverage, oracle outcomes, the dial name, and the stamp."""
     corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
     root = tmc.DATA_ROOT / vertical
@@ -66,6 +70,7 @@ def bands(vertical: str) -> tuple[dict[int, list[float]], dict[int, list[bool]],
     ran = probes.get("status") == "run"
 
     coverage: dict[int, list[float]] = collections.defaultdict(list)
+    ceiling: dict[int, list[float]] = collections.defaultdict(list)
     oracle: dict[int, list[bool]] = collections.defaultdict(list)
     dial = None
     stamped = False
@@ -77,16 +82,33 @@ def bands(vertical: str) -> tuple[dict[int, list[float]], dict[int, list[bool]],
         dial = extension.get("difficulty_dial")
         stamped = bool(extension.get("difficulty_validated"))
 
-        texts = ["\n".join(f"{t['role']}: {t['content']}" for t in session)
-                 for session in entry["haystack_sessions"]]
+        gold = set(entry["answer_session_ids"])
+        # SCAFFOLDING-STRIPPED, because the retriever half is meant to measure retrieval.
+        #
+        # The calibration echo clause injects the question's own vocabulary into distractors, and
+        # stripping it lifts BM25 coverage by +0.10 to +0.34 across the family. Ranking with it in
+        # measures how a bag-of-words retriever copes with a bracketed keyword list, which is not
+        # the claim a difficulty band makes.
+        #
+        # It also covers for the structural ceiling, which is why both corrections are needed and
+        # neither works alone: on Arithmetic the shortfall against min(1, K/G) varies by 0.36 with
+        # the clause in, and by 0.000 with it out. With the artifact in place the ceiling check sees
+        # a real-looking spread; with it removed, every band sits exactly on its ceiling.
+        texts = []
+        for session_id, session in zip(entry["haystack_session_ids"], entry["haystack_sessions"]):
+            text = "\n".join(f"{turn['role']}: {turn['content']}" for turn in session)
+            texts.append(text if session_id in gold else _ECHO_CLAUSE.sub("", text))
         order = tmc.bm25_rank(entry["question"], texts)
         top = {entry["haystack_session_ids"][i] for i in order[:tmc.K_REF]}
-        gold = set(entry["answer_session_ids"])
         coverage[band].append(len(gold & top) / max(1, len(gold)))
+        # What ANY retriever could have scored on this question at this budget. With a top-K budget
+        # and G gold sessions the best possible coverage is min(1, K/G), so a band whose G exceeds K
+        # is capped before retrieval quality enters at all.
+        ceiling[band].append(tmc.structural_ceiling(len(gold), tmc.K_REF))
         if ran:
             oracle[band].append(entry["question_id"] not in oracle_failed)
 
-    return coverage, oracle, dial, stamped
+    return coverage, oracle, dial, stamped, ceiling
 
 
 def main() -> None:
@@ -97,7 +119,7 @@ def main() -> None:
 
     disagreements = []
     for vertical in tmc.VERTICALS:
-        coverage, oracle, dial, stamped = bands(vertical)
+        coverage, oracle, dial, stamped, ceiling = bands(vertical)
         if not coverage:
             print(f"{vertical:<14} no difficulty stamps")
             continue
@@ -139,12 +161,30 @@ def main() -> None:
             rho = None
         thin = [b for b in order if len(coverage[b]) < MIN_BAND_N]
 
+        # THE SLOPE MUST BE IN THE SHORTFALL, NOT IN THE RAW COVERAGE.
+        #
+        # Coverage falls automatically when a band's G exceeds the retrieval budget, because the best
+        # possible score is min(1, K/G). A dial that moves G therefore moves coverage without moving
+        # anything about retrieval, and the check used to accept that as a validated gradient.
+        #
+        # Measured on Arithmetic, that is exactly what was happening: with the calibration
+        # scaffolding stripped, observed coverage equals the structural ceiling in EVERY band to
+        # three decimals -- 1.000/1.000/1.000/0.833 against ceilings of 1.000/1.000/1.000/0.833,
+        # shortfall +0.000 throughout. The dial was measuring arithmetic on two integers.
+        shortfall = {b: means[b] - statistics.mean(ceiling[b]) for b in order if ceiling.get(b)}
+        head = [shortfall[b] for b in usable if b in shortfall]
+        ceiling_explains = bool(head) and (max(head) - min(head)) < MIN_RETRIEVER_DROP
+
         slopes = (drop >= MIN_RETRIEVER_DROP and rho is not None and rho <= MAX_TREND_RHO
-                  and len(usable) >= MIN_USABLE_BANDS)
+                  and len(usable) >= MIN_USABLE_BANDS and not ceiling_explains)
         flat = spread is not None and spread <= MAX_ORACLE_SPREAD
         # "Not yet probed" is its own answer and must not collapse into "does not slope". They
         # differ in what to do next: one needs a decision, the other needs a probe run.
-        if not slopes:
+        if ceiling_explains and drop >= MIN_RETRIEVER_DROP:
+            verdict, judged = (
+                "coverage falls only because G exceeds the retrieval budget; the dial measures "
+                "min(1, K/G), not retrieval"), True
+        elif not slopes:
             verdict, judged = (
                 "does not slope" if len(usable) >= MIN_USABLE_BANDS
                 else f"only {len(usable)} band(s) with n >= {MIN_BAND_N}; "
@@ -161,6 +201,10 @@ def main() -> None:
             f"{b}:{means[b]:.2f}(n={len(coverage[b])})" for b in order)
             + f"   drop {drop:+.2f}  rho " + ("n/a" if rho is None else f"{rho:+.2f}")
             + (f"  [{len(thin)} band(s) under n={MIN_BAND_N}, excluded]" if thin else ""))
+        if shortfall:
+            print(f"{'':<14} vs ceiling " + "  ".join(
+                f"{b}:{shortfall[b]:+.2f}" for b in order if b in shortfall)
+                + ("   <- explained by K/G" if ceiling_explains else ""))
         if oracle_means:
             print(f"{'':<14} oracle     " + "  ".join(
                 f"{b}:{oracle_means[b]:.2f}" for b in order if b in oracle_means)

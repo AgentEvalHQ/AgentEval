@@ -29440,7 +29440,7 @@
         "value": 15,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -30331,7 +30331,7 @@
         "value": 19,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -31077,7 +31077,7 @@
         "value": 15,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -31997,7 +31997,7 @@
         "value": 19,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -32823,7 +32823,7 @@
         "value": 11,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -33707,7 +33707,7 @@
         "value": 19,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -34359,7 +34359,7 @@
         "value": 11,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -35105,7 +35105,7 @@
         "value": 11,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -35960,7 +35960,7 @@
         "value": 17,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -36844,7 +36844,7 @@
         "value": 11,
         "unit": "days"
       },
-      "difficulty": 1,
+      "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -37619,7 +37619,7 @@
         "value": 12,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"
@@ -38365,7 +38365,7 @@
         "value": 15,
         "unit": "days"
       },
-      "difficulty": 2,
+      "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
       "vertical": "arithmetic"

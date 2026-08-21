@@ -328,7 +328,7 @@ gold is itself an abstention.
 |---|---|---|---|---|---|---|---|---|
 | Prospective | 49/50 | 18/19 | 50/50 | 45/45 | — | 48/50 | 34/50 | +0.30 |
 | Episodic | 48/50 | — | 50/50 | 50/50 | — | 50/50 | 30/50 | +0.36 |
-| Arithmetic | 47/50 | — | 50/50 | 50/50 | 50/50 | 42/50 | 16/50 | +0.62 |
+| Arithmetic | 49/50 | — | 50/50 | 50/50 | 50/50 | 43/50 | 18/50 | +0.62 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 53/60 | +0.12 |
 | Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 | 35/35 | 20/35 | +0.43 |
 | Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.20 |
@@ -388,6 +388,25 @@ gold is itself an abstention.
 > retriever comes close to `V8`, which is the control that isolates the mechanism.
 >
 > Stamped per corpus as `structure.retrieval_ceiling`.
+>
+> **And no vertical in this family has a validated difficulty ladder.** Every corpus carries
+> `difficulty_validated: false`. The bands describe **how the corpus was built** and nothing more —
+> a higher rung is not known to be harder, and should not be reported as though it were.
+>
+> The rule they used to pass had two artifacts in it, and neither correction works alone. Coverage
+> was ranked with the calibration scaffolding in place, which is worth +0.10 to +0.34 on its own;
+> and a dial that moves `G` moves coverage through the structural ceiling `min(1, K/G)` without
+> touching retrieval. On Arithmetic the shortfall against that ceiling varies by 0.36 with the
+> scaffolding in and by **0.000** with it out — the artifact was covering for the ceiling.
+>
+> With both corrections applied, every band of every vertical sits on its ceiling. WorkingMemory,
+> which this guide previously named as the one validated ladder, reads 1.00 / 1.00 / 1.00 / 0.67 /
+> 0.75 as gated and **1.00 / 1.00 / 1.00 / 1.00 / 1.00** scaffolding-stripped: the gradient was the
+> clause. It could not have been otherwise — its dial is measured in *sessions between*, and BM25
+> has no position component.
+>
+> See ADR-026 §20. `validate_typedmemeval_difficulty.py` now applies both corrections, and would
+> refuse every stamp this family has issued.
 
 **Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
 ablating either the statement or the invalidation stops the model producing the gold, so both

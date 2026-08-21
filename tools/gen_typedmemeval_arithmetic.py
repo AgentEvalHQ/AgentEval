@@ -780,7 +780,32 @@ _INPUT_BANDS = {2: 1, 3: 2, 4: 3, 5: 4, 6: 5}
 
 
 def _difficulty_band(derivation: dict) -> int:
-    return _INPUT_BANDS.get(len(derivation.get("inputs") or []), 3)
+    """Bands on DISPERSION -- the number of distinct gold sessions the answer is assembled from.
+
+    It used to band on `len(inputs)`, which is a different unit for different shapes and is why the
+    ladder pointed backwards. A `count`/`sum`/`delta` input is ONE session; a `duration` input is a
+    spell, carrying an opening session and a closing one. So a duration assembled from six gold
+    sessions was banded as three, and every duration question landed in bands 1-2 while no other
+    shape could reach them. Band 1 was 100% duration.
+
+    That produced a difficulty label anti-correlated with difficulty. Measured on v5, V8 accuracy by
+    band ran 0.33 / 0.76 / 1.00 / 1.00 / 1.00 -- the band called EASIEST was where the answer model
+    failed two questions in three -- and the cause was not that duration is hard for its dispersion.
+    It is that `duration` is a harder OPERATION, and the mis-scaled dial had quietly sorted every
+    instance of it into the low bands, so the ladder measured "is this a duration question" while
+    claiming to measure dispersion.
+
+    Counting sessions puts every shape on one unit. It does not make duration easier, and it does
+    not manufacture a gradient where there is none -- V8 says count/delta/sum score 1.00 at every
+    input count from three to six, so dispersion buys no answering difficulty under full context at
+    all. What it fixes is the label: the bands now name the quantity they claim to name.
+    """
+    sessions = set()
+    for item in derivation.get("inputs") or []:
+        sessions.add(item["session_index"])
+        if "from_session_index" in item:
+            sessions.add(item["from_session_index"])
+    return _INPUT_BANDS.get(len(sessions), 3)
 
 
 def build(echo: float, rng: random.Random) -> list[tmc.Question]:
@@ -817,23 +842,25 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             plan.qid, plan.qtype, plan.question, plan.answer,
             sessions[-1].timestamp + timedelta(days=2), sessions,
             deepcopy({"shape": plan.shape, "derivation": plan.derivation,
-                      # Dispersion is this vertical's memory dial: how many places the answer
-                      # has to be assembled from. The ladder already graded realised retrieval
-                      # monotonically (0.92 down to 0.42 across inputs 2-6) and was simply
-                      # never named, which made it the cheapest lever in the family.
+                      # Dispersion is this vertical's dial: how many distinct gold sessions the
+                      # answer must be assembled from. See _difficulty_band for why that is counted
+                      # in SESSIONS rather than in `inputs` -- the two are the same number for
+                      # count/delta/sum and differ by a factor of two for duration, and getting it
+                      # wrong put every duration question in the bottom two bands and made band 1
+                      # entirely duration.
                       "difficulty": _difficulty_band(plan.derivation),
-                      # UNVALIDATED because CONFOUNDED, which is not the same as flat. The
-                      # retriever half passes convincingly -- 0.92 down to 0.42, a drop of 0.50,
-                      # the steepest in the family. The oracle half does not: bands 1 and 2 read
-                      # 0.83 and 0.94 against 1.00 everywhere above, a spread of 0.17. The cause is
-                      # that the `duration` shape lives at two and three inputs and is where the
-                      # answer model struggles on its own, so the easy end of a dispersion ladder is
-                      # quietly the answer model's hard end. Part of that clean gradient is the
-                      # oracle failing rather than retrieval getting harder, and a number built
-                      # partly out of oracle error reads as memory difficulty everywhere downstream.
-                      # Fixing it needs a generation change (spread `duration` across input counts),
-                      # so v4 ships the band declared rather than claimed. Tracked as the first v5
-                      # item.
+                      # STILL UNVALIDATED, and now for an honest reason rather than a confounded
+                      # one. The mis-scaled dial has been fixed and no band is owned by one shape,
+                      # but the underlying finding survives the fix and is worth stating: V8 says
+                      # count, delta and sum score 1.00 at THREE, FOUR, FIVE and SIX gold sessions
+                      # alike, so dispersion buys no answering difficulty at all once the evidence
+                      # is in context. It moves BM25 coverage (0.92 -> 0.42) and it moves nothing
+                      # else, which makes it a retrieval dial rather than a memory-difficulty one.
+                      #
+                      # `duration` remains harder than the other three as an OPERATION -- its V8 is
+                      # 0.33 against 1.00 -- and no band arrangement changes that. Spreading it
+                      # across bands stops the ladder pointing backwards; it does not manufacture a
+                      # gradient, and claiming one would be the same error in a new place.
                       "difficulty_dial": "dispersion", "difficulty_validated": False,
                       **plan.extra}),
         ))

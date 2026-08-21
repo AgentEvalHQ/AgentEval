@@ -374,12 +374,27 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
                     "shape": f"distance-{distance}",
                     "distance_sessions": distance,
                     "fact_family": family.key,
-                    # The band variable is the rung, which IS the memory dial for this
-                    # vertical (ADR-026 §16 C): distance between the fact and the question,
-                    # with nothing else varying. Diagnostics, never a claim -- n = 12 per band
-                    # is well under the n >= 30 floor a citable figure needs.
+                    # The band variable is the rung: distance between the fact and the question,
+                    # with nothing else varying. Diagnostics, never a claim -- n = 12 per band is
+                    # well under the n >= 30 floor a citable figure needs.
+                    #
+                    # UNVALIDATED as of 2026-08-21, and this was the family's ONLY validated ladder.
+                    # It validated against BM25 coverage, which read 1.00/1.00/1.00/0.67/0.75 across
+                    # the rungs. Strip the calibration echo clause from the distractors and it reads
+                    # 1.00/1.00/1.00/1.00/1.00 -- the entire gradient was the scaffolding, not the
+                    # distance.
+                    #
+                    # In hindsight it could not have been anything else: BM25 has no position
+                    # component, so a dial measured in SESSIONS BETWEEN cannot move it except through
+                    # an artifact. We had already recorded exactly that reasoning for Prospective and
+                    # Forgetting -- "these are not retrieval dials, so no reference retriever repairs
+                    # them" -- and did not apply it to the one vertical whose ladder we were citing.
+                    #
+                    # Retiring the stamp rather than the bands: the rungs still describe how the
+                    # corpus was built, and a reader is entitled to know the construction. What they
+                    # are not entitled to infer is that a higher rung is harder to retrieve from.
                     "difficulty": DISTANCES.index(distance) + 1,
-                    "difficulty_dial": "distance", "difficulty_validated": True,
+                    "difficulty_dial": "distance", "difficulty_validated": False,
                 },
             ))
             index += 1

@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No vertical has a validated difficulty ladder, and the rule that said otherwise was certifying
+  artifacts.** Every corpus now carries `difficulty_validated: false`. The bands describe how the
+  corpus was built; a higher rung is not known to be harder.
+
+  The retriever half of band validation had **two** artifacts in it, and neither correction works
+  alone — which is why it survived three revisions:
+
+  - **The calibration scaffolding.** Coverage was ranked with the echo clause in place, worth +0.10
+    to +0.34 on its own.
+  - **The structural ceiling.** With a top-`K` budget and `G` gold sessions nothing can beat
+    `min(1, K/G)`, so a dial that moves `G` moves coverage without touching retrieval.
+
+  On Arithmetic the shortfall against the ceiling varies by 0.36 with the scaffolding in and by
+  **0.000** with it out: the artifact was covering for the ceiling, so a ceiling check on un-stripped
+  coverage sees a real-looking spread. With both applied, **every band of every vertical sits on its
+  ceiling**.
+
+  **WorkingMemory's stamp is retired** — the family's only validated ladder. It read
+  1.00/1.00/1.00/**0.67**/**0.75** as gated and **1.00/1.00/1.00/1.00/1.00** scaffolding-stripped;
+  the whole gradient was the clause. It could not have been otherwise: its dial is measured in
+  *sessions between*, and BM25 has no position component — the same reasoning ADR-027 §2.2 used to
+  refute a partner's claim about Prospective and Forgetting, which we failed to apply to the one
+  ladder we were citing. See ADR-026 §20.
+
+  `validate_typedmemeval_difficulty.py` now ranks on scaffolding-stripped text and requires the slope
+  to survive comparison with `min(1, K/G)`. It would refuse every stamp this family has ever issued.
+
+- **Arithmetic's difficulty bands pointed backwards because the dial was mis-scaled.**
+  `_difficulty_band` counted `len(inputs)`, and an "input" is one session for `count`/`delta`/`sum`
+  but a *spell* — two sessions — for `duration`. So a duration assembled from six gold sessions was
+  banded as three, every duration question landed in the bottom two bands, and **band 1 was 100%
+  duration**. V8 by band read 0.33 / 0.76 / 1.00 / 1.00 / 1.00: the band labelled easiest was where
+  the answer model failed two questions in three.
+
+  Banding on distinct gold sessions puts every shape on one unit. Duration now spans bands 3 and 5,
+  no band is owned by a single shape, and V8 reads 1.00 / 0.76 / 1.00 / 0.79 — no longer inverted.
+
+  The fix exposes what the confound was hiding: **`count`, `delta` and `sum` score 1.00 at three,
+  four, five and six gold sessions alike**, so dispersion buys no answering difficulty once the
+  evidence is in context. It is a retrieval dial, not a memory-difficulty one, and `duration` is
+  simply a harder operation (V8 0.33 against 1.00) that no band arrangement changes.
+
+
+### Fixed
+
 - **Part of the published `V1 − V9` headroom is unreachable by any ranker, and we said otherwise.**
   Having found that the calibration scaffolding depresses BM25, we told a consuming project to expect
   a scaffolding-robust retriever near `V8`. That was an extrapolation from a *coverage* figure
