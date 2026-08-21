@@ -455,7 +455,10 @@ ones, and this is where the third would go soft.
 3. **Band × shape cross-tab published for each proposed vertical**, with no shape dominating a band.
 4. **The two open v6 items from ADR-026 §19 closed or explicitly deferred with reasons:** Arithmetic's
    widened oracle confound (spread 0.33) and WorkingMemory's coverage drift toward the ceiling
-   (0.767 → 0.867 on the family's only validated ladder).
+   (0.767 → 0.867). Both closed by ADR-026 §20, though not as this criterion anticipated: the drift
+   was not drift. WorkingMemory's coverage slope was the calibration scaffolding, its stamp is
+   retired, and **no vertical in the family carries a validated ladder** — so a new vertical cannot
+   be asked to match one. Read criteria 1–3 above as construction requirements only.
 
 ## 10. Composability commitments (prompt 09 §2.4)
 

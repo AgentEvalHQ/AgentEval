@@ -1379,6 +1379,12 @@ ceiling does not move, which is what makes the ladder a measurement of memory ra
 answer model. That is the first time anything in this family has been positively demonstrated to
 grade memory difficulty rather than merely asserted to.
 
+> **SUPERSEDED BY §20 (2026-08-21).** It was not demonstrated. The coverage column above is ranked
+> with the calibration scaffolding in place and is not compared against the structural ceiling
+> `min(1, K/G)`; correct for both and WorkingMemory reads 1.00 / 1.00 / 1.00 / 1.00 / 1.00 and
+> Episodic falls only because `G > K_ref`. Both stamps are retired. The table is kept as written
+> because it is what the rule certified at the time, which is the fact §20 has to explain.
+
 Arithmetic fails the second half, and the cause is locatable: its two lowest bands sit at 0.83 and
 0.82 against 1.00 above them, because the `duration` shape lives at two and three inputs and
 `duration` is where the answer model struggles (8/12 on its own). So bands 1-2 mix dispersion with
