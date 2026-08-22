@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.PartnerDeskDemo.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The demo under test. This ProjectReference also copies the demo's apphost, deps.json and
+         runtimeconfig.json into this project's output, which is how the tests start the real
+         PartnerIntel MCP server as a child process. -->
+    <ProjectReference Include="..\AgentEval.PartnerDeskDemo\AgentEval.PartnerDeskDemo.csproj" />
+    <!-- The evaluation harness, so its pure aggregation logic (Wilson intervals, metric mapping) is
+         covered deterministically here rather than only through the live console path. -->
+    <ProjectReference Include="..\AgentEval.PartnerDeskDemo.Evals\AgentEval.PartnerDeskDemo.Evals.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Data\partners.json reaches this project's output transitively: the demo project marks it
+       CopyToOutputDirectory, and that flows through the ProjectReference. No explicit copy is needed here. -->
+
+</Project>

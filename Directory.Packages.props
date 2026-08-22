@@ -87,6 +87,14 @@
     <PackageVersion Include="PdfSharp-MigraDoc" Version="6.2.4" />
     <PackageVersion Include="QuestPDF" Version="2026.2.4" />
     
+    <!-- Model Context Protocol (.NET SDK, Apache-2.0) — used ONLY by samples/AgentEval.PartnerDeskDemo,
+         which hosts a real stdio MCP server in a child process and connects to it as an MCP client so the
+         demo's third-party boundary is a genuine protocol boundary rather than an in-process call.
+         ModelContextProtocol.Core carries BOTH the client (McpClient/StdioClientTransport) and the transport-
+         level server (McpServer.Create/StdioServerTransport), so the demo needs no DI-hosting package.
+         The shipping libraries do NOT reference it. -->
+    <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.0" />
+
     <!-- JSON Schema -->
     <PackageVersion Include="JsonSchema.Net" Version="7.3.4" />
 

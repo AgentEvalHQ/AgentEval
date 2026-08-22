@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.PartnerDeskDemo</RootNamespace>
+    <AssemblyName>AgentEval.PartnerDeskDemo</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Gatekeeper (UseGatekeeper, ToolUsageContractGate, result gates, containment) plus the tracing and
+         scripted-provider surfaces the offline pass oracle uses. -->
+    <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <!-- The third-party boundary is a REAL MCP session: a child process speaking MCP over stdio.
+         ModelContextProtocol.Core provides both halves (McpServer/StdioServerTransport on the server side,
+         McpClient/StdioClientTransport on the client side). -->
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Data\partners.json" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="demo-manifest.json"
+                      LogicalName="AgentEval.PartnerDeskDemo.demo-manifest.json" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1206 @@
+{
+  "schemaVersion": "1.0",
+  "notice": "SYNTHETIC DEMO DATA. Every company, person, address and figure below is invented for the AgentEval PartnerDesk demo. No real individual or organisation is described.",
+  "partners": [
+    {
+      "id": "PTR-0001",
+      "company": "Alpina Logistik AG",
+      "contact": "Elena Gsteiger",
+      "email": "elena.gsteiger@alpina.example",
+      "sector": "Logistics",
+      "canton": "GR",
+      "annualContractValueChf": 1450000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0002",
+      "company": "Rigi Bau AG",
+      "contact": "Quentin Lehmann",
+      "email": "quentin.lehmann@rigi.example",
+      "sector": "Real estate",
+      "canton": "VS",
+      "annualContractValueChf": 3456000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0003",
+      "company": "Zermatt Technik GmbH",
+      "contact": "Giulia Wyss",
+      "email": "giulia.wyss@zermatt.example",
+      "sector": "Pharma",
+      "canton": "GE",
+      "annualContractValueChf": 3922000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0004",
+      "company": "Verbier Analytik SA",
+      "contact": "Esther Marti",
+      "email": "esther.marti@verbier.example",
+      "sector": "Wholesale trade",
+      "canton": "BS",
+      "annualContractValueChf": 3208000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0005",
+      "company": "Jungfrau Treuhand AG",
+      "contact": "Beat Ulrich",
+      "email": "beat.ulrich@jungfrau.example",
+      "sector": "Engineering",
+      "canton": "BE",
+      "annualContractValueChf": 699000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0006",
+      "company": "Lavaux Systeme GmbH",
+      "contact": "Daniel Lüthi",
+      "email": "daniel.luethi@lavaux.example",
+      "sector": "IT services",
+      "canton": "NE",
+      "annualContractValueChf": 390000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0007",
+      "company": "Sempach Versicherung AG",
+      "contact": "Daniel Brunner",
+      "email": "daniel.brunner@sempach.example",
+      "sector": "Wholesale trade",
+      "canton": "VS",
+      "annualContractValueChf": 275000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0008",
+      "company": "Seeland Kommunikation GmbH",
+      "contact": "Regula Egger",
+      "email": "regula.egger@seeland.example",
+      "sector": "Pharma",
+      "canton": "TG",
+      "annualContractValueChf": 2873000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0009",
+      "company": "Lavaux Kommunikation Sàrl",
+      "contact": "Esther Perren",
+      "email": "esther.perren@lavaux2.example",
+      "sector": "Facility management",
+      "canton": "NE",
+      "annualContractValueChf": 218000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0010",
+      "company": "Emmental Systeme AG",
+      "contact": "Lukas Jaquet",
+      "email": "lukas.jaquet@emmental.example",
+      "sector": "Wholesale trade",
+      "canton": "AG",
+      "annualContractValueChf": 2388000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0011",
+      "company": "Bernina Alta Systeme Sàrl",
+      "contact": "Esther Bachmann",
+      "email": "esther.bachmann@bernina.example",
+      "sector": "Energy",
+      "canton": "GE",
+      "annualContractValueChf": 410000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0012",
+      "company": "Titlis Versicherung SA",
+      "contact": "Lukas Ammann",
+      "email": "lukas.ammann@titlis.example",
+      "sector": "Manufacturing",
+      "canton": "TI",
+      "annualContractValueChf": 2431000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0013",
+      "company": "Simplon Consulting GmbH",
+      "contact": "Daniel Ammann",
+      "email": "daniel.ammann@simplon.example",
+      "sector": "Engineering",
+      "canton": "BS",
+      "annualContractValueChf": 1213000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0014",
+      "company": "Alpina Industrie GmbH",
+      "contact": "Heinz Keller",
+      "email": "heinz.keller@alpina2.example",
+      "sector": "Pharma",
+      "canton": "BE",
+      "annualContractValueChf": 1084000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0015",
+      "company": "Grimsel Logistik SA",
+      "contact": "Irene Jenni",
+      "email": "irene.jenni@grimsel.example",
+      "sector": "Facility management",
+      "canton": "SG",
+      "annualContractValueChf": 212000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0016",
+      "company": "Seeland Immobilien SA",
+      "contact": "Karin Christen",
+      "email": "karin.christen@seeland2.example",
+      "sector": "Logistics",
+      "canton": "BE",
+      "annualContractValueChf": 2406000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0017",
+      "company": "Furka Energie GmbH",
+      "contact": "Xenia Jaquet",
+      "email": "xenia.jaquet@furka.example",
+      "sector": "Insurance broking",
+      "canton": "VD",
+      "annualContractValueChf": 117000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0018",
+      "company": "Titlis Analytik AG",
+      "contact": "Stefan Zimmermann",
+      "email": "stefan.zimmermann@titlis2.example",
+      "sector": "IT services",
+      "canton": "ZH",
+      "annualContractValueChf": 3649000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0019",
+      "company": "Thun Logistik Sàrl",
+      "contact": "Elena Steiner",
+      "email": "elena.steiner@thun.example",
+      "sector": "IT services",
+      "canton": "ZG",
+      "annualContractValueChf": 2177000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0020",
+      "company": "Säntis Immobilien AG",
+      "contact": "Beat Kobel",
+      "email": "beat.kobel@saentis.example",
+      "sector": "Construction",
+      "canton": "NE",
+      "annualContractValueChf": 988000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0021",
+      "company": "Verbier Consulting SA",
+      "contact": "Lukas Imhof",
+      "email": "lukas.imhof@verbier2.example",
+      "sector": "Construction",
+      "canton": "TI",
+      "annualContractValueChf": 735000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0022",
+      "company": "Aare Industrie AG",
+      "contact": "Bruno Ott",
+      "email": "bruno.ott@aare.example",
+      "sector": "IT services",
+      "canton": "BS",
+      "annualContractValueChf": 82000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0023",
+      "company": "Helvetia Consulting SA",
+      "contact": "Thomas Ammann",
+      "email": "thomas.ammann@helvetia.example",
+      "sector": "Fiduciary",
+      "canton": "VS",
+      "annualContractValueChf": 1143000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0024",
+      "company": "Oberland Treuhand AG",
+      "contact": "Hansruedi Ammann",
+      "email": "hansruedi.ammann@oberland.example",
+      "sector": "Engineering",
+      "canton": "AG",
+      "annualContractValueChf": 1581000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0025",
+      "company": "Alpina Transport SA",
+      "contact": "Corinne Brunner",
+      "email": "corinne.brunner@alpina3.example",
+      "sector": "IT services",
+      "canton": "FR",
+      "annualContractValueChf": 2091000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0026",
+      "company": "Aare Services GmbH",
+      "contact": "Bruno Ott",
+      "email": "bruno.ott@aare2.example",
+      "sector": "Engineering",
+      "canton": "FR",
+      "annualContractValueChf": 3790000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0027",
+      "company": "Splügen Kommunikation AG",
+      "contact": "Irene Ulrich",
+      "email": "irene.ulrich@spluegen.example",
+      "sector": "Energy",
+      "canton": "VS",
+      "annualContractValueChf": 2857000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0028",
+      "company": "Seeland Analytik GmbH",
+      "contact": "Yves Fankhauser",
+      "email": "yves.fankhauser@seeland3.example",
+      "sector": "IT services",
+      "canton": "GR",
+      "annualContractValueChf": 3206000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0029",
+      "company": "Engadin Treuhand SA",
+      "contact": "Laurent Wyss",
+      "email": "laurent.wyss@engadin.example",
+      "sector": "Fiduciary",
+      "canton": "TI",
+      "annualContractValueChf": 285000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0030",
+      "company": "Simplon Industrie SA",
+      "contact": "Esther Pfister",
+      "email": "esther.pfister@simplon2.example",
+      "sector": "Logistics",
+      "canton": "NE",
+      "annualContractValueChf": 609000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0031",
+      "company": "Gotthard Logistik SA",
+      "contact": "Andrea Meier",
+      "email": "andrea.meier@gotthard.example",
+      "sector": "Facility management",
+      "canton": "BS",
+      "annualContractValueChf": 2826000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0032",
+      "company": "Ticino Transport AG",
+      "contact": "Regula Rüegg",
+      "email": "regula.rueegg@ticino.example",
+      "sector": "Insurance broking",
+      "canton": "LU",
+      "annualContractValueChf": 1181000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0033",
+      "company": "Titlis Treuhand AG",
+      "contact": "Joachim Schmid",
+      "email": "joachim.schmid@titlis3.example",
+      "sector": "Engineering",
+      "canton": "SG",
+      "annualContractValueChf": 3871000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0034",
+      "company": "Limmat Analytik GmbH",
+      "contact": "Monika Marti",
+      "email": "monika.marti@limmat.example",
+      "sector": "Wholesale trade",
+      "canton": "GE",
+      "annualContractValueChf": 236000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0035",
+      "company": "Jungfrau Industrie AG",
+      "contact": "Felix Niederer",
+      "email": "felix.niederer@jungfrau2.example",
+      "sector": "Manufacturing",
+      "canton": "ZH",
+      "annualContractValueChf": 2849000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0036",
+      "company": "Furka Technik SA",
+      "contact": "Felix Lehmann",
+      "email": "felix.lehmann@furka2.example",
+      "sector": "Fiduciary",
+      "canton": "LU",
+      "annualContractValueChf": 3318000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0037",
+      "company": "Furka Bau Sàrl",
+      "contact": "Bruno Nussbaumer",
+      "email": "bruno.nussbaumer@furka3.example",
+      "sector": "Fiduciary",
+      "canton": "SG",
+      "annualContractValueChf": 1065000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0038",
+      "company": "Oberland Kommunikation GmbH",
+      "contact": "Quentin Niederer",
+      "email": "quentin.niederer@oberland2.example",
+      "sector": "Real estate",
+      "canton": "VS",
+      "annualContractValueChf": 1732000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0039",
+      "company": "Helvetia Transport SA",
+      "contact": "Katrin Egger",
+      "email": "katrin.egger@helvetia2.example",
+      "sector": "Logistics",
+      "canton": "BS",
+      "annualContractValueChf": 110000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0040",
+      "company": "Appenzell Partner AG",
+      "contact": "Corinne Meier",
+      "email": "corinne.meier@appenzell.example",
+      "sector": "Manufacturing",
+      "canton": "ZH",
+      "annualContractValueChf": 1376000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0041",
+      "company": "Mittelland Industrie GmbH",
+      "contact": "Gabriela Huber",
+      "email": "gabriela.huber@mittelland.example",
+      "sector": "Fiduciary",
+      "canton": "BS",
+      "annualContractValueChf": 2710000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0042",
+      "company": "Neuenburg Versicherung Sàrl",
+      "contact": "Felix Marti",
+      "email": "felix.marti@neuenburg.example",
+      "sector": "IT services",
+      "canton": "SO",
+      "annualContractValueChf": 1380000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0043",
+      "company": "Basilea Immobilien SA",
+      "contact": "Karin Ott",
+      "email": "karin.ott@basilea.example",
+      "sector": "Manufacturing",
+      "canton": "GE",
+      "annualContractValueChf": 2678000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0044",
+      "company": "Jungfrau Bau SA",
+      "contact": "Yves Oberholzer",
+      "email": "yves.oberholzer@jungfrau3.example",
+      "sector": "Logistics",
+      "canton": "BS",
+      "annualContractValueChf": 3852000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0045",
+      "company": "Titlis Consulting GmbH",
+      "contact": "Dominik Marti",
+      "email": "dominik.marti@titlis4.example",
+      "sector": "Logistics",
+      "canton": "ZH",
+      "annualContractValueChf": 1137000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0046",
+      "company": "Pilatus Logistik AG",
+      "contact": "Esther Dubois",
+      "email": "esther.dubois@pilatus.example",
+      "sector": "Insurance broking",
+      "canton": "VD",
+      "annualContractValueChf": 4168000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0047",
+      "company": "Limmat Kommunikation AG",
+      "contact": "Dominik Egger",
+      "email": "dominik.egger@limmat2.example",
+      "sector": "Engineering",
+      "canton": "VD",
+      "annualContractValueChf": 519000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0048",
+      "company": "Toggenburg Technik GmbH",
+      "contact": "Nadia Nussbaumer",
+      "email": "nadia.nussbaumer@toggenburg.example",
+      "sector": "Insurance broking",
+      "canton": "SO",
+      "annualContractValueChf": 961000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0049",
+      "company": "Ticino Systeme GmbH",
+      "contact": "Corinne Keller",
+      "email": "corinne.keller@ticino2.example",
+      "sector": "Fiduciary",
+      "canton": "GE",
+      "annualContractValueChf": 3933000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0050",
+      "company": "Helvetia Pharma AG",
+      "contact": "Andrea Iten",
+      "email": "andrea.iten@helvetia3.example",
+      "sector": "Pharma",
+      "canton": "ZG",
+      "annualContractValueChf": 4032000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0051",
+      "company": "Seeland Consulting AG",
+      "contact": "Gabriela Rüegg",
+      "email": "gabriela.rueegg@seeland4.example",
+      "sector": "Wholesale trade",
+      "canton": "SG",
+      "annualContractValueChf": 1620000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0052",
+      "company": "Helvetia Handel SA",
+      "contact": "Heinz Meier",
+      "email": "heinz.meier@helvetia4.example",
+      "sector": "Manufacturing",
+      "canton": "SO",
+      "annualContractValueChf": 895000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0053",
+      "company": "Sempach Partner SA",
+      "contact": "Joachim Cavelti",
+      "email": "joachim.cavelti@sempach2.example",
+      "sector": "Insurance broking",
+      "canton": "BE",
+      "annualContractValueChf": 3676000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0054",
+      "company": "Furka Kommunikation AG",
+      "contact": "Thomas Iten",
+      "email": "thomas.iten@furka4.example",
+      "sector": "Logistics",
+      "canton": "NE",
+      "annualContractValueChf": 3447000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0055",
+      "company": "Engadin Werkstoffe GmbH",
+      "contact": "Beat Lehmann",
+      "email": "beat.lehmann@engadin2.example",
+      "sector": "Energy",
+      "canton": "BE",
+      "annualContractValueChf": 2495000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0056",
+      "company": "Splügen Transport AG",
+      "contact": "Irene Kobel",
+      "email": "irene.kobel@spluegen2.example",
+      "sector": "Logistics",
+      "canton": "AG",
+      "annualContractValueChf": 537000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0057",
+      "company": "Säntis Services GmbH",
+      "contact": "Yves Lüthi",
+      "email": "yves.luethi@saentis2.example",
+      "sector": "Manufacturing",
+      "canton": "SO",
+      "annualContractValueChf": 1637000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0058",
+      "company": "Helvetia Analytik AG",
+      "contact": "Heinz Jaquet",
+      "email": "heinz.jaquet@helvetia5.example",
+      "sector": "Engineering",
+      "canton": "BS",
+      "annualContractValueChf": 3232000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0059",
+      "company": "Sempach Handel AG",
+      "contact": "Nadia Imhof",
+      "email": "nadia.imhof@sempach3.example",
+      "sector": "Insurance broking",
+      "canton": "AG",
+      "annualContractValueChf": 2920000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0060",
+      "company": "Thun Logistik SA",
+      "contact": "Stefan Steiner",
+      "email": "stefan.steiner@thun2.example",
+      "sector": "Insurance broking",
+      "canton": "ZH",
+      "annualContractValueChf": 1455000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0061",
+      "company": "Thun Kommunikation GmbH",
+      "contact": "Hansruedi Fankhauser",
+      "email": "hansruedi.fankhauser@thun3.example",
+      "sector": "Insurance broking",
+      "canton": "FR",
+      "annualContractValueChf": 1760000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0062",
+      "company": "Zermatt Technik AG",
+      "contact": "Xenia Rüegg",
+      "email": "xenia.rueegg@zermatt2.example",
+      "sector": "IT services",
+      "canton": "ZH",
+      "annualContractValueChf": 1173000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0063",
+      "company": "Mittelland Treuhand AG",
+      "contact": "Daniel Frei",
+      "email": "daniel.frei@mittelland2.example",
+      "sector": "Engineering",
+      "canton": "GE",
+      "annualContractValueChf": 3736000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0064",
+      "company": "Oberland Partner Sàrl",
+      "contact": "Lukas Ammann",
+      "email": "lukas.ammann@oberland3.example",
+      "sector": "Facility management",
+      "canton": "AG",
+      "annualContractValueChf": 3083000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0065",
+      "company": "Titlis Industrie SA",
+      "contact": "Monika Vogel",
+      "email": "monika.vogel@titlis5.example",
+      "sector": "Engineering",
+      "canton": "ZH",
+      "annualContractValueChf": 2657000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0066",
+      "company": "Lavaux Datentechnik GmbH",
+      "contact": "Ombretta Jaquet",
+      "email": "ombretta.jaquet@lavaux3.example",
+      "sector": "Energy",
+      "canton": "NE",
+      "annualContractValueChf": 3118000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0067",
+      "company": "Neuenburg Transport Sàrl",
+      "contact": "Xenia Vogel",
+      "email": "xenia.vogel@neuenburg2.example",
+      "sector": "Insurance broking",
+      "canton": "GE",
+      "annualContractValueChf": 3683000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0068",
+      "company": "Basilea Bau AG",
+      "contact": "Lukas Iten",
+      "email": "lukas.iten@basilea2.example",
+      "sector": "Fiduciary",
+      "canton": "VS",
+      "annualContractValueChf": 554000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0069",
+      "company": "Zermatt Services AG",
+      "contact": "Marlène Ott",
+      "email": "marlene.ott@zermatt3.example",
+      "sector": "Energy",
+      "canton": "VD",
+      "annualContractValueChf": 62000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0070",
+      "company": "Rhein Energie AG",
+      "contact": "Felix Tschudi",
+      "email": "felix.tschudi@rhein.example",
+      "sector": "Fiduciary",
+      "canton": "GE",
+      "annualContractValueChf": 1241000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0071",
+      "company": "Engadin Transport GmbH",
+      "contact": "Lukas Gerber",
+      "email": "lukas.gerber@engadin3.example",
+      "sector": "Energy",
+      "canton": "SG",
+      "annualContractValueChf": 1792000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0072",
+      "company": "Lugano Industrie GmbH",
+      "contact": "Irene Held",
+      "email": "irene.held@lugano.example",
+      "sector": "Construction",
+      "canton": "TI",
+      "annualContractValueChf": 3094000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0073",
+      "company": "Brienz Services SA",
+      "contact": "Yves Frei",
+      "email": "yves.frei@brienz.example",
+      "sector": "IT services",
+      "canton": "ZH",
+      "annualContractValueChf": 1647000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0074",
+      "company": "Rhein Handel GmbH",
+      "contact": "Heinz Kobel",
+      "email": "heinz.kobel@rhein2.example",
+      "sector": "IT services",
+      "canton": "NE",
+      "annualContractValueChf": 4070000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0075",
+      "company": "Ticino Handel AG",
+      "contact": "Stefan Egger",
+      "email": "stefan.egger@ticino3.example",
+      "sector": "Facility management",
+      "canton": "BS",
+      "annualContractValueChf": 2041000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0076",
+      "company": "Alpina Kommunikation GmbH",
+      "contact": "Andrea Vogel",
+      "email": "andrea.vogel@alpina4.example",
+      "sector": "Facility management",
+      "canton": "VD",
+      "annualContractValueChf": 1792000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0077",
+      "company": "Furka Finanz GmbH",
+      "contact": "Werner Held",
+      "email": "werner.held@furka5.example",
+      "sector": "Manufacturing",
+      "canton": "GR",
+      "annualContractValueChf": 3047000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0078",
+      "company": "Emmental Transport GmbH",
+      "contact": "Monika Pfister",
+      "email": "monika.pfister@emmental2.example",
+      "sector": "IT services",
+      "canton": "VS",
+      "annualContractValueChf": 534000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0079",
+      "company": "Vierwald Partner Sàrl",
+      "contact": "Zoé Christen",
+      "email": "zoe.christen@vierwald.example",
+      "sector": "Pharma",
+      "canton": "BS",
+      "annualContractValueChf": 3420000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0080",
+      "company": "Sempach Datentechnik AG",
+      "contact": "Lukas Pfister",
+      "email": "lukas.pfister@sempach4.example",
+      "sector": "Logistics",
+      "canton": "SG",
+      "annualContractValueChf": 2004000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0081",
+      "company": "Jungfrau Transport GmbH",
+      "contact": "Laurent Gerber",
+      "email": "laurent.gerber@jungfrau4.example",
+      "sector": "Logistics",
+      "canton": "VS",
+      "annualContractValueChf": 1165000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0082",
+      "company": "Bernina Handel SA",
+      "contact": "Isabelle Ott",
+      "email": "isabelle.ott@bernina2.example",
+      "sector": "IT services",
+      "canton": "VS",
+      "annualContractValueChf": 2059000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0083",
+      "company": "Bernina Alta Kommunikation SA",
+      "contact": "Jonas Gsteiger",
+      "email": "jonas.gsteiger@bernina3.example",
+      "sector": "Facility management",
+      "canton": "AG",
+      "annualContractValueChf": 714000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0084",
+      "company": "Simplon Logistik AG",
+      "contact": "Werner Lüthi",
+      "email": "werner.luethi@simplon3.example",
+      "sector": "Energy",
+      "canton": "AG",
+      "annualContractValueChf": 160000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0085",
+      "company": "Limmat Services Sàrl",
+      "contact": "Céline Ulrich",
+      "email": "celine.ulrich@limmat3.example",
+      "sector": "Energy",
+      "canton": "TI",
+      "annualContractValueChf": 2391000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0086",
+      "company": "Ticino Immobilien AG",
+      "contact": "Nicolas Zimmermann",
+      "email": "nicolas.zimmermann@ticino4.example",
+      "sector": "Engineering",
+      "canton": "TG",
+      "annualContractValueChf": 830000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0087",
+      "company": "Toggenburg Finanz AG",
+      "contact": "Katrin Oberholzer",
+      "email": "katrin.oberholzer@toggenburg2.example",
+      "sector": "Construction",
+      "canton": "GE",
+      "annualContractValueChf": 2404000,
+      "riskBand": "Elevated"
+    },
+    {
+      "id": "PTR-0088",
+      "company": "Mittelland Treuhand Sàrl",
+      "contact": "Quentin Bachmann",
+      "email": "quentin.bachmann@mittelland3.example",
+      "sector": "Facility management",
+      "canton": "VS",
+      "annualContractValueChf": 2457000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0089",
+      "company": "Alpina Werkstoffe GmbH",
+      "contact": "Elena Huber",
+      "email": "elena.huber@alpina5.example",
+      "sector": "IT services",
+      "canton": "TG",
+      "annualContractValueChf": 1688000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0090",
+      "company": "Sempach Consulting AG",
+      "contact": "Joachim Brunner",
+      "email": "joachim.brunner@sempach5.example",
+      "sector": "IT services",
+      "canton": "NE",
+      "annualContractValueChf": 582000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0091",
+      "company": "Gotthard Partner AG",
+      "contact": "Thomas Rüegg",
+      "email": "thomas.rueegg@gotthard2.example",
+      "sector": "Fiduciary",
+      "canton": "SG",
+      "annualContractValueChf": 2079000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0092",
+      "company": "Sempach Bau AG",
+      "contact": "Bruno Iten",
+      "email": "bruno.iten@sempach6.example",
+      "sector": "Real estate",
+      "canton": "ZH",
+      "annualContractValueChf": 1841000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0093",
+      "company": "Helvetia Immobilien AG",
+      "contact": "Elena Nussbaumer",
+      "email": "elena.nussbaumer@helvetia6.example",
+      "sector": "Fiduciary",
+      "canton": "BS",
+      "annualContractValueChf": 3179000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0094",
+      "company": "Bernina Alta Treuhand SA",
+      "contact": "Yves Lüthi",
+      "email": "yves.luethi@bernina4.example",
+      "sector": "Facility management",
+      "canton": "GR",
+      "annualContractValueChf": 1147000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0095",
+      "company": "Emmental Handel SA",
+      "contact": "Ursula Schmid",
+      "email": "ursula.schmid@emmental3.example",
+      "sector": "Manufacturing",
+      "canton": "BS",
+      "annualContractValueChf": 1053000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0096",
+      "company": "Rigi Transport AG",
+      "contact": "Thomas Iten",
+      "email": "thomas.iten@rigi2.example",
+      "sector": "IT services",
+      "canton": "ZG",
+      "annualContractValueChf": 1326000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0097",
+      "company": "Solothurn Consulting SA",
+      "contact": "Isabelle Imhof",
+      "email": "isabelle.imhof@solothurn.example",
+      "sector": "Construction",
+      "canton": "TI",
+      "annualContractValueChf": 3416000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0098",
+      "company": "Bernina Alta Pharma SA",
+      "contact": "Céline Schmid",
+      "email": "celine.schmid@bernina5.example",
+      "sector": "Wholesale trade",
+      "canton": "VD",
+      "annualContractValueChf": 2218000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0099",
+      "company": "Klausen Energie SA",
+      "contact": "Valérie Brunner",
+      "email": "valerie.brunner@klausen.example",
+      "sector": "Insurance broking",
+      "canton": "SO",
+      "annualContractValueChf": 3105000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0100",
+      "company": "Titlis Energie SA",
+      "contact": "Marlène Zimmermann",
+      "email": "marlene.zimmermann@titlis6.example",
+      "sector": "Pharma",
+      "canton": "VD",
+      "annualContractValueChf": 2279000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0101",
+      "company": "Winterthur Services AG",
+      "contact": "Zoé Frei",
+      "email": "zoe.frei@winterthur.example",
+      "sector": "Energy",
+      "canton": "TG",
+      "annualContractValueChf": 2202000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0102",
+      "company": "Solothurn Bau GmbH",
+      "contact": "Bruno Dubois",
+      "email": "bruno.dubois@solothurn2.example",
+      "sector": "Facility management",
+      "canton": "SG",
+      "annualContractValueChf": 1587000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0103",
+      "company": "Solothurn Pharma GmbH",
+      "contact": "Werner Steiner",
+      "email": "werner.steiner@solothurn3.example",
+      "sector": "Pharma",
+      "canton": "VS",
+      "annualContractValueChf": 2109000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0104",
+      "company": "Brienz Analytik AG",
+      "contact": "Joachim Schmid",
+      "email": "joachim.schmid@brienz2.example",
+      "sector": "Wholesale trade",
+      "canton": "FR",
+      "annualContractValueChf": 2481000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0105",
+      "company": "Lugano Treuhand GmbH",
+      "contact": "Bruno Pfister",
+      "email": "bruno.pfister@lugano2.example",
+      "sector": "Logistics",
+      "canton": "LU",
+      "annualContractValueChf": 1525000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0106",
+      "company": "Lugano Consulting AG",
+      "contact": "Dominik Huber",
+      "email": "dominik.huber@lugano3.example",
+      "sector": "Pharma",
+      "canton": "TG",
+      "annualContractValueChf": 1462000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0107",
+      "company": "Pilatus Finanz AG",
+      "contact": "Stefan Frei",
+      "email": "stefan.frei@pilatus2.example",
+      "sector": "Manufacturing",
+      "canton": "BS",
+      "annualContractValueChf": 1583000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0108",
+      "company": "Rigi Datentechnik GmbH",
+      "contact": "Andrea Bachmann",
+      "email": "andrea.bachmann@rigi3.example",
+      "sector": "Fiduciary",
+      "canton": "TI",
+      "annualContractValueChf": 1212000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0109",
+      "company": "Furka Bau SA",
+      "contact": "Quentin Niederer",
+      "email": "quentin.niederer@furka6.example",
+      "sector": "Energy",
+      "canton": "GR",
+      "annualContractValueChf": 1305000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0110",
+      "company": "Verbier Handel AG",
+      "contact": "Xenia Huber",
+      "email": "xenia.huber@verbier3.example",
+      "sector": "Construction",
+      "canton": "GR",
+      "annualContractValueChf": 534000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0111",
+      "company": "Oberland Werkstoffe SA",
+      "contact": "Monika Schmid",
+      "email": "monika.schmid@oberland4.example",
+      "sector": "Logistics",
+      "canton": "GE",
+      "annualContractValueChf": 3274000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0112",
+      "company": "Grimsel Finanz AG",
+      "contact": "Esther Meier",
+      "email": "esther.meier@grimsel2.example",
+      "sector": "Wholesale trade",
+      "canton": "BS",
+      "annualContractValueChf": 1271000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0113",
+      "company": "Grimsel Partner AG",
+      "contact": "Bruno Huber",
+      "email": "bruno.huber@grimsel3.example",
+      "sector": "Manufacturing",
+      "canton": "VD",
+      "annualContractValueChf": 837000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0114",
+      "company": "Lugano Services AG",
+      "contact": "Lukas Jenni",
+      "email": "lukas.jenni@lugano4.example",
+      "sector": "Fiduciary",
+      "canton": "BS",
+      "annualContractValueChf": 2431000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0115",
+      "company": "Titlis Treuhand Sàrl",
+      "contact": "Dominik Bachmann",
+      "email": "dominik.bachmann@titlis7.example",
+      "sector": "Engineering",
+      "canton": "GE",
+      "annualContractValueChf": 1139000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0116",
+      "company": "Rigi Analytik SA",
+      "contact": "Hansruedi Niederer",
+      "email": "hansruedi.niederer@rigi4.example",
+      "sector": "Logistics",
+      "canton": "TI",
+      "annualContractValueChf": 3464000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0117",
+      "company": "Zermatt Services SA",
+      "contact": "Elena Niederer",
+      "email": "elena.niederer@zermatt4.example",
+      "sector": "Manufacturing",
+      "canton": "NE",
+      "annualContractValueChf": 3658000,
+      "riskBand": "Low"
+    },
+    {
+      "id": "PTR-0118",
+      "company": "Aare Bau Sàrl",
+      "contact": "Hansruedi Meier",
+      "email": "hansruedi.meier@aare3.example",
+      "sector": "Facility management",
+      "canton": "BE",
+      "annualContractValueChf": 1516000,
+      "riskBand": "High"
+    },
+    {
+      "id": "PTR-0119",
+      "company": "Matterhorn Werkstoffe AG",
+      "contact": "Yves Huber",
+      "email": "yves.huber@matterhorn.example",
+      "sector": "Real estate",
+      "canton": "TG",
+      "annualContractValueChf": 3854000,
+      "riskBand": "Medium"
+    },
+    {
+      "id": "PTR-0120",
+      "company": "Alpina Transport GmbH",
+      "contact": "Andrea Ott",
+      "email": "andrea.ott@alpina6.example",
+      "sector": "Pharma",
+      "canton": "TI",
+      "annualContractValueChf": 3476000,
+      "riskBand": "Low"
+    }
+  ]
+}
