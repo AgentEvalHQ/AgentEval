@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0-beta] - 2026-08-22
+
 ### Added
+
+- **PartnerDesk "The Trusted Supplier" sample** (`samples/AgentEval.PartnerDeskDemo`) — a
+  third-party MCP turns a well-behaved due-diligence agent into a data-exfiltration tool, and
+  Gatekeeper stops it at two levels. One MAF `ChatClientAgent`, two faked local tools over a 120-row
+  synthetic register, and **PartnerIntel, a real MCP server run as a child process over stdio** with
+  an evil mode that appends a poisoned processing directive to an otherwise correct report.
+
+  Four phases on one keypress: clean, compromised (the register walks out silently), Level 1 where
+  `ToolUsageContractGate` + `PartnerRegisterScopeGate` refuse the export before execution **while
+  the trace still proves the agent attempted it**, and Level 2 where `HiddenInstructionPrefilterGate`
+  withholds the poisoned MCP result from model context and the finding drives containment of the MCP
+  source. 75 tests assert over the recorded trajectory, the tool-effect ledger and Gatekeeper's
+  verdicts — never console text — with a scripted model for determinism but the real MCP child
+  process, real gates and real containment.
+
 
 - **Empty-response rate per probe arm is now a published, gated statistic.** `probes.empty_rate_by_arm`
   records calls, empties and rate for every arm, and a corpus test refuses any arm above its
@@ -23,6 +40,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gate failure at authoring time. The V2 0/1436 against V3 258/387 spread is what makes the
   statistic worth gating -- it separates a healthy arm from a broken one with no overlap.
 
+
+- **Required-evidence coverage, counted at both the retrieval and the answer-context boundary.**
+  `QuestionEvidenceDiagnostics` gains `RequiredEvidenceSessionCount`,
+  `RequiredEvidenceSessionsRetrieved` and `RequiredEvidenceSessionsInAnswerContext`.
+
+  Every gold diagnostic before this was an `Any` over `Retrieved`. That is adequate only when one
+  session carries the answer: for a question assembled from four, one-of-four and four-of-four both
+  report `GoldSessionPresent: true`. And `AnswerContext` -- the references actually supplied to the
+  answer model -- carried no gold analysis at all, so retrieval could rank every required session in
+  the top four and a downstream context budget could drop three of them with nothing to show it.
+
+  A consumer hit exactly that, and had to infer it from which way the answers were wrong. The
+  inference was wrong and they retracted it. The gap between `...Retrieved` and
+  `...InAnswerContext` measures it directly.
+
+  Session-based rather than text-based, so it needs no evidence content and works under
+  `EvidenceCaptureMode.References` with no privacy implication. `...InAnswerContext` is null when
+  no answer-context reference carries a session ID, and observability is decided independently of
+  the retrieval lists: an adapter may instrument one boundary and not the other, and a confident
+  zero there is indistinguishable from a budget that dropped everything.
+
+  The blind spot sat where it did for a structural reason. Across the family, six verticals have a
+  median of one required session and Arithmetic has a median of four with a floor of three -- so the
+  any-check was near-exact everywhere except the one vertical that assembles.
+
+### Changed
+
+- **The probe capture path no longer manufactures silence.** It retries a length-truncated empty
+  completion once at a larger budget (ceiling 8000), records `finish_reason`, content-filter verdict
+  and token usage for any that remain, and **stops serving an empty cache entry as a purchased
+  answer** -- 455 of 4033 entries are empty, and without that last change a re-run replays them from
+  disk and the retry never fires.
+
 ### Fixed
 
 - **The length-retry is bounded in attempts, not tokens**, and no longer shares the transport retry
@@ -37,7 +87,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bytes.
 
 
-### Fixed
 
 - **V3 and V6 pass when the model says nothing, and two thirds of V3's calls said nothing.**
   Chasing the V8/V9 silence defect into the call cache found the same fault pointing the other way,
@@ -57,16 +106,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the answer -- are the highest. That is a reasoning deployment spending its completion budget on
   reasoning tokens before emitting content.
 
-### Changed
-
-- **The probe capture path no longer manufactures silence.** It retries a length-truncated empty
-  completion once at a larger budget (ceiling 8000), records `finish_reason`, content-filter verdict
-  and token usage for any that remain, and **stops serving an empty cache entry as a purchased
-  answer** -- 455 of 4033 entries are empty, and without that last change a re-run replays them from
-  disk and the retry never fires.
-
-
-### Fixed
 
 - **Half of this family's V8 failures were silence, counted as wrong answers.** Across the seven
   corpora, **5 of 10 V8 failures and 32 of 111 V9 failures have no captured answer at all** --
@@ -102,34 +141,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently move published numbers.
 
 
-### Added
-
-- **Required-evidence coverage, counted at both the retrieval and the answer-context boundary.**
-  `QuestionEvidenceDiagnostics` gains `RequiredEvidenceSessionCount`,
-  `RequiredEvidenceSessionsRetrieved` and `RequiredEvidenceSessionsInAnswerContext`.
-
-  Every gold diagnostic before this was an `Any` over `Retrieved`. That is adequate only when one
-  session carries the answer: for a question assembled from four, one-of-four and four-of-four both
-  report `GoldSessionPresent: true`. And `AnswerContext` -- the references actually supplied to the
-  answer model -- carried no gold analysis at all, so retrieval could rank every required session in
-  the top four and a downstream context budget could drop three of them with nothing to show it.
-
-  A consumer hit exactly that, and had to infer it from which way the answers were wrong. The
-  inference was wrong and they retracted it. The gap between `...Retrieved` and
-  `...InAnswerContext` measures it directly.
-
-  Session-based rather than text-based, so it needs no evidence content and works under
-  `EvidenceCaptureMode.References` with no privacy implication. `...InAnswerContext` is null when
-  no answer-context reference carries a session ID, and observability is decided independently of
-  the retrieval lists: an adapter may instrument one boundary and not the other, and a confident
-  zero there is indistinguishable from a budget that dropped everything.
-
-  The blind spot sat where it did for a structural reason. Across the family, six verticals have a
-  median of one required session and Arithmetic has a median of four with a floor of three -- so the
-  any-check was near-exact everywhere except the one vertical that assembles.
-
-
-### Fixed
 
 - **No vertical has a validated difficulty ladder, and the rule that said otherwise was certifying
   artifacts.** Every corpus now carries `difficulty_validated: false`. The bands describe how the
@@ -174,7 +185,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   simply a harder operation (V8 0.33 against 1.00) that no band arrangement changes.
 
 
-### Fixed
 
 - **Part of the published `V1 − V9` headroom is unreachable by any ranker, and we said otherwise.**
   Having found that the calibration scaffolding depresses BM25, we told a consuming project to expect
@@ -207,7 +217,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every re-run since is paid for again.
 
 
-### Fixed
 
 - **`V1 − V9` is an upper bound, not an estimate — the caveat is now published beside the number.**
   The calibration gate manufactures its difficulty by injecting the question's own vocabulary into
@@ -231,7 +240,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/measure_scaffolding_dependence.py`, and disclosed in the guide beside the headroom table it
   qualifies. **Difficulty that a one-line regex defeats is not difficulty**; earning it from
   naturalistic same-domain competition is a generation change and is the next corpus revision.
-
 
 ## [0.26.0-beta] - 2026-08-20
 
