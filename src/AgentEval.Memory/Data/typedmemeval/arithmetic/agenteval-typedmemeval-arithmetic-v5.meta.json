@@ -1406,6 +1406,22 @@
         ]
       },
       "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
+    },
+    "empty_completion_disclosure": {
+      "measured_over": "the 4033 cached reference-model calls present in this tree, attributed by cache-key arm; not necessarily the full historical run",
+      "empty_completion_rate": {
+        "v1": "0/220",
+        "v2": "0/1436",
+        "v3": "258/387 (66.7%)",
+        "v6": "182/861 (21.1%)",
+        "v8": "3/217",
+        "v9": "8/212"
+      },
+      "direction": {
+        "v8_v9": "CONSERVATIVE. An empty completion cannot match gold, so it scores as a failure and the published pass count is a lower bound.",
+        "v3_v6": "ANTI-CONSERVATIVE, and this is the serious one. V3 passes when an ablated context FAILS to reproduce the answer, and an empty completion cannot reproduce anything, so silence scores as a PASS. V6 has the same shape. Two thirds of V3's calls are empty, so its 50/50 results certify less than they appear to."
+      },
+      "reading": "An empty completion is not evidence of anything, but the probe arms treated it as evidence in both directions at once. The likely cause is a reasoning deployment spending the completion budget on reasoning tokens before emitting content -- V2, whose prompt carries no session context, has a zero rate, while V3 and V6, which ask the model to work hard over a context that no longer contains the answer, have the highest. V3 AND V6 MUST BE RE-RUN BEFORE THEY ARE CITED AGAIN. V1, V2, V7 are unaffected. The capture path now retries a length-truncated empty at a larger budget, records finish_reason, filter verdict and usage for any that remain, and no longer serves an empty cache entry as a purchased answer."
     }
   }
 }

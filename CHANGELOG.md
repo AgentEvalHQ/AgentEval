@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **V3 and V6 pass when the model says nothing, and two thirds of V3's calls said nothing.**
+  Chasing the V8/V9 silence defect into the call cache found the same fault pointing the other way,
+  and this direction is the dangerous one. Over the 4033 cached reference-model calls in this tree:
+  **V3 258/387 empty (66.7%), V6 182/861 (21.1%)**, against **V1 0/220, V2 0/1436, V8 3/217,
+  V9 8/212**.
+
+  V3 passes when a gold-ablated context FAILS to reproduce the answer (`record["v3"] = not leaked`).
+  An empty completion cannot reproduce anything, so **silence scores as a pass**. V6 has the same
+  shape. Where V8/V9 silence is conservative -- it can only understate a ceiling -- V3/V6 silence
+  is **anti-conservative**: it certifies validity the evidence does not support.
+
+  **V3 and V6 must be re-run before they are cited again.** V1, V2 and V7 are unaffected and stand.
+
+  The likely cause is visible in the distribution: V2, whose prompt carries no session context, is
+  at zero, while V3 and V6 -- which ask the model to work hard over a context that no longer holds
+  the answer -- are the highest. That is a reasoning deployment spending its completion budget on
+  reasoning tokens before emitting content.
+
+### Changed
+
+- **The probe capture path no longer manufactures silence.** It retries a length-truncated empty
+  completion once at a larger budget (ceiling 8000), records `finish_reason`, content-filter verdict
+  and token usage for any that remain, and **stops serving an empty cache entry as a purchased
+  answer** -- 455 of 4033 entries are empty, and without that last change a re-run replays them from
+  disk and the retry never fires.
+
+
+### Fixed
+
 - **Half of this family's V8 failures were silence, counted as wrong answers.** Across the seven
   corpora, **5 of 10 V8 failures and 32 of 111 V9 failures have no captured answer at all** --
   Episodic V9 is 12 of 20, Prospective V8 is 2 of 2. Every published V8 and V9 figure therefore

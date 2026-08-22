@@ -142,13 +142,28 @@ def load_cache() -> None:
             return
 
 
+#: Hard ceiling for the retry above. A reasoning deployment can spend an arbitrary amount on
+#: reasoning; this bounds what one question may cost before we accept the silence and record it.
+_MAX_COMPLETION_CEILING = 8_000
+
+#: Why a completion came back empty, keyed by cache key. Written to the run metadata so the
+#: refusal / filter / truncation trichotomy is decidable from the record instead of inferred.
+_empty_reasons: dict[str, dict] = {}
+
+
 def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     """One chat completion, cached so an interrupted run resumes instead of re-paying."""
     load_cache()
     with _cache_lock:
-        if cache_key in _cache:
+        # An EMPTY cached value is not a purchased answer, so it is not served as one. The cache
+        # holds tens of thousands of entries, several dozen of which are the empty completions that
+        # made published arms count silence as error; without this, a re-run replays them from disk
+        # and the length-retry above never gets the chance to fire.
+        if _cache.get(cache_key):
             _stats["cache_hit"] += 1
             return _cache[cache_key]
+        if cache_key in _cache:
+            _stats["empty_cache_entry_repaid"] += 1
 
     endpoint, key, deployment = _config()
     url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={API_VERSION}"
@@ -167,7 +182,37 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             )
             with urllib.request.urlopen(request, timeout=180) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            text = (payload["choices"][0]["message"].get("content") or "").strip()
+            choice = payload["choices"][0]
+            text = (choice["message"].get("content") or "").strip()
+            finish = choice.get("finish_reason")
+
+            # An empty completion used to be indistinguishable from a wrong answer, and the probe
+            # arms counted it as one: 5 of 10 V8 failures and 32 of 111 V9 failures across the
+            # family had no captured answer. The cause is visible only in the fields this function
+            # used to throw away.
+            #
+            # On a reasoning deployment the completion budget is spent on reasoning tokens BEFORE
+            # any content is emitted, so a hard question returns finish_reason="length" with empty
+            # content while an easier one answers fine -- which is exactly the observed pattern of
+            # empties clustering on the longest contexts and on duration under V8, and of the same
+            # question answering under V9. Retried once at a larger budget rather than recorded as
+            # a failure, because a truncated reasoning trace is our instrument running out of room,
+            # not the model being wrong.
+            if not text and finish == "length" and max_tokens < _MAX_COMPLETION_CEILING:
+                _stats["retried_for_length"] += 1
+                body["max_completion_tokens" if "max_completion_tokens" in body else "max_tokens"]                     = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
+                max_tokens = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
+                continue
+
+            if not text:
+                # Still empty: record WHY, so refusal / filter / truncation stop being one bucket.
+                _stats["empty_completion"] += 1
+                _empty_reasons[cache_key] = {
+                    "finish_reason": finish,
+                    "content_filter": choice.get("content_filter_results"),
+                    "usage": payload.get("usage"),
+                }
+
             with _cache_lock:
                 _cache[cache_key] = text
                 _stats["call"] += 1
@@ -728,6 +773,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # to know that before quoting them.
         # The headline of ADR-027 SS6. `interference_cost` is V1 - V8 as a share of the questions
         # both are defined on: 0.0 means a perfect retriever buys nothing on this corpus.
+        # The trichotomy a consumer asked us to make decidable. Empty completions that survived
+        # the length-retry are recorded WITH their finish_reason, filter verdict and token usage,
+        # so a re-run that still loses answers says why instead of manufacturing a lower bound.
+        "empty_completions": {
+            "count": len(_empty_reasons),
+            "retried_for_length": _stats["retried_for_length"],
+            "by_cache_key": dict(sorted(_empty_reasons.items())),
+        } if _empty_reasons or _stats["retried_for_length"] else {"count": 0},
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
