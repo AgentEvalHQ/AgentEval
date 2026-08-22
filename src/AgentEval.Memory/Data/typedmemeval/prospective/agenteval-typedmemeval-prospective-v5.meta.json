@@ -1318,6 +1318,31 @@
       "headroom_over_lexical_retrieval": 0.3,
       "headroom_unlimited_context_over_lexical": 0.28,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
+    "no_answer_captured": {
+      "v8": {
+        "failures": 2,
+        "failures_with_no_captured_answer": 2,
+        "question_ids": [
+          "tme-pro-045",
+          "tme-pro-046"
+        ]
+      },
+      "v9": {
+        "failures": 16,
+        "failures_with_no_captured_answer": 8,
+        "question_ids": [
+          "tme-pro-015",
+          "tme-pro-016",
+          "tme-pro-023",
+          "tme-pro-027",
+          "tme-pro-045",
+          "tme-pro-046",
+          "tme-pro-047",
+          "tme-pro-048"
+        ]
+      },
+      "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
     }
   }
 }

@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Half of this family's V8 failures were silence, counted as wrong answers.** Across the seven
+  corpora, **5 of 10 V8 failures and 32 of 111 V9 failures have no captured answer at all** --
+  Episodic V9 is 12 of 20, Prospective V8 is 2 of 2. Every published V8 and V9 figure therefore
+  conflates "the model answered wrongly" with "we recorded no answer", and is a LOWER BOUND rather
+  than a measurement.
+
+  This is the same conflation the evidence envelope refuses when it reports null instead of zero,
+  and we shipped an instrument enforcing it for a consumer in the same release in which our own
+  probe pipeline was violating it.
+
+  Disclosed per corpus as `probes.no_answer_captured`, with the question IDs, rather than corrected:
+  whether an empty response is a refusal, a provider filter or a capture fault is not decidable from
+  the record, and excluding them would substitute one unexamined assumption for another. The probe
+  runner now records `failures_with_no_captured_answer` so the next run separates them at source.
+
+- **Arithmetic's `duration` shape does not state its day-counting convention, and gold silently
+  fixes one.** Gold counts a spell exclusively -- 2026/02/07 to 2026/02/10 is 3 days -- and **0 of
+  12 questions say so**, while all 12 gold answers state the spell count, making the inclusive
+  reading exactly `gold + spells`.
+
+  **Four of four duration misses across two independent oracles are exactly that reading, with
+  perfect arithmetic in every one.** Ours answered 13 against gold 11 on `tme-ari-043` while
+  stating "counting the arrival and departure dates in each spell"; a consuming project's oracle
+  answered 18/13/14 against 15/11/11. The same model answered 11 on `tme-ari-043` under V9, so the
+  convention is a coin flip by context, not a capability.
+
+  So `duration`'s headline -- V1 11/12 collapsing to V8 5/12, and all six of Arithmetic's
+  interference regressions -- is substantially not an interference finding: **4 of its 7 V8 failures
+  are the convention and 3 more have no captured answer.** Stamped as
+  `by_shape.duration.convention_underspecified`. Not repaired here: stating the convention in the
+  question text changes corpus bytes and is a revision decision, and widening the judge would
+  silently move published numbers.
+
+
 ### Added
 
 - **Required-evidence coverage, counted at both the retrieval and the answer-context boundary.**

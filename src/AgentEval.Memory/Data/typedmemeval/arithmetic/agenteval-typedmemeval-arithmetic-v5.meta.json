@@ -656,7 +656,17 @@
         "v8_passed": 5,
         "v9_applicable": 12,
         "v9_passed": 4,
-        "required_sessions_median": 6
+        "required_sessions_median": 6,
+        "convention_underspecified": {
+          "axis": "day-counting for a spell",
+          "gold_convention": "exclusive (2026/02/07 to 2026/02/10 counts as 3 days)",
+          "alternative": "inclusive, counting both endpoints",
+          "alternative_value": "gold value + number of spells; every gold answer states the spell count, so the alternative is exactly computable per question",
+          "stated_in_question_text": 0,
+          "of_questions": 12,
+          "observed": "Four of four duration misses across two independent oracles are exactly the inclusive reading, with perfect arithmetic in every one: our reference on tme-ari-043 answered 13 against gold 11 while stating 'counting the arrival and departure dates in each spell', and a consuming project's oracle answered 18/13/14 against gold 15/11/11 on tme-ari-041/043/046. The same model answered 11 on tme-ari-043 under V9, so the convention is a coin flip by context rather than a capability.",
+          "reading": "No duration question states which convention it wants, and gold silently fixes one. To that extent this shape measures convention-guessing rather than memory, which is the same genre of defect as difficulty a retriever defeats. Disclosed here rather than repaired: stating the convention in the question text changes corpus bytes and is a revision decision, and widening the judge would silently move already-published numbers."
+        }
       },
       "sum": {
         "questions": 14,
@@ -1373,6 +1383,29 @@
         "v6_redundant_components": []
       }
     },
-    "probed_corpus_sha256": "7c859653967ae5decc51ae07c707a838014582771cbe7347b4dae889872f9881"
+    "probed_corpus_sha256": "7c859653967ae5decc51ae07c707a838014582771cbe7347b4dae889872f9881",
+    "no_answer_captured": {
+      "v8": {
+        "failures": 7,
+        "failures_with_no_captured_answer": 3,
+        "question_ids": [
+          "tme-ari-040",
+          "tme-ari-041",
+          "tme-ari-047"
+        ]
+      },
+      "v9": {
+        "failures": 32,
+        "failures_with_no_captured_answer": 5,
+        "question_ids": [
+          "tme-ari-040",
+          "tme-ari-041",
+          "tme-ari-042",
+          "tme-ari-049",
+          "tme-ari-050"
+        ]
+      },
+      "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
+    }
   }
 }

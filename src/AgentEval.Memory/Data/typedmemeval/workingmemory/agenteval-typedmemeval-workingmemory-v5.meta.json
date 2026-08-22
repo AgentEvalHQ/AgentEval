@@ -1462,6 +1462,18 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0"
+    "probed_corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0",
+    "no_answer_captured": {
+      "v9": {
+        "failures": 7,
+        "failures_with_no_captured_answer": 3,
+        "question_ids": [
+          "tme-wm-004",
+          "tme-wm-059",
+          "tme-wm-060"
+        ]
+      },
+      "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
+    }
   }
 }

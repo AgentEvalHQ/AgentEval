@@ -598,6 +598,16 @@ def _interference(records: list[dict]) -> dict:
         "interference_cost": round((v1 - v8) / len(both), 4),
         "regressed_under_interference": sorted(
             r["question_id"] for r in both if r["v1"] and not r["v8"]),
+        # A failure with no captured answer is NOT a wrong answer, and counting it as one is the
+        # same conflation the evidence envelope refuses when it reports null instead of zero. Half
+        # of this family's V8 failures had an empty response, so a reader comparing their system
+        # against a published ceiling was comparing against a number partly made of silence.
+        # Reported rather than excluded: whether an empty response is a refusal, a filter or a
+        # capture fault is not decidable from the record, and excluding it would substitute one
+        # unexamined assumption for another.
+        "failures_with_no_captured_answer": sorted(
+            r["question_id"] for r in both
+            if r["v1"] and not r["v8"] and not (r.get("v8_answer") or "").strip()),
         "reading": ("V1 minus V8 as a share of the questions both are defined on. 0.0 means a "
                     "perfect retriever and no retriever produce the same answers here, so no two "
                     "retrievers can be distinguished on this corpus."),
