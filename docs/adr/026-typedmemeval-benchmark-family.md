@@ -1379,6 +1379,12 @@ ceiling does not move, which is what makes the ladder a measurement of memory ra
 answer model. That is the first time anything in this family has been positively demonstrated to
 grade memory difficulty rather than merely asserted to.
 
+> **SUPERSEDED BY §20 (2026-08-21).** It was not demonstrated. The coverage column above is ranked
+> with the calibration scaffolding in place and is not compared against the structural ceiling
+> `min(1, K/G)`; correct for both and WorkingMemory reads 1.00 / 1.00 / 1.00 / 1.00 / 1.00 and
+> Episodic falls only because `G > K_ref`. Both stamps are retired. The table is kept as written
+> because it is what the rule certified at the time, which is the fact §20 has to explain.
+
 Arithmetic fails the second half, and the cause is locatable: its two lowest bands sit at 0.83 and
 0.82 against 1.00 above them, because the `duration` shape lives at two and three inputs and
 `duration` is where the answer model struggles (8/12 on its own). So bands 1-2 mix dispersion with
@@ -1600,6 +1606,56 @@ cleared Episodic.
 **Why v5 and not a v4 respin.** v4 is published. Different bytes under a shipped revision label is
 the benchmark-identity violation this family has a rule against, and the rule does not have an
 exception for "the old bytes were wrong" — that is the case it exists for.
+
+### 20. No vertical has a validated difficulty ladder, and the rule that said otherwise was measuring artifacts (2026-08-21)
+
+§16 introduced difficulty bands validated in two halves: the reference retriever's coverage must
+slope across the bands, and the answer model on gold alone must stay flat. §19 tightened the second
+half and reclassified two verticals. **The first half was measuring two artifacts, and once both are
+removed nothing in the family validates.**
+
+**Artifact one — the calibration scaffolding.** BM25 coverage is dragged into band by injecting the
+question's own vocabulary into distractors as a bracketed clause. Strip it from the distractors and
+coverage rises by +0.10 to +0.34 (see the guide's `scaffolding_dependence`). A ladder validated on
+un-stripped coverage is validated on how a bag-of-words retriever copes with a keyword list.
+
+**Artifact two — the structural ceiling.** With a top-`K` budget and `G` gold sessions, no retriever
+can exceed `min(1, K/G)`. A dial that moves `G` therefore moves coverage without touching retrieval.
+
+**Neither correction works alone, which is why this survived.** On Arithmetic the shortfall against
+the ceiling varies by 0.36 with the scaffolding in and by **0.000** with it out: the artifact was
+covering for the ceiling, and a ceiling check on un-stripped coverage sees a real-looking spread.
+
+**With both applied, every band of every vertical sits on its structural ceiling**, and the family's
+only validated ladder loses its stamp:
+
+| Vertical | coverage as gated | scaffolding-stripped | verdict |
+|---|---|---|---|
+| **WorkingMemory** | 1.00 / 1.00 / 1.00 / **0.67** / **0.75** | 1.00 / 1.00 / 1.00 / 1.00 / 1.00 | **does not slope** |
+| Arithmetic | 0.79 / 0.84 / 0.57 / 0.31 | 1.00 / 1.00 / 1.00 / 0.83 | falls only because `G > K` |
+| Bitemporal, Temporal | varies | flat at 1.00 | does not slope |
+
+**WorkingMemory could not have worked, and we had already written down why.** Its dial is measured in
+*sessions between* the fact and the question. BM25 has no position component, so distance cannot move
+it except through an artifact. ADR-027 §2.2 recorded exactly that reasoning for Prospective and
+Forgetting — *"these are not retrieval dials, so no reference retriever repairs them"* — and we did
+not apply it to the one vertical whose ladder we were citing. The stamp is retired.
+
+**What the bands are now.** They describe how the corpus was built, and nothing more. A reader is
+entitled to the construction; they are not entitled to infer that a higher rung is harder. Every
+vertical carries `difficulty_validated: false`, which is for the first time true of all of them at
+once and honest for each.
+
+**The rule itself is repaired rather than dropped.** `validate_typedmemeval_difficulty.py` now ranks
+on scaffolding-stripped text and requires the slope to survive comparison with `min(1, K/G)`. It
+would have refused every stamp this family has ever issued, which is the point: a validator that
+certifies artifacts is worse than no validator, because it launders them into published claims.
+
+**The deeper finding, stated plainly because it decides the next revision.** The generators' only
+difficulty levers are the echo knob and dispersion. The first is an artifact. The second moves the
+structural ceiling and nothing else. **So this family currently has no working difficulty mechanism
+at all**, and manufacturing one means earning competition from naturalistic same-domain content
+rather than from injected vocabulary — a generation change, and the next corpus revision.
 
 ## Consequences
 

@@ -128,6 +128,47 @@ public sealed class QuestionEvidenceDiagnostics
     /// <summary>First retrieval rank containing a gold evidence session.</summary>
     public int? FirstGoldRank { get; init; }
 
+    /// <summary>
+    /// Distinct gold evidence sessions the question requires. Null when the entry declares none.
+    /// </summary>
+    /// <remarks>
+    /// The denominator for the two counts below. Reported separately so a consumer never has to
+    /// reconstruct it from a benchmark file to interpret them.
+    /// </remarks>
+    public int? RequiredEvidenceSessionCount { get; init; }
+
+    /// <summary>
+    /// How many required evidence sessions appear anywhere in <c>Retrieved</c>. Null when no
+    /// retrieved reference carries a source session ID.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="GoldSessionPresent"/> answers "at least one", which cannot distinguish one
+    /// required session of four from four of four. A question whose answer is assembled from
+    /// several sessions is not served by an any-check.
+    /// </remarks>
+    public int? RequiredEvidenceSessionsRetrieved { get; init; }
+
+    /// <summary>
+    /// How many required evidence sessions appear in <c>AnswerContext</c> -- the references
+    /// actually supplied to the answer model. Null when no answer-context reference carries a
+    /// source session ID.
+    /// </summary>
+    /// <remarks>
+    /// This is the one that localizes a failure, because it is measured at a different boundary
+    /// than every other gold diagnostic here. Retrieval can rank every required session highly and
+    /// a downstream context budget can still drop most of them before the model sees anything: that
+    /// shows up as a gap between this and <see cref="RequiredEvidenceSessionsRetrieved"/>, and it
+    /// is invisible to a retrieval-side check.
+    ///
+    /// Deliberately session-based rather than text-based, so it needs no evidence content and works
+    /// under <see cref="EvidenceCaptureMode.References"/> with no privacy implication.
+    ///
+    /// Null means NOT MEASURED and must never be read as zero. An adapter that supplies no
+    /// answer-context session IDs is uninstrumented, not starved, and the difference between those
+    /// two readings is the whole reason this field is nullable.
+    /// </remarks>
+    public int? RequiredEvidenceSessionsInAnswerContext { get; init; }
+
     /// <summary>Distinct source-session count among retrieved references.</summary>
     public int? DistinctSourceSessionCount { get; init; }
 

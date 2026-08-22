@@ -8,7 +8,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 60,
-  "corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933",
+  "corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0",
   "generator": {
     "tool": "tools/gen_typedmemeval_workingmemory.py",
     "version": "1.0.0",
@@ -122,12 +122,6 @@
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     },
-    "scaffolding_dependence": {
-      "bm25_coverage_as_shipped": 0.8833,
-      "bm25_coverage_without_distractor_echo": 1.0,
-      "dependence": 0.1167,
-      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
-    },
     "retrieval_ceiling": {
       "k_ref": 5,
       "coverage_scaffolding_stripped": 1.0,
@@ -135,6 +129,12 @@
       "questions_scored": 60,
       "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever.",
       "accuracy_scaffolding_stripped": 1.0
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.8833,
+      "bm25_coverage_without_distractor_echo": 1.0,
+      "dependence": 0.1167,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "probes": {
@@ -557,12 +557,12 @@
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-19T06:22:45Z",
-      "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933"
+      "measured_at": "2026-08-21T15:10:22Z",
+      "probed_corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-19T23:25:10Z",
+    "run_at": "2026-08-21T15:10:03Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -601,41 +601,83 @@
       "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
       "not_applicable_reason": "V6 is not defined for workingmemory"
     },
+    "v8_full_haystack": {
+      "applicable": 60,
+      "v1_passed": 60,
+      "v8_passed": 60,
+      "interference_cost": 0.0,
+      "regressed_under_interference": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    },
+    "v9_reference_retrieval": {
+      "applicable": 60,
+      "v1_gold_only": 60,
+      "v8_full_haystack": 60,
+      "v9_bm25_top_k": 53,
+      "headroom_over_lexical_retrieval": 0.1167,
+      "headroom_unlimited_context_over_lexical": 0.1167,
+      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
     "by_shape": {
       "distance-15": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       },
       "distance-25": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       },
       "distance-40": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 8,
+        "required_sessions_median": 1
       },
       "distance-60": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 9,
+        "required_sessions_median": 1
       },
       "distance-8": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       }
     },
     "per_question": {
@@ -655,9 +697,9 @@
       "tme-wm-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You switched to a new employer called **Pomfret Instruments**.",
+        "v8_answer": "You switched to a new employer called **Pomfret Instruments**. The outfit is called **Pomfret Instruments**.",
         "v9": true,
-        "v9_answer": "You switched to a new employer called **Pomfret Instruments**.",
+        "v9_answer": "Your new employer is Pomfret Instruments — that is the outfit’s name.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -668,7 +710,7 @@
       "tme-wm-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You switched to a new employer called **Ashlore Instruments**.",
+        "v8_answer": "You switched to a new employer called **Ashlore Instruments**. The outfit is called **Ashlore Instruments** these days.",
         "v9": true,
         "v9_answer": "You switched to a new employer called **Ashlore Instruments**.",
         "v9_gold_in_context": 1,
@@ -694,9 +736,9 @@
       "tme-wm-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You switched to a new employer called **Dunmoor Instruments**. The outfit is called **Dunmoor Instruments** these days.",
+        "v8_answer": "You switched to a new employer called **Dunmoor Instruments**.",
         "v9": false,
-        "v9_answer": "The conversations do not say which new employer you switched to, or what the outfit is called these days.\n\nThey mention Ibbetson Instruments, Calderwick Instruments, Pellick Instruments, and an agency call, but no confirmed switch or current name for the outfit.",
+        "v9_answer": "The conversations do not say plainly which new employer you switched to or what the outfit is called these days.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -967,9 +1009,9 @@
       "tme-wm-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You have joined the **Pomfret Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
+        "v8_answer": "You joined the **Pomfret Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v9": true,
-        "v9_answer": "You joined the **Pomfret Singers** this term, and they rehearse in the **old chapel** on Wednesday evening.",
+        "v9_answer": "You have joined the **Pomfret Singers** this term, and they rehearse in **the old chapel** on Wednesday evenings.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -980,9 +1022,9 @@
       "tme-wm-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You joined the **Vessik Singers** this term, and they rehearse in the **old chapel** on Wednesday evening.",
+        "v8_answer": "You joined the **Vessik Singers** this term, and they rehearse in **the old chapel** on Wednesday evenings.",
         "v9": true,
-        "v9_answer": "You joined the Vessik Singers this term, and they rehearse in the old chapel on Wednesday evening.",
+        "v9_answer": "You joined the **Vessik Singers** choir this term, and they rehearse **in the old chapel** on Wednesday evening.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -993,7 +1035,7 @@
       "tme-wm-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You joined the **Halverstock Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
+        "v8_answer": "You joined the **Halverstock Singers** this term, and they rehearse in **the old chapel** on Wednesday evenings.",
         "v9": true,
         "v9_answer": "You joined the **Halverstock Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v9_gold_in_context": 1,
@@ -1006,7 +1048,7 @@
       "tme-wm-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You joined the **Tarraby Singers** this term, and they rehearse in **the old chapel** on a Wednesday evening.",
+        "v8_answer": "You joined the **Tarraby Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v9": true,
         "v9_answer": "You joined the **Tarraby Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v9_gold_in_context": 1,
@@ -1019,9 +1061,9 @@
       "tme-wm-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You joined the **Verrick Singers** choir this term, and they rehearse **in the old chapel** on a Wednesday evening.",
+        "v8_answer": "You joined the **Verrick Singers** choir this term, and they rehearse **in the old chapel** on Wednesday evenings.",
         "v9": true,
-        "v9_answer": "You said you joined the **Verrick Singers** this term, and they rehearse **in the old chapel** on Wednesday evenings.",
+        "v9_answer": "You joined the **Verrick Singers** this term, and they rehearse in the **old chapel** on Wednesday evenings.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1032,9 +1074,9 @@
       "tme-wm-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "A Tarraby Cycles bike.",
+        "v8_answer": "You ended up buying a Tarraby Cycles bike for the commute this spring.",
         "v9": true,
-        "v9_answer": "You ended up buying a Tarraby Cycles bike.",
+        "v9_answer": "A Tarraby Cycles bike.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1060,7 +1102,7 @@
         "v8": true,
         "v8_answer": "Ashlore Cycles.",
         "v9": true,
-        "v9_answer": "You ended up buying an **Ashlore Cycles** bike for the commute this spring.",
+        "v9_answer": "Ashlore Cycles.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1071,7 +1113,7 @@
       "tme-wm-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You ended up buying a **Pomfret Cycles** bike for the commute this spring.",
+        "v8_answer": "Pomfret Cycles.",
         "v9": true,
         "v9_answer": "A Pomfret Cycles bike.",
         "v9_gold_in_context": 1,
@@ -1084,9 +1126,9 @@
       "tme-wm-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You ended up buying a Vessik Cycles bike for the commute this spring.",
+        "v8_answer": "You ended up buying a **Vessik Cycles** bike for the commute this spring.",
         "v9": true,
-        "v9_answer": "You ended up buying a **Vessik Cycles** bike.",
+        "v9_answer": "You ended up buying a Vessik Cycles bike.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1138,7 +1180,7 @@
         "v8": true,
         "v8_answer": "Pomfret Broadband.",
         "v9": false,
-        "v9_answer": "The earlier conversations do not say which broadband provider you ended up on after the switch went through.",
+        "v9_answer": "The conversations do not say which broadband provider you ended up on after the switch went through.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1151,7 +1193,7 @@
         "v8": true,
         "v8_answer": "Vessik Broadband.",
         "v9": false,
-        "v9_answer": "Larkwood Broadband.",
+        "v9_answer": "The conversations do not say which broadband provider you ended up on since the switch went through. They mention Solvane, Larkwood, and Estrey, but not that specific outcome.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1203,7 +1245,7 @@
         "v8": true,
         "v8_answer": "Brindlow Fields.",
         "v9": true,
-        "v9_answer": "Brindlow Fields.",
+        "v9_answer": "Brindlow Fields — the allotment site behind the depot.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1370,7 +1412,7 @@
       "tme-wm-057": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You signed up to the **Ashlore Circle** for the winter, and they meet **in the back room**.",
+        "v8_answer": "You signed up to the **Ashlore Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9": true,
         "v9_answer": "You signed up to the Ashlore Circle reading circle for the winter, and they meet in the back room.",
         "v9_gold_in_context": 1,
@@ -1383,9 +1425,9 @@
       "tme-wm-058": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You signed up to the **Quillon Circle** reading circle for the winter, and they meet **in the back room**.",
+        "v8_answer": "You signed up to the **Quillon Circle** for the winter, and they meet **in the back room**.",
         "v9": true,
-        "v9_answer": "You signed up to the Quillon Circle reading circle for the winter, and they meet in the back room.",
+        "v9_answer": "You signed up to the **Quillon Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1396,7 +1438,7 @@
       "tme-wm-059": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You signed up to the Brindlow Circle reading circle for the winter, and they meet in the back room.",
+        "v8_answer": "You signed up to the **Brindlow Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9": false,
         "v9_answer": "",
         "v9_gold_in_context": 0,
@@ -1409,9 +1451,9 @@
       "tme-wm-060": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You signed up to the Ondrey Circle reading circle for the winter, and they meet in the back room.",
+        "v8_answer": "You signed up to the **Ondrey Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9": false,
-        "v9_answer": "The conversations do not say which reading circle you signed up to for the winter, nor where it meets.\n\nThey only mention that you nearly signed up to Mossam Circle, were invited to Ibbetson Circle and never went, and had books belonging to Torvald Circle and Solvane Circle.",
+        "v9_answer": "",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1420,23 +1462,67 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "43df4ed5572d893cde1566cae5262791730dd5e6b3dfe68c003af4e001222933",
-    "v8_full_haystack": {
-      "applicable": 60,
-      "v1_passed": 60,
-      "v8_passed": 60,
-      "interference_cost": 0.0,
-      "regressed_under_interference": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    "probed_corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0",
+    "no_answer_captured": {
+      "v9": {
+        "failures": 7,
+        "failures_with_no_captured_answer": 3,
+        "question_ids": [
+          "tme-wm-004",
+          "tme-wm-059",
+          "tme-wm-060"
+        ]
+      },
+      "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
     },
-    "v9_reference_retrieval": {
-      "applicable": 60,
-      "v1_gold_only": 60,
-      "v8_full_haystack": 60,
-      "v9_bm25_top_k": 53,
-      "headroom_over_lexical_retrieval": 0.1167,
-      "headroom_unlimited_context_over_lexical": 0.1167,
-      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
-    }
+    "empty_completion_disclosure": {
+      "measured_over": "the 4033 cached reference-model calls present in this tree, attributed by cache-key arm; not necessarily the full historical run",
+      "empty_completion_rate": {
+        "v1": "0/220",
+        "v2": "0/1436",
+        "v3": "258/387 (66.7%)",
+        "v6": "182/861 (21.1%)",
+        "v8": "3/217",
+        "v9": "8/212"
+      },
+      "direction": {
+        "v8_v9": "CONSERVATIVE. An empty completion cannot match gold, so it scores as a failure and the published pass count is a lower bound.",
+        "v3_v6": "ANTI-CONSERVATIVE, and this is the serious one. V3 passes when an ablated context FAILS to reproduce the answer, and an empty completion cannot reproduce anything, so silence scores as a PASS. V6 has the same shape. Two thirds of V3's calls are empty, so its 50/50 results certify less than they appear to."
+      },
+      "reading": "An empty completion is not evidence of anything, but the probe arms treated it as evidence in both directions at once. The likely cause is a reasoning deployment spending the completion budget on reasoning tokens before emitting content -- V2, whose prompt carries no session context, has a zero rate, while V3 and V6, which ask the model to work hard over a context that no longer contains the answer, have the highest. V3 AND V6 MUST BE RE-RUN BEFORE THEY ARE CITED AGAIN. V1, V2, V7 are unaffected. The capture path now retries a length-truncated empty at a larger budget, records finish_reason, filter verdict and usage for any that remain, and no longer serves an empty cache entry as a purchased answer."
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "calls": 920,
+        "empty": 4,
+        "rate": 0.0043
+      },
+      "v2": {
+        "calls": 1436,
+        "empty": 0,
+        "rate": 0.0
+      },
+      "v3": {
+        "calls": 387,
+        "empty": 258,
+        "rate": 0.6667
+      },
+      "v6": {
+        "calls": 861,
+        "empty": 182,
+        "rate": 0.2114
+      },
+      "v8": {
+        "calls": 217,
+        "empty": 3,
+        "rate": 0.0138
+      },
+      "v9": {
+        "calls": 212,
+        "empty": 8,
+        "rate": 0.0377
+      }
+    },
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache; per-corpus attribution arrives with the next full run"
   }
 }

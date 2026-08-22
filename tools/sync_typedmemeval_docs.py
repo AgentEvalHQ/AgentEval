@@ -117,6 +117,75 @@ def check_citation_revisions(revision: str) -> list[str]:
     return stale
 
 
+#: Phrases that assert a vertical HAS a validated difficulty ladder.
+#:
+#: Deliberately short and unambiguous. A claim check earns its place by being boring: every pattern
+#: here is a sentence no one writes by accident, so a hit is a finding rather than a prompt to go
+#: and read the paragraph.
+_LADDER_CLAIM = re.compile(
+    r"validated (?:difficulty )?ladders?"
+    r"|difficulty_validated`?\s*:?\s*`?\s*true"
+    r"|\*\*memory difficulty\*\*",
+    re.IGNORECASE,
+)
+
+#: Words that mark a section as recording a retracted claim rather than making one.
+_RETRACTION_MARKERS = ("superseded", "retired", "retracted", "no longer", "no vertical", "previously")
+
+
+def check_validated_ladder_claims() -> list[str]:
+    """Docs asserting a validated difficulty ladder that the shipped corpora do not support.
+
+    Grounded in the corpora, not in a list kept here: the check reads every shipped corpus and only
+    fires when NOTHING stamps `difficulty_validated: true`. Re-earn a ladder and the check goes
+    quiet on its own, which is the property that keeps it from being suppressed the first time it is
+    inconvenient.
+
+    This is the sibling of `check_citation_revisions`, and it exists for the same reason: the class
+    is real. When WorkingMemory's stamp was retired (ADR-026 §20) three docs kept citing it -- the
+    §16 verdict table, ADR-027's acceptance criteria, and the CHANGELOG -- and all three were found
+    by hand. A stamp lives in code and its claims live in prose, so nothing but a check keeps them
+    together.
+
+    Scoped to the enclosing heading section rather than the line, because a retraction notice sits
+    in its own paragraph and cannot be on the same line as the table row it retracts. ADRs are NOT
+    skipped: unlike a citation rule, a live acceptance criterion in an ADR is a claim a reader will
+    act on, and that is precisely where the last one hid.
+    """
+    stamped_true = False
+    for vertical in tmc.VERTICALS:
+        for path in (tmc.DATA_ROOT / vertical).glob("*.json"):
+            if '"difficulty_validated": true' in path.read_text(encoding="utf-8"):
+                stamped_true = True
+    if stamped_true:
+        return []
+
+    docs_root = GUIDE.parent.parent.parent
+    findings = []
+    for doc in sorted(docs_root.rglob("*.md")):
+        if "_site" in doc.parts:
+            continue
+        section, heading, start = [], "(preamble)", 1
+        sections = []
+        for number, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if line.startswith("#"):
+                sections.append((heading, start, section))
+                section, heading, start = [], line.strip("# ").strip(), number
+            section.append((number, line))
+        sections.append((heading, start, section))
+
+        for heading, _, body in sections:
+            joined = chr(10).join(line for _, line in body)
+            if any(marker in joined.lower() for marker in _RETRACTION_MARKERS):
+                continue
+            for number, line in body:
+                if _LADDER_CLAIM.search(line):
+                    findings.append(
+                        f"{doc.relative_to(docs_root)}:{number}: under {heading!r}: "
+                        f"{line.strip()[:90]}")
+    return findings
+
+
 def build_tables() -> tuple[str, str]:
     probe_rows, coverage_rows = [], []
     for vertical in tmc.VERTICALS:
@@ -161,6 +230,14 @@ def main() -> None:
         raise SystemExit(
             f"a citation rule does not name the current revision "
             f"({tmc.CORPUS_REVISION}):\n  {joined}")
+
+    claims = check_validated_ladder_claims()
+    if claims:
+        joined = (chr(10) + '  ').join(claims)
+        raise SystemExit(
+            'a doc asserts a validated difficulty ladder, but no shipped corpus stamps '
+            f'difficulty_validated: true:{chr(10)}  {joined}{chr(10)}'
+            'Either re-earn the stamp, or mark the section as recording a retracted claim.')
 
     probe_table, coverage_table = build_tables()
     text = original = GUIDE.read_text(encoding="utf-8")

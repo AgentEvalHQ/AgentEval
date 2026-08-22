@@ -7,7 +7,184 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0-beta] - 2026-08-22
+
+### Added
+
+- **PartnerDesk "The Trusted Supplier" sample** (`samples/AgentEval.PartnerDeskDemo`) — a
+  third-party MCP turns a well-behaved due-diligence agent into a data-exfiltration tool, and
+  Gatekeeper stops it at two levels. One MAF `ChatClientAgent`, two faked local tools over a 120-row
+  synthetic register, and **PartnerIntel, a real MCP server run as a child process over stdio** with
+  an evil mode that appends a poisoned processing directive to an otherwise correct report.
+
+  Four phases on one keypress: clean, compromised (the register walks out silently), Level 1 where
+  `ToolUsageContractGate` + `PartnerRegisterScopeGate` refuse the export before execution **while
+  the trace still proves the agent attempted it**, and Level 2 where `HiddenInstructionPrefilterGate`
+  withholds the poisoned MCP result from model context and the finding drives containment of the MCP
+  source. 75 tests assert over the recorded trajectory, the tool-effect ledger and Gatekeeper's
+  verdicts — never console text — with a scripted model for determinism but the real MCP child
+  process, real gates and real containment.
+
+
+- **Empty-response rate per probe arm is now a published, gated statistic.** `probes.empty_rate_by_arm`
+  records calls, empties and rate for every arm, and a corpus test refuses any arm above its
+  ceiling the way the separability test refuses a discriminating feature. The ceiling (5%) and the
+  ratchet are **C# constants, never read from the record** -- an artifact that supplies its own
+  threshold always clears it.
+
+  V3 (0.6667) and V6 (0.2114) are pinned as ratchet entries rather than waived, so the known defect
+  stays visible and can only shrink. Verified by tightening the ratchet: the gate fails on all seven
+  verticals and passes when restored.
+
+  This turns "a reasoning deployment burned its completion budget" from a forensic discovery into a
+  gate failure at authoring time. The V2 0/1436 against V3 258/387 spread is what makes the
+  statistic worth gating -- it separates a healthy arm from a broken one with no overlap.
+
+
+- **Required-evidence coverage, counted at both the retrieval and the answer-context boundary.**
+  `QuestionEvidenceDiagnostics` gains `RequiredEvidenceSessionCount`,
+  `RequiredEvidenceSessionsRetrieved` and `RequiredEvidenceSessionsInAnswerContext`.
+
+  Every gold diagnostic before this was an `Any` over `Retrieved`. That is adequate only when one
+  session carries the answer: for a question assembled from four, one-of-four and four-of-four both
+  report `GoldSessionPresent: true`. And `AnswerContext` -- the references actually supplied to the
+  answer model -- carried no gold analysis at all, so retrieval could rank every required session in
+  the top four and a downstream context budget could drop three of them with nothing to show it.
+
+  A consumer hit exactly that, and had to infer it from which way the answers were wrong. The
+  inference was wrong and they retracted it. The gap between `...Retrieved` and
+  `...InAnswerContext` measures it directly.
+
+  Session-based rather than text-based, so it needs no evidence content and works under
+  `EvidenceCaptureMode.References` with no privacy implication. `...InAnswerContext` is null when
+  no answer-context reference carries a session ID, and observability is decided independently of
+  the retrieval lists: an adapter may instrument one boundary and not the other, and a confident
+  zero there is indistinguishable from a budget that dropped everything.
+
+  The blind spot sat where it did for a structural reason. Across the family, six verticals have a
+  median of one required session and Arithmetic has a median of four with a floor of three -- so the
+  any-check was near-exact everywhere except the one vertical that assembles.
+
+### Changed
+
+- **The probe capture path no longer manufactures silence.** It retries a length-truncated empty
+  completion once at a larger budget (ceiling 8000), records `finish_reason`, content-filter verdict
+  and token usage for any that remain, and **stops serving an empty cache entry as a purchased
+  answer** -- 455 of 4033 entries are empty, and without that last change a re-run replays them from
+  disk and the retry never fires.
+
 ### Fixed
+
+- **The length-retry is bounded in attempts, not tokens**, and no longer shares the transport retry
+  budget. A length-retry that consumed transport attempts could exhaust them alongside a 429 and
+  fall out of the loop into a fatal "unreachable" naming the wrong cause; and a token bound has no
+  natural final attempt, where an attempt bound guarantees a last response whose `finish_reason` is
+  itself the evidence.
+
+- **`_arm_of` carried an invisible backspace byte (0x08) inside its regex**, so every cache key fell
+  through to `v1` and per-arm attribution silently collapsed onto one arm. Introduced in the same
+  change that added the tally and caught before it stamped anything. The file now has zero control
+  bytes.
+
+
+
+- **V3 and V6 pass when the model says nothing, and two thirds of V3's calls said nothing.**
+  Chasing the V8/V9 silence defect into the call cache found the same fault pointing the other way,
+  and this direction is the dangerous one. Over the 4033 cached reference-model calls in this tree:
+  **V3 258/387 empty (66.7%), V6 182/861 (21.1%)**, against **V1 0/220, V2 0/1436, V8 3/217,
+  V9 8/212**.
+
+  V3 passes when a gold-ablated context FAILS to reproduce the answer (`record["v3"] = not leaked`).
+  An empty completion cannot reproduce anything, so **silence scores as a pass**. V6 has the same
+  shape. Where V8/V9 silence is conservative -- it can only understate a ceiling -- V3/V6 silence
+  is **anti-conservative**: it certifies validity the evidence does not support.
+
+  **V3 and V6 must be re-run before they are cited again.** V1, V2 and V7 are unaffected and stand.
+
+  The likely cause is visible in the distribution: V2, whose prompt carries no session context, is
+  at zero, while V3 and V6 -- which ask the model to work hard over a context that no longer holds
+  the answer -- are the highest. That is a reasoning deployment spending its completion budget on
+  reasoning tokens before emitting content.
+
+
+- **Half of this family's V8 failures were silence, counted as wrong answers.** Across the seven
+  corpora, **5 of 10 V8 failures and 32 of 111 V9 failures have no captured answer at all** --
+  Episodic V9 is 12 of 20, Prospective V8 is 2 of 2. Every published V8 and V9 figure therefore
+  conflates "the model answered wrongly" with "we recorded no answer", and is a LOWER BOUND rather
+  than a measurement.
+
+  This is the same conflation the evidence envelope refuses when it reports null instead of zero,
+  and we shipped an instrument enforcing it for a consumer in the same release in which our own
+  probe pipeline was violating it.
+
+  Disclosed per corpus as `probes.no_answer_captured`, with the question IDs, rather than corrected:
+  whether an empty response is a refusal, a provider filter or a capture fault is not decidable from
+  the record, and excluding them would substitute one unexamined assumption for another. The probe
+  runner now records `failures_with_no_captured_answer` so the next run separates them at source.
+
+- **Arithmetic's `duration` shape does not state its day-counting convention, and gold silently
+  fixes one.** Gold counts a spell exclusively -- 2026/02/07 to 2026/02/10 is 3 days -- and **0 of
+  12 questions say so**, while all 12 gold answers state the spell count, making the inclusive
+  reading exactly `gold + spells`.
+
+  **Four of four duration misses across two independent oracles are exactly that reading, with
+  perfect arithmetic in every one.** Ours answered 13 against gold 11 on `tme-ari-043` while
+  stating "counting the arrival and departure dates in each spell"; a consuming project's oracle
+  answered 18/13/14 against 15/11/11. The same model answered 11 on `tme-ari-043` under V9, so the
+  convention is a coin flip by context, not a capability.
+
+  So `duration`'s headline -- V1 11/12 collapsing to V8 5/12, and all six of Arithmetic's
+  interference regressions -- is substantially not an interference finding: **4 of its 7 V8 failures
+  are the convention and 3 more have no captured answer.** Stamped as
+  `by_shape.duration.convention_underspecified`. Not repaired here: stating the convention in the
+  question text changes corpus bytes and is a revision decision, and widening the judge would
+  silently move published numbers.
+
+
+
+- **No vertical has a validated difficulty ladder, and the rule that said otherwise was certifying
+  artifacts.** Every corpus now carries `difficulty_validated: false`. The bands describe how the
+  corpus was built; a higher rung is not known to be harder.
+
+  The retriever half of band validation had **two** artifacts in it, and neither correction works
+  alone — which is why it survived three revisions:
+
+  - **The calibration scaffolding.** Coverage was ranked with the echo clause in place, worth +0.10
+    to +0.34 on its own.
+  - **The structural ceiling.** With a top-`K` budget and `G` gold sessions nothing can beat
+    `min(1, K/G)`, so a dial that moves `G` moves coverage without touching retrieval.
+
+  On Arithmetic the shortfall against the ceiling varies by 0.36 with the scaffolding in and by
+  **0.000** with it out: the artifact was covering for the ceiling, so a ceiling check on un-stripped
+  coverage sees a real-looking spread. With both applied, **every band of every vertical sits on its
+  ceiling**.
+
+  **WorkingMemory's stamp is retired** — the family's only validated ladder. It read
+  1.00/1.00/1.00/**0.67**/**0.75** as gated and **1.00/1.00/1.00/1.00/1.00** scaffolding-stripped;
+  the whole gradient was the clause. It could not have been otherwise: its dial is measured in
+  *sessions between*, and BM25 has no position component — the same reasoning ADR-027 §2.2 used to
+  refute a partner's claim about Prospective and Forgetting, which we failed to apply to the one
+  ladder we were citing. See ADR-026 §20.
+
+  `validate_typedmemeval_difficulty.py` now ranks on scaffolding-stripped text and requires the slope
+  to survive comparison with `min(1, K/G)`. It would refuse every stamp this family has ever issued.
+
+- **Arithmetic's difficulty bands pointed backwards because the dial was mis-scaled.**
+  `_difficulty_band` counted `len(inputs)`, and an "input" is one session for `count`/`delta`/`sum`
+  but a *spell* — two sessions — for `duration`. So a duration assembled from six gold sessions was
+  banded as three, every duration question landed in the bottom two bands, and **band 1 was 100%
+  duration**. V8 by band read 0.33 / 0.76 / 1.00 / 1.00 / 1.00: the band labelled easiest was where
+  the answer model failed two questions in three.
+
+  Banding on distinct gold sessions puts every shape on one unit. Duration now spans bands 3 and 5,
+  no band is owned by a single shape, and V8 reads 1.00 / 0.76 / 1.00 / 0.79 — no longer inverted.
+
+  The fix exposes what the confound was hiding: **`count`, `delta` and `sum` score 1.00 at three,
+  four, five and six gold sessions alike**, so dispersion buys no answering difficulty once the
+  evidence is in context. It is a retrieval dial, not a memory-difficulty one, and `duration` is
+  simply a harder operation (V8 0.33 against 1.00) that no band arrangement changes.
+
+
 
 - **Part of the published `V1 − V9` headroom is unreachable by any ranker, and we said otherwise.**
   Having found that the calibration scaffolding depresses BM25, we told a consuming project to expect
@@ -40,7 +217,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every re-run since is paid for again.
 
 
-### Fixed
 
 - **`V1 − V9` is an upper bound, not an estimate — the caveat is now published beside the number.**
   The calibration gate manufactures its difficulty by injecting the question's own vocabulary into
@@ -64,7 +240,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/measure_scaffolding_dependence.py`, and disclosed in the guide beside the headroom table it
   qualifies. **Difficulty that a one-line regex defeats is not difficulty**; earning it from
   naturalistic same-domain competition is a generation change and is the next corpus revision.
-
 
 ## [0.26.0-beta] - 2026-08-20
 

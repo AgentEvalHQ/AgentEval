@@ -142,13 +142,45 @@ def load_cache() -> None:
             return
 
 
+#: Per-arm call and empty tallies, so the empty rate is a published, gateable statistic rather
+#: than something reconstructed forensically from a cache after the fact.
+_arm_calls: Counter = Counter()
+_arm_empty: Counter = Counter()
+
+
+def _arm_of(cache_key: str) -> str:
+    """The probe arm a cache key belongs to, e.g. 'v3' from '<question>:v3:2'."""
+    match = re.search(":(v" + chr(92) + "d)(?::|$)", cache_key)
+    return match.group(1) if match else "v1"
+
+
+#: Hard ceiling for the retry above. A reasoning deployment can spend an arbitrary amount on
+#: reasoning; this bounds what one question may cost before we accept the silence and record it.
+_MAX_COMPLETION_CEILING = 8_000
+
+#: How many times a length-truncated empty is retried at a larger budget. Attempts rather than a
+#: token ceiling, so the last one always produces a response whose finish_reason can be recorded.
+_LENGTH_RETRIES = 2
+
+#: Why a completion came back empty, keyed by cache key. Written to the run metadata so the
+#: refusal / filter / truncation trichotomy is decidable from the record instead of inferred.
+_empty_reasons: dict[str, dict] = {}
+
+
 def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     """One chat completion, cached so an interrupted run resumes instead of re-paying."""
     load_cache()
     with _cache_lock:
-        if cache_key in _cache:
+        # An EMPTY cached value is not a purchased answer, so it is not served as one. The cache
+        # holds tens of thousands of entries, several dozen of which are the empty completions that
+        # made published arms count silence as error; without this, a re-run replays them from disk
+        # and the length-retry above never gets the chance to fire.
+        if _cache.get(cache_key):
             _stats["cache_hit"] += 1
+            _arm_calls[_arm_of(cache_key)] += 1
             return _cache[cache_key]
+        if cache_key in _cache:
+            _stats["empty_cache_entry_repaid"] += 1
 
     endpoint, key, deployment = _config()
     url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={API_VERSION}"
@@ -157,7 +189,8 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     body = {"messages": [{"role": "user", "content": prompt}], "max_completion_tokens": max_tokens}
 
     last_error = None
-    for attempt in range(5):
+    length_retries = 0
+    for attempt in range(5 + _LENGTH_RETRIES):
         try:
             request = urllib.request.Request(
                 url,
@@ -167,7 +200,48 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             )
             with urllib.request.urlopen(request, timeout=180) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            text = (payload["choices"][0]["message"].get("content") or "").strip()
+            _arm = _arm_of(cache_key)
+            _arm_calls[_arm] += 1
+            choice = payload["choices"][0]
+            text = (choice["message"].get("content") or "").strip()
+            finish = choice.get("finish_reason")
+
+            # An empty completion used to be indistinguishable from a wrong answer, and the probe
+            # arms counted it as one: 5 of 10 V8 failures and 32 of 111 V9 failures across the
+            # family had no captured answer. The cause is visible only in the fields this function
+            # used to throw away.
+            #
+            # On a reasoning deployment the completion budget is spent on reasoning tokens BEFORE
+            # any content is emitted, so a hard question returns finish_reason="length" with empty
+            # content while an easier one answers fine -- which is exactly the observed pattern of
+            # empties clustering on the longest contexts and on duration under V8, and of the same
+            # question answering under V9. Retried once at a larger budget rather than recorded as
+            # a failure, because a truncated reasoning trace is our instrument running out of room,
+            # not the model being wrong.
+            # Bounded in ATTEMPTS, not tokens, and counted separately from the transport retries
+            # above. Two reasons. A length-retry sharing the transport budget can exhaust it
+            # alongside a 429 and fall out of the loop into a fatal "unreachable" that names the
+            # wrong cause. And a token bound has no natural last attempt to record: bounding by
+            # attempts guarantees a final response whose finish_reason IS the evidence, where a
+            # missing one is just another hole.
+            if not text and finish == "length" and length_retries < _LENGTH_RETRIES:
+                length_retries += 1
+                _stats["retried_for_length"] += 1
+                max_tokens = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
+                budget_key = "max_completion_tokens" if "max_completion_tokens" in body else "max_tokens"
+                body[budget_key] = max_tokens
+                continue
+
+            if not text:
+                # Still empty: record WHY, so refusal / filter / truncation stop being one bucket.
+                _stats["empty_completion"] += 1
+                _arm_empty[_arm] += 1
+                _empty_reasons[cache_key] = {
+                    "finish_reason": finish,
+                    "content_filter": choice.get("content_filter_results"),
+                    "usage": payload.get("usage"),
+                }
+
             with _cache_lock:
                 _cache[cache_key] = text
                 _stats["call"] += 1
@@ -598,6 +672,16 @@ def _interference(records: list[dict]) -> dict:
         "interference_cost": round((v1 - v8) / len(both), 4),
         "regressed_under_interference": sorted(
             r["question_id"] for r in both if r["v1"] and not r["v8"]),
+        # A failure with no captured answer is NOT a wrong answer, and counting it as one is the
+        # same conflation the evidence envelope refuses when it reports null instead of zero. Half
+        # of this family's V8 failures had an empty response, so a reader comparing their system
+        # against a published ceiling was comparing against a number partly made of silence.
+        # Reported rather than excluded: whether an empty response is a refusal, a filter or a
+        # capture fault is not decidable from the record, and excluding it would substitute one
+        # unexamined assumption for another.
+        "failures_with_no_captured_answer": sorted(
+            r["question_id"] for r in both
+            if r["v1"] and not r["v8"] and not (r.get("v8_answer") or "").strip()),
         "reading": ("V1 minus V8 as a share of the questions both are defined on. 0.0 means a "
                     "perfect retriever and no retriever produce the same answers here, so no two "
                     "retrievers can be distinguished on this corpus."),
@@ -618,6 +702,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
 
     by_id = {r["question_id"]: r for r in records}
     shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
+    gold_counts = {e["question_id"]: len(e.get("answer_session_ids") or []) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -717,6 +802,22 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # to know that before quoting them.
         # The headline of ADR-027 SS6. `interference_cost` is V1 - V8 as a share of the questions
         # both are defined on: 0.0 means a perfect retriever buys nothing on this corpus.
+        # The trichotomy a consumer asked us to make decidable. Empty completions that survived
+        # the length-retry are recorded WITH their finish_reason, filter verdict and token usage,
+        # so a re-run that still loses answers says why instead of manufacturing a lower bound.
+        "empty_completions": {
+            "count": len(_empty_reasons),
+            "retried_for_length": _stats["retried_for_length"],
+            "by_cache_key": dict(sorted(_empty_reasons.items())),
+        } if _empty_reasons or _stats["retried_for_length"] else {"count": 0},
+        # Published and gateable, per a consumer's ask, so this class dies at authoring time
+        # instead of being rediscovered forensically. The V2 0/1436 against V3 258/387 spread shows
+        # the statistic discriminates cleanly between an arm that is fine and one that is not.
+        "empty_rate_by_arm": {
+            arm: {"calls": _arm_calls[arm], "empty": _arm_empty[arm],
+                  "rate": round(_arm_empty[arm] / _arm_calls[arm], 4) if _arm_calls[arm] else None}
+            for arm in sorted(set(_arm_calls) | set(_arm_empty))
+        },
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
@@ -726,6 +827,19 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v1_passed": sum(1 for r in group if r.get("v1") is True),
                 "v3_applicable": sum(1 for r in group if r.get("v3") is not None),
                 "v3_passed": sum(1 for r in group if r.get("v3") is True),
+                # V8 and V9 per shape, because V1 alone cannot distinguish the two ways a shape
+                # gets hard. Arithmetic's `duration` passes V1 at 11/12 and V8 at 5/12: every one
+                # of this vertical's six interference regressions is a duration question, so the
+                # answer step survives clean evidence and collapses among distractors. Its
+                # `delta` is the inverse -- V9 8/10 against `count` and `sum` at 3/14 -- so the
+                # shape that looks like the hardest assembly is the one a plain BM25 pipeline
+                # solves best. A consumer diagnosing a shape-specific failure needs both columns;
+                # with only V1 they will read the vertical's ordering exactly backwards.
+                "v8_applicable": sum(1 for r in group if r.get("v8") is not None),
+                "v8_passed": sum(1 for r in group if r.get("v8") is True),
+                "v9_applicable": sum(1 for r in group if r.get("v9") is not None),
+                "v9_passed": sum(1 for r in group if r.get("v9") is True),
+                "required_sessions_median": _median_g(group, gold_counts),
             }
             for shape, group in sorted(
                 {s: [r for r in records if shapes.get(r["question_id"]) == s]
@@ -737,6 +851,18 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             for r in records
         },
     }
+
+
+def _median_g(group: list, gold_counts: dict) -> int | None:
+    """Median required gold sessions for a shape.
+
+    The difficulty axis conjunction adopts in place of the retired bands, and the number that
+    explains why an any-check instrument hid a consumer's bug for sixteen runs: six verticals sit
+    at a median of one required session, and Arithmetic sits at four.
+    """
+    values = sorted(gold_counts[r["question_id"]] for r in group
+                    if r["question_id"] in gold_counts)
+    return values[len(values) // 2] if values else None
 
 
 def self_test() -> None:
