@@ -40,7 +40,17 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Contains("Overall accuracy:        50.0%", invocation.Output);
         Assert.Contains("(1/2 scored, 3 selected)", invocation.Output);
         Assert.Contains("Inconclusive judgments:  1", invocation.Output);
-        Assert.DoesNotContain("5000", invocation.Output);
+
+        // Scoped to the accuracy line rather than the whole transcript. The guard is against a
+        // mis-scaled percent -- 50.0% rendering as "5000" -- but the transcript also prints the
+        // workspace path, which is a randomly named temp directory. A run that drew
+        // "...96f2e438390616129bc35000e..." failed this assertion on a hex coincidence rather than
+        // on a rendering bug, so the substring is now checked where the rendering actually happens.
+        var accuracyLine = Assert.Single(
+            invocation.Output
+                .Split('\n')
+                .Where(line => line.Contains("Overall accuracy:", StringComparison.Ordinal)));
+        Assert.DoesNotContain("5000", accuracyLine);
 
         var runDirectory = Assert.Single(fixture.RunDirectories());
         var summary = JsonDocument.Parse(

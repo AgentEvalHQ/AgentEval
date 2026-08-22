@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attribution rather than reimplementing it, because two copies of that rule is how the first one
   drifted.
 
+- **A LongMemEval CLI test failed on a random temp path rather than on the thing it guards.**
+  `RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering` asserted that `"5000"`
+  appears nowhere in the console transcript — a guard against a mis-scaled percent rendering `50.0%`
+  as `5000`. The transcript also prints the workspace path, which is a randomly named temp
+  directory, and a CI run that drew `...96f2e438390616129bc35000e...` failed on the hex coincidence.
+  The substring is now checked on the accuracy line, where the rendering actually happens.
+
 ## [0.27.0-beta] - 2026-08-22
 
 ### Added
