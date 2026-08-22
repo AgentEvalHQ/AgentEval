@@ -603,21 +603,36 @@
         "v1_applicable": 20,
         "v1_passed": 20,
         "v3_applicable": 20,
-        "v3_passed": 20
+        "v3_passed": 20,
+        "v8_applicable": 20,
+        "v8_passed": 20,
+        "v9_applicable": 20,
+        "v9_passed": 16,
+        "required_sessions_median": 1
       },
       "list-order": {
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 15,
         "v3_applicable": 15,
-        "v3_passed": 15
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 0,
+        "required_sessions_median": 5
       },
       "participant-attribution": {
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 13,
         "v3_applicable": 15,
-        "v3_passed": 15
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 14,
+        "required_sessions_median": 1
       }
     },
     "per_question": {

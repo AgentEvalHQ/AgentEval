@@ -627,28 +627,48 @@
         "v1_applicable": 14,
         "v1_passed": 14,
         "v3_applicable": 14,
-        "v3_passed": 14
+        "v3_passed": 14,
+        "v8_applicable": 14,
+        "v8_passed": 14,
+        "v9_applicable": 14,
+        "v9_passed": 3,
+        "required_sessions_median": 4
       },
       "delta": {
         "questions": 10,
         "v1_applicable": 10,
         "v1_passed": 10,
         "v3_applicable": 10,
-        "v3_passed": 10
+        "v3_passed": 10,
+        "v8_applicable": 10,
+        "v8_passed": 10,
+        "v9_applicable": 10,
+        "v9_passed": 8,
+        "required_sessions_median": 4
       },
       "duration": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 11,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 5,
+        "v9_applicable": 12,
+        "v9_passed": 4,
+        "required_sessions_median": 6
       },
       "sum": {
         "questions": 14,
         "v1_applicable": 14,
         "v1_passed": 14,
         "v3_applicable": 14,
-        "v3_passed": 14
+        "v3_passed": 14,
+        "v8_applicable": 14,
+        "v8_passed": 14,
+        "v9_applicable": 14,
+        "v9_passed": 3,
+        "required_sessions_median": 4
       }
     },
     "per_question": {

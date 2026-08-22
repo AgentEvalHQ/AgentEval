@@ -608,28 +608,48 @@
         "v1_applicable": 16,
         "v1_passed": 16,
         "v3_applicable": 15,
-        "v3_passed": 15
+        "v3_passed": 15,
+        "v8_applicable": 16,
+        "v8_passed": 16,
+        "v9_applicable": 16,
+        "v9_passed": 10,
+        "required_sessions_median": 1
       },
       "expiring-validity": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 10,
-        "v3_passed": 10
+        "v3_passed": 10,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       },
       "not-yet-true": {
         "questions": 10,
         "v1_applicable": 10,
         "v1_passed": 9,
         "v3_applicable": 9,
-        "v3_passed": 9
+        "v3_passed": 9,
+        "v8_applicable": 10,
+        "v8_passed": 8,
+        "v9_applicable": 10,
+        "v9_passed": 6,
+        "required_sessions_median": 1
       },
       "seed-carry-over": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 11,
-        "v3_passed": 11
+        "v3_passed": 11,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 6,
+        "required_sessions_median": 1
       }
     },
     "per_question": {

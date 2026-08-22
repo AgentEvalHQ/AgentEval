@@ -624,35 +624,60 @@
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       },
       "distance-25": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       },
       "distance-40": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 8,
+        "required_sessions_median": 1
       },
       "distance-60": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 9,
+        "required_sessions_median": 1
       },
       "distance-8": {
         "questions": 12,
         "v1_applicable": 12,
         "v1_passed": 12,
         "v3_applicable": 12,
-        "v3_passed": 12
+        "v3_passed": 12,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 12,
+        "required_sessions_median": 1
       }
     },
     "per_question": {

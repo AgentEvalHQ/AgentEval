@@ -612,14 +612,24 @@
         "v1_applicable": 36,
         "v1_passed": 36,
         "v3_applicable": 36,
-        "v3_passed": 36
+        "v3_passed": 36,
+        "v8_applicable": 36,
+        "v8_passed": 35,
+        "v9_applicable": 36,
+        "v9_passed": 31,
+        "required_sessions_median": 1
       },
       "correction-depth": {
         "questions": 24,
         "v1_applicable": 24,
         "v1_passed": 24,
         "v3_applicable": 24,
-        "v3_passed": 24
+        "v3_passed": 24,
+        "v8_applicable": 24,
+        "v8_passed": 24,
+        "v9_applicable": 24,
+        "v9_passed": 17,
+        "required_sessions_median": 1
       }
     },
     "per_question": {

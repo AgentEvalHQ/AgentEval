@@ -348,6 +348,46 @@ public sealed class LongMemEvalEvidenceCaptureTests
         Assert.Equal(2, diagnostics.AnswerContextReferenceCount);
     }
 
+    [Fact]
+    public void Capture_ZeroGoldQuestion_LeavesRequiredCountsNotApplicable()
+    {
+        // An abstention question: nothing in the haystack answers it, so there is no required
+        // evidence to cover. Zero required and zero covered would serialize identically to a
+        // question whose every required session was dropped, and a consumer aggregating coverage
+        // would divide by a zero denominator. Null says "not applicable" instead.
+        var envelope = Envelope(
+            [Reference("r-1", 1, "session-other", 0)],
+            [Reference("c-1", 1, "session-other", 0, contextOrder: 1)]);
+
+        var diagnostics = LongMemEvalEvidenceCapture.Capture(
+            AgentResponseWith(Reserved(envelope)),
+            NoGoldEntry(),
+            Options(EvidenceCaptureMode.References, topK: 4)).Diagnostics!;
+
+        Assert.Null(diagnostics.RequiredEvidenceSessionCount);
+
+        // The two covered counts stay OBSERVED and read zero, because they are answering a
+        // different question: the boundaries were instrumented and nothing gold was in them, which
+        // for a zero-gold question is the correct reading rather than a missing one.
+        Assert.Equal(0, diagnostics.RequiredEvidenceSessionsRetrieved);
+        Assert.Equal(0, diagnostics.RequiredEvidenceSessionsInAnswerContext);
+        Assert.False(diagnostics.GoldSessionPresent);
+    }
+
+    private static LongMemEvalEntry NoGoldEntry() => new()
+    {
+        QuestionId = "q-abstain",
+        QuestionType = "abstention",
+        Question = "What did the speaker say about a thing never mentioned?",
+        HaystackSessionIds = ["session-other"],
+        AnswerSessionIds = [],
+        HaystackDates = ["2026/01/01 (Thu) 00:00"],
+        HaystackSessions =
+        [
+            [new LongMemEvalTurn { Role = "user", Content = "other", HasAnswer = false }]
+        ]
+    };
+
     private static LongMemEvalEntry MultiGoldEntry() => new()
     {
         QuestionId = "q-multi",

@@ -625,21 +625,36 @@
         "v1_applicable": 15,
         "v1_passed": 15,
         "v3_applicable": 15,
-        "v3_passed": 15
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 7,
+        "required_sessions_median": 2
       },
       "occurrence-order": {
         "questions": 20,
         "v1_applicable": 20,
         "v1_passed": 20,
         "v3_applicable": 0,
-        "v3_passed": 0
+        "v3_passed": 0,
+        "v8_applicable": 20,
+        "v8_passed": 20,
+        "v9_applicable": 20,
+        "v9_passed": 19,
+        "required_sessions_median": 1
       },
       "recency": {
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 15,
         "v3_applicable": 15,
-        "v3_passed": 15
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 15,
+        "required_sessions_median": 2
       }
     },
     "per_question": {

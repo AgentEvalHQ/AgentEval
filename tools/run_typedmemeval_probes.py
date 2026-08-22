@@ -618,6 +618,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
 
     by_id = {r["question_id"]: r for r in records}
     shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
+    gold_counts = {e["question_id"]: len(e.get("answer_session_ids") or []) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -726,6 +727,19 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v1_passed": sum(1 for r in group if r.get("v1") is True),
                 "v3_applicable": sum(1 for r in group if r.get("v3") is not None),
                 "v3_passed": sum(1 for r in group if r.get("v3") is True),
+                # V8 and V9 per shape, because V1 alone cannot distinguish the two ways a shape
+                # gets hard. Arithmetic's `duration` passes V1 at 11/12 and V8 at 5/12: every one
+                # of this vertical's six interference regressions is a duration question, so the
+                # answer step survives clean evidence and collapses among distractors. Its
+                # `delta` is the inverse -- V9 8/10 against `count` and `sum` at 3/14 -- so the
+                # shape that looks like the hardest assembly is the one a plain BM25 pipeline
+                # solves best. A consumer diagnosing a shape-specific failure needs both columns;
+                # with only V1 they will read the vertical's ordering exactly backwards.
+                "v8_applicable": sum(1 for r in group if r.get("v8") is not None),
+                "v8_passed": sum(1 for r in group if r.get("v8") is True),
+                "v9_applicable": sum(1 for r in group if r.get("v9") is not None),
+                "v9_passed": sum(1 for r in group if r.get("v9") is True),
+                "required_sessions_median": _median_g(group, gold_counts),
             }
             for shape, group in sorted(
                 {s: [r for r in records if shapes.get(r["question_id"]) == s]
@@ -737,6 +751,18 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             for r in records
         },
     }
+
+
+def _median_g(group: list, gold_counts: dict) -> int | None:
+    """Median required gold sessions for a shape.
+
+    The difficulty axis conjunction adopts in place of the retired bands, and the number that
+    explains why an any-check instrument hid a consumer's bug for sixteen runs: six verticals sit
+    at a median of one required session, and Arithmetic sits at four.
+    """
+    values = sorted(gold_counts[r["question_id"]] for r in group
+                    if r["question_id"] in gold_counts)
+    return values[len(values) // 2] if values else None
 
 
 def self_test() -> None:
