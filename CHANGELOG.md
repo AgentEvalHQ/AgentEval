@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Required-evidence coverage, counted at both the retrieval and the answer-context boundary.**
+  `QuestionEvidenceDiagnostics` gains `RequiredEvidenceSessionCount`,
+  `RequiredEvidenceSessionsRetrieved` and `RequiredEvidenceSessionsInAnswerContext`.
+
+  Every gold diagnostic before this was an `Any` over `Retrieved`. That is adequate only when one
+  session carries the answer: for a question assembled from four, one-of-four and four-of-four both
+  report `GoldSessionPresent: true`. And `AnswerContext` -- the references actually supplied to the
+  answer model -- carried no gold analysis at all, so retrieval could rank every required session in
+  the top four and a downstream context budget could drop three of them with nothing to show it.
+
+  A consumer hit exactly that, and had to infer it from which way the answers were wrong. The
+  inference was wrong and they retracted it. The gap between `...Retrieved` and
+  `...InAnswerContext` measures it directly.
+
+  Session-based rather than text-based, so it needs no evidence content and works under
+  `EvidenceCaptureMode.References` with no privacy implication. `...InAnswerContext` is null when
+  no answer-context reference carries a session ID, and observability is decided independently of
+  the retrieval lists: an adapter may instrument one boundary and not the other, and a confident
+  zero there is indistinguishable from a budget that dropped everything.
+
+  The blind spot sat where it did for a structural reason. Across the family, six verticals have a
+  median of one required session and Arithmetic has a median of four with a floor of three -- so the
+  any-check was near-exact everywhere except the one vertical that assembles.
+
+
 ### Fixed
 
 - **No vertical has a validated difficulty ladder, and the rule that said otherwise was certifying

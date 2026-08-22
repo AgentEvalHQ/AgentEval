@@ -263,6 +263,39 @@ internal static class LongMemEvalEvidenceCapture
                 .Min()
             : null;
 
+        // Required-evidence COVERAGE, as counts rather than an any-check.
+        //
+        // Every other gold diagnostic here is an Any over Retrieved, which is adequate only when one
+        // session carries the answer. It cannot distinguish one required session of four from four
+        // of four, so a multi-session question reads healthy the moment anything gold is ranked.
+        var requiredCount = goldSessionIds.Count > 0 ? goldSessionIds.Count : (int?)null;
+        var requiredRetrieved = canObserveSessions
+            ? sourceReferences
+                .Select(reference => reference.SourceSessionId!)
+                .Where(goldSessionIds.Contains)
+                .Distinct(StringComparer.Ordinal)
+                .Count()
+            : (int?)null;
+
+        // Measured at the ANSWER-CONTEXT boundary, which is the point of it. Retrieval can rank
+        // every required session highly while a downstream context budget drops most of them before
+        // the model sees anything -- a failure that is invisible to every retrieval-side check above
+        // and shows up here as a gap against requiredRetrieved.
+        //
+        // Observability is decided independently of the retrieval lists: an adapter can instrument
+        // one boundary and not the other, and inheriting canObserveSessions here would report a
+        // confident zero for an adapter that simply never labelled its answer context.
+        var answerContextSessions = envelope.AnswerContext
+            .Where(reference => reference.SourceSessionId is not null)
+            .ToList();
+        var requiredInAnswerContext = answerContextSessions.Count > 0
+            ? answerContextSessions
+                .Select(reference => reference.SourceSessionId!)
+                .Where(goldSessionIds.Contains)
+                .Distinct(StringComparer.Ordinal)
+                .Count()
+            : (int?)null;
+
         var sessionIndex = (entry.HaystackSessionIds ?? [])
             .Select((id, index) => (id, index))
             .GroupBy(pair => pair.id, StringComparer.Ordinal)
@@ -299,6 +332,9 @@ internal static class LongMemEvalEvidenceCapture
                 ? observedTurnLabels.Any(value => value)
                 : null,
             FirstGoldRank = firstGoldRank,
+            RequiredEvidenceSessionCount = requiredCount,
+            RequiredEvidenceSessionsRetrieved = requiredRetrieved,
+            RequiredEvidenceSessionsInAnswerContext = requiredInAnswerContext,
             DistinctSourceSessionCount = canObserveSessions ? distinctSessions : null,
             SourceSessionDiversityRatio = canObserveSessions
                 ? (double)distinctSessions / sourceReferences.Count

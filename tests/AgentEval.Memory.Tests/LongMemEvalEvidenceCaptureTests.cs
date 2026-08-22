@@ -294,6 +294,83 @@ public sealed class LongMemEvalEvidenceCaptureTests
         Assert.Null(result.Diagnostics.HasAnswerTurnPresent);
     }
 
+    [Fact]
+    public void Capture_CountsRequiredEvidenceSeparatelyAtEachBoundary()
+    {
+        // The failure this exists to make visible: retrieval ranks EVERY required session in the
+        // top four, and a downstream context budget then supplies exactly one of them to the model.
+        // A consumer reading the any-checks sees a healthy retrieval and has to infer the rest from
+        // which way the answers are wrong.
+        var envelope = Envelope(
+            [
+                Reference("r-1", 1, "session-gold-a", 0),
+                Reference("r-2", 2, "session-gold-b", 0),
+                Reference("r-3", 3, "session-gold-c", 0),
+                Reference("r-4", 4, "session-gold-d", 0)
+            ],
+            [Reference("c-1", 1, "session-gold-a", 0, contextOrder: 1)]);
+
+        var diagnostics = LongMemEvalEvidenceCapture.Capture(
+            AgentResponseWith(Reserved(envelope)),
+            MultiGoldEntry(),
+            Options(EvidenceCaptureMode.References, topK: 4)).Diagnostics!;
+
+        Assert.Equal(4, diagnostics.RequiredEvidenceSessionCount);
+        Assert.Equal(4, diagnostics.RequiredEvidenceSessionsRetrieved);
+        Assert.Equal(1, diagnostics.RequiredEvidenceSessionsInAnswerContext);
+
+        // The old instrument, on the same evidence, reporting nothing wrong. Asserted rather than
+        // described so that any future attempt to "fix" the any-check has to confront the fact that
+        // it is answering a different question, not a broken version of this one.
+        Assert.True(diagnostics.GoldSessionPresent);
+        Assert.Equal(1, diagnostics.FirstGoldRank);
+
+        Assert.DoesNotContain("session-gold", JsonSerializer.Serialize(diagnostics));
+    }
+
+    [Fact]
+    public void Capture_UninstrumentedAnswerContext_LeavesRequiredCoverageNotMeasured()
+    {
+        // Answer-context references carrying no session ID. Zero required sessions are OBSERVED in
+        // the context, and reporting that as zero would be indistinguishable from a budget that
+        // dropped all of them -- the precise confusion this field exists to end.
+        var envelope = Envelope(
+            [Reference("r-1", 1, "session-gold-a", 0), Reference("r-2", 2, "session-gold-b", 0)],
+            [Reference("c-1", 1, contextOrder: 1), Reference("c-2", 2, contextOrder: 2)]);
+
+        var diagnostics = LongMemEvalEvidenceCapture.Capture(
+            AgentResponseWith(Reserved(envelope)),
+            MultiGoldEntry(),
+            Options(EvidenceCaptureMode.References, topK: 4)).Diagnostics!;
+
+        Assert.Equal(2, diagnostics.RequiredEvidenceSessionsRetrieved);
+        Assert.Null(diagnostics.RequiredEvidenceSessionsInAnswerContext);
+        Assert.Equal(2, diagnostics.AnswerContextReferenceCount);
+    }
+
+    private static LongMemEvalEntry MultiGoldEntry() => new()
+    {
+        QuestionId = "q-multi",
+        QuestionType = "multi-session",
+        Question = "How many orders?",
+        HaystackSessionIds =
+            ["session-gold-a", "session-gold-b", "session-gold-c", "session-gold-d", "session-other"],
+        AnswerSessionIds = ["session-gold-a", "session-gold-b", "session-gold-c", "session-gold-d"],
+        HaystackDates =
+        [
+            "2026/01/01 (Thu) 00:00", "2026/01/02 (Fri) 00:00", "2026/01/03 (Sat) 00:00",
+            "2026/01/04 (Sun) 00:00", "2026/01/05 (Mon) 00:00"
+        ],
+        HaystackSessions =
+        [
+            [new LongMemEvalTurn { Role = "user", Content = "a", HasAnswer = true }],
+            [new LongMemEvalTurn { Role = "user", Content = "b", HasAnswer = true }],
+            [new LongMemEvalTurn { Role = "user", Content = "c", HasAnswer = true }],
+            [new LongMemEvalTurn { Role = "user", Content = "d", HasAnswer = true }],
+            [new LongMemEvalTurn { Role = "user", Content = "other", HasAnswer = false }]
+        ]
+    };
+
     private static ExternalBenchmarkOptions Options(
         EvidenceCaptureMode mode,
         int topK = 10) => new()
