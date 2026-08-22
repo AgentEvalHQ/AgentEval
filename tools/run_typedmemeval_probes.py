@@ -143,15 +143,54 @@ def load_cache() -> None:
 
 
 #: Per-arm call and empty tallies, so the empty rate is a published, gateable statistic rather
-#: than something reconstructed forensically from a cache after the fact.
+#: than something reconstructed forensically from a cache after the fact. Keyed by
+#: (arm, population): a judge grade and a probe answer are different populations with different
+#: consequences, and pooling them diluted every denominator in the first cut of this instrument.
 _arm_calls: Counter = Counter()
 _arm_empty: Counter = Counter()
 
+#: An arm token is `v`, digits, and an OPTIONAL SUFFIX -- `v9strip` is a real arm, not a malformed
+#: `v9`. The first cut matched only `v\d` and fell back to `"v1"` for anything else, which filed
+#: all 700 v9strip calls under v1: v1's denominator went 220 -> 920, v9strip's empties landed in
+#: v1's numerator, and v9strip itself got no bucket and therefore no ceiling.
+#:
+#: There is deliberately NO fallback to a real arm. An unattributable key becomes "unknown", which
+#: the corpus gate fails on, because an arm nobody can name is an arm nobody is watching.
+_ARM_TOKEN = re.compile("^v[0-9]+[a-z]*$")
 
-def _arm_of(cache_key: str) -> str:
-    """The probe arm a cache key belongs to, e.g. 'v3' from '<question>:v3:2'."""
-    match = re.search(":(v" + chr(92) + "d)(?::|$)", cache_key)
-    return match.group(1) if match else "v1"
+
+def _arm_and_kind(cache_key: str) -> tuple[str, str]:
+    """The probe arm and population a cache key belongs to.
+
+    Keys are ``<question>:<arm>[:<index>...][:judge]`` -- e.g. ``a1b2:v6:3:0`` or
+    ``a1b2:v9strip:judge``. The population matters because the two failures are not the same
+    event: an empty JUDGE grade is a missing grade, while an empty PROBE answer is a missing
+    answer that V3 and V6 then score as a pass.
+    """
+    parts = cache_key.split(":")
+    arm = parts[1] if len(parts) > 1 else ""
+    kind = "judge" if len(parts) > 2 and parts[-1] == "judge" else "probe"
+    return (arm if _ARM_TOKEN.match(arm) else "unknown"), kind
+
+
+def _arm_row(arm: str) -> dict:
+    """One published row per arm, probe answers and judge grades kept apart.
+
+    ``calls``/``empty``/``rate`` describe PROBE ANSWERS only. That is the population the ceiling
+    is about, and pooling judge grades into it is precisely what let V9's true 7.3% read as 3.8%
+    and V3's 78.2% read as 66.7% -- every affected arm was understated, never overstated.
+    """
+    probe, judge = _arm_calls[(arm, "probe")], _arm_calls[(arm, "judge")]
+    probe_empty, judge_empty = _arm_empty[(arm, "probe")], _arm_empty[(arm, "judge")]
+    return {
+        "population": "probe_answers",
+        "calls": probe,
+        "empty": probe_empty,
+        "rate": round(probe_empty / probe, 4) if probe else None,
+        "judge_calls": judge,
+        "judge_empty": judge_empty,
+        "judge_rate": round(judge_empty / judge, 4) if judge else None,
+    }
 
 
 #: Hard ceiling for the retry above. A reasoning deployment can spend an arbitrary amount on
@@ -177,7 +216,7 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
         # and the length-retry above never gets the chance to fire.
         if _cache.get(cache_key):
             _stats["cache_hit"] += 1
-            _arm_calls[_arm_of(cache_key)] += 1
+            _arm_calls[_arm_and_kind(cache_key)] += 1
             return _cache[cache_key]
         if cache_key in _cache:
             _stats["empty_cache_entry_repaid"] += 1
@@ -200,7 +239,7 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             )
             with urllib.request.urlopen(request, timeout=180) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            _arm = _arm_of(cache_key)
+            _arm = _arm_and_kind(cache_key)
             _arm_calls[_arm] += 1
             choice = payload["choices"][0]
             text = (choice["message"].get("content") or "").strip()
@@ -811,12 +850,12 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "by_cache_key": dict(sorted(_empty_reasons.items())),
         } if _empty_reasons or _stats["retried_for_length"] else {"count": 0},
         # Published and gateable, per a consumer's ask, so this class dies at authoring time
-        # instead of being rediscovered forensically. The V2 0/1436 against V3 258/387 spread shows
-        # the statistic discriminates cleanly between an arm that is fine and one that is not.
+        # instead of being rediscovered forensically. The V2 0/1100 against V3 258/330 spread shows
+        # the statistic discriminates cleanly between an arm that is fine and one that is not --
+        # but only once judge grades are kept out of the denominator, which is the correction here.
         "empty_rate_by_arm": {
-            arm: {"calls": _arm_calls[arm], "empty": _arm_empty[arm],
-                  "rate": round(_arm_empty[arm] / _arm_calls[arm], 4) if _arm_calls[arm] else None}
-            for arm in sorted(set(_arm_calls) | set(_arm_empty))
+            arm: _arm_row(arm)
+            for arm in sorted({a for a, _kind in set(_arm_calls) | set(_arm_empty)})
         },
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
@@ -927,11 +966,107 @@ def self_test() -> None:
     bare = "No, not yet."
     check("negative gold with no content is undecidable", _v3_decidable(bare, known), False)
 
+    # --- Arm attribution. Also a real shipped defect, not a hypothetical. ---------------------
+    # 0.27.0-beta matched an arm token as `v` plus digits and fell back to "v1" on no match, so
+    # every `v9strip` key -- a real arm, 700 calls -- was filed under v1. The published effect:
+    # v1's denominator read 920 against a true 220, v9strip's empties were counted in v1's
+    # numerator, and v9strip had no row of its own and therefore no ceiling to breach.
+    check("suffixed arm keeps its own identity", _arm_and_kind("a1:v9strip"), ("v9strip", "probe"))
+    check("suffixed arm's judge call is not a probe answer",
+          _arm_and_kind("a1:v9strip:judge"), ("v9strip", "judge"))
+
+    # Judge grades are a separate population. Pooling them into an arm's denominator understated
+    # every affected arm: v3's 258 empties over 330 probe answers (78.2%) read as 258/387 (66.7%),
+    # and v9's 7.3% read as 3.8% -- under a 5% ceiling it should never have cleared.
+    check("indexed probe answer", _arm_and_kind("a1:v6:3:0"), ("v6", "probe"))
+    check("indexed judge grade", _arm_and_kind("a1:v6:3:0:judge"), ("v6", "judge"))
+
+    # No fallback to a real arm. An unattributable key must be visibly unattributed, because the
+    # corpus gate fails on "unknown" -- silently crediting it to v1 is what hid this for a release.
+    check("unattributable key does not borrow a real arm",
+          _arm_and_kind("garbage")[0], "unknown")
+    check("malformed arm token does not borrow a real arm",
+          _arm_and_kind("a1:vX:judge")[0], "unknown")
+
     if failures:
         for f in failures:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
-    print("self-test OK  (10 evidence-screen cases)")
+    print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases)")
+
+
+def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
+    """Recompute the per-arm empty rates from the shared call cache. Makes no API calls.
+
+    The rates are a property of the cached calls, not of a fresh run, so a mis-attribution in the
+    tallying can be corrected without re-probing -- and must be, because the wrong figures shipped
+    inside seven corpora in 0.27.0-beta. This deliberately reuses `_arm_and_kind` rather than
+    reimplementing the parse: two copies of an attribution rule is how the first one drifted.
+
+    Only the empty-rate fields are touched. Everything else in the probe record was measured by a
+    run and is not this tool's to rewrite.
+    """
+    load_cache()
+    if not _cache:
+        raise SystemExit(f"no call cache at {CACHE_PATH}; nothing to recompute")
+
+    _arm_calls.clear()
+    _arm_empty.clear()
+    for cache_key, value in _cache.items():
+        bucket = _arm_and_kind(cache_key)
+        _arm_calls[bucket] += 1
+        if not (value or "").strip():
+            _arm_empty[bucket] += 1
+
+    arms = sorted({arm for arm, _kind in set(_arm_calls) | set(_arm_empty)})
+    by_arm = {arm: _arm_row(arm) for arm in arms}
+    rate_text = {
+        arm: (f"{row['empty']}/{row['calls']}"
+              + (f" ({row['rate']:.1%})" if row["rate"] else ""))
+        for arm, row in by_arm.items()
+    }
+    for arm in arms:
+        row = by_arm[arm]
+        print(f"  {arm:9s} probe {row['empty']:4d}/{row['calls']:<5d} "
+              f"judge {row['judge_empty']:4d}/{row['judge_calls']:<5d}")
+
+    for vertical in verticals:
+        corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
+        meta_path = tmc.DATA_ROOT / vertical / f"{corpus_id}.meta.json"
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        probes = metadata.get("probes")
+        if not probes:
+            print(f"{vertical}: no probe record, skipped", flush=True)
+            continue
+
+        probes["empty_rate_by_arm"] = by_arm
+        probes["empty_rate_scope"] = (
+            "family-wide, derived from the shared reference-model call cache and split by "
+            "population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried "
+            "alongside rather than pooled into them. Per-corpus attribution arrives with the next "
+            "full run.")
+
+        disclosure = probes.get("empty_completion_disclosure")
+        if isinstance(disclosure, dict):
+            disclosure["measured_over"] = (
+                f"the {len(_cache)} cached reference-model calls present in this tree, attributed "
+                "by cache-key arm and split into probe answers and judge grades; not necessarily "
+                "the full historical run")
+            disclosure["empty_completion_rate"] = rate_text
+            disclosure["correction"] = (
+                "SUPERSEDES the figures published in 0.27.0-beta, which were UNDERSTATED in every "
+                "affected arm. That cut parsed an arm token as `v` plus digits only, so the 700 "
+                "`v9strip` calls fell through a fallback into v1 (denominator 220 -> 920) and "
+                "`v9strip` itself got no bucket and so no ceiling; judge grades were also pooled "
+                "into each arm's denominator. Corrected, probe-answer only: v3 66.7% -> 78.2%, "
+                "v6 21.1% -> 27.0%, v9 3.8% -> 7.3%, v1 0.4% -> 0.0%. Judge grades are healthy at "
+                "0/1246 empty, so the pooling diluted the rates without changing their direction. "
+                "The V3/V6 re-run requirement is unchanged and slightly larger than first stated.")
+        metadata["probes"] = probes
+        meta_path.write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8", newline="\n")
+        print(f"{vertical}: empty-rate stamp corrected", flush=True)
 
 
 def main() -> None:
@@ -941,10 +1076,17 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--self-test", action="store_true",
                         help="check the evidence screen against known-bad cases; needs no credentials")
+    parser.add_argument("--restamp-empty-rates-from-cache", action="store_true",
+                        help="recompute empty_rate_by_arm from the shared call cache and rewrite "
+                             "that field alone in every corpus; makes no API calls")
     args = parser.parse_args()
 
     if args.self_test:
         self_test()
+        return
+
+    if args.restamp_empty_rates_from_cache:
+        restamp_empty_rates_from_cache(args.verticals or list(tmc.VERTICALS))
         return
 
     load_cache()

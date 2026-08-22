@@ -521,9 +521,13 @@ public sealed class TypedMemEvalCorpusTests
     // A probe arm that returns nothing is not measuring the model, and both directions of that
     // mistake have already shipped. V8/V9 counted silence as a wrong answer, which understated a
     // ceiling. V3 and V6 pass when an ablated context FAILS to reproduce the answer, so silence
-    // scores as a PASS and certifies validity the evidence does not support -- 258 of V3's 387
-    // calls were empty. This gate exists so the class dies at authoring time rather than being
-    // rediscovered forensically, which is how both instances were found.
+    // scores as a PASS and certifies validity the evidence does not support -- 258 of V3's 330
+    // probe answers were empty. This gate exists so the class dies at authoring time rather than
+    // being rediscovered forensically, which is how both instances were found.
+    //
+    // The rate is measured over PROBE ANSWERS. Judge grades are a separate population -- 0 of 1246
+    // empty, i.e. healthy -- and pooling them into the denominator is what made this instrument
+    // understate itself on its own first release.
     [Theory]
     [MemberData(nameof(AllVerticals))]
     public void Metadata_KeepsEveryProbeArmBelowItsEmptyResponseCeiling(TypedMemEvalVertical vertical)
@@ -533,8 +537,29 @@ public sealed class TypedMemEvalCorpusTests
             probes.TryGetProperty("empty_rate_by_arm", out var byArm),
             $"{vertical} carries no empty-rate record. Re-run tools/run_typedmemeval_probes.py.");
 
+        // Equality against a C# list, not "every arm present is under its ceiling". The first cut
+        // of this gate checked only the latter, and v9strip -- a real arm -- produced no bucket at
+        // all because the tally parsed an arm token as `v` plus digits and quietly filed its 700
+        // calls under v1. An arm with no row cleared the ceiling by not being there, which is the
+        // pass-by-absence shape this suite has been bitten by before (see the V7 refused-features
+        // check, which is written this way for the same reason). Adding an arm to the runner now
+        // fails here until it is named and monitored.
+        var recorded = byArm.EnumerateObject().Select(a => a.Name).ToHashSet(StringComparer.Ordinal);
+        Assert.False(
+            recorded.Contains("unknown"),
+            $"{vertical} has probe calls that could not be attributed to a named arm. An arm " +
+            "nobody can name is an arm nobody is watching — fix _arm_and_kind, do not ignore it.");
+        Assert.Equal(
+            ExpectedProbeArms.OrderBy(n => n, StringComparer.Ordinal),
+            recorded.OrderBy(n => n, StringComparer.Ordinal));
+
         foreach (var arm in byArm.EnumerateObject())
         {
+            // `rate` is PROBE ANSWERS only. Judge grades ride alongside in judge_* and are
+            // deliberately not pooled in: doing so put 1246 healthy grades into the denominators
+            // and understated every affected arm (v3 78.2% read as 66.7%, v9 7.3% as 3.8%).
+            Assert.Equal("probe_answers", arm.Value.GetProperty("population").GetString());
+
             if (!arm.Value.TryGetProperty("rate", out var rateNode) ||
                 rateNode.ValueKind == JsonValueKind.Null)
             {
@@ -568,9 +593,28 @@ public sealed class TypedMemEvalCorpusTests
     /// </summary>
     private static readonly Dictionary<string, double> KnownEmptyRateRatchet = new(StringComparer.Ordinal)
     {
-        ["v3"] = 0.6667,
-        ["v6"] = 0.2114,
+        // Probe-answer rates. These are HIGHER than the 0.6667 / 0.2114 published in 0.27.0-beta,
+        // and nothing got worse between the two: that cut pooled judge grades into the denominator
+        // and mis-filed 700 v9strip calls under v1, so every affected arm was understated. The
+        // numbers moved because the instrument was corrected, and the ratchet firing on that move
+        // is the ratchet working.
+        ["v3"] = 0.7818,
+        ["v6"] = 0.2696,
+
+        // v9 is a ceiling BREACH, not a waiver. Its true probe-answer rate has always been above
+        // EmptyRateCeiling; pooling 102 judge grades into 110 probe calls is the only reason it
+        // ever read as passing. Recorded here so it stays visible and can only shrink, rather than
+        // quietly clearing a bar it does not clear. Direction is conservative -- silence scores as
+        // a failure on V9, so the published retrieval ceiling is a lower bound.
+        ["v9"] = 0.0727,
     };
+
+    /// <summary>
+    /// Every arm the probe runner is expected to tally. Named here rather than inferred from the
+    /// record, so an arm that stops reporting fails instead of passing by absence.
+    /// </summary>
+    private static readonly string[] ExpectedProbeArms =
+        ["v1", "v2", "v3", "v6", "v8", "v9", "v9strip"];
 
     private const double SeparabilityMaxAuc = 0.75;
 

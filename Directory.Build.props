@@ -39,7 +39,7 @@
          whose assemblies reported 0.16.0.0 — and `AgentEvalVersion` in result provenance reads
          Assembly.GetName().Version, so every result that release produced was stamped with a
          version that had not been current since 0.16. The consuming project caught it. -->
-    <Version>0.27.0-beta</Version>
+    <Version>0.28.0-beta</Version>
 
     <!-- Package icon for NuGet -->
     <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>

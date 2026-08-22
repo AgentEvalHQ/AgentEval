@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0-beta] - 2026-08-22
+
+### Fixed
+
+- **The per-arm empty-rate instrument shipped in 0.27.0-beta was measuring itself wrong, and
+  understated the defect it exists to expose.** Two mistakes, one release apart in discovery but
+  both present at publication.
+
+  It parsed an arm token as `v` followed by digits, then **fell back to `"v1"` when that failed**.
+  `v9strip` is a real arm, not a malformed `v9`, so all 700 of its calls were filed under v1: v1's
+  denominator read **920 against a true 220**, v9strip's empties were counted in v1's numerator, and
+  **v9strip itself had no row and therefore no ceiling** — it cleared the gate by not being in it.
+  Second, **judge grades were pooled into each arm's denominator** alongside probe answers, which
+  are the population the ceiling is about.
+
+  Corrected, probe-answers only — every affected arm was **understated, never overstated**:
+
+  | arm | published 0.27.0-beta | corrected |
+  |---|---|---|
+  | v3 | 258/387 (66.7%) | **258/330 (78.2%)** |
+  | v6 | 182/861 (21.1%) | **182/675 (27.0%)** |
+  | v9 | 8/212 (3.8%) | **8/110 (7.3%)** |
+  | v1 | 4/920 (0.4%) | **0/110 (0.0%)** |
+  | v9strip | *not measured* | **4/352 (1.1%)** |
+
+  **V9's true rate breaches the 5% ceiling and always did** — pooling 102 judge grades into 110
+  probe calls is the only reason it read as passing. It is now recorded as a ratchet entry, visible
+  and able only to shrink, rather than silently clearing a bar it does not clear. Its direction is
+  conservative (silence scores as a failure on V9), so the published retrieval ceiling remains a
+  lower bound. Judge grades are healthy at **0 empty of 1246**, so the pooling diluted the rates
+  without changing any conclusion: **V3/V6 remain uncitable pending re-run**, by a slightly larger
+  margin than first stated.
+
+  The gate now asserts the recorded arm set **equals** a C# list rather than checking only that
+  present arms are under their ceilings — the same pass-by-absence defence the V7 separability test
+  uses, and the fix for an arm going unmonitored. An unattributable key becomes `unknown`, which the
+  gate fails on, instead of borrowing a real arm's identity. Six attribution cases were added to the
+  runner's CI self-test. Verified by falsification: removing an arm, introducing an `unknown`
+  bucket, and regressing a rate each fail the gate.
+
+  Corpus **bytes are untouched** — only the metadata stamp changed, so every `probed_corpus_sha256`
+  still matches and no probe re-run was required. Recomputed offline from the same call cache via
+  `run_typedmemeval_probes.py --restamp-empty-rates-from-cache`, which reuses the runner's own
+  attribution rather than reimplementing it, because two copies of that rule is how the first one
+  drifted.
+
+- **A LongMemEval CLI test failed on a random temp path rather than on the thing it guards.**
+  `RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering` asserted that `"5000"`
+  appears nowhere in the console transcript — a guard against a mis-scaled percent rendering `50.0%`
+  as `5000`. The transcript also prints the workspace path, which is a randomly named temp
+  directory, and a CI run that drew `...96f2e438390616129bc35000e...` failed on the hex coincidence.
+  The substring is now checked on the accuracy line, where the rendering actually happens.
+
 ## [0.27.0-beta] - 2026-08-22
 
 ### Added
@@ -4335,7 +4388,9 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.28.0-beta...HEAD
+[0.28.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.27.0-beta...v0.28.0-beta
+[0.27.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...v0.27.0-beta
 [0.26.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...v0.26.0-beta
 [0.25.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.24.0-beta...v0.25.0-beta
 [0.24.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.23.0-beta...v0.24.0-beta
