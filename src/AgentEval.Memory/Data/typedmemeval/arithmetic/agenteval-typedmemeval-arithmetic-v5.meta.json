@@ -1422,6 +1422,39 @@
         "v3_v6": "ANTI-CONSERVATIVE, and this is the serious one. V3 passes when an ablated context FAILS to reproduce the answer, and an empty completion cannot reproduce anything, so silence scores as a PASS. V6 has the same shape. Two thirds of V3's calls are empty, so its 50/50 results certify less than they appear to."
       },
       "reading": "An empty completion is not evidence of anything, but the probe arms treated it as evidence in both directions at once. The likely cause is a reasoning deployment spending the completion budget on reasoning tokens before emitting content -- V2, whose prompt carries no session context, has a zero rate, while V3 and V6, which ask the model to work hard over a context that no longer contains the answer, have the highest. V3 AND V6 MUST BE RE-RUN BEFORE THEY ARE CITED AGAIN. V1, V2, V7 are unaffected. The capture path now retries a length-truncated empty at a larger budget, records finish_reason, filter verdict and usage for any that remain, and no longer serves an empty cache entry as a purchased answer."
-    }
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "calls": 920,
+        "empty": 4,
+        "rate": 0.0043
+      },
+      "v2": {
+        "calls": 1436,
+        "empty": 0,
+        "rate": 0.0
+      },
+      "v3": {
+        "calls": 387,
+        "empty": 258,
+        "rate": 0.6667
+      },
+      "v6": {
+        "calls": 861,
+        "empty": 182,
+        "rate": 0.2114
+      },
+      "v8": {
+        "calls": 217,
+        "empty": 3,
+        "rate": 0.0138
+      },
+      "v9": {
+        "calls": 212,
+        "empty": 8,
+        "rate": 0.0377
+      }
+    },
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache; per-corpus attribution arrives with the next full run"
   }
 }

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Empty-response rate per probe arm is now a published, gated statistic.** `probes.empty_rate_by_arm`
+  records calls, empties and rate for every arm, and a corpus test refuses any arm above its
+  ceiling the way the separability test refuses a discriminating feature. The ceiling (5%) and the
+  ratchet are **C# constants, never read from the record** -- an artifact that supplies its own
+  threshold always clears it.
+
+  V3 (0.6667) and V6 (0.2114) are pinned as ratchet entries rather than waived, so the known defect
+  stays visible and can only shrink. Verified by tightening the ratchet: the gate fails on all seven
+  verticals and passes when restored.
+
+  This turns "a reasoning deployment burned its completion budget" from a forensic discovery into a
+  gate failure at authoring time. The V2 0/1436 against V3 258/387 spread is what makes the
+  statistic worth gating -- it separates a healthy arm from a broken one with no overlap.
+
+### Fixed
+
+- **The length-retry is bounded in attempts, not tokens**, and no longer shares the transport retry
+  budget. A length-retry that consumed transport attempts could exhaust them alongside a 429 and
+  fall out of the loop into a fatal "unreachable" naming the wrong cause; and a token bound has no
+  natural final attempt, where an attempt bound guarantees a last response whose `finish_reason` is
+  itself the evidence.
+
+- **`_arm_of` carried an invisible backspace byte (0x08) inside its regex**, so every cache key fell
+  through to `v1` and per-arm attribution silently collapsed onto one arm. Introduced in the same
+  change that added the tally and caught before it stamped anything. The file now has zero control
+  bytes.
+
+
 ### Fixed
 
 - **V3 and V6 pass when the model says nothing, and two thirds of V3's calls said nothing.**

@@ -518,6 +518,60 @@ public sealed class TypedMemEvalCorpusTests
     }
 
     /// <summary>The refusal bar, mirroring <c>SEPARABILITY_MAX_AUC</c> in typedmemeval_common.py.</summary>
+    // A probe arm that returns nothing is not measuring the model, and both directions of that
+    // mistake have already shipped. V8/V9 counted silence as a wrong answer, which understated a
+    // ceiling. V3 and V6 pass when an ablated context FAILS to reproduce the answer, so silence
+    // scores as a PASS and certifies validity the evidence does not support -- 258 of V3's 387
+    // calls were empty. This gate exists so the class dies at authoring time rather than being
+    // rediscovered forensically, which is how both instances were found.
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void Metadata_KeepsEveryProbeArmBelowItsEmptyResponseCeiling(TypedMemEvalVertical vertical)
+    {
+        var probes = Metadata(vertical).GetProperty("probes");
+        Assert.True(
+            probes.TryGetProperty("empty_rate_by_arm", out var byArm),
+            $"{vertical} carries no empty-rate record. Re-run tools/run_typedmemeval_probes.py.");
+
+        foreach (var arm in byArm.EnumerateObject())
+        {
+            if (!arm.Value.TryGetProperty("rate", out var rateNode) ||
+                rateNode.ValueKind == JsonValueKind.Null)
+            {
+                continue;
+            }
+
+            // The ceiling and the ratchet are C# constants for the same reason the separability
+            // bar is: a record that supplied its own threshold would always clear it.
+            var rate = rateNode.GetDouble();
+            var ceiling = KnownEmptyRateRatchet.TryGetValue(arm.Name, out var allowed)
+                ? allowed
+                : EmptyRateCeiling;
+
+            Assert.True(
+                rate <= ceiling,
+                $"probe arm {arm.Name} on {vertical} returned no answer on {rate:P1} of calls, " +
+                $"above its {ceiling:P1} ceiling. An empty completion is not evidence: on V8/V9 it " +
+                "understates a ceiling, and on V3/V6 it scores as a PASS and overstates validity. " +
+                "Raise the completion budget or fix capture — do not raise this number.");
+        }
+    }
+
+    /// <summary>Empty-response ceiling for any arm without a recorded ratchet entry.</summary>
+    private const double EmptyRateCeiling = 0.05;
+
+    /// <summary>
+    /// Known-bad arms awaiting the capture re-run, as a RATCHET: these may only ever shrink.
+    /// V3 and V6 are the anti-conservative pair — their results are uncitable until re-run — and
+    /// they are pinned here rather than waived so the defect stays visible and cannot regress.
+    /// When the re-run lands, lower these to <see cref="EmptyRateCeiling"/> and delete the entry.
+    /// </summary>
+    private static readonly Dictionary<string, double> KnownEmptyRateRatchet = new(StringComparer.Ordinal)
+    {
+        ["v3"] = 0.6667,
+        ["v6"] = 0.2114,
+    };
+
     private const double SeparabilityMaxAuc = 0.75;
 
     /// <summary>

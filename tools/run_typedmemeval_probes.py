@@ -142,9 +142,25 @@ def load_cache() -> None:
             return
 
 
+#: Per-arm call and empty tallies, so the empty rate is a published, gateable statistic rather
+#: than something reconstructed forensically from a cache after the fact.
+_arm_calls: Counter = Counter()
+_arm_empty: Counter = Counter()
+
+
+def _arm_of(cache_key: str) -> str:
+    """The probe arm a cache key belongs to, e.g. 'v3' from '<question>:v3:2'."""
+    match = re.search(":(v" + chr(92) + "d)(?::|$)", cache_key)
+    return match.group(1) if match else "v1"
+
+
 #: Hard ceiling for the retry above. A reasoning deployment can spend an arbitrary amount on
 #: reasoning; this bounds what one question may cost before we accept the silence and record it.
 _MAX_COMPLETION_CEILING = 8_000
+
+#: How many times a length-truncated empty is retried at a larger budget. Attempts rather than a
+#: token ceiling, so the last one always produces a response whose finish_reason can be recorded.
+_LENGTH_RETRIES = 2
 
 #: Why a completion came back empty, keyed by cache key. Written to the run metadata so the
 #: refusal / filter / truncation trichotomy is decidable from the record instead of inferred.
@@ -161,6 +177,7 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
         # and the length-retry above never gets the chance to fire.
         if _cache.get(cache_key):
             _stats["cache_hit"] += 1
+            _arm_calls[_arm_of(cache_key)] += 1
             return _cache[cache_key]
         if cache_key in _cache:
             _stats["empty_cache_entry_repaid"] += 1
@@ -172,7 +189,8 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     body = {"messages": [{"role": "user", "content": prompt}], "max_completion_tokens": max_tokens}
 
     last_error = None
-    for attempt in range(5):
+    length_retries = 0
+    for attempt in range(5 + _LENGTH_RETRIES):
         try:
             request = urllib.request.Request(
                 url,
@@ -182,6 +200,8 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             )
             with urllib.request.urlopen(request, timeout=180) as response:
                 payload = json.loads(response.read().decode("utf-8"))
+            _arm = _arm_of(cache_key)
+            _arm_calls[_arm] += 1
             choice = payload["choices"][0]
             text = (choice["message"].get("content") or "").strip()
             finish = choice.get("finish_reason")
@@ -198,15 +218,24 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             # question answering under V9. Retried once at a larger budget rather than recorded as
             # a failure, because a truncated reasoning trace is our instrument running out of room,
             # not the model being wrong.
-            if not text and finish == "length" and max_tokens < _MAX_COMPLETION_CEILING:
+            # Bounded in ATTEMPTS, not tokens, and counted separately from the transport retries
+            # above. Two reasons. A length-retry sharing the transport budget can exhaust it
+            # alongside a 429 and fall out of the loop into a fatal "unreachable" that names the
+            # wrong cause. And a token bound has no natural last attempt to record: bounding by
+            # attempts guarantees a final response whose finish_reason IS the evidence, where a
+            # missing one is just another hole.
+            if not text and finish == "length" and length_retries < _LENGTH_RETRIES:
+                length_retries += 1
                 _stats["retried_for_length"] += 1
-                body["max_completion_tokens" if "max_completion_tokens" in body else "max_tokens"]                     = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
                 max_tokens = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
+                budget_key = "max_completion_tokens" if "max_completion_tokens" in body else "max_tokens"
+                body[budget_key] = max_tokens
                 continue
 
             if not text:
                 # Still empty: record WHY, so refusal / filter / truncation stop being one bucket.
                 _stats["empty_completion"] += 1
+                _arm_empty[_arm] += 1
                 _empty_reasons[cache_key] = {
                     "finish_reason": finish,
                     "content_filter": choice.get("content_filter_results"),
@@ -781,6 +810,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "retried_for_length": _stats["retried_for_length"],
             "by_cache_key": dict(sorted(_empty_reasons.items())),
         } if _empty_reasons or _stats["retried_for_length"] else {"count": 0},
+        # Published and gateable, per a consumer's ask, so this class dies at authoring time
+        # instead of being rediscovered forensically. The V2 0/1436 against V3 258/387 spread shows
+        # the statistic discriminates cleanly between an arm that is fine and one that is not.
+        "empty_rate_by_arm": {
+            arm: {"calls": _arm_calls[arm], "empty": _arm_empty[arm],
+                  "rate": round(_arm_empty[arm] / _arm_calls[arm], 4) if _arm_calls[arm] else None}
+            for arm in sorted(set(_arm_calls) | set(_arm_empty))
+        },
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
