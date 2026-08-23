@@ -195,11 +195,37 @@ def _arm_row(arm: str) -> dict:
 
 #: Hard ceiling for the retry above. A reasoning deployment can spend an arbitrary amount on
 #: reasoning; this bounds what one question may cost before we accept the silence and record it.
-_MAX_COMPLETION_CEILING = 8_000
+#:
+#: SIZED FROM MEASUREMENT, not chosen. Every empty this runner recorded came back with
+#: reasoning_tokens exactly equal to the old 8,000 cap -- right-censored observations that proved
+#: 8,000 was too small and said nothing about what suffices. Replaying those 19 prompts at
+#: escalating budgets uncensored them: reasoning needed ran 153 / 7,677 / 14,639
+#: (min / median / max), so the old cap sat almost exactly on the MEDIAN and clipped roughly the
+#: upper half of a perfectly ordinary distribution. Answers themselves are tiny -- 104 to 358
+#: characters -- so essentially the whole budget is reasoning.
+#:
+#: 32,000 is ~2.2x the observed maximum. The margin is not padding: the same prompt resolved at
+#: 16,000 on one sample and needed more on another, so reasoning length is stochastic and a ceiling
+#: set at the observed max would clip the next draw.
+_MAX_COMPLETION_CEILING = 32_000
 
 #: How many times a length-truncated empty is retried at a larger budget. Attempts rather than a
 #: token ceiling, so the last one always produces a response whose finish_reason can be recorded.
-_LENGTH_RETRIES = 2
+#:
+#: Three, not two, because the LADDER was the binding constraint and not the ceiling: at x3 growth
+#: from 900 the old two retries topped out at 8,100, so raising _MAX_COMPLETION_CEILING alone could
+#: never have reached a question needing 14,639. The final retry jumps straight to the ceiling
+#: rather than tripling again, so the last attempt is always the most generous one available.
+_LENGTH_RETRIES = 3
+
+#: Starting budget for the ablation arms. V3 and V6 ask the model to reconstruct an answer from a
+#: context the answer was REMOVED from, so it searches the whole haystack before concluding -- 18 of
+#: the 19 measured truncations were V3. Starting them near the top of the measured range resolves
+#: almost all on the first call instead of burning two truncated attempts first.
+#:
+#: This is close to free: max_completion_tokens is a CAP, not a reservation. A call given 16,000
+#: that finishes in 500 bills 500. The arms that answer promptly keep the small default.
+_ABLATION_MAX_TOKENS = 16_000
 
 #: Why a completion came back empty, keyed by cache key. Written to the run metadata so the
 #: refusal / filter / truncation trichotomy is decidable from the record instead of inferred.
@@ -266,7 +292,12 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             if not text and finish == "length" and length_retries < _LENGTH_RETRIES:
                 length_retries += 1
                 _stats["retried_for_length"] += 1
-                max_tokens = min(max_tokens * 3, _MAX_COMPLETION_CEILING)
+                # The last attempt goes straight to the ceiling instead of tripling again: there is
+                # no value in a final rung that is still short of the most generous budget we are
+                # willing to buy, and the measured need is stochastic enough that the extra headroom
+                # is what converts a truncation into an answer.
+                max_tokens = (_MAX_COMPLETION_CEILING if length_retries == _LENGTH_RETRIES
+                              else min(max_tokens * 3, _MAX_COMPLETION_CEILING))
                 budget_key = "max_completion_tokens" if "max_completion_tokens" in body else "max_tokens"
                 body[budget_key] = max_tokens
                 continue
@@ -525,6 +556,20 @@ def question_key(entry: dict) -> str:
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
+def _mark_silent(record: dict, arm: str) -> None:
+    """Record that an arm went UNMEASURED on this question because the model returned nothing.
+
+    An empty completion is not evidence, and scoring it as one has shipped in both directions: on
+    V1/V8/V9 silence scored as a wrong answer and understated a ceiling, and on V3/V6 it scored as
+    a PASS and certified validity the evidence does not support. The retry in `complete` cut the
+    rate from 78.2% to 3.1% on V3, but frequency is not the same as accounting -- the residue was
+    still being scored. Marking the arm unmeasured drops it from the numerator AND the denominator
+    together, which is the only handling that does not bias the rate either way, and leaves the
+    count reportable instead of absorbed.
+    """
+    record.setdefault("silent_arms", []).append(arm)
+
+
 def probe_question(entry: dict, vertical: str) -> dict:
     qid = entry["question_id"]
     key = question_key(entry)
@@ -540,7 +585,11 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # measuring the model, not the memory system, and does not belong in the corpus.
     if golds:
         answer = complete(ask(question, date, subset(entry, golds)), cache_key=f"{key}:v1")
-        record["v1"] = produced_gold(question, gold, answer, f"{key}:v1:judge")
+        if answer:
+            record["v1"] = produced_gold(question, gold, answer, f"{key}:v1:judge")
+        else:
+            record["v1"] = None
+            _mark_silent(record, "v1")
         record["v1_answer"] = answer[:300]
     else:
         # A never-known probe has no gold to retrieve; its ceiling behaviour is to abstain, which
@@ -566,7 +615,11 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # undefined case.
     if golds:
         answer = complete(ask(question, date, subset(entry, everything)), cache_key=f"{key}:v8")
-        record["v8"] = produced_gold(question, gold, answer, f"{key}:v8:judge")
+        if answer:
+            record["v8"] = produced_gold(question, gold, answer, f"{key}:v8:judge")
+        else:
+            record["v8"] = None
+            _mark_silent(record, "v8")
         record["v8_answer"] = answer[:300]
     else:
         record["v8"] = None
@@ -595,7 +648,11 @@ def probe_question(entry: dict, vertical: str) -> dict:
         ranked = tmc.bm25_rank(question, texts)[:tmc.K_REF]
         answer = complete(ask(question, date, subset(entry, sorted(ranked))),
                           cache_key=f"{key}:v9")
-        record["v9"] = produced_gold(question, gold, answer, f"{key}:v9:judge")
+        if answer:
+            record["v9"] = produced_gold(question, gold, answer, f"{key}:v9:judge")
+        else:
+            record["v9"] = None
+            _mark_silent(record, "v9")
         record["v9_answer"] = answer[:300]
         record["v9_gold_in_context"] = sum(1 for i in ranked if i in golds)
     else:
@@ -609,13 +666,31 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # negative and got one. Recorded as not-applicable rather than scored, the same way V1 is.
     if golds:
         hits = 0
+        silent = 0
         for k in range(V2_SAMPLES):
             answer = complete(ask(question, date, ""), cache_key=f"{key}:v2:{k}", max_tokens=700)
+            if not answer:
+                silent += 1
+                continue
             if produced_gold(question, gold, answer, f"{key}:v2:{k}:judge", screen=True,
                          already_known=f"{question} {date}"):
                 hits += 1
         record["v2_hits"] = hits
-        record["v2"] = hits < V2_REJECT_AT
+        # Silence is only disqualifying where it could CHANGE the verdict. V2 draws ten samples and
+        # fails on V2_REJECT_AT hits, so a silent draw matters only if the hits already seen plus
+        # the silent ones could have reached that threshold; below it the verdict stands on the
+        # samples that spoke. (V3 and V6 fail on a single leak, so any silence there is always
+        # potentially verdict-changing -- which is why their rule looks stricter. It is the same
+        # rule.) Without this, a model that said nothing would be scored as a model that could not
+        # guess, which is the anti-conservative direction again.
+        if hits >= V2_REJECT_AT:
+            record["v2"] = False
+        elif silent and hits + silent >= V2_REJECT_AT:
+            record["v2"] = None
+            record["v2_silent_samples"] = silent
+            _mark_silent(record, "v2")
+        else:
+            record["v2"] = True
     else:
         record["v2"] = None
 
@@ -630,13 +705,30 @@ def probe_question(entry: dict, vertical: str) -> dict:
                  and (entry.get("typedmemeval") or {}).get("shape") not in _V3_GUESSABLE_SHAPES)
     if non_gold and golds and decidable:
         leaked = False
+        silent = 0
         for k in range(ABLATION_SAMPLES):
-            answer = complete(ask(question, date, subset(entry, non_gold)), cache_key=f"{key}:v3:{k}")
+            answer = complete(ask(question, date, subset(entry, non_gold)),
+                              cache_key=f"{key}:v3:{k}",
+                              max_tokens=_ABLATION_MAX_TOKENS)
+            if not answer:
+                silent += 1
+                continue
             if produced_gold(question, gold, answer, f"{key}:v3:{k}:judge",
                              require_distinctive=True, already_known=f"{question} {date}"):
                 leaked = True
                 break
-        record["v3"] = not leaked
+        # A leak found is a leak, whatever the other samples did. But "no leak" is only a finding
+        # if every sample actually spoke: a silent sample is a draw that MIGHT have leaked, and
+        # counting it as evidence of non-leakage is exactly the anti-conservative failure this arm
+        # shipped with.
+        if leaked:
+            record["v3"] = False
+        elif silent:
+            record["v3"] = None
+            record["v3_silent_samples"] = silent
+            _mark_silent(record, "v3")
+        else:
+            record["v3"] = True
         record["ablation_samples"] = ABLATION_SAMPLES
     else:
         record["v3"] = None
@@ -648,8 +740,10 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # the rule there would report a corpus defect the corpus never promised not to have.
     if len(golds) > 1 and vertical in ("arithmetic", "forgetting") and decidable:
         survived = []
+        silent_drops = []
         for dropped in golds:
             keep = [i for i in everything if i != dropped]
+            saw_silence = False
             # Sampled, for the same reason as V3: one draw can miss a component that is in fact
             # redundant, and a component wrongly called load-bearing inflates per-component coverage.
             # `already_known` matters here too — without it the screen counts the year and the
@@ -657,13 +751,30 @@ def probe_question(entry: dict, vertical: str) -> dict:
             # precisely the false positive the subtraction exists to remove.
             for k in range(ABLATION_SAMPLES):
                 answer = complete(ask(question, date, subset(entry, keep)),
-                                  cache_key=f"{key}:v6:{dropped}:{k}")
+                                  cache_key=f"{key}:v6:{dropped}:{k}",
+                                  max_tokens=_ABLATION_MAX_TOKENS)
+                if not answer:
+                    saw_silence = True
+                    continue
                 if produced_gold(
                         question, gold, answer, f"{key}:v6:{dropped}:{k}:judge",
                         require_distinctive=True, already_known=f"{question} {date}"):
                     survived.append(dropped)
                     break
-        record["v6"] = not survived
+            else:
+                # No sample reproduced the answer without this component. That is only evidence
+                # the component is load-bearing if the model actually answered; silence here is
+                # the same false PASS as in V3, one level down.
+                if saw_silence:
+                    silent_drops.append(dropped)
+        if survived:
+            record["v6"] = False
+        elif silent_drops:
+            record["v6"] = None
+            record["v6_silent_drops"] = silent_drops
+            _mark_silent(record, "v6")
+        else:
+            record["v6"] = True
         record["v6_redundant_components"] = survived
     else:
         record["v6"] = None
@@ -715,9 +826,14 @@ def _interference(records: list[dict]) -> dict:
         # same conflation the evidence envelope refuses when it reports null instead of zero. Half
         # of this family's V8 failures had an empty response, so a reader comparing their system
         # against a published ceiling was comparing against a number partly made of silence.
-        # Reported rather than excluded: whether an empty response is a refusal, a filter or a
-        # capture fault is not decidable from the record, and excluding it would substitute one
-        # unexamined assumption for another.
+        #
+        # This was previously REPORTED rather than excluded, on the grounds that refusal, filter and
+        # capture fault are not distinguishable from the record. They now are: `complete` records
+        # finish_reason, content-filter verdict and usage, and every empty measured so far is
+        # finish_reason="length" with reasoning_tokens exactly equal to the cap and ZERO content
+        # filters -- truncation, not refusal. So silence is excluded at the source (the arm records
+        # None and leaves both sides of the ratio) and this list stays only to name any that slip
+        # through, which should now be none.
         "failures_with_no_captured_answer": sorted(
             r["question_id"] for r in both
             if r["v1"] and not r["v8"] and not (r.get("v8_answer") or "").strip()),
@@ -768,11 +884,24 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
 
     def tally(key):
         applicable = [r for r in records if r.get(key) is not None]
-        return {
+        # Questions this arm could not measure because the model returned nothing. They are already
+        # out of `applicable` -- silence sets the arm to None -- but a denominator that shrinks with
+        # no trace is how a rate quietly stops describing the corpus. Named here so the reader can
+        # see what the rate is NOT over.
+        silent = sorted(r["question_id"] for r in records if key in (r.get("silent_arms") or []))
+        row = {
             "applicable": len(applicable),
             "passed": sum(1 for r in applicable if r[key]),
             "failed": sorted(r["question_id"] for r in applicable if not r[key]),
         }
+        if silent:
+            row["unmeasured_no_answer"] = silent
+            row["unmeasured_reading"] = (
+                "The model returned no text on these, so the arm is undefined for them. They are "
+                "excluded from BOTH `passed` and `applicable`: scoring silence as a pass overstates "
+                "validity on V3/V6, and scoring it as a failure understates the ceiling on "
+                "V1/V8/V9. Re-run these before citing this arm as complete.")
+        return row
 
     return {
         "status": "run",
@@ -988,11 +1117,42 @@ def self_test() -> None:
     check("malformed arm token does not borrow a real arm",
           _arm_and_kind("a1:vX:judge")[0], "unknown")
 
+    # --- Silence is never a verdict. Also a real shipped defect. -------------------------------
+    # Every arm scored an empty completion as a result: a PASS on V2/V3/V6 (a model that says
+    # nothing cannot guess, leak, or reproduce) and a FAILURE on V1/V8/V9. Both directions are
+    # wrong and they bias opposite ways, so the corpus looked more valid AND harder than it is.
+    # A totally silent model must leave every arm undefined, not sweep every arm.
+    silent_entry = {
+        "question_id": "tme-self-001",
+        "question": "How many days did the loaner van stay at Ockendon Rise?",
+        "answer": "17 days in total, across 2 spells.",
+        "question_date": "2026/03/02 (Mon) 09:00",
+        "haystack_sessions": [[{"role": "user", "content": "The loaner van turned up."}],
+                              [{"role": "user", "content": "I handed the loaner van back."}],
+                              [{"role": "user", "content": "The primer arrived."}]],
+        "haystack_dates": ["2026/02/02 (Mon) 09:00", "2026/02/19 (Thu) 09:00",
+                           "2026/02/25 (Wed) 09:00"],
+        "haystack_session_ids": ["s0", "s1", "s2"],
+        "answer_session_ids": ["s0", "s1"],
+        "typedmemeval": {"shape": "duration"},
+    }
+    real_complete = globals()["complete"]
+    globals()["complete"] = lambda *a, **k: ""      # a model that returns nothing, every time
+    try:
+        rec = probe_question(silent_entry, "arithmetic")
+    finally:
+        globals()["complete"] = real_complete
+
+    for arm in ("v1", "v2", "v3", "v6", "v8", "v9"):
+        check(f"silence leaves {arm} undefined rather than scored", rec.get(arm), None)
+    check("silence is named on every arm it blocked",
+          sorted(set(rec.get("silent_arms") or [])), ["v1", "v2", "v3", "v6", "v8", "v9"])
+
     if failures:
         for f in failures:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
-    print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases)")
+    print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

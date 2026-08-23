@@ -67,6 +67,19 @@ jobs:
         working-directory: tools
         run: python3 run_typedmemeval_probes.py --self-test
 
+      # The calibration search decides how hard a corpus IS, so a defect in it is invisible in
+      # every downstream number. The shipped search stopped at the first in-band rung, which let
+      # nine words of question text move arithmetic's realised coverage from 0.636 to 0.847 -- a
+      # cosmetic edit making a vertical 0.21 easier. These cases run the search against arithmetic's
+      # measured response curve and assert the old stop is red and the new one converges near the
+      # target, including the bimodal case where mid-band is unreachable and must be REPORTED
+      # rather than forced.
+      # always(), for the same reason as the steps around it.
+      - name: Check the TypedMemEval calibration search converges on target
+        if: always()
+        working-directory: tools
+        run: python3 typedmemeval_common.py --self-test
+
       # The separability gate is only worth its green if something is known to turn it red. This
       # rebuilds the role-order defect the consuming project found in v4-episodic -- gold running
       # u|a|a|u|a while every distractor ran u|a|u|a|a -- and asserts the gate refuses it. It also

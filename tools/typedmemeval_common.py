@@ -98,6 +98,24 @@ K_REF = 5
 BAND_LOW = 0.50
 BAND_HIGH = 0.90
 
+#: The point in the band the search actually aims at, declared beside the band rather than derived
+#: at the call site. "In band" is an acceptance test; this is the design target. Landing anywhere in
+#: [0.50, 0.90] leaves realised coverage a 0.40-wide accident, which makes cross-vertical comparison
+#: meaningless and lets a cosmetic corpus edit move a vertical's difficulty without anyone noticing.
+BAND_TARGET = (BAND_LOW + BAND_HIGH) / 2
+
+#: Close enough to stop. The echo knob is a staircase, not a continuum -- 46% of arithmetic's
+#: questions sit pinned at 0.0 or 1.0 realised coverage, so the knob moves blocks of questions
+#: rather than shifting each one -- and demanding an exact hit would just burn the iteration budget
+#: stepping across a tread.
+BAND_TOLERANCE = 0.05
+
+#: Bracket floor. If the search narrows below this without reaching tolerance, the staircase has no
+#: step near the target; the corpus is then reported at its closest reachable point rather than
+#: forced, because a corpus that cannot be calibrated to mid-band is itself a finding about the
+#: calibration model.
+BAND_RESOLUTION = 1e-4
+
 #: The deterministic reference retriever. Named in metadata so the number is re-derivable.
 RETRIEVER_ID = "bm25-okapi-k1.5-b0.75"
 BM25_K1 = 1.5
@@ -1770,6 +1788,51 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
 
 
 
+def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
+    """Bisect the lexical-echo knob toward :data:`BAND_TARGET`. Returns (echo, mean, iterations).
+
+    Split out of :func:`calibrate` so the search can be tested against a synthetic response curve
+    instead of only through a real corpus build. `evaluate(echo) -> mean realised coverage`, and
+    coverage must fall as echo rises (distractors compete harder); the bracket rides that monotone.
+
+    Converges on the TARGET, not on "anywhere in the band". The first cut of this search broke as
+    soon as the best result was in band, which spent 2-3 of a 24-iteration budget and accepted
+    whatever rung the bisection was standing on. Arithmetic's echo grid measures 0.9240 / 0.6363 /
+    0.2733 at echo 0.125 / 0.250 / 0.375 -- exactly one rung in band -- so the stamped difficulty
+    was set by grid placement rather than by intent. Adding nine words to 12 of 50 questions then
+    moved the in-band rung a full step and took mean realised coverage from 0.636 to 0.847: a
+    cosmetic edit silently making a vertical 0.21 easier, which is fatal to the before/after such a
+    corpus exists to support. A finer search finds the plateau the coarse grid stepped over.
+
+    The knob is a staircase rather than a continuum, so `BAND_TOLERANCE` stops on a tread and
+    `BAND_RESOLUTION` stops when the bracket is exhausted -- reporting the closest reachable point
+    rather than forcing one, because a corpus that cannot be calibrated to mid-band is itself a
+    finding about the calibration model.
+    """
+    lo, hi = 0.0, 1.0
+    mean = evaluate(hi)
+    best_echo, best_mean = hi, mean
+    iterations = 1
+    if mean > BAND_HIGH:
+        return best_echo, best_mean, iterations   # saturated even at maximum echo; caller refuses
+
+    for _ in range(max_iterations):
+        if abs(best_mean - BAND_TARGET) <= BAND_TOLERANCE:
+            break
+        if hi - lo < BAND_RESOLUTION:
+            break                                 # no step on this staircase nearer the target
+        mid = (lo + hi) / 2
+        mean = evaluate(mid)
+        iterations += 1
+        if abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
+            best_echo, best_mean = mid, mean
+        if mean > BAND_TARGET:
+            lo = mid                              # still too easy to find -- echo harder
+        else:
+            hi = mid                              # past the target -- back off
+    return best_echo, best_mean, iterations
+
+
 def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question], Calibration]:
     """Binary-searches the lexical-echo knob until mean realised coverage lands in band.
 
@@ -1796,30 +1859,19 @@ def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question
         trace.append((round(echo, 4), round(mean, 4)))
         return questions, mean, per_q
 
-    lo, hi = 0.0, 1.0
-    questions, mean, per_q = attempt(hi)
-    if mean > BAND_HIGH:
+    cache: dict[float, tuple[list[Question], float, dict[str, float]]] = {}
+
+    def evaluate(echo: float) -> float:
+        cache[echo] = attempt(echo)
+        return cache[echo][1]
+
+    echo, mean, iterations = search_echo(evaluate, max_iterations)
+    if mean > BAND_HIGH and echo == 1.0:
         raise SystemExit(
             f"calibration gate: even at maximum distractor echo the mean realised coverage is "
             f"{mean:.3f}, above the {BAND_HIGH} ceiling. The corpus is saturated by construction "
             f"and must be redesigned (wider haystack, harder distractors) rather than shipped.")
-
-    best = (questions, mean, per_q, hi)
-    iterations = 1
-    for _ in range(max_iterations):
-        if BAND_LOW <= best[1] <= BAND_HIGH:
-            break
-        mid = (lo + hi) / 2
-        questions, mean, per_q = attempt(mid)
-        iterations += 1
-        if mean > BAND_HIGH:
-            lo = mid          # still too easy to find -- echo harder
-        else:
-            hi = mid          # in band or too hard -- back off
-        if abs(mean - (BAND_LOW + BAND_HIGH) / 2) < abs(best[1] - (BAND_LOW + BAND_HIGH) / 2):
-            best = (questions, mean, per_q, mid)
-
-    questions, mean, per_q, echo = best
+    questions, mean, per_q = cache[echo]
     if not (BAND_LOW <= mean <= BAND_HIGH):
         raise SystemExit(
             f"calibration gate: converged on mean realised coverage {mean:.3f}, outside the "
@@ -2034,3 +2086,103 @@ def interleave(rng: random.Random, gold: list[Session], filler: list[Session]) -
     for session, stamp in zip(sessions, stamps):
         session.timestamp = stamp
     return sessions
+
+
+# --------------------------------------------------------------------------------------
+# Self-test
+# --------------------------------------------------------------------------------------
+
+def _staircase(steps):
+    """A synthetic echo->coverage response. Coverage falls as echo rises, in TREADS, because the
+    real knob works by flooding distractor IDF and so flips blocks of questions between fully
+    covered and fully missed rather than sliding each one. 46% of arithmetic's questions sit
+    pinned at 0.0 or 1.0, which is what makes the real curve a staircase."""
+    def evaluate(echo):
+        for edge, mean in steps:
+            if echo < edge:
+                return mean
+        return steps[-1][1]
+    return evaluate
+
+
+def _first_in_band_search(evaluate, max_iterations=24):
+    """The search AS IT SHIPPED, reproduced so its failure is asserted rather than described.
+    Stops at the first in-band result instead of converging on the target."""
+    lo, hi = 0.0, 1.0
+    mean = evaluate(hi)
+    best_echo, best_mean, iterations = hi, mean, 1
+    for _ in range(max_iterations):
+        if BAND_LOW <= best_mean <= BAND_HIGH:
+            break
+        mid = (lo + hi) / 2
+        mean = evaluate(mid)
+        iterations += 1
+        if mean > BAND_HIGH:
+            lo = mid
+        else:
+            hi = mid
+        if abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
+            best_echo, best_mean = mid, mean
+    return best_echo, best_mean, iterations
+
+
+def self_test() -> None:
+    """Calibration-search cases. Each is a real defect this search shipped with."""
+    failures: list[str] = []
+
+    def check(label, actual, expected):
+        if actual != expected:
+            failures.append(f"{label}: expected {expected!r}, got {actual!r}")
+
+    # Arithmetic's MEASURED response with the duration convention text, as treads. Every echo the
+    # bisection actually visits is pinned to the value the real sweep recorded there:
+    # 1.0 -> 0.0473, 0.5 -> 0.0473, 0.25 -> 0.4930, 0.125 -> 0.8473, 0.1875 -> 0.7037.
+    ARITHMETIC = _staircase([
+        (0.125, 0.9533), (0.17, 0.8473), (0.215, 0.7037), (0.23, 0.6837),
+        (0.25, 0.5867), (0.38, 0.4930), (1.01, 0.0473),
+    ])
+
+    # The fix: converge NEAR THE TARGET, not merely inside the band.
+    echo, mean, iters = search_echo(ARITHMETIC)
+    check("new search lands within tolerance of the target",
+          abs(mean - BAND_TARGET) <= BAND_TOLERANCE, True)
+    check("new search lands in band", BAND_LOW <= mean <= BAND_HIGH, True)
+
+    # The red condition, asserted rather than described: the shipped search stops at the first
+    # in-band rung, burning 2-3 of a 24-iteration budget and accepting a point it never refines.
+    old_echo, old_mean, old_iters = _first_in_band_search(ARITHMETIC)
+    check("old search stopped on a small fraction of the budget", old_iters <= 6, True)
+    check("old search reproduces the shipped rung", round(old_mean, 4), 0.8473)
+    check("old search misses the target by more than tolerance",
+          abs(old_mean - BAND_TARGET) > BAND_TOLERANCE, True)
+    check("the new search is strictly closer to the target on the same curve",
+          abs(mean - BAND_TARGET) < abs(old_mean - BAND_TARGET), True)
+    check("and it spends more of the budget doing it", iters > old_iters, True)
+
+    # Saturated by construction: coverage never falls below the ceiling, so the caller must refuse
+    # rather than ship. The search reports the maximum-echo result and does not loop.
+    sat_echo, sat_mean, _ = search_echo(_staircase([(1.01, 0.97)]))
+    check("saturated corpus is reported at maximum echo", sat_echo, 1.0)
+    check("saturated corpus is reported above the ceiling", sat_mean > BAND_HIGH, True)
+
+    # A staircase with NO tread near the target: it jumps 0.86 -> 0.52 across one edge. The search
+    # must terminate and report the closest reachable point rather than forcing one, because that
+    # is a finding about the calibration model, not a corpus to be bullied into band.
+    gap_echo, gap_mean, gap_iters = search_echo(_staircase([(0.4, 0.86), (1.01, 0.52)]))
+    check("bimodal curve still terminates", gap_iters <= 24, True)
+    check("bimodal curve reports a reachable point", gap_mean in (0.86, 0.52), True)
+    check("bimodal curve is still inside the band", BAND_LOW <= gap_mean <= BAND_HIGH, True)
+
+    if failures:
+        for f in failures:
+            print(f"self-test FAIL  {f}")
+        raise SystemExit(1)
+    print("self-test OK  (11 calibration-search cases)")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--self-test" in sys.argv:
+        self_test()
+    else:
+        raise SystemExit("typedmemeval_common is a library; run with --self-test")

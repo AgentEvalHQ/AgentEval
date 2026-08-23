@@ -646,8 +646,18 @@ def _draw_duration_plans(rng: random.Random, start: int) -> list[_Plan]:
         distractor_slots = sorted(rng.sample(free, NUMERIC_DISTRACTORS))
         distractor_values = _draw_day_distractors(rng, spell_days, sum(spell_days), g + 1)
 
+        # The day-counting convention is STATED, not left to be inferred. Gold is
+        # `close_slot - open_slot` over one-day spacing, i.e. the half-open interval
+        # [arrival, departure) -- and the inclusive reading is exactly `gold + spells`, which is
+        # what two independent oracles produced on 4 of 4 duration misses. A question whose answer
+        # depends on an unstated convention measures the convention, not the memory.
+        #
+        # Worded to add no `day`/`days` token beyond the one the question already carries. The
+        # gold sessions never state a duration, while the DAY_DISTRACTORS all say "for {n} days",
+        # so every extra day-token in the query pulls BM25 toward the distractors and away from
+        # gold. "arrival"/"departure" appear in neither, so they are inert for retrieval.
         question = (f"Counting every spell, how many days in total did I have {noun} "
-                    f"at {site}?")
+                    f"at {site}? Count each spell from arrival up to but not including departure.")
         script: list[tuple[str, str, bool]] = [("", "", False)] * total
         for spell in range(spells):
             script[gold_slots[2 * spell]] = (opens, rng.choice(REPLIES), True)
