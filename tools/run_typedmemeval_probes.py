@@ -98,9 +98,14 @@ def _config() -> tuple[str, str, str]:
 
 
 #: Completions between cache flushes. Small enough that a kill costs a minute of work, large
-#: enough that the write is not itself a cost: the cache is ~1 MB, so this is a megabyte per
-#: fifty calls against calls that take seconds each.
-_CACHE_FLUSH_EVERY = 50
+#: enough that the write is not itself a cost.
+#:
+#: Was fifty, on the assumption that calls take seconds. The ablation arms falsify that: V3 and V6
+#: reason for 7,000-15,000 tokens over a full haystack and take MINUTES each, so a fifty-call
+#: interval could span an entire run window and a killed process discarded everything it had
+#: bought. Ten costs a few megabytes of rewrite across a long run and makes an interrupted run lose
+#: almost nothing, which matters because these runs are interrupted routinely.
+_CACHE_FLUSH_EVERY = 10
 
 
 def _flush_cache() -> None:
