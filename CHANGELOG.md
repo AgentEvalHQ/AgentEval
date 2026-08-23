@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The BM25 calibration gate read its acceptance band out of the artifact it was grading.**
+  `Metadata_RecordsACalibrationGateInsideItsBand` took `band_low` / `band_high` from the corpus
+  metadata and then checked that corpus's mean realised coverage against them — so a corpus stamped
+  `[0.0, 1.0]` would have declared itself acceptable and passed. The band is now a C# constant
+  mirroring `BAND_LOW` / `BAND_HIGH` in `typedmemeval_common.py`, and the **stamped** band is
+  asserted *equal* to it rather than used as the bar.
+
+  The generator does enforce the band at authoring time and refuses to ship an out-of-band corpus,
+  but **CI never runs the generator**, so this gate was the only thing standing behind it. All seven
+  shipped corpora carry the correct `[0.5, 0.9]` and every mean is in band — **nothing was
+  mis-graded**; the gate simply could not have detected it. Verified by falsification: widening a
+  corpus's declared band to `[0.0, 1.0]` now fails the gate.
+
+  Found by turning a consuming project's report back on ourselves. They applied our
+  "passable-by-absence" finding to their own gates and located a one-directional containment check;
+  auditing ours for the same class turned up this one. Test-only — no shipped artifact changed.
+
 ## [0.28.0-beta] - 2026-08-22
 
 ### Fixed

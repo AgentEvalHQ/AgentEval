@@ -106,10 +106,16 @@ public sealed class TypedMemEvalCorpusTests
         // exists to fix.
         var coverage = Metadata(vertical).GetProperty("coverage");
         var mean = coverage.GetProperty("mean_realised").GetDouble();
-        var low = coverage.GetProperty("band_low").GetDouble();
-        var high = coverage.GetProperty("band_high").GetDouble();
 
-        Assert.InRange(mean, low, high);
+        // The band is a C# constant and the stamped one is CHECKED AGAINST IT, not used as the
+        // bar. This gate used to read band_low/band_high out of the artifact and grade the artifact
+        // against them, so a corpus stamped [0.0, 1.0] would have cleared it by declaring itself
+        // acceptable -- the same defect this suite already refuses in the V7 separability gate and
+        // in the empty-rate ratchet. The generator enforces BAND_LOW/BAND_HIGH at authoring time,
+        // but CI never runs the generator, so this is the only thing standing behind the band.
+        Assert.Equal(CalibrationBandLow, coverage.GetProperty("band_low").GetDouble(), 6);
+        Assert.Equal(CalibrationBandHigh, coverage.GetProperty("band_high").GetDouble(), 6);
+        Assert.InRange(mean, CalibrationBandLow, CalibrationBandHigh);
         Assert.False(string.IsNullOrWhiteSpace(coverage.GetProperty("retriever").GetString()));
         Assert.True(coverage.GetProperty("iterations").GetInt32() >= 1);
         Assert.Equal(
@@ -581,6 +587,13 @@ public sealed class TypedMemEvalCorpusTests
                 "Raise the completion budget or fix capture — do not raise this number.");
         }
     }
+
+    /// <summary>
+    /// The BM25 calibration acceptance band, mirroring <c>BAND_LOW</c> / <c>BAND_HIGH</c> in
+    /// typedmemeval_common.py. Held here so the corpus cannot supply the bar it is graded against.
+    /// </summary>
+    private const double CalibrationBandLow = 0.50;
+    private const double CalibrationBandHigh = 0.90;
 
     /// <summary>Empty-response ceiling for any arm without a recorded ratchet entry.</summary>
     private const double EmptyRateCeiling = 0.05;
