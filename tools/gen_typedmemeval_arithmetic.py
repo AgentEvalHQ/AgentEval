@@ -657,7 +657,7 @@ def _draw_duration_plans(rng: random.Random, start: int) -> list[_Plan]:
         # so every extra day-token in the query pulls BM25 toward the distractors and away from
         # gold. "arrival"/"departure" appear in neither, so they are inert for retrieval.
         question = (f"Counting every spell, how many days in total did I have {noun} "
-                    f"at {site}? Count each spell from arrival up to but not including departure.")
+                    f"at {site}? Exclude the departure day.")
         script: list[tuple[str, str, bool]] = [("", "", False)] * total
         for spell in range(spells):
             script[gold_slots[2 * spell]] = (opens, rng.choice(REPLIES), True)
@@ -818,7 +818,7 @@ def _difficulty_band(derivation: dict) -> int:
     return _INPUT_BANDS.get(len(sessions), 3)
 
 
-def build(echo: float, rng: random.Random) -> list[tmc.Question]:
+def build(echo, rng: random.Random) -> list[tmc.Question]:
     questions: list[tmc.Question] = []
     for plan in _plans(rng):
         # The echo clause is the only thing that moves with the calibration knob, and it
@@ -833,12 +833,26 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
         # makes realised coverage fall smoothly and keeps the four shapes from landing at
         # wildly different coverage for reasons that have nothing to do with the shapes.
         sessions = []
-        for user, assistant, is_gold in plan.script:
+        for index, (user, assistant, is_gold) in enumerate(plan.script):
             if is_gold:
                 sessions.append(tmc.make_session(BASE_STAMP, (user, assistant),
                                                  gold_turn=0, tag="gold"))
             else:
-                echoed = tmc.echo_terms(plan.question, echo, rng)
+                # Per-SHAPE knob, and a per-QUESTION rng.
+                #
+                # The knob is per shape because one dial for the whole vertical is satisfiable by
+                # averaging: `duration` collapsed to 0.083 realised coverage and the dial loosened
+                # the other three shapes until the mean returned to 0.700.
+                #
+                # The rng is per question because `echo_terms` draws `rng.sample` at a size that
+                # scales with the knob and returns early at echo<=0. On a shared stream, changing
+                # one shape's knob shifts every later question's filler, so the shapes are coupled
+                # and no per-shape search can converge. Seeding on the question id makes each
+                # sample a function of (question, session, knob) alone.
+                shape_echo = echo.get(plan.shape, 0.0) if isinstance(echo, dict) else echo
+                echoed = tmc.echo_terms(
+                    plan.question, shape_echo,
+                    random.Random(f"{plan.qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
                 sessions.append(tmc.make_session(BASE_STAMP,
                                                  (user, tmc.weave_echo(assistant, echoed)),
                                                  tag="filler"))
@@ -1079,4 +1093,8 @@ if __name__ == "__main__":
         ),
         generator_tool="tools/gen_typedmemeval_arithmetic.py",
         extra_checks=check_arithmetic,
+        # Opts this vertical into per-shape calibration. Its four shapes respond to the echo knob
+        # very differently -- `duration` carries a constraint clause that costs it lexical
+        # retrievability -- so one dial for the vertical buys a healthy mean over an unhealthy set.
+        shape_of=lambda q: (q.extension or {}).get("shape"),
     )

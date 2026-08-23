@@ -523,6 +523,145 @@ public sealed class TypedMemEvalCorpusTests
                      recordedExempt.OrderBy(n => n, StringComparer.Ordinal));
     }
 
+    /// <summary>
+    /// The calibration band holds PER SHAPE, not only on the vertical's mean.
+    /// </summary>
+    /// <remarks>
+    /// A mean is satisfiable by averaging, and it was. Arithmetic calibrated to 0.700 — dead on
+    /// target, gate green, 985 tests passing — while its four shapes sat at 0.857 / 0.947 / 0.083 /
+    /// 0.894. A constraint clause added to the duration questions collapsed their lexical
+    /// retrievability, and the echo knob then COMPENSATED by loosening every other shape until the
+    /// average landed back on target: count went 3/14 to 8/14 and sum 3/14 to 9/14 under V9, not
+    /// because they got better but because they were made easier to pay for duration.
+    ///
+    /// No shape's difficulty may be the residual of another shape's compensation. The generator's
+    /// own docstring warned that this knob can make "the mean stop describing any individual
+    /// question"; nothing checked it until this.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void Coverage_HoldsTheBandWithinEveryShapeNotJustOnTheMean(TypedMemEvalVertical vertical)
+    {
+        var coverage = Metadata(vertical).GetProperty("coverage");
+        var perQuestion = coverage.GetProperty("per_question").EnumerateObject()
+            .ToDictionary(p => p.Name, p => p.Value.GetDouble(), StringComparer.Ordinal);
+        var shapes = TypedMemEvalExtensions.Parse(TypedMemEvalCorpus.ReadJson(vertical));
+
+        // Every question must be attributable to a shape, or a collapsed shape could hide in the
+        // unattributed remainder — the same pass-by-absence this suite refuses everywhere else.
+        Assert.Equal(
+            perQuestion.Keys.OrderBy(k => k, StringComparer.Ordinal),
+            shapes.Keys.OrderBy(k => k, StringComparer.Ordinal));
+
+        // A question with no gold session has no coverage to realise: the ratio is 0/0 and the
+        // generator reports 1.0. Forgetting's `never-known` shape is entirely such questions, so it
+        // reads as a saturated 1.000 that no amount of calibration could ever move. That is a
+        // definitional artefact, not a difficulty measurement, and gating on it would demand the
+        // impossible. Shapes where NO question has gold are excluded; a shape with any gold at all
+        // is measured on the questions that have it.
+        var goldCount = TypedMemEvalCorpus.Load(vertical).ToDictionary(
+            e => e.QuestionId,
+            e => (e.AnswerSessionIds ?? []).Count(id => (e.HaystackSessionIds ?? []).Contains(id)),
+            StringComparer.Ordinal);
+
+        var byShape = shapes
+            .GroupBy(kv => kv.Value.Shape, StringComparer.Ordinal)
+            .Where(g => g.Any(kv => goldCount[kv.Key] > 0))
+            .ToDictionary(
+                g => g.Key,
+                g => g.Where(kv => goldCount[kv.Key] > 0).Average(kv => perQuestion[kv.Key]),
+                StringComparer.Ordinal);
+
+        // Exemptions are a C# constant, never read from the record. A shape that genuinely cannot
+        // reach the band at any honest rung is a FINDING about that shape, and it is recorded here
+        // with its reason rather than waived by the artifact declaring itself exempt.
+        var exempt = UncalibratableShapes
+            .Where(e => e.Key.Vertical == vertical)
+            .ToDictionary(e => e.Key.Shape, e => e.Value, StringComparer.Ordinal);
+
+        foreach (var (shape, mean) in byShape.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            if (exempt.TryGetValue(shape, out var reason))
+            {
+                Assert.False(string.IsNullOrWhiteSpace(reason));
+                continue;
+            }
+
+            // Verticals still calibrated on their mean are pinned here as a RATCHET rather than
+            // waived: the recorded distance from the band may shrink but never grow, so the debt
+            // stays visible and cannot quietly worsen while the family-wide recalibration is
+            // pending. Only arithmetic calibrates per shape today.
+            if (PendingPerShapeRecalibration.TryGetValue((vertical, shape), out var recorded))
+            {
+                // Tolerance matches the precision the ratchet is recorded at (4 dp). A repeating
+                // value like 0.46666… rounds UP to 0.4667, which makes the true measurement
+                // fractionally further from the band than its own record — an artefact of writing
+                // the constant down, not a regression.
+                Assert.True(
+                    DistanceFromBand(mean) <= DistanceFromBand(recorded) + 1e-4,
+                    $"{vertical} shape '{shape}' moved AWAY from its band: {mean:F4} against a " +
+                    $"recorded {recorded:F4}. This shape is awaiting per-shape calibration; it may " +
+                    "improve, but it may not regress.");
+                continue;
+            }
+
+            Assert.True(
+                mean >= CalibrationBandLow && mean <= CalibrationBandHigh,
+                $"{vertical} shape '{shape}' has mean realised coverage {mean:F3}, outside the " +
+                $"[{CalibrationBandLow}, {CalibrationBandHigh}] band, even though the vertical's " +
+                "mean may be inside it. Calibrate this shape to its own band — a shape whose " +
+                "difficulty is the residual of another shape's compensation measures neither.");
+        }
+
+        // Equality, not containment: an exemption that stops being needed must be deleted, or the
+        // list silently accumulates permission the corpus no longer requires.
+        Assert.Equal(
+            exempt.Keys.OrderBy(k => k, StringComparer.Ordinal),
+            exempt.Keys.Where(byShape.ContainsKey).OrderBy(k => k, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Shapes that cannot be calibrated into the band at any honest rung, with the reason. Held as
+    /// a C# constant for the same reason the separability bar is: a corpus that supplied its own
+    /// exemption would always clear the gate.
+    /// </summary>
+    private static readonly Dictionary<(TypedMemEvalVertical Vertical, string Shape), string>
+        UncalibratableShapes = new();
+
+    /// <summary>
+    /// Shapes outside their band on verticals still calibrated on the MEAN, recorded as a ratchet:
+    /// each may move toward its band, never away. Cleared per vertical as the flagged family-wide
+    /// per-shape recalibration reaches it.
+    /// </summary>
+    /// <remarks>
+    /// These are not my clause's doing — they predate it and were invisible because nothing had
+    /// ever checked coverage below the vertical mean. Every one of these verticals reports a mean
+    /// comfortably in band. Two patterns worth carrying into that cut: WorkingMemory's
+    /// <c>distance-8/15/25</c> are all saturated while its longer distances are not, so the short
+    /// end of its declared difficulty axis may be measuring nothing; and Episodic's
+    /// <c>list-order</c> at 0.27 is the family's hardest shape by a wide margin, which is the same
+    /// shape the ceiling table flags as one of only two bitten by the K_ref budget.
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical Vertical, string Shape), double>
+        PendingPerShapeRecalibration = new()
+        {
+            [(TypedMemEvalVertical.Episodic, "list-order")] = 0.2746,
+            [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 0.9333,
+            [(TypedMemEvalVertical.Forgetting, "still-valid")] = 0.4667,
+            [(TypedMemEvalVertical.Prospective, "expiring-validity")] = 1.0000,
+            [(TypedMemEvalVertical.Temporal, "occurrence-order")] = 0.9500,
+            [(TypedMemEvalVertical.Temporal, "recency")] = 1.0000,
+            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] = 1.0000,
+            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] = 1.0000,
+            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] = 0.9167,
+        };
+
+    /// <summary>How far a shape's realised coverage sits outside the band; zero when inside.</summary>
+    private static double DistanceFromBand(double mean)
+        => mean < CalibrationBandLow ? CalibrationBandLow - mean
+         : mean > CalibrationBandHigh ? mean - CalibrationBandHigh
+         : 0.0;
+
     /// <summary>The refusal bar, mirroring <c>SEPARABILITY_MAX_AUC</c> in typedmemeval_common.py.</summary>
     // A probe arm that returns nothing is not measuring the model, and both directions of that
     // mistake have already shipped. V8/V9 counted silence as a wrong answer, which understated a
@@ -623,11 +762,20 @@ public sealed class TypedMemEvalCorpusTests
     };
 
     /// <summary>
-    /// Every arm the probe runner is expected to tally. Named here rather than inferred from the
-    /// record, so an arm that stops reporting fails instead of passing by absence.
+    /// Every arm <c>run_typedmemeval_probes.py</c> is expected to tally. Named here rather than
+    /// inferred from the record, so an arm that stops reporting fails instead of passing by absence.
     /// </summary>
+    /// <remarks>
+    /// This list omits <c>v9strip</c> ON PURPOSE. That arm belongs to
+    /// <c>tools/measure_retrieval_ceiling.py</c>, a separate one-off tool that happens to SHARE the
+    /// reference-model call cache; the probe runner never emits it. The first version of this list
+    /// was derived from the cache rather than from the runner, so it inherited a foreign tool's arm
+    /// and demanded a row nothing writes — and the 0.28 restamp, which recomputed the stamp from
+    /// that same shared cache, really did fold another tool's 700 calls into this corpus's record.
+    /// The stamp describes the calls the RUNNER made, so this list has to be the runner's arms.
+    /// </remarks>
     private static readonly string[] ExpectedProbeArms =
-        ["v1", "v2", "v3", "v6", "v8", "v9", "v9strip"];
+        ["v1", "v2", "v3", "v6", "v8", "v9"];
 
     private const double SeparabilityMaxAuc = 0.75;
 

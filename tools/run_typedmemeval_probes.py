@@ -163,6 +163,20 @@ _arm_empty: Counter = Counter()
 #: the corpus gate fails on, because an arm nobody can name is an arm nobody is watching.
 _ARM_TOKEN = re.compile("^v[0-9]+[a-z]*$")
 
+#: Every arm THIS runner can call. The stamp emits a row for each one even when the run never
+#: exercised it, so the published set is fixed and an arm can never go missing.
+#:
+#: It could, and did. `_arm_calls` accumulates across a process and metadata is written as each
+#: vertical finishes, so the stamp recorded whatever had been called SO FAR -- which depends on the
+#: order the verticals were passed on the command line. A run of `bitemporal temporal forgetting`
+#: gave the first two no `v6` row (neither exercises leave-one-out) and the third one a `v6` row,
+#: for the same corpora and the same code. Absence then reads as "this arm is clean" instead of
+#: "this arm was never called", which is the pass-by-absence shape the corpus gate exists to refuse.
+#:
+#: Mirrored by ExpectedProbeArms in TypedMemEvalCorpusTests. `v9strip` is deliberately NOT here: it
+#: belongs to measure_retrieval_ceiling.py, which merely shares this cache.
+PROBE_ARMS = ("v1", "v2", "v3", "v6", "v8", "v9")
+
 
 def _arm_and_kind(cache_key: str) -> tuple[str, str]:
     """The probe arm and population a cache key belongs to.
@@ -987,10 +1001,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # instead of being rediscovered forensically. The V2 0/1100 against V3 258/330 spread shows
         # the statistic discriminates cleanly between an arm that is fine and one that is not --
         # but only once judge grades are kept out of the denominator, which is the correction here.
-        "empty_rate_by_arm": {
-            arm: _arm_row(arm)
-            for arm in sorted({a for a, _kind in set(_arm_calls) | set(_arm_empty)})
-        },
+        "empty_rate_by_arm": {arm: _arm_row(arm) for arm in PROBE_ARMS},
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
@@ -1183,7 +1194,10 @@ def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
         if not (value or "").strip():
             _arm_empty[bucket] += 1
 
-    arms = sorted({arm for arm, _kind in set(_arm_calls) | set(_arm_empty)})
+    # PROBE_ARMS, not "whatever is in the cache". The cache is SHARED with
+    # measure_retrieval_ceiling.py, so deriving the arm list from it folded that tool's 700
+    # `v9strip` calls into this corpus's probe record -- a foreign measurement published as ours.
+    arms = list(PROBE_ARMS)
     by_arm = {arm: _arm_row(arm) for arm in arms}
     rate_text = {
         arm: (f"{row['empty']}/{row['calls']}"

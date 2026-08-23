@@ -1656,6 +1656,12 @@ class Calibration:
     iterations: int
     per_question: dict[str, float]
     trace: list[tuple[float, float]]
+    #: Echo knob per shape, when the vertical calibrates each shape to its own band. None when the
+    #: vertical still calibrates on the mean alone.
+    echo_by_shape: dict[str, float] | None = None
+    #: Realised coverage per shape at the chosen knobs, so a collapsed shape hiding inside a healthy
+    #: mean is visible in the record rather than only in a gate failure.
+    per_shape: dict[str, float] | None = None
 
 
 
@@ -1833,6 +1839,76 @@ def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
     return best_echo, best_mean, iterations
 
 
+def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
+                        ) -> tuple[list[Question], Calibration]:
+    """Calibrate each SHAPE to its own band instead of the vertical's mean.
+
+    A mean is satisfiable by averaging, and it was. Arithmetic calibrated to 0.700 -- dead on
+    target -- while its shapes sat at 0.857 / 0.947 / 0.083 / 0.894: a constraint clause collapsed
+    `duration`'s lexical retrievability and the single knob COMPENSATED by loosening the other three
+    until the average came back. `count` went 3/14 to 8/14 under V9 not because it got better but
+    because it was made easier to pay for `duration`. No shape's difficulty may be the residual of
+    another shape's compensation.
+
+    Shapes are searched independently, which is only sound because the echo sample is drawn from a
+    PER-QUESTION rng: `echo_terms` calls `rng.sample` with a size that scales with the knob and
+    returns early at echo<=0, so a shared stream would make one shape's knob shift every later
+    question's filler and no per-shape search could converge. Generators opting into this must seed
+    per question.
+
+    A shape that cannot reach the band at any rung is reported at its closest reachable point, not
+    forced -- the caller decides whether that is a corpus to fix or a property to publish.
+    """
+    def attempt(echo_map: dict[str, float]) -> list[Question]:
+        questions = build(echo_map, random.Random(seed))  # DevSkim: ignore DS148264 - deterministic corpus generation
+        equalise_echo(questions, 0.0, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
+        equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
+        equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
+        return questions
+
+    def scored(questions: list[Question], shape: str) -> list[float]:
+        # Questions with no gold have no coverage to realise -- the ratio is 0/0 and reads 1.0 --
+        # so they are excluded rather than allowed to pin a shape at saturation it cannot leave.
+        return [realised_coverage(q) for q in questions
+                if shape_of(q) == shape and any(s.is_gold for s in q.sessions)]
+
+    probe = attempt({})
+    shapes = sorted({shape_of(q) for q in probe})
+    echo_map: dict[str, float] = {}
+    per_shape: dict[str, float] = {}
+    iterations = 0
+
+    for shape in shapes:
+        if not scored(probe, shape):
+            echo_map[shape] = 0.0        # nothing to calibrate: no question here has gold
+            per_shape[shape] = 1.0
+            continue
+
+        def evaluate(echo: float, _shape=shape) -> float:
+            trial = dict(echo_map)
+            trial[_shape] = echo
+            values = scored(attempt(trial), _shape)
+            return sum(values) / len(values) if values else 0.0
+
+        best_echo, best_mean, iters = search_echo(evaluate, max_iterations)
+        echo_map[shape] = best_echo
+        per_shape[shape] = round(best_mean, 4)
+        iterations += iters
+
+    questions = attempt(echo_map)
+    per_q = {q.question_id: realised_coverage(q) for q in questions}
+    mean = sum(per_q.values()) / len(per_q) if per_q else 0.0
+    return questions, Calibration(
+        echo=round(sum(echo_map.values()) / len(echo_map), 4) if echo_map else 0.0,
+        mean=round(mean, 4),
+        iterations=iterations,
+        per_question=per_q,
+        trace=[],
+        echo_by_shape={s: round(e, 4) for s, e in sorted(echo_map.items())},
+        per_shape=per_shape,
+    )
+
+
 def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question], Calibration]:
     """Binary-searches the lexical-echo knob until mean realised coverage lands in band.
 
@@ -1900,6 +1976,7 @@ def finalise(
     generator_tool: str,
     seed: int = 20260815,
     extra_checks=None,
+    shape_of=None,
 ) -> None:
     """Calibrates, verifies, and writes the corpus and its metadata sidecar.
 
@@ -1910,7 +1987,12 @@ def finalise(
     abbrev, expected_count = VERTICALS[vertical]
     corpus_id = f"agenteval-typedmemeval-{vertical}-{CORPUS_REVISION}"
 
-    questions, calibration = calibrate(build, seed)
+    # `shape_of` opts a vertical into PER-SHAPE calibration. Without it the vertical is calibrated
+    # on its mean, which is satisfiable by averaging one shape's collapse against another's
+    # saturation; with it, every shape must reach its own band on its own knob.
+    questions, calibration = (
+        calibrate_per_shape(build, seed, shape_of) if shape_of is not None
+        else calibrate(build, seed))
 
     if len(questions) != expected_count:
         raise SystemExit(
@@ -1969,6 +2051,11 @@ def finalise(
             "iterations": calibration.iterations,
             "search_trace": calibration.trace,
             "per_question": {k: round(v, 4) for k, v in sorted(calibration.per_question.items())},
+            # Published so a collapsed shape inside a healthy mean is visible in the RECORD, not
+            # only in a gate failure. `mean_realised` alone hid arithmetic's duration at 0.083
+            # behind a vertical mean of exactly 0.700.
+            **({"echo_by_shape": calibration.echo_by_shape} if calibration.echo_by_shape else {}),
+            **({"per_shape_realised": calibration.per_shape} if calibration.per_shape else {}),
         },
         "ceiling": {
             "k_ref": K_REF,

@@ -557,18 +557,22 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-19T23:26:38Z",
+    "run_at": "2026-08-23T21:16:56Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 60,
-      "passed": 60,
-      "failed": []
+      "passed": 59,
+      "failed": [
+        "tme-bit-028"
+      ]
     },
     "v1_pair_flip": {
       "pairs": 30,
-      "passed": 30,
-      "failed": []
+      "passed": 29,
+      "failed": [
+        "tme-bit-p14"
+      ]
     },
     "ablation_samples_per_question": 3,
     "v2_non_inferability": {
@@ -598,19 +602,20 @@
     },
     "v8_full_haystack": {
       "applicable": 60,
-      "v1_passed": 60,
+      "v1_passed": 59,
       "v8_passed": 59,
-      "interference_cost": 0.0167,
+      "interference_cost": 0.0,
       "regressed_under_interference": [
         "tme-bit-032"
       ],
+      "failures_with_no_captured_answer": [],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
     },
     "by_shape": {
       "belief-at-instant": {
         "questions": 36,
         "v1_applicable": 36,
-        "v1_passed": 36,
+        "v1_passed": 35,
         "v3_applicable": 36,
         "v3_passed": 36,
         "v8_applicable": 36,
@@ -662,7 +667,7 @@
       "tme-bit-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Tomas Beddoe is down as **Northolt Bay** for March.",
+        "v8_answer": "Tomas Beddoe is down as **Northolt Bay** for **March**.",
         "v9": true,
         "v9_answer": "Tomas Beddoe is down as **Northolt Bay** for March.",
         "v9_gold_in_context": 1,
@@ -675,9 +680,9 @@
       "tme-bit-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 24 January, Tomas Beddoe was down as at **Lowick** for March.",
+        "v8_answer": "As of 24 January, Tomas Beddoe was down as **Lowick** for March.",
         "v9": true,
-        "v9_answer": "As of 24 January, Tomas Beddoe was down as **Lowick** for March.",
+        "v9_answer": "As things stood on 24 January, Tomas Beddoe was down as **Lowick** for March.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -701,7 +706,7 @@
       "tme-bit-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 30 January, the file had Priya Nandra at **Halstead Vale** from April.",
+        "v8_answer": "Halstead Vale.",
         "v9": true,
         "v9_answer": "Halstead Vale.",
         "v9_gold_in_context": 1,
@@ -716,7 +721,7 @@
         "v8": true,
         "v8_answer": "Colm Whitaker was at **Lowick** in February.",
         "v9": false,
-        "v9_answer": "The record does not say which department Colm Whitaker was at in February. It only repeats “colm, whitaker, february” without naming a department.",
+        "v9_answer": "The record does not say which department Colm Whitaker was at in February.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -727,9 +732,9 @@
       "tme-bit-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "At 31 January, the file gave **Colm Whitaker as being at Elverton from February**.",
+        "v8_answer": "At 31 January, the file gave **Elverton** for Colm Whitaker in February.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which department Colm Whitaker was in for February. They only mention “colm, whitaker, february” as an aside, without giving a department.",
+        "v9_answer": "The conversations do not state any department for Colm Whitaker in February.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -742,7 +747,7 @@
         "v8": true,
         "v8_answer": "Ines Vargas is at **Kelsford**, covering **March**.",
         "v9": true,
-        "v9_answer": "Kelsford. The earlier Marchmont note was corrected: Ines Vargas was at Kelsford from March.",
+        "v9_answer": "Kelsford.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -753,9 +758,9 @@
       "tme-bit-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Marchmont.",
+        "v8_answer": "As of 05 February, the record said Ines Vargas was at **Marchmont** in March.",
         "v9": true,
-        "v9_answer": "Marchmont.",
+        "v9_answer": "As of 05 February, the record said Ines Vargas was at **Marchmont** in March.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -768,7 +773,7 @@
         "v8": true,
         "v8_answer": "Halstead Vale.",
         "v9": true,
-        "v9_answer": "Halstead Vale. The record corrected the earlier Orrindale note and says Ravi Ellory was at Halstead Vale from April.",
+        "v9_answer": "Halstead Vale. The earlier Orrindale note was corrected in Session 5.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -779,9 +784,9 @@
       "tme-bit-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 13 February, the record showed Ravi Ellory at **Orrindale** in April.",
+        "v8_answer": "As of 13 February, the record showed Ravi Ellory at Orrindale in April.",
         "v9": false,
-        "v9_answer": "The conversations do not state which branch the record showed for Ravi Ellory in April as of 13 February.",
+        "v9_answer": "The conversations do not state any April branch for Ravi Ellory.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -805,9 +810,9 @@
       "tme-bit-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 10 February, Nell Cortazar was down as at **Fenwick Cross** for February.",
+        "v8_answer": "As of 10 February, Nell Cortazar was down as being at **Fenwick Cross** for February.",
         "v9": true,
-        "v9_answer": "As of 10 February, Nell Cortazar was down as being at **Fenwick Cross** from February.",
+        "v9_answer": "As of 10 February, Nell Cortazar was down as being at **Fenwick Cross** for February.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -859,7 +864,7 @@
         "v8": true,
         "v8_answer": "At 26 February, the file gave Sara Mbeki’s April region as **Garrowby**.",
         "v9": false,
-        "v9_answer": "The conversations up to 26 February do not state which region Sara Mbeki was filed under for April. “Ardenholm from April” only appears later, on 3 March.",
+        "v9_answer": "The conversations up to 26 February do not say which region the file gave for Sara Mbeki in April. Later, on 3 March, it was revised to “Ardenholm from April,” but the earlier region is not given.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -872,7 +877,7 @@
         "v8": true,
         "v8_answer": "Lowick.",
         "v9": true,
-        "v9_answer": "Jonas Pfeiffer: **Lowick** for February.",
+        "v9_answer": "Lowick. The earlier note said Dunmarsh, but it was later corrected to “Jonas Pfeiffer: Lowick from February.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -883,7 +888,7 @@
       "tme-bit-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 27 February, the record had Jonas Pfeiffer at **Dunmarsh** in February.",
+        "v8_answer": "Dunmarsh.",
         "v9": true,
         "v9_answer": "Dunmarsh.",
         "v9_gold_in_context": 1,
@@ -896,7 +901,7 @@
       "tme-bit-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Pellworth.",
+        "v8_answer": "Pellworth. The later note corrected Alice Renwick’s March city from Northolt Bay to Pellworth.",
         "v9": true,
         "v9_answer": "Pellworth.",
         "v9_gold_in_context": 1,
@@ -935,9 +940,9 @@
       "tme-bit-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 20 March, Tomas Beddoe was down as being at **Jarrow Bank** for April.",
+        "v8_answer": "As things stood on 20 March, Tomas Beddoe was down as **Jarrow Bank** for April.",
         "v9": true,
-        "v9_answer": "As things stood on 20 March, Tomas Beddoe was down as **Jarrow Bank** for April.",
+        "v9_answer": "As of 20 March, Tomas Beddoe was down as **Jarrow Bank** for April.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -948,7 +953,7 @@
       "tme-bit-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Priya Nandra is listed as being at **Ilminster** from February.",
+        "v8_answer": "Ilminster.",
         "v9": true,
         "v9_answer": "Ilminster.",
         "v9_gold_in_context": 1,
@@ -976,7 +981,7 @@
         "v8": true,
         "v8_answer": "Colm Whitaker was at **Marchmont** in March.",
         "v9": true,
-        "v9_answer": "Colm Whitaker was at **Marchmont** in March.",
+        "v9_answer": "According to the corrected record, Colm Whitaker was at **Marchmont** from March.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -985,9 +990,9 @@
         "v6": null
       },
       "tme-bit-028": {
-        "v1": true,
+        "v1": false,
         "v8": true,
-        "v8_answer": "Lowick.",
+        "v8_answer": "At 17 March, the file gave **Lowick** for Colm Whitaker in March.",
         "v9": true,
         "v9_answer": "Lowick.",
         "v9_gold_in_context": 1,
@@ -1000,9 +1005,9 @@
       "tme-bit-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ines Vargas is listed at **Northolt Bay** from April.",
+        "v8_answer": "Ines Vargas: **Northolt Bay**, from **April**.",
         "v9": true,
-        "v9_answer": "Ines Vargas is at **Northolt Bay** from April.",
+        "v9_answer": "Ines Vargas is listed as at **Northolt Bay** from April.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1013,9 +1018,9 @@
       "tme-bit-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 25 March, the record had Ines Vargas at **Marchmont** from April.",
+        "v8_answer": "As of 25 March, the record had Ines Vargas at **Marchmont** from **April**.",
         "v9": true,
-        "v9_answer": "Marchmont.",
+        "v9_answer": "As of 25 March, the record had Ines Vargas at **Marchmont** from April.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1039,9 +1044,9 @@
       "tme-bit-032": {
         "v1": true,
         "v8": false,
-        "v8_answer": "As of 01 April, the record showed **Ravi Ellory at Dunmarsh in February**.",
+        "v8_answer": "As of 01 April, the record showed Ravi Ellory at **Dunmarsh** in February.",
         "v9": false,
-        "v9_answer": "As of 01 April, the record showed **Ravi Ellory in Dunmarsh in February**.",
+        "v9_answer": "As of 01 April, Ravi Ellory’s February branch was recorded as **Dunmarsh**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1065,7 +1070,7 @@
       "tme-bit-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As things stood on 11 April, Nell Cortazar was down as at **Kelsford** for March.",
+        "v8_answer": "As of 11 April, Nell Cortazar was down as being at **Kelsford** for March.",
         "v9": true,
         "v9_answer": "As of 11 April, Nell Cortazar was down as **Kelsford** for March.",
         "v9_gold_in_context": 1,
@@ -1091,7 +1096,7 @@
       "tme-bit-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 11 April, the file had Otto Lindqvist at **Orrindale** from April.",
+        "v8_answer": "Orrindale.",
         "v9": true,
         "v9_answer": "Orrindale.",
         "v9_gold_in_context": 1,
@@ -1104,9 +1109,9 @@
       "tme-bit-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Colm Whitaker was at **Marchmont** in February.",
+        "v8_answer": "According to the record, Colm Whitaker was at **Marchmont** in February.",
         "v9": true,
-        "v9_answer": "Colm Whitaker was at **Marchmont** in February.",
+        "v9_answer": "According to the record, Colm Whitaker was at **Marchmont** in February.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1130,7 +1135,7 @@
       "tme-bit-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Kelsford.",
+        "v8_answer": "Ines Vargas is recorded as being at **Kelsford** for March.",
         "v9": true,
         "v9_answer": "Kelsford.",
         "v9_gold_in_context": 1,
@@ -1169,9 +1174,9 @@
       "tme-bit-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 20 April, the record showed Ravi Ellory at **Jarrow Bank** from **April**.",
+        "v8_answer": "As of 20 April, the record showed Ravi Ellory at Jarrow Bank from April.",
         "v9": true,
-        "v9_answer": "As of 20 April, the record showed Ravi Ellory at **Jarrow Bank** in April.",
+        "v9_answer": "As of 20 April, the record showed Ravi Ellory at **Jarrow Bank** for April.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1195,9 +1200,9 @@
       "tme-bit-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As things stood on 01 May, Nell Cortazar was down as **Pellworth** for February.",
+        "v8_answer": "As things stood on 01 May, Nell Cortazar was down as at **Pellworth** for February.",
         "v9": false,
-        "v9_answer": "",
+        "v9_answer": "The conversations do not state which unit Nell Cortazar was down as for February as of 01 May. The only explicit later note is the 06 May correction saying she was at Bexmoor from February.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1234,7 +1239,7 @@
       "tme-bit-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "According to the latest record, Sara Mbeki was at **Halstead Vale** in April.",
+        "v8_answer": "According to the record, Sara Mbeki was at **Halstead Vale** in April.",
         "v9": false,
         "v9_answer": "Sara Mbeki was at **Calderwick** in April.",
         "v9_gold_in_context": 0,
@@ -1249,7 +1254,7 @@
         "v8": true,
         "v8_answer": "Ilminster.",
         "v9": false,
-        "v9_answer": "The conversations up to 02 May do not state any region for Sara Mbeki in April. They only mention “sara, mbeki, april” as something on the assistant’s mind.",
+        "v9_answer": "The conversations up to 02 May do not say which region the file gave for Sara Mbeki in April.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1260,7 +1265,7 @@
       "tme-bit-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Jarrow Bank.",
+        "v8_answer": "Jonas Pfeiffer: **Jarrow Bank**, from **February**.",
         "v9": true,
         "v9_answer": "Jarrow Bank.",
         "v9_gold_in_context": 1,
@@ -1275,7 +1280,7 @@
         "v8": true,
         "v8_answer": "As of 19 May, Jonas Pfeiffer was recorded as being at **Bexmoor** in February.",
         "v9": true,
-        "v9_answer": "As of 19 May, the record said Jonas Pfeiffer was at **Bexmoor** in February.",
+        "v9_answer": "Bexmoor.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1286,7 +1291,7 @@
       "tme-bit-051": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Bexmoor.",
+        "v8_answer": "Alice Renwick is recorded as being at **Bexmoor** in March.",
         "v9": true,
         "v9_answer": "Bexmoor.",
         "v9_gold_in_context": 1,
@@ -1325,9 +1330,9 @@
       "tme-bit-054": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As things stood on 30 May, Tomas Beddoe was down as **Calderwick** for April.",
+        "v8_answer": "As things stood on 30 May, Tomas Beddoe was down as being at **Calderwick** for April.",
         "v9": false,
-        "v9_answer": "The conversations don’t say what Tomas Beddoe was down as for April on 30 May. They only say that on 10 June the logged entry was revised to “Ilminster from April.”",
+        "v9_answer": "As things stood on 30 May, Tomas Beddoe was down as **Down** for April.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1338,7 +1343,7 @@
       "tme-bit-055": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Fenwick Cross.",
+        "v8_answer": "Priya Nandra is listed at **Fenwick Cross** from February.",
         "v9": true,
         "v9_answer": "Fenwick Cross.",
         "v9_gold_in_context": 1,
@@ -1351,9 +1356,9 @@
       "tme-bit-056": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As of 30 May, the file had Priya Nandra at **Pellworth** from February.",
+        "v8_answer": "As of 30 May, the file had Priya Nandra at **Pellworth** in **February**.",
         "v9": false,
-        "v9_answer": "The conversations on file by 30 May do not say which office Priya Nandra had in February. They only mention “february, office, nandra” as a note, without naming the office.",
+        "v9_answer": "The conversations do not contain that information. By 30 May, there was no recorded office for Priya Nandra in February.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1366,7 +1371,7 @@
         "v8": true,
         "v8_answer": "According to the record, Colm Whitaker was at **Ilminster** in March.",
         "v9": false,
-        "v9_answer": "The record does not say which department Colm Whitaker was at in March.",
+        "v9_answer": "The record does not say which department Colm Whitaker was at in March. It only mentions “whitaker, colm, march” without giving a department.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1390,7 +1395,7 @@
       "tme-bit-059": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Calderwick.",
+        "v8_answer": "Ines Vargas is recorded at **Calderwick** for April.",
         "v9": true,
         "v9_answer": "Calderwick.",
         "v9_gold_in_context": 1,
@@ -1417,10 +1422,10 @@
     "probed_corpus_sha256": "f5b384d7f0ff9c0fbef8b962a5f4d67865a3e82e3f4e3fe6f770fc82647cb393",
     "v9_reference_retrieval": {
       "applicable": 60,
-      "v1_gold_only": 60,
+      "v1_gold_only": 59,
       "v8_full_haystack": 59,
       "v9_bm25_top_k": 48,
-      "headroom_over_lexical_retrieval": 0.2,
+      "headroom_over_lexical_retrieval": 0.1833,
       "headroom_unlimited_context_over_lexical": 0.1833,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
@@ -1455,68 +1460,62 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 110,
+        "calls": 60,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 110,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1100,
+        "calls": 600,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 336,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 330,
-        "empty": 258,
-        "rate": 0.7818,
-        "judge_calls": 57,
+        "calls": 180,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 675,
-        "empty": 182,
-        "rate": 0.2696,
-        "judge_calls": 186,
+        "calls": 0,
+        "empty": 0,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 3,
-        "rate": 0.0273,
-        "judge_calls": 107,
+        "calls": 60,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 8,
-        "rate": 0.0727,
-        "judge_calls": 102,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v9strip": {
-        "population": "probe_answers",
-        "calls": 352,
-        "empty": 4,
-        "rate": 0.0114,
-        "judge_calls": 348,
+        "calls": 60,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
     },
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
+    "empty_completions": {
+      "count": 0
+    }
   }
 }
