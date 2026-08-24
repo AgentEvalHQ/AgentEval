@@ -81,6 +81,13 @@ internal static class TypedMemEvalJudgePrompts
         the reminder fired early, the pass is described as expired before it expired, the move is
         described as done. That is a different failure from being wrong about a date, and it is the
         one this vertical exists to catch.
+
+        PRECEDENCE — "premature" outranks "wrong" HERE, on this vertical only. Every premature
+        answer also commits to a value gold does not support, so "wrong" is always literally
+        available and the more specific label loses by default: a reminder that fired early was
+        being graded "wrong about a date", which is the one distinction this vertical exists to
+        draw. When the disagreement is that gold says a thing has NOT happened yet and the answer
+        says it HAS, choose "premature". Use "wrong" only when the mismatch is something else.
         """;
 
     private const string ArithmeticBody = """
