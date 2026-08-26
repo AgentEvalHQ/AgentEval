@@ -72,6 +72,7 @@ internal sealed record ReliabilityRaceObservation(
     string Scenario,
     bool Correct,
     bool ToolAdherent,
+    bool ToolExecutionError,
     bool Reliable,
     int ToolCalls,
     double? LatencyMs,
@@ -93,6 +94,7 @@ internal sealed record ReliabilityRaceSummary(
     double? AverageTokens,
     decimal? TotalCost,
     decimal? CostPerReliableRun,
+    int ToolErrorCount,
     int ErrorCount)
 {
     public int Total => Observations.Count;
@@ -123,6 +125,7 @@ internal sealed record ReliabilityRaceSummary(
             AverageTokens: tokens.Length > 0 ? tokens.Average() : null,
             TotalCost: totalCost,
             CostPerReliableRun: totalCost.HasValue && reliableCount > 0 ? totalCost.Value / reliableCount : null,
+            ToolErrorCount: observations.Count(o => o.ToolExecutionError),
             ErrorCount: observations.Count(o => o.Error is not null));
     }
 
@@ -185,6 +188,7 @@ internal sealed record ReliabilityRaceDecision(
             ("required-tool adherence", CompareHigher(first.ToolAdherence.Estimate, second.ToolAdherence.Estimate)),
             ("exactly-one-tool efficiency", CompareHigher(first.ExactlyOneToolCall.Estimate, second.ExactlyOneToolCall.Estimate)),
             ("end-to-end reliability", reliabilityComparison),
+            ("tool execution error rate", CompareLower(Rate(first.ToolErrorCount, first.Total), Rate(second.ToolErrorCount, second.Total))),
             ("error rate", CompareLower(Rate(first.ErrorCount, first.Total), Rate(second.ErrorCount, second.Total))),
         };
 

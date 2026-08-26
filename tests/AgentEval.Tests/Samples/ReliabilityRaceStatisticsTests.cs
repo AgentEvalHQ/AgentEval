@@ -73,6 +73,23 @@ public sealed class ReliabilityRaceStatisticsTests
         Assert.Equal("Every comparable factor is tied.", decision.RecommendationReason);
     }
 
+    [Fact]
+    public void Decision_ToolExecutionError_RecommendsErrorFreeModelAndNamesFactor()
+    {
+        var errorFree = ReliabilityRaceSummary.Create(
+            "error-free",
+            [Observation(true, true, true, 1)]);
+        var toolError = ReliabilityRaceSummary.Create(
+            "tool-error",
+            [Observation(true, true, false, 1, toolExecutionError: true)]);
+
+        var decision = ReliabilityRaceDecision.Create(errorFree, toolError);
+
+        Assert.False(decision.RecommendationIsTie);
+        Assert.Equal("error-free", Assert.Single(decision.RecommendedWinners));
+        Assert.Contains("tool execution error rate", decision.RecommendationReason);
+    }
+
     [Theory]
     [InlineData("5", 5)]
     [InlineData("10", 10)]
@@ -202,11 +219,13 @@ public sealed class ReliabilityRaceStatisticsTests
         double? latencyMs = null,
         decimal? cost = null,
         int? tokens = null,
-        string? error = null) =>
+        string? error = null,
+        bool toolExecutionError = false) =>
         new(
             Scenario: "scenario",
             Correct: correct,
             ToolAdherent: toolAdherent,
+            ToolExecutionError: toolExecutionError,
             Reliable: reliable,
             ToolCalls: toolCalls,
             LatencyMs: latencyMs,

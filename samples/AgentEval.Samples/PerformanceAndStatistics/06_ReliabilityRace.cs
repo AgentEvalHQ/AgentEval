@@ -186,15 +186,18 @@ public static class ReliabilityRace
                 ModelName = arm.Deployment,
             });
 
-        var toolCalls = result.ToolUsage?.GetCallsByName(ToolName).Count() ?? 0;
+        var requiredToolCalls = result.ToolUsage?.GetCallsByName(ToolName).ToArray() ?? [];
+        var toolCalls = requiredToolCalls.Length;
         var correct = result.Passed;
         var toolAdherent = toolCalls > 0;
+        var toolExecutionError = requiredToolCalls.Any(call => !call.WasExecuted || call.HasError);
 
         return new ReliabilityRaceObservation(
             Scenario: scenario.Name,
             Correct: correct,
             ToolAdherent: toolAdherent,
-            Reliable: correct && toolAdherent && result.Error is null,
+            ToolExecutionError: toolExecutionError,
+            Reliable: correct && toolAdherent && !toolExecutionError && result.Error is null,
             ToolCalls: toolCalls,
             LatencyMs: result.Performance?.TotalDuration.TotalMilliseconds,
             Cost: result.Performance?.EstimatedCost,
@@ -261,6 +264,7 @@ public static class ReliabilityRace
             Console.WriteLine($"      Correct answer:       {FormatRate(summary.Correct)}");
             Console.WriteLine($"      Required tool used:   {FormatRate(summary.ToolAdherence)}");
             Console.WriteLine($"      Exactly one tool call: {FormatRate(summary.ExactlyOneToolCall)}");
+            Console.WriteLine($"      Tool execution errors: {summary.ToolErrorCount}/{summary.Total} trials");
             Console.WriteLine($"      End-to-end reliable:  {FormatRate(summary.Reliable)}");
             Console.WriteLine($"      Latency P50 / P95:    {FormatMilliseconds(summary.P50LatencyMs)} / {FormatMilliseconds(summary.P95LatencyMs)}");
             Console.WriteLine($"      Avg tokens:           {FormatNumber(summary.AverageTokens)}");
@@ -334,7 +338,8 @@ public static class ReliabilityRace
 
             var reason = failure.Error is not null
                 ? $"error={Shorten(failure.Error, 70)}"
-                : $"correct={failure.Correct}, tool={failure.ToolAdherent}, output={Shorten(failure.Output, 70)}";
+                : $"correct={failure.Correct}, tool={failure.ToolAdherent}, " +
+                  $"toolError={failure.ToolExecutionError}, output={Shorten(failure.Output, 70)}";
             Console.WriteLine($"      {summary.Label}: {failure.Scenario} — {reason}");
         }
         Console.WriteLine();
