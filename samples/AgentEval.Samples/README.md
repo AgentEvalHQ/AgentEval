@@ -83,6 +83,7 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | 3 | **Model Comparison** | Compare & rank 3 models on quality, speed, cost, reliability | Yes ×3 | 10 min |
 | 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
 | 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
+| 6 | **Reliability Race** | Two-model cumulative reliability, Wilson 95% intervals, tool adherence, latency and cost | Optional ×2; offline preview | 8 min |
 
 ### E — Safety & Security
 
@@ -260,9 +261,12 @@ $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
 # Optional: embedding-based metrics (B1 — Comprehensive RAG)
 $env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-ada-002"
 
-# Optional: multi-model samples (B3 Judge Calibration, D3 Model Comparison, D4 Stochastic+Comparison)
+# Optional: multi-model samples (B3 Judge Calibration, D3 Model Comparison, D4 Stochastic+Comparison, D6 Reliability Race)
 $env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"
 $env:AZURE_OPENAI_DEPLOYMENT_3 = "gpt-4.1"
+
+# D6 defaults to 100 paired trials/model; lower this for a quick live rehearsal
+$env:AGENTEVAL_RELIABILITY_RUNS = "20"
 ```
 
 ```bash
@@ -274,7 +278,7 @@ export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 
 ### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
 
-Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
+Samples in **Group A (A1–A4)**, **D6 Reliability Race** (illustrative preview), **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
 work fully without credentials. You'll see:
 
 ```
@@ -331,6 +335,18 @@ var result = await runner.RunStochasticTestAsync(
 result.Statistics.Mean.Should().BeGreaterThan(80);          // avg quality
 result.Statistics.StandardDeviation.Should().BeLessThan(10); // consistency
 ```
+
+### Reliability Race (D6)
+
+D6 runs the same routing scenario against two fresh model sessions in alternating order. It reports
+correctness, required-tool adherence, end-to-end reliability, Wilson 95% intervals, P50/P95 latency,
+tokens, and cost without hiding the trade-offs in a composite score. It defaults to 100 paired trials
+per deployment; set `AGENTEVAL_RELIABILITY_RUNS` lower for rehearsals.
+
+For a visible capability/cost contrast, point `AZURE_OPENAI_DEPLOYMENT` at a balanced mini deployment
+and `AZURE_OPENAI_DEPLOYMENT_2` at an economy/nano deployment available in your Azure region. Azure
+deployment names are user-defined—the sample compares exactly the two names you configure. Without
+both deployments it renders a deterministic, explicitly simulated conference preview.
 
 ### Policy guardrails (E1)
 ```csharp
