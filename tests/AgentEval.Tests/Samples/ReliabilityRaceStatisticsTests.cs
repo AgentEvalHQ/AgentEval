@@ -7,6 +7,72 @@ namespace AgentEval.Tests.Samples;
 
 public sealed class ReliabilityRaceStatisticsTests
 {
+    [Fact]
+    public void Decision_EqualReliabilityButEconomyDominates_RecommendsEconomyWithoutInventingReliabilityLead()
+    {
+        var frontier = ReliabilityRaceSummary.Create(
+            "frontier",
+            Enumerable.Range(0, 5)
+                .Select(_ => Observation(true, true, true, 1, latencyMs: 3000, cost: 0.004m, tokens: 600))
+                .ToArray());
+        var economy = ReliabilityRaceSummary.Create(
+            "economy",
+            Enumerable.Range(0, 5)
+                .Select(_ => Observation(true, true, true, 1, latencyMs: 1500, cost: 0.0001m, tokens: 400))
+                .ToArray());
+
+        var decision = ReliabilityRaceDecision.Create(frontier, economy);
+
+        Assert.True(decision.ReliabilityIsDraw);
+        Assert.Null(decision.ReliabilityLeader);
+        Assert.Equal(0, decision.ReliabilityDelta);
+        Assert.False(decision.RecommendationIsTie);
+        Assert.Equal("economy", Assert.Single(decision.RecommendedWinners));
+        Assert.Contains("no worse", decision.RecommendationReason);
+    }
+
+    [Fact]
+    public void Decision_QualityVersusEfficiencyTradeoff_NamesBothJointWinners()
+    {
+        var quality = ReliabilityRaceSummary.Create(
+            "quality",
+            [
+                Observation(true, true, true, 1, latencyMs: 3000, cost: 0.004m, tokens: 600),
+                Observation(true, true, true, 1, latencyMs: 3000, cost: 0.004m, tokens: 600),
+            ]);
+        var efficiency = ReliabilityRaceSummary.Create(
+            "efficiency",
+            [
+                Observation(true, true, true, 1, latencyMs: 1000, cost: 0.0001m, tokens: 300),
+                Observation(false, true, false, 1, latencyMs: 1000, cost: 0.0001m, tokens: 300),
+            ]);
+
+        var decision = ReliabilityRaceDecision.Create(quality, efficiency);
+
+        Assert.False(decision.ReliabilityIsDraw);
+        Assert.True(decision.RecommendationIsTie);
+        Assert.Equal(["quality", "efficiency"], decision.RecommendedWinners);
+        Assert.Contains("Neither model dominates", decision.RecommendationReason);
+    }
+
+    [Fact]
+    public void Decision_AllFactorsEqual_NamesBothJointWinners()
+    {
+        ReliabilityRaceObservation[] observations =
+        [
+            Observation(true, true, true, 1, latencyMs: 1000, cost: 0.001m, tokens: 300),
+        ];
+
+        var decision = ReliabilityRaceDecision.Create(
+            ReliabilityRaceSummary.Create("a", observations),
+            ReliabilityRaceSummary.Create("b", observations));
+
+        Assert.True(decision.ReliabilityIsDraw);
+        Assert.True(decision.RecommendationIsTie);
+        Assert.Equal(["a", "b"], decision.RecommendedWinners);
+        Assert.Equal("Every comparable factor is tied.", decision.RecommendationReason);
+    }
+
     [Theory]
     [InlineData("5", 5)]
     [InlineData("10", 10)]

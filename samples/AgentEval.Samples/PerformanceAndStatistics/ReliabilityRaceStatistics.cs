@@ -146,3 +146,130 @@ internal sealed record ReliabilityRaceSummary(
         return sorted[lower] + ((sorted[upper] - sorted[lower]) * fraction);
     }
 }
+
+/// <summary>
+/// Produces an honest reliability interpretation and an unweighted, multi-factor recommendation.
+/// </summary>
+internal sealed record ReliabilityRaceDecision(
+    bool ReliabilityIsDraw,
+    string? ReliabilityLeader,
+    double ReliabilityDelta,
+    bool ReliabilityIntervalsSeparate,
+    IReadOnlyList<string> RecommendedWinners,
+    string RecommendationReason)
+{
+    private const double EqualityTolerance = 1e-12;
+
+    public bool RecommendationIsTie => RecommendedWinners.Count > 1;
+
+    public static ReliabilityRaceDecision Create(
+        ReliabilityRaceSummary first,
+        ReliabilityRaceSummary second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+
+        var reliabilityComparison = CompareHigher(first.Reliable.Estimate, second.Reliable.Estimate);
+        var reliabilityIsDraw = reliabilityComparison == 0;
+        var reliabilityLeader = reliabilityComparison switch
+        {
+            > 0 => first,
+            < 0 => second,
+            _ => null,
+        };
+        var reliabilityOther = ReferenceEquals(reliabilityLeader, first) ? second : first;
+
+        var factors = new List<(string Name, int Comparison)>
+        {
+            ("correctness", CompareHigher(first.Correct.Estimate, second.Correct.Estimate)),
+            ("required-tool adherence", CompareHigher(first.ToolAdherence.Estimate, second.ToolAdherence.Estimate)),
+            ("exactly-one-tool efficiency", CompareHigher(first.ExactlyOneToolCall.Estimate, second.ExactlyOneToolCall.Estimate)),
+            ("end-to-end reliability", reliabilityComparison),
+            ("error rate", CompareLower(Rate(first.ErrorCount, first.Total), Rate(second.ErrorCount, second.Total))),
+        };
+
+        AddNullableFactor(factors, "P50 latency", first.P50LatencyMs, second.P50LatencyMs);
+        AddNullableFactor(factors, "P95 latency", first.P95LatencyMs, second.P95LatencyMs);
+        AddNullableFactor(factors, "average tokens", first.AverageTokens, second.AverageTokens);
+        AddNullableFactor(factors, "total cost", first.TotalCost, second.TotalCost);
+        AddNullableFactor(factors, "cost per reliable run", first.CostPerReliableRun, second.CostPerReliableRun);
+
+        var firstDominates = factors.All(factor => factor.Comparison >= 0)
+            && factors.Any(factor => factor.Comparison > 0);
+        var secondDominates = factors.All(factor => factor.Comparison <= 0)
+            && factors.Any(factor => factor.Comparison < 0);
+
+        IReadOnlyList<string> winners;
+        string reason;
+        if (firstDominates)
+        {
+            winners = [first.Label];
+            reason = DominanceReason(first.Label, factors.Where(factor => factor.Comparison > 0).Select(factor => factor.Name));
+        }
+        else if (secondDominates)
+        {
+            winners = [second.Label];
+            reason = DominanceReason(second.Label, factors.Where(factor => factor.Comparison < 0).Select(factor => factor.Name));
+        }
+        else
+        {
+            winners = [first.Label, second.Label];
+            var firstLeads = factors.Where(factor => factor.Comparison > 0).Select(factor => factor.Name).ToArray();
+            var secondLeads = factors.Where(factor => factor.Comparison < 0).Select(factor => factor.Name).ToArray();
+            reason = firstLeads.Length == 0 && secondLeads.Length == 0
+                ? "Every comparable factor is tied."
+                : $"Neither model dominates: {LeadSummary(first.Label, firstLeads)}; {LeadSummary(second.Label, secondLeads)}.";
+        }
+
+        return new ReliabilityRaceDecision(
+            ReliabilityIsDraw: reliabilityIsDraw,
+            ReliabilityLeader: reliabilityLeader?.Label,
+            ReliabilityDelta: Math.Abs(first.Reliable.Estimate - second.Reliable.Estimate),
+            ReliabilityIntervalsSeparate: reliabilityLeader is not null
+                && reliabilityLeader.Reliable.Lower > reliabilityOther.Reliable.Upper,
+            RecommendedWinners: winners,
+            RecommendationReason: reason);
+    }
+
+    private static int CompareHigher(double first, double second) => Compare(first, second);
+
+    private static int CompareLower(double first, double second) => -Compare(first, second);
+
+    private static int Compare(decimal first, decimal second) =>
+        first == second ? 0 : first > second ? 1 : -1;
+
+    private static int Compare(double first, double second) =>
+        Math.Abs(first - second) <= EqualityTolerance ? 0 : first > second ? 1 : -1;
+
+    private static double Rate(int count, int total) => total == 0 ? 0 : (double)count / total;
+
+    private static void AddNullableFactor(
+        ICollection<(string Name, int Comparison)> factors,
+        string name,
+        double? first,
+        double? second)
+    {
+        if (first.HasValue && second.HasValue)
+        {
+            factors.Add((name, CompareLower(first.Value, second.Value)));
+        }
+    }
+
+    private static void AddNullableFactor(
+        ICollection<(string Name, int Comparison)> factors,
+        string name,
+        decimal? first,
+        decimal? second)
+    {
+        if (first.HasValue && second.HasValue)
+        {
+            factors.Add((name, -Compare(first.Value, second.Value)));
+        }
+    }
+
+    private static string DominanceReason(string winner, IEnumerable<string> advantages) =>
+        $"{winner} is no worse on any measured factor and leads on {string.Join(", ", advantages)}.";
+
+    private static string LeadSummary(string label, IReadOnlyCollection<string> advantages) =>
+        advantages.Count == 0 ? $"{label} leads on none" : $"{label} leads on {string.Join(", ", advantages)}";
+}

@@ -269,31 +269,55 @@ public static class ReliabilityRace
             Console.WriteLine($"      Errors:               {summary.ErrorCount}/{summary.Total}\n");
         }
 
-        PrintConclusion(summaries);
+        var decision = ReliabilityRaceDecision.Create(summaries[0], summaries[1]);
+        PrintInterpretation(summaries, decision);
         PrintRareFailures(summaries);
 
         Console.WriteLine("   Takeaway: show the rate, its denominator, and its uncertainty. Keep correctness,");
         Console.WriteLine("   tool behavior, latency, and economics separate so the audience can choose the trade-off.\n");
+
+        PrintRecommendation(decision);
     }
 
-    private static void PrintConclusion(IReadOnlyList<ReliabilityRaceSummary> summaries)
+    private static void PrintInterpretation(
+        IReadOnlyList<ReliabilityRaceSummary> summaries,
+        ReliabilityRaceDecision decision)
     {
         if (summaries.Count != 2 || summaries.Any(s => s.Total == 0))
         {
             return;
         }
 
-        var leader = summaries.OrderByDescending(s => s.Reliable.Estimate).First();
-        var other = summaries.First(s => !ReferenceEquals(s, leader));
-        var delta = leader.Reliable.Estimate - other.Reliable.Estimate;
-        var intervalsSeparate = leader.Reliable.Lower > other.Reliable.Upper;
-
         Console.WriteLine("   INTERPRETATION");
-        Console.WriteLine($"      Observed reliability delta: {delta:+0.0%;-0.0%;0.0%} in favor of {leader.Label}.");
-        Console.WriteLine(intervalsSeparate
-            ? "      The two Wilson intervals are separated at this sample size: the reliability gap is clear."
-            : "      The Wilson intervals still overlap: describe the observed gap, not a conclusive winner.");
+        if (decision.ReliabilityIsDraw)
+        {
+            Console.WriteLine(
+                $"      Reliability score: DRAW — {summaries[0].Reliable.Estimate:P1} each " +
+                $"({summaries[0].Reliable.Successes}/{summaries[0].Total} vs " +
+                $"{summaries[1].Reliable.Successes}/{summaries[1].Total}).");
+            Console.WriteLine("      Neither model leads on observed reliability; both receive the same reliability score.");
+        }
+        else
+        {
+            Console.WriteLine(
+                $"      Observed reliability delta: {decision.ReliabilityDelta:+0.0%;-0.0%;0.0%} " +
+                $"in favor of {decision.ReliabilityLeader}.");
+            Console.WriteLine(decision.ReliabilityIntervalsSeparate
+                ? "      The two Wilson intervals are separated at this sample size: the reliability gap is clear."
+                : "      The Wilson intervals still overlap: describe the observed gap, not a conclusive reliability winner.");
+        }
         Console.WriteLine("      Faster or cheaper can still be the right production choice; the scorecard keeps that visible.\n");
+    }
+
+    private static void PrintRecommendation(ReliabilityRaceDecision decision)
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("   FINAL RECOMMENDATION — Pareto rule, no hidden weights");
+        Console.ResetColor();
+        Console.WriteLine(decision.RecommendationIsTie
+            ? $"      JOINT WINNERS: {string.Join(" + ", decision.RecommendedWinners)}"
+            : $"      WINNER: {decision.RecommendedWinners[0]}");
+        Console.WriteLine($"      {decision.RecommendationReason}\n");
     }
 
     private static void PrintRareFailures(IEnumerable<ReliabilityRaceSummary> summaries)
