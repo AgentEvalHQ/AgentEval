@@ -7,6 +7,70 @@ namespace AgentEval.Tests.Samples;
 
 public sealed class ReliabilityRaceStatisticsTests
 {
+    [Theory]
+    [InlineData("5", 5)]
+    [InlineData("10", 10)]
+    [InlineData("20", 20)]
+    [InlineData("100", 100)]
+    public void RunCountSelector_ConfiguredAllowedValue_ReturnsValue(string configured, int expected)
+    {
+        var output = new StringWriter();
+
+        var selected = ReliabilityRaceRunCountSelector.Select(
+            configured,
+            interactive: false,
+            TextReader.Null,
+            output);
+
+        Assert.Equal(expected, selected);
+        Assert.Contains("AGENTEVAL_RELIABILITY_RUNS", output.ToString());
+    }
+
+    [Fact]
+    public void RunCountSelector_InteractiveInvalidThenValid_PromptsAgain()
+    {
+        var input = new StringReader("7\n100\n");
+        var output = new StringWriter();
+
+        var selected = ReliabilityRaceRunCountSelector.Select(null, interactive: true, input, output);
+
+        Assert.Equal(100, selected);
+        Assert.Contains("Enter 5, 10, 20, or 100", output.ToString());
+    }
+
+    [Fact]
+    public void RunCountSelector_InteractiveBlank_UsesRecommendedDefault()
+    {
+        var selected = ReliabilityRaceRunCountSelector.Select(
+            null,
+            interactive: true,
+            new StringReader(Environment.NewLine),
+            TextWriter.Null);
+
+        Assert.Equal(20, selected);
+    }
+
+    [Fact]
+    public void RunCountSelector_NonInteractive_UsesRecommendedDefault()
+    {
+        var selected = ReliabilityRaceRunCountSelector.Select(
+            null,
+            interactive: false,
+            TextReader.Null,
+            TextWriter.Null);
+
+        Assert.Equal(20, selected);
+    }
+
+    [Fact]
+    public void RunCountSelector_InvalidConfiguredValue_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            ReliabilityRaceRunCountSelector.Select("7", false, TextReader.Null, TextWriter.Null));
+
+        Assert.Contains("5, 10, 20, 100", exception.Message);
+    }
+
     [Fact]
     public void Create_MixedOutcomes_SeparatesCorrectnessToolUseAndReliability()
     {

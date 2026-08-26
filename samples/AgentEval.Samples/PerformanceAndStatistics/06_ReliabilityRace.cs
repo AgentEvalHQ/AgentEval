@@ -24,13 +24,11 @@ namespace AgentEval.Samples;
 ///
 /// Runs a clearly labelled deterministic preview when live credentials are unavailable.
 ///
-/// Time to understand: 8 minutes. Default live budget: 100 paired trials/model (200 calls).
+/// Time to understand: 8 minutes. Interactive default: 20 paired trials/model (40 calls).
 /// </summary>
 public static class ReliabilityRace
 {
     private const string ToolName = nameof(LookupSupportRoute);
-    private const int DefaultRuns = 100;
-    private const int MaxRuns = 500;
     private const string TelemetrySourceName = "AgentEval.Samples.ReliabilityRace";
 
     private const string AgentInstructions = """
@@ -58,11 +56,17 @@ public static class ReliabilityRace
     {
         PrintHeader();
 
-        var runs = ReadInt("AGENTEVAL_RELIABILITY_RUNS", DefaultRuns, 1, MaxRuns);
+        var runs = ReliabilityRaceRunCountSelector.Select(
+            Environment.GetEnvironmentVariable("AGENTEVAL_RELIABILITY_RUNS"),
+            Program.IsInteractive,
+            Console.In,
+            Console.Out);
         var delayMs = ReadInt("AGENTEVAL_RELIABILITY_DELAY_MS", 0, 0, 30_000);
         var secondDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT_2");
 
         PrintWilsonExplanation();
+        Console.WriteLine("   Stochastic design: repeated independent agent executions expose behavioral variance.");
+        Console.WriteLine("   D6 pairs the runs so both models face the same scenario before the evidence updates.");
         Console.WriteLine($"   Experiment: {runs} paired trials/model, {runs * 2} total calls");
         Console.WriteLine("   Design:     same scenario each round, fresh session each call, model order alternates\n");
 
