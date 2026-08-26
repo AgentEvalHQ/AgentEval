@@ -83,7 +83,7 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | 3 | **Model Comparison** | Compare & rank 3 models on quality, speed, cost, reliability | Yes ×3 | 10 min |
 | 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
 | 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
-| 6 | **Reliability Race** | Two-model stochastic race; choose 5/10/20/100 runs; Wilson intervals and tool adherence | Optional ×2; offline preview | 8 min |
+| 6 | **Reliability Race** | Two live models; choose 5/10/20/100 runs; Wilson intervals and tool adherence | Yes ×2 | 8 min |
 
 ### E — Safety & Security
 
@@ -278,7 +278,7 @@ export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 
 ### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
 
-Samples in **Group A (A1–A4)**, **D6 Reliability Race** (illustrative preview), **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
+Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
 work fully without credentials. You'll see:
 
 ```
@@ -344,10 +344,11 @@ tokens, and cost without hiding the trade-offs in a composite score. It asks for
 paired trials per deployment (20 is the recommended live-demo default). Set
 `AGENTEVAL_RELIABILITY_RUNS` to one of those values for non-interactive runs.
 
-For a visible capability/cost contrast, point `AZURE_OPENAI_DEPLOYMENT` at a balanced mini deployment
-and `AZURE_OPENAI_DEPLOYMENT_2` at an economy/nano deployment available in your Azure region. Azure
-deployment names are user-defined—the sample compares exactly the two names you configure. Without
-both deployments it renders a deterministic, explicitly simulated conference preview.
+D6 is live-only: it never fabricates observations and has no simulated fallback. It reuses the same
+`AIConfig` endpoint and API key as every other live sample. The two arms come from the existing shared
+deployment slots: `AIConfig.ModelDeployment` and `AIConfig.SecondaryModelDeployment`. The recommended
+conference pair is **gpt-5.5** (frontier arm) versus **gpt-4o-mini** (economy arm); the secondary slot
+already defaults to `gpt-4o-mini`, so D6 introduces no new credential or D6-specific configuration.
 
 ### Policy guardrails (E1)
 ```csharp

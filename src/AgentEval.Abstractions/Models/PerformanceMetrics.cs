@@ -89,6 +89,7 @@ public static class ModelPricing
         new(StringComparer.OrdinalIgnoreCase)
     {
         // OpenAI models (GPT family)
+        ["gpt-5.5"] = (0.005m, 0.03m),        // $5 / $30 per 1M tokens (2026-08)
         ["gpt-5"] = (0.005m, 0.02m),          // GPT-5 (estimated pricing)
         ["gpt-5-chat"] = (0.005m, 0.02m),     // GPT-5 chat variant
         ["gpt-5-mini"] = (0.0001m, 0.0004m),  // GPT-5 mini (placeholder)

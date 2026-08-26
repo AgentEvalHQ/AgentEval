@@ -13,6 +13,7 @@ namespace AgentEval.Tests;
 public class ModelPricingTests
 {
     [Theory]
+    [InlineData("gpt-5.5", 1000, 1000, 0.035)] // 0.005 + 0.030
     [InlineData("gpt-4o", 1000, 500, 0.0125)] // 0.005 + 0.0075
     [InlineData("gpt-4o-mini", 1000, 500, 0.00045)] // 0.00015 + 0.0003
     [InlineData("gpt-3.5-turbo", 1000, 1000, 0.002)] // 0.0005 + 0.0015

@@ -22,8 +22,6 @@ namespace AgentEval.Samples;
 /// - P50/P95 latency, token use, total cost, and cost per reliable result
 /// - Alternating model order and fresh sessions to reduce experimental bias
 ///
-/// Runs a clearly labelled deterministic preview when live credentials are unavailable.
-///
 /// Time to understand: 8 minutes. Interactive default: 20 paired trials/model (40 calls).
 /// </summary>
 public static class ReliabilityRace
@@ -56,13 +54,23 @@ public static class ReliabilityRace
     {
         PrintHeader();
 
+        if (!AIConfig.IsConfigured)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("   D6 is live-only and never generates simulated results.");
+            Console.ResetColor();
+            Console.WriteLine("   It uses the same shared AIConfig endpoint, key, and primary deployment as the other live samples.\n");
+            return;
+        }
+
         var runs = ReliabilityRaceRunCountSelector.Select(
             Environment.GetEnvironmentVariable("AGENTEVAL_RELIABILITY_RUNS"),
             Program.IsInteractive,
             Console.In,
             Console.Out);
         var delayMs = ReadInt("AGENTEVAL_RELIABILITY_DELAY_MS", 0, 0, 30_000);
-        var secondDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT_2");
+        var primaryDeployment = AIConfig.ModelDeployment;
+        var secondaryDeployment = AIConfig.SecondaryModelDeployment;
 
         PrintWilsonExplanation();
         Console.WriteLine("   Stochastic design: repeated independent agent executions expose behavioral variance.");
@@ -70,30 +78,23 @@ public static class ReliabilityRace
         Console.WriteLine($"   Experiment: {runs} paired trials/model, {runs * 2} total calls");
         Console.WriteLine("   Design:     same scenario each round, fresh session each call, model order alternates\n");
 
-        if (!AIConfig.IsConfigured || string.IsNullOrWhiteSpace(secondDeployment))
+        if (string.Equals(primaryDeployment, secondaryDeployment, StringComparison.OrdinalIgnoreCase))
         {
-            PrintPreviewReason(secondDeployment);
-            RunOfflinePreview(runs);
-            return;
-        }
-
-        if (string.Equals(AIConfig.ModelDeployment, secondDeployment, StringComparison.OrdinalIgnoreCase))
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   Both deployment variables name the same deployment; showing the offline preview instead.\n");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   D6 requires two distinct deployments; both shared AIConfig slots resolve to '{primaryDeployment}'.");
             Console.ResetColor();
-            RunOfflinePreview(runs);
+            Console.WriteLine("   No calls were made and no results were fabricated.\n");
             return;
         }
 
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var arms = new[]
         {
-            CreateLiveArm(azureClient, AIConfig.ModelDeployment),
-            CreateLiveArm(azureClient, secondDeployment),
+            CreateLiveArm(azureClient, $"Frontier · {primaryDeployment}", primaryDeployment),
+            CreateLiveArm(azureClient, $"Economy · {secondaryDeployment}", secondaryDeployment),
         };
 
-        Console.WriteLine("   LIVE RUN — results are measurements of these deployments and this task only:");
+        Console.WriteLine("   LIVE RUN — shared AIConfig credentials, real model calls, no fallback:");
         Console.WriteLine($"   A: {arms[0].Label}");
         Console.WriteLine($"   B: {arms[1].Label}\n");
 
@@ -130,10 +131,10 @@ public static class ReliabilityRace
             }
         }
 
-        PrintFinalReport(arms, isPreview: false);
+        PrintFinalReport(arms);
     }
 
-    private static ModelArm CreateLiveArm(AzureOpenAIClient client, string deployment)
+    private static ModelArm CreateLiveArm(AzureOpenAIClient client, string label, string deployment)
     {
         var observableClient = client
             .GetChatClient(deployment)
@@ -143,7 +144,7 @@ public static class ReliabilityRace
             .Build();
 
         return new ModelArm(
-            deployment,
+            label,
             deployment,
             () =>
             {
@@ -153,7 +154,7 @@ public static class ReliabilityRace
                     ChatOptions = new ChatOptions
                     {
                         Instructions = AgentInstructions,
-                        MaxOutputTokens = 96,
+                        MaxOutputTokens = 512,
                         Tools = [AIFunctionFactory.Create(LookupSupportRoute)],
                     },
                 });
@@ -176,7 +177,7 @@ public static class ReliabilityRace
         };
 
         var result = await harness.RunEvaluationAsync(
-            arm.CreateAgent!(),
+            arm.CreateAgent(),
             testCase,
             new EvaluationOptions
             {
@@ -200,63 +201,6 @@ public static class ReliabilityRace
             TotalTokens: result.Performance?.TotalTokens,
             Output: result.ActualOutput ?? string.Empty,
             Error: result.Error?.Message);
-    }
-
-    private static void RunOfflinePreview(int runs)
-    {
-        var arms = new[]
-        {
-            new ModelArm("SIMULATED balanced arm", "preview-balanced", null),
-            new ModelArm("SIMULATED economical arm", "preview-economical", null),
-        };
-        var checkpoints = BuildCheckpoints(runs);
-
-        for (var round = 1; round <= runs; round++)
-        {
-            var scenario = Scenarios[(round - 1) % Scenarios.Count];
-            arms[0].Observations.Add(CreatePreviewObservation(round, scenario, balanced: true));
-            arms[1].Observations.Add(CreatePreviewObservation(round, scenario, balanced: false));
-
-            if (checkpoints.Contains(round))
-            {
-                PrintCheckpoint(round, arms);
-            }
-        }
-
-        PrintFinalReport(arms, isPreview: true);
-    }
-
-    private static ReliabilityRaceObservation CreatePreviewObservation(int round, RoutingScenario scenario, bool balanced)
-    {
-        // Deterministic illustrative data: the first trial deliberately tells the wrong one-shot story.
-        // These values exercise the presentation; they are never described as model measurements.
-        var correct = balanced
-            ? round != 1 && round % 29 != 0
-            : round % 13 != 0;
-        var toolAdherent = balanced
-            ? round % 17 != 0 && round % 41 != 0
-            : round % 5 != 0;
-        var toolCalls = toolAdherent ? (round % (balanced ? 23 : 7) == 0 ? 2 : 1) : 0;
-        var reliable = correct && toolAdherent;
-        var latency = balanced
-            ? 610 + ((round * 47) % 330)
-            : 255 + ((round * 31) % 180);
-        var tokens = balanced
-            ? 118 + ((round * 7) % 26)
-            : 82 + ((round * 5) % 22);
-        var cost = balanced ? 0.00045m : 0.00012m;
-
-        return new ReliabilityRaceObservation(
-            Scenario: scenario.Name,
-            Correct: correct,
-            ToolAdherent: toolAdherent,
-            Reliable: reliable,
-            ToolCalls: toolCalls,
-            LatencyMs: latency,
-            Cost: cost,
-            TotalTokens: tokens,
-            Output: correct ? $"ROUTE={scenario.ExpectedCode}" : "ROUTE=UNVERIFIED",
-            Error: null);
     }
 
     private static void PrintHeader()
@@ -283,20 +227,6 @@ public static class ReliabilityRace
         Console.WriteLine($"   100/100      → 100%, and Wilson 95% narrows to [{hundredOfHundred.Lower:P1}, {hundredOfHundred.Upper:P1}]\n");
     }
 
-    private static void PrintPreviewReason(string? secondDeployment)
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("   OFFLINE PREVIEW — deterministic illustrative data, not model benchmark results.");
-        Console.ResetColor();
-        Console.WriteLine("   To run live, configure AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY,");
-        Console.WriteLine("   AZURE_OPENAI_DEPLOYMENT, and a distinct AZURE_OPENAI_DEPLOYMENT_2.");
-        if (AIConfig.IsConfigured && string.IsNullOrWhiteSpace(secondDeployment))
-        {
-            Console.WriteLine("   Primary credentials were found; only AZURE_OPENAI_DEPLOYMENT_2 is missing.");
-        }
-        Console.WriteLine();
-    }
-
     private static void PrintCheckpoint(int completed, IReadOnlyList<ModelArm> arms)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -316,7 +246,7 @@ public static class ReliabilityRace
         Console.WriteLine();
     }
 
-    private static void PrintFinalReport(IReadOnlyList<ModelArm> arms, bool isPreview)
+    private static void PrintFinalReport(IReadOnlyList<ModelArm> arms)
     {
         var summaries = arms.Select(arm => ReliabilityRaceSummary.Create(arm.Label, arm.Observations)).ToArray();
 
@@ -341,14 +271,6 @@ public static class ReliabilityRace
 
         PrintConclusion(summaries);
         PrintRareFailures(summaries);
-
-        if (isPreview)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   Preview reminder: every number above is simulated to exercise the talk track.");
-            Console.WriteLine("   Do not present it as a measured comparison of named models.\n");
-            Console.ResetColor();
-        }
 
         Console.WriteLine("   Takeaway: show the rate, its denominator, and its uncertainty. Keep correctness,");
         Console.WriteLine("   tool behavior, latency, and economics separate so the audience can choose the trade-off.\n");
@@ -459,11 +381,11 @@ public static class ReliabilityRace
     private sealed class ModelArm(
         string label,
         string deployment,
-        Func<IEvaluableAgent>? createAgent)
+        Func<IEvaluableAgent> createAgent)
     {
         public string Label { get; } = label;
         public string Deployment { get; } = deployment;
-        public Func<IEvaluableAgent>? CreateAgent { get; } = createAgent;
+        public Func<IEvaluableAgent> CreateAgent { get; } = createAgent;
         public List<ReliabilityRaceObservation> Observations { get; } = [];
     }
 }
