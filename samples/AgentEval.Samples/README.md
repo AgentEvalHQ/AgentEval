@@ -338,10 +338,14 @@ result.Statistics.StandardDeviation.Should().BeLessThan(10); // consistency
 
 ### Reliability Race (D6)
 
-D6 runs the same routing scenario against two fresh model sessions in alternating order. It reports
-correctness, required-tool adherence, end-to-end reliability, Wilson 95% intervals, P50/P95 latency,
-tokens, and cost without hiding the trade-offs in a composite score. It asks for 5, 10, 20, or 100
-paired trials per deployment (20 is the recommended live-demo default). Set
+D6 rotates nine routing scenarios (three customer tiers × three issue types) through two fresh model
+sessions in alternating order. Each paired round gives both models the same scenario, so the comparison
+is fair while still testing robustness beyond one lucky or memorized prompt. It reports correctness,
+required-tool adherence, end-to-end reliability, Wilson 95% intervals, P50/P95 latency, tokens, and cost
+without hiding the trade-offs in a composite score. It asks for 5, 10, 20, or 100 agent runs per
+deployment (20 is the recommended live-demo default). Choosing 100 therefore schedules exactly 100
+agent runs per model and 200 total agent runs. A tool-using agent run normally makes more than one
+low-level model API request, so API-request count is not the same as agent-run count. Set
 `AGENTEVAL_RELIABILITY_RUNS` to one of those values for non-interactive runs.
 
 D6 is live-only: it never fabricates observations and has no simulated fallback. It reuses the same

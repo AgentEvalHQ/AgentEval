@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// - P50/P95 latency, token use, total cost, and cost per reliable result
 /// - Alternating model order and fresh sessions to reduce experimental bias
 ///
-/// Time to understand: 8 minutes. Interactive default: 20 paired trials/model (40 calls).
+/// Time to understand: 8 minutes. Interactive default: 20 paired rounds (20 agent runs/model, 40 total).
 /// </summary>
 public static class ReliabilityRace
 {
@@ -74,9 +74,20 @@ public static class ReliabilityRace
 
         PrintWilsonExplanation();
         Console.WriteLine("   Stochastic design: repeated independent agent executions expose behavioral variance.");
-        Console.WriteLine("   D6 pairs the runs so both models face the same scenario before the evidence updates.");
-        Console.WriteLine($"   Experiment: {runs} paired trials/model, {runs * 2} total calls");
-        Console.WriteLine("   Design:     same scenario each round, fresh session each call, model order alternates\n");
+        Console.WriteLine("   D6 pairs each round: both models receive the same case before the evidence updates.");
+        Console.WriteLine($"   Planned experiment: {runs} paired rounds = {runs} agent runs/model, {runs * 2} total agent runs");
+        Console.WriteLine("   API-request note: one tool-using agent run normally makes two model requests — one to choose");
+        Console.WriteLine("   the tool and one to answer after it returns. Missing/repeated tools or retries can change that,");
+        Console.WriteLine("   so D6 fixes the agent-run count; it does not promise an exact low-level API-request count.");
+        Console.WriteLine($"   Scenario suite: {Scenarios.Count} routing cases (3 customer tiers × 3 issue types), round-robin.");
+        Console.WriteLine($"   Coverage at {runs}: {runs / Scenarios.Count} complete suite cycle(s)" +
+                          (runs % Scenarios.Count == 0
+                              ? "."
+                              : $" plus the first {runs % Scenarios.Count} case(s) once more."));
+        Console.WriteLine("   Purpose: measure robustness across inputs, not luck on one prompt. Sessions are fresh and");
+        Console.WriteLine("   model order alternates, while the paired case sequence stays identical for both models.\n");
+        Console.WriteLine("   A single prompt would measure randomness for only that prompt; the suite estimates average");
+        Console.WriteLine("   reliability across a small representative workload.\n");
 
         if (string.Equals(primaryDeployment, secondaryDeployment, StringComparison.OrdinalIgnoreCase))
         {
@@ -220,13 +231,17 @@ public static class ReliabilityRace
 
     private static void PrintWilsonExplanation()
     {
+        var fiveOfFive = WilsonInterval.Compute(5, 5);
         var threeOfThree = WilsonInterval.Compute(3, 3);
         var hundredOfHundred = WilsonInterval.Compute(100, 100);
 
         Console.WriteLine("   What is a Wilson interval?");
-        Console.WriteLine("   A pass percentage is an estimate, not certainty. Wilson gives a plausible range for");
-        Console.WriteLine("   the underlying success rate and stays inside 0–100%, even when every run passes.");
+        Console.WriteLine("   The pass rate says what happened in this run. The Wilson interval shows how uncertain");
+        Console.WriteLine("   that number still is: which long-run pass rates remain compatible with this evidence?");
+        Console.WriteLine("   '95%' means the method covers the true long-run rate in about 95 of 100 repeated experiments.");
+        Console.WriteLine("   Few runs give a wide interval; more runs give a narrower, more convincing interval.");
         Console.WriteLine($"   3/3 passes   → 100%, but Wilson 95% is [{threeOfThree.Lower:P1}, {threeOfThree.Upper:P1}]");
+        Console.WriteLine($"   5/5 passes   → 100%, but Wilson 95% is [{fiveOfFive.Lower:P1}, {fiveOfFive.Upper:P1}]");
         Console.WriteLine($"   100/100      → 100%, and Wilson 95% narrows to [{hundredOfHundred.Lower:P1}, {hundredOfHundred.Upper:P1}]\n");
     }
 

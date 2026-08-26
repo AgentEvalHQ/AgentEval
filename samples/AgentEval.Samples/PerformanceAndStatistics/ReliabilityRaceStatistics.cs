@@ -25,7 +25,7 @@ internal static class ReliabilityRaceRunCountSelector
         {
             if (int.TryParse(configuredValue, out var configured) && Allowed.Contains(configured))
             {
-                output.WriteLine($"   Iterations: {configured} per model (AGENTEVAL_RELIABILITY_RUNS)\n");
+                output.WriteLine($"   Agent runs: {configured} per model (AGENTEVAL_RELIABILITY_RUNS)\n");
                 return configured;
             }
 
@@ -36,11 +36,11 @@ internal static class ReliabilityRaceRunCountSelector
 
         if (!interactive)
         {
-            output.WriteLine($"   Iterations: {Default} per model (non-interactive default)\n");
+            output.WriteLine($"   Agent runs: {Default} per model (non-interactive default)\n");
             return Default;
         }
 
-        output.WriteLine("   Choose the stochastic depth (paired trials per model):");
+        output.WriteLine("   Choose the stochastic depth (agent runs per model):");
         output.WriteLine("      5    quick pulse");
         output.WriteLine("      10   short rehearsal");
         output.WriteLine("      20   recommended live demo");
@@ -48,7 +48,7 @@ internal static class ReliabilityRaceRunCountSelector
 
         while (true)
         {
-            output.Write($"   Iterations [default {Default}]: ");
+            output.Write($"   Agent runs/model [default {Default}]: ");
             var raw = input.ReadLine()?.Trim();
             if (string.IsNullOrEmpty(raw))
             {
