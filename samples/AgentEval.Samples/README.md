@@ -83,6 +83,7 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | 3 | **Model Comparison** | Compare & rank 3 models on quality, speed, cost, reliability | Yes ×3 | 10 min |
 | 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
 | 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
+| 6 | **Reliability Race** | Two live models; choose 5/10/20/100 runs; Wilson intervals and tool adherence | Yes ×2 | 8 min |
 
 ### E — Safety & Security
 
@@ -260,9 +261,13 @@ $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
 # Optional: embedding-based metrics (B1 — Comprehensive RAG)
 $env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-ada-002"
 
-# Optional: multi-model samples (B3 Judge Calibration, D3 Model Comparison, D4 Stochastic+Comparison)
+# Optional: multi-model samples (B3 Judge Calibration, D3 Model Comparison, D4 Stochastic+Comparison, D6 Reliability Race)
 $env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"
 $env:AZURE_OPENAI_DEPLOYMENT_3 = "gpt-4.1"
+
+# D6 prompts for 5, 10, 20, or 100 agent runs/model; set these for automation/rate limits
+$env:AGENTEVAL_RELIABILITY_RUNS = "20"
+$env:AGENTEVAL_RELIABILITY_DELAY_MS = "250"
 ```
 
 ```bash
@@ -331,6 +336,25 @@ var result = await runner.RunStochasticTestAsync(
 result.Statistics.Mean.Should().BeGreaterThan(80);          // avg quality
 result.Statistics.StandardDeviation.Should().BeLessThan(10); // consistency
 ```
+
+### Reliability Race (D6)
+
+D6 rotates nine routing scenarios (three customer tiers × three issue types) through two fresh model
+sessions in alternating order. Each paired round gives both models the same scenario, so the comparison
+is fair while still testing robustness beyond one lucky or memorized prompt. It reports correctness,
+required-tool adherence, end-to-end reliability, Wilson 95% intervals, P50/P95 latency, tokens, and cost
+without hiding the trade-offs in a composite score. It asks for 5, 10, 20, or 100 agent runs per
+deployment (20 is the recommended live-demo default). Choosing 100 therefore schedules exactly 100
+agent runs per model and 200 total agent runs. A tool-using agent run normally makes more than one
+low-level model API request, so API-request count is not the same as agent-run count. Set
+`AGENTEVAL_RELIABILITY_RUNS` to one of those values for non-interactive runs. Optionally set
+`AGENTEVAL_RELIABILITY_DELAY_MS` to pause between agent runs when the deployments need rate-limit headroom.
+
+D6 is live-only: it never fabricates observations and has no simulated fallback. It reuses the same
+`AIConfig` endpoint and API key as every other live sample. The two arms come from the existing shared
+deployment slots: `AIConfig.ModelDeployment` and `AIConfig.SecondaryModelDeployment`. The recommended
+conference pair is **gpt-5.5** (frontier arm) versus **gpt-4o-mini** (economy arm); the secondary slot
+already defaults to `gpt-4o-mini`, so D6 introduces no new credential or D6-specific configuration.
 
 ### Policy guardrails (E1)
 ```csharp

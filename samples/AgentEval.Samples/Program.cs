@@ -13,6 +13,9 @@ public static class Program
 {
     private static bool _interactive = true;
 
+    /// <summary>Whether samples may prompt for interactive input.</summary>
+    internal static bool IsInteractive => _interactive;
+
     // ──────────────────────────────────────────────────────────
     //  Sample catalogue — one record per group, samples in order
     // ──────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ public static class Program
             new("Model Comparison",          "Compare and rank 3 models on quality, speed, cost, reliability",       ModelComparison.RunAsync),
             new("Stochastic + Comparison",   "Stochastic rigor applied to side-by-side model comparison",           CombinedStochasticComparison.RunAsync),
             new("Streaming vs Async",        "TTFT vs throughput — compare streaming and non-streaming modes",       StreamingVsAsyncPerformance.RunAsync),
+            new("Reliability Race",          "Two live models, choose 5/10/20/100 runs, Wilson intervals, adherence", ReliabilityRace.RunAsync),
         ]),
 
         new('E', "Safety & Security", "",

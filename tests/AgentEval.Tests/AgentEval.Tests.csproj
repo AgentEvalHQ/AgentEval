@@ -69,4 +69,11 @@
                       LogicalName="AgentEval.Tests.GatekeeperReplayCorpus.jsonl" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Compile the demo's pure aggregation helper into the test assembly. This keeps the live
+         sample net10-only while exercising its statistics across every test target framework. -->
+    <Compile Include="../../samples/AgentEval.Samples/PerformanceAndStatistics/ReliabilityRaceStatistics.cs"
+             Link="Samples/ReliabilityRaceStatistics.cs" />
+  </ItemGroup>
+
 </Project>
