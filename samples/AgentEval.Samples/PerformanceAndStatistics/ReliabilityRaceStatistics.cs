@@ -67,6 +67,32 @@ internal static class ReliabilityRaceRunCountSelector
     }
 }
 
+/// <summary>Pure trial rules kept separate so the live demo's pass/fail behavior is deterministic and testable.</summary>
+internal static class ReliabilityRaceTrialRules
+{
+    public static bool IsExactRouteOutput(string? actualOutput, string expectedCode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedCode);
+        return string.Equals(
+            actualOutput?.Trim(),
+            $"ROUTE={expectedCode}",
+            StringComparison.Ordinal);
+    }
+
+    public static bool HasConsecutiveSetupFailures(
+        IReadOnlyList<ReliabilityRaceObservation> observations,
+        int requiredConsecutiveFailures = 3)
+    {
+        ArgumentNullException.ThrowIfNull(observations);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(requiredConsecutiveFailures);
+
+        return observations.Count >= requiredConsecutiveFailures
+            && observations
+                .Skip(observations.Count - requiredConsecutiveFailures)
+                .All(observation => observation.Error is not null);
+    }
+}
+
 /// <summary>A single paired-trial observation used by the Reliability Race sample.</summary>
 internal sealed record ReliabilityRaceObservation(
     string Scenario,
@@ -228,7 +254,9 @@ internal sealed record ReliabilityRaceDecision(
         return new ReliabilityRaceDecision(
             ReliabilityIsDraw: reliabilityIsDraw,
             ReliabilityLeader: reliabilityLeader?.Label,
-            ReliabilityDelta: Math.Abs(first.Reliable.Estimate - second.Reliable.Estimate),
+            ReliabilityDelta: reliabilityIsDraw
+                ? 0
+                : Math.Abs(first.Reliable.Estimate - second.Reliable.Estimate),
             ReliabilityIntervalsSeparate: reliabilityLeader is not null
                 && reliabilityLeader.Reliable.Lower > reliabilityOther.Reliable.Upper,
             RecommendedWinners: winners,

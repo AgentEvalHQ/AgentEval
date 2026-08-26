@@ -128,7 +128,7 @@ public static class ReliabilityRace
                 }
             }
 
-            if (arms.Any(arm => arm.Observations.Count == 3 && arm.Observations.All(o => o.Error is not null)))
+            if (arms.Any(arm => ReliabilityRaceTrialRules.HasConsecutiveSetupFailures(arm.Observations)))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("   Stopping after three consecutive setup failures. Check deployment names and quota.\n");
@@ -183,7 +183,7 @@ public static class ReliabilityRace
         {
             Name = scenario.Name,
             Input = scenario.Prompt,
-            ExpectedOutputContains = scenario.ExpectedCode,
+            ExpectedOutputContains = $"ROUTE={scenario.ExpectedCode}",
             ExpectedTools = [ToolName],
         };
 
@@ -199,7 +199,8 @@ public static class ReliabilityRace
 
         var requiredToolCalls = result.ToolUsage?.GetCallsByName(ToolName).ToArray() ?? [];
         var toolCalls = requiredToolCalls.Length;
-        var correct = result.Passed;
+        var correct = ReliabilityRaceTrialRules.IsExactRouteOutput(result.ActualOutput, scenario.ExpectedCode);
+        // Invocation adherence belongs to the model; execution failures are reported separately below.
         var toolAdherent = toolCalls > 0;
         var toolExecutionError = requiredToolCalls.Any(call => !call.WasExecuted || call.HasError);
 
@@ -277,7 +278,7 @@ public static class ReliabilityRace
             Console.WriteLine($"   {summary.Label}");
             Console.ResetColor();
             Console.WriteLine($"      Correct answer:       {FormatRate(summary.Correct)}");
-            Console.WriteLine($"      Required tool used:   {FormatRate(summary.ToolAdherence)}");
+            Console.WriteLine($"      Required tool invoked: {FormatRate(summary.ToolAdherence)}");
             Console.WriteLine($"      Exactly one tool call: {FormatRate(summary.ExactlyOneToolCall)}");
             Console.WriteLine($"      Tool execution errors: {summary.ToolErrorCount}/{summary.Total} trials");
             Console.WriteLine($"      End-to-end reliable:  {FormatRate(summary.Reliable)}");

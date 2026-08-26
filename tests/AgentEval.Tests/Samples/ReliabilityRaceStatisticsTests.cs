@@ -7,6 +7,45 @@ namespace AgentEval.Tests.Samples;
 
 public sealed class ReliabilityRaceStatisticsTests
 {
+    [Theory]
+    [InlineData("ROUTE=P1-04H", true)]
+    [InlineData("  ROUTE=P1-04H\r\n", true)]
+    [InlineData("P1-04H", false)]
+    [InlineData("Authoritative route: P1-04H", false)]
+    [InlineData("ROUTE=P1-04H because it is urgent", false)]
+    [InlineData("ROUTE=P3-24H", false)]
+    public void ExactRouteOutput_RequiresContractWithoutExtraText(string actualOutput, bool expected)
+    {
+        Assert.Equal(expected, ReliabilityRaceTrialRules.IsExactRouteOutput(actualOutput, "P1-04H"));
+    }
+
+    [Fact]
+    public void ConsecutiveSetupFailures_LaterInRun_StopsAfterLastThreeErrors()
+    {
+        ReliabilityRaceObservation[] observations =
+        [
+            Observation(true, true, true, 1),
+            Observation(false, false, false, 0, error: "setup-1"),
+            Observation(false, false, false, 0, error: "setup-2"),
+            Observation(false, false, false, 0, error: "setup-3"),
+        ];
+
+        Assert.True(ReliabilityRaceTrialRules.HasConsecutiveSetupFailures(observations));
+    }
+
+    [Fact]
+    public void ConsecutiveSetupFailures_InterruptedBySuccess_DoesNotStop()
+    {
+        ReliabilityRaceObservation[] observations =
+        [
+            Observation(false, false, false, 0, error: "setup-1"),
+            Observation(false, false, false, 0, error: "setup-2"),
+            Observation(true, true, true, 1),
+        ];
+
+        Assert.False(ReliabilityRaceTrialRules.HasConsecutiveSetupFailures(observations));
+    }
+
     [Fact]
     public void Decision_EqualReliabilityButEconomyDominates_RecommendsEconomyWithoutInventingReliabilityLead()
     {

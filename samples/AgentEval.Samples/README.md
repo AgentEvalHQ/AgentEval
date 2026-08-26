@@ -265,8 +265,9 @@ $env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-ada-002"
 $env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"
 $env:AZURE_OPENAI_DEPLOYMENT_3 = "gpt-4.1"
 
-# D6 prompts for 5, 10, 20, or 100 paired trials/model; set this for automation
+# D6 prompts for 5, 10, 20, or 100 agent runs/model; set these for automation/rate limits
 $env:AGENTEVAL_RELIABILITY_RUNS = "20"
+$env:AGENTEVAL_RELIABILITY_DELAY_MS = "250"
 ```
 
 ```bash
@@ -346,7 +347,8 @@ without hiding the trade-offs in a composite score. It asks for 5, 10, 20, or 10
 deployment (20 is the recommended live-demo default). Choosing 100 therefore schedules exactly 100
 agent runs per model and 200 total agent runs. A tool-using agent run normally makes more than one
 low-level model API request, so API-request count is not the same as agent-run count. Set
-`AGENTEVAL_RELIABILITY_RUNS` to one of those values for non-interactive runs.
+`AGENTEVAL_RELIABILITY_RUNS` to one of those values for non-interactive runs. Optionally set
+`AGENTEVAL_RELIABILITY_DELAY_MS` to pause between agent runs when the deployments need rate-limit headroom.
 
 D6 is live-only: it never fabricates observations and has no simulated fallback. It reuses the same
 `AIConfig` endpoint and API key as every other live sample. The two arms come from the existing shared
