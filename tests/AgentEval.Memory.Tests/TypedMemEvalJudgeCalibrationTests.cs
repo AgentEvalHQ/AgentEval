@@ -47,6 +47,18 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
     /// </remarks>
     private const double AgreementThreshold = 0.85;
 
+    /// <summary>Floor each vertical must clear on its own, not merely on the family average.</summary>
+    /// <remarks>
+    /// A family-wide threshold is satisfiable by averaging, which is the same defect the corpus
+    /// calibration had: arithmetic certified at a mean of 0.700 while its duration shape sat at
+    /// 0.083. Bitemporal ran 0.750 behind a green 0.946 for the same reason — six verticals near
+    /// 0.98 carried it, and nothing looked underneath. Set below the family floor on purpose: a
+    /// single vertical is 24-28 cases, so one boundary case moves it ~0.04 and a floor equal to the
+    /// family's would fail on noise. What this catches is a vertical that has broadly stopped
+    /// working, which is what 0.750 was.
+    /// </remarks>
+    private const double PerVerticalAgreementThreshold = 0.80;
+
     private const string CalibrationResource = "Data.typedmemeval-judge-calibration.json";
     private const string RecordedResultResource = "Data.typedmemeval-judge-calibration-result.json";
 
@@ -278,6 +290,23 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
             $"verticals with no recorded per-vertical agreement: {string.Join(", ", unmeasured)}. " +
             $"Each one has its own template and its own failure modes; one missing here is one the " +
             $"family-wide number is averaging over without ever having seen.");
+
+        // The family floor alone is satisfiable by averaging. Bitemporal sat at 0.750 behind a
+        // green 0.946 because six verticals near 0.98 carried it, and the gate could not see it
+        // because it only ever read the mean.
+        var belowFloor = Enum.GetValues<TypedMemEvalVertical>()
+            .Where(vertical => perVertical.TryGetProperty(vertical.ToString(), out var value) &&
+                               value.GetDouble() < PerVerticalAgreementThreshold)
+            .Select(vertical =>
+                $"{vertical} {perVertical.GetProperty(vertical.ToString()).GetDouble():0.###}")
+            .ToArray();
+
+        Assert.True(
+            belowFloor.Length == 0,
+            $"verticals below the {PerVerticalAgreementThreshold} per-vertical floor: " +
+            $"{string.Join(", ", belowFloor)}. The family-wide figure can be green while one " +
+            $"vertical is broken, because the others average it away — fix the vertical's template " +
+            $"or say why the floor should move, but do not let the mean stand in for it.");
     }
 
     [Fact]
@@ -309,7 +338,8 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         options.Validate();
 
         using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        var observed = new ConcurrentBag<(CalibrationCase Case, TypedMemEvalOutcome? Actual, string Detail)>();
+        var observed = new ConcurrentBag<(CalibrationCase Case, TypedMemEvalOutcome? Actual,
+            string? Branch, string Detail)>();
 
         // Bounded rather than unbounded: the whole set is one burst of judge calls, and a deployment
         // that throttles would turn a calibration measurement into a retry-accounting measurement.
@@ -339,6 +369,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
                 observed.Add((
                     calibrationCase,
                     judgment.Outcome,
+                    judgment.QuestionAsks,
                     judgment.Outcome is null
                         ? $"no verdict ({judgment.SafeFailureCode})"
                         : judgment.Reasoning ?? "(no reasoning)"));
@@ -380,6 +411,39 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
 
         foreach (var line in disagreements)
             _output.WriteLine(line);
+
+        var lowVerticals = Enum.GetValues<TypedMemEvalVertical>()
+            .Select(vertical => (Vertical: vertical, Subset: results
+                .Where(r => string.Equals(r.Case.Vertical, vertical.ToString(), StringComparison.Ordinal))
+                .ToArray()))
+            .Where(pair => pair.Subset.Length > 0)
+            .Select(pair => (pair.Vertical, Share: (double)pair.Subset.Count(r =>
+                r.Actual == Enum.Parse<TypedMemEvalOutcome>(r.Case.Expected)) / pair.Subset.Length))
+            .Where(pair => pair.Share < PerVerticalAgreementThreshold)
+            .Select(pair => $"{pair.Vertical} {pair.Share:0.###}")
+            .ToArray();
+
+        Assert.True(
+            lowVerticals.Length == 0,
+            $"verticals below the {PerVerticalAgreementThreshold} floor in this run: " +
+            $"{string.Join(", ", lowVerticals)}. Measured live against '{deployment}'.");
+
+        // The discriminator branch, asserted independently of the outcome. Without this a template
+        // that suppresses a label outright is indistinguishable from one that discriminates
+        // properly — which is exactly how the first Bitemporal body reached 24/24 while overfitted.
+        // Declared only where the branch is unambiguous; a case with no declaration is not checked.
+        var wrongBranch = results
+            .Where(r => r.Case.QuestionAsks is not null)
+            .Where(r => !string.Equals(r.Branch, r.Case.QuestionAsks, StringComparison.Ordinal))
+            .Select(r => $"{r.Case.Id} expected question_asks={r.Case.QuestionAsks}, got {r.Branch ?? "none"}")
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            wrongBranch.Length == 0,
+            $"the judge reached the right outcome by the wrong route on " +
+            $"{wrongBranch.Length} case(s):{Environment.NewLine}" +
+            string.Join(Environment.NewLine, wrongBranch));
 
         Assert.True(
             agreement >= AgreementThreshold,
@@ -439,7 +503,8 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         string Expected,
         string Rule,
         string Note,
-        CalibrationDerivation? Derivation);
+        CalibrationDerivation? Derivation,
+        string? QuestionAsks = null);
 
     /// <summary>The gold derivation an Arithmetic case's judge call carries.</summary>
     private sealed record CalibrationDerivation(

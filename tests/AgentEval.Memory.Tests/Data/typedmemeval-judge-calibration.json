@@ -1858,7 +1858,8 @@
     "answer": "Dunmarsh, which is where she is recorded.",
     "expected": "Wrong",
     "rule": "bitemporal-present-tense-substitution",
-    "note": "Answers with the current record on a question about a past belief."
+    "note": "Answers with the current record on a question about a past belief.",
+    "question_asks": "value"
   },
   {
     "id": "cal-bit-012",
@@ -1869,7 +1870,8 @@
     "answer": "Both Bexmoor and Dunmarsh appear for her.",
     "expected": "Wrong",
     "rule": "bitemporal-lists-both-values",
-    "note": "Listing both refuses the discrimination the question asks for. Not an abstention, because it commits to a set containing a wrong member."
+    "note": "Listing both refuses the discrimination the question asks for. Not an abstention, because it commits to a set containing a wrong member.",
+    "question_asks": "value"
   },
   {
     "id": "cal-bit-013",
@@ -1902,7 +1904,8 @@
     "answer": "Fenwick Cross.",
     "expected": "Wrong",
     "rule": "bitemporal-depth-intermediate-value",
-    "note": "An intermediate value from the middle of the chain: the chain was followed but not cut at the asked instant."
+    "note": "An intermediate value from the middle of the chain: the chain was followed but not cut at the asked instant.",
+    "question_asks": "value"
   },
   {
     "id": "cal-bit-016",
@@ -1979,7 +1982,8 @@
     "answer": "Ilminster.",
     "expected": "Wrong",
     "rule": "bitemporal-depth-belief-wrong-value",
-    "note": "A value the file did not hold at the asked instant."
+    "note": "A value the file did not hold at the asked instant.",
+    "question_asks": "value"
   },
   {
     "id": "cal-bit-023",
@@ -2144,7 +2148,8 @@
     "answer": "Nothing happened between them.",
     "expected": "Wrong",
     "rule": "temporal-between-denies-middle",
-    "note": "The chain places an event between them, so this is wrong rather than an abstention."
+    "note": "The chain places an event between them, so this is wrong rather than an abstention.",
+    "question_asks": "ordering"
   },
   {
     "id": "cal-tem-014",
@@ -2177,7 +2182,8 @@
     "answer": "There is no record of a Kessel handover.",
     "expected": "Missed",
     "rule": "temporal-between-denies-endpoint",
-    "note": "Denies an event the record states."
+    "note": "Denies an event the record states.",
+    "question_asks": "presence"
   },
   {
     "id": "cal-tem-017",
@@ -2276,7 +2282,8 @@
     "answer": "Yes, it had already been recorded by then.",
     "expected": "Premature",
     "rule": "bitemporal-premature-correction-not-yet-recorded",
-    "note": "The unambiguous floor case. The question asks about the EVENT of recording rather than about a value, gold denies it with a date, and the answer asserts it as done. This is what premature means on this vertical, and a judge that cannot label this one has been told to suppress premature too hard."
+    "note": "The unambiguous floor case. The question asks about the EVENT of recording rather than about a value, gold denies it with a date, and the answer asserts it as done. This is what premature means on this vertical, and a judge that cannot label this one has been told to suppress premature too hard.",
+    "question_asks": "occurrence"
   },
   {
     "id": "cal-bit-026",
@@ -2287,7 +2294,8 @@
     "answer": "Yes, both corrections were in place by 16 January.",
     "expected": "Premature",
     "rule": "bitemporal-depth-premature-second-correction",
-    "note": "Half the answer is true - the first correction really had landed - so the judge has to notice that only the SECOND is over-claimed. Tests that a partially satisfied chain does not launder a premature assertion into correct."
+    "note": "Half the answer is true - the first correction really had landed - so the judge has to notice that only the SECOND is over-claimed. Tests that a partially satisfied chain does not launder a premature assertion into correct.",
+    "question_asks": "occurrence"
   },
   {
     "id": "cal-bit-027",
@@ -2298,7 +2306,8 @@
     "answer": "I think so - I believe it had been entered by then.",
     "expected": "Premature",
     "rule": "bitemporal-premature-hedged",
-    "note": "Precedence rule 1 says a stated position outranks hedging, so 'I think so' is graded as the yes it commits to. Premature, not abstained. Tests the interaction between the hedging rule and the premature rule, which no other bitemporal case exercises."
+    "note": "Precedence rule 1 says a stated position outranks hedging, so 'I think so' is graded as the yes it commits to. Premature, not abstained. Tests the interaction between the hedging rule and the premature rule, which no other bitemporal case exercises.",
+    "question_asks": "occurrence"
   },
   {
     "id": "cal-bit-028",
@@ -2309,7 +2318,8 @@
     "answer": "Halstead Vale, and yes, the correction had been applied by then.",
     "expected": "Premature",
     "rule": "bitemporal-depth-premature-with-correct-value",
-    "note": "The hardest of the four and the real trap. The VALUE matches gold exactly, so value-matching alone returns correct, and precedence rule 3 says extra correct detail never lowers the outcome - but the extra detail here is not correct, it asserts as done something gold dates five days later. A judge told that premature essentially never applies on this vertical will most likely fail this one first."
+    "note": "The hardest of the four and the real trap. The VALUE matches gold exactly, so value-matching alone returns correct, and precedence rule 3 says extra correct detail never lowers the outcome - but the extra detail here is not correct, it asserts as done something gold dates five days later. A judge told that premature essentially never applies on this vertical will most likely fail this one first.",
+    "question_asks": "occurrence"
   },
   {
     "id": "cal-tem-025",
@@ -2320,7 +2330,8 @@
     "answer": "Both the Kessel handover and the Ondrey audit are on record, but nothing falls between them.",
     "expected": "Wrong",
     "rule": "temporal-between-accepts-anchors-denies-content",
-    "note": "The clean statement of the distinction. The answer explicitly accepts both anchors as recorded and then makes a false claim about the interval, so the defect is ordering and not absence. Wrong, not missed."
+    "note": "The clean statement of the distinction. The answer explicitly accepts both anchors as recorded and then makes a false claim about the interval, so the defect is ordering and not absence. Wrong, not missed.",
+    "question_asks": "ordering"
   },
   {
     "id": "cal-tem-026",
@@ -2331,7 +2342,8 @@
     "answer": "I have no record of either the Kessel handover or the Ondrey audit, so nothing lies between them.",
     "expected": "Missed",
     "rule": "temporal-between-denies-both-anchors",
-    "note": "The mirror of cal-tem-025 and the one a too-broad rule breaks. The trailing clause is interval-shaped, but the operative claim is that the record does not hold the events at all. Missed, not wrong - a rule that reads 'nothing lies between' and stops has over-corrected."
+    "note": "The mirror of cal-tem-025 and the one a too-broad rule breaks. The trailing clause is interval-shaped, but the operative claim is that the record does not hold the events at all. Missed, not wrong - a rule that reads 'nothing lies between' and stops has over-corrected.",
+    "question_asks": "presence"
   },
   {
     "id": "cal-tem-027",
@@ -2342,7 +2354,8 @@
     "answer": "All three are in the record, but none of them is the most recent.",
     "expected": "Wrong",
     "rule": "temporal-recency-accepts-events-denies-ordering",
-    "note": "Denies that an ordering exists while accepting every event. Gold says one is latest, so this commits to a false claim about the sequence rather than failing to hold the events."
+    "note": "Denies that an ordering exists while accepting every event. Gold says one is latest, so this commits to a false claim about the sequence rather than failing to hold the events.",
+    "question_asks": "ordering"
   },
   {
     "id": "cal-tem-028",
@@ -2353,6 +2366,7 @@
     "answer": "The rewiring is recorded, but I have no record of the Harrow survey.",
     "expected": "Missed",
     "rule": "temporal-order-denies-one-event",
-    "note": "The hardest of the four. Half the answer accepts an event and half denies one the record states, and it commits to no ordering at all. The denial decides: missed. A rule that keys on 'accepts an event, therefore ordering error' will call this wrong."
+    "note": "The hardest of the four. Half the answer accepts an event and half denies one the record states, and it commits to no ordering at all. The denial decides: missed. A rule that keys on 'accepts an event, therefore ordering error' will call this wrong.",
+    "question_asks": "presence"
   }
 ]

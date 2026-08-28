@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A family-wide judge floor is satisfiable by averaging — added a per-vertical one.** Bitemporal
+  sat at **0.750** behind a green family **0.946** because six verticals near 0.98 averaged it away,
+  and the gate only ever read the mean. This is the same defect the corpus calibration had, where
+  arithmetic certified at 0.700 with its `duration` shape at 0.083. A **0.80 per-vertical floor**
+  now applies to both the recorded result and the live arm. Set below the family's 0.85 on purpose:
+  a vertical is 24–28 cases, so one boundary case moves it ~0.04 and a floor at parity would fail on
+  noise. Verified by falsification — forcing a vertical to 0.75 fires it.
+
+- **The judge now emits the discriminator branch it took, and CI asserts it independently of the
+  outcome.** A template that suppresses a label outright is indistinguishable from one that
+  discriminates correctly if you only ever check the final label — which is exactly how the first
+  Bitemporal body reached 24/24 while overfitted. `question_asks` is emitted in the judge's JSON at
+  **zero extra calls**, with two enums because the verticals discriminate on different axes:
+  Bitemporal `value`|`occurrence` (a property of the **question**), Temporal `ordering`|`presence`
+  (a property of what the **answer** commits to). Declared on 14 cases where the branch is
+  unambiguous and asserted only where declared — a `Correct` or `Abstained` answer has no meaningful
+  branch, so asserting one would be noise. Reaching the right outcome by the wrong route now fails
+  the build.
+
 - **Temporal had no judge template either — the second and last vertical falling through to
   `StandardBody`.** Its only guidance was the shared preamble, which defines *missed* as
   confidently asserting nothing is there when gold says something is. *"Nothing happened between

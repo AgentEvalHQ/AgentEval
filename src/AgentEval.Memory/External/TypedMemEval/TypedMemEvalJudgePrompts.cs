@@ -278,6 +278,28 @@ internal static class TypedMemEvalJudgePrompts
              "ordered_pairs_correct": <integer>,
              "ordered_pairs_total": <integer>}
             """,
+        TypedMemEvalVerdict.Kind.Bitemporal => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "question_asks": "value" | "occurrence"}
+
+            question_asks is the branch you took above: "value" if the question asks which value the
+            record held at the as-of instant, "occurrence" if it asks whether a correction had been
+            made by then. Report what you actually decided, not what would justify the outcome.
+            """,
+        TypedMemEvalVerdict.Kind.Temporal => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "question_asks": "ordering" | "presence"}
+
+            question_asks is the branch you took above: "ordering" if the answer accepts the events
+            and misplaces them, "presence" if it denies the record holds them. Report what you
+            actually decided, not what would justify the outcome.
+            """,
         _ => """
 
             Reply with a single JSON object and nothing else:
@@ -309,7 +331,9 @@ internal static class TypedMemEvalJudgePrompts
             .Append(Closing).Append('\u001e')
             .Append(ContractFor(TypedMemEvalVerdict.Kind.Base)).Append('\u001e')
             .Append(ContractFor(TypedMemEvalVerdict.Kind.Forgetting)).Append('\u001e')
-            .Append(ContractFor(TypedMemEvalVerdict.Kind.ListOrder));
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.ListOrder)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Bitemporal)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Temporal));
 
         var normalized = builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
         // Not a security function: this identifies which prompt text produced a verdict.
