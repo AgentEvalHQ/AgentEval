@@ -1,25 +1,29 @@
 {
-  "judge_prompt_fingerprint": "edc5fbaa733cdad29007980165465522177bb0bfdfaa492b85d92fa217523e01",
-  "measured_at": "2026-08-15",
-  "model": "gpt-5.5",
-  "agreement": 0.983,
-  "status": "measured",
-  "cases": 120,
-  "runs": 2,
-  "per_vertical": {
-    "Prospective": 1.0,
-    "Episodic": 1.0,
-    "Arithmetic": 1.0,
-    "WorkingMemory": 1.0,
-    "Forgetting": 0.917
-  },
+  "judge_prompt_fingerprint": "4c626f05634ba997b067990f5e525861c762e6c25fd86b1a8989dd4141ea76ff",
+  "measured_at": null,
+  "model": null,
+  "agreement": null,
+  "status": "not_measured",
+  "cases": null,
+  "runs": 0,
+  "per_vertical": {},
   "disagreements": {
-    "every_run": [
-      "cal-for-006"
-    ],
-    "run_varying": [
-      "cal-for-012"
-    ]
+    "every_run": [],
+    "run_varying": []
   },
-  "note": "Two runs of the live arm at this fingerprint: 0.992 and 0.983. The lower is recorded, and the per-vertical figures come from that same lower run, so this record never quotes the best of a set. The previous fingerprint's measurement (84bacb9b..., 0.975 over three runs) is superseded and not comparable: ArithmeticBody gained a rule that direction is part of a difference's value, added in response to calibration case cal-ari-016, where the old template's grade-the-arithmetic-not-the-phrasing wording let 'went up by 46' pass against a gold of 46 lower. cal-ari-016 now agrees in both runs and Arithmetic is at 1.0. One case disagrees in every run and was not relabelled to improve the number: cal-for-006, where an answer replaces a cancelled gym membership with an invented move to a different gym; the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry. cal-for-012 disagrees in one run of the two - the Forgetting boundary where the preamble's definition of abstained meets the over-forgetting rule - which is judge noise at the boundary rather than drift, and the reason this file records runs rather than a single point."
+  "superseded": {
+    "judge_prompt_fingerprint": "edc5fbaa733cdad29007980165465522177bb0bfdfaa492b85d92fa217523e01",
+    "measured_at": "2026-08-15",
+    "model": "gpt-5.5",
+    "agreement": 0.983,
+    "cases": 120,
+    "per_vertical": {
+      "Prospective": 1.0,
+      "Episodic": 1.0,
+      "Arithmetic": 1.0,
+      "WorkingMemory": 1.0,
+      "Forgetting": 0.917
+    }
+  },
+  "note": "ProspectiveBody gained a precedence rule - premature outranks wrong, on that vertical only - so the fingerprint moved and the previous measurement describes a judge that no longer exists. Recorded honestly as not_measured rather than carried forward; the live arm against gpt-5.5 is the next step and this file is filled in from its output. The superseded record is kept because its SCOPE is the more useful part of it: it reads agreement 0.983 over 120 cases, and the calibration set holds 168 across 7 verticals. Bitemporal and Temporal arrived in 0.26.0-beta with 24 cases each, both routed to StandardBody, which was already inside the fingerprint - so the fingerprint never changed, the tripwire never fired, and a measurement over 5 of 7 verticals was read as a family-wide number for eight days. The gate now asserts the recorded case count equals the live set and that every vertical in the enum has a per-vertical entry, so growing the set fails the build instead of quietly diluting the number. Three local runs of the NEW prompt scored 0.881 / 0.869 / 0.869 over all 168 cases, but against gpt-4o-mini and not the gpt-5.5 this record names; they are not written here because they measure a different judge, and swapping the recorded model without saying so is the same class of silent substitution this file exists to prevent."
 }
