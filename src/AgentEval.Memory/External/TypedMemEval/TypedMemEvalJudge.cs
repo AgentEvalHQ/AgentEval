@@ -213,6 +213,9 @@ public sealed class TypedMemEvalJudge
             TypedMemEvalVertical.Bitemporal =>
                 TypedMemEvalJudgePrompts.Bitemporal(question, goldAnswer, agentResponse),
 
+            TypedMemEvalVertical.Temporal =>
+                TypedMemEvalJudgePrompts.Temporal(question, goldAnswer, agentResponse),
+
             TypedMemEvalVertical.Forgetting =>
                 TypedMemEvalJudgePrompts.Forgetting(question, goldAnswer, agentResponse),
 
