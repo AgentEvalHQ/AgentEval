@@ -210,6 +210,9 @@ public sealed class TypedMemEvalJudge
             TypedMemEvalVertical.Prospective =>
                 TypedMemEvalJudgePrompts.Prospective(question, goldAnswer, agentResponse),
 
+            TypedMemEvalVertical.Bitemporal =>
+                TypedMemEvalJudgePrompts.Bitemporal(question, goldAnswer, agentResponse),
+
             TypedMemEvalVertical.Forgetting =>
                 TypedMemEvalJudgePrompts.Forgetting(question, goldAnswer, agentResponse),
 

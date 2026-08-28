@@ -90,6 +90,49 @@ internal static class TypedMemEvalJudgePrompts
         says it HAS, choose "premature". Use "wrong" only when the mismatch is something else.
         """;
 
+    /// <remarks>
+    /// Bitemporal shipped in 0.26.0-beta with no body of its own, so it was graded by the shared
+    /// preamble alone - and that preamble defines "premature" as asserting as already true
+    /// something gold says has not happened yet. Bitemporal golds justify themselves with exactly
+    /// that sentence ("the correction had not been recorded yet"), so a capable judge read the
+    /// justification as the proposition under test and returned premature where the label says
+    /// wrong, in four of 24 cases in every run. The distinction is not pedantic: premature is a
+    /// SCHEDULING defect and answering a past belief with the present record is a RETRIEVAL one,
+    /// and they route to different repairs.
+    /// </remarks>
+    private const string BitemporalBody = """
+
+        This question has TWO time coordinates and they are independent:
+        - transaction time - the "as of <date>" instant, meaning what the RECORD CONTAINED then;
+        - valid time - the period the fact itself is about.
+
+        Gold answers the record as it stood at the as-of instant. Where gold adds a sentence like
+        "the correction had not been recorded yet", that sentence is a JUSTIFICATION for gold's
+        value. It is not a claim about an event, and it is not the thing being graded. Grade the
+        VALUE the answer commits to against the value gold commits to.
+
+        Which label applies depends on WHAT THE QUESTION ASKS FOR. Decide that first.
+
+        - Asks WHICH VALUE the record held at the as-of instant, and the answer gives a
+          later-recorded value - the current record, or anything written after that instant: the
+          outcome is "wrong". That failure is a transaction-time collapse, the system returning what
+          it knows now instead of what it held then. It is not "premature".
+
+        - Asks WHETHER a correction, update or entry had been made by the as-of instant, and gold
+          says it had not: an answer asserting that it HAD is "premature". What gold denies here is
+          an EVENT, not a value, and asserting an event as already done when gold dates it later is
+          exactly what premature means. Do NOT downgrade this to "wrong" on the grounds that yes and
+          no are values - the question is about occurrence, not about which value was on file.
+
+        An answer can do both at once: give the right value for the as-of instant AND assert a
+        not-yet-made correction as already applied. When gold denies the correction, the premature
+        assertion decides the outcome, because a correct value alongside a false claim of occurrence
+        is still a claim that the record had moved on when it had not.
+
+        Listing several values, one of which is gold's, is "wrong" and not "abstained" - it commits
+        to a set containing a value the record did not hold at that instant.
+        """;
+
     private const string ArithmeticBody = """
 
         This question has a derived numeric answer. Grade the ARITHMETIC, not the phrasing.
@@ -161,6 +204,9 @@ internal static class TypedMemEvalJudgePrompts
     internal static string Prospective(string question, string gold, string answer)
         => string.Format(Preamble + ProspectiveBody + Closing, question, gold, answer);
 
+    internal static string Bitemporal(string question, string gold, string answer)
+        => string.Format(Preamble + BitemporalBody + Closing, question, gold, answer);
+
     internal static string ListOrder(string question, string gold, string answer)
         => string.Format(Preamble + ListOrderBody + Closing, question, gold, answer);
 
@@ -220,6 +266,7 @@ internal static class TypedMemEvalJudgePrompts
             .Append(Preamble).Append('\u001e')
             .Append(StandardBody).Append('\u001e')
             .Append(ProspectiveBody).Append('\u001e')
+            .Append(BitemporalBody).Append('\u001e')
             .Append(ArithmeticBody).Append('\u001e')
             .Append(ListOrderBody).Append('\u001e')
             .Append(ForgettingBody).Append('\u001e')
