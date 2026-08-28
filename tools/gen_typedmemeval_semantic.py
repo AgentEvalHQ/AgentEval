@@ -27,10 +27,18 @@ cancellation, never an abstention, always a stated value. `check_semantic` refus
 phrased as a cancellation, because a corpus that blurs the two measures Forgetting's construct
 under Semantic's name.
 
-NO TIMESTAMPS, ON PURPOSE. Replacement order is carried by the TEXT ("I have moved again", "that
-one is out of date now"), never by session dates. Supplying dates would let a metadata sort answer
-current-value with no reading at all -- the same saturation SS2.1 refused, reintroduced through
-the scaffolding.
+ORDER IS STATED TWICE, AND BOTH MUST AGREE. Each replacement NAMES the value it supersedes, so the
+chain is recoverable from text alone; and gold session dates are laid out to follow that chain, so
+a reader who sorts by recency gets the same answer as a reader who follows the sentences.
+
+Both halves were learned the hard way. An early revision asserted here that order "is carried by
+the TEXT" while the frames encoded no order at all - V1 scored 6/20 and the model answered with the
+FIRST value. Adding the chain moved it only to 7/20, because the second half was still wrong:
+sessions are shuffled and dates were stamped in shuffled order, so the corpus told the reader one
+thing in prose and the opposite in metadata. The probe renders "### Session N (date)", so dates are
+read. Asked the same questions with no dates the model answered 4 of 5 correctly, which is what
+located it. Ordering by recency IS the resolution SS3.1 asks for, so agreeing dates cost the shape
+nothing: every statement must still be retrieved before the last one can be named.
 
 NO DIFFICULTY AXIS IS STAMPED. The paired second axis -- fact-grain competition -- is HELD pending
 validation on a non-lexical arm. See tools/validate_factgrain_axis.py: the only competition
@@ -81,12 +89,14 @@ ATTRIBUTES = (
 #: -- a cancellation would put the question in Forgetting's outcome space, where abstention is a
 #: legitimate answer and here it never is.
 REPLACEMENT_FRAMES = (
-    "I have switched my {attribute} to {value}.",
-    "My {attribute} is {value} from now on.",
-    "Change of plan on the {attribute} -- it is {value} now.",
-    "I moved the {attribute} over to {value}.",
-    "{value} is my {attribute} these days.",
+    "I have switched my {attribute} from {previous} to {value}.",
+    "My {attribute} is now {value} rather than {previous}.",
+    "Change of plan on the {attribute} -- {previous} is out, {value} is in.",
+    "I moved the {attribute} off {previous} and over to {value}.",
+    "{value} has taken over from {previous} as my {attribute}.",
 )
+#: The opening statement has no predecessor, so `previous` is accepted and ignored -- str.format
+#: tolerates unused keys, which keeps one call site for both frame banks.
 FIRST_FRAMES = (
     "My {attribute} is {value}.",
     "I use {value} as my {attribute}.",
@@ -220,7 +230,8 @@ def _filler(rng: random.Random, echoed: list[str]) -> tmc.Session:  # DevSkim: i
     if draw < 0.55:
         attribute, values = rng.choice(UNASKED_ATTRIBUTES)
         frame = rng.choice(REPLACEMENT_FRAMES + FIRST_FRAMES)
-        user = frame.format(attribute=attribute, value=rng.choice(values))
+        pair = rng.sample(list(values), 2)
+        user = frame.format(attribute=attribute, previous=pair[0], value=pair[1])
         return tmc.Session(
             turns=[tmc.Turn("user", tmc.weave_echo(user, echoed)),
                    tmc.Turn("assistant", _reply(rng))],
@@ -239,9 +250,34 @@ def _gold(user: str, assistant: str, rng: random.Random, tag: str) -> tmc.Sessio
         timestamp=_BASE, is_gold=True, tag=tag)
 
 
-def _lay_out(sessions: list[tmc.Session], ordinal: int) -> None:
-    """Stamps timestamps in list order. They carry NO signal here -- replacement order lives in the
-    text -- but the schema requires them and a constant would collide."""
+def _lay_out(sessions: list[tmc.Session], ordinal: int, chain: list[str] | None = None) -> None:
+    """Stamps timestamps in list order, after optionally reordering gold so the chain reads forward.
+
+    The probe renders each session as "### Session N (date)", so dates ARE read. Shuffling sessions
+    and then stamping dates in the shuffled order made the metadata contradict the prose: a value
+    stated third could carry the earliest date. That is Temporal's misleading-timestamp construct,
+    it does not belong in Semantic, and it cost two probe runs before a no-dates control found it.
+
+    Gold sessions keep the SLOTS the shuffle gave them - so gold position carries no signal, and the
+    list stays in chronological order, which the harness checks - but they are permuted among those
+    slots so that the earliest gold slot holds the first statement in the chain. Ordering by recency
+    is exactly the resolution SS3.1 asks for, so this costs the shape nothing: every statement must
+    still be retrieved before the last can be named.
+    """
+    if chain is not None:
+        position = {value: rank for rank, value in enumerate(chain)}
+
+        def rank_of(session: tmc.Session) -> int:
+            # A session's place in the chain is the LATEST value it names: an opening statement
+            # names only chain[0]; a replacement names its predecessor and its successor.
+            text = session.text()
+            return max((rank for value, rank in position.items() if value in text), default=0)
+
+        slots = [i for i, session in enumerate(sessions) if session.is_gold]
+        ordered = sorted((sessions[i] for i in slots), key=rank_of)
+        for slot, session in zip(slots, ordered):
+            sessions[slot] = session
+
     start = _BASE + timedelta(days=ordinal * 37)
     for i, session in enumerate(sessions):
         session.timestamp = start + timedelta(days=i, hours=(i * 3) % 11)
@@ -270,16 +306,20 @@ def _current_value(index: int, echo: float, rng: random.Random) -> tmc.Question:
     golds = [_gold(
         rng.choice(FIRST_FRAMES).format(attribute=attribute, value=chosen[0]),
         _reply(rng), rng, "first")]
-    for value in chosen[1:]:
+    # Each replacement names what it supersedes, so the statements chain. Sessions are shuffled and
+    # timestamps carry no signal, so this chain is the ONLY thing that says which value is current:
+    # the one named as a destination and never as a source.
+    for previous, value in zip(chosen, chosen[1:]):
         golds.append(_gold(
-            rng.choice(REPLACEMENT_FRAMES).format(attribute=attribute, value=value),
+            rng.choice(REPLACEMENT_FRAMES).format(
+                attribute=attribute, previous=previous, value=value),
             _reply(rng), rng, "replacement"))
 
     sessions = golds + [_filler(rng, echoed) for _ in range(rng.randint(H_MIN, H_MAX))]
     # Shuffled so gold position carries no signal, and so the replacement chain cannot be read off
     # the session order -- only off the text.
     rng.shuffle(sessions)
-    _lay_out(sessions, index)
+    _lay_out(sessions, index, chain=list(chosen))
 
     return tmc.Question(
         question_id=qid, question_type=TYPE_CURRENT, question=ask,
@@ -325,7 +365,7 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
     topic, belief = SOURCE_TOPICS[index % len(SOURCE_TOPICS)]
     candidates = 2 + (index % 3)   # how many conversations plausibly could have carried it
     qid = f"tme-sem-{CURRENT_QUESTIONS + COREF_QUESTIONS + index + 1:03d}"
-    ask = f"Which conversation did I tell you that {belief}?"
+    ask = f"What were we discussing when I told you that {belief}?"
     echoed = tmc.echo_terms(ask, echo, random.Random(f"{qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
 
     golds = [_gold(f"About {topic} -- {belief}.", _reply(rng), rng, "source")]
@@ -350,7 +390,7 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
 
     return tmc.Question(
         question_id=qid, question_type=TYPE_SOURCE, question=ask,
-        answer=f"In the conversation about {topic}.",
+        answer=f"We were discussing {topic}.",
         question_date=_BASE + timedelta(
             days=(CURRENT_QUESTIONS + COREF_QUESTIONS + index) * 37 + 60),
         sessions=sessions,
@@ -397,6 +437,40 @@ def check_semantic(questions: list[tmc.Question]) -> list[str]:
                     f"{q.question_id}: {q.g} gold sessions for {len(stated)} statements -- every "
                     f"statement must be gold or 'which is last' is not decidable from gold alone")
 
+            # THE ORDERING CLAIM, ENFORCED RATHER THAN ASSERTED.
+            #
+            # Sessions are shuffled and timestamps carry no signal, so the ONLY thing that can say
+            # which value is current is the replacement chain in the text. An earlier revision
+            # claimed exactly that in the module docstring while the frames encoded no order at
+            # all; V1 scored 6/20 and the reference model answered with the FIRST value, which
+            # under perfect retrieval and no ordering signal is as defensible as any other choice.
+            #
+            # The property that has to hold: every value except the first appears as a DESTINATION
+            # in some statement, every value except the last appears as a SOURCE in some statement,
+            # and exactly one value is a destination that is never a source. That one is the
+            # answer, and it is recoverable by reading alone.
+            sources, destinations = set(), set()
+            for session in (x for x in q.sessions if x.is_gold and x.tag == "replacement"):
+                text = session.text()
+                for value in stated:
+                    if value not in text:
+                        continue
+                    # The destination is whichever of the two the answer would become: in every
+                    # frame the superseding value is the one the sentence resolves to, so compare
+                    # against the chain we authored rather than re-parsing prose.
+                    index = stated.index(value)
+                    if index > 0 and stated[index - 1] in text:
+                        destinations.add(value)
+                        sources.add(stated[index - 1])
+
+            current = destinations - sources
+            if len(current) != 1 or q.answer.rstrip(".") not in current:
+                problems.append(
+                    f"{q.question_id}: the replacement chain does not identify a unique current "
+                    f"value from the text alone (destinations-never-sources = {sorted(current)}, "
+                    f"answer = {q.answer!r}). Without that, 'which is last' is not decidable by "
+                    f"reading and the shape measures nothing.")
+
         # THE CO-REFERENCE PREMISE. The asked designation must NOT appear in the session that
         # states the fact; if it does, lexical retrieval reaches the fact directly and the shape
         # measures nothing.
@@ -411,7 +485,7 @@ def check_semantic(questions: list[tmc.Question]) -> list[str]:
         # SOURCE ATTRIBUTION is scored on the cited source, so the answer must name a topic and the
         # belief must not be restatable as the answer.
         if shape == SHAPE_SOURCE:
-            if "conversation about" not in q.answer.lower():
+            if "we were discussing" not in q.answer.lower():
                 problems.append(f"{q.question_id}: source-attribution answer does not name a source")
             decoys = sum(1 for s in q.sessions if s.tag == "decoy")
             if decoys != q.extension["candidate_sources"] - 1:
