@@ -562,7 +562,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-21T15:10:03Z",
+    "run_at": "2026-08-23T18:10:46Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -607,6 +607,7 @@
       "v8_passed": 60,
       "interference_cost": 0.0,
       "regressed_under_interference": [],
+      "failures_with_no_captured_answer": [],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
     },
     "v9_reference_retrieval": {
@@ -725,7 +726,7 @@
         "v8": true,
         "v8_answer": "You switched to a new employer called **Marrowby Instruments**.",
         "v9": false,
-        "v9_answer": "",
+        "v9_answer": "The conversations don’t plainly say that you switched to a new employer, nor do they state what the outfit is called these days.\n\nThe latest employer/outfit name mentioned is **Larkwood Instruments**, but the record only says you have known people there from the old days—not that you switched to it.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1440,7 +1441,7 @@
         "v8": true,
         "v8_answer": "You signed up to the **Brindlow Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9": false,
-        "v9_answer": "",
+        "v9_answer": "The conversations do not state that plainly.\n\nThey mention Pellick Circle, Calderwick Circle, and Ninnis Circle, but only as places/groups you had been to, nearly signed up to, or had a book from. They do not say which reading circle you actually signed up to for the winter, nor where it meets.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1453,7 +1454,7 @@
         "v8": true,
         "v8_answer": "You signed up to the **Ondrey Circle** reading circle for the winter, and they meet **in the back room**.",
         "v9": false,
-        "v9_answer": "",
+        "v9_answer": "The conversations do not say plainly which reading circle you signed up to for the winter, or where they meet.\n\nThey mention Mossam Circle, Torvald Circle, Ibbetson Circle, and Solvane Circle, but none is explicitly identified as the one you signed up to, and no meeting place is given.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1496,68 +1497,64 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 110,
+        "calls": 210,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 110,
+        "judge_calls": 210,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1100,
+        "calls": 2100,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 336,
+        "judge_calls": 803,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 330,
-        "empty": 258,
-        "rate": 0.7818,
-        "judge_calls": 57,
+        "calls": 608,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 253,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
         "calls": 675,
-        "empty": 182,
-        "rate": 0.2696,
-        "judge_calls": 186,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 232,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 3,
-        "rate": 0.0273,
-        "judge_calls": 107,
+        "calls": 210,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 210,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 8,
-        "rate": 0.0727,
-        "judge_calls": 102,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v9strip": {
-        "population": "probe_answers",
-        "calls": 352,
-        "empty": 4,
-        "rate": 0.0114,
-        "judge_calls": 348,
+        "calls": 213,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 210,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
     },
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 3,
+      "by_cache_key": {}
+    }
   }
 }

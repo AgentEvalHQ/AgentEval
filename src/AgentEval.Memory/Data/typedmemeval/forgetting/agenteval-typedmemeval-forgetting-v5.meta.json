@@ -549,18 +549,25 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-19T23:25:42Z",
+    "run_at": "2026-08-23T19:14:32Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
-      "passed": 35,
-      "failed": []
+      "passed": 32,
+      "failed": [
+        "tme-for-012",
+        "tme-for-013",
+        "tme-for-020"
+      ]
     },
     "v1_pair_flip": {
       "pairs": 15,
-      "passed": 15,
-      "failed": []
+      "passed": 13,
+      "failed": [
+        "tme-for-p12",
+        "tme-for-p13"
+      ]
     },
     "ablation_samples_per_question": 3,
     "v2_non_inferability": {
@@ -607,13 +614,13 @@
       "invalidated": {
         "questions": 20,
         "v1_applicable": 20,
-        "v1_passed": 20,
+        "v1_passed": 17,
         "v3_applicable": 20,
         "v3_passed": 20,
         "v8_applicable": 20,
-        "v8_passed": 20,
+        "v8_passed": 19,
         "v9_applicable": 20,
-        "v9_passed": 11,
+        "v9_passed": 13,
         "required_sessions_median": 2
       },
       "never-known": {
@@ -645,9 +652,9 @@
       "tme-for-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The conversations say you chose an **Orrindale Vantage** on 2026/01/07.\n\nHowever, on 2026/01/21 you also said “the car has gone” and that you sold it to a dealer, so they do **not plainly confirm what you’re driving now**.",
+        "v8_answer": "I can’t say that you’re driving any car at the moment. The only named car was the **Orrindale Vantage**, but later you said **the car had gone** and that you’d sold it to a dealer up the coast.",
         "v9": true,
-        "v9_answer": "The conversations don’t say which car you’re driving now. They only say you chose an Orrindale Vantage, and later that the car was sold to a dealer up the coast.",
+        "v9_answer": "The conversations don’t say which car you’re driving at the moment. The last car mentioned was the Orrindale Vantage, but you later said the car had been sold to a dealer.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -659,9 +666,9 @@
       "tme-for-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your gym membership was with **Brackmoor Quartz**, but later you said you **cancelled the membership outright**, so you don’t currently have one according to the conversations.",
+        "v8_answer": "You don’t currently have a gym membership — you cancelled it outright. It had been with **Brackmoor Quartz**.",
         "v9": true,
-        "v9_answer": "Your gym membership was with **Brackmoor Quartz**, but you later said you **cancelled the membership outright**.",
+        "v9_answer": "Your gym membership was with **Brackmoor Quartz**, but you later said you **cancelled the membership outright**, so there is no current gym membership on record.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -673,9 +680,9 @@
       "tme-for-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re not currently registered with a dentist. You had settled on Orrindale Ember, but later came off their books when the practice closed.",
+        "v8_answer": "You are not currently registered with a dentist. You had registered with Orrindale Ember, but later came off their books when the practice closed.",
         "v9": true,
-        "v9_answer": "You were registered with Orrindale Ember, but later you came off their books when the practice closed. So the conversations don’t show you currently registered with any dentist.",
+        "v9_answer": "You’re not currently registered with a dentist, based on the conversations. You had settled on **Orrindale Ember**, but later said you came off their books when the practice closed.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -687,9 +694,9 @@
       "tme-for-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "I don’t know from these conversations.\n\nYou previously said you chose **Ryhope Reverie**, but later said you **left the provider mid-contract** after the third outage. No new broadband provider is mentioned after that.",
+        "v8_answer": "You chose **Ryhope Reverie** when you switched broadband, but later said you **left the provider mid-contract** after the third outage. No later broadband provider is recorded.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They say your broadband tariff was **Selwick Regular**, and later that you left the provider mid-contract, but they do not state the provider’s name.",
+        "v9_answer": "The conversations don’t plainly name your broadband provider. They only say your broadband tariff was **Selwick Regular**, and later that you left the provider mid-contract.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -701,9 +708,9 @@
       "tme-for-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "None now. You took the flat off the letting agent and manage it yourself. Previously, the agent was Neskett Ember.",
+        "v8_answer": "None now — you took the flat off the letting agent and manage it yourself. Previously, it was with Neskett Ember.",
         "v9": true,
-        "v9_answer": "No letting agent handles it now — you took the flat off the agent and manage it yourself.",
+        "v9_answer": "No letting agent handles it now. You took the flat off Neskett Ember and manage it yourself.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -715,7 +722,7 @@
       "tme-for-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "None now. You had chosen **Neskett Anvil** for the boxes, but later said the storage unit was empty and the account was closed.",
+        "v8_answer": "Neskett Anvil was the storage place chosen for the boxes.  \n\nBut later you said the storage unit was empty and the account had been closed, so it no longer holds them.",
         "v9": false,
         "v9_answer": "Neskett Anvil.",
         "v9_gold_in_context": 1,
@@ -729,9 +736,9 @@
       "tme-for-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "None, as far as the record says. You picked a **Vintry Meridian**, but later said there was **no bike here any more** because it was stolen from outside the library and never replaced.",
+        "v8_answer": "You aren’t riding a bike now. You had picked a Vintry Meridian, but later said it was stolen outside the library and never replaced.",
         "v9": true,
-        "v9_answer": "None. You had the Vintry Meridian, but it was stolen outside the library and you never replaced it.",
+        "v9_answer": "None. You had a Vintry Meridian, but it was stolen outside the library and you never replaced it.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -743,9 +750,9 @@
       "tme-for-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No one at the moment — the accounts are unattended. You had gone with Wistan Kindred, but later ended the engagement after the filing mess.",
+        "v8_answer": "No one currently. You had gone with Wistan Kindred, but later said the accounts are unattended and you ended the engagement after the filing mess.",
         "v9": true,
-        "v9_answer": "Your accounts are unattended. You said you ended the engagement after the filing mess; no person is identified as currently doing them.",
+        "v9_answer": "No one, as far as these conversations say. You said the accounts are unattended, and that you ended the engagement after the filing mess.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -757,9 +764,9 @@
       "tme-for-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You were on **Kelbrick Quartz**, but later you said that tariff was **finished** and you let it lapse when the handset died. So the conversations don’t say you’re currently on any phone tariff.",
+        "v8_answer": "You were on **Kelbrick Quartz**, but later you said **that tariff is finished** and you let it lapse when the handset died. No later phone tariff is mentioned.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which phone tariff you’re on. They only mention broadband tariffs.",
+        "v9_answer": "I don’t know from these conversations. They mention broadband tariff details, but not your phone tariff.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -771,7 +778,7 @@
       "tme-for-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No one — the flat is currently uninsured.",
+        "v8_answer": "No one currently. The flat is uninsured; the Cambourne Cascade policy ran out and was not renewed.",
         "v9": false,
         "v9_answer": "The conversations don’t say who insures the flat.",
         "v9_gold_in_context": 0,
@@ -785,8 +792,8 @@
       "tme-for-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Nobody is cleaning the flat now; the cleaner visits were stopped when the rate went up.",
-        "v9": false,
+        "v8_answer": "Nobody is cleaning the flat now. The cleaner visits were stopped when the rate went up.",
+        "v9": true,
         "v9_answer": "The conversations do not say who cleans the flat.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
@@ -797,11 +804,11 @@
         "v6_redundant_components": []
       },
       "tme-for-012": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "They came from **Vantoro Quartz**, but you later **stopped the standing order after the last bad batch**, so no beans are arriving now.",
+        "v1": false,
+        "v8": false,
+        "v8_answer": "Your coffee beans were from **Vantoro Quartz**. You later stopped the standing order after a bad batch.",
         "v9": false,
-        "v9_answer": "They came from **Vantoro Quartz**, though you later stopped the standing order after a bad batch.",
+        "v9_answer": "Your coffee beans came from Vantoro Quartz, though you later stopped the standing order after a bad batch.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -811,11 +818,11 @@
         "v6_redundant_components": []
       },
       "tme-for-013": {
-        "v1": true,
+        "v1": false,
         "v8": true,
-        "v8_answer": "You were seeing **Brackmoor Vantage** for the shoulder physio, but the later note says the physio work is over and you were discharged at the final appointment—so you are **not currently seeing a physio**.",
+        "v8_answer": "You were seeing **Brackmoor Vantage** for shoulder physio — but you later said the physio work was over and you’d been discharged at the final appointment.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They only mention “physio,” not which physio you’re seeing.",
+        "v9_answer": "I don’t know — the conversations only mention “physio” in passing, not which physio you’re seeing.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -827,7 +834,7 @@
       "tme-for-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The conversations don’t say who taught you guitar. They only say you started guitar lessons, picked “Feskin Vantage,” and later gave the lessons up when the teacher moved away.",
+        "v8_answer": "Feskin Vantage taught you guitar, but the lessons have since stopped because the teacher moved away.",
         "v9": true,
         "v9_answer": "The conversations don’t say who teaches you guitar.",
         "v9_gold_in_context": 0,
@@ -841,9 +848,9 @@
       "tme-for-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No firm is doing your windows now. You had chosen **Brackmoor Ember**, but later said the window job was dead and you pulled out before any work started.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which firm is doing your windows.",
+        "v8_answer": "No firm is doing them now. You had chosen **Brackmoor Ember**, but later said the window job was dead and you pulled out before any work started.",
+        "v9": true,
+        "v9_answer": "The conversations don’t say which firm is doing your windows. They only mention that the guttering contractor is Aldmoor Plain.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -855,9 +862,9 @@
       "tme-for-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You don’t currently use a vet. You previously registered the cat with **Kelbrick Vantage**, but later said you took her off their books and have no vet at present.",
+        "v8_answer": "You don’t currently use a vet. Earlier you had registered the cat with **Kelbrick Vantage**, but later you said you took her off their books when you stopped going.",
         "v9": true,
-        "v9_answer": "You don’t currently use a vet. You said, “We have no vet at present,” and that you took her off their books when you stopped going.",
+        "v9_answer": "You don’t currently use a vet. You said you took her off their books when you stopped going.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -869,9 +876,9 @@
       "tme-for-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You had settled on **Cambourne Anvil**, but later said that hairdresser was over and you **stopped going after the price rise**. The conversations don’t say which hairdresser you go to now.",
+        "v8_answer": "You don’t currently have a hairdresser recorded. You had settled on **Cambourne Anvil**, but later stopped going after the price rise.",
         "v9": true,
-        "v9_answer": "You don’t currently go to the hairdresser mentioned. You had settled on Cambourne Anvil, but later said you stopped going after the price rise. No replacement hairdresser is given.",
+        "v9_answer": "You don’t currently go to the hairdresser mentioned. You had settled on Cambourne Anvil, but later said you stopped going after the price rise. No new hairdresser is mentioned.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -883,9 +890,9 @@
       "tme-for-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re not in a running club now — you said you’re clubless and let the membership lapse. Earlier, you had chosen Brackmoor Quartz.",
+        "v8_answer": "You’re not in a running club now — you said you’re clubless and let the membership lapse. Previously, you had chosen Brackmoor Quartz.",
         "v9": true,
-        "v9_answer": "You’re not in a running club now. The latest note says you are “clubless for running” and let the membership lapse. Previously, you had chosen **Brackmoor Quartz**.",
+        "v9_answer": "You’re not in a running club now — you said you are “clubless for running” because the membership lapsed.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -897,9 +904,9 @@
       "tme-for-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You went with **Oswent Ember**, but later said you **quit the club** after the third duplicate case—so you’re not currently a member, as far as these conversations say.",
+        "v8_answer": "You aren’t currently a member of a wine club. You had joined **Oswent Ember**, but you later quit after the third duplicate case.",
         "v9": true,
-        "v9_answer": "You are not currently a member of a wine club. You had gone with **Oswent Ember**, but later said you quit after the third duplicate case.",
+        "v9_answer": "You’re not currently a member of a wine club, as far as these conversations say. You had signed up with **Oswent Ember**, but later said you quit after the third duplicate case.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -909,9 +916,9 @@
         "v6_redundant_components": []
       },
       "tme-for-020": {
-        "v1": true,
+        "v1": false,
         "v8": true,
-        "v8_answer": "You saw **Vantoro Ember** — though later you noted there were **no more osteopath appointments** because the course had finished.",
+        "v8_answer": "Vantoro Ember.  \n\nThough the later note says there are no more osteopath appointments now—the course finished.",
         "v9": false,
         "v9_answer": "Vantoro Ember.",
         "v9_gold_in_context": 1,
@@ -925,9 +932,9 @@
       "tme-for-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Orrindale Quartz.",
+        "v8_answer": "You’re driving the **Orrindale Quartz**.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They mention “car, driving,” but not which car you’re driving at the moment.",
+        "v9_answer": "The conversations do not say which car you are driving at the moment.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -944,7 +951,7 @@
         "v8": true,
         "v8_answer": "Your gym membership is with **Draythe Reverie**.",
         "v9": true,
-        "v9_answer": "Draythe Reverie.",
+        "v9_answer": "Your gym membership is with **Draythe Reverie**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -961,7 +968,7 @@
         "v8": true,
         "v8_answer": "You are registered with **Feskin Reverie**.",
         "v9": true,
-        "v9_answer": "You’re registered with **Feskin Reverie**, a dentist near the station.",
+        "v9_answer": "You’re registered with **Feskin Reverie**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1029,7 +1036,7 @@
         "v8": true,
         "v8_answer": "Trellick Pilot.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which bike you’re riding.",
+        "v9_answer": "I don’t know. The conversations mention “bike” being on your mind, but they don’t say which bike you’re riding.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1044,7 +1051,7 @@
       "tme-for-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ulverston Quartz.",
+        "v8_answer": "Ulverston Quartz does your accounts/returns.",
         "v9": false,
         "v9_answer": "The conversations don’t say who does your accounts.",
         "v9_gold_in_context": 0,
@@ -1063,7 +1070,7 @@
         "v8": true,
         "v8_answer": "You are on the **Neskett Kindred** phone tariff.",
         "v9": true,
-        "v9_answer": "Neskett Kindred.",
+        "v9_answer": "You’re on the **Neskett Kindred** phone tariff.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1095,7 +1102,7 @@
       "tme-for-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Orrindale Ardent — they were chosen as the cleaner for fortnightly visits.",
+        "v8_answer": "Orrindale Ardent — they were booked as the cleaner for fortnightly visits, and later confirmed as unchanged.",
         "v9": false,
         "v9_answer": "The conversations do not say who cleans the flat.",
         "v9_gold_in_context": 0,
@@ -1114,7 +1121,7 @@
         "v8": true,
         "v8_answer": "Your coffee beans come from Brackmoor Quartz.",
         "v9": true,
-        "v9_answer": "Your coffee beans come from **Brackmoor Quartz**.",
+        "v9_answer": "Your coffee beans come from Brackmoor Quartz.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1129,7 +1136,7 @@
       "tme-for-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re seeing **Larkmead Solace**.",
+        "v8_answer": "Larkmead Solace.",
         "v9": true,
         "v9_answer": "Larkmead Solace.",
         "v9_gold_in_context": 1,
@@ -1165,7 +1172,7 @@
         "v8": true,
         "v8_answer": "Draythe Ardent.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which firm is doing your windows.",
+        "v9_answer": "The conversations don’t say which firm is doing your windows. They only mention “firm” in passing, without naming it.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1301,19 +1308,20 @@
     "probed_corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656",
     "v8_full_haystack": {
       "applicable": 35,
-      "v1_passed": 35,
-      "v8_passed": 35,
-      "interference_cost": 0.0,
+      "v1_passed": 32,
+      "v8_passed": 34,
+      "interference_cost": -0.0571,
       "regressed_under_interference": [],
+      "failures_with_no_captured_answer": [],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
     },
     "v9_reference_retrieval": {
       "applicable": 35,
-      "v1_gold_only": 35,
-      "v8_full_haystack": 35,
-      "v9_bm25_top_k": 20,
-      "headroom_over_lexical_retrieval": 0.4286,
-      "headroom_unlimited_context_over_lexical": 0.4286,
+      "v1_gold_only": 32,
+      "v8_full_haystack": 34,
+      "v9_bm25_top_k": 22,
+      "headroom_over_lexical_retrieval": 0.2857,
+      "headroom_unlimited_context_over_lexical": 0.3429,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "empty_completion_disclosure": {
@@ -1337,68 +1345,64 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 110,
+        "calls": 145,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 110,
+        "judge_calls": 145,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1100,
+        "calls": 1582,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 336,
+        "judge_calls": 350,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 330,
-        "empty": 258,
-        "rate": 0.7818,
-        "judge_calls": 57,
+        "calls": 375,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 675,
-        "empty": 182,
-        "rate": 0.2696,
-        "judge_calls": 186,
+        "calls": 151,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 91,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 3,
-        "rate": 0.0273,
-        "judge_calls": 107,
+        "calls": 145,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 145,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 110,
-        "empty": 8,
-        "rate": 0.0727,
-        "judge_calls": 102,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v9strip": {
-        "population": "probe_answers",
-        "calls": 352,
-        "empty": 4,
-        "rate": 0.0114,
-        "judge_calls": 348,
+        "calls": 150,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 145,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
     },
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 137,
+      "by_cache_key": {}
+    }
   }
 }

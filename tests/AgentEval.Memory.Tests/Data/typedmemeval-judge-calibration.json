@@ -2266,5 +2266,49 @@
     "expected": "Missed",
     "rule": "temporal-recency-denies-events",
     "note": "Asserts absence where all three are stated."
+  },
+  {
+    "id": "cal-bit-025",
+    "vertical": "Bitemporal",
+    "shape": "belief-at-instant",
+    "question": "As of 14 January, had the office correction for Priya Nandra been recorded?",
+    "gold": "No. The correction was not recorded until 22 January.",
+    "answer": "Yes, it had already been recorded by then.",
+    "expected": "Premature",
+    "rule": "bitemporal-premature-correction-not-yet-recorded",
+    "note": "The unambiguous floor case. The question asks about the EVENT of recording rather than about a value, gold denies it with a date, and the answer asserts it as done. This is what premature means on this vertical, and a judge that cannot label this one has been told to suppress premature too hard."
+  },
+  {
+    "id": "cal-bit-026",
+    "vertical": "Bitemporal",
+    "shape": "correction-depth",
+    "question": "As of 16 January, had the second correction to Ines Vargas's site been applied?",
+    "gold": "No. The first correction was applied on 12 January; the second came on 24 January.",
+    "answer": "Yes, both corrections were in place by 16 January.",
+    "expected": "Premature",
+    "rule": "bitemporal-depth-premature-second-correction",
+    "note": "Half the answer is true - the first correction really had landed - so the judge has to notice that only the SECOND is over-claimed. Tests that a partially satisfied chain does not launder a premature assertion into correct."
+  },
+  {
+    "id": "cal-bit-027",
+    "vertical": "Bitemporal",
+    "shape": "belief-at-instant",
+    "question": "As of 16 January, had the address correction for Halvard Nyman been entered?",
+    "gold": "No. It was entered on 21 January.",
+    "answer": "I think so - I believe it had been entered by then.",
+    "expected": "Premature",
+    "rule": "bitemporal-premature-hedged",
+    "note": "Precedence rule 1 says a stated position outranks hedging, so 'I think so' is graded as the yes it commits to. Premature, not abstained. Tests the interaction between the hedging rule and the premature rule, which no other bitemporal case exercises."
+  },
+  {
+    "id": "cal-bit-028",
+    "vertical": "Bitemporal",
+    "shape": "correction-depth",
+    "question": "As of 20 January, what did the record show for Ines Vargas's May site, and had the pending correction been applied?",
+    "gold": "Halstead Vale, and no - the correction was not applied until 26 January.",
+    "answer": "Halstead Vale, and yes, the correction had been applied by then.",
+    "expected": "Premature",
+    "rule": "bitemporal-depth-premature-with-correct-value",
+    "note": "The hardest of the four and the real trap. The VALUE matches gold exactly, so value-matching alone returns correct, and precedence rule 3 says extra correct detail never lowers the outcome - but the extra detail here is not correct, it asserts as done something gold dates five days later. A judge told that premature essentially never applies on this vertical will most likely fail this one first."
   }
 ]

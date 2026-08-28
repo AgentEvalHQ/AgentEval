@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bitemporal had no judge template, and the shared preamble mis-graded it — then the first fix
+  overfitted and the calibration set could not tell.** Bitemporal shipped in `0.26.0-beta` with no
+  body of its own, falling through to `StandardBody` (the two words "Grade this answer."). The
+  shared preamble defines *premature* as asserting as already true something gold says has not
+  happened yet, and Bitemporal golds justify themselves with exactly that sentence — *"the
+  correction had not been recorded yet"* — so the judge read the **justification clause as the
+  proposition under test** and returned `Premature` where the label says `Wrong`. Four of 24 cases,
+  in every run. Measured at **0.750 / 0.792 / 0.792** against `gpt-5.5`.
+
+  The first fix told the judge that premature "will essentially never be the right label" here. It
+  scored Bitemporal **24/24** — and was overfitted. Every Bitemporal case then in the set was
+  labelled `Correct`, `Wrong`, `Abstained` or `Missed`; **not one was `Premature`**, so a rule
+  suppressing `Premature` outright could not be penalised by the only instrument watching. The gate
+  could not fail in the direction the fix pushed it.
+
+  Four Bitemporal cases whose correct label **is** `Premature` are therefore added as negative
+  controls, graded blunt to subtle: a flat yes against a dated no; an over-claim of the second of
+  two corrections where the first genuinely landed; a hedged assertion, graded on the position it
+  commits to under precedence rule 1; and one where the **value matches gold exactly** and only the
+  appended claim of occurrence is early. The overfitted version scores **0 of 4** on them.
+
+  The shipped fix replaces suppression with a **question-type discriminator**: decide first what the
+  question asks. Asks *which value* the record held and the answer gives a later-recorded one →
+  `wrong`, a transaction-time collapse. Asks *whether a correction had been made* by the as-of
+  instant and gold says it had not → `premature`, because what gold denies is an **event**, not a
+  value. One answer doing both is decided by the premature assertion. **Bitemporal 28/28 in all
+  three runs**; family agreement **0.988 / 0.983 / 0.983**, lowest recorded. The shared preamble is
+  untouched, and blast radius was measured rather than assumed — all 172 cases, all seven verticals,
+  three runs, no new failure shape anywhere.
+
+- **Silence was still a verdict, and the completion ceiling was sized on a censored sample.** The
+  `0.27` retry cut V3's empty rate from 78.2% to 3.1%, but frequency is not accounting: the residue
+  still *scored*, as a PASS on V2/V3/V6 and a FAILURE on V1/V8/V9 — biasing in opposite directions
+  at once. All six arms now leave silence undefined, out of numerator and denominator together,
+  published as `unmeasured_no_answer`. Writing it surfaced the same defect in **V2**, which nobody
+  had flagged.
+
+  The ceiling itself had been sized on clipped data: every recorded empty came back with
+  `reasoning_tokens` exactly equal to the 8,000 cap. Replaying them uncensored gives **153 / 7,677 /
+  14,639** (min/median/max) — **the cap sat almost exactly on the median**. And the retry *ladder*
+  was the real constraint, not the ceiling: at x3 from 900, two retries topped out at 8,100, so
+  raising the cap alone could never have reached 14,639. Re-probing arithmetic on the corrected
+  instrument returns **0.0% empty on every arm**, with `unmeasured_no_answer` null — nothing needed
+  excluding.
+
+- **A vertical mean is satisfiable by averaging, and one shape was destroyed behind a green one.**
+  Arithmetic calibrated to **0.700 — dead on target, gate green, 985 tests passing** — while its
+  shapes sat at `count 0.857 / delta 0.947 / duration 0.083 / sum 0.894`. A convention clause
+  collapsed `duration`'s lexical retrievability and the single echo knob **compensated**, loosening
+  the other shapes until the average came back. Calibration is now per shape, and the gate holds the
+  band **within every shape** rather than across their mean:
+  `count 0.827 / delta 0.777 / duration 0.653 / sum 0.818`.
+
+  The search was also stopping at the first in-band rung rather than converging on a declared
+  target, so stamped difficulty was set by grid placement instead of intent — nine words of question
+  text moved realised coverage from 0.636 to 0.847. It now converges on `BAND_TARGET`.
+
+  Running the per-shape gate red-first found **ten shapes across five verticals** outside the band,
+  none of them caused by this work and none previously visible, because nothing had ever looked
+  below a vertical mean. They are pinned as a ratchet pending a family-wide recalibration.
+
+- **The probe cache flushed every fifty calls, on the assumption calls take seconds.** V3 and V6
+  take minutes; an interrupted ten-minute window banked nothing. Now every ten.
+
+- **The BM25 calibration gate read its acceptance band out of the artifact it was grading.**
+  `Metadata_RecordsACalibrationGateInsideItsBand` took `band_low` / `band_high` from the corpus
+  metadata and then checked that corpus's mean realised coverage against them — so a corpus stamped
+  `[0.0, 1.0]` would have declared itself acceptable and passed. The band is now a C# constant
+  mirroring `BAND_LOW` / `BAND_HIGH` in `typedmemeval_common.py`, and the **stamped** band is
+  asserted *equal* to it rather than used as the bar.
+
+  The generator does enforce the band at authoring time and refuses to ship an out-of-band corpus,
+  but **CI never runs the generator**, so this gate was the only thing standing behind it. All seven
+  shipped corpora carry the correct `[0.5, 0.9]` and every mean is in band — **nothing was
+  mis-graded**; the gate simply could not have detected it. Verified by falsification: widening a
+  corpus's declared band to `[0.0, 1.0]` now fails the gate.
+
+  Found by turning a consuming project's report back on ourselves. They applied our
+  "passable-by-absence" finding to their own gates and located a one-directional containment check;
+  auditing ours for the same class turned up this one. Test-only — no shipped artifact changed.
+
 ## [0.28.0-beta] - 2026-08-22
 
 ### Fixed
