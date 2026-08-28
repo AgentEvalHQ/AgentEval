@@ -40,6 +40,17 @@ public sealed class TypedMemEvalJudgment
     /// <summary>Observed item pairs considered (list-order only).</summary>
     public int? OrderedPairsTotal { get; init; }
 
+    /// <summary>
+    /// Which branch of the vertical's discriminator the judge reports having taken, or null where
+    /// the contract does not ask for one.
+    /// </summary>
+    /// <remarks>
+    /// An independent observation of the step the outcome was derived from. Without it a template
+    /// that suppresses a label outright is indistinguishable from one that discriminates properly,
+    /// which is how the first Bitemporal body scored 24/24 while being overfitted.
+    /// </remarks>
+    public string? QuestionAsks { get; init; }
+
     /// <summary>Bounded AgentEval-owned failure code; never provider exception text.</summary>
     public string? SafeFailureCode { get; init; }
 
@@ -140,7 +151,7 @@ public sealed class TypedMemEvalJudge
                 _logger.LogWarning(
                     "TypedMemEval judge provider failure on a {Vertical} question: {FailureCode}",
                     vertical, safeCode);
-                parsed = new TypedMemEvalVerdict.Parsed(null, null, false, false, null, null, safeCode);
+                parsed = new TypedMemEvalVerdict.Parsed(null, null, false, false, null, null, null, safeCode);
                 raw = null;
             }
 
@@ -173,6 +184,7 @@ public sealed class TypedMemEvalJudge
             ClaimedNoLongerKnown = parsed.ClaimedNoLongerKnown,
             OrderedPairsCorrect = parsed.OrderedPairsCorrect,
             OrderedPairsTotal = parsed.OrderedPairsTotal,
+            QuestionAsks = parsed.QuestionAsks,
             SafeFailureCode = parsed.FailureCode,
             LlmCallCount = providerCalls,
             PrimaryLlmCallCount = primaryCalls,
@@ -192,6 +204,8 @@ public sealed class TypedMemEvalJudge
         => vertical switch
         {
             TypedMemEvalVertical.Forgetting => TypedMemEvalVerdict.Kind.Forgetting,
+            TypedMemEvalVertical.Bitemporal => TypedMemEvalVerdict.Kind.Bitemporal,
+            TypedMemEvalVertical.Temporal => TypedMemEvalVerdict.Kind.Temporal,
             TypedMemEvalVertical.Episodic when extension.Shape == "list-order"
                 => TypedMemEvalVerdict.Kind.ListOrder,
             _ => TypedMemEvalVerdict.Kind.Base
@@ -212,6 +226,9 @@ public sealed class TypedMemEvalJudge
 
             TypedMemEvalVertical.Bitemporal =>
                 TypedMemEvalJudgePrompts.Bitemporal(question, goldAnswer, agentResponse),
+
+            TypedMemEvalVertical.Temporal =>
+                TypedMemEvalJudgePrompts.Temporal(question, goldAnswer, agentResponse),
 
             TypedMemEvalVertical.Forgetting =>
                 TypedMemEvalJudgePrompts.Forgetting(question, goldAnswer, agentResponse),

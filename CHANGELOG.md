@@ -9,6 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A family-wide judge floor is satisfiable by averaging — added a per-vertical one.** Bitemporal
+  sat at **0.750** behind a green family **0.946** because six verticals near 0.98 averaged it away,
+  and the gate only ever read the mean. This is the same defect the corpus calibration had, where
+  arithmetic certified at 0.700 with its `duration` shape at 0.083. A **0.80 per-vertical floor**
+  now applies to both the recorded result and the live arm. Set below the family's 0.85 on purpose:
+  a vertical is 24–28 cases, so one boundary case moves it ~0.04 and a floor at parity would fail on
+  noise. Verified by falsification — forcing a vertical to 0.75 fires it.
+
+- **The judge now emits the discriminator branch it took, and CI asserts it independently of the
+  outcome.** A template that suppresses a label outright is indistinguishable from one that
+  discriminates correctly if you only ever check the final label — which is exactly how the first
+  Bitemporal body reached 24/24 while overfitted. `question_asks` is emitted in the judge's JSON at
+  **zero extra calls**, with two enums because the verticals discriminate on different axes:
+  Bitemporal `value`|`occurrence` (a property of the **question**), Temporal `ordering`|`presence`
+  (a property of what the **answer** commits to). Declared on 14 cases where the branch is
+  unambiguous and asserted only where declared — a `Correct` or `Abstained` answer has no meaningful
+  branch, so asserting one would be noise. Reaching the right outcome by the wrong route now fails
+  the build.
+
+- **Temporal had no judge template either — the second and last vertical falling through to
+  `StandardBody`.** Its only guidance was the shared preamble, which defines *missed* as
+  confidently asserting nothing is there when gold says something is. *"Nothing happened between
+  them"* matches that word for word, so the judge returned `Missed` where the label says `Wrong` —
+  but that answer **accepts both anchors** and makes a false claim about ordering, which is a
+  sequencing defect, not a retrieval one.
+
+  The body draws the line: accepts the events and misplaces them — including denying an interval
+  contains anything, or that any candidate is latest — is `wrong`, because **an empty interval is an
+  ordering claim, not a statement about what the record holds**; denying the record holds the events
+  at all is `missed`; an answer doing both is decided by the denial.
+
+  **Measured with a baseline first**, which the Bitemporal fix skipped. Four controls were authored
+  *before* the body existed — two `Wrong`, two `Missed`, so the set can fail in either direction —
+  and the baseline with them in and no body present was **Temporal 0.857 / 0.929**. `cal-tem-026` is
+  the over-correction guard: it says *"nothing lies between them"* while its operative claim is that
+  the record holds neither anchor, so a rule reading only the interval phrase breaks it. It holds.
+
+  **Temporal 28/28 on judgment in all three runs**; family **0.983** over 176 cases. The recorded
+  0.964 is run 2, where one case returned no verdict under an Azure content filter — infrastructure
+  rather than disagreement, but the live arm scores an absent verdict as a miss on purpose.
+
+  Open and deliberately not fixed here: the preamble gives *"I have no record of that"* as its
+  `abstained` example and *"you never told me about that"* as its `missed` example. Those are
+  near-synonyms, it is family-wide, and it is the likeliest cause of `cal-for-012`/`cal-for-013`
+  alternating. Editing the shared preamble changes grading for all seven verticals, so it needs its
+  own controls and its own before/after.
+
+### Fixed
+
 - **Bitemporal had no judge template, and the shared preamble mis-graded it — then the first fix
   overfitted and the calibration set could not tell.** Bitemporal shipped in `0.26.0-beta` with no
   body of its own, falling through to `StandardBody` (the two words "Grade this answer."). The

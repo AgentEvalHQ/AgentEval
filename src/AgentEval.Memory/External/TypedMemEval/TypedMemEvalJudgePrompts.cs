@@ -133,6 +133,38 @@ internal static class TypedMemEvalJudgePrompts
         to a set containing a value the record did not hold at that instant.
         """;
 
+    /// <remarks>
+    /// Temporal shipped in 0.26.0-beta with no body of its own and fell through to
+    /// <c>StandardBody</c>, so the only guidance it had was the shared preamble - which defines
+    /// <i>missed</i> as confidently asserting that nothing is there when gold says something is.
+    /// "Nothing happened between them" matches that word for word, so the judge returned Missed
+    /// where the label says Wrong. But that answer ACCEPTS both anchors ("them") and makes a false
+    /// claim about ordering, which is a different defect from not holding the events at all: one is
+    /// a sequencing error, the other is a retrieval failure, and they route to different repairs.
+    /// </remarks>
+    private const string TemporalBody = """
+
+        This question is about the ORDER of events - which came first, what fell between two of
+        them, which is most recent. Session order and mention order are not evidence of event order;
+        grade against gold.
+
+        Two failures look alike here and are not. Decide which one the answer commits to:
+
+        - The answer ACCEPTS that the events are on record and gets their order, position or
+          recency wrong: that is "wrong". This includes denying that an interval contains anything
+          ("nothing happened between them") and denying that any candidate is the latest, because
+          both accept the events and make a false claim about how they are arranged. An empty
+          interval is an ordering claim, not a statement about what the record holds.
+
+        - The answer DENIES that the record holds the events at all ("neither is recorded", "none of
+          those appear in the record", "I have no record of the Kessel handover"): that is "missed".
+          The defect is that the events are not there to be ordered.
+
+        When an answer does both - accepts one event and denies another the record states - the
+        DENIAL decides, and the outcome is "missed". It has not committed to an ordering at all.
+
+        """;
+
     private const string ArithmeticBody = """
 
         This question has a derived numeric answer. Grade the ARITHMETIC, not the phrasing.
@@ -207,6 +239,9 @@ internal static class TypedMemEvalJudgePrompts
     internal static string Bitemporal(string question, string gold, string answer)
         => string.Format(Preamble + BitemporalBody + Closing, question, gold, answer);
 
+    internal static string Temporal(string question, string gold, string answer)
+        => string.Format(Preamble + TemporalBody + Closing, question, gold, answer);
+
     internal static string ListOrder(string question, string gold, string answer)
         => string.Format(Preamble + ListOrderBody + Closing, question, gold, answer);
 
@@ -243,6 +278,28 @@ internal static class TypedMemEvalJudgePrompts
              "ordered_pairs_correct": <integer>,
              "ordered_pairs_total": <integer>}
             """,
+        TypedMemEvalVerdict.Kind.Bitemporal => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "question_asks": "value" | "occurrence"}
+
+            question_asks is the branch you took above: "value" if the question asks which value the
+            record held at the as-of instant, "occurrence" if it asks whether a correction had been
+            made by then. Report what you actually decided, not what would justify the outcome.
+            """,
+        TypedMemEvalVerdict.Kind.Temporal => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "question_asks": "ordering" | "presence"}
+
+            question_asks is the branch you took above: "ordering" if the answer accepts the events
+            and misplaces them, "presence" if it denies the record holds them. Report what you
+            actually decided, not what would justify the outcome.
+            """,
         _ => """
 
             Reply with a single JSON object and nothing else:
@@ -267,13 +324,16 @@ internal static class TypedMemEvalJudgePrompts
             .Append(StandardBody).Append('\u001e')
             .Append(ProspectiveBody).Append('\u001e')
             .Append(BitemporalBody).Append('\u001e')
+            .Append(TemporalBody).Append('\u001e')
             .Append(ArithmeticBody).Append('\u001e')
             .Append(ListOrderBody).Append('\u001e')
             .Append(ForgettingBody).Append('\u001e')
             .Append(Closing).Append('\u001e')
             .Append(ContractFor(TypedMemEvalVerdict.Kind.Base)).Append('\u001e')
             .Append(ContractFor(TypedMemEvalVerdict.Kind.Forgetting)).Append('\u001e')
-            .Append(ContractFor(TypedMemEvalVerdict.Kind.ListOrder));
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.ListOrder)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Bitemporal)).Append('\u001e')
+            .Append(ContractFor(TypedMemEvalVerdict.Kind.Temporal));
 
         var normalized = builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
         // Not a security function: this identifies which prompt text produced a verdict.

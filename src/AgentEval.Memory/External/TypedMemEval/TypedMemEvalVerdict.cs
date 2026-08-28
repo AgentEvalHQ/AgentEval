@@ -45,7 +45,21 @@ internal static class TypedMemEvalVerdict
         Forgetting,
 
         /// <summary>Adds the observed pairwise-order tally (Episodic list-order).</summary>
-        ListOrder
+        ListOrder,
+
+        /// <summary>
+        /// Adds which branch of the two-clock discriminator the judge took (Bitemporal).
+        /// </summary>
+        /// <remarks>
+        /// The outcome alone cannot say WHY it was chosen, so a template that suppresses a label
+        /// outright looks identical to one that discriminates correctly — which is exactly how the
+        /// first Bitemporal body scored 24/24 while being overfitted. Emitting the branch makes the
+        /// intermediate step assertable at no extra call.
+        /// </remarks>
+        Bitemporal,
+
+        /// <summary>Adds which branch of the ordering-versus-presence discriminator was taken (Temporal).</summary>
+        Temporal
     }
 
     private const string OutcomeProperty = """
@@ -109,12 +123,46 @@ internal static class TypedMemEvalVerdict
         }
         """);
 
+    private static readonly JsonElement s_bitemporal = ParseSchema($$"""
+        {
+          "type": "object",
+          "properties": {
+        {{OutcomeProperty}},
+            "question_asks": {
+              "type": "string",
+              "enum": ["value", "occurrence"],
+              "description": "Which the question asks for: the VALUE the record held at the as-of instant, or WHETHER a correction had been made by then. Report the branch you actually took."
+            }
+          },
+          "required": ["outcome", "reasoning", "question_asks"],
+          "additionalProperties": false
+        }
+        """);
+
+    private static readonly JsonElement s_temporal = ParseSchema($$"""
+        {
+          "type": "object",
+          "properties": {
+        {{OutcomeProperty}},
+            "question_asks": {
+              "type": "string",
+              "enum": ["ordering", "presence"],
+              "description": "Which failure the answer commits to: ORDERING, accepting the events and misplacing them, or PRESENCE, denying the record holds them. Report the branch you actually took."
+            }
+          },
+          "required": ["outcome", "reasoning", "question_asks"],
+          "additionalProperties": false
+        }
+        """);
+
     private static JsonElement ParseSchema(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     internal static JsonElement Schema(Kind kind) => kind switch
     {
         Kind.Forgetting => s_forgetting,
         Kind.ListOrder => s_listOrder,
+        Kind.Bitemporal => s_bitemporal,
+        Kind.Temporal => s_temporal,
         _ => s_base
     };
 
@@ -126,6 +174,7 @@ internal static class TypedMemEvalVerdict
         bool ClaimedNoLongerKnown,
         int? OrderedPairsCorrect,
         int? OrderedPairsTotal,
+        string? QuestionAsks,
         string? FailureCode);
 
     /// <summary>
@@ -180,7 +229,7 @@ internal static class TypedMemEvalVerdict
             };
 
             if (outcome is null)
-                return new Parsed(null, reasoning, false, false, null, null, "structured_outcome_out_of_enum");
+                return new Parsed(null, reasoning, false, false, null, null, null, "structured_outcome_out_of_enum");
 
             return new Parsed(
                 outcome,
@@ -191,11 +240,24 @@ internal static class TypedMemEvalVerdict
                     forgotten.ValueKind == JsonValueKind.True,
                 ReadInt(root, "ordered_pairs_correct"),
                 ReadInt(root, "ordered_pairs_total"),
+                ReadQuestionAsks(root),
                 null);
         }
     }
 
-    private static Parsed Fail(string code) => new(null, null, false, false, null, null, code);
+    private static Parsed Fail(string code) => new(null, null, false, false, null, null, null, code);
+
+    /// <summary>
+    /// The discriminator branch, lower-cased, or null when the judge did not emit one. Never
+    /// inferred from the outcome: the whole point is that it is an INDEPENDENT observation of the
+    /// step the outcome was derived from, so guessing it would defeat the assertion it exists for.
+    /// </summary>
+    private static string? ReadQuestionAsks(JsonElement root)
+        => root.TryGetProperty("question_asks", out var value) &&
+           value.ValueKind == JsonValueKind.String &&
+           value.GetString() is { Length: > 0 } text
+            ? text.Trim().ToLowerInvariant()
+            : null;
 
     private static int? ReadInt(JsonElement root, string name)
         => root.TryGetProperty(name, out var value) &&
