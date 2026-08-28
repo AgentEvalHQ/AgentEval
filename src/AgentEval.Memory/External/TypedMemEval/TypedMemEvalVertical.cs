@@ -47,7 +47,19 @@ public enum TypedMemEvalVertical
     /// record when a thing was said rather than when it happened — a system that sorts by date is
     /// answering a different question (ADR-027 §3.2).
     /// </summary>
-    Temporal = 6
+    Temporal = 6,
+
+    /// <summary>
+    /// Resolution rather than recall: the current value after k replacements, a fact asked under a
+    /// designation other than the one it was stated under, and which session a belief came from.
+    /// </summary>
+    /// <remarks>
+    /// ADR-027 §2.1 REFUSED plain-fact Semantic as saturated by construction — stating a fact once
+    /// and asking about it later measures nothing a lexical baseline cannot do. §3.1 narrows it to
+    /// three shapes where retrieving the evidence is necessary and not sufficient.
+    /// </remarks>
+    Semantic = 7
+
 }
 
 /// <summary>What the harness needs to know about one vertical before it runs.</summary>
@@ -181,6 +193,20 @@ public static class TypedMemEvalVerticals
             // when each session was recorded. A run without them is not harder, it is ill-posed.
             RequiredGrounding = TemporalGroundingMode.TimestampsOnly,
             RequiresTimestamps = true
+        },
+        [TypedMemEvalVertical.Semantic] = new()
+        {
+            Vertical = TypedMemEvalVertical.Semantic,
+            Slug = "semantic",
+            Abbreviation = "sem",
+            DisplayName = "TypedMemEval-Semantic",
+            QuestionCount = 50,
+            // No timestamps. The vertical resolves by STATED order — "I have moved again", a named
+            // replacement chain — not by when a session was recorded. Supplying dates would let a
+            // metadata sort answer current-value without reading anything, which is exactly the
+            // saturation §2.1 refused.
+            RequiredGrounding = TemporalGroundingMode.None,
+            RequiresTimestamps = false
         },
         [TypedMemEvalVertical.Temporal] = new()
         {
