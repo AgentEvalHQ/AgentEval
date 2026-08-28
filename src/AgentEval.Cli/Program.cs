@@ -473,11 +473,13 @@ benchCmd.Add(benchNistCmd);
         var benchTmeVerticalOpt = new Option<string?>("--vertical") { Description = "prospective | episodic | arithmetic | workingmemory | forgetting. REQUIRED — the verticals measure different mechanisms, so there is no default." };
         var benchTmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
         var benchTmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+        var benchTmeEvidenceOpt = new Option<string?>("--evidence-detail") { Description = "references (default) | content. 'content' opts in to storing the retrieved TEXT in the result, not just which sessions were retrieved — it answers 'was the needed value actually in the prompt', which identifiers alone cannot. Off by default and loud when engaged: the content is whatever the agent retrieved, so use it only on corpora you control. Credential-shaped and control-byte content is still rejected." };
 
         var benchTmeCmd = new Command("typedmemeval", $"Run one TypedMemEval {TypedMemEvalVerticalDescriptor.CorpusRevision} (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
         benchTmeCmd.Add(benchTmeVerticalOpt);
         benchTmeCmd.Add(benchTmeSubjectOpt);
         benchTmeCmd.Add(benchTmeRootOpt);
+        benchTmeCmd.Add(benchTmeEvidenceOpt);
         benchTmeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var vertical = parseResult.GetValue(benchTmeVerticalOpt);
@@ -493,7 +495,20 @@ benchCmd.Add(benchNistCmd);
                 return 1;
             }
             var root = parseResult.GetValue(benchTmeRootOpt);
-            return await BenchTypedMemEvalCommand.RunAsync(vertical, subject, root, ct);
+
+            var evidenceDetail = parseResult.GetValue(benchTmeEvidenceOpt)?.Trim().ToLowerInvariant();
+            // Rejected rather than silently defaulted. A typo here is the difference between
+            // capturing content and not, and a run that quietly did the safer thing still wasted
+            // the spend the caller was paying for.
+            if (evidenceDetail is not (null or "references" or "content"))
+            {
+                Console.Error.WriteLine(
+                    $"Error: --evidence-detail must be 'references' or 'content', not '{evidenceDetail}'.");
+                return 1;
+            }
+
+            return await BenchTypedMemEvalCommand.RunAsync(
+                vertical, subject, root, captureEvidenceContent: evidenceDetail == "content", ct);
         });
         benchCmd.Add(benchTmeCmd);
     }

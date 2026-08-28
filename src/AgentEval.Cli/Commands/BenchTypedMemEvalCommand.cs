@@ -45,13 +45,43 @@ public static class BenchTypedMemEvalCommand
 {
     /// <summary>Runs the bench typedmemeval command using auto-discovered workspace root.</summary>
     public static Task<int> RunAsync(string vertical, string? subject, string? root, CancellationToken ct = default)
-        => RunAsync(vertical, subject, root, chatClientOverride: null, ct);
+        => RunAsync(vertical, subject, root, captureEvidenceContent: false, chatClientOverride: null, ct);
+
+    /// <summary>Runs the command with an explicit evidence-detail opt-in.</summary>
+    /// <param name="captureEvidenceContent">
+    /// Opt in to <see cref="EvidenceCaptureMode.Full"/>, which permits the adapter to attach the
+    /// retrieved TEXT and not merely identifiers. Default false, and it must stay that way: the
+    /// content is whatever the agent retrieved, so it may carry anything the corpus carries. The
+    /// safe-schema screen still rejects credential-shaped and control-byte content under Full.
+    /// </param>
+    public static Task<int> RunAsync(
+        string vertical, string? subject, string? root, bool captureEvidenceContent,
+        CancellationToken ct = default)
+        => RunAsync(vertical, subject, root, captureEvidenceContent, chatClientOverride: null, ct);
+
+    /// <summary>
+    /// Turns the caller's evidence-detail choice into runner options, or null to take the runner's
+    /// defaults.
+    /// </summary>
+    /// <remarks>
+    /// Extracted so the opt-in is testable without a deployment. This is the seam that was missing:
+    /// the command previously passed <c>options: null</c> unconditionally, so no caller could reach
+    /// <see cref="EvidenceCaptureMode.Full"/> however they invoked it, and an adapter that honoured
+    /// the request had its content rejected by the safe schema. The consuming project hit the same
+    /// shape independently in their own facade — the mapping was faithful in both codebases and
+    /// neither caller ever set the field.
+    /// </remarks>
+    internal static TypedMemEvalOptions? BuildRunOptions(bool captureEvidenceContent)
+        => captureEvidenceContent
+            ? new TypedMemEvalOptions { EvidenceCaptureMode = EvidenceCaptureMode.Full }
+            : null;
 
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
         string vertical,
         string? subject,
         string? root,
+        bool captureEvidenceContent,
         Microsoft.Extensions.AI.IChatClient? chatClientOverride,
         CancellationToken ct = default)
     {
@@ -139,13 +169,23 @@ public static class BenchTypedMemEvalCommand
         Console.WriteLine($"   Corpus:              {descriptor.CorpusId} ({descriptor.QuestionCount} embedded questions, no download)");
         Console.WriteLine($"   Grounding:           {descriptor.RequiredGrounding}");
         Console.WriteLine("   Scoring:             typed outcome vector — no single percentage");
+        if (captureEvidenceContent)
+        {
+            // Loud on purpose. This is the difference between storing which sessions were
+            // retrieved and storing what they SAID, and nobody should discover it from a JSON
+            // field after the run.
+            Console.WriteLine();
+            Console.WriteLine("   ⚠ EVIDENCE DETAIL:   content — retrieved TEXT will be stored in the result,");
+            Console.WriteLine("                        not just identifiers. Use only on corpora you control.");
+        }
         Console.WriteLine();
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult result;
         try
         {
-            result = await new TypedMemEvalRunner(chatClient).RunAsync(agent, descriptor.Vertical, options: null, ct);
+            result = await new TypedMemEvalRunner(chatClient)
+                .RunAsync(agent, descriptor.Vertical, BuildRunOptions(captureEvidenceContent), ct);
         }
         catch (ArgumentException ex) when (ex.ParamName == "agent")
         {
@@ -226,6 +266,7 @@ public static class BenchTypedMemEvalCommand
                 ["max_judge_retries"] = result.Options.MaxJudgeRetries,
                 ["judge_max_output_tokens"] = result.Options.JudgeMaxOutputTokens,
                 ["evidence_capture_mode"] = (int)result.Options.EvidenceCaptureMode,
+                ["evidence_content_captured"] = result.Options.PersistsEvidenceContent ? 1 : 0,
                 ["evidence_top_k"] = result.Options.EvidenceTopK
             };
             if (typed.Coverage.Mean is { } coverageMean) metrics["coverage_mean"] = coverageMean;
