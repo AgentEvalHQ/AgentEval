@@ -1,15 +1,36 @@
 {
   "judge_prompt_fingerprint": "4c626f05634ba997b067990f5e525861c762e6c25fd86b1a8989dd4141ea76ff",
-  "measured_at": null,
-  "model": null,
-  "agreement": null,
-  "status": "not_measured",
-  "cases": null,
-  "runs": 0,
-  "per_vertical": {},
+  "measured_at": "2026-08-28",
+  "model": "gpt-5.5",
+  "agreement": 0.94,
+  "status": "measured",
+  "cases": 168,
+  "runs": 3,
+  "per_vertical": {
+    "Prospective": 1.0,
+    "Episodic": 0.958,
+    "Arithmetic": 1.0,
+    "WorkingMemory": 1.0,
+    "Forgetting": 0.917,
+    "Bitemporal": 0.792,
+    "Temporal": 0.917
+  },
   "disagreements": {
-    "every_run": [],
-    "run_varying": []
+    "every_run": [
+      "cal-bit-011",
+      "cal-bit-012",
+      "cal-bit-015",
+      "cal-bit-022",
+      "cal-for-006",
+      "cal-tem-013"
+    ],
+    "run_varying": [
+      "cal-bit-002",
+      "cal-bit-014",
+      "cal-epi-014",
+      "cal-for-012",
+      "cal-tem-016"
+    ]
   },
   "superseded": {
     "judge_prompt_fingerprint": "edc5fbaa733cdad29007980165465522177bb0bfdfaa492b85d92fa217523e01",
@@ -25,5 +46,5 @@
       "Forgetting": 0.917
     }
   },
-  "note": "ProspectiveBody gained a precedence rule - premature outranks wrong, on that vertical only - so the fingerprint moved and the previous measurement describes a judge that no longer exists. Recorded honestly as not_measured rather than carried forward; the live arm against gpt-5.5 is the next step and this file is filled in from its output. The superseded record is kept because its SCOPE is the more useful part of it: it reads agreement 0.983 over 120 cases, and the calibration set holds 168 across 7 verticals. Bitemporal and Temporal arrived in 0.26.0-beta with 24 cases each, both routed to StandardBody, which was already inside the fingerprint - so the fingerprint never changed, the tripwire never fired, and a measurement over 5 of 7 verticals was read as a family-wide number for eight days. The gate now asserts the recorded case count equals the live set and that every vertical in the enum has a per-vertical entry, so growing the set fails the build instead of quietly diluting the number. Three local runs of the NEW prompt scored 0.881 / 0.869 / 0.869 over all 168 cases, but against gpt-4o-mini and not the gpt-5.5 this record names; they are not written here because they measure a different judge, and swapping the recorded model without saying so is the same class of silent substitution this file exists to prevent."
+  "note": "Three runs at this fingerprint: 0.946 / 0.958 / 0.940. The lowest is recorded and the per-vertical figures come from that same lowest run, so this record never quotes the best of a set. Bitemporal ran 0.750 / 0.792 / 0.792 - its worst is 0.750, lower than the 0.792 recorded here, and that is the number to argue with. BITEMPORAL IS THE FINDING AND IT IS NOT NEW. Six of its 24 cases fail, four of them in every run, all with one shape: the label says Wrong and the judge says Premature. The cause is a collision between two verticals' contracts inside the SHARED Preamble, which defines premature as asserting as already true something gold says has not happened yet. Bitemporal golds read 'the correction had not been recorded yet', which satisfies that definition literally, so a capable judge labels them Premature; the hand labels say Wrong because in bitemporal the defect is a transaction-time mismatch rather than an early assertion. Both readings follow from the text as written, which is the defect. This predates the ProspectiveBody edit that moved the fingerprint. Bitemporal routes to Standard(), built from Preamble + StandardBody + Closing + ContractFor, and all four are byte-identical to main - the added text is in ProspectiveBody, which Bitemporal never sees. It has been true since Bitemporal shipped in 0.26.0-beta and was invisible because the superseded record measured 120 cases across the five verticals that existed on 2026-08-15. The published family-wide agreement never included the vertical that is worst. NOT FIXED HERE, ON PURPOSE. The two repairs are to disambiguate premature from wrong for transaction-time golds, or to relabel the six cases - and relabelling to move a number is the move this file exists to prevent. The threshold is also family-wide at 0.85, so Bitemporal at 0.792 passes because six verticals near 0.98 carry it: the same mean-satisfiable-by-averaging shape the corpus calibration had, where arithmetic's duration sat at 0.083 behind a green 0.700 mean. A per-vertical floor is the obvious next gate and is deliberately left as a decision, because adding it turns CI red until the Preamble collision is resolved. cal-for-006 disagrees in every run and was not relabelled: an answer replaces a cancelled gym membership with an invented move to a different gym, the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry."
 }
