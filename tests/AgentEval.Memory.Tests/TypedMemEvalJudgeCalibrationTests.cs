@@ -249,6 +249,35 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("model").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("measured_at").GetString()));
         Assert.Equal("measured", root.GetProperty("status").GetString());
+
+        // The record has to describe the set it is read as validating. Without this the fingerprint
+        // is the only thing holding it, and the fingerprint covers the prompt TEXT, not the case
+        // list — so cases can be added under an unchanged fingerprint and the stored agreement
+        // silently describes a shrinking fraction of them. That is exactly what happened: Bitemporal
+        // and Temporal arrived in 0.26.0-beta with 48 cases between them, both routed to
+        // StandardBody, which was already in the fingerprint. Nothing changed, nothing fired, and a
+        // measurement over 120 of 168 cases went on being read as a family-wide number.
+        var recordedCases = root.GetProperty("cases").GetInt32();
+        Assert.True(
+            recordedCases == Cases.Count,
+            $"the recorded measurement covers {recordedCases} cases but the calibration set holds " +
+            $"{Cases.Count}. Growing the set cannot invalidate a stored number on its own — the " +
+            $"fingerprint pins the prompt text, not the case list — so re-measure and restate the " +
+            $"count. A record that describes a subset is not evidence about the whole.");
+
+        // Same failure, per vertical: a vertical added with no entry here would be absent rather
+        // than low, and absence reads as nothing to see. Checked against the enum and not against
+        // the calibration file, so the expectation cannot shrink alongside the thing it measures.
+        var perVertical = root.GetProperty("per_vertical");
+        var unmeasured = Enum.GetValues<TypedMemEvalVertical>()
+            .Where(vertical => !perVertical.TryGetProperty(vertical.ToString(), out _))
+            .ToArray();
+
+        Assert.True(
+            unmeasured.Length == 0,
+            $"verticals with no recorded per-vertical agreement: {string.Join(", ", unmeasured)}. " +
+            $"Each one has its own template and its own failure modes; one missing here is one the " +
+            $"family-wide number is averaging over without ever having seen.");
     }
 
     [Fact]
