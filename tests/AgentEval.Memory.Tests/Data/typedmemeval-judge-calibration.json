@@ -2378,7 +2378,8 @@
     "answer": "Oakhurst Transit.",
     "expected": "Correct",
     "rule": "semantic-current-correct",
-    "note": "The current value, plainly."
+    "note": "The current value, plainly.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-002",
@@ -2400,7 +2401,8 @@
     "answer": "Marlow Carriage.",
     "expected": "Wrong",
     "rule": "semantic-current-superseded-value",
-    "note": "THE CORE FAILURE OF THIS SHAPE. Marlow Carriage was genuinely the courier once, so this is not a fabrication - it is a resolution failure, the chain retrieved but not ordered. Still wrong, because the question asks what it is NOW."
+    "note": "THE CORE FAILURE OF THIS SHAPE. Marlow Carriage was genuinely the courier once, so this is not a fabrication - it is a resolution failure, the chain retrieved but not ordered. Still wrong, because the question asks what it is NOW.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-004",
@@ -2422,7 +2424,8 @@
     "answer": "You have used Pellham Freight, Marlow Carriage and Oakhurst Transit.",
     "expected": "Wrong",
     "rule": "semantic-current-lists-without-resolving",
-    "note": "Retrieval succeeded and resolution did not. Listing every value refuses the discrimination the question asks for. Not an abstention: it commits to a set whose members are mostly superseded. This is the shape's whole point - retrieving is necessary and NOT sufficient."
+    "note": "Retrieval succeeded and resolution did not. Listing every value refuses the discrimination the question asks for. Not an abstention: it commits to a set whose members are mostly superseded. This is the shape's whole point - retrieving is necessary and NOT sufficient.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-006",
@@ -2433,7 +2436,8 @@
     "answer": "I am not sure, but probably Oakhurst Transit.",
     "expected": "Correct",
     "rule": "semantic-current-hedged-states-value",
-    "note": "Precedence rule 1: a stated value outranks hedging, and the value is right."
+    "note": "Precedence rule 1: a stated value outranks hedging, and the value is right.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-007",
@@ -2444,7 +2448,8 @@
     "answer": "I do not have a current courier on file for you.",
     "expected": "Missed",
     "rule": "semantic-current-denies-any-value",
-    "note": "Confidently asserts nothing is there when gold says something is."
+    "note": "Confidently asserts nothing is there when gold says something is.",
+    "question_asks": "absence"
   },
   {
     "id": "cal-sem-008",
@@ -2455,7 +2460,8 @@
     "answer": "I could not say which of them is current.",
     "expected": "Abstained",
     "rule": "semantic-current-declines",
-    "note": "Declines to commit to any value. Distinct from cal-sem-005, which commits to a set."
+    "note": "Declines to commit to any value. Distinct from cal-sem-005, which commits to a set.",
+    "question_asks": "uncertainty"
   },
   {
     "id": "cal-sem-009",
@@ -2477,7 +2483,8 @@
     "answer": "In the spring.",
     "expected": "Correct",
     "rule": "semantic-coref-correct",
-    "note": "The fact, asked under the far designation and answered."
+    "note": "The fact, asked under the far designation and answered.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-011",
@@ -2499,7 +2506,8 @@
     "answer": "In the autumn.",
     "expected": "Wrong",
     "rule": "semantic-coref-wrong-value",
-    "note": "A committed value that does not match gold."
+    "note": "A committed value that does not match gold.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-013",
@@ -2510,7 +2518,8 @@
     "answer": "I have nothing recorded about a new flat.",
     "expected": "Missed",
     "rule": "semantic-coref-denies-entity",
-    "note": "Denies an entity the record holds. The resolution failed and the answer reports absence rather than uncertainty."
+    "note": "Denies an entity the record holds. The resolution failed and the answer reports absence rather than uncertainty.",
+    "question_asks": "absence"
   },
   {
     "id": "cal-sem-014",
@@ -2521,7 +2530,8 @@
     "answer": "I am not sure which place you mean by the new flat.",
     "expected": "Abstained",
     "rule": "semantic-coref-declines-on-designation",
-    "note": "Declines because the designation did not resolve. Uncertainty rather than denial - the line the preamble draws between abstained and missed."
+    "note": "Declines because the designation did not resolve. Uncertainty rather than denial - the line the preamble draws between abstained and missed.",
+    "question_asks": "uncertainty"
   },
   {
     "id": "cal-sem-015",
@@ -2532,7 +2542,8 @@
     "answer": "The boiler at the workshop was replaced last year.",
     "expected": "Wrong",
     "rule": "semantic-coref-resolves-to-wrong-entity",
-    "note": "Resolved the designation to the WRONG entity and answered confidently about it. The characteristic co-reference failure, and it commits to a value."
+    "note": "Resolved the designation to the WRONG entity and answered confidently about it. The characteristic co-reference failure, and it commits to a value.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-016",
@@ -2554,7 +2565,8 @@
     "answer": "In the conversation about the roof repair.",
     "expected": "Correct",
     "rule": "semantic-source-correct",
-    "note": "Names the right conversation."
+    "note": "Names the right conversation.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-018",
@@ -2576,7 +2588,8 @@
     "answer": "In the conversation about the gutter clearing.",
     "expected": "Wrong",
     "rule": "semantic-source-wrong-conversation",
-    "note": "Cites a decoy - a plausible neighbouring topic that did not carry the belief."
+    "note": "Cites a decoy - a plausible neighbouring topic that did not carry the belief.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-020",
@@ -2587,7 +2600,8 @@
     "answer": "You told me the guttering has to be done at the same time.",
     "expected": "Wrong",
     "rule": "semantic-source-restates-belief-cites-nothing",
-    "note": "Restates the belief and cites no conversation. KNOWN-UNSTABLE, and recorded as such rather than tuned away. Pooled across eight runs today the judge split exactly 4-4 between wrong and abstained, so neither label is 'right' and the case cannot discriminate anything. I first labelled it abstained, relabelled it wrong on the strength of one run plus my own reading, and the fuller evidence says that was overconfident in the other direction; the label stays at wrong on the preamble's own wording - it asserts rather than declines - but the honest status is that this sits on the shared preamble's abstained/missed/wrong boundary. That boundary is a FAMILY-WIDE defect parked for its own controlled change: the preamble gives 'I have no record of that' as its ABSTAINED example and 'you never told me about that' as its MISSED example, and they are near-synonyms. cal-for-006, cal-for-012, cal-for-013, cal-wm-012 and cal-sem-007 flap on the same seam across four verticals. Do not read a failure here as evidence about Semantic's construct."
+    "note": "Restates the belief and cites no conversation. KNOWN-UNSTABLE, and recorded as such rather than tuned away. Pooled across eight runs today the judge split exactly 4-4 between wrong and abstained, so neither label is 'right' and the case cannot discriminate anything. I first labelled it abstained, relabelled it wrong on the strength of one run plus my own reading, and the fuller evidence says that was overconfident in the other direction; the label stays at wrong on the preamble's own wording - it asserts rather than declines - but the honest status is that this sits on the shared preamble's abstained/missed/wrong boundary. That boundary is a FAMILY-WIDE defect parked for its own controlled change: the preamble gives 'I have no record of that' as its ABSTAINED example and 'you never told me about that' as its MISSED example, and they are near-synonyms. cal-for-006, cal-for-012, cal-for-013, cal-wm-012 and cal-sem-007 flap on the same seam across four verticals. Do not read a failure here as evidence about Semantic's construct.",
+    "question_asks": "value"
   },
   {
     "id": "cal-sem-021",
@@ -2598,7 +2612,8 @@
     "answer": "You never told me that.",
     "expected": "Missed",
     "rule": "semantic-source-denies-being-told",
-    "note": "Confidently denies a belief the record holds."
+    "note": "Confidently denies a belief the record holds.",
+    "question_asks": "absence"
   },
   {
     "id": "cal-sem-022",
@@ -2609,7 +2624,8 @@
     "answer": "I could not say which conversation that came from.",
     "expected": "Abstained",
     "rule": "semantic-source-declines",
-    "note": "Declines outright. The same outcome as cal-sem-020 by a different route, which is why both are here: one declines openly, the other declines by answering a different question."
+    "note": "Declines outright. The same outcome as cal-sem-020 by a different route, which is why both are here: one declines openly, the other declines by answering a different question.",
+    "question_asks": "uncertainty"
   },
   {
     "id": "cal-sem-023",
@@ -2631,7 +2647,8 @@
     "answer": "The roof repair conversation -- that is where the guttering came up.",
     "expected": "Correct",
     "rule": "semantic-source-correct-with-belief",
-    "note": "Names the right source AND restates the belief. The restatement is extra detail rather than a substitute, so it stays correct - the mirror of cal-sem-020."
+    "note": "Names the right source AND restates the belief. The restatement is extra detail rather than a substitute, so it stays correct - the mirror of cal-sem-020.",
+    "question_asks": "value"
   },
   {
     "id": "cal-cnj-001",
@@ -2928,7 +2945,8 @@
     "answer": "I could not tell you who that is now.",
     "expected": "Abstained",
     "rule": "seam-declines-without-absence-claim",
-    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Declines and asserts nothing about the record. Abstained on any reading."
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Declines and asserts nothing about the record. Abstained on any reading.",
+    "question_asks": "uncertainty"
   },
   {
     "id": "cal-sem-026",
@@ -2939,7 +2957,8 @@
     "answer": "Nothing is recorded for your courier.",
     "expected": "Missed",
     "rule": "seam-nothing-recorded",
-    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Asserts the record is empty when gold says it is not. The sibling of cal-sem-007, which is the case that first exposed this seam by matching the abstained illustration while carrying the missed label."
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Asserts the record is empty when gold says it is not. The sibling of cal-sem-007, which is the case that first exposed this seam by matching the abstained illustration while carrying the missed label.",
+    "question_asks": "absence"
   },
   {
     "id": "cal-wm-025",

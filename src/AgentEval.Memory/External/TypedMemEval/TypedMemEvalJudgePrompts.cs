@@ -198,6 +198,45 @@ internal static class TypedMemEvalJudgePrompts
           resolved entity alongside a correct count is correct, and so is naming the
           designation the events were recorded under. Only a contradiction demotes.
         """;
+    /// <remarks>
+    /// Semantic shipped without a body deliberately - it measured 0.958 on the shared preamble
+    /// alone and no case failed consistently, so a template would have been ceremony. What the
+    /// preamble cannot settle is its own abstained/missed line: it states the distinction as
+    /// uncertainty versus denial and then illustrates ABSTAINED with "I have no record of that",
+    /// which is a denial. Every other vertical with a stake carries a body that settles it;
+    /// Semantic was the only one that did not, and cal-sem-007 and cal-sem-013 flip between
+    /// Missed and Abstained across runs as a result.
+    ///
+    /// Editing the shared preamble was tried and measured: it converted the family's canonical
+    /// genuine-refusal cases to Missed in four verticals and dropped agreement 0.983 to 0.966.
+    /// The remedy is per-vertical, which is what this is.
+    /// </remarks>
+    private const string SemanticBody = """
+
+        This question asks you to RESOLVE something, not merely to recall it: the current value
+        after a chain of replacements, a fact stated under a different designation, or which
+        conversation a belief came from.
+
+        THE DISTINCTION THIS VERTICAL NEEDS SETTLED. An answer that fails to give the value can
+        fail in three different ways, and they are three different outcomes:
+
+        - It ASSERTS THE RECORD HOLDS NOTHING - "I have no record of that", "nothing is
+          recorded", "I do not have one on file" - when gold says the record does hold it. That
+          is "missed". It is a claim about the store, and gold says the claim is false.
+
+        - It DECLINES WITHOUT CLAIMING ABSENCE - "I could not say which", "I am not sure which
+          one you mean". That is "abstained". Uncertainty about what is there differs from
+          asserting nothing is.
+
+        - It COMMITS TO SOMETHING THAT IS NOT THE ANSWER. That is "wrong", not abstained, and
+          it includes two cases that look like refusals and are not: listing every value the
+          record has held without saying which is current, and restating a related fact instead
+          of answering the question asked. Both commit; neither declines.
+
+        Nothing above changes the preamble's precedence rules. A hedged answer is still graded
+        on the value it states, and extra detail that agrees with gold still never lowers the
+        outcome.
+        """;
     private const string ArithmeticBody = """
 
         This question has a derived numeric answer. Grade the ARITHMETIC, not the phrasing.
@@ -278,6 +317,9 @@ internal static class TypedMemEvalJudgePrompts
     internal static string Conjunction(string question, string gold, string answer)
         => string.Format(Preamble + ConjunctionBody + Closing, question, gold, answer);
 
+    internal static string Semantic(string question, string gold, string answer)
+        => string.Format(Preamble + SemanticBody + Closing, question, gold, answer);
+
     internal static string ListOrder(string question, string gold, string answer)
         => string.Format(Preamble + ListOrderBody + Closing, question, gold, answer);
 
@@ -313,6 +355,18 @@ internal static class TypedMemEvalJudgePrompts
              "reasoning": "<one or two sentences>",
              "ordered_pairs_correct": <integer>,
              "ordered_pairs_total": <integer>}
+            """,
+        TypedMemEvalVerdict.Kind.Semantic => """
+
+            Reply with a single JSON object and nothing else:
+            {"outcome": "correct" | "wrong" | "abstained" | "missed" | "premature",
+             "reasoning": "<one or two sentences>",
+             "question_asks": "value" | "absence" | "uncertainty"}
+
+            question_asks is what THE ANSWER commits to, and it is the branch you took above:
+            "value" if it commits to some value (right or wrong), "absence" if it asserts the
+            record holds nothing, "uncertainty" if it declines without claiming absence. Report
+            what you actually decided, not what would justify the outcome.
             """,
         TypedMemEvalVerdict.Kind.Bitemporal => """
 
@@ -362,6 +416,7 @@ internal static class TypedMemEvalJudgePrompts
             .Append(BitemporalBody).Append('\u001e')
             .Append(TemporalBody).Append('\u001e')
             .Append(ConjunctionBody).Append('\u001e')
+            .Append(SemanticBody).Append('\u001e')
             .Append(ArithmeticBody).Append('\u001e')
             .Append(ListOrderBody).Append('\u001e')
             .Append(ForgettingBody).Append('\u001e')
