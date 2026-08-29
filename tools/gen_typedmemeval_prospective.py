@@ -8,14 +8,38 @@ grounding, where the harness strips its own printed dates, a system that stamps 
 with ingestion time has nothing left to read.
 
     Seed carry-over (from agenteval-timegrounded-v1)   12
-    Due-later reminders                                16   =  8 before/after pairs
-    Expiring validity                                  12   =  6 before/after pairs
-    Not-yet-true assertions                            10   =  5 before/after pairs
+    Due-later reminders                                 8   =  4 before/after pairs
+    Expiring validity                                   6   =  3 before/after pairs
+    Not-yet-true assertions                             6   =  3 before/after pairs
+    Due-window sweeps                                  18   =  9 before/after pairs
 
 The pairs are the teeth. Each pair is one haystack asked twice, differing only in
 question_date: once before the pivotal instant, once after. Gold flips between the arms
 by construction, so a system that fires the reminder early is visibly *premature* rather
 than merely wrong -- a distinction no single question can draw.
+
+DUE-WINDOW EXISTS BECAUSE THE PAIRS ALONE WERE NOT ENOUGH, and the consuming project
+proved it. They ran this corpus with ProspectiveFiring AND ValidTime=Current both DARK --
+a doubly-dark control -- and scored 49/50. Every differentiator-shaped cell was perfect.
+Their prereg had fixed the reading in advance: "if it scores HIGH anyway, that is a
+finding about the corpus."
+
+The mechanism, once you look: the other three shapes NAME THE THING. "Has the reminder
+about the allotment lease renewal come due yet?" hands a similarity retriever the exact
+words of the session it needs, the harness hands the model "today", and the corpus hands
+it the due date. Comparing two dates in context is arithmetic, not firing semantics --
+so a system with no prospective feature at all answers correctly, and the pairs
+discriminate date arithmetic rather than the thing the vertical claims to measure.
+
+Due-window names NOTHING. "What did I ask to be reminded about that falls due in the next
+fortnight?" gives a similarity retriever no entity to match on; the haystack holds five to
+seven reminders whose only distinguishing property is WHEN each falls due. The answer is a
+SET, and the set membership changes with the as-of instant, so the two arms of a pair have
+different answers over identical evidence. A system that cannot query its own memory by
+time has nothing to retrieve on.
+
+The corpus difficulty this vertical carries is therefore now temporal-semantics difficulty
+in this shape and retrieval difficulty in the others, and the two are reported separately.
 
 V4 governs every message: no absolute date, no four-digit year anywhere in the
 conversations. Every temporal expression a speaker uses is relative ("in eight weeks",
@@ -43,6 +67,7 @@ SHAPE_SEED = "seed-carry-over"
 SHAPE_REMINDER = "due-later-reminder"
 SHAPE_VALIDITY = "expiring-validity"
 SHAPE_NOT_YET = "not-yet-true"
+SHAPE_WINDOW = "due-window"
 
 TYPE_SEED_ASOF = "temporal-as-of"
 TYPE_SEED_CURRENT = "temporal-current"
@@ -50,6 +75,7 @@ TYPE_SEED_PROSPECTIVE = "prospective-memory"
 TYPE_REMINDER = "prospective-reminder"
 TYPE_VALIDITY = "prospective-validity"
 TYPE_NOT_YET = "prospective-not-yet"
+TYPE_WINDOW = "prospective-due-window"
 
 # Relative phrasings and the week offsets they mean. The generator computes every gold
 # date from (session timestamp + offset), so the phrase and the answer cannot disagree.
@@ -219,6 +245,137 @@ def _supports_dash() -> bool:
         return False
 
 
+#: Reminders used by the due-window sweeps. Kept apart from REMINDERS so a window question and a
+#: named-entity question can never share a task and let the named one leak an answer to the other.
+WINDOW_TASKS = [
+    "re-tension the bike chain", "reorder the printer toner", "book the boiler service",
+    "return the borrowed telescope", "chase the deposit refund", "swap the smoke-alarm batteries",
+    "file the allotment water claim", "submit the conference abstract",
+    "renew the parking permit", "collect the repaired lamp",
+]
+
+#: The sweep window, in days, and the wording that expresses it without naming a date.
+WINDOW_SPANS = ((14, "the next fortnight"), (21, "the next three weeks"), (10, "the next ten days"))
+
+#: Varied phrasings for a window reminder. One uniform sentence shape made punctuation density a
+#: perfect gold separator in a fifth of the questions -- V7 caught it, correctly: a construction
+#: only gold receives is a frame, however little it says.
+WINDOW_FRAMES = (
+    "Remind me to {task} in {word} weeks.",
+    "Give me a nudge in {word} weeks -- I need to {task}.",
+    "In {word} weeks, remind me: {task}!",
+    "Something for the list; in {word} weeks I have to {task}.",
+    "Can you remind me in {word} weeks? I need to {task}.",
+    "Diary note: {task}, in {word} weeks.",
+)
+
+
+def _window_pair(
+    qid_before: str,
+    qid_after: str,
+    pair_id: str,
+    anchor,
+    rng: random.Random,  # DevSkim: ignore DS148264 - deterministic corpus generation
+    echo: float,
+    index: int,
+) -> list[tmc.Question]:
+    """One due-window sweep, asked twice.
+
+    THE SHAPE EXISTS BECAUSE NAMING THE THING DEFEATS THE MEASUREMENT. Every other shape here asks
+    "has <named reminder> come due?", which hands a similarity retriever the exact vocabulary of
+    the session it needs; the harness supplies "today" and the session supplies the due date, so
+    comparing them is arithmetic a model does in context with no prospective feature at all. The
+    consuming project proved it by scoring 49/50 with firing and valid-time BOTH dark.
+
+    This question names NOTHING. The haystack carries several reminders whose only distinguishing
+    property is when each falls due, and the answer is the SUBSET falling inside a window measured
+    from the as-of instant. Similarity has no entity to match on, and the two arms have different
+    answers over identical evidence, so a system that cannot query its memory by time has nothing
+    to retrieve on.
+
+    Gold differs BETWEEN THE ARMS, which no other shape here does: a session is gold on the arm
+    whose window contains its due date. Both arms still present identical evidence - the marking
+    differs, not the haystack.
+    """
+    span_days, span_words = WINDOW_SPANS[index % len(WINDOW_SPANS)]
+    question_text = (f"What did I ask you to remind me about that falls due in {span_words}? "
+                     f"Name each one and its date.")
+    echoed = tmc.echo_terms(question_text, echo, rng)
+
+    count = 5 + (index % 3)
+    tasks = [WINDOW_TASKS[(index * 3 + k) % len(WINDOW_TASKS)] for k in range(count)]
+
+    reminders = [tmc.make_session(anchor, ("", ""), gold_turn=0, tag="reminder") for _ in tasks]
+    filler = [_filler_session(rng, echoed, anchor) for _ in range(rng.randint(10, 14))]
+
+    sessions = list(filler)
+    for session in reminders:
+        sessions.insert(rng.randrange(len(sessions) + 1), session)
+
+    stamps = tmc.spread(anchor, len(sessions), hours=30)
+    for session, stamp in zip(sessions, stamps):
+        session.timestamp = stamp
+
+    latest = sessions[-1].timestamp
+
+    # Due dates are read back from the FINAL timestamps, never from the anchor - the lesson that
+    # cost this generator all 38 of its paired questions on its first V1 probe.
+    due = {}
+    for offset, (session, task) in enumerate(zip(reminders, tasks)):
+        weeks = ((latest - session.timestamp).days // 7) + 2 + offset
+        word = next((w for w, v in WEEK_WORDS.items() if v == weeks), None)
+        if word is None:
+            return []   # no word form for this offset; the pair is not emitted rather than fudged
+        frame = WINDOW_FRAMES[(index + offset) % len(WINDOW_FRAMES)]
+        session.turns[0].content = frame.format(task=task, word=word)
+        due[id(session)] = (task, session.timestamp + timedelta(weeks=weeks))
+
+    ordered = sorted(due.values(), key=lambda x: x[1])
+
+    # Two as-of instants whose windows select DIFFERENT non-empty subsets. Walk the sorted due
+    # dates and take a cut that leaves at least one on each side; a pair whose arms agree would
+    # measure nothing, so the construction refuses rather than emitting it.
+    before_at = after_at = None
+    for cut in range(1, len(ordered)):
+        candidate_before = ordered[0][1] - timedelta(days=1)
+        candidate_after = ordered[cut][1] - timedelta(days=1)
+        if candidate_before <= latest:
+            continue
+        in_before = [t for t, d in ordered if candidate_before < d <= candidate_before + timedelta(days=span_days)]
+        in_after = [t for t, d in ordered if candidate_after < d <= candidate_after + timedelta(days=span_days)]
+        if in_before and in_after and set(in_before) != set(in_after):
+            before_at, after_at = candidate_before, candidate_after
+            break
+    if before_at is None:
+        return []
+
+    def arm(asked, qid, label):
+        window = [(t, d) for t, d in ordered if asked < d <= asked + timedelta(days=span_days)]
+        copy = _copy(sessions)
+        chosen = {t for t, _ in window}
+        for session in copy:
+            session.is_gold = session.tag == "reminder" and any(
+                t in session.turns[0].content for t in chosen)
+            # A reminder outside THIS arm's window is not evidence for it. make_session marks the
+            # turn answer-bearing at construction, and the schema forbids that on a non-gold
+            # session, so the flag has to follow the per-arm marking rather than the tag.
+            for turn in session.turns:
+                turn.has_answer = session.is_gold and turn.role == "user"
+        listed = ", ".join(f"{t} on {_fmt(d)}" for t, d in window)
+        answer = (f"{len(window)}: {listed}." if len(window) != 1
+                  else f"One: {listed}.")
+        return tmc.Question(
+            qid, TYPE_WINDOW, question_text, answer, asked, copy,
+            {"pair_id": pair_id, "shape": SHAPE_WINDOW, "arm": label,
+             "window_days": span_days, "reminders_in_haystack": count,
+             "reminders_in_window": len(window),
+             "difficulty_dial": "distance", "difficulty_validated": False,
+             "difficulty": _displacement_band(asked, copy),
+             "displacement_days": _displacement_days(asked, copy)})
+
+    return [arm(before_at, qid_before, "before"), arm(after_at, qid_after, "after")]
+
+
 def _pair(
     qid_before: str,
     qid_after: str,
@@ -246,7 +403,16 @@ def _pair(
 
     Both arms share one haystack, deep-copied so a mutation on one arm cannot reach the other.
     Independence between the arms is a property of the *run* -- the runner resets the agent between
-    questions -- not of the corpus, which must present both arms with identical evidence.
+    questions -- not of the corpus.
+
+    WHAT "SHARED" MEANS HERE, MEASURED RATHER THAN ASSUMED. An earlier version of this docstring
+    claimed the arms present IDENTICAL evidence. They do not, and never have in any shipped
+    revision: `finalise`'s equalisation pipeline runs per question, so the padding appended to each
+    session is regenerated independently after the copy and 0 of 19 pairs match byte for byte. What
+    IS identical is everything load-bearing -- the same sessions in the same order at the same
+    timestamps, and the same answer-bearing sentence, so both arms derive the same pivot from the
+    same reminder. Only decorative padding differs. The claim is narrowed to what holds because the
+    stronger one was checked and was false.
     """
     echoed = tmc.echo_terms(question_text, echo, rng)
 
@@ -380,16 +546,26 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
     return out
 
 
-def build(echo: float, rng: random.Random) -> list[tmc.Question]:
+def build(echo, rng: random.Random) -> list[tmc.Question]:
+    """`echo` is a float, or a dict keyed by shape under per-shape calibration.
+
+    Per-shape matters here more than it did before the reshape: due-window is deliberately less
+    lexically reachable than the named-entity shapes - that is the whole point of it - so one knob
+    tuned on the mean would loosen the named shapes to pay for it, which is the
+    mean-satisfiable-by-averaging defect this family has now hit at coverage, at headroom, and here.
+    """
+    def knob(shape: str) -> float:
+        return echo.get(shape, 0.0) if isinstance(echo, dict) else echo
+
     questions: list[tmc.Question] = []
-    questions += _seed_questions(rng, echo, start_index=1)
+    questions += _seed_questions(rng, knob(SHAPE_SEED), start_index=1)
 
     index = 13
     pair_no = 1
     base = datetime(2026, 3, 2, 9, 30)
 
-    # --- Due-later reminders: 8 pairs -------------------------------------------------
-    for i in range(8):
+    # --- Due-later reminders: 4 pairs -------------------------------------------------
+    for i in range(4):
         task, noun = REMINDERS[i % len(REMINDERS)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -400,13 +576,14 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"Not yet. You asked to be reminded to {task}, and it falls due on {{date}}, "
             f"which is still ahead of you.",
             f"Yes. The reminder to {task} came due on {{date}}, which has now passed.",
-            base + timedelta(days=11 * i), rng, echo, filler_count=rng.randint(12, 17),
+            base + timedelta(days=11 * i), rng, knob(SHAPE_REMINDER),
+            filler_count=rng.randint(12, 17),
         )
         index += 2
         pair_no += 1
 
-    # --- Expiring validity: 6 pairs ---------------------------------------------------
-    for i in range(6):
+    # --- Expiring validity: 3 pairs ---------------------------------------------------
+    for i in range(3):
         thing, noun = VALIDITY[i % len(VALIDITY)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -416,13 +593,14 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             "",  # shared bank only — see equalise_reply
             f"Yes, still valid. The {thing} runs out on {{date}}.",
             f"No, it has expired. The {thing} ran out on {{date}}.",
-            base + timedelta(days=9 * i + 4), rng, echo, filler_count=rng.randint(12, 17),
+            base + timedelta(days=9 * i + 4), rng, knob(SHAPE_VALIDITY),
+            filler_count=rng.randint(12, 17),
         )
         index += 2
         pair_no += 1
 
-    # --- Not-yet-true assertions: 5 pairs ---------------------------------------------
-    for i in range(5):
+    # --- Not-yet-true assertions: 3 pairs ---------------------------------------------
+    for i in range(3):
         future, past, noun = NOT_YET[i % len(NOT_YET)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -442,10 +620,28 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
             f"It is still ahead. The record has you due to {future} on {{date}}.",
             f"It is no longer ahead. The record had you due to {future} on {{date}}, which has "
             f"passed; nothing since then records whether it went ahead.",
-            base + timedelta(days=13 * i + 2), rng, echo, filler_count=rng.randint(12, 17),
+            base + timedelta(days=13 * i + 2), rng, knob(SHAPE_NOT_YET),
+            filler_count=rng.randint(12, 17),
         )
         index += 2
         pair_no += 1
+
+    # --- Due-window sweeps: 9 pairs ---------------------------------------------------
+    # The shape the consuming project's doubly-dark 49/50 asked for: no entity named, so
+    # similarity has nothing to match and only a time-indexed query reaches the answer.
+    made = 0
+    attempt = 0
+    while made < 9:
+        pair = _window_pair(
+            f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
+            base + timedelta(days=7 * attempt + 3), rng, knob(SHAPE_WINDOW), attempt)
+        attempt += 1
+        if not pair:
+            continue          # arms would have agreed; that pair measures nothing
+        questions += pair
+        index += 2
+        pair_no += 1
+        made += 1
 
     return questions
 
@@ -476,6 +672,12 @@ def check_pairs(questions: list[tmc.Question]) -> list[str]:
             failures.append(f"{pid}: arms ask different questions")
         if not before.question_date < after.question_date:
             failures.append(f"{pid}: before-arm query time does not precede the after-arm")
+        if before.extension.get("shape") == SHAPE_WINDOW:
+            # A window arm names a SET of things falling due ahead of the as-of instant; there is
+            # no single pivot to describe as "not yet". The equivalent guarantee is enforced by
+            # _check_window, which requires every gold due date to lie strictly after the question
+            # date, and by _check_window_arms_differ.
+            continue
         lowered = before.answer.lower()
         # "still ahead" joins the list for the not-yet-true shape, which now asks what the
         # record shows rather than whether the thing happened. The property being checked is
@@ -508,8 +710,8 @@ def _check_arithmetic(questions: list[tmc.Question]) -> list[str]:
     """
     failures = []
     for q in questions:
-        if q.extension.get("shape") == SHAPE_SEED:
-            continue
+        if q.extension.get("shape") in (SHAPE_SEED, SHAPE_WINDOW):
+            continue   # SHAPE_WINDOW has its own arithmetic check: _check_window
         gold_index = q.gold_indices[0]
         session = q.sessions[gold_index]
         text = session.turns[0].content
@@ -531,14 +733,97 @@ def _check_arithmetic(questions: list[tmc.Question]) -> list[str]:
     return failures
 
 
+def _check_window(questions: list[tmc.Question]) -> list[str]:
+    """Re-does the arithmetic for the due-window sweeps, over the whole gold SET.
+
+    _check_arithmetic verifies one pivot against one gold, which is what the named-entity pairs
+    carry. A window answer names one date per gold, and every one of them has to be the date that
+    gold session's own timestamp produces - the same guarantee, applied set-wise. Written because
+    the single-gold version would silently pass a window question after checking one of its four
+    dates.
+    """
+    failures = []
+    for q in questions:
+        if q.extension.get("shape") != SHAPE_WINDOW:
+            continue
+
+        gold = [q.sessions[i] for i in q.gold_indices]
+        if not gold:
+            failures.append(f"{q.question_id}: due-window arm has no gold at all")
+            continue
+
+        span = timedelta(days=q.extension["window_days"])
+        for session in gold:
+            text = session.turns[0].content
+            weeks = next((v for w, v in WEEK_WORDS.items() if f" {w} weeks" in text), None)
+            if weeks is None:
+                failures.append(f"{q.question_id}: a gold turn states no week offset")
+                continue
+            due = session.timestamp + timedelta(weeks=weeks)
+            if _fmt(due) not in q.answer:
+                failures.append(
+                    f"{q.question_id}: answer does not name {_fmt(due)}, the date a gold session's "
+                    f"own timestamp plus {weeks} weeks produces")
+            # THE DEFINING PROPERTY: gold is exactly what falls inside the window measured from the
+            # as-of instant. A gold outside it would mean the arm is scored on evidence its own
+            # question does not ask for.
+            if not (q.question_date < due <= q.question_date + span):
+                failures.append(
+                    f"{q.question_id}: a gold session falls due {_fmt(due)}, outside the "
+                    f"{q.extension['window_days']}-day window from {_fmt(q.question_date)}")
+
+        # And nothing outside gold may fall inside the window, or the answer is incomplete.
+        for session in q.sessions:
+            if session.is_gold or session.tag != "reminder":
+                continue
+            text = session.turns[0].content
+            weeks = next((v for w, v in WEEK_WORDS.items() if f" {w} weeks" in text), None)
+            if weeks is None:
+                continue
+            due = session.timestamp + timedelta(weeks=weeks)
+            if q.question_date < due <= q.question_date + span:
+                failures.append(
+                    f"{q.question_id}: a NON-gold reminder falls due {_fmt(due)}, inside the "
+                    f"window - the answer is incomplete and the question unanswerable as gold")
+    return failures
+
+
+def _check_window_arms_differ(questions: list[tmc.Question]) -> list[str]:
+    """A pair whose arms give the same answer measures nothing.
+
+    This is the whole point of the shape: identical evidence, different as-of instant, different
+    answer. If the two arms ever agree, the question has stopped discriminating a system that
+    tracks time from one that does not, and it should fail the build rather than pad the count.
+    """
+    failures = []
+    by_pair = {}
+    for q in questions:
+        if q.extension.get("shape") != SHAPE_WINDOW:
+            continue
+        by_pair.setdefault(q.extension["pair_id"], []).append(q)
+    for pair_id, arms in by_pair.items():
+        if len(arms) != 2:
+            failures.append(f"{pair_id}: due-window pair has {len(arms)} arms, expected 2")
+            continue
+        if arms[0].answer == arms[1].answer:
+            failures.append(
+                f"{pair_id}: both arms answer identically, so the as-of instant changes nothing "
+                f"and the pair measures neither firing nor valid time")
+    return failures
+
+
 if __name__ == "__main__":
     tmc.finalise(
         vertical="prospective",
         build=build,
         structure=tmc.StructureSpec(
-            h_min=10, h_max=24, g_values={1, 2}, gold_position_shuffled=True,
+            # 1-2 for the named-entity shapes; due-window carries one gold per reminder whose
+            # due date falls inside the arm's window, which runs to four.
+            h_min=10, h_max=24, g_values={1, 2, 3, 4}, gold_position_shuffled=True,
             no_absolute_dates=True,
         ),
         generator_tool="tools/gen_typedmemeval_prospective.py",
-        extra_checks=check_pairs,
+        extra_checks=lambda qs: (check_pairs(qs) + _check_window(qs)
+                                 + _check_window_arms_differ(qs)),
+        shape_of=lambda q: (q.extension or {}).get("shape"),
     )

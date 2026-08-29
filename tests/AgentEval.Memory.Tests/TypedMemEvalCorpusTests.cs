@@ -713,6 +713,18 @@ public sealed class TypedMemEvalCorpusTests
             // Declared rather than ratcheted on purpose. A ratchet says "known bad, improve it";
             // this says "the band does not apply here", and the difference matters — a future
             // session must not try to calibrate this shape into range and quietly destroy it.
+            // The reshape's whole point, and the reason it is declared rather than ratcheted. The
+            // question names NO entity - "what did I ask to be reminded about that falls due in the
+            // next fortnight?" - so a lexical retriever has nothing to match and reaches the
+            // reminders only by accident. Realised coverage is 0.222 at echo 0.125, and there is no
+            // knob that raises it: raising it would mean naming the thing in the question, which is
+            // exactly the construction that let the consuming project score 49/50 with firing and
+            // valid-time both dark.
+            [(TypedMemEvalVertical.Prospective, "due-window")] =
+                "Names no entity by construction, so BM25 has nothing to match on and coverage " +
+                "cannot be raised without reintroducing the entity - which is the saturation the " +
+                "reshape exists to remove. 0.222 is the shape's floor, not a calibration failure.",
+
             [(TypedMemEvalVertical.Conjunction, "alias-then-count")] =
                 "Co-reference by construction: events are stated under a designation the question " +
                 "never uses, so BM25 cannot reach them from the question at any echo setting. " +
@@ -740,7 +752,17 @@ public sealed class TypedMemEvalCorpusTests
             [(TypedMemEvalVertical.Episodic, "list-order")] = 0.2746,
             [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 0.9333,
             [(TypedMemEvalVertical.Forgetting, "still-valid")] = 0.4667,
+            // The reshape improved this one from 1.0000 to 0.8333 - into band - by rebalancing the
+            // named-entity shapes to make room for due-window. Left in the ratchet because the
+            // ratchet is a floor that may only improve, and removing an entry a change happened to
+            // fix would hide that it was ever there.
             [(TypedMemEvalVertical.Prospective, "expiring-validity")] = 1.0000,
+            // SATURATED, and newly visible. G=1 with a named entity means BM25@5 finds the single
+            // gold session every time, so realised coverage is 1.000 and no echo setting moves it.
+            // It is ratcheted rather than declared uncalibratable because it CAN be fixed - by the
+            // same treatment due-window got, removing the entity from the question - whereas
+            // due-window's floor is a property of already having done that.
+            [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
             [(TypedMemEvalVertical.Temporal, "occurrence-order")] = 0.9500,
             [(TypedMemEvalVertical.Temporal, "recency")] = 1.0000,
             [(TypedMemEvalVertical.WorkingMemory, "distance-8")] = 1.0000,
