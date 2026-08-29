@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Semantic gained a judge body, and it was built under REACH ENUMERATION.** Semantic shipped
+  without one deliberately — it measured 0.958 on the shared preamble alone and nothing failed
+  consistently — but that left it as the **only** vertical with nothing to settle the preamble's
+  `abstained`/`missed` line, which states the distinction as *uncertainty versus denial* and then
+  illustrates `abstained` with *"I have no record of that"* — a denial. `cal-sem-007` and
+  `cal-sem-013` alternated across runs as a result. **Semantic is now 26/26 in all three runs**;
+  family agreement 0.991 / 0.987 / 0.996.
+
+  All 26 Semantic cases were enumerated *before* a line of the body was written, and **19 carry a
+  declared route** rather than only the four the body targets — `absence` (4), `uncertainty` (4),
+  `value` (11). The two that matter are `cal-sem-005` and `cal-sem-020`: both *look* like refusals
+  and both **commit**, so a body sweeping them into `abstained` would have repeated the preamble
+  regression at vertical scale. Both held. The route is asserted independently of the outcome, so a
+  template reaching the right label by the wrong reasoning fails rather than passing quietly.
+
+- **Prospective is reshaped: firing semantics are now required, not optional.** The consuming
+  project ran the corpus with `ProspectiveFiring` **and** `ValidTime=Current` both dark and scored
+  **49/50**. The mechanism was that every shape **named the thing** — which hands a similarity
+  retriever the words of the session it needs, while the harness supplies "today" and the corpus
+  supplies the due date, making the comparison in-context arithmetic no memory feature is needed for.
+
+  The new `due-window` shape names **nothing**: several reminders whose only distinguishing property
+  is *when* each falls due, and an answer that is a **set** whose membership changes with the as-of
+  instant. Result — **the family's first real interference cost, 0.00 → 0.28**, and `due-window`'s V8
+  is **4/18**: the entire haystack in context and fourteen still fail. Headroom 0.32 → 0.54.
+
+  Per-shape calibration, opted in here for the first time, also revealed `not-yet-true` has been
+  **saturated at 1.000** for its whole shipped life, hidden by the vertical mean. Ratcheted.
+
+- **The shared preamble's `abstained`/`missed` seam was investigated and the preamble ships
+  UNCHANGED.** Eight negative controls showed six of eight pass with no edit at all, and the repair
+  that makes the preamble self-consistent turned out to be a **measured regression** — it converted
+  the family's canonical `genuine-refusal-abstains` cases to `Missed` across four verticals and
+  dropped agreement 0.983 → 0.966.
+
+  What holds instead is narrower and was written down nowhere: **a vertical body supersedes the
+  shared preamble**, so the same sentence is correctly `wrong` in Forgetting (over-forgetting) and
+  correctly `missed` in Semantic. The ambiguity reaches only a vertical that *lacks* a body — which
+  is why the remedy was the Semantic body above, not a preamble edit.
+
+  The lesson the consuming project adopted from it: **controls-first is necessary and not
+  sufficient — enumerate what a change can REACH, not only what it targets.** The guard written for
+  that edit was built against the imagined failure; the regression landed on existing cases never
+  enumerated.
+
+## [0.30.0-beta] - 2026-08-29
+
+
+### Fixed
+
 - **A family-wide judge floor is satisfiable by averaging — added a per-vertical one.** Bitemporal
   sat at **0.750** behind a green family **0.946** because six verticals near 0.98 averaged it away,
   and the gate only ever read the mean. This is the same defect the corpus calibration had, where
