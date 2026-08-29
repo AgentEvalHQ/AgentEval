@@ -175,6 +175,51 @@ public sealed class TypedMemEvalCorpusTests
 
     [Theory]
     [MemberData(nameof(AllVerticals))]
+    public void Metadata_LabelsEveryGoldItemWithItsMemoryType(TypedMemEvalVertical vertical)
+    {
+        // ADR-027 §10 commitment 1. Prompt 10's Conjunction vertical COMPOSES certified verticals
+        // rather than authoring fresh questions, so a merged question draws gold from more than one
+        // memory type and the consuming decision rule needs a per-type denominator. Recording the
+        // type once per question is sufficient only while every gold item in a question shares it,
+        // which is true today and stops being true the moment composition starts.
+        //
+        // The labels live in the SIDECAR, not the corpus, and deliberately: corpus_sha256 covers
+        // the whole corpus JSON, so putting them in the extension would have changed the sha of all
+        // eight verticals and invalidated every probe record with it.
+        var metadata = Metadata(vertical);
+        Assert.True(
+            metadata.TryGetProperty("gold_item_types", out var labels),
+            $"{vertical}: the sidecar carries no gold_item_types. Run tools/add_gold_item_types.py.");
+
+        var slug = TypedMemEvalVerticals.All.Single(d => d.Vertical == vertical).Slug;
+        var extensions = TypedMemEvalExtensions.Parse(TypedMemEvalCorpus.ReadJson(vertical));
+
+        foreach (var entry in TypedMemEvalCorpus.Load(vertical))
+        {
+            Assert.True(
+                labels.TryGetProperty(entry.QuestionId, out var forQuestion),
+                $"{entry.QuestionId}: no gold_item_types entry.");
+
+            // One label per gold item, in the order the gold ids appear — a count mismatch means
+            // the sidecar describes a corpus other than the one shipping beside it.
+            var goldCount = extensions[entry.QuestionId].GoldSessionIndices.Count;
+            Assert.True(
+                forQuestion.GetArrayLength() == goldCount,
+                $"{entry.QuestionId}: {forQuestion.GetArrayLength()} type labels for {goldCount} " +
+                $"gold items.");
+
+            // Every shipped vertical is single-type. Conjunction is where this stops holding, and
+            // when it does this assertion is what has to be widened deliberately rather than a
+            // silent mixture appearing in a corpus that claims to be one type.
+            foreach (var label in forQuestion.EnumerateArray())
+            {
+                Assert.Equal(slug, label.GetString());
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
     public void Corpus_LabelsGoldOnlyOnAnswerSessions(TypedMemEvalVertical vertical)
     {
         var corpusJson = TypedMemEvalCorpus.ReadJson(vertical);

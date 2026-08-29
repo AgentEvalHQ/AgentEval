@@ -129,6 +129,162 @@
       "accuracy_scaffolding_stripped": 0.96
     }
   },
+  "gold_item_types": {
+    "tme-pro-001": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-002": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-003": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-004": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-005": [
+      "prospective"
+    ],
+    "tme-pro-006": [
+      "prospective"
+    ],
+    "tme-pro-007": [
+      "prospective"
+    ],
+    "tme-pro-008": [
+      "prospective"
+    ],
+    "tme-pro-009": [
+      "prospective"
+    ],
+    "tme-pro-010": [
+      "prospective"
+    ],
+    "tme-pro-011": [
+      "prospective"
+    ],
+    "tme-pro-012": [
+      "prospective"
+    ],
+    "tme-pro-013": [
+      "prospective"
+    ],
+    "tme-pro-014": [
+      "prospective"
+    ],
+    "tme-pro-015": [
+      "prospective"
+    ],
+    "tme-pro-016": [
+      "prospective"
+    ],
+    "tme-pro-017": [
+      "prospective"
+    ],
+    "tme-pro-018": [
+      "prospective"
+    ],
+    "tme-pro-019": [
+      "prospective"
+    ],
+    "tme-pro-020": [
+      "prospective"
+    ],
+    "tme-pro-021": [
+      "prospective"
+    ],
+    "tme-pro-022": [
+      "prospective"
+    ],
+    "tme-pro-023": [
+      "prospective"
+    ],
+    "tme-pro-024": [
+      "prospective"
+    ],
+    "tme-pro-025": [
+      "prospective"
+    ],
+    "tme-pro-026": [
+      "prospective"
+    ],
+    "tme-pro-027": [
+      "prospective"
+    ],
+    "tme-pro-028": [
+      "prospective"
+    ],
+    "tme-pro-029": [
+      "prospective"
+    ],
+    "tme-pro-030": [
+      "prospective"
+    ],
+    "tme-pro-031": [
+      "prospective"
+    ],
+    "tme-pro-032": [
+      "prospective"
+    ],
+    "tme-pro-033": [
+      "prospective"
+    ],
+    "tme-pro-034": [
+      "prospective"
+    ],
+    "tme-pro-035": [
+      "prospective"
+    ],
+    "tme-pro-036": [
+      "prospective"
+    ],
+    "tme-pro-037": [
+      "prospective"
+    ],
+    "tme-pro-038": [
+      "prospective"
+    ],
+    "tme-pro-039": [
+      "prospective"
+    ],
+    "tme-pro-040": [
+      "prospective"
+    ],
+    "tme-pro-041": [
+      "prospective"
+    ],
+    "tme-pro-042": [
+      "prospective"
+    ],
+    "tme-pro-043": [
+      "prospective"
+    ],
+    "tme-pro-044": [
+      "prospective"
+    ],
+    "tme-pro-045": [
+      "prospective"
+    ],
+    "tme-pro-046": [
+      "prospective"
+    ],
+    "tme-pro-047": [
+      "prospective"
+    ],
+    "tme-pro-048": [
+      "prospective"
+    ],
+    "tme-pro-049": [
+      "prospective"
+    ],
+    "tme-pro-050": [
+      "prospective"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
@@ -552,7 +708,7 @@
       "probed_corpus_sha256": "6ddd3e9bb594816ee866b3255cd8a7beb274b6d46661d19574632299dd7df0f3"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-23T19:14:32Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -654,7 +810,7 @@
         "v8": true,
         "v8_answer": "At the start of March, you were a member of **Riverside Fitness**.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which gym you were a member of at the start of March. They only mention “gym, start, march” without naming a gym.",
+        "v9_answer": "The conversations don\u2019t say which gym you were a member of at the start of March. They only mention \u201cgym, start, march\u201d without naming a gym.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -665,9 +821,9 @@
       "tme-pro-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "One allergy tablet each morning. The conversations say you started one tablet with breakfast on Feb 3, and it wasn’t doubled to two each morning until the Apr 6 doctor’s appointment.",
+        "v8_answer": "One allergy tablet each morning. The conversations say you started one tablet with breakfast on Feb 3, and it wasn\u2019t doubled to two each morning until the Apr 6 doctor\u2019s appointment.",
         "v9": false,
-        "v9_answer": "I don’t know. The conversations mention “allergy,” “morning,” and “tablets,” but they do not say how many you were taking during March.",
+        "v9_answer": "I don\u2019t know. The conversations mention \u201callergy,\u201d \u201cmorning,\u201d and \u201ctablets,\u201d but they do not say how many you were taking during March.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -678,7 +834,7 @@
       "tme-pro-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were working to **27 April 2026** — eight weeks from the Harbour kickoff on **2 March 2026**.",
+        "v8_answer": "We were working to **27 April 2026** \u2014 eight weeks from the Harbour kickoff on **2 March 2026**.",
         "v9": true,
         "v9_answer": "We were working to **27 April 2026** for Harbour delivery before the client moved it.",
         "v9_gold_in_context": 2,
@@ -691,9 +847,9 @@
       "tme-pro-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "About four weeks — you first mentioned the first physio session on 2026/01/20, and said your shoulder felt better on 2026/02/17.",
+        "v8_answer": "About four weeks \u2014 you first mentioned the first physio session on 2026/01/20, and said your shoulder felt better on 2026/02/17.",
         "v9": true,
-        "v9_answer": "About four weeks — from your first physio session on Jan 20 to when you said your shoulder felt better on Feb 17.",
+        "v9_answer": "About four weeks \u2014 from your first physio session on Jan 20 to when you said your shoulder felt better on Feb 17.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -706,7 +862,7 @@
         "v8": true,
         "v8_answer": "No. You started the 30-day Lumen trial on 2026/04/28, so it would have ended around 2026/05/28. As of 2026/06/03, it is no longer running.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They only mention “still, trial, lumen” as something on your mind, but they don’t say when the Lumen trial started or ends.",
+        "v9_answer": "I don\u2019t know from these conversations. They only mention \u201cstill, trial, lumen\u201d as something on your mind, but they don\u2019t say when the Lumen trial started or ends.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -717,9 +873,9 @@
       "tme-pro-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Yes. You accepted the Halcyon Systems offer on 2026/02/16 and said you start the first Monday of the next month — 2026/03/02. Since today is 2026/04/20, you’ve started already.",
+        "v8_answer": "Yes. You accepted the Halcyon Systems offer on 2026/02/16 and said you start the first Monday of the next month \u2014 2026/03/02. Since today is 2026/04/20, you\u2019ve started already.",
         "v9": true,
-        "v9_answer": "Yes. You said on 2026/02/16 that you start at Halcyon Systems on the first Monday of the next month — March 2, 2026 — and today is 2026/04/20.",
+        "v9_answer": "Yes. You said on 2026/02/16 that you start at Halcyon Systems on the first Monday of the next month \u2014 March 2, 2026 \u2014 and today is 2026/04/20.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -730,9 +886,9 @@
       "tme-pro-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The puppy is about **20 weeks old** now — roughly **4½ months**.",
+        "v8_answer": "The puppy is about **20 weeks old** now \u2014 roughly **4\u00bd months**.",
         "v9": true,
-        "v9_answer": "The puppy is 20 weeks old now — about 4½ months.",
+        "v9_answer": "The puppy is 20 weeks old now \u2014 about 4\u00bd months.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -745,7 +901,7 @@
         "v8": true,
         "v8_answer": "No. Your car was serviced on 2026/01/29, and you said it is done every six months, so the next service would be due around 2026/07/29. Current date is 2026/06/20.",
         "v9": false,
-        "v9_answer": "I don’t have enough information from those conversations to tell.\n\nThey mention “car service” being on your mind, and Sam’s car test, but they don’t say when your car service is due.",
+        "v9_answer": "I don\u2019t have enough information from those conversations to tell.\n\nThey mention \u201ccar service\u201d being on your mind, and Sam\u2019s car test, but they don\u2019t say when your car service is due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -756,9 +912,9 @@
       "tme-pro-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No. You signed the Meridian Health contract on 2026/05/11, and “first Monday of next month” was day one — that would be 2026/06/01. Current date is 2026/05/27, so you have not started yet.",
+        "v8_answer": "No. You signed the Meridian Health contract on 2026/05/11, and \u201cfirst Monday of next month\u201d was day one \u2014 that would be 2026/06/01. Current date is 2026/05/27, so you have not started yet.",
         "v9": true,
-        "v9_answer": "No. Your day one at Meridian Health is the first Monday of next month — June 1, 2026 — and it is currently May 27, 2026.",
+        "v9_answer": "No. Your day one at Meridian Health is the first Monday of next month \u2014 June 1, 2026 \u2014 and it is currently May 27, 2026.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -770,7 +926,7 @@
         "v8": true,
         "v8_answer": "No. The visa application went in on 2026/04/14, and they said to allow eight weeks for a decision. As of 2026/05/26, it has been about six weeks, so it is not overdue yet.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. The visa application is mentioned as being “on my mind,” but there’s no date, expected response time, or deadline recorded.",
+        "v9_answer": "I don\u2019t know from these conversations. The visa application is mentioned as being \u201con my mind,\u201d but there\u2019s no date, expected response time, or deadline recorded.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -794,9 +950,9 @@
       "tme-pro-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No. You joined the rowing club on 2026/02/24, and the members’ rate only kicks in after six months, so it should be available around 2026/08/24.",
+        "v8_answer": "No. You joined the rowing club on 2026/02/24, and the members\u2019 rate only kicks in after six months, so it should be available around 2026/08/24.",
         "v9": true,
-        "v9_answer": "No. You joined the rowing club on 2026/02/24, and the members’ rate only kicks in after six months, so it should apply around 2026/08/24. Current date is 2026/06/15.",
+        "v9_answer": "No. You joined the rowing club on 2026/02/24, and the members\u2019 rate only kicks in after six months, so it should apply around 2026/08/24. Current date is 2026/06/15.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -809,7 +965,7 @@
         "v8": true,
         "v8_answer": "No. The allotment lease renewal reminder has not come due yet.\n\nIt is due on **2026/05/30 (Sat)**.",
         "v9": true,
-        "v9_answer": "No. The allotment lease renewal reminder has not come due yet.\n\nIt was set on 2026/03/21 for “in ten weeks,” so it is due on 2026/05/30.",
+        "v9_answer": "No. The allotment lease renewal reminder has not come due yet.\n\nIt was set on 2026/03/21 for \u201cin ten weeks,\u201d so it is due on 2026/05/30.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -834,7 +990,7 @@
         "v8": true,
         "v8_answer": "No. The reminder to book the boiler service is due on 2026/05/22 (Fri), so as of 2026/05/16 it has not come due yet.",
         "v9": false,
-        "v9_answer": "I can’t tell from these conversations. They mention “service, due, come, reminder, boiler, date” as something on the assistant’s mind, but they never give an actual due date for a boiler service booking reminder, so I can’t say whether it has come due.",
+        "v9_answer": "I can\u2019t tell from these conversations. They mention \u201cservice, due, come, reminder, boiler, date\u201d as something on the assistant\u2019s mind, but they never give an actual due date for a boiler service booking reminder, so I can\u2019t say whether it has come due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -847,7 +1003,7 @@
         "v8": true,
         "v8_answer": "Yes. The reminder to book the boiler service came due on **Friday, 2026/05/22**. Since today is **Thursday, 2026/05/28**, it is already due.",
         "v9": false,
-        "v9_answer": "I can’t tell from these conversations. They mention a boiler service reminder being “on my mind,” but they do not give the reminder’s due date, so I can’t say whether it has come due or what date it was due.",
+        "v9_answer": "I can\u2019t tell from these conversations. They mention a boiler service reminder being \u201con my mind,\u201d but they do not give the reminder\u2019s due date, so I can\u2019t say whether it has come due or what date it was due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -938,7 +1094,7 @@
         "v8": true,
         "v8_answer": "No. The reminder to submit the conference abstract is due on **2026/07/24 (Fri)**, so as of **2026/07/18 (Sat)** it has **not** come due yet.",
         "v9": false,
-        "v9_answer": "I can’t tell from those conversations. They mention a reminder about a “conference abstract,” but they do not give a due date, so I can’t say whether it has come due yet or what date it is/was due.",
+        "v9_answer": "I can\u2019t tell from those conversations. They mention a reminder about a \u201cconference abstract,\u201d but they do not give a due date, so I can\u2019t say whether it has come due yet or what date it is/was due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -951,7 +1107,7 @@
         "v8": true,
         "v8_answer": "Yes. The reminder to submit the conference abstract was due on **2026/07/24 (Fri)**, so by **2026/07/30** it has already come due.",
         "v9": false,
-        "v9_answer": "The conversations do not contain a due date for the conference abstract reminder.\n\nThey only repeatedly mention: “Also on my mind: conference, come, abstract, date, reminder.” So I can’t tell whether it has come due yet, or what date it is/was due.",
+        "v9_answer": "The conversations do not contain a due date for the conference abstract reminder.\n\nThey only repeatedly mention: \u201cAlso on my mind: conference, come, abstract, date, reminder.\u201d So I can\u2019t tell whether it has come due yet, or what date it is/was due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -990,7 +1146,7 @@
         "v8": true,
         "v8_answer": "No. The reminder has not come due yet.\n\nIt was set on 2026/05/28 for eleven weeks later, so it is due on 2026/08/13.",
         "v9": false,
-        "v9_answer": "Yes. The conversations give two possible dates for the smoke-detector/battery reminder:\n\n- **2026/07/03** — from 2026/05/22 plus six weeks.\n- **2026/07/13** — from 2026/05/25 plus seven weeks.\n\nAs of **2026/08/07**, either date has already passed.",
+        "v9_answer": "Yes. The conversations give two possible dates for the smoke-detector/battery reminder:\n\n- **2026/07/03** \u2014 from 2026/05/22 plus six weeks.\n- **2026/07/13** \u2014 from 2026/05/25 plus seven weeks.\n\nAs of **2026/08/07**, either date has already passed.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1168,9 +1324,9 @@
       "tme-pro-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you are due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **Thursday, 2026/05/21**.\n\nAs of **2026/05/15**, that date is **still ahead of you** — in **6 days**.",
+        "v8_answer": "The record says you are due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **Thursday, 2026/05/21**.\n\nAs of **2026/05/15**, that date is **still ahead of you** \u2014 in **6 days**.",
         "v9": true,
-        "v9_answer": "The record says you are due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **2026/05/21**.\n\nAs of the current date, **2026/05/15**, that date is **still ahead of you** — it is in **six days**.",
+        "v9_answer": "The record says you are due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **2026/05/21**.\n\nAs of the current date, **2026/05/15**, that date is **still ahead of you** \u2014 it is in **six days**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1181,7 +1337,7 @@
       "tme-pro-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you were due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **2026/05/21 (Thu)**.\n\nAs of **2026/05/27 (Wed)**, that date is **no longer ahead of you** — it was **6 days ago**.",
+        "v8_answer": "The record says you were due to start at Halloway Instruments **nine weeks after 2026/03/19**, which is **2026/05/21 (Thu)**.\n\nAs of **2026/05/27 (Wed)**, that date is **no longer ahead of you** \u2014 it was **6 days ago**.",
         "v9": true,
         "v9_answer": "The record says that on 2026/03/19 you were due to start at Halloway Instruments in nine weeks.\n\nThat works out to 2026/05/21.\n\nAs of 2026/05/27, that date is no longer ahead of you; it has already passed.",
         "v9_gold_in_context": 1,
@@ -1194,9 +1350,9 @@
       "tme-pro-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you were due to move into the flat on Ferrier Row **eleven weeks after 2026/03/27**, which is **2026/06/12 (Friday)**.\n\nAs of **2026/06/06**, that date is **still ahead of you** — in about **6 days**.",
+        "v8_answer": "The record says you were due to move into the flat on Ferrier Row **eleven weeks after 2026/03/27**, which is **2026/06/12 (Friday)**.\n\nAs of **2026/06/06**, that date is **still ahead of you** \u2014 in about **6 days**.",
         "v9": true,
-        "v9_answer": "The record says you are due to move into the flat on Ferrier Row **eleven weeks after 2026/03/27**, which is **2026/06/12**.\n\nAs of **2026/06/06**, that date is still ahead of you — **in 6 days**.",
+        "v9_answer": "The record says you are due to move into the flat on Ferrier Row **eleven weeks after 2026/03/27**, which is **2026/06/12**.\n\nAs of **2026/06/06**, that date is still ahead of you \u2014 **in 6 days**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1207,9 +1363,9 @@
       "tme-pro-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says that on **2026/03/27** you were due to move into the flat on Ferrier Row **in eleven weeks**.\n\nThat works out to **2026/06/12 (Friday)**.\n\nAs of **2026/06/18**, that date is **not still ahead of you** — it was about **six days ago**.",
+        "v8_answer": "The record says that on **2026/03/27** you were due to move into the flat on Ferrier Row **in eleven weeks**.\n\nThat works out to **2026/06/12 (Friday)**.\n\nAs of **2026/06/18**, that date is **not still ahead of you** \u2014 it was about **six days ago**.",
         "v9": true,
-        "v9_answer": "The record says that on 2026/03/27 you were due to move into the flat on Ferrier Row “in eleven weeks,” which points to 2026/06/12.\n\nAs of 2026/06/18, that date is not still ahead of you; it was about six days ago.",
+        "v9_answer": "The record says that on 2026/03/27 you were due to move into the flat on Ferrier Row \u201cin eleven weeks,\u201d which points to 2026/06/12.\n\nAs of 2026/06/18, that date is not still ahead of you; it was about six days ago.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1220,9 +1376,9 @@
       "tme-pro-045": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says that on **2026/04/11 (Sat)** you said:\n\n> “I am due to take over the Tuesday pottery class in eighteen weeks.”\n\nTaken literally, **18 weeks from 2026/04/11 is 2026/08/15 (Sat)**.\n\nSo as of **2026/08/09 (Sun)**, that date is **still ahead of you** — about **6 days away**.\n\nOne caveat:",
+        "v8_answer": "The record says that on **2026/04/11 (Sat)** you said:\n\n> \u201cI am due to take over the Tuesday pottery class in eighteen weeks.\u201d\n\nTaken literally, **18 weeks from 2026/04/11 is 2026/08/15 (Sat)**.\n\nSo as of **2026/08/09 (Sun)**, that date is **still ahead of you** \u2014 about **6 days away**.\n\nOne caveat:",
         "v9": false,
-        "v9_answer": "The record says that on **2026/04/11** you were **due to take over the Tuesday pottery class in eighteen weeks**.\n\nInterpreting that as the Tuesday class in the week eighteen weeks later, the date is:\n\n**Tuesday, 2026/08/11.**\n\nAs of the current date, **Sunday, 2026/08/09**, yes — that date is still",
+        "v9_answer": "The record says that on **2026/04/11** you were **due to take over the Tuesday pottery class in eighteen weeks**.\n\nInterpreting that as the Tuesday class in the week eighteen weeks later, the date is:\n\n**Tuesday, 2026/08/11.**\n\nAs of the current date, **Sunday, 2026/08/09**, yes \u2014 that date is still",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1235,7 +1391,7 @@
         "v8": true,
         "v8_answer": "The record says that on **2026/04/11** you were **due to take over the Tuesday pottery class in eighteen weeks**.\n\n- Counted literally, eighteen weeks from 2026/04/11 is **2026/08/15**.\n- Since it is specifically the **Tuesday** pottery class, the likely class-date interpretation is **Tuesday, 2026/",
         "v9": false,
-        "v9_answer": "The record only says, repeatedly, that something about “pottery … due … class … take … Tuesday” was “still ahead.”\n\nIt does **not** give the actual date. So I can’t tell from the record whether it is still ahead of you as of 2026/08/21, or what the date is.",
+        "v9_answer": "The record only says, repeatedly, that something about \u201cpottery \u2026 due \u2026 class \u2026 take \u2026 Tuesday\u201d was \u201cstill ahead.\u201d\n\nIt does **not** give the actual date. So I can\u2019t tell from the record whether it is still ahead of you as of 2026/08/21, or what the date is.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1246,9 +1402,9 @@
       "tme-pro-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you are due to switch to the four-day week **sixteen weeks after 2026/04/25**.\n\nThat makes the date **2026/08/15 (Saturday)**.\n\nGiven the current date is **2026/08/09**, yes — it is **still ahead of you**, by about **six days**.",
+        "v8_answer": "The record says you are due to switch to the four-day week **sixteen weeks after 2026/04/25**.\n\nThat makes the date **2026/08/15 (Saturday)**.\n\nGiven the current date is **2026/08/09**, yes \u2014 it is **still ahead of you**, by about **six days**.",
         "v9": false,
-        "v9_answer": "The record does not say when you are due to switch to the four-day week.\n\nIt only repeatedly notes the words “due,” “ahead,” “record,” “switch,” “week,” “day,” and “four” as being “on my mind,” but it gives no actual date or timing for a four-day-week switch. So I can’t tell from the record whether ",
+        "v9_answer": "The record does not say when you are due to switch to the four-day week.\n\nIt only repeatedly notes the words \u201cdue,\u201d \u201cahead,\u201d \u201crecord,\u201d \u201cswitch,\u201d \u201cweek,\u201d \u201cday,\u201d and \u201cfour\u201d as being \u201con my mind,\u201d but it gives no actual date or timing for a four-day-week switch. So I can\u2019t tell from the record whether ",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1259,9 +1415,9 @@
       "tme-pro-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you were due to switch to the four-day week **sixteen weeks after 2026/04/25**, which is **2026/08/15**.\n\nAs of the current date, **2026/08/21**, that date is **not still ahead of you** — it was **six days ago**.",
+        "v8_answer": "The record says you were due to switch to the four-day week **sixteen weeks after 2026/04/25**, which is **2026/08/15**.\n\nAs of the current date, **2026/08/21**, that date is **not still ahead of you** \u2014 it was **six days ago**.",
         "v9": false,
-        "v9_answer": "The record does not state when you are due to switch to the four-day week. It only repeatedly mentions the words “due,” “ahead,” “record,” “switch,” “week,” “day,” and “four,” without giving an actual date.\n\nSo I can’t tell from the record whether that date is still ahead of you, or what it is.",
+        "v9_answer": "The record does not state when you are due to switch to the four-day week. It only repeatedly mentions the words \u201cdue,\u201d \u201cahead,\u201d \u201crecord,\u201d \u201cswitch,\u201d \u201cweek,\u201d \u201cday,\u201d and \u201cfour,\u201d without giving an actual date.\n\nSo I can\u2019t tell from the record whether that date is still ahead of you, or what it is.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1272,9 +1428,9 @@
       "tme-pro-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which is **2026/06/21 (Sunday)**.\n\nAs of the current date, **2026/06/15**, that date is **still ahead of you** — it is **6 days away**.",
+        "v8_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which is **2026/06/21 (Sunday)**.\n\nAs of the current date, **2026/06/15**, that date is **still ahead of you** \u2014 it is **6 days away**.",
         "v9": true,
-        "v9_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which makes the date **2026/06/21**.\n\nAs of **2026/06/15**, that date is **still ahead of you** — about **six days away**.",
+        "v9_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which makes the date **2026/06/21**.\n\nAs of **2026/06/15**, that date is **still ahead of you** \u2014 about **six days away**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1287,7 +1443,7 @@
         "v8": true,
         "v8_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which makes the date **2026/06/21**.\n\nGiven the current date is **2026/06/27**, that date is **not still ahead of you**; it has already passed.",
         "v9": true,
-        "v9_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which is **2026/06/21**.\n\nAs of **2026/06/27**, that date is **not still ahead of you** — it was **six days ago**.",
+        "v9_answer": "The record says you were due to hand the archive over to Nadia **eight weeks after 2026/04/26**, which is **2026/06/21**.\n\nAs of **2026/06/27**, that date is **not still ahead of you** \u2014 it was **six days ago**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,

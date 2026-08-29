@@ -137,12 +137,194 @@
       "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
+  "gold_item_types": {
+    "tme-wm-001": [
+      "workingmemory"
+    ],
+    "tme-wm-002": [
+      "workingmemory"
+    ],
+    "tme-wm-003": [
+      "workingmemory"
+    ],
+    "tme-wm-004": [
+      "workingmemory"
+    ],
+    "tme-wm-005": [
+      "workingmemory"
+    ],
+    "tme-wm-006": [
+      "workingmemory"
+    ],
+    "tme-wm-007": [
+      "workingmemory"
+    ],
+    "tme-wm-008": [
+      "workingmemory"
+    ],
+    "tme-wm-009": [
+      "workingmemory"
+    ],
+    "tme-wm-010": [
+      "workingmemory"
+    ],
+    "tme-wm-011": [
+      "workingmemory"
+    ],
+    "tme-wm-012": [
+      "workingmemory"
+    ],
+    "tme-wm-013": [
+      "workingmemory"
+    ],
+    "tme-wm-014": [
+      "workingmemory"
+    ],
+    "tme-wm-015": [
+      "workingmemory"
+    ],
+    "tme-wm-016": [
+      "workingmemory"
+    ],
+    "tme-wm-017": [
+      "workingmemory"
+    ],
+    "tme-wm-018": [
+      "workingmemory"
+    ],
+    "tme-wm-019": [
+      "workingmemory"
+    ],
+    "tme-wm-020": [
+      "workingmemory"
+    ],
+    "tme-wm-021": [
+      "workingmemory"
+    ],
+    "tme-wm-022": [
+      "workingmemory"
+    ],
+    "tme-wm-023": [
+      "workingmemory"
+    ],
+    "tme-wm-024": [
+      "workingmemory"
+    ],
+    "tme-wm-025": [
+      "workingmemory"
+    ],
+    "tme-wm-026": [
+      "workingmemory"
+    ],
+    "tme-wm-027": [
+      "workingmemory"
+    ],
+    "tme-wm-028": [
+      "workingmemory"
+    ],
+    "tme-wm-029": [
+      "workingmemory"
+    ],
+    "tme-wm-030": [
+      "workingmemory"
+    ],
+    "tme-wm-031": [
+      "workingmemory"
+    ],
+    "tme-wm-032": [
+      "workingmemory"
+    ],
+    "tme-wm-033": [
+      "workingmemory"
+    ],
+    "tme-wm-034": [
+      "workingmemory"
+    ],
+    "tme-wm-035": [
+      "workingmemory"
+    ],
+    "tme-wm-036": [
+      "workingmemory"
+    ],
+    "tme-wm-037": [
+      "workingmemory"
+    ],
+    "tme-wm-038": [
+      "workingmemory"
+    ],
+    "tme-wm-039": [
+      "workingmemory"
+    ],
+    "tme-wm-040": [
+      "workingmemory"
+    ],
+    "tme-wm-041": [
+      "workingmemory"
+    ],
+    "tme-wm-042": [
+      "workingmemory"
+    ],
+    "tme-wm-043": [
+      "workingmemory"
+    ],
+    "tme-wm-044": [
+      "workingmemory"
+    ],
+    "tme-wm-045": [
+      "workingmemory"
+    ],
+    "tme-wm-046": [
+      "workingmemory"
+    ],
+    "tme-wm-047": [
+      "workingmemory"
+    ],
+    "tme-wm-048": [
+      "workingmemory"
+    ],
+    "tme-wm-049": [
+      "workingmemory"
+    ],
+    "tme-wm-050": [
+      "workingmemory"
+    ],
+    "tme-wm-051": [
+      "workingmemory"
+    ],
+    "tme-wm-052": [
+      "workingmemory"
+    ],
+    "tme-wm-053": [
+      "workingmemory"
+    ],
+    "tme-wm-054": [
+      "workingmemory"
+    ],
+    "tme-wm-055": [
+      "workingmemory"
+    ],
+    "tme-wm-056": [
+      "workingmemory"
+    ],
+    "tme-wm-057": [
+      "workingmemory"
+    ],
+    "tme-wm-058": [
+      "workingmemory"
+    ],
+    "tme-wm-059": [
+      "workingmemory"
+    ],
+    "tme-wm-060": [
+      "workingmemory"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
-        "position in haystack — WorkingMemory pins the gold session at index 0 and varies how many sessions follow it (ADR §5.4); that distance IS the independent variable, so gold's position separates perfectly (1.000) by construction rather than by defect. A retriever scored on this corpus must not use position. The corpus records gold_position_shuffled: false and h_is_independent_variable: true, so the exemption is checkable against the data rather than merely asserted here"
+        "position in haystack \u2014 WorkingMemory pins the gold session at index 0 and varies how many sessions follow it (ADR \u00a75.4); that distance IS the independent variable, so gold's position separates perfectly (1.000) by construction rather than by defect. A retriever scored on this corpus must not use position. The corpus records gold_position_shuffled: false and h_is_independent_variable: true, so the exemption is checkable against the data rather than merely asserted here"
       ],
       "threshold_auc": 0.75,
       "refused_features": [
@@ -561,7 +743,7 @@
       "probed_corpus_sha256": "7e04e4cb1717cbbfb1ee0afe3b18c86b9364859bb1442ad2f4419ece301af7a0"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-23T18:10:46Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -700,7 +882,7 @@
         "v8": true,
         "v8_answer": "You switched to a new employer called **Pomfret Instruments**. The outfit is called **Pomfret Instruments**.",
         "v9": true,
-        "v9_answer": "Your new employer is Pomfret Instruments — that is the outfit’s name.",
+        "v9_answer": "Your new employer is Pomfret Instruments \u2014 that is the outfit\u2019s name.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -726,7 +908,7 @@
         "v8": true,
         "v8_answer": "You switched to a new employer called **Marrowby Instruments**.",
         "v9": false,
-        "v9_answer": "The conversations don’t plainly say that you switched to a new employer, nor do they state what the outfit is called these days.\n\nThe latest employer/outfit name mentioned is **Larkwood Instruments**, but the record only says you have known people there from the old days—not that you switched to it.",
+        "v9_answer": "The conversations don\u2019t plainly say that you switched to a new employer, nor do they state what the outfit is called these days.\n\nThe latest employer/outfit name mentioned is **Larkwood Instruments**, but the record only says you have known people there from the old days\u2014not that you switched to it.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1246,7 +1428,7 @@
         "v8": true,
         "v8_answer": "Brindlow Fields.",
         "v9": true,
-        "v9_answer": "Brindlow Fields — the allotment site behind the depot.",
+        "v9_answer": "Brindlow Fields \u2014 the allotment site behind the depot.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,

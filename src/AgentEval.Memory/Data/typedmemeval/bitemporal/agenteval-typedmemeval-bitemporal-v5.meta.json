@@ -133,6 +133,188 @@
       "accuracy_scaffolding_stripped": 0.9833
     }
   },
+  "gold_item_types": {
+    "tme-bit-001": [
+      "bitemporal"
+    ],
+    "tme-bit-002": [
+      "bitemporal"
+    ],
+    "tme-bit-003": [
+      "bitemporal"
+    ],
+    "tme-bit-004": [
+      "bitemporal"
+    ],
+    "tme-bit-005": [
+      "bitemporal"
+    ],
+    "tme-bit-006": [
+      "bitemporal"
+    ],
+    "tme-bit-007": [
+      "bitemporal"
+    ],
+    "tme-bit-008": [
+      "bitemporal"
+    ],
+    "tme-bit-009": [
+      "bitemporal"
+    ],
+    "tme-bit-010": [
+      "bitemporal"
+    ],
+    "tme-bit-011": [
+      "bitemporal"
+    ],
+    "tme-bit-012": [
+      "bitemporal"
+    ],
+    "tme-bit-013": [
+      "bitemporal"
+    ],
+    "tme-bit-014": [
+      "bitemporal"
+    ],
+    "tme-bit-015": [
+      "bitemporal"
+    ],
+    "tme-bit-016": [
+      "bitemporal"
+    ],
+    "tme-bit-017": [
+      "bitemporal"
+    ],
+    "tme-bit-018": [
+      "bitemporal"
+    ],
+    "tme-bit-019": [
+      "bitemporal"
+    ],
+    "tme-bit-020": [
+      "bitemporal"
+    ],
+    "tme-bit-021": [
+      "bitemporal"
+    ],
+    "tme-bit-022": [
+      "bitemporal"
+    ],
+    "tme-bit-023": [
+      "bitemporal"
+    ],
+    "tme-bit-024": [
+      "bitemporal"
+    ],
+    "tme-bit-025": [
+      "bitemporal"
+    ],
+    "tme-bit-026": [
+      "bitemporal"
+    ],
+    "tme-bit-027": [
+      "bitemporal"
+    ],
+    "tme-bit-028": [
+      "bitemporal"
+    ],
+    "tme-bit-029": [
+      "bitemporal"
+    ],
+    "tme-bit-030": [
+      "bitemporal"
+    ],
+    "tme-bit-031": [
+      "bitemporal"
+    ],
+    "tme-bit-032": [
+      "bitemporal"
+    ],
+    "tme-bit-033": [
+      "bitemporal"
+    ],
+    "tme-bit-034": [
+      "bitemporal"
+    ],
+    "tme-bit-035": [
+      "bitemporal"
+    ],
+    "tme-bit-036": [
+      "bitemporal"
+    ],
+    "tme-bit-037": [
+      "bitemporal"
+    ],
+    "tme-bit-038": [
+      "bitemporal"
+    ],
+    "tme-bit-039": [
+      "bitemporal"
+    ],
+    "tme-bit-040": [
+      "bitemporal"
+    ],
+    "tme-bit-041": [
+      "bitemporal"
+    ],
+    "tme-bit-042": [
+      "bitemporal"
+    ],
+    "tme-bit-043": [
+      "bitemporal"
+    ],
+    "tme-bit-044": [
+      "bitemporal"
+    ],
+    "tme-bit-045": [
+      "bitemporal"
+    ],
+    "tme-bit-046": [
+      "bitemporal"
+    ],
+    "tme-bit-047": [
+      "bitemporal"
+    ],
+    "tme-bit-048": [
+      "bitemporal"
+    ],
+    "tme-bit-049": [
+      "bitemporal"
+    ],
+    "tme-bit-050": [
+      "bitemporal"
+    ],
+    "tme-bit-051": [
+      "bitemporal"
+    ],
+    "tme-bit-052": [
+      "bitemporal"
+    ],
+    "tme-bit-053": [
+      "bitemporal"
+    ],
+    "tme-bit-054": [
+      "bitemporal"
+    ],
+    "tme-bit-055": [
+      "bitemporal"
+    ],
+    "tme-bit-056": [
+      "bitemporal"
+    ],
+    "tme-bit-057": [
+      "bitemporal"
+    ],
+    "tme-bit-058": [
+      "bitemporal"
+    ],
+    "tme-bit-059": [
+      "bitemporal"
+    ],
+    "tme-bit-060": [
+      "bitemporal"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
@@ -556,7 +738,7 @@
       "probed_corpus_sha256": "f5b384d7f0ff9c0fbef8b962a5f4d67865a3e82e3f4e3fe6f770fc82647cb393"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-23T21:16:56Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -862,9 +1044,9 @@
       "tme-bit-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "At 26 February, the file gave Sara Mbeki’s April region as **Garrowby**.",
+        "v8_answer": "At 26 February, the file gave Sara Mbeki\u2019s April region as **Garrowby**.",
         "v9": false,
-        "v9_answer": "The conversations up to 26 February do not say which region the file gave for Sara Mbeki in April. Later, on 3 March, it was revised to “Ardenholm from April,” but the earlier region is not given.",
+        "v9_answer": "The conversations up to 26 February do not say which region the file gave for Sara Mbeki in April. Later, on 3 March, it was revised to \u201cArdenholm from April,\u201d but the earlier region is not given.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -877,7 +1059,7 @@
         "v8": true,
         "v8_answer": "Lowick.",
         "v9": true,
-        "v9_answer": "Lowick. The earlier note said Dunmarsh, but it was later corrected to “Jonas Pfeiffer: Lowick from February.”",
+        "v9_answer": "Lowick. The earlier note said Dunmarsh, but it was later corrected to \u201cJonas Pfeiffer: Lowick from February.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -901,7 +1083,7 @@
       "tme-bit-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Pellworth. The later note corrected Alice Renwick’s March city from Northolt Bay to Pellworth.",
+        "v8_answer": "Pellworth. The later note corrected Alice Renwick\u2019s March city from Northolt Bay to Pellworth.",
         "v9": true,
         "v9_answer": "Pellworth.",
         "v9_gold_in_context": 1,
@@ -1046,7 +1228,7 @@
         "v8": false,
         "v8_answer": "As of 01 April, the record showed Ravi Ellory at **Dunmarsh** in February.",
         "v9": false,
-        "v9_answer": "As of 01 April, Ravi Ellory’s February branch was recorded as **Dunmarsh**.",
+        "v9_answer": "As of 01 April, Ravi Ellory\u2019s February branch was recorded as **Dunmarsh**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1371,7 +1553,7 @@
         "v8": true,
         "v8_answer": "According to the record, Colm Whitaker was at **Ilminster** in March.",
         "v9": false,
-        "v9_answer": "The record does not say which department Colm Whitaker was at in March. It only mentions “whitaker, colm, march” without giving a department.",
+        "v9_answer": "The record does not say which department Colm Whitaker was at in March. It only mentions \u201cwhitaker, colm, march\u201d without giving a department.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,

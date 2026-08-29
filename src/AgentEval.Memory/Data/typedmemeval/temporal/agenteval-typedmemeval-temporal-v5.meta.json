@@ -125,6 +125,188 @@
       "accuracy_scaffolding_stripped": 1.0
     }
   },
+  "gold_item_types": {
+    "tme-tem-001": [
+      "temporal"
+    ],
+    "tme-tem-002": [
+      "temporal"
+    ],
+    "tme-tem-003": [
+      "temporal"
+    ],
+    "tme-tem-004": [
+      "temporal"
+    ],
+    "tme-tem-005": [
+      "temporal"
+    ],
+    "tme-tem-006": [
+      "temporal"
+    ],
+    "tme-tem-007": [
+      "temporal"
+    ],
+    "tme-tem-008": [
+      "temporal"
+    ],
+    "tme-tem-009": [
+      "temporal"
+    ],
+    "tme-tem-010": [
+      "temporal"
+    ],
+    "tme-tem-011": [
+      "temporal"
+    ],
+    "tme-tem-012": [
+      "temporal"
+    ],
+    "tme-tem-013": [
+      "temporal"
+    ],
+    "tme-tem-014": [
+      "temporal"
+    ],
+    "tme-tem-015": [
+      "temporal"
+    ],
+    "tme-tem-016": [
+      "temporal"
+    ],
+    "tme-tem-017": [
+      "temporal"
+    ],
+    "tme-tem-018": [
+      "temporal"
+    ],
+    "tme-tem-019": [
+      "temporal"
+    ],
+    "tme-tem-020": [
+      "temporal"
+    ],
+    "tme-tem-021": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-022": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-023": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-024": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-025": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-026": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-027": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-028": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-029": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-030": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-031": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-032": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-033": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-034": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-035": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-036": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-037": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-038": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-039": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-040": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-041": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-042": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-043": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-044": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-045": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-046": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-047": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-048": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-049": [
+      "temporal",
+      "temporal"
+    ],
+    "tme-tem-050": [
+      "temporal",
+      "temporal"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
@@ -548,7 +730,7 @@
       "probed_corpus_sha256": "a6c10b3dfe8c2a16b54fb8a7b4c3acb8f3537fb7f9d9a6f4feb35af4ff82017e"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-23T21:16:56Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -822,7 +1004,7 @@
         "v8": true,
         "v8_answer": "The Fenn commissioning came first; the Traymoor fit-out happened after it.",
         "v9": false,
-        "v9_answer": "The conversations do not say which came first. They mention “commissioning, traymoor, fit, fenn,” but give no order between the Fenn commissioning and the Traymoor fit-out.",
+        "v9_answer": "The conversations do not say which came first. They mention \u201ccommissioning, traymoor, fit, fenn,\u201d but give no order between the Fenn commissioning and the Traymoor fit-out.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -917,7 +1099,7 @@
       "tme-tem-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Traymoor fit-out** happened in between.\n\nFrom the notes: **Esker retrofit → Traymoor fit-out → Dunmow changeover**.",
+        "v8_answer": "The **Traymoor fit-out** happened in between.\n\nFrom the notes: **Esker retrofit \u2192 Traymoor fit-out \u2192 Dunmow changeover**.",
         "v9": true,
         "v9_answer": "The Traymoor fit-out happened in between.\n\nThe records say: Esker retrofit came before Traymoor fit-out, and Traymoor fit-out came before the Dunmow changeover.",
         "v9_gold_in_context": 2,
@@ -932,7 +1114,7 @@
         "v8": true,
         "v8_answer": "The Yarrow move happened in between: the notes say it came after the Dunmow changeover and before the Vance inspection.",
         "v9": true,
-        "v9_answer": "The Yarrow move happened before the Vance inspection — the inspection happened once the Yarrow move was out of the way.",
+        "v9_answer": "The Yarrow move happened before the Vance inspection \u2014 the inspection happened once the Yarrow move was out of the way.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -958,7 +1140,7 @@
         "v8": true,
         "v8_answer": "The Kessel handover happened in between: the Ondrey audit preceded the Kessel handover, and the Kessel handover was done well ahead of the Yarrow move.",
         "v9": true,
-        "v9_answer": "The **Kessel handover** happened between the **Ondrey audit** and the **Yarrow move**.\n\nOrder given in the conversations:\n\n**Ondrey audit → Kessel handover → Yarrow move**",
+        "v9_answer": "The **Kessel handover** happened between the **Ondrey audit** and the **Yarrow move**.\n\nOrder given in the conversations:\n\n**Ondrey audit \u2192 Kessel handover \u2192 Yarrow move**",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -984,7 +1166,7 @@
         "v8": true,
         "v8_answer": "The Harrow survey happened in between: the Yarrow move came before the Harrow survey, and the Harrow survey came before the Bellamy rewiring.",
         "v9": false,
-        "v9_answer": "The conversations don’t say what happened between the Yarrow move and the Bellamy rewiring.\n\nThey only state that the Yarrow move came earlier than the Harrow survey. Bellamy rewiring is not placed in the sequence.",
+        "v9_answer": "The conversations don\u2019t say what happened between the Yarrow move and the Bellamy rewiring.\n\nThey only state that the Yarrow move came earlier than the Harrow survey. Bellamy rewiring is not placed in the sequence.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -995,7 +1177,7 @@
       "tme-tem-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between: Harrow survey → Dunmow changeover → Vance inspection.",
+        "v8_answer": "The Dunmow changeover happened in between: Harrow survey \u2192 Dunmow changeover \u2192 Vance inspection.",
         "v9": true,
         "v9_answer": "The Dunmow changeover happened in between: the Harrow survey was before the Dunmow changeover, and the Dunmow changeover was before the Vance inspection.",
         "v9_gold_in_context": 2,
@@ -1023,7 +1205,7 @@
         "v8": true,
         "v8_answer": "The Kessel handover happened in between: the Bellamy rewiring came before the Kessel handover, and the Kessel handover came before the Ondrey audit.",
         "v9": false,
-        "v9_answer": "The conversations don’t say what happened between the Bellamy rewiring and the Ondrey audit.\n\nThey only state that the Bellamy rewiring came before the Kessel handover; they don’t place the Ondrey audit in that sequence.",
+        "v9_answer": "The conversations don\u2019t say what happened between the Bellamy rewiring and the Ondrey audit.\n\nThey only state that the Bellamy rewiring came before the Kessel handover; they don\u2019t place the Ondrey audit in that sequence.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1034,7 +1216,7 @@
       "tme-tem-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between.\n\nThe notes say the Dunmow changeover was after the Vance inspection, and later that it preceded the Wrenfield sign-off. So the order was:\n\nVance inspection → Dunmow changeover → Wrenfield sign-off.",
+        "v8_answer": "The Dunmow changeover happened in between.\n\nThe notes say the Dunmow changeover was after the Vance inspection, and later that it preceded the Wrenfield sign-off. So the order was:\n\nVance inspection \u2192 Dunmow changeover \u2192 Wrenfield sign-off.",
         "v9": true,
         "v9_answer": "The Dunmow changeover happened between the Vance inspection and the Wrenfield sign-off.",
         "v9_gold_in_context": 2,
@@ -1047,7 +1229,7 @@
       "tme-tem-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off happened in between: Calder relining → Wrenfield sign-off → Dunmow changeover.",
+        "v8_answer": "The Wrenfield sign-off happened in between: Calder relining \u2192 Wrenfield sign-off \u2192 Dunmow changeover.",
         "v9": false,
         "v9_answer": "The conversations do not say what happened between the Dunmow changeover and the Calder relining.\n\nThey only say that the Dunmow changeover came earlier than the Fenn commissioning, and followed the Wrenfield sign-off. They do not give an order involving the Calder relining.",
         "v9_gold_in_context": 1,
@@ -1073,7 +1255,7 @@
       "tme-tem-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between.\n\nThe notes establish:\n\nFenn commissioning → Dunmow changeover → Wrenfield sign-off\n\nNothing else is clearly placed between Fenn and Wrenfield in the conversations.",
+        "v8_answer": "The Dunmow changeover happened in between.\n\nThe notes establish:\n\nFenn commissioning \u2192 Dunmow changeover \u2192 Wrenfield sign-off\n\nNothing else is clearly placed between Fenn and Wrenfield in the conversations.",
         "v9": true,
         "v9_answer": "The Dunmow changeover happened in between: it came after the Fenn commissioning and before the Wrenfield sign-off.",
         "v9_gold_in_context": 2,
@@ -1088,7 +1270,7 @@
         "v8": true,
         "v8_answer": "The Harrow survey happened in between: the records say the Wrenfield sign-off came before the Harrow survey, and the Harrow survey came before the Calder relining.",
         "v9": false,
-        "v9_answer": "The conversations don’t contain enough information to answer that.\n\nThey say the Wrenfield sign-off happened before the Harrow survey, but they do not establish where the Calder relining fits, so I can’t say what was between them.",
+        "v9_answer": "The conversations don\u2019t contain enough information to answer that.\n\nThey say the Wrenfield sign-off happened before the Harrow survey, but they do not establish where the Calder relining fits, so I can\u2019t say what was between them.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1216,7 +1398,7 @@
       "tme-tem-045": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Vance inspection** happened most recently.\n\nSequence from the notes: **Fenn commissioning → Kessel handover → Vance inspection**.",
+        "v8_answer": "The **Vance inspection** happened most recently.\n\nSequence from the notes: **Fenn commissioning \u2192 Kessel handover \u2192 Vance inspection**.",
         "v9": true,
         "v9_answer": "The Vance inspection happened most recently.",
         "v9_gold_in_context": 2,
@@ -1229,9 +1411,9 @@
       "tme-tem-046": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Vance inspection** happened most recently.\n\nSequence from the conversations: **Wrenfield sign-off → Yarrow move → Vance inspection**.",
+        "v8_answer": "The **Vance inspection** happened most recently.\n\nSequence from the conversations: **Wrenfield sign-off \u2192 Yarrow move \u2192 Vance inspection**.",
         "v9": true,
-        "v9_answer": "The **Vance inspection** happened most recently.\n\nThe sequence given is: **Wrenfield sign-off → Yarrow move → Vance inspection**.",
+        "v9_answer": "The **Vance inspection** happened most recently.\n\nThe sequence given is: **Wrenfield sign-off \u2192 Yarrow move \u2192 Vance inspection**.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1268,7 +1450,7 @@
       "tme-tem-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining happened most recently.\n\nThe recorded order is: Fenn commissioning → Bellamy rewiring → Calder relining.",
+        "v8_answer": "The Calder relining happened most recently.\n\nThe recorded order is: Fenn commissioning \u2192 Bellamy rewiring \u2192 Calder relining.",
         "v9": true,
         "v9_answer": "The Calder relining happened most recently.",
         "v9_gold_in_context": 2,
