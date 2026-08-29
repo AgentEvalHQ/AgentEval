@@ -774,6 +774,22 @@ public sealed class TypedMemEvalCorpusTests
     private static readonly Dictionary<(TypedMemEvalVertical Vertical, string Shape), double>
         PendingPerShapeRecalibration = new()
         {
+            // WHAT THIS RATCHET ACTUALLY REPRESENTS, measured 2026-08-30 rather than assumed.
+            // Out-of-band COVERAGE is not the same as an unfailable question: coverage measures
+            // what a BM25 budget retrieves, and the reasoning half still discriminates. Checked
+            // shape by shape against V9:
+            //
+            //   temporal/recency                cov 1.000  V9 15/15  <- THE ONLY UNFAILABLE SHAPE
+            //   episodic/list-order             cov 0.275  V9  0/15  <- the opposite extreme
+            //   episodic/participant-attribution cov 0.933 V9 14/15  discriminates
+            //   forgetting/still-valid          cov 0.467  V9  9/15  discriminates
+            //   temporal/occurrence-order       cov 0.950  V9 19/20  discriminates
+            //
+            // So the family carries ONE shape that cannot fail and one that nothing passes, not
+            // the eleven-shape debt an earlier audit of mine reported. Fixing temporal/recency
+            // means regenerating that corpus, invalidating its probe record and resetting the
+            // consuming project's controls on it — worth proposing to them with these numbers,
+            // not worth doing unilaterally while nothing is blocked on it.
             [(TypedMemEvalVertical.Episodic, "list-order")] = 0.2746,
             [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 0.9333,
             [(TypedMemEvalVertical.Forgetting, "still-valid")] = 0.4667,
