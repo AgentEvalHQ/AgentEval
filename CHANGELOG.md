@@ -56,6 +56,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alternating. Editing the shared preamble changes grading for all seven verticals, so it needs its
   own controls and its own before/after.
 
+- **TypedMemEval-Conjunction: the cross-type vertical (ADR-027 §10).** Questions no single memory
+  type can answer — a fact of type A must be resolved and an operation of type B applied to it.
+  Retrieving either half is necessary and neither is sufficient, so a stack strong on one type and
+  weak on the other scores like a stack weak on both. Three shapes: `value-then-count` (Semantic
+  current-value + Arithmetic count), `alias-then-count` (Semantic co-reference + Arithmetic count),
+  `order-then-value` (Temporal order + Semantic current-value).
+
+  Probed: **V1 49/50, V9 18/50, headroom 0.62** — tied with Arithmetic for the largest in the
+  family. **Read the shapes, never the mean:** `alias-then-count` 0.93, `value-then-count` 0.85,
+  **`order-then-value` 0.00 — saturated under BM25** and unable to discriminate retrievers at all.
+  That is the mean-satisfiable-by-averaging defect one level up, at headroom rather than coverage,
+  and it is declared in the corpus rather than left inside an average.
+
+  The **first vertical with genuinely mixed gold** (35 `arithmetic+semantic`, 15
+  `semantic+temporal`), so a per-type denominator is computable. §10's instruction not to inherit
+  the parts' certifications was load-bearing: its own V7 caught two gold-only constructions the
+  parent verticals' passes would have papered over.
+
+- **TypedMemEval-Semantic: resolution rather than recall (ADR-027 §3.1, narrowed).** §2.1 refused
+  plain-fact Semantic as saturated by construction; these three shapes share the property plain
+  recall lacks — retrieving the evidence is necessary and **not sufficient**. `current-value`
+  (an attribute replaced *k* times), `co-reference` (a fact asked under a different designation),
+  `source-attribution` (which conversation a belief came from).
+
+  Probed V1 50/50, V9 34/50, headroom 0.32. **It ships with no judge body, and that is the
+  finding** — 0.958 across three runs on the shared preamble alone. Bitemporal and Temporal each
+  needed one because each genuinely collided with the preamble; Semantic does not collide.
+
+- **Per-item gold type labels (ADR-027 §10 commitment 1).** Every gold item now carries the memory
+  type it belongs to, in the **sidecar** rather than the corpus: `corpus_sha256` covers the whole
+  corpus JSON, so putting them in the extension would have moved the sha of every vertical and
+  invalidated every probe record with it.
+
+- **`bench typedmemeval` had no way to reach `EvidenceCaptureMode.Full` — the caller never set
+  it.** Every layer underneath was correct: the option exists, `TypedMemEvalOptions` maps it
+  faithfully, and the guard permits content under `Full`. But the command passed `options: null`
+  unconditionally, so an adapter attaching retrieved text had it rejected with
+  `evidence_content_not_allowed`. New `--evidence-detail references|content`, default
+  `references`, rejected rather than silently defaulted on a typo, loud on stdout when engaged.
+
+  *(This entry was written for the original PR and lost when two changelog edits to the same region
+  were squashed; restored here rather than left as a shipped feature with no record.)*
+
+### Added
+
+- **`tools/validate_factgrain_axis.py`** — the R2 instrument. Fact-grain competition was proposed
+  as a paired second difficulty axis; this shows it **cannot be validated against our own arms**.
+  The only measure that predicts V9 misses is derived from the same BM25 that V9 *is*, so predictor
+  and outcome share an instrument; both retriever-independent measures carry no signal. V1 and V8
+  pass every question, so V9 is the only arm with variance and it is lexical. Committed as a
+  runnable script so the negative result is reproducible.
+
+## [0.29.0-beta] - 2026-08-28
+
 ### Fixed
 
 - **Bitemporal had no judge template, and the shared preamble mis-graded it — then the first fix
