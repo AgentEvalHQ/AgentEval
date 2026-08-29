@@ -121,9 +121,22 @@ public sealed class TypedMemEvalRunnerTests
 
         var pairs = result.TypedOutcomes!.PairConsistency!;
         Assert.Equal(19, pairs.Pairs);
-        Assert.Equal(19, pairs.TimeBlindPattern);
         Assert.Equal(0, pairs.BothArmsCorrect);
         Assert.Equal(19, pairs.MissedAfter);
+
+        // TEN OF NINETEEN, AND THE SHORTFALL IS THE TEST DOUBLE, NOT THE DETECTOR. ArmAwareJudge
+        // recognises a before-arm by three markers the generator guarantees on named-entity gold -
+        // "Not yet.", "Yes, still valid", "It is still ahead". A due-window answer is a SET of
+        // things falling due ("2: reorder the printer toner on 13 April 2026, ...") and carries
+        // none of them, so the stub reads both window arms as after-arms and answers "missed" to
+        // each. That is why MissedAfter is 19 while the correct-then-missed pattern is 10.
+        //
+        // What this test therefore covers is the ten named-entity pairs. Whether the outcome-pair
+        // detector catches a genuinely time-blind system on the window shape is NOT established
+        // here and should not be inferred from this number - a real such system returns the same
+        // SET at both instants, whose label pattern depends on how the judge grades a partly-right
+        // set. Establishing it needs a stub that can answer a window question.
+        Assert.Equal(10, pairs.TimeBlindPattern);
     }
 
     [Fact]
