@@ -165,6 +165,39 @@ internal static class TypedMemEvalJudgePrompts
 
         """;
 
+    /// <remarks>
+    /// Conjunction joins two memory types, and the shared preamble cannot express that BOTH
+    /// halves must be right. Precedence rule 3 says extra correct detail never lowers the
+    /// outcome, and the judge reasonably extended it to detail that was NOT correct: given
+    /// "3 times, with Marlow Carriage" against a gold of 3 with a different courier, it
+    /// returned correct in both baseline runs, reasoning the courier name was extra detail
+    /// that did not change the count. The number matched by coincidence while the resolution
+    /// had failed - the exact failure this vertical exists to expose, and the one a per-type
+    /// score cannot see.
+    /// </remarks>
+    private const string ConjunctionBody = """
+
+        This question JOINS two kinds of memory: a fact has to be resolved, and then an
+        operation applied to it. Both halves must be right. Grade the whole answer, never one
+        half of it.
+
+        A count is a count OF something, and a value is a value AT something. So:
+
+        - If the answer states the right number or value but attaches it to the WRONG entity,
+          designation or moment, it is "wrong". Do NOT treat the mismatched entity as harmless
+          extra detail. Precedence rule 3 covers extra detail that is CORRECT; detail
+          contradicting the resolution is not extra, it is evidence the resolution failed and
+          the match was luck.
+
+        - If the answer resolves the fact correctly and never performs the operation - naming
+          the entity when a count was asked for - it has committed to something the question
+          did not ask. That is "wrong", not "abstained". Abstained requires declining to
+          commit to any value at all.
+
+        - Extra detail that AGREES with gold still never lowers the outcome. Naming the
+          resolved entity alongside a correct count is correct, and so is naming the
+          designation the events were recorded under. Only a contradiction demotes.
+        """;
     private const string ArithmeticBody = """
 
         This question has a derived numeric answer. Grade the ARITHMETIC, not the phrasing.
@@ -241,6 +274,9 @@ internal static class TypedMemEvalJudgePrompts
 
     internal static string Temporal(string question, string gold, string answer)
         => string.Format(Preamble + TemporalBody + Closing, question, gold, answer);
+
+    internal static string Conjunction(string question, string gold, string answer)
+        => string.Format(Preamble + ConjunctionBody + Closing, question, gold, answer);
 
     internal static string ListOrder(string question, string gold, string answer)
         => string.Format(Preamble + ListOrderBody + Closing, question, gold, answer);
@@ -325,6 +361,7 @@ internal static class TypedMemEvalJudgePrompts
             .Append(ProspectiveBody).Append('\u001e')
             .Append(BitemporalBody).Append('\u001e')
             .Append(TemporalBody).Append('\u001e')
+            .Append(ConjunctionBody).Append('\u001e')
             .Append(ArithmeticBody).Append('\u001e')
             .Append(ListOrderBody).Append('\u001e')
             .Append(ForgettingBody).Append('\u001e')

@@ -167,9 +167,16 @@ public sealed class TypedMemEvalCorpusTests
 
         Assert.Equal(minimum < 1.0, declared);
 
-        // Only the two dispersion verticals can have one, because only they spread gold across
-        // more than K_ref sessions. Everywhere else G is 1 or 2 by the mechanism under test.
-        var expected = vertical is TypedMemEvalVertical.Arithmetic or TypedMemEvalVertical.Episodic;
+        // Only dispersion verticals can have one, because only they spread gold across more than
+        // K_ref sessions. Conjunction joins TWO memory types in a single question, so G exceeds
+        // K_ref whenever both halves carry more than two gold items — that is the construct rather
+        // than an accident, and it is the reason it is listed here deliberately. Contrast Semantic,
+        // where G reached 6 only because the replacement chain grew; there the dispersion was
+        // incidental, it confounded the sufficiency claim the shape exists to test, and the chain
+        // was capped instead of the gate being widened.
+        var expected = vertical is TypedMemEvalVertical.Arithmetic
+            or TypedMemEvalVertical.Episodic
+            or TypedMemEvalVertical.Conjunction;
         Assert.Equal(expected, declared);
     }
 
@@ -208,12 +215,35 @@ public sealed class TypedMemEvalCorpusTests
                 $"{entry.QuestionId}: {forQuestion.GetArrayLength()} type labels for {goldCount} " +
                 $"gold items.");
 
-            // Every shipped vertical is single-type. Conjunction is where this stops holding, and
-            // when it does this assertion is what has to be widened deliberately rather than a
-            // silent mixture appearing in a corpus that claims to be one type.
-            foreach (var label in forQuestion.EnumerateArray())
+            var labelled = forQuestion.EnumerateArray().Select(x => x.GetString()!).ToArray();
+
+            if (vertical is TypedMemEvalVertical.Conjunction)
             {
-                Assert.Equal(slug, label.GetString());
+                // The one vertical whose gold is mixed by construction, widened deliberately rather
+                // than by a silent mixture appearing somewhere. Each label names the vertical whose
+                // CONSTRUCT that gold item carries, so a per-type denominator is computable — and
+                // the join must be real: a conjunction question whose gold is all one type is that
+                // type wearing this vertical's name.
+                var slugs = TypedMemEvalVerticals.All.Select(d => d.Slug).ToHashSet(StringComparer.Ordinal);
+                foreach (var label in labelled)
+                {
+                    Assert.True(
+                        slugs.Contains(label) && label != slug,
+                        $"{entry.QuestionId}: '{label}' is not another vertical's slug. Conjunction " +
+                        $"gold carries the type of the construct it came from, never its own.");
+                }
+
+                Assert.True(
+                    labelled.Distinct(StringComparer.Ordinal).Count() >= 2,
+                    $"{entry.QuestionId}: gold is entirely '{labelled[0]}'. A conjunction question " +
+                    $"must draw gold from at least two memory types or one half is decorative.");
+                continue;
+            }
+
+            // Every other shipped vertical is single-type.
+            foreach (var label in labelled)
+            {
+                Assert.Equal(slug, label);
             }
         }
     }
@@ -671,7 +701,24 @@ public sealed class TypedMemEvalCorpusTests
     /// exemption would always clear the gate.
     /// </summary>
     private static readonly Dictionary<(TypedMemEvalVertical Vertical, string Shape), string>
-        UncalibratableShapes = new();
+        UncalibratableShapes = new()
+        {
+            // The events are recorded under one designation and counted under another, so a lexical
+            // retriever searching the ASKED designation cannot reach them at all — it can only
+            // reach the link session. Realised coverage is 0.336 at echo 0.0, which is the floor
+            // this shape can reach: there is no knob that raises it, because raising it would mean
+            // putting the asked designation into the event sessions, which is precisely the
+            // co-reference the shape measures.
+            //
+            // Declared rather than ratcheted on purpose. A ratchet says "known bad, improve it";
+            // this says "the band does not apply here", and the difference matters — a future
+            // session must not try to calibrate this shape into range and quietly destroy it.
+            [(TypedMemEvalVertical.Conjunction, "alias-then-count")] =
+                "Co-reference by construction: events are stated under a designation the question " +
+                "never uses, so BM25 cannot reach them from the question at any echo setting. " +
+                "Coverage 0.336 is the shape's floor, not a calibration failure — raising it would " +
+                "require defeating the co-reference the shape exists to measure.",
+        };
 
     /// <summary>
     /// Shapes outside their band on verticals still calibrated on the MEAN, recorded as a ratchet:

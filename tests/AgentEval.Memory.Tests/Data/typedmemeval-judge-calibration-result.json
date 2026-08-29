@@ -1,48 +1,47 @@
 {
-  "judge_prompt_fingerprint": "6f006dbb4014994ae2db341e6546a83093658a3e514a0aa2de10eed9a6879e7b",
-  "measured_at": "2026-08-28",
+  "judge_prompt_fingerprint": "2fe921a6528c10fb29423ebe3100dc135634211c3bc60f4623fca7b8d91373e3",
+  "measured_at": "2026-08-29",
   "model": "gpt-5.5",
-  "agreement": 0.98,
+  "agreement": 0.991,
   "status": "measured",
-  "cases": 200,
+  "cases": 224,
   "runs": 3,
   "per_vertical": {
     "Prospective": 1.0,
     "Episodic": 1.0,
     "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
-    "Forgetting": 0.875,
+    "Forgetting": 0.917,
     "Bitemporal": 1.0,
     "Temporal": 1.0,
-    "Semantic": 0.958
+    "Semantic": 1.0,
+    "Conjunction": 1.0
   },
   "disagreements": {
     "every_run": [
-      "cal-for-006",
-      "cal-for-012"
+      "cal-for-006"
     ],
     "run_varying": [
-      "cal-for-013",
-      "cal-sem-007",
-      "cal-sem-020",
-      "cal-wm-012"
+      "cal-for-012",
+      "cal-sem-020"
     ]
   },
   "superseded": {
     "judge_prompt_fingerprint": "6f006dbb4014994ae2db341e6546a83093658a3e514a0aa2de10eed9a6879e7b",
     "measured_at": "2026-08-28",
     "model": "gpt-5.5",
-    "agreement": 0.983,
-    "cases": 176,
+    "agreement": 0.98,
+    "cases": 200,
     "per_vertical": {
-      "Prospective": 0.958,
+      "Prospective": 1.0,
       "Episodic": 1.0,
       "Arithmetic": 1.0,
       "WorkingMemory": 1.0,
-      "Forgetting": 0.917,
+      "Forgetting": 0.875,
       "Bitemporal": 1.0,
-      "Temporal": 1.0
+      "Temporal": 1.0,
+      "Semantic": 0.958
     }
   },
-  "note": "Three runs: 0.980 / 0.980 / 0.985. Lowest recorded, per-vertical from that run. The prompt did NOT change - the fingerprint is identical to the previous record - and the re-measurement was forced by SCOPE: Semantic added 24 calibration cases, 176 -> 200, and the gate requires the recorded count to equal the live set. That gate exists because a measurement over 120 of 168 cases once passed as family-wide for eight days. SEMANTIC SHIPS WITH NO JUDGE BODY, and that is a finding rather than an omission. Bitemporal and Temporal each needed one because each had a real collision with the shared preamble - 'the correction had not been recorded yet' reads as premature, 'nothing happened between them' reads as missed. Semantic has no such collision: measured at 0.958 in all three runs with nothing but the preamble and StandardBody, comfortably clear of the 0.80 per-vertical floor, and NO case fails in every run. THE DISCIPLINE THAT PRODUCED THAT ANSWER: 24 controls were authored BEFORE any body existed and a baseline was measured first. Two of my own labels failed that baseline. cal-sem-009 was simply wrong - I labelled a TRUNCATED company name correct, and preamble rule 3 already says missing detail gold treats as part of the answer lowers the outcome; the control was fighting an existing rule instead of testing a new one, and is now a paraphrase rather than a truncation. cal-sem-020 I relabelled abstained -> wrong, and that was overconfident too: pooled over eight runs the judge splits exactly 4-4 there. Had the body been written first, both labels would have been enforced by a template and Semantic would have shown a flawless 24/24 - the Bitemporal overfit again, one week later. WHAT REMAINS IS NOT SEMANTIC'S. Every flapping case in this record - cal-for-006, cal-for-012, cal-for-013, cal-wm-012, cal-sem-007, cal-sem-020 - sits on the same abstained/missed/wrong seam, now visible across FOUR verticals. The shared preamble lists 'I have no record of that' under ABSTAINED and 'you never told me about that' under MISSED, and they are near-synonyms. On this evidence that ambiguity is the largest remaining source of judge instability in the family, and it is parked for its own controlled change with its own controls and a before/after across all eight verticals."
+  "note": "Three runs: 0.991 / 0.991 / 0.991 - the tightest the set has recorded, and the first with eight of nine verticals at 1.000. Per-vertical from run 3, the run whose lowest vertical is lowest. CONJUNCTION ADDED, and it needed a body. It is the first vertical whose gold is mixed-type, and the shared preamble has no way to say that BOTH halves of a join must be right: precedence rule 3 says extra correct detail never lowers the outcome, and the judge extended that to detail which was not correct. Given '3 times, with Marlow Carriage' against a gold of 3 with a different courier it returned CORRECT in every baseline run. The body says a count is a count OF something, that a right number on the wrong entity is wrong rather than correct-with-extra, and that resolving the fact without performing the operation is a commitment rather than an abstention. Conjunction 24/24 in all three runs, from a baseline of 22/24. THE FIX THAT MATTERED WAS IN THE CORPUS, NOT THE PROMPT. cal-cnj-023 - right count, superseded entity - kept returning correct even WITH the body, and the judge was right: it sees only question, gold and answer, and the gold said '3 times.' with no courier in it. There was no contradiction to find. A prompt rule could have forced agreement, at the cost of teaching the judge to punish appended detail in general and breaking the four controls that exist to stop exactly that. Gold now reads '3 times, with Oakhurst Transit.' The general rule, which applies to anything composed after this: IF A QUESTION REQUIRES TWO THINGS TO BE RIGHT, GOLD MUST STATE BOTH, OR THE SECOND IS UNJUDGEABLE. TWO OF MY OWN LABELS WERE WRONG AGAIN, both caught by the baseline rather than by review. cal-cnj-005 and cal-cnj-024 are the same construction on two shapes - resolve the fact, never perform the operation - and I labelled them abstained; the preamble reserves abstained for declining to commit to ANY value, and both commit confidently to something the question did not ask. I also relabelled only one of the two at first, which the judge caught by marking both wrong in every run. Across Semantic and Conjunction my authored labels have needed correction at roughly one case in ten, which is the whole argument for measuring a baseline before writing a body: every one of those would otherwise have been fossilised into a template that made the number look perfect. cal-for-006 remains the only every-run disagreement in the family. It, cal-for-012 and cal-sem-020 all sit on the shared preamble's abstained/missed/wrong seam, which stays parked for its own controlled change across all nine verticals."
 }
