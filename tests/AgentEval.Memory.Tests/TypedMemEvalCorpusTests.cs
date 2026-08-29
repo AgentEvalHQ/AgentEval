@@ -720,6 +720,31 @@ public sealed class TypedMemEvalCorpusTests
             // knob that raises it: raising it would mean naming the thing in the question, which is
             // exactly the construction that let the consuming project score 49/50 with firing and
             // valid-time both dark.
+            // WORKINGMEMORY'S EASY RUNGS ARE NOT DEBT, and moving them out of the ratchet is the
+            // point of this entry. They sat there at 1.0000 / 1.0000 / 0.9167 as "known bad, may
+            // only improve" — but the vertical is a declared LADDER. Its own generator says the
+            // result surface reports the outcome-by-distance CURVE rather than one number, because
+            // "an aggregate over a distance ladder is exactly the summary this family exists to
+            // refuse", and its structure spec sets h_is_independent_variable.
+            //
+            // A ladder needs rungs the system PASSES. distance-8 at 12/12 against distance-40 at
+            // 8/12 IS the finding; the band was designed for single-difficulty verticals and does
+            // not apply to a ladder's easy end. Calibrating distance-8 into [0.5, 0.9] would mean
+            // making a fact stated eight sessions ago hard to retrieve, which destroys the baseline
+            // the curve is measured against.
+            //
+            // Declared rather than ratcheted so a future session reads "the band does not apply"
+            // instead of "fix this". I nearly regenerated this corpus on the opposite reading.
+            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] =
+                "Easy rung of a declared distance ladder (h_is_independent_variable). A ladder " +
+                "needs rungs the system passes; calibrating this into band would mean making an " +
+                "eight-session-old fact hard to retrieve and would destroy the curve's baseline.",
+            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] =
+                "Easy rung of a declared distance ladder — see distance-8.",
+            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] =
+                "Middle rung of a declared distance ladder, 0.917 and falling as distance grows " +
+                "(40 -> 8/12, 60 -> 9/12). The descent IS the measurement.",
+
             [(TypedMemEvalVertical.Prospective, "due-window")] =
                 "Names no entity by construction, so BM25 has nothing to match on and coverage " +
                 "cannot be raised without reintroducing the entity - which is the saturation the " +
@@ -765,9 +790,6 @@ public sealed class TypedMemEvalCorpusTests
             [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
             [(TypedMemEvalVertical.Temporal, "occurrence-order")] = 0.9500,
             [(TypedMemEvalVertical.Temporal, "recency")] = 1.0000,
-            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] = 1.0000,
-            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] = 1.0000,
-            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] = 0.9167,
         };
 
     /// <summary>How far a shape's realised coverage sits outside the band; zero when inside.</summary>
