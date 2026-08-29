@@ -131,6 +131,221 @@
       "accuracy_scaffolding_stripped": 0.84
     }
   },
+  "gold_item_types": {
+    "tme-epi-001": [
+      "episodic"
+    ],
+    "tme-epi-002": [
+      "episodic"
+    ],
+    "tme-epi-003": [
+      "episodic"
+    ],
+    "tme-epi-004": [
+      "episodic"
+    ],
+    "tme-epi-005": [
+      "episodic"
+    ],
+    "tme-epi-006": [
+      "episodic"
+    ],
+    "tme-epi-007": [
+      "episodic"
+    ],
+    "tme-epi-008": [
+      "episodic"
+    ],
+    "tme-epi-009": [
+      "episodic"
+    ],
+    "tme-epi-010": [
+      "episodic"
+    ],
+    "tme-epi-011": [
+      "episodic"
+    ],
+    "tme-epi-012": [
+      "episodic"
+    ],
+    "tme-epi-013": [
+      "episodic"
+    ],
+    "tme-epi-014": [
+      "episodic"
+    ],
+    "tme-epi-015": [
+      "episodic"
+    ],
+    "tme-epi-016": [
+      "episodic"
+    ],
+    "tme-epi-017": [
+      "episodic"
+    ],
+    "tme-epi-018": [
+      "episodic"
+    ],
+    "tme-epi-019": [
+      "episodic"
+    ],
+    "tme-epi-020": [
+      "episodic"
+    ],
+    "tme-epi-021": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-022": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-023": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-024": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-025": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-026": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-027": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-028": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-029": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-030": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-031": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-032": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-033": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-034": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-035": [
+      "episodic",
+      "episodic",
+      "episodic",
+      "episodic"
+    ],
+    "tme-epi-036": [
+      "episodic"
+    ],
+    "tme-epi-037": [
+      "episodic"
+    ],
+    "tme-epi-038": [
+      "episodic"
+    ],
+    "tme-epi-039": [
+      "episodic"
+    ],
+    "tme-epi-040": [
+      "episodic"
+    ],
+    "tme-epi-041": [
+      "episodic"
+    ],
+    "tme-epi-042": [
+      "episodic"
+    ],
+    "tme-epi-043": [
+      "episodic"
+    ],
+    "tme-epi-044": [
+      "episodic"
+    ],
+    "tme-epi-045": [
+      "episodic"
+    ],
+    "tme-epi-046": [
+      "episodic"
+    ],
+    "tme-epi-047": [
+      "episodic"
+    ],
+    "tme-epi-048": [
+      "episodic"
+    ],
+    "tme-epi-049": [
+      "episodic"
+    ],
+    "tme-epi-050": [
+      "episodic"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
@@ -554,7 +769,7 @@
       "probed_corpus_sha256": "2c6000a6912e5ef0464e01d93072c4c02f112b470f664b1381f6b5309a630303"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-23T19:14:32Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -671,7 +886,7 @@
         "v8": true,
         "v8_answer": "The skip hire booking was being held at the **Halstow yard**.",
         "v9": false,
-        "v9_answer": "I don’t have a yard for the skip hire booking in those conversations.\n\nWhat was said was:\n- skip hire booking goes through **PN-729**\n- skip hire booking sits in bay **RS-454**\n\nThe **WG-879 yard** was mentioned for the loft insulation quote, not the skip hire booking.",
+        "v9_answer": "I don\u2019t have a yard for the skip hire booking in those conversations.\n\nWhat was said was:\n- skip hire booking goes through **PN-729**\n- skip hire booking sits in bay **RS-454**\n\nThe **WG-879 yard** was mentioned for the loft insulation quote, not the skip hire booking.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -710,7 +925,7 @@
         "v8": true,
         "v8_answer": "The boiler flue check is being held at the Marstow yard.",
         "v9": false,
-        "v9_answer": "The conversations do not say which yard the boiler flue check is being held at. They only mention “boiler,” “check,” and “held” in passing; no yard is given for it.",
+        "v9_answer": "The conversations do not say which yard the boiler flue check is being held at. They only mention \u201cboiler,\u201d \u201ccheck,\u201d and \u201cheld\u201d in passing; no yard is given for it.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -723,7 +938,7 @@
         "v8": true,
         "v8_answer": "Halfoot handles the guttering replacement, going by the file.",
         "v9": false,
-        "v9_answer": "The conversations don’t say who handles the guttering replacement.",
+        "v9_answer": "The conversations don\u2019t say who handles the guttering replacement.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -762,7 +977,7 @@
         "v8": true,
         "v8_answer": "The greenhouse glass order is being held at the **Quinway yard**.",
         "v9": false,
-        "v9_answer": "I didn’t tell you a yard for the greenhouse glass order. The earlier conversation only says it was filed under reference TL-134.",
+        "v9_answer": "I didn\u2019t tell you a yard for the greenhouse glass order. The earlier conversation only says it was filed under reference TL-134.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -903,9 +1118,9 @@
       "tme-epi-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Dunholt — 2026/01/09  \n2. Rushfoot — 2026/01/11  \n3. Nadmore — 2026/01/22  \n4. Ferfoot — 2026/01/27  \n5. Velmore — 2026/02/01",
+        "v8_answer": "Earliest first:\n\n1. Dunholt \u2014 2026/01/09  \n2. Rushfoot \u2014 2026/01/11  \n3. Nadmore \u2014 2026/01/22  \n4. Ferfoot \u2014 2026/01/27  \n5. Velmore \u2014 2026/02/01",
         "v9": false,
-        "v9_answer": "The conversations only show two of those additions:\n\n1. Dunholt — 2026/01/09  \n2. Ferfoot — 2026/01/27  \n\nThey do not say when Nadmore, Velmore, or Rushfoot were added, so I can’t determine the full earliest-first order from the record provided.",
+        "v9_answer": "The conversations only show two of those additions:\n\n1. Dunholt \u2014 2026/01/09  \n2. Ferfoot \u2014 2026/01/27  \n\nThey do not say when Nadmore, Velmore, or Rushfoot were added, so I can\u2019t determine the full earliest-first order from the record provided.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -916,7 +1131,7 @@
       "tme-epi-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Torhow — 2026/01/05  \n2. Calcombe — 2026/01/06  \n3. Quinrel — 2026/01/11  \n4. Halcombe — 2026/01/22  \n5. Velholt — 2026/01/26  \n6. Torholt — 2026/01/27",
+        "v8_answer": "Earliest first:\n\n1. Torhow \u2014 2026/01/05  \n2. Calcombe \u2014 2026/01/06  \n3. Quinrel \u2014 2026/01/11  \n4. Halcombe \u2014 2026/01/22  \n5. Velholt \u2014 2026/01/26  \n6. Torholt \u2014 2026/01/27",
         "v9": false,
         "v9_answer": "The earlier conversations do not state the order for Velholt, Torholt, Torhow, Halcombe, Quinrel, and Calcombe.",
         "v9_gold_in_context": 0,
@@ -929,9 +1144,9 @@
       "tme-epi-023": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brayholt → Hestlick → Glenridge → Ferrel → Penrel → Fercombe",
+        "v8_answer": "Brayholt \u2192 Hestlick \u2192 Glenridge \u2192 Ferrel \u2192 Penrel \u2192 Fercombe",
         "v9": false,
-        "v9_answer": "The earlier conversations don’t contain the order in which Brayholt, Fercombe, Hestlick, Penrel, Glenridge, and Ferrel were added to the supper clubs shortlist. So I can’t determine the earliest-first order from them.",
+        "v9_answer": "The earlier conversations don\u2019t contain the order in which Brayholt, Fercombe, Hestlick, Penrel, Glenridge, and Ferrel were added to the supper clubs shortlist. So I can\u2019t determine the earliest-first order from them.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -942,9 +1157,9 @@
       "tme-epi-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Halholt — 2026/01/05\n2. Velfoot — 2026/01/11\n3. Halway — 2026/01/20\n4. Rushmore — 2026/01/29\n5. Dunstow — 2026/02/05\n6. Ottlick — 2026/02/11",
+        "v8_answer": "Earliest first:\n\n1. Halholt \u2014 2026/01/05\n2. Velfoot \u2014 2026/01/11\n3. Halway \u2014 2026/01/20\n4. Rushmore \u2014 2026/01/29\n5. Dunstow \u2014 2026/02/05\n6. Ottlick \u2014 2026/02/11",
         "v9": false,
-        "v9_answer": "I don’t have enough information to give the full order.\n\nFrom the conversations provided, I can see these additions:\n\n1. **Halholt** — 2026/01/05  \n2. **Rushmore** — 2026/01/29  \n3. **Ottlick** — 2026/02/11  \n\nThe records provided do **not** say when **Velfoot**, **Dunstow**, or **Halway** were adde",
+        "v9_answer": "I don\u2019t have enough information to give the full order.\n\nFrom the conversations provided, I can see these additions:\n\n1. **Halholt** \u2014 2026/01/05  \n2. **Rushmore** \u2014 2026/01/29  \n3. **Ottlick** \u2014 2026/02/11  \n\nThe records provided do **not** say when **Velfoot**, **Dunstow**, or **Halway** were adde",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -955,9 +1170,9 @@
       "tme-epi-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Velcombe — 2026/01/09  \n2. Marholt — 2026/01/10  \n3. Halholt — 2026/01/20  \n4. Calmore — 2026/01/29  \n5. Rushridge — 2026/02/01  \n6. Rushcombe — 2026/02/06  \n7. Nadridge — 2026/02/10",
+        "v8_answer": "Earliest first:\n\n1. Velcombe \u2014 2026/01/09  \n2. Marholt \u2014 2026/01/10  \n3. Halholt \u2014 2026/01/20  \n4. Calmore \u2014 2026/01/29  \n5. Rushridge \u2014 2026/02/01  \n6. Rushcombe \u2014 2026/02/06  \n7. Nadridge \u2014 2026/02/10",
         "v9": false,
-        "v9_answer": "The record doesn’t contain enough information to determine the full order.\n\nIt only explicitly says that **Halholt** was put on the **cycle loops shortlist** on **2026/01/20**. The other six—**Rushridge, Rushcombe, Nadridge, Calmore, Marholt, Velcombe**—are not recorded as being added, so I can’t pl",
+        "v9_answer": "The record doesn\u2019t contain enough information to determine the full order.\n\nIt only explicitly says that **Halholt** was put on the **cycle loops shortlist** on **2026/01/20**. The other six\u2014**Rushridge, Rushcombe, Nadridge, Calmore, Marholt, Velcombe**\u2014are not recorded as being added, so I can\u2019t pl",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -968,7 +1183,7 @@
       "tme-epi-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Ferhow — 2026/01/07  \n2. Bramstow — 2026/01/10  \n3. Penrel — 2026/01/20  \n4. Rushstow — 2026/01/22  \n5. Kestmore — 2026/01/24  \n6. Halway — 2026/01/25  \n7. Penway — 2026/02/03",
+        "v8_answer": "Earliest first:\n\n1. Ferhow \u2014 2026/01/07  \n2. Bramstow \u2014 2026/01/10  \n3. Penrel \u2014 2026/01/20  \n4. Rushstow \u2014 2026/01/22  \n5. Kestmore \u2014 2026/01/24  \n6. Halway \u2014 2026/01/25  \n7. Penway \u2014 2026/02/03",
         "v9": false,
         "v9_answer": "Earliest first:\n\n1. Rushstow  \n2. Bramstow  \n3. Halway  \n4. Ferhow  \n5. Kestmore  \n6. Penrel  \n7. Penway",
         "v9_gold_in_context": 1,
@@ -981,9 +1196,9 @@
       "tme-epi-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Hesthow — 2026/01/14  \n2. Hestcombe — 2026/01/20  \n3. Torstow — 2026/01/30  \n4. Glenstow — 2026/02/01",
+        "v8_answer": "Earliest first:\n\n1. Hesthow \u2014 2026/01/14  \n2. Hestcombe \u2014 2026/01/20  \n3. Torstow \u2014 2026/01/30  \n4. Glenstow \u2014 2026/02/01",
         "v9": false,
-        "v9_answer": "The conversations don’t contain when Hesthow was added, so I can’t determine the full four-item order.\n\nWhat they do show is:\n\n1. Hestcombe — 2026/01/20  \n2. Torstow — 2026/01/30  \n3. Glenstow — 2026/02/01\n\nHesthow is not mentioned in the provided record.",
+        "v9_answer": "The conversations don\u2019t contain when Hesthow was added, so I can\u2019t determine the full four-item order.\n\nWhat they do show is:\n\n1. Hestcombe \u2014 2026/01/20  \n2. Torstow \u2014 2026/01/30  \n3. Glenstow \u2014 2026/02/01\n\nHesthow is not mentioned in the provided record.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -994,9 +1209,9 @@
       "tme-epi-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Wexmore — 2026/01/11  \n2. Calholt — 2026/01/15  \n3. Nadridge — 2026/01/19  \n4. Ardcombe — 2026/01/27  \n5. Glencombe — 2026/01/29  \n6. Hestmore — 2026/01/30",
+        "v8_answer": "Earliest first:\n\n1. Wexmore \u2014 2026/01/11  \n2. Calholt \u2014 2026/01/15  \n3. Nadridge \u2014 2026/01/19  \n4. Ardcombe \u2014 2026/01/27  \n5. Glencombe \u2014 2026/01/29  \n6. Hestmore \u2014 2026/01/30",
         "v9": false,
-        "v9_answer": "I don’t have enough information to give the full order.\n\nFrom the conversations, I can tell only that:\n\n1. Wexmore was added on 2026/01/11  \n2. Calholt was added on 2026/01/15  \n\nSo Wexmore came before Calholt. The conversations do not say when Ardcombe, Glencombe, Nadridge, or Hestmore were added.",
+        "v9_answer": "I don\u2019t have enough information to give the full order.\n\nFrom the conversations, I can tell only that:\n\n1. Wexmore was added on 2026/01/11  \n2. Calholt was added on 2026/01/15  \n\nSo Wexmore came before Calholt. The conversations do not say when Ardcombe, Glencombe, Nadridge, or Hestmore were added.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1007,9 +1222,9 @@
       "tme-epi-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ottrel → Marfoot → Ottlick → Rushstow → Velcombe",
+        "v8_answer": "Ottrel \u2192 Marfoot \u2192 Ottlick \u2192 Rushstow \u2192 Velcombe",
         "v9": false,
-        "v9_answer": "The conversations don’t contain the full answer.\n\nThey only show these two from your list being added:\n\n1. **Ottlick** — 2026/01/20  \n2. **Velcombe** — 2026/02/01  \n\nI don’t see **Ottrel**, **Rushstow**, or **Marfoot** being added in the provided conversations, so I can’t determine the complete earl",
+        "v9_answer": "The conversations don\u2019t contain the full answer.\n\nThey only show these two from your list being added:\n\n1. **Ottlick** \u2014 2026/01/20  \n2. **Velcombe** \u2014 2026/02/01  \n\nI don\u2019t see **Ottrel**, **Rushstow**, or **Marfoot** being added in the provided conversations, so I can\u2019t determine the complete earl",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1020,7 +1235,7 @@
       "tme-epi-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Braystow — 2026/01/05\n2. Dunway — 2026/01/10\n3. Torlick — 2026/01/21\n4. Hestrel — 2026/01/22\n5. Kestholt — 2026/01/29",
+        "v8_answer": "Earliest first:\n\n1. Braystow \u2014 2026/01/05\n2. Dunway \u2014 2026/01/10\n3. Torlick \u2014 2026/01/21\n4. Hestrel \u2014 2026/01/22\n5. Kestholt \u2014 2026/01/29",
         "v9": false,
         "v9_answer": "The conversations only show **Braystow** being added to the repair cafes shortlist.\n\nThey do **not** mention Torlick, Kestholt, Dunway, or Hestrel being added, so the full earliest-first order cannot be determined from this record.",
         "v9_gold_in_context": 1,
@@ -1033,9 +1248,9 @@
       "tme-epi-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Bramstow → Ferholt → Hestridge → Bramway → Glencombe",
+        "v8_answer": "Bramstow \u2192 Ferholt \u2192 Hestridge \u2192 Bramway \u2192 Glencombe",
         "v9": false,
-        "v9_answer": "The earlier conversations do not contain that answer. They mention shortlist-related cue words, but they do not state when Bramstow, Glencombe, Bramway, Hestridge, or Ferholt were added, so I can’t determine the earliest-first order from the record.",
+        "v9_answer": "The earlier conversations do not contain that answer. They mention shortlist-related cue words, but they do not state when Bramstow, Glencombe, Bramway, Hestridge, or Ferholt were added, so I can\u2019t determine the earliest-first order from the record.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1046,9 +1261,9 @@
       "tme-epi-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first: **Marmore → Penstow → Velstow → Hallick**.",
+        "v8_answer": "Earliest first: **Marmore \u2192 Penstow \u2192 Velstow \u2192 Hallick**.",
         "v9": false,
-        "v9_answer": "The conversations don’t contain any mention of Hallick, Velstow, Marmore, or Penstow being added to a bothy-stops shortlist, so I can’t determine the order.",
+        "v9_answer": "The conversations don\u2019t contain any mention of Hallick, Velstow, Marmore, or Penstow being added to a bothy-stops shortlist, so I can\u2019t determine the order.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1059,9 +1274,9 @@
       "tme-epi-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ottridge → Dunridge → Selhow → Sellick",
+        "v8_answer": "Ottridge \u2192 Dunridge \u2192 Selhow \u2192 Sellick",
         "v9": false,
-        "v9_answer": "The conversations only show these two additions:\n\n1. **Dunridge** — 2026/01/17  \n2. **Sellick** — 2026/02/03  \n\nThey do **not** say when **Selhow** or **Ottridge** were added, so the full earliest-first order cannot be determined from the record provided.",
+        "v9_answer": "The conversations only show these two additions:\n\n1. **Dunridge** \u2014 2026/01/17  \n2. **Sellick** \u2014 2026/02/03  \n\nThey do **not** say when **Selhow** or **Ottridge** were added, so the full earliest-first order cannot be determined from the record provided.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1072,7 +1287,7 @@
       "tme-epi-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brayholt → Rushcombe → Quinmore → Wexlick",
+        "v8_answer": "Brayholt \u2192 Rushcombe \u2192 Quinmore \u2192 Wexlick",
         "v9": false,
         "v9_answer": "The conversations only show **Quinmore** being added to the board games shortlist. They do not mention Wexlick, Rushcombe, or Brayholt being added, so the full order cannot be determined from the record.",
         "v9_gold_in_context": 1,
@@ -1085,9 +1300,9 @@
       "tme-epi-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first: **Wexstow, Penstow, Rushhow, Brayholt**.\n\n- **Wexstow** — 2026/01/09  \n- **Penstow** — 2026/01/12  \n- **Rushhow** — 2026/01/20  \n- **Brayholt** — 2026/02/04",
+        "v8_answer": "Earliest first: **Wexstow, Penstow, Rushhow, Brayholt**.\n\n- **Wexstow** \u2014 2026/01/09  \n- **Penstow** \u2014 2026/01/12  \n- **Rushhow** \u2014 2026/01/20  \n- **Brayholt** \u2014 2026/02/04",
         "v9": false,
-        "v9_answer": "The conversations do not contain the full answer: I can see only three orchard-variety additions:\n\n1. Wexstow — 2026/01/09  \n2. Rushhow — 2026/01/20  \n3. Brayholt — 2026/02/04  \n\nPenstow is not mentioned as being added, so its position in the order cannot be determined from the record.",
+        "v9_answer": "The conversations do not contain the full answer: I can see only three orchard-variety additions:\n\n1. Wexstow \u2014 2026/01/09  \n2. Rushhow \u2014 2026/01/20  \n3. Brayholt \u2014 2026/02/04  \n\nPenstow is not mentioned as being added, so its position in the order cannot be determined from the record.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1098,7 +1313,7 @@
       "tme-epi-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — in Session 11 on 2026/01/17.",
+        "v8_answer": "You said it \u2014 in Session 11 on 2026/01/17.",
         "v9": true,
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
@@ -1111,7 +1326,7 @@
       "tme-epi-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me — I said: “the bus replacement … leaves from the far side of the bridge.”",
+        "v8_answer": "It was me \u2014 I said: \u201cthe bus replacement \u2026 leaves from the far side of the bridge.\u201d",
         "v9": false,
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
@@ -1126,7 +1341,7 @@
         "v8": true,
         "v8_answer": "That was me.",
         "v9": true,
-        "v9_answer": "You said the prompt about the print shop, but **I** was the one who said: “it wants files flattened before upload.”",
+        "v9_answer": "You said the prompt about the print shop, but **I** was the one who said: \u201cit wants files flattened before upload.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1163,7 +1378,7 @@
       "tme-epi-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — in Session 19 on 2026/01/27.",
+        "v8_answer": "You said it \u2014 in Session 19 on 2026/01/27.",
         "v9": true,
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
@@ -1176,9 +1391,9 @@
       "tme-epi-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "That was me — I said: “Worth remembering about the canal gate: it gets locked from the far side.”",
+        "v8_answer": "That was me \u2014 I said: \u201cWorth remembering about the canal gate: it gets locked from the far side.\u201d",
         "v9": true,
-        "v9_answer": "It was me — the assistant said: “Worth remembering about the canal gate: it gets locked from the far side.”",
+        "v9_answer": "It was me \u2014 the assistant said: \u201cWorth remembering about the canal gate: it gets locked from the far side.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1189,9 +1404,9 @@
       "tme-epi-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "That was me. In Session 15, I said: “About the loft hatch — it sticks unless you lift before you push.”",
+        "v8_answer": "That was me. In Session 15, I said: \u201cAbout the loft hatch \u2014 it sticks unless you lift before you push.\u201d",
         "v9": true,
-        "v9_answer": "That was me — the assistant said it.",
+        "v9_answer": "That was me \u2014 the assistant said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1230,7 +1445,7 @@
         "v8": true,
         "v8_answer": "That was me.",
         "v9": true,
-        "v9_answer": "That was me. I said: “One thing about the Marrow Lane depot, it only takes card after six.”",
+        "v9_answer": "That was me. I said: \u201cOne thing about the Marrow Lane depot, it only takes card after six.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1243,7 +1458,7 @@
         "v8": true,
         "v8_answer": "That was me.",
         "v9": true,
-        "v9_answer": "You said the topic came up, but **I** was the one who said: “the wheelie bin round … skips the first week of every month.”",
+        "v9_answer": "You said the topic came up, but **I** was the one who said: \u201cthe wheelie bin round \u2026 skips the first week of every month.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1269,7 +1484,7 @@
         "v8": true,
         "v8_answer": "You said it.",
         "v9": true,
-        "v9_answer": "You said it — in Session 5, your message included: “hall, input, side, faster, us, wakes.”",
+        "v9_answer": "You said it \u2014 in Session 5, your message included: \u201chall, input, side, faster, us, wakes.\u201d",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1280,9 +1495,9 @@
       "tme-epi-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me — I said that the bulk-buy account needs two signatures before anything changes.",
+        "v8_answer": "It was me \u2014 I said that the bulk-buy account needs two signatures before anything changes.",
         "v9": true,
-        "v9_answer": "That was me — the assistant said: “The thing with the bulk-buy account is that it needs two signatures before anything changes.”",
+        "v9_answer": "That was me \u2014 the assistant said: \u201cThe thing with the bulk-buy account is that it needs two signatures before anything changes.\u201d",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,

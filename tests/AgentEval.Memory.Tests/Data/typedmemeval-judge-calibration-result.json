@@ -2,43 +2,47 @@
   "judge_prompt_fingerprint": "6f006dbb4014994ae2db341e6546a83093658a3e514a0aa2de10eed9a6879e7b",
   "measured_at": "2026-08-28",
   "model": "gpt-5.5",
-  "agreement": 0.983,
+  "agreement": 0.98,
   "status": "measured",
-  "cases": 176,
+  "cases": 200,
   "runs": 3,
   "per_vertical": {
-    "Prospective": 0.958,
+    "Prospective": 1.0,
     "Episodic": 1.0,
     "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
-    "Forgetting": 0.917,
+    "Forgetting": 0.875,
     "Bitemporal": 1.0,
-    "Temporal": 1.0
+    "Temporal": 1.0,
+    "Semantic": 0.958
   },
   "disagreements": {
-    "every_run": [],
-    "run_varying": [
-      "cal-epi-014",
+    "every_run": [
       "cal-for-006",
-      "cal-for-012",
-      "cal-pro-017"
+      "cal-for-012"
+    ],
+    "run_varying": [
+      "cal-for-013",
+      "cal-sem-007",
+      "cal-sem-020",
+      "cal-wm-012"
     ]
   },
   "superseded": {
-    "judge_prompt_fingerprint": "4a6e357c23f02bd3bdbd56cd1548c4bf23632ccfee896a2f0b3c41e299e4ed75",
+    "judge_prompt_fingerprint": "6f006dbb4014994ae2db341e6546a83093658a3e514a0aa2de10eed9a6879e7b",
     "measured_at": "2026-08-28",
     "model": "gpt-5.5",
     "agreement": 0.983,
     "cases": 176,
     "per_vertical": {
-      "Prospective": 1.0,
+      "Prospective": 0.958,
       "Episodic": 1.0,
       "Arithmetic": 1.0,
       "WorkingMemory": 1.0,
       "Forgetting": 0.917,
       "Bitemporal": 1.0,
-      "Temporal": 0.964
+      "Temporal": 1.0
     }
   },
-  "note": "Three runs at this fingerprint: 0.989 / 0.994 / 0.983. Lowest recorded, per-vertical from that same run. Bitemporal 28/28 and Temporal 28/28 in ALL THREE. For the first time no case disagrees in every run. THREE CHANGES SHIP TOGETHER, all adopted by the consuming project. (1) TemporalBody - the second and last vertical with no judge template. Like Bitemporal it fell through to StandardBody, the two words 'Grade this answer.' The preamble defines missed as confidently asserting nothing is there when gold says something is, and 'nothing happened between them' matches that word for word - but that answer ACCEPTS both anchors and misplaces them, which is a sequencing defect rather than a retrieval one. The body says: accepts the events and misplaces them, including an empty interval or no-latest claim, is wrong; denies the record holds them is missed; doing both is decided by the denial. Measured against a BASELINE TAKEN BEFORE THE BODY EXISTED - Temporal 0.857 / 0.929 with the controls already in. (2) A PER-VERTICAL FLOOR of 0.80, on this record AND on the live arm. A family-wide threshold is satisfiable by averaging, which is how Bitemporal sat at 0.750 behind a green 0.946 with nothing able to see it. Set below the family's 0.85 deliberately: a vertical is 24-28 cases, so one boundary case moves it about 0.04 and a floor at parity would fail on noise. Verified by falsification - forcing a vertical to 0.75 fires it. (3) question_asks, the discriminator branch, emitted by the judge and asserted INDEPENDENTLY of the outcome at zero extra calls. Two enums, because the verticals discriminate on different axes: Bitemporal value|occurrence, a property of the QUESTION; Temporal ordering|presence, a property of what the ANSWER commits to. Declared on 14 cases where the branch is unambiguous and asserted only where declared - a Correct or Abstained answer has no meaningful branch. This is the gate that would have caught the first Bitemporal body, which reached 24/24 while suppressing a label outright. No case reached its outcome by the wrong route in any run. cal-pro-017 appears in run 3 as Wrong -> Premature. That is 0.29's ProspectiveBody precedence rule firing, and it is the ONLY transition that rule can make - it chooses between two failure labels and can never move anything into or out of correct, so accuracy is invariant under it and only the failure distribution shifts. STILL OPEN: the preamble gives 'I have no record of that' as its ABSTAINED example and 'you never told me about that' as its MISSED example. Near-synonyms, family-wide, and the likeliest cause of cal-for-012 flapping. Parked for its own controlled change with its own controls and a seven-vertical before/after, per the consuming project's ruling."
+  "note": "Three runs: 0.980 / 0.980 / 0.985. Lowest recorded, per-vertical from that run. The prompt did NOT change - the fingerprint is identical to the previous record - and the re-measurement was forced by SCOPE: Semantic added 24 calibration cases, 176 -> 200, and the gate requires the recorded count to equal the live set. That gate exists because a measurement over 120 of 168 cases once passed as family-wide for eight days. SEMANTIC SHIPS WITH NO JUDGE BODY, and that is a finding rather than an omission. Bitemporal and Temporal each needed one because each had a real collision with the shared preamble - 'the correction had not been recorded yet' reads as premature, 'nothing happened between them' reads as missed. Semantic has no such collision: measured at 0.958 in all three runs with nothing but the preamble and StandardBody, comfortably clear of the 0.80 per-vertical floor, and NO case fails in every run. THE DISCIPLINE THAT PRODUCED THAT ANSWER: 24 controls were authored BEFORE any body existed and a baseline was measured first. Two of my own labels failed that baseline. cal-sem-009 was simply wrong - I labelled a TRUNCATED company name correct, and preamble rule 3 already says missing detail gold treats as part of the answer lowers the outcome; the control was fighting an existing rule instead of testing a new one, and is now a paraphrase rather than a truncation. cal-sem-020 I relabelled abstained -> wrong, and that was overconfident too: pooled over eight runs the judge splits exactly 4-4 there. Had the body been written first, both labels would have been enforced by a template and Semantic would have shown a flawless 24/24 - the Bitemporal overfit again, one week later. WHAT REMAINS IS NOT SEMANTIC'S. Every flapping case in this record - cal-for-006, cal-for-012, cal-for-013, cal-wm-012, cal-sem-007, cal-sem-020 - sits on the same abstained/missed/wrong seam, now visible across FOUR verticals. The shared preamble lists 'I have no record of that' under ABSTAINED and 'you never told me about that' under MISSED, and they are near-synonyms. On this evidence that ambiguity is the largest remaining source of judge instability in the family, and it is parked for its own controlled change with its own controls and a before/after across all eight verticals."
 }

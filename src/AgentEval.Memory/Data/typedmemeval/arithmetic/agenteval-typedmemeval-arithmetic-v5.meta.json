@@ -118,6 +118,333 @@
       "separates_gold": false
     }
   },
+  "gold_item_types": {
+    "tme-ari-001": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-002": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-003": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-004": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-005": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-006": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-007": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-008": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-009": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-010": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-011": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-012": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-013": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-014": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-015": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-016": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-017": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-018": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-019": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-020": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-021": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-022": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-023": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-024": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-025": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-026": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-027": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-028": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-029": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-030": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-031": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-032": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-033": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-034": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-035": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-036": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-037": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-038": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-039": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-040": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-041": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-042": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-043": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-044": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-045": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-046": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-047": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-048": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-049": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-ari-050": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ]
+  },
   "probes": {
     "status": "run",
     "v7_separability": {
@@ -541,7 +868,7 @@
       "probed_corpus_sha256": "2feda94be7e8c0267ea2ade28fe92ad25208e535e8756907e7550e0f67c184ef"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-28T13:40:37Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -971,7 +1298,7 @@
       "tme-ari-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Marrow Lane rewire payments logged were:\n\n- $169.74 — render mesh\n- $224.01 — stair spindles\n- $96.11 — tile adhesive\n- $241.87 — plasterboard\n\nTotal: **$731.73**",
+        "v8_answer": "The Marrow Lane rewire payments logged were:\n\n- $169.74 \u2014 render mesh\n- $224.01 \u2014 stair spindles\n- $96.11 \u2014 tile adhesive\n- $241.87 \u2014 plasterboard\n\nTotal: **$731.73**",
         "v9": true,
         "v9_answer": "$731.73",
         "v9_gold_in_context": 4,
@@ -985,7 +1312,7 @@
       "tme-ari-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The payments logged against the Ferrier Row cellar were:\n\n- $57.40 — replacement sash cords\n- $377.57 — tile adhesive\n- $228.46 — cavity trays\n- $175.29 — plasterboard\n\nTotal: **$838.72**",
+        "v8_answer": "The payments logged against the Ferrier Row cellar were:\n\n- $57.40 \u2014 replacement sash cords\n- $377.57 \u2014 tile adhesive\n- $228.46 \u2014 cavity trays\n- $175.29 \u2014 plasterboard\n\nTotal: **$838.72**",
         "v9": false,
         "v9_answer": "$232.69 total.",
         "v9_gold_in_context": 2,
@@ -1111,7 +1438,7 @@
       "tme-ari-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Halloway Wharf porch total: **$682.01**  \nThrelkeld Vale staircase total: **$837.32**\n\nDifference: **$155.31** — the Threlkeld Vale staircase total is higher.",
+        "v8_answer": "Halloway Wharf porch total: **$682.01**  \nThrelkeld Vale staircase total: **$837.32**\n\nDifference: **$155.31** \u2014 the Threlkeld Vale staircase total is higher.",
         "v9": false,
         "v9_answer": "Halloway Wharf porch: **$399.56**\n\nThrelkeld Vale staircase total: **$837.32**  \n($460.07 + $266.84 + $110.41)\n\nDifference: **$437.76** more logged against the Threlkeld Vale staircase.",
         "v9_gold_in_context": 4,
@@ -1139,9 +1466,9 @@
       "tme-ari-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Larkspur Terrace workshop total: **$909.58**  \nNettlebed Barn studio total: **$1,076.51**\n\nDifference: **$166.93** — the **Nettlebed Barn studio** total is higher.",
+        "v8_answer": "Larkspur Terrace workshop total: **$909.58**  \nNettlebed Barn studio total: **$1,076.51**\n\nDifference: **$166.93** \u2014 the **Nettlebed Barn studio** total is higher.",
         "v9": false,
-        "v9_answer": "I don’t have a logged payment against the **Larkspur Terrace workshop** in the conversations provided, so I can’t calculate the difference.\n\nWhat is logged against the **Nettlebed Barn studio** totals **$1,076.51**:\n\n- $371.51 — stair spindles  \n- $362.29 — skirting  \n- $342.71 — replacement sash co",
+        "v9_answer": "I don\u2019t have a logged payment against the **Larkspur Terrace workshop** in the conversations provided, so I can\u2019t calculate the difference.\n\nWhat is logged against the **Nettlebed Barn studio** totals **$1,076.51**:\n\n- $371.51 \u2014 stair spindles  \n- $362.29 \u2014 skirting  \n- $342.71 \u2014 replacement sash co",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1153,9 +1480,9 @@
       "tme-ari-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You logged:\n\n- Crowmarsh Mill dormer: $92.51\n- Bellweather Court attic: $856.75 total\n\nDifference: $764.24 — the Bellweather Court attic total was higher.",
+        "v8_answer": "You logged:\n\n- Crowmarsh Mill dormer: $92.51\n- Bellweather Court attic: $856.75 total\n\nDifference: $764.24 \u2014 the Bellweather Court attic total was higher.",
         "v9": false,
-        "v9_answer": "The record shows:\n\n- Crowmarsh Mill dormer: **$92.51**\n- Bellweather Court attic: **$352.49** and later **$77.36**\n\nSo there isn’t a single unambiguous difference.\n\n- Compared with the **$352.49** Bellweather entry: **$259.98**\n- Compared with the **$77.36** Bellweather entry: **$15.15**\n- If you me",
+        "v9_answer": "The record shows:\n\n- Crowmarsh Mill dormer: **$92.51**\n- Bellweather Court attic: **$352.49** and later **$77.36**\n\nSo there isn\u2019t a single unambiguous difference.\n\n- Compared with the **$352.49** Bellweather entry: **$259.98**\n- Compared with the **$77.36** Bellweather entry: **$15.15**\n- If you me",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1167,7 +1494,7 @@
       "tme-ari-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Rushmere Fields brickwork total: **$937.41**  \nFerrier Row cellar total: **$603.68**\n\nDifference: **$333.73** — Rushmere Fields brickwork was higher.",
+        "v8_answer": "Rushmere Fields brickwork total: **$937.41**  \nFerrier Row cellar total: **$603.68**\n\nDifference: **$333.73** \u2014 Rushmere Fields brickwork was higher.",
         "v9": false,
         "v9_answer": "You logged $937.41 against the Rushmere Fields brickwork in total, and $172.30 against the Ferrier Row cellar.\n\nDifference: **$765.11** more against Rushmere Fields brickwork.",
         "v9_gold_in_context": 4,
@@ -1181,9 +1508,9 @@
       "tme-ari-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Quarrier Walk screed: **$243.92**\n\nFerrier Row cellar: **$62.71 + $144.03 + $98.14 = $304.88**\n\nDifference: **$60.96** — the Ferrier Row cellar total is higher.",
+        "v8_answer": "Quarrier Walk screed: **$243.92**\n\nFerrier Row cellar: **$62.71 + $144.03 + $98.14 = $304.88**\n\nDifference: **$60.96** \u2014 the Ferrier Row cellar total is higher.",
         "v9": false,
-        "v9_answer": "I don’t have a logged amount for the **Quarrier Walk screed** in those conversations, so I can’t calculate the difference.\n\nThe **Ferrier Row cellar** entries shown are:\n\n- **$62.71** for cavity trays\n- **$144.03** for the loft hatch\n- **$98.14** for underfloor insulation",
+        "v9_answer": "I don\u2019t have a logged amount for the **Quarrier Walk screed** in those conversations, so I can\u2019t calculate the difference.\n\nThe **Ferrier Row cellar** entries shown are:\n\n- **$62.71** for cavity trays\n- **$144.03** for the loft hatch\n- **$98.14** for underfloor insulation",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1209,9 +1536,9 @@
       "tme-ari-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Marrow Lane rewire: **$284.35**.\n\nOckendon Rise glazing: **$388.55 total**  \n- $238.15 for cavity trays  \n- $150.40 for guttering  \n\nDifference: **$104.20** — the Ockendon Rise glazing total is higher.",
+        "v8_answer": "Marrow Lane rewire: **$284.35**.\n\nOckendon Rise glazing: **$388.55 total**  \n- $238.15 for cavity trays  \n- $150.40 for guttering  \n\nDifference: **$104.20** \u2014 the Ockendon Rise glazing total is higher.",
         "v9": false,
-        "v9_answer": "$46.20 — the Marrow Lane rewire ($284.35) was $46.20 more than the Ockendon Rise glazing ($238.15).",
+        "v9_answer": "$46.20 \u2014 the Marrow Lane rewire ($284.35) was $46.20 more than the Ockendon Rise glazing ($238.15).",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1225,7 +1552,7 @@
         "v8": true,
         "v8_answer": "Crowmarsh Mill dormer total: **$474.95**  \nThrelkeld Vale staircase total: **$1,109.98**\n\nDifference: **$635.03**\n\nSo, you logged **$635.03 more** against the **Threlkeld Vale staircase** than against the **Crowmarsh Mill dormer**.",
         "v9": false,
-        "v9_answer": "Crowmarsh Mill dormer logged: **$372.54**\n\nThrelkeld Vale staircase logged in total: **$1,109.98**  \n- $440.58  \n- $230.80  \n- $438.60  \n\nDifference: **$737.44** — the Threlkeld Vale staircase total is higher.",
+        "v9_answer": "Crowmarsh Mill dormer logged: **$372.54**\n\nThrelkeld Vale staircase logged in total: **$1,109.98**  \n- $440.58  \n- $230.80  \n- $438.60  \n\nDifference: **$737.44** \u2014 the Threlkeld Vale staircase total is higher.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1251,7 +1578,7 @@
       "tme-ari-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "15 days total.\n\n- 2026/02/02 in → 2026/02/13 out, excluding departure day: 11 days\n- 2026/02/18 in → 2026/02/22 out, excluding departure day: 4 days\n\nTotal: 11 + 4 = 15 days.",
+        "v8_answer": "15 days total.\n\n- 2026/02/02 in \u2192 2026/02/13 out, excluding departure day: 11 days\n- 2026/02/18 in \u2192 2026/02/22 out, excluding departure day: 4 days\n\nTotal: 11 + 4 = 15 days.",
         "v9": true,
         "v9_answer": "15 days in total.",
         "v9_gold_in_context": 4,
@@ -1265,7 +1592,7 @@
       "tme-ari-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "19 days total.\n\nBreakdown, excluding each departure day:\n\n- Feb 3–Feb 5: 2 days  \n- Feb 7–Feb 18: 11 days  \n- Feb 20–Feb 26: 6 days  \n\nTotal: 2 + 11 + 6 = 19 days.",
+        "v8_answer": "19 days total.\n\nBreakdown, excluding each departure day:\n\n- Feb 3\u2013Feb 5: 2 days  \n- Feb 7\u2013Feb 18: 11 days  \n- Feb 20\u2013Feb 26: 6 days  \n\nTotal: 2 + 11 + 6 = 19 days.",
         "v9": false,
         "v9_answer": "The conversations do not contain that total. They mention the skip company changing the collection window, but they do not say how many days the drive skip was at Larkspur Terrace.",
         "v9_gold_in_context": 0,
@@ -1279,9 +1606,9 @@
       "tme-ari-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "15 days in total.\n\nBreakdown, excluding each return/departure day:\n\n- Feb 3 → Feb 9: 6 days\n- Feb 10 → Feb 14: 4 days\n- Feb 20 → Feb 25: 5 days\n\nTotal: 6 + 4 + 5 = 15 days.",
+        "v8_answer": "15 days in total.\n\nBreakdown, excluding each return/departure day:\n\n- Feb 3 \u2192 Feb 9: 6 days\n- Feb 10 \u2192 Feb 14: 4 days\n- Feb 20 \u2192 Feb 25: 5 days\n\nTotal: 6 + 4 + 5 = 15 days.",
         "v9": false,
-        "v9_answer": "The conversations don’t contain enough information to determine that.\n\nThey say the tile cutter was borrowed on 2026/02/10 and again on 2026/02/20, and returned on 2026/02/25. But they do not say when the first borrowing spell ended, so the total across every spell cannot be calculated from the reco",
+        "v9_answer": "The conversations don\u2019t contain enough information to determine that.\n\nThey say the tile cutter was borrowed on 2026/02/10 and again on 2026/02/20, and returned on 2026/02/25. But they do not say when the first borrowing spell ended, so the total across every spell cannot be calculated from the reco",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1307,7 +1634,7 @@
       "tme-ari-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "11 days in total.\n\n- First spell: arrived 2026/02/07, left 2026/02/10 — exclude departure day = 3 days.\n- Second spell: arrived 2026/02/18, left 2026/02/26 — exclude departure day = 8 days.\n\nTotal: 3 + 8 = 11 days.",
+        "v8_answer": "11 days in total.\n\n- First spell: arrived 2026/02/07, left 2026/02/10 \u2014 exclude departure day = 3 days.\n- Second spell: arrived 2026/02/18, left 2026/02/26 \u2014 exclude departure day = 8 days.\n\nTotal: 3 + 8 = 11 days.",
         "v9": true,
         "v9_answer": "11 days total.\n\n- 7 Feb to 10 Feb, excluding departure day: 3 days\n- 18 Feb to 26 Feb, excluding departure day: 8 days\n\nTotal: 3 + 8 = 11 days.",
         "v9_gold_in_context": 4,
@@ -1323,7 +1650,7 @@
         "v8": true,
         "v8_answer": "19 days total.",
         "v9": true,
-        "v9_answer": "19 days total.\n\n- 2026/02/07 pickup → 2026/02/24 return, excluding return day: 17 days\n- 2026/02/27 pickup → 2026/03/01 return, excluding return day: 2 days\n\nTotal: 17 + 2 = 19 days.",
+        "v9_answer": "19 days total.\n\n- 2026/02/07 pickup \u2192 2026/02/24 return, excluding return day: 17 days\n- 2026/02/27 pickup \u2192 2026/03/01 return, excluding return day: 2 days\n\nTotal: 17 + 2 = 19 days.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1351,7 +1678,7 @@
         "v8": true,
         "v8_answer": "11 days total.",
         "v9": false,
-        "v9_answer": "I can’t determine that from the conversations.\n\nThey say the borrowed threading machine was sent back from Wexcombe Gate on **2026/02/15** and again on **2026/02/25**, but they do not say when either spell began, so the total number of days held — excluding departure days — is not contained in the r",
+        "v9_answer": "I can\u2019t determine that from the conversations.\n\nThey say the borrowed threading machine was sent back from Wexcombe Gate on **2026/02/15** and again on **2026/02/25**, but they do not say when either spell began, so the total number of days held \u2014 excluding departure days \u2014 is not contained in the r",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1363,7 +1690,7 @@
       "tme-ari-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "17 days in total.\n\n- 4 Feb in, 8 Feb out → count 4–7 Feb = 4 days  \n- 15 Feb in, 28 Feb out → count 15–27 Feb = 13 days  \n\nTotal: 4 + 13 = 17 days.",
+        "v8_answer": "17 days in total.\n\n- 4 Feb in, 8 Feb out \u2192 count 4\u20137 Feb = 4 days  \n- 15 Feb in, 28 Feb out \u2192 count 15\u201327 Feb = 13 days  \n\nTotal: 4 + 13 = 17 days.",
         "v9": true,
         "v9_answer": "17 days total.\n\n- 4 Feb went in; 8 Feb came out, excluding 8 Feb = 4 days.\n- 15 Feb went in; 28 Feb came out, excluding 28 Feb = 13 days.\n\nTotal: 4 + 13 = 17 days.",
         "v9_gold_in_context": 4,
@@ -1377,9 +1704,9 @@
       "tme-ari-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "11 days total.\n\n- Spell 1: Feb 2–Feb 8, excluding departure day Feb 8 = 6 days\n- Spell 2: Feb 10–Feb 15, excluding departure day Feb 15 = 5 days\n\nTotal: 6 + 5 = 11 days.",
+        "v8_answer": "11 days total.\n\n- Spell 1: Feb 2\u2013Feb 8, excluding departure day Feb 8 = 6 days\n- Spell 2: Feb 10\u2013Feb 15, excluding departure day Feb 15 = 5 days\n\nTotal: 6 + 5 = 11 days.",
         "v9": false,
-        "v9_answer": "The conversations don’t contain enough information to determine that total.\n\nThey only say the loaner van was handed back from Ockendon Rise on **2026/02/08** and **2026/02/15**. They do not say when either spell began or how many days the van had been there before each departure day.",
+        "v9_answer": "The conversations don\u2019t contain enough information to determine that total.\n\nThey only say the loaner van was handed back from Ockendon Rise on **2026/02/08** and **2026/02/15**. They do not say when either spell began or how many days the van had been there before each departure day.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1391,9 +1718,9 @@
       "tme-ari-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "12 days total.\n\nBreakdown excluding each departure day:\n\n- Feb 2 up → Feb 7 down: 5 days\n- Feb 9 up → Feb 12 down: 3 days\n- Feb 16 up → Feb 20 down: 4 days\n\nTotal: 5 + 3 + 4 = 12 days.",
+        "v8_answer": "12 days total.\n\nBreakdown excluding each departure day:\n\n- Feb 2 up \u2192 Feb 7 down: 5 days\n- Feb 9 up \u2192 Feb 12 down: 3 days\n- Feb 16 up \u2192 Feb 20 down: 4 days\n\nTotal: 5 + 3 + 4 = 12 days.",
         "v9": false,
-        "v9_answer": "The conversations don’t say how many days the tower scaffold was at Marrow Lane. They only say it came down on 2026/02/07, so I can’t calculate the total excluding the departure day.",
+        "v9_answer": "The conversations don\u2019t say how many days the tower scaffold was at Marrow Lane. They only say it came down on 2026/02/07, so I can\u2019t calculate the total excluding the departure day.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1405,7 +1732,7 @@
       "tme-ari-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "15 days in total.\n\nBreakdown, excluding each return/departure day:\n\n- 2026/02/02 collected → 2026/02/09 returned: 7 days  \n- 2026/02/12 collected → 2026/02/17 returned: 5 days  \n- 2026/02/18 collected → 2026/02/21 returned: 3 days  \n\nTotal: 7 + 5 + 3 = 15 days.",
+        "v8_answer": "15 days in total.\n\nBreakdown, excluding each return/departure day:\n\n- 2026/02/02 collected \u2192 2026/02/09 returned: 7 days  \n- 2026/02/12 collected \u2192 2026/02/17 returned: 5 days  \n- 2026/02/18 collected \u2192 2026/02/21 returned: 3 days  \n\nTotal: 7 + 5 + 3 = 15 days.",
         "v9": false,
         "v9_answer": "The conversations only give one complete hire spell:\n\n- Collected: 2026/02/02\n- Returned: 2026/02/09\n- Excluding the departure/return day: 7 days\n\nThey also mention later collections on 2026/02/12 and 2026/02/18, but no return dates are recorded for those, so the total across every spell cannot be d",
         "v9_gold_in_context": 4,
