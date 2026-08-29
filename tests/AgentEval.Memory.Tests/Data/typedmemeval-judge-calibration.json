@@ -2896,5 +2896,71 @@
     "expected": "Wrong",
     "rule": "conj-restates-resolution-never-counts",
     "note": "Performs the co-reference and stops, committing to no number. RELABELLED abstained -> wrong alongside cal-cnj-005, which is the identical construction on the other shape and which I relabelled first while leaving this one behind - my inconsistency, caught by the judge marking both wrong in every run. Abstained requires declining to commit to any value; this commits to a true statement that answers a different question. cal-cnj-006 and cal-cnj-013 are the genuine abstentions."
+  },
+  {
+    "id": "cal-for-026",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Who is my dentist?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "I have no record of a dentist for you.",
+    "expected": "Wrong",
+    "rule": "seam-record-absence-is-over-forgetting",
+    "note": "RELABELLED missed -> wrong after the BEFORE measurement, and the label was mine to fix. Gold here is STILL-VALID, and ForgettingBody says in as many words: 'Gold says the fact is still valid: an answer claiming it is no longer known is wrong - the system is forgetting something it should still hold.' The vertical's own template supersedes the shared preamble's abstained/missed line, and the judge applied it correctly in both runs. I authored the label from the preamble alone without reading the body that governs the case. See also cal-for-025 and cal-for-027, relabelled for the same reason. The case still earns its place: it is almost verbatim the preamble's ABSTAINED illustration and it is not abstained under any reading, which is the point. In Forgetting it is wrong (over-forgetting a still-valid fact); in a vertical with no body of its own it would be missed (see cal-sem-026, which is the same sentence shape and IS missed). One phrase, two correct answers, decided by the vertical - that is the discipline working, not an ambiguity. Two sibling controls (cal-for-025 'I don't know', cal-for-027 'I am not sure what I have on file') were authored alongside this one and REMOVED: with an Abstained label they graded Wrong, with a Wrong label they graded Abstained, flapping both ways across six runs. A case the judge answers both ways with equal frequency cannot discriminate anything and only adds noise to a vertical that already carries the family's last every-run disagreement. They were mine, added this session, and removed for failing their design purpose - not for being inconvenient. This case and cal-for-028 are stable at Wrong and carry the finding they were all authored to look for."
+  },
+  {
+    "id": "cal-for-028",
+    "vertical": "Forgetting",
+    "shape": "still-valid",
+    "question": "Who is my dentist?",
+    "gold": "Ashcroft Dental - that is still your dentist.",
+    "answer": "There is nothing on file about a dentist.",
+    "expected": "Wrong",
+    "rule": "seam-store-asserted-empty-is-over-forgetting",
+    "note": "RELABELLED missed -> wrong after the BEFORE measurement, and the label was mine to fix. Gold here is STILL-VALID, and ForgettingBody says in as many words: 'Gold says the fact is still valid: an answer claiming it is no longer known is wrong - the system is forgetting something it should still hold.' The vertical's own template supersedes the shared preamble's abstained/missed line, and the judge applied it correctly in both runs. I authored the label from the preamble alone without reading the body that governs the case. Third-person form of cal-for-026. Same reading, same correction."
+  },
+  {
+    "id": "cal-sem-025",
+    "vertical": "Semantic",
+    "shape": "current-value",
+    "question": "Who is my usual courier now?",
+    "gold": "Oakhurst Transit.",
+    "answer": "I could not tell you who that is now.",
+    "expected": "Abstained",
+    "rule": "seam-declines-without-absence-claim",
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Declines and asserts nothing about the record. Abstained on any reading."
+  },
+  {
+    "id": "cal-sem-026",
+    "vertical": "Semantic",
+    "shape": "current-value",
+    "question": "Who is my usual courier now?",
+    "gold": "Oakhurst Transit.",
+    "answer": "Nothing is recorded for your courier.",
+    "expected": "Missed",
+    "rule": "seam-nothing-recorded",
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Asserts the record is empty when gold says it is not. The sibling of cal-sem-007, which is the case that first exposed this seam by matching the abstained illustration while carrying the missed label."
+  },
+  {
+    "id": "cal-wm-025",
+    "vertical": "WorkingMemory",
+    "shape": "distance-8",
+    "question": "Which gym did I say I go to?",
+    "gold": "Brightwater.",
+    "answer": "I don't recall.",
+    "expected": "Abstained",
+    "rule": "seam-recall-failure-is-uncertainty",
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Reports the system's own failure to retrieve without claiming the fact is absent. Abstained - and this one matters because 'I do not recall' is easily read as a denial."
+  },
+  {
+    "id": "cal-wm-026",
+    "vertical": "WorkingMemory",
+    "shape": "distance-8",
+    "question": "Which gym did I say I go to?",
+    "gold": "Brightwater.",
+    "answer": "You never mentioned a gym.",
+    "expected": "Missed",
+    "rule": "seam-denies-being-told",
+    "note": "SEAM CONTROL for the shared preamble's abstained/missed boundary. The preamble states the line as UNCERTAINTY versus DENIAL, then lists 'I have no record of that' as an ABSTAINED example - a phrase that denies the record holds anything, which is what MISSED's own example says. The rule and its illustrations disagree, and six cases across four verticals flap on it. These eight fix the reading in both directions before any preamble edit. Verbatim the preamble's MISSED illustration, kept as the anchor at that end so the edit cannot drift missed toward abstained either."
   }
 ]
