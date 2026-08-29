@@ -1,8 +1,8 @@
 {
-  "judge_prompt_fingerprint": "2fe921a6528c10fb29423ebe3100dc135634211c3bc60f4623fca7b8d91373e3",
+  "judge_prompt_fingerprint": "b1d3f7216032ba27232fe4f0824f84226ffc39db6b226a66fa286b756b44e123",
   "measured_at": "2026-08-29",
   "model": "gpt-5.5",
-  "agreement": 0.983,
+  "agreement": 0.987,
   "status": "measured",
   "cases": 230,
   "runs": 3,
@@ -11,41 +11,38 @@
     "Episodic": 1.0,
     "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
-    "Forgetting": 0.885,
+    "Forgetting": 0.923,
     "Bitemporal": 1.0,
     "Temporal": 1.0,
-    "Semantic": 0.962,
-    "Conjunction": 1.0
+    "Semantic": 1.0,
+    "Conjunction": 0.958
   },
   "disagreements": {
     "every_run": [
-      "cal-for-006",
-      "cal-for-012"
+      "cal-for-006"
     ],
     "run_varying": [
-      "cal-for-013",
-      "cal-sem-007",
-      "cal-sem-013",
-      "cal-sem-020"
+      "cal-cnj-011",
+      "cal-for-012"
     ]
   },
   "superseded": {
     "judge_prompt_fingerprint": "2fe921a6528c10fb29423ebe3100dc135634211c3bc60f4623fca7b8d91373e3",
     "measured_at": "2026-08-29",
     "model": "gpt-5.5",
-    "agreement": 0.991,
-    "cases": 224,
+    "agreement": 0.983,
+    "cases": 230,
     "per_vertical": {
       "Prospective": 1.0,
       "Episodic": 1.0,
       "Arithmetic": 1.0,
       "WorkingMemory": 1.0,
-      "Forgetting": 0.917,
+      "Forgetting": 0.885,
       "Bitemporal": 1.0,
       "Temporal": 1.0,
-      "Semantic": 1.0,
+      "Semantic": 0.962,
       "Conjunction": 1.0
     }
   },
-  "note": "Three runs: 0.983 / 0.983 / 0.983. THE FINGERPRINT IS UNCHANGED - no prompt edit ships from this work. The re-measurement was forced by SCOPE alone: six calibration controls were added, 224 -> 230. THIS TASK PRODUCED THREE NESTED NEGATIVE RESULTS, and shipping almost nothing is the correct outcome. It was undertaken because the shared preamble states the abstained/missed line as uncertainty-versus-denial and then illustrates ABSTAINED with 'I have no record of that', which is a denial. I argued to the consuming project that this was the family's largest remaining judge defect and that it should be sequenced ahead of their own corpus work. They adopted that ordering on my argument. The argument was wrong. (1) THE SEAM IS NOT A FAMILY-WIDE DEFECT. Eight negative controls were authored first and a BEFORE state measured across all nine verticals: six of eight passed unchanged. (2) MY REPAIR WAS A REGRESSION. Making the preamble self-consistent - folding record-absence into missed - dropped agreement from 0.983/0.987 to 0.974/0.966/0.974 and converted the family's canonical genuine-refusal-abstains cases to Missed in FOUR verticals (cal-epi-013, cal-wm-003, cal-wm-022, cal-bit-024, cal-tem-023). Reverted. The preamble ships untouched. (3) HALF MY CONTROLS WERE NOT MEASURING THE SEAM. Four were placed in Forgetting's still-valid shape, where ForgettingBody states that an answer claiming a still-valid fact is no longer known is WRONG. Under that rule abstained is essentially unreachable in that shape - even a bare 'I don't know' grades wrong - so those controls measured the vertical's over-forgetting rule instead. Two of them (cal-for-025, cal-for-027) then flapped BOTH WAYS across six runs: labelled Abstained they graded Wrong, labelled Wrong they graded Abstained. A case the judge answers both ways with equal frequency has no correct label and cannot discriminate anything, so both were removed - cases I added this session, removed for failing their design purpose rather than for being inconvenient, and the removal is recorded in cal-for-026's note rather than left to a diff. WHAT SHIPS IS ONE RULE AND SIX CONTROLS. The rule is that A VERTICAL BODY SUPERSEDES THE SHARED PREAMBLE, which was true, load-bearing and written down nowhere before. cal-for-026 and cal-for-028 document it: the same sentence shape is WRONG in Forgetting (over-forgetting) and MISSED in Semantic (cal-sem-026), decided by the vertical, and both are stable. THE CORRECT SCOPING, narrower than what I claimed: the preamble's ambiguity reaches whichever vertical LACKS a body to settle it. Semantic is the only one, and it is where the residue lives - cal-sem-007 and cal-sem-013 flip between Missed and Abstained on exactly this boundary. The remedy is therefore a Semantic body or a deliberate acceptance there, NOT a preamble edit, which is measurably worse. cal-for-006 and cal-for-012 remain the only every-run disagreements. Forgetting at 0.885 is its floor with the two surviving seam controls in it, above the 0.80 per-vertical floor."
+  "note": "Three runs: 0.991 / 0.987 / 0.996. Lowest recorded, per-vertical from that run. Run 3's 0.996 is the highest this set has measured, with cal-for-006 its only disagreement. SEMANTIC GAINED A JUDGE BODY, commissioned by the consuming project after it shipped without one. That was the right call at the time - it measured 0.958 on the shared preamble alone and nothing failed consistently - but it left Semantic as the ONLY vertical with no body to settle the preamble's abstained/missed line, which the preamble states as uncertainty-versus-denial and then illustrates with a denial. cal-sem-007 and cal-sem-013 alternated between Missed and Abstained across runs as a result. Semantic is now 26/26 in ALL THREE RUNS. THE SHARED PREAMBLE WAS NOT TOUCHED, and that is deliberate: editing it was tried, measured, and reverted - it converted the family's canonical genuine-refusal cases to Missed across four verticals and dropped agreement 0.983 to 0.966. Per-vertical is the remedy, and the family rule it confirms is that A VERTICAL BODY SUPERSEDES THE SHARED PREAMBLE. BUILT UNDER REACH ENUMERATION, a requirement the consuming project adopted from our own failure on that preamble edit: controls-first is necessary and not sufficient, because the guard there was built against the failure imagined rather than the surfaces the change could touch. So all 26 Semantic cases were enumerated first and 19 carry a DECLARED ROUTE, not just the four the body targets. The two that matter are cal-sem-005 (lists every value the record has held) and cal-sem-020 (restates a related fact): both LOOK like refusals and both COMMIT, so a body that swept them into abstained would repeat the preamble regression at vertical scale. Both held at 'value'. The route is asserted INDEPENDENTLY of the outcome via question_asks - value | absence | uncertainty - so a template reaching the right label by the wrong reasoning fails rather than passing quietly. No case reached its outcome by the wrong route in any run. cal-for-006 remains the family's only every-run disagreement: an answer replaces a cancelled gym membership with an invented move to a different gym, the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry."
 }

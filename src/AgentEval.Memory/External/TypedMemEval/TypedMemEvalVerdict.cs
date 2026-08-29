@@ -59,7 +59,14 @@ internal static class TypedMemEvalVerdict
         Bitemporal,
 
         /// <summary>Adds which branch of the ordering-versus-presence discriminator was taken (Temporal).</summary>
-        Temporal
+        Temporal,
+
+        /// <summary>
+        /// Adds what the answer commits to when it does not give the value (Semantic): a value, an
+        /// assertion of absence, or uncertainty. That three-way is the distinction the shared
+        /// preamble states but does not settle.
+        /// </summary>
+        Semantic
     }
 
     private const string OutcomeProperty = """
@@ -155,6 +162,22 @@ internal static class TypedMemEvalVerdict
         }
         """);
 
+    private static readonly JsonElement s_semantic = ParseSchema($$"""
+        {
+          "type": "object",
+          "properties": {
+        {{OutcomeProperty}},
+            "question_asks": {
+              "type": "string",
+              "enum": ["value", "absence", "uncertainty"],
+              "description": "What the answer commits to: a VALUE (right or wrong), an assertion of ABSENCE (the record holds nothing), or UNCERTAINTY (declines without claiming absence). Report the branch you actually took."
+            }
+          },
+          "required": ["outcome", "reasoning", "question_asks"],
+          "additionalProperties": false
+        }
+        """);
+
     private static JsonElement ParseSchema(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     internal static JsonElement Schema(Kind kind) => kind switch
@@ -163,6 +186,7 @@ internal static class TypedMemEvalVerdict
         Kind.ListOrder => s_listOrder,
         Kind.Bitemporal => s_bitemporal,
         Kind.Temporal => s_temporal,
+        Kind.Semantic => s_semantic,
         _ => s_base
     };
 

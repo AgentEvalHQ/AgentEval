@@ -206,6 +206,7 @@ public sealed class TypedMemEvalJudge
             TypedMemEvalVertical.Forgetting => TypedMemEvalVerdict.Kind.Forgetting,
             TypedMemEvalVertical.Bitemporal => TypedMemEvalVerdict.Kind.Bitemporal,
             TypedMemEvalVertical.Temporal => TypedMemEvalVerdict.Kind.Temporal,
+            TypedMemEvalVertical.Semantic => TypedMemEvalVerdict.Kind.Semantic,
             TypedMemEvalVertical.Episodic when extension.Shape == "list-order"
                 => TypedMemEvalVerdict.Kind.ListOrder,
             _ => TypedMemEvalVerdict.Kind.Base
@@ -229,6 +230,9 @@ public sealed class TypedMemEvalJudge
 
             TypedMemEvalVertical.Temporal =>
                 TypedMemEvalJudgePrompts.Temporal(question, goldAnswer, agentResponse),
+
+            TypedMemEvalVertical.Semantic =>
+                TypedMemEvalJudgePrompts.Semantic(question, goldAnswer, agentResponse),
 
             TypedMemEvalVertical.Conjunction =>
                 TypedMemEvalJudgePrompts.Conjunction(question, goldAnswer, agentResponse),
