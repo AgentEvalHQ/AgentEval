@@ -2,46 +2,50 @@
   "judge_prompt_fingerprint": "2fe921a6528c10fb29423ebe3100dc135634211c3bc60f4623fca7b8d91373e3",
   "measured_at": "2026-08-29",
   "model": "gpt-5.5",
-  "agreement": 0.991,
+  "agreement": 0.983,
   "status": "measured",
-  "cases": 224,
+  "cases": 230,
   "runs": 3,
   "per_vertical": {
     "Prospective": 1.0,
     "Episodic": 1.0,
     "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
-    "Forgetting": 0.917,
+    "Forgetting": 0.885,
     "Bitemporal": 1.0,
     "Temporal": 1.0,
-    "Semantic": 1.0,
+    "Semantic": 0.962,
     "Conjunction": 1.0
   },
   "disagreements": {
     "every_run": [
-      "cal-for-006"
+      "cal-for-006",
+      "cal-for-012"
     ],
     "run_varying": [
-      "cal-for-012",
+      "cal-for-013",
+      "cal-sem-007",
+      "cal-sem-013",
       "cal-sem-020"
     ]
   },
   "superseded": {
-    "judge_prompt_fingerprint": "6f006dbb4014994ae2db341e6546a83093658a3e514a0aa2de10eed9a6879e7b",
-    "measured_at": "2026-08-28",
+    "judge_prompt_fingerprint": "2fe921a6528c10fb29423ebe3100dc135634211c3bc60f4623fca7b8d91373e3",
+    "measured_at": "2026-08-29",
     "model": "gpt-5.5",
-    "agreement": 0.98,
-    "cases": 200,
+    "agreement": 0.991,
+    "cases": 224,
     "per_vertical": {
       "Prospective": 1.0,
       "Episodic": 1.0,
       "Arithmetic": 1.0,
       "WorkingMemory": 1.0,
-      "Forgetting": 0.875,
+      "Forgetting": 0.917,
       "Bitemporal": 1.0,
       "Temporal": 1.0,
-      "Semantic": 0.958
+      "Semantic": 1.0,
+      "Conjunction": 1.0
     }
   },
-  "note": "Three runs: 0.991 / 0.991 / 0.991 - the tightest the set has recorded, and the first with eight of nine verticals at 1.000. Per-vertical from run 3, the run whose lowest vertical is lowest. CONJUNCTION ADDED, and it needed a body. It is the first vertical whose gold is mixed-type, and the shared preamble has no way to say that BOTH halves of a join must be right: precedence rule 3 says extra correct detail never lowers the outcome, and the judge extended that to detail which was not correct. Given '3 times, with Marlow Carriage' against a gold of 3 with a different courier it returned CORRECT in every baseline run. The body says a count is a count OF something, that a right number on the wrong entity is wrong rather than correct-with-extra, and that resolving the fact without performing the operation is a commitment rather than an abstention. Conjunction 24/24 in all three runs, from a baseline of 22/24. THE FIX THAT MATTERED WAS IN THE CORPUS, NOT THE PROMPT. cal-cnj-023 - right count, superseded entity - kept returning correct even WITH the body, and the judge was right: it sees only question, gold and answer, and the gold said '3 times.' with no courier in it. There was no contradiction to find. A prompt rule could have forced agreement, at the cost of teaching the judge to punish appended detail in general and breaking the four controls that exist to stop exactly that. Gold now reads '3 times, with Oakhurst Transit.' The general rule, which applies to anything composed after this: IF A QUESTION REQUIRES TWO THINGS TO BE RIGHT, GOLD MUST STATE BOTH, OR THE SECOND IS UNJUDGEABLE. TWO OF MY OWN LABELS WERE WRONG AGAIN, both caught by the baseline rather than by review. cal-cnj-005 and cal-cnj-024 are the same construction on two shapes - resolve the fact, never perform the operation - and I labelled them abstained; the preamble reserves abstained for declining to commit to ANY value, and both commit confidently to something the question did not ask. I also relabelled only one of the two at first, which the judge caught by marking both wrong in every run. Across Semantic and Conjunction my authored labels have needed correction at roughly one case in ten, which is the whole argument for measuring a baseline before writing a body: every one of those would otherwise have been fossilised into a template that made the number look perfect. cal-for-006 remains the only every-run disagreement in the family. It, cal-for-012 and cal-sem-020 all sit on the shared preamble's abstained/missed/wrong seam, which stays parked for its own controlled change across all nine verticals."
+  "note": "Three runs: 0.983 / 0.983 / 0.983. THE FINGERPRINT IS UNCHANGED - no prompt edit ships from this work. The re-measurement was forced by SCOPE alone: six calibration controls were added, 224 -> 230. THIS TASK PRODUCED THREE NESTED NEGATIVE RESULTS, and shipping almost nothing is the correct outcome. It was undertaken because the shared preamble states the abstained/missed line as uncertainty-versus-denial and then illustrates ABSTAINED with 'I have no record of that', which is a denial. I argued to the consuming project that this was the family's largest remaining judge defect and that it should be sequenced ahead of their own corpus work. They adopted that ordering on my argument. The argument was wrong. (1) THE SEAM IS NOT A FAMILY-WIDE DEFECT. Eight negative controls were authored first and a BEFORE state measured across all nine verticals: six of eight passed unchanged. (2) MY REPAIR WAS A REGRESSION. Making the preamble self-consistent - folding record-absence into missed - dropped agreement from 0.983/0.987 to 0.974/0.966/0.974 and converted the family's canonical genuine-refusal-abstains cases to Missed in FOUR verticals (cal-epi-013, cal-wm-003, cal-wm-022, cal-bit-024, cal-tem-023). Reverted. The preamble ships untouched. (3) HALF MY CONTROLS WERE NOT MEASURING THE SEAM. Four were placed in Forgetting's still-valid shape, where ForgettingBody states that an answer claiming a still-valid fact is no longer known is WRONG. Under that rule abstained is essentially unreachable in that shape - even a bare 'I don't know' grades wrong - so those controls measured the vertical's over-forgetting rule instead. Two of them (cal-for-025, cal-for-027) then flapped BOTH WAYS across six runs: labelled Abstained they graded Wrong, labelled Wrong they graded Abstained. A case the judge answers both ways with equal frequency has no correct label and cannot discriminate anything, so both were removed - cases I added this session, removed for failing their design purpose rather than for being inconvenient, and the removal is recorded in cal-for-026's note rather than left to a diff. WHAT SHIPS IS ONE RULE AND SIX CONTROLS. The rule is that A VERTICAL BODY SUPERSEDES THE SHARED PREAMBLE, which was true, load-bearing and written down nowhere before. cal-for-026 and cal-for-028 document it: the same sentence shape is WRONG in Forgetting (over-forgetting) and MISSED in Semantic (cal-sem-026), decided by the vertical, and both are stable. THE CORRECT SCOPING, narrower than what I claimed: the preamble's ambiguity reaches whichever vertical LACKS a body to settle it. Semantic is the only one, and it is where the residue lives - cal-sem-007 and cal-sem-013 flip between Missed and Abstained on exactly this boundary. The remedy is therefore a Semantic body or a deliberate acceptance there, NOT a preamble edit, which is measurably worse. cal-for-006 and cal-for-012 remain the only every-run disagreements. Forgetting at 0.885 is its floor with the two surviving seam controls in it, above the 0.80 per-vertical floor."
 }
