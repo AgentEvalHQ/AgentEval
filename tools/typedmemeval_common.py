@@ -138,6 +138,9 @@ VERTICALS = {
     # ADR-027 SS3.1, narrowed. Resolution rather than recall: current-value after k
     # replacements, co-reference across designations, source attribution.
     "semantic":     ("sem",  50),
+    # ADR-027 SS10. Cross-type: questions no single memory type can answer, composed from the
+    # constructs the other verticals certify. Gold is genuinely mixed-type here.
+    "conjunction":  ("cnj",  50),
 }
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "src" / "AgentEval.Memory" / "Data" / "typedmemeval"

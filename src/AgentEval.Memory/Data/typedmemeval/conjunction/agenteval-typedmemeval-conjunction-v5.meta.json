@@ -1,0 +1,1714 @@
+{
+  "corpus_id": "agenteval-typedmemeval-conjunction-v5",
+  "vertical": "conjunction",
+  "revision": "v5",
+  "supersedes": {
+    "revision": "v4",
+    "shipped_in": "0.24.0-beta",
+    "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
+  },
+  "question_count": 50,
+  "corpus_sha256": "c62ef477359749c12c65519946350a520804c6f6a12afaadf81b5aad0695ecef",
+  "generator": {
+    "tool": "gen_typedmemeval_conjunction.py",
+    "version": "1.0.0",
+    "seed": 20260815
+  },
+  "k_ref": 5,
+  "coverage": {
+    "retriever": "bm25-okapi-k1.5-b0.75",
+    "band_low": 0.5,
+    "band_high": 0.9,
+    "mean_realised": 0.546,
+    "echo": 0.2083,
+    "iterations": 33,
+    "search_trace": [],
+    "per_question": {
+      "tme-cnj-001": 1.0,
+      "tme-cnj-002": 0.5,
+      "tme-cnj-003": 0.25,
+      "tme-cnj-004": 0.5,
+      "tme-cnj-005": 0.8333,
+      "tme-cnj-006": 0.5,
+      "tme-cnj-007": 0.5,
+      "tme-cnj-008": 0.5,
+      "tme-cnj-009": 0.625,
+      "tme-cnj-010": 0.5,
+      "tme-cnj-011": 0.5,
+      "tme-cnj-012": 0.5,
+      "tme-cnj-013": 1.0,
+      "tme-cnj-014": 0.6667,
+      "tme-cnj-015": 0.5,
+      "tme-cnj-016": 0.5,
+      "tme-cnj-017": 0.6667,
+      "tme-cnj-018": 0.625,
+      "tme-cnj-019": 0.5,
+      "tme-cnj-020": 0.5,
+      "tme-cnj-021": 0.3333,
+      "tme-cnj-022": 0.25,
+      "tme-cnj-023": 0.4,
+      "tme-cnj-024": 0.3333,
+      "tme-cnj-025": 0.0,
+      "tme-cnj-026": 0.2,
+      "tme-cnj-027": 0.3333,
+      "tme-cnj-028": 0.75,
+      "tme-cnj-029": 0.2,
+      "tme-cnj-030": 0.3333,
+      "tme-cnj-031": 0.25,
+      "tme-cnj-032": 0.2,
+      "tme-cnj-033": 1.0,
+      "tme-cnj-034": 0.25,
+      "tme-cnj-035": 0.2,
+      "tme-cnj-036": 0.4,
+      "tme-cnj-037": 0.6,
+      "tme-cnj-038": 0.8,
+      "tme-cnj-039": 0.8,
+      "tme-cnj-040": 1.0,
+      "tme-cnj-041": 1.0,
+      "tme-cnj-042": 0.4,
+      "tme-cnj-043": 0.6,
+      "tme-cnj-044": 0.8,
+      "tme-cnj-045": 0.6,
+      "tme-cnj-046": 0.8,
+      "tme-cnj-047": 0.4,
+      "tme-cnj-048": 1.0,
+      "tme-cnj-049": 1.0,
+      "tme-cnj-050": 0.4
+    },
+    "echo_by_shape": {
+      "alias-then-count": 0.25,
+      "order-then-value": 0.25,
+      "value-then-count": 0.125
+    },
+    "per_shape_realised": {
+      "alias-then-count": 0.3356,
+      "order-then-value": 0.72,
+      "value-then-count": 0.5833
+    }
+  },
+  "ceiling": {
+    "k_ref": 5,
+    "by_g": {
+      "3": 1.0,
+      "4": 1.0,
+      "5": 1.0,
+      "6": 0.8333,
+      "8": 0.625
+    },
+    "min": 0.625,
+    "structural_below_one": true
+  },
+  "structure": {
+    "g_distribution": {
+      "3": 5,
+      "4": 12,
+      "5": 20,
+      "6": 7,
+      "8": 6
+    },
+    "h_min": 14,
+    "h_max": 24,
+    "gold_position_shuffled": true,
+    "h_is_independent_variable": false,
+    "no_absolute_dates": true,
+    "empty_turns": {
+      "count": 272,
+      "of_turns": 6100,
+      "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
+      "separates_gold": false
+    }
+  },
+  "gold_item_types": {
+    "tme-cnj-001": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-002": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-003": [
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-004": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-005": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-006": [
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-007": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-008": [
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-009": [
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-010": [
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-011": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-012": [
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-013": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-014": [
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-015": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-016": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-017": [
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-018": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-019": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-020": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-021": [
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-022": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-023": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-024": [
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-025": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-026": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-027": [
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-028": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-029": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-030": [
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-031": [
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-032": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-033": [
+      "semantic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-034": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-035": [
+      "arithmetic",
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
+    ],
+    "tme-cnj-036": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "temporal",
+      "semantic"
+    ],
+    "tme-cnj-037": [
+      "semantic",
+      "temporal",
+      "semantic",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-038": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-039": [
+      "semantic",
+      "temporal",
+      "temporal",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-040": [
+      "semantic",
+      "semantic",
+      "semantic",
+      "temporal",
+      "temporal"
+    ],
+    "tme-cnj-041": [
+      "semantic",
+      "temporal",
+      "semantic",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-042": [
+      "temporal",
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-043": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-044": [
+      "semantic",
+      "temporal",
+      "semantic",
+      "temporal",
+      "semantic"
+    ],
+    "tme-cnj-045": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-046": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "temporal",
+      "semantic"
+    ],
+    "tme-cnj-047": [
+      "semantic",
+      "semantic",
+      "temporal",
+      "semantic",
+      "temporal"
+    ],
+    "tme-cnj-048": [
+      "temporal",
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-049": [
+      "temporal",
+      "semantic",
+      "semantic",
+      "temporal",
+      "semantic"
+    ],
+    "tme-cnj-050": [
+      "temporal",
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic"
+    ]
+  },
+  "probes": {
+    "status": "run",
+    "v7_separability": {
+      "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
+      "exempt": [
+        "none"
+      ],
+      "threshold_auc": 0.75,
+      "refused_features": [
+        "assistant_length_chars",
+        "assistant_mean_turn_chars",
+        "assistant_punctuation_density",
+        "assistant_sentence_count",
+        "assistant_slot1_length_chars",
+        "assistant_slot2_length_chars",
+        "assistant_slot3_length_chars",
+        "assistant_type_token_ratio",
+        "assistant_uppercase_density",
+        "boilerplate_ngram",
+        "digit_density",
+        "em_dash_density",
+        "first_assistant_length_chars",
+        "first_assistant_sentence_count",
+        "first_assistant_uppercase_density",
+        "first_user_length_chars",
+        "first_user_sentence_count",
+        "first_user_uppercase_density",
+        "gold_marker_ngram",
+        "mean_turn_chars",
+        "position_0_is_assistant",
+        "position_0_is_user",
+        "position_1_is_assistant",
+        "position_1_is_user",
+        "position_2_is_assistant",
+        "position_2_is_user",
+        "position_3_is_assistant",
+        "position_3_is_user",
+        "position_in_haystack",
+        "punctuation_density",
+        "role_sequence",
+        "sentence_count",
+        "session_length_chars",
+        "turn_count",
+        "type_token_ratio",
+        "uppercase_density",
+        "user_length_chars",
+        "user_mean_turn_chars",
+        "user_punctuation_density",
+        "user_sentence_count",
+        "user_slot1_length_chars",
+        "user_slot2_length_chars",
+        "user_slot3_length_chars",
+        "user_type_token_ratio",
+        "user_uppercase_density"
+      ],
+      "exempt_features": [],
+      "reported_only_features": [],
+      "features": {
+        "session_length_chars": 0.526,
+        "turn_count": 0.5,
+        "position_in_haystack": 0.5069,
+        "digit_density": 0.5,
+        "uppercase_density": 0.5187,
+        "sentence_count": 0.5357,
+        "punctuation_density": 0.5123,
+        "em_dash_density": 0.5,
+        "mean_turn_chars": 0.526,
+        "type_token_ratio": 0.5507,
+        "first_user_length_chars": 0.5934,
+        "first_user_uppercase_density": 0.5428,
+        "first_user_sentence_count": 0.5684,
+        "first_assistant_length_chars": 0.575,
+        "first_assistant_uppercase_density": 0.5203,
+        "first_assistant_sentence_count": 0.5299,
+        "user_slot1_length_chars": 0.501,
+        "user_slot2_length_chars": 0.5,
+        "user_slot3_length_chars": 0.5,
+        "assistant_slot1_length_chars": 0.5052,
+        "assistant_slot2_length_chars": 0.5012,
+        "assistant_slot3_length_chars": 0.5,
+        "user_length_chars": 0.5614,
+        "user_uppercase_density": 0.5408,
+        "user_sentence_count": 0.56,
+        "user_punctuation_density": 0.5151,
+        "user_type_token_ratio": 0.6035,
+        "user_mean_turn_chars": 0.5614,
+        "assistant_length_chars": 0.5327,
+        "assistant_uppercase_density": 0.5094,
+        "assistant_sentence_count": 0.504,
+        "assistant_punctuation_density": 0.5116,
+        "assistant_type_token_ratio": 0.5172,
+        "assistant_mean_turn_chars": 0.5327,
+        "position_0_is_user": 0.5,
+        "position_0_is_assistant": 0.5,
+        "position_1_is_user": 0.5,
+        "position_1_is_assistant": 0.5,
+        "position_2_is_user": 0.5,
+        "position_2_is_assistant": 0.5,
+        "position_3_is_user": 0.5,
+        "position_3_is_assistant": 0.5,
+        "role_sequence": 0.5,
+        "gold_marker_ngram": 0.6011,
+        "boilerplate_ngram": 0.6244
+      },
+      "worst_refused_feature": "boilerplate_ngram",
+      "worst_refused_auc": 0.6244,
+      "worst_role_sequence": null,
+      "role_sequence_auc": 0.5,
+      "worst_gold_marker_ngram": "this",
+      "gold_marker_ngram_auc": 0.6011,
+      "worst_boilerplate_ngram": "is the",
+      "boilerplate_ngram_auc": 0.6244,
+      "gold_exclusive_ngrams": [],
+      "perfect_separation": {
+        "session_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "turn_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_in_haystack": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "digit_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "sentence_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "punctuation_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "em_dash_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "type_token_ratio": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_user_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_user_uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_user_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_assistant_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_assistant_uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "first_assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_slot1_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_slot2_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_slot3_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_slot1_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_slot2_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_slot3_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_punctuation_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_type_token_ratio": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "user_mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_length_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_sentence_count": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_punctuation_density": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_0_is_user": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_0_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_1_is_user": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_1_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_2_is_user": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_2_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_3_is_user": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "position_3_is_assistant": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        },
+        "gold_marker_ngram": {
+          "share": 0.0,
+          "chance": 0.0002,
+          "observed": 0,
+          "expected": 0.01,
+          "z": -0.1
+        }
+      },
+      "bimodal_features": {},
+      "passed": true,
+      "status": "run",
+      "measured_by": "generator",
+      "probed_corpus_sha256": "c62ef477359749c12c65519946350a520804c6f6a12afaadf81b5aad0695ecef"
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-29T09:14:40Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 49,
+      "failed": [
+        "tme-cnj-018"
+      ]
+    },
+    "v1_pair_flip": {
+      "pairs": 0,
+      "passed": 0,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": []
+    },
+    "v3_gold_ablated": {
+      "applicable": 50,
+      "passed": 49,
+      "failed": [
+        "tme-cnj-024"
+      ],
+      "not_decidable": [],
+      "not_decidable_for_guessable_shapes": [
+        "occurrence-order"
+      ],
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for conjunction"
+    },
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 5,
+      "by_cache_key": {}
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "population": "probe_answers",
+        "calls": 50,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v2": {
+        "population": "probe_answers",
+        "calls": 500,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 150,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v3": {
+        "population": "probe_answers",
+        "calls": 148,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 43,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v6": {
+        "population": "probe_answers",
+        "calls": 0,
+        "empty": 0,
+        "rate": null,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v8": {
+        "population": "probe_answers",
+        "calls": 53,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v9": {
+        "population": "probe_answers",
+        "calls": 52,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      }
+    },
+    "v8_full_haystack": {
+      "applicable": 50,
+      "v1_passed": 49,
+      "v8_passed": 50,
+      "interference_cost": -0.02,
+      "regressed_under_interference": [],
+      "failures_with_no_captured_answer": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    },
+    "v9_reference_retrieval": {
+      "applicable": 50,
+      "v1_gold_only": 49,
+      "v8_full_haystack": 50,
+      "v9_bm25_top_k": 18,
+      "headroom_over_lexical_retrieval": 0.62,
+      "headroom_unlimited_context_over_lexical": 0.64,
+      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
+    "by_shape": {
+      "alias-then-count": {
+        "questions": 15,
+        "v1_applicable": 15,
+        "v1_passed": 15,
+        "v3_applicable": 15,
+        "v3_passed": 14,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 1,
+        "required_sessions_median": 4
+      },
+      "order-then-value": {
+        "questions": 15,
+        "v1_applicable": 15,
+        "v1_passed": 15,
+        "v3_applicable": 15,
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 15,
+        "required_sessions_median": 5
+      },
+      "value-then-count": {
+        "questions": 20,
+        "v1_applicable": 20,
+        "v1_passed": 19,
+        "v3_applicable": 20,
+        "v3_passed": 20,
+        "v8_applicable": 20,
+        "v8_passed": 20,
+        "v9_applicable": 20,
+        "v9_passed": 2,
+        "required_sessions_median": 6
+      }
+    },
+    "per_question": {
+      "tme-cnj-001": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times. Your current usual courier is Oakhurst Transit, and you logged orders with Oakhurst Transit on 2026/04/06 and 2026/04/20.",
+        "v9": true,
+        "v9_answer": "2 times.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-002": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with the current regular printer, Ashcombe Press, **3 times**.",
+        "v9": false,
+        "v9_answer": "Once — the current regular printer is **Ashcombe Press**.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-003": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with the current main contractor, Halstead Works, **4 times**.",
+        "v9": false,
+        "v9_answer": "The conversations identify your current main contractor as **Garrowby Build**, but they do **not** say how many times you put an order in with them.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-004": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times — both were jobs raised with Oakhurst Transit, the current usual courier.",
+        "v9": false,
+        "v9_answer": "The conversations do not say that you put any orders in with your current usual courier, Oakhurst Transit.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-005": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 times. Your current regular printer is Elmsworth Type, and the notes record orders with Elmsworth Type on Sep 17, Sep 19, and Sep 26.",
+        "v9": false,
+        "v9_answer": "2 times — both with Elmsworth Type, the current regular printer.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-006": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "4 times — counting only the current main contractor, Ilminster Trades.",
+        "v9": false,
+        "v9_answer": "The conversations do not say that you put any order in with your main contractor.\n\nThey only say that your current main contractor is Ilminster Trades.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-007": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times — both were bookings/collections with Corvin Dispatch, the current usual courier.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say that you put any order in with your current usual courier, Corvin Dispatch.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-008": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 times.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say that you put in any orders with the current regular printer.\n\nThey only say the current regular printer is Culverton Print.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-009": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Your current main contractor is Garrowby Build.\n\nYou put an order in with Garrowby Build **4 times**.\n\nIf you meant only after Garrowby Build became the main contractor, then it was **1 time**.",
+        "v9": false,
+        "v9_answer": "Once: the current main contractor is Garrowby Build, and there is one recorded order placed with Garrowby Build.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-010": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times.",
+        "v9": false,
+        "v9_answer": "I only see one relevant order mentioned: the coffee order. The current usual courier is Marlow Carriage. So the count is **1**.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-011": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You booked with the current regular printer, Ashcombe Press, **3 times**.",
+        "v9": false,
+        "v9_answer": "The conversations do not say that you put any orders in with your current regular printer, Ashcombe Press. So the count is not provided.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-012": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order/job in with the current main contractor, Jarrow Contracting, **4 times**.",
+        "v9": false,
+        "v9_answer": "I don’t know. The conversations identify the current main contractor as Jarrow Contracting, but they don’t say how many orders you put in with them.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-013": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times.",
+        "v9": true,
+        "v9_answer": "You put an order in with your current usual courier, Corvin Dispatch, **2 times**.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-014": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with the current regular printer, Ashcombe Press, **3 times**.",
+        "v9": false,
+        "v9_answer": "Once — the only recorded instance for the current regular printer, Ashcombe Press, is when you sent the paperwork over to Ashcombe Press.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-015": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "4 times.",
+        "v9": false,
+        "v9_answer": "The conversations do not say that you put in any orders with your main contractor.\n\nThey only say that your current main contractor is Ilminster Trades.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-016": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times — both with the current usual courier, Oakhurst Transit.",
+        "v9": false,
+        "v9_answer": "Once — the current usual courier is Oakhurst Transit, and it was set/mentioned once.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-017": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 times — the current regular printer is Fairbourne Plate, and you logged orders with Fairbourne Plate on Jan 25, Jan 29, and Feb 5.",
+        "v9": false,
+        "v9_answer": "0 times. The current regular printer is Elmsworth Type, and the conversations do not record any orders placed with Elmsworth Type.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-018": {
+        "v1": false,
+        "v8": true,
+        "v8_answer": "You put an order in with the current main contractor, Jarrow Contracting, **4 times**.",
+        "v9": false,
+        "v9_answer": "Once — the current main contractor is Jarrow Contracting, and the record shows one instance of paperwork/order being sent to Jarrow Contracting.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-019": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 times — both were bookings with Corvin Dispatch, the current usual courier.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say that you put any order in with your current usual courier, Corvin Dispatch.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-020": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 times — the current regular printer is Brentwood Litho, and you logged raising a job with Brentwood Litho on:\n\n- 2028/05/24\n- 2028/05/28\n- 2028/06/13",
+        "v9": false,
+        "v9_answer": "The current regular printer is Brentwood Litho. The conversations do not record any orders placed with Brentwood Litho.\n\nAnswer: 0",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-021": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Two deliveries were taken at the new flat.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the new flat.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-022": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Three deliveries were taken at the workshop.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the workshop.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-023": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Four deliveries were taken at head office.\n\nHead office was recorded as the Calderwick office, and deliveries there were noted in Sessions 1, 2, 16, and 17.",
+        "v9": false,
+        "v9_answer": "1 delivery was taken at head office.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-024": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 deliveries were taken at the weekend place — the cottage at Wray Head.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the weekend place.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": false,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-025": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Three deliveries were taken at the annexe — i.e. at the Peverel building.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the annexe.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-026": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "4 deliveries were taken at the new flat.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the new flat.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-027": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 deliveries were taken at the workshop.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the workshop.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-028": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 deliveries were taken at head office, meaning the Calderwick office.",
+        "v9": false,
+        "v9_answer": "2 deliveries were taken at head office.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-029": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "4 deliveries were taken at the weekend place, the cottage at Wray Head.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say how many deliveries were taken at the weekend place. They only note that the weekend place is the cottage at Wray Head.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-030": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Two deliveries were taken at the annexe.",
+        "v9": false,
+        "v9_answer": "One delivery.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-031": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "3 deliveries were taken at the new flat.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the new flat.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-032": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Four deliveries were taken at the workshop.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say how many deliveries were taken at the workshop. They only say the workshop is the unit behind the depot.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-033": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "2 deliveries were taken at head office.",
+        "v9": true,
+        "v9_answer": "2 deliveries.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-034": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Three deliveries were taken at the weekend place, the cottage at Wray Head.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the weekend place.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-035": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "4 deliveries were taken at the annexe.",
+        "v9": false,
+        "v9_answer": "The conversations do not say how many deliveries were taken at the annexe.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-036": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nettleford Runners.",
+        "v9": true,
+        "v9_answer": "Nettleford Runners.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-037": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Elmsworth Type.",
+        "v9": true,
+        "v9_answer": "Elmsworth Type.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-038": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Garrowby Build.",
+        "v9": true,
+        "v9_answer": "Garrowby Build.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-039": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellham Freight.",
+        "v9": true,
+        "v9_answer": "Pellham Freight.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-040": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Elmsworth Type.",
+        "v9": true,
+        "v9_answer": "Elmsworth Type.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-041": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Kelsall Group.",
+        "v9": true,
+        "v9_answer": "Kelsall Group.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-042": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Marlow Carriage.",
+        "v9": true,
+        "v9_answer": "Marlow Carriage.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-043": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Brentwood Litho.",
+        "v9": true,
+        "v9_answer": "Brentwood Litho.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-044": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Kelsall Group.",
+        "v9": true,
+        "v9_answer": "Kelsall Group.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-045": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellham Freight.",
+        "v9": true,
+        "v9_answer": "Pellham Freight.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-046": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Brentwood Litho.",
+        "v9": true,
+        "v9_answer": "Brentwood Litho.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-047": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Contracting.",
+        "v9": true,
+        "v9_answer": "Jarrow Contracting.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-048": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellham Freight.",
+        "v9": true,
+        "v9_answer": "Pellham Freight.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-049": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Brentwood Litho.",
+        "v9": true,
+        "v9_answer": "Brentwood Litho.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-cnj-050": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Contracting.",
+        "v9": true,
+        "v9_answer": "Jarrow Contracting.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "c62ef477359749c12c65519946350a520804c6f6a12afaadf81b5aad0695ecef"
+  }
+}

@@ -44,7 +44,21 @@ def gold_item_types(corpus: list[dict], vertical: str) -> dict[str, list[str]]:
     """
     out: dict[str, list[str]] = {}
     for entry in corpus:
-        out[entry["question_id"]] = [vertical] * len(entry["answer_session_ids"])
+        gold_count = len(entry["answer_session_ids"])
+
+        # A corpus that already knows its own per-item types wins. Conjunction draws gold from two
+        # verticals' constructs and records which is which at generation time; deriving from the
+        # vertical name here would overwrite that with a uniform label and destroy the per-type
+        # denominator the whole commitment exists to enable. It did, once, before this branch.
+        declared = entry["typedmemeval"].get("gold_item_types")
+        if declared:
+            if len(declared) != gold_count:
+                raise SystemExit(
+                    f"{entry['question_id']}: corpus declares {len(declared)} gold item types for "
+                    f"{gold_count} gold items")
+            out[entry["question_id"]] = list(declared)
+        else:
+            out[entry["question_id"]] = [vertical] * gold_count
     return out
 
 

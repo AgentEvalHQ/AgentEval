@@ -230,6 +230,9 @@ public sealed class TypedMemEvalJudge
             TypedMemEvalVertical.Temporal =>
                 TypedMemEvalJudgePrompts.Temporal(question, goldAnswer, agentResponse),
 
+            TypedMemEvalVertical.Conjunction =>
+                TypedMemEvalJudgePrompts.Conjunction(question, goldAnswer, agentResponse),
+
             TypedMemEvalVertical.Forgetting =>
                 TypedMemEvalJudgePrompts.Forgetting(question, goldAnswer, agentResponse),
 

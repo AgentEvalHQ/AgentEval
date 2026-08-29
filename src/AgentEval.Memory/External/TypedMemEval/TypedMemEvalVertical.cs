@@ -58,7 +58,20 @@ public enum TypedMemEvalVertical
     /// and asking about it later measures nothing a lexical baseline cannot do. §3.1 narrows it to
     /// three shapes where retrieving the evidence is necessary and not sufficient.
     /// </remarks>
-    Semantic = 7
+    Semantic = 7,
+
+    /// <summary>
+    /// Cross-type: questions no single memory type can answer. Gold is drawn from two verticals'
+    /// constructs and both halves are load-bearing.
+    /// </summary>
+    /// <remarks>
+    /// ADR-027 SS10. Composed from certified verticals rather than authored fresh, and the FIRST
+    /// vertical whose gold is genuinely mixed-type - a stack strong on one type and weak on the
+    /// other scores here like a stack weak on both, which is what a per-type score cannot show.
+    /// The merged corpus does NOT inherit its parts' certifications: SS10 requires its own V7 run,
+    /// and it got one.
+    /// </remarks>
+    Conjunction = 8
 
 }
 
@@ -205,6 +218,19 @@ public static class TypedMemEvalVerticals
             // replacement chain — not by when a session was recorded. Supplying dates would let a
             // metadata sort answer current-value without reading anything, which is exactly the
             // saturation §2.1 refused.
+            RequiredGrounding = TemporalGroundingMode.None,
+            RequiresTimestamps = false
+        },
+        [TypedMemEvalVertical.Conjunction] = new()
+        {
+            Vertical = TypedMemEvalVertical.Conjunction,
+            Slug = "conjunction",
+            Abbreviation = "cnj",
+            DisplayName = "TypedMemEval-Conjunction",
+            QuestionCount = 50,
+            // No timestamps. Both halves resolve by stated relation - a replacement chain, an alias,
+            // an anchor pinned between two switches - never by session date. Supplying dates would
+            // let a metadata sort answer the semantic half without reading it.
             RequiredGrounding = TemporalGroundingMode.None,
             RequiresTimestamps = false
         },
