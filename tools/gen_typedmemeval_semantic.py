@@ -318,7 +318,7 @@ def _current_value(index: int, echo: float, rng: random.Random) -> tmc.Question:
     sessions = golds + [_filler(rng, echoed) for _ in range(rng.randint(H_MIN, H_MAX))]
     # Shuffled so gold position carries no signal, and so the replacement chain cannot be read off
     # the session order -- only off the text.
-    rng.shuffle(sessions)
+    rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation under a fixed seed; a CSPRNG cannot be replayed, and this orders sessions, not secrets.
     _lay_out(sessions, index, chain=list(chosen))
 
     return tmc.Question(
@@ -348,7 +348,7 @@ def _co_reference(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         golds.append(_gold(f"{asked.capitalize()} is {middle}.", _reply(rng), rng, "link"))
 
     sessions = golds + [_filler(rng, echoed) for _ in range(rng.randint(H_MIN, H_MAX))]
-    rng.shuffle(sessions)
+    rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation under a fixed seed; a CSPRNG cannot be replayed, and this orders sessions, not secrets.
     _lay_out(sessions, CURRENT_QUESTIONS + index)
 
     return tmc.Question(
@@ -385,7 +385,7 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
     # claims about its own shape.
     filler = max(H_MIN - len(decoys), rng.randint(H_MIN, H_MAX) - len(decoys))
     sessions = golds + decoys + [_filler(rng, echoed) for _ in range(filler)]
-    rng.shuffle(sessions)
+    rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation under a fixed seed; a CSPRNG cannot be replayed, and this orders sessions, not secrets.
     _lay_out(sessions, CURRENT_QUESTIONS + COREF_QUESTIONS + index)
 
     return tmc.Question(
