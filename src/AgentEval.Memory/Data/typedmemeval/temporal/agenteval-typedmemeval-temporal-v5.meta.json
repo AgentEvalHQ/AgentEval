@@ -805,7 +805,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:31:59Z",
+    "run_at": "2026-08-30T14:44:28Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -825,7 +825,17 @@
       "temperature": "provider default",
       "applicable": 50,
       "passed": 50,
-      "failed": []
+      "failed": [],
+      "closed_choice": {
+        "questions": 35,
+        "by_candidates": {
+          "2": 20,
+          "3": 15
+        },
+        "chance_floor_exceeds_reject_line": true,
+        "passes_not_evidence_of_non_inferability": 35,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
     },
     "v3_gold_ablated": {
       "applicable": 30,
@@ -987,6 +997,7 @@
         "v9_answer": "The Quorlory rewiring came first; the Vreskade survey happened after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -999,6 +1010,7 @@
         "v9_answer": "The Traymoor fit-out came first, before the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1011,6 +1023,7 @@
         "v9_answer": "The Zethisk handover came first; the Ondrey audit came after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1023,6 +1036,7 @@
         "v9_answer": "The Traymoor fit-out came first — it was done well ahead of the Wrenfield sign-off.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1035,6 +1049,7 @@
         "v9_answer": "The Janduisk commissioning came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1047,6 +1062,7 @@
         "v9_answer": "The Ovridory retrofit came first, before the Traymoor fit-out.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1059,6 +1075,7 @@
         "v9_answer": "The Draimune inspection came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1071,6 +1088,7 @@
         "v9_answer": "The Janduisk commissioning came first, followed by the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1083,6 +1101,7 @@
         "v9_answer": "The Draimune inspection came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1095,6 +1114,7 @@
         "v9_answer": "The Janduisk commissioning came first, before the Ovridory retrofit.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1107,6 +1127,7 @@
         "v9_answer": "The Zethisk handover came first, then the Draimune inspection.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1119,6 +1140,7 @@
         "v9_answer": "The Vreskade survey came first. The Janduisk commissioning came after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1131,6 +1153,7 @@
         "v9_answer": "The Skarvarn relining came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1143,6 +1166,7 @@
         "v9_answer": "The Draimune inspection came first, before the Zethisk handover.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1155,6 +1179,7 @@
         "v9_answer": "The Ondrey audit came first, well ahead of the Ovridory retrofit.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1167,6 +1192,7 @@
         "v9_answer": "The Trevuade changeover came first; the Skarvarn relining happened after it was out of the way.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1179,6 +1205,7 @@
         "v9_answer": "The Wrenfield sign-off came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1191,6 +1218,7 @@
         "v9_answer": "The Skarvarn relining came first.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1203,6 +1231,7 @@
         "v9_answer": "The Wrenfield sign-off came first, well ahead of the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1215,6 +1244,7 @@
         "v9_answer": "The Ovridory retrofit came first; the Plennell move came later.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1452,6 +1482,7 @@
         "v9_answer": "The Plennell move happened most recently.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1468,6 +1499,7 @@
         "v9_answer": "The **Ovridory retrofit** happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 1,
         "v3_required_hits": 3,
@@ -1484,6 +1516,7 @@
         "v9_answer": "The Plennell move happened most recently.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1500,6 +1533,7 @@
         "v9_answer": "The Quorlory rewiring happened most recently.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1516,6 +1550,7 @@
         "v9_answer": "The Vreskade survey happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 1,
         "v3_required_hits": 3,
@@ -1532,6 +1567,7 @@
         "v9_answer": "The conversations do not plainly say which of the Janduisk commissioning, the Zethisk handover, and the Plennell move happened most recently.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1548,6 +1584,7 @@
         "v9_answer": "The Ondrey audit happened most recently.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1564,6 +1601,7 @@
         "v9_answer": "The Trevuade changeover happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 1,
         "v3_required_hits": 3,
@@ -1580,6 +1618,7 @@
         "v9_answer": "The conversations don’t contain enough information to say.\n\nThey do establish:\n\n- Vreskade survey happened before the Quorlory rewiring.\n- Quorlory rewiring happened before the Plennell move.\n\nSo the Plennell move was later than the Vreskade survey.\n\nBut they do not place the Zethisk handover relati",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1596,6 +1635,7 @@
         "v9_answer": "The Plennell move happened most recently.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 1,
         "v3_required_hits": 3,
@@ -1612,6 +1652,7 @@
         "v9_answer": "The Trevuade changeover happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1628,6 +1669,7 @@
         "v9_answer": "The conversations do not determine that plainly.\n\nThey do say:\n\n- The Plennell move happened after the Vreskade survey.\n- The Vreskade survey happened after the Draimune inspection.\n\nSo the Plennell move was more recent than the Draimune inspection. But there is no stated ordering between the Traymo",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1644,6 +1686,7 @@
         "v9_answer": "The conversations do not say enough to determine that.\n\nThey establish that the Trevuade changeover happened before the Ondrey audit, but they do not place the Skarvarn relining relative to either of those.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1660,6 +1703,7 @@
         "v9_answer": "The conversations establish that:\n\n- Skarvarn relining happened before Janduisk commissioning.\n- Trevuade changeover happened after Janduisk commissioning.\n\nSo Trevuade changeover happened after Skarvarn relining.\n\nBut there is no timing information given for the Zethisk handover relative to either ",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,
@@ -1676,6 +1720,7 @@
         "v9_answer": "The conversations don’t contain enough information to determine that.\n\nThey do say the **Quorlory rewiring** happened after the **Zethisk handover**. But they don’t give any timing for the **Plennell move**, so we can’t say which of the three happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
+        "v2_candidates": 3,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 3,

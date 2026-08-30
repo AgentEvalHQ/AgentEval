@@ -770,7 +770,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:30:47Z",
+    "run_at": "2026-08-30T14:44:27Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -790,7 +790,16 @@
       "temperature": "provider default",
       "applicable": 50,
       "passed": 50,
-      "failed": []
+      "failed": [],
+      "closed_choice": {
+        "questions": 15,
+        "by_candidates": {
+          "2": 15
+        },
+        "chance_floor_exceeds_reject_line": true,
+        "passes_not_evidence_of_non_inferability": 15,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
     },
     "v3_gold_ablated": {
       "applicable": 35,
@@ -1395,6 +1404,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1407,6 +1417,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1419,6 +1430,7 @@
         "v9_answer": "You said the prompt about the print shop, but **I** was the one who said: “it wants files flattened before upload.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1431,6 +1443,7 @@
         "v9_answer": "That was you.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1443,6 +1456,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1455,6 +1469,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1467,6 +1482,7 @@
         "v9_answer": "It was me — the assistant said: “Worth remembering about the canal gate: it gets locked from the far side.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1479,6 +1495,7 @@
         "v9_answer": "That was me — the assistant said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1491,6 +1508,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1503,6 +1521,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1515,6 +1534,7 @@
         "v9_answer": "That was me. I said: “One thing about the Marrow Lane depot, it only takes card after six.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1527,6 +1547,7 @@
         "v9_answer": "You said the topic came up, but **I** was the one who said: “the wheelie bin round … skips the first week of every month.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1539,6 +1560,7 @@
         "v9_answer": "You said it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1551,6 +1573,7 @@
         "v9_answer": "You said it — in Session 5, your message included: “hall, input, side, faster, us, wakes.”",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1563,6 +1586,7 @@
         "v9_answer": "That was me — the assistant said: “The thing with the bulk-buy account is that it needs two signatures before anything changes.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
