@@ -111,14 +111,22 @@ Exactly one causal reading is safe — `Wrong` with `EvidenceAbsent` *is* a retr
 The mirror reading (`Missed` with `EvidencePresent` means a synthesis failure) is an inference, not
 a fact, because a compression loss inside the store looks identical from here.
 
-## The five verticals
+## The nine verticals
 
 ### Prospective (50 questions)
 
-Due-later reminders, expiring validity, not-yet-true assertions — plus the twelve time-grounded
-probe questions carried in as its seed. Runs under `TimestampsOnly` grounding: the conversations
-contain **no absolute date and no four-digit year**, so every temporal expression is relative and
-resolving it requires the session's own timestamp.
+Due-later reminders, expiring validity, not-yet-true assertions, **due-windows** — plus the twelve
+time-grounded probe questions carried in as its seed. Runs under `TimestampsOnly` grounding: the
+conversations contain **no absolute date and no four-digit year**, so every temporal expression is
+relative and resolving it requires the session's own timestamp.
+
+`due-window` (18 questions) was added in 0.31.0-beta because the vertical could be answered with
+firing semantics switched off. Every earlier shape **names the thing** being asked about, which
+hands a similarity retriever the words of the session it needs while the harness supplies "today"
+and the corpus supplies the due date — in-context arithmetic no memory feature is needed for. A
+due-window names nothing: several reminders whose only distinguishing property is *when* each falls
+due, and an answer that is a **set** whose membership changes with the as-of instant. It gave the
+family its first real interference cost (0.00 → 0.28).
 
 Thirty-eight of the fifty are **19 before/after pairs**: one haystack asked twice, differing only in
 when it was asked, with gold flipping between the arms. Pairs are the vertical's teeth — a system
@@ -218,6 +226,57 @@ published numbers:
 An answer that recalls the old value *while marking it superseded* — "it was a Honda, but you sold
 it" — is **Correct**. That is ideal memory, not a mistake.
 
+### Bitemporal (60 questions)
+
+Thirty-six belief-at-instant, twenty-four correction-depth. The vertical separates **when something
+was true** from **when the record learned it** — a question asks what the file showed *as of* one
+date about a state holding *at* another, so a store that keeps only the latest value cannot answer
+it at all, and one that keeps history but not the order of corrections answers it wrongly.
+
+Correction-depth stacks revisions: a fact is recorded, corrected, and corrected again, and the
+question picks an as-of instant between them. The two dials are independent on purpose — depth
+tests whether the store retains superseded values, and the as-of instant tests whether it can be
+asked about a past belief rather than a current one.
+
+### Temporal (50 questions)
+
+Twenty occurrence-order, fifteen interval-position, fifteen recency. Events are never dated; they
+are related to each other in a chain ("the X survey came after the Y rewiring"), so ordering them
+requires following the relations rather than reading a timestamp. Like Prospective, the
+conversations carry **no absolute date and no four-digit year**.
+
+`recency` was reshaped in 0.31.0-beta. It had asked about three *adjacent* events, which made the
+answer one transitive step over two sessions that named those events outright — and it scored
+**15/15 at V1, V8 and V9**, the only shape in the family on which no two systems could be told
+apart. It now asks about events **spanning** the chain, so every link between them has to be
+followed. V9 on `recency` is **7/15** where it was 15/15, and the vertical's headroom rose from
+0.16 to **0.34**.
+
+Milestone names are **verified non-referential** (`tools/audit_name_collisions.py`). An earlier bank
+was built from real British place-names, and the reference model answered *"which came first"* from
+world knowledge about a Glasgow shipbuilder with no haystack at all.
+
+### Semantic (50 questions)
+
+Twenty current-value, fifteen co-reference, fifteen source-attribution. These ask the store to
+**resolve** rather than recall: the current value after a chain of replacements, a fact stated under
+a different designation than the question uses, or which earlier conversation a belief came from.
+
+Source-attribution is the awkward one by design — the answer is not a value in the store but a
+property of *where the value came from*, which a system that flattens history into a current-state
+snapshot cannot recover even when it holds the right value.
+
+### Conjunction (50 questions)
+
+Twenty value-then-count, fifteen alias-then-count, fifteen order-then-value. Each question needs a
+fact of one memory type resolved **and** an operation of another type applied to it. Retrieving
+either half is necessary and neither is sufficient, so **a stack strong on one type and weak on the
+other scores like a stack weak on both** — which is exactly what a per-type score cannot show.
+
+**Read the shapes, not the mean.** `order-then-value` is **saturated under BM25** (V9 15/15,
+headroom 0.00) and cannot discriminate retrievers at all; the vertical's headroom is carried
+entirely by the other two. That is declared here rather than left inside an average.
+
 ## Coverage: what the corpora guarantee, and what they don't
 
 A saturated corpus cannot see retrieval mechanisms. Two mechanisms produce non-saturation, and the
@@ -245,13 +304,15 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.700 | 1 (×46), 2 (×4) |
+| Prospective | 50 | 0.617 | 1 (×29), 2 (×13), 3 (×4), 4 (×4) |
 | Episodic | 50 | 0.682 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
-| Arithmetic | 50 | 0.636 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| Arithmetic | 50 | 0.758 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
 | WorkingMemory | 60 | 0.867 | 1 (×60) |
-| Forgetting | 50 | 0.670 | 0 (×15), 2 (×35) |
+| Forgetting | 50 | 0.629 | 0 (×15), 2 (×35) |
 | Bitemporal | 60 | 0.800 | 1 (×60) |
-| Temporal | 50 | 0.900 | 1 (×20), 2 (×30) |
+| Temporal | 50 | 0.785 | 1 (×20), 2 (×15), 3 (×5), 4 (×5), 5 (×5) |
+| Semantic | 50 | 0.677 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
+| Conjunction | 50 | 0.534 | 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -326,13 +387,15 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 45/45 | — | 48/50 | 34/50 | +0.30 |
-| Episodic | 48/50 | — | 50/50 | 50/50 | — | 50/50 | 30/50 | +0.36 |
-| Arithmetic | 49/50 | — | 50/50 | 50/50 | 50/50 | 43/50 | 18/50 | +0.62 |
+| Prospective | 50/50 | 19/19 | 50/50 | 29/29 | — | 36/50 | 23/50 | +0.54 |
+| Episodic | 50/50 | — | 50/50 | 35/35 | — | 50/50 | 30/50 | +0.40 |
+| Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 19/50 | +0.62 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 53/60 | +0.12 |
-| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 | 35/35 | 20/35 | +0.43 |
-| Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.20 |
-| Temporal | 50/50 | — | 49/50 | 30/30 | — | 50/50 | 41/50 | +0.18 |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/35 | 31/35 | 21/35 | +0.37 |
+| Bitemporal | 59/60 | 29/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.18 |
+| Temporal | 50/50 | — | 50/50 | 30/30 | — | 50/50 | 33/50 | +0.34 |
+| Semantic | 50/50 | — | 50/50 | 48/50 | — | 48/50 | 34/50 | +0.32 |
+| Conjunction | 50/50 | — | 50/50 | 49/50 | — | 50/50 | 18/50 | +0.64 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**
