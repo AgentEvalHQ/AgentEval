@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Temporal's `recency` shape could not rank anything, and now it is the hardest shape in the
+  vertical.** It scored **15/15 at V1, V8 *and* V9** — the only shape in the family on which no two
+  systems could be told apart. The mechanism was that it asked about the **last three** events in the
+  chain, so gold was the two adjacent links and answering was a single transitive step over two
+  sessions that named the asked events outright. Guessability was checked first and came back clean:
+  the answer was first-named 6/15, middle 3/15, last 6/15, all at chance. The construct was sound and
+  simply too easy on both halves.
+
+  It now asks about events **spanning** the chain — earliest, middle, latest — so every link between
+  them has to be followed. **V9 15/15 → 6/15**, and the vertical's headroom **0.16 → 0.40**. Gold
+  grows from 2 links to `count - 1` and stays minimal: on a single chain `A<B<C<D<E` asked over
+  `{A, C, E}`, dropping any intermediate link removes a transitive step the answer needs.
+
+  Two follow-on defects surfaced *because* the change was made and were fixed with it. More gold
+  needed a higher echo to hold coverage, which pushed the calibration clause's distractor rate to
+  1.00 and made a relation session separable by the clause's **absence** — the first shipped build's
+  tell, inverted. A first repair wove the clause into the **user** turn at 60%, and the separability
+  gate caught that from two directions at once: parity still failing (0.40 vs 1.00) *and*
+  `assistant_punctuation_density` separating at **AUC 0.849**, because filler assistants carried the
+  clause and gold assistants did not. Same turn, same rate, no exceptions.
+
+  Coverage `1.000 → 0.744` and `occurrence-order` came into band as a side effect (0.950 → 0.900),
+  clearing both temporal ratchet entries with one change. **The corpus sha moves
+  (`a6c10b3d…` → `31d26e60…`) and temporal's controls reset.**
+
 - **Semantic gained a judge body, and it was built under REACH ENUMERATION.** Semantic shipped
   without one deliberately — it measured 0.958 on the shared preamble alone and nothing failed
   consistently — but that left it as the **only** vertical with nothing to settle the preamble's
@@ -53,6 +78,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sufficient — enumerate what a change can REACH, not only what it targets.** The guard written for
   that edit was built against the imagined failure; the regression landed on existing cases never
   enumerated.
+
+### Added
+
+- **A chance-floor audit for closed-choice questions — and it says 69 of our V2 passes were never
+  earned.** `tools/validate_v2_chance_floor.py`.
+
+  V2 asks the reference model each question with no haystack, ten times, and rejects it on two or
+  more gold hits. That is an observed rate of **0.20**. But **71 of 470 questions enumerate their own
+  alternatives** — *"Which came first, X or Y?"*, *"Was that me or you?"*, *"Is my Lumen trial still
+  running?"* — so a model that has never seen the haystack still picks from a set of known size `k`
+  and lands gold at `1/k` by construction. The chance floor is **0.50** at `k=2` and **0.33** at
+  `k=3`. **The reject line sits below the floor.** A model that does nothing but guess is rejected
+  with probability **0.989** at `k=2`.
+
+  So on those questions V2 cannot separate a clean question from a guessable one. What its verdict
+  records is whether the reference model **abstained** — it passes when the model declines and fails
+  when the model guesses, and neither outcome is a property of the corpus. **The direction is the
+  flattering one:** an abstaining reference model turns the uninformative zone into passes, and
+  **69 questions carry a V2 pass on that basis** (temporal 33, prospective 21, episodic 15). Exactly
+  **one** closed-choice question is genuinely above chance, and one more was a **false failure**
+  reported on a hit count below what guessing alone produces.
+
+  **The same floor sits under the arms we publish.** A raw pass count reads as if zero were the
+  floor, and on these questions it is not. Chance-corrected as `(observed − chance) / (1 − chance)`:
+
+  | vertical | closed-choice | V9 raw | V9 corrected |
+  |---|---|---|---|
+  | prospective | 21 | 14/21 (0.67) | **0.33** |
+  | temporal | 35 | 24/35 (0.69) | **0.45** |
+  | episodic | 15 | 14/15 (0.93) | 0.87 |
+
+  Headroom (`V1 − V9`) is a difference and the floor largely cancels, so published headroom is not
+  inflated — if anything it was **understated**. The absolute pass counts were not.
+
+  The audit costs **no model calls**: `k` is read from the question text by literal pattern, so it
+  cannot be tuned toward a comfortable answer, and the hit counts come from probe records already on
+  disk. This is the fourth confirmed shape of the gate self-examination rule, after element-missing,
+  bar-supplied and diluted-denominator: **floor-below-chance** — the reject line sits beneath the
+  item's structural floor, so the gate separates reference-model behaviour rather than corpora.
 
 ## [0.30.0-beta] - 2026-08-29
 
