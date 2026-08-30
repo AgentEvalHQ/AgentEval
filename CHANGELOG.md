@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0-beta] - 2026-08-30
+
 ### Fixed
 
 - **Temporal's `recency` shape could not rank anything, and now it is the hardest shape in the
