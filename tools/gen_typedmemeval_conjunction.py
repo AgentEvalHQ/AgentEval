@@ -120,9 +120,13 @@ DESIGNATIONS = (
     ("the Peverel building", "the annexe", "The annexe is the Peverel building."),
 )
 
+#: Shares the ordering role of Temporal's bank and shared its defect: four of these six were real
+#: entities (Harrow, Kessel, Bellamy, Vance), and `order-then-value` asks which came first, so a
+#: model that knows the referents can order them without the corpus. Verified non-referential by
+#: tools/audit_name_collisions.py; see gen_typedmemeval_temporal.py for the full finding.
 MILESTONES = (
-    "the Harrow survey", "the Bellamy rewiring", "the Kessel handover", "the Ondrey audit",
-    "the Traymoor fit-out", "the Vance inspection",
+    "the Vreskade survey", "the Quorlory rewiring", "the Zethisk handover", "the Ondrey audit",
+    "the Traymoor fit-out", "the Draimune inspection",
 )
 AFTER_FRAMES = (
     "Worth noting {a} came after {b}.",

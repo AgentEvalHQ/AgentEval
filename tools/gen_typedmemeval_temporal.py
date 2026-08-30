@@ -52,16 +52,35 @@ RECENCY_QUESTIONS = 15
 H_MIN, H_MAX = 14, 24
 _BASE = datetime(2026, 2, 2, 10, 0)
 
-#: Invented milestone names. Arbitrary by construction (V2): nothing about a name makes it likelier
-#: to be first, so zero-context guessing has nothing to work with.
+#: Milestone names, VERIFIED non-referential rather than assumed so.
+#:
+#: This comment used to read "Invented milestone names. Arbitrary by construction (V2): nothing
+#: about a name makes it likelier to be first, so zero-context guessing has nothing to work with."
+#: V2 disproved it. Asked "Which came first, the Fenn commissioning or the Yarrow move?" with no
+#: context at all, the reference model answered "Yarrow moved its shipbuilding operations to
+#: Scotstoun, Glasgow in the early 1900s, while the Fenn commissioning was during World War II" --
+#: real knowledge about Yarrow Shipbuilders and a USS Fenn. NINE of the twelve names were real
+#: entities: Harrow and Kessel are places, Bellamy and Vance and Ruskin are people, Calder is a
+#: river, Esker is a company.
+#:
+#: AND V2 SEES ONLY PART OF IT, because it scores a leak that agrees with gold. Five questions show
+#: the model reasoning from world knowledge; V2 flagged two. `tme-tem-013` hit 10/10 purely because
+#: the corpus happened to order those two events the way history did -- ordered the other way, the
+#: model would have been confidently wrong ten times out of ten and the question would have PASSED.
+#: So the arm that caught this cannot be the arm that certifies the fix.
+#:
+#: Every name below was put through `tools/audit_name_collisions.py`, which asks the reference model
+#: whether it can state a concrete fact about the name, and kept only those it could not. The
+#: instrument that condemned the old bank is the one that cleared the new one.
 MILESTONES = (
-    "the Harrow survey", "the Bellamy rewiring", "the Kessel handover", "the Ondrey audit",
-    "the Traymoor fit-out", "the Vance inspection", "the Wrenfield sign-off", "the Yarrow move",
-    "the Calder relining", "the Dunmow changeover", "the Esker retrofit", "the Fenn commissioning",
+    "the Vreskade survey", "the Quorlory rewiring", "the Zethisk handover", "the Ondrey audit",
+    "the Traymoor fit-out", "the Draimune inspection", "the Wrenfield sign-off",
+    "the Plennell move", "the Skarvarn relining", "the Trevuade changeover",
+    "the Ovridory retrofit", "the Janduisk commissioning",
 )
 FILLER_MILESTONES = (
-    "the Palgrave clear-out", "the Quenby repaint", "the Ruskin resurfacing",
-    "the Sallow re-roofing", "the Thurlow rewire", "the Upton screed",
+    "the Wexilune clear-out", "the Ghelmell repaint", "the Prazzarn resurfacing",
+    "the Sallow re-roofing", "the Yolviade rewire", "the Kreshory screed",
 )
 
 #: One bank for gold and filler alike. `{a}` is anchored relative to `{b}`.

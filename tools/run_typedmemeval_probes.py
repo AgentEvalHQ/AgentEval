@@ -528,7 +528,26 @@ _NEGATIVE_GOLD = re.compile(
 #: The precedent is ADR-026's: Forgetting's two-way shape is bounded by V2 (ten zero-context samples)
 #: rather than by V3, for exactly this reason. Scoped by SHAPE rather than by vertical, because it is
 #: a property of the question form and the next vertical with a two-way shape will inherit it.
-_V3_GUESSABLE_SHAPES = {"occurrence-order"}
+_V3_GUESSABLE_SHAPES = {"occurrence-order", "recency"}
+
+#: WHY THESE TWO, DERIVED RATHER THAN LISTED BY HAND. V3 draws ABLATION_SAMPLES and condemns a
+#: question on a SINGLE hit, so against a model that simply guesses among the k candidates the
+#: question names, the false-failure rate is 1 - (1 - 1/k)**ABLATION_SAMPLES:
+#:
+#:     k=2 (occurrence-order)  0.875     even 3-of-3 leaves p=0.125, so NO threshold decides it
+#:     k=3 (recency)           0.704     3-of-3 would give p=0.037, but the arm stops at one hit
+#:
+#: `recency` was missing and it cost a real investigation: a clean regeneration took temporal's V3
+#: from 30/30 to 26/30, and all four "failures" were recency questions. Nothing had leaked -- the
+#: model guessed, which is what a three-way question invites. The previous run passing 30/30 was
+#: luck, not evidence, because the model usually declines rather than guessing.
+#:
+#: THE PROPER FIX IS A CHANCE-AWARE THRESHOLD, not a longer list: require the smallest h with
+#: P(X>=h | 1/k) < 0.05 and call the shape undecidable when no h <= ABLATION_SAMPLES qualifies --
+#: which DERIVES this set instead of curating it, and would keep recency measured at 3-of-3 rather
+#: than dropping it. That changes V3 semantics for every closed-choice shape in the family
+#: (episodic attribution, prospective yes/no), so it is queued as its own change rather than
+#: smuggled in beside a name fix. Listed here so the next reader knows this set is a stand-in.
 
 
 def _v3_decidable(gold: str, already_known: str) -> bool:
