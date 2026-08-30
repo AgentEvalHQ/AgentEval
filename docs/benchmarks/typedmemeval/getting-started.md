@@ -111,14 +111,22 @@ Exactly one causal reading is safe — `Wrong` with `EvidenceAbsent` *is* a retr
 The mirror reading (`Missed` with `EvidencePresent` means a synthesis failure) is an inference, not
 a fact, because a compression loss inside the store looks identical from here.
 
-## The five verticals
+## The nine verticals
 
 ### Prospective (50 questions)
 
-Due-later reminders, expiring validity, not-yet-true assertions — plus the twelve time-grounded
-probe questions carried in as its seed. Runs under `TimestampsOnly` grounding: the conversations
-contain **no absolute date and no four-digit year**, so every temporal expression is relative and
-resolving it requires the session's own timestamp.
+Due-later reminders, expiring validity, not-yet-true assertions, **due-windows** — plus the twelve
+time-grounded probe questions carried in as its seed. Runs under `TimestampsOnly` grounding: the
+conversations contain **no absolute date and no four-digit year**, so every temporal expression is
+relative and resolving it requires the session's own timestamp.
+
+`due-window` (18 questions) was added in 0.31.0-beta because the vertical could be answered with
+firing semantics switched off. Every earlier shape **names the thing** being asked about, which
+hands a similarity retriever the words of the session it needs while the harness supplies "today"
+and the corpus supplies the due date — in-context arithmetic no memory feature is needed for. A
+due-window names nothing: several reminders whose only distinguishing property is *when* each falls
+due, and an answer that is a **set** whose membership changes with the as-of instant. It gave the
+family its first real interference cost (0.00 → 0.28).
 
 Thirty-eight of the fifty are **19 before/after pairs**: one haystack asked twice, differing only in
 when it was asked, with gold flipping between the arms. Pairs are the vertical's teeth — a system
@@ -217,6 +225,57 @@ published numbers:
 
 An answer that recalls the old value *while marking it superseded* — "it was a Honda, but you sold
 it" — is **Correct**. That is ideal memory, not a mistake.
+
+### Bitemporal (60 questions)
+
+Thirty-six belief-at-instant, twenty-four correction-depth. The vertical separates **when something
+was true** from **when the record learned it** — a question asks what the file showed *as of* one
+date about a state holding *at* another, so a store that keeps only the latest value cannot answer
+it at all, and one that keeps history but not the order of corrections answers it wrongly.
+
+Correction-depth stacks revisions: a fact is recorded, corrected, and corrected again, and the
+question picks an as-of instant between them. The two dials are independent on purpose — depth
+tests whether the store retains superseded values, and the as-of instant tests whether it can be
+asked about a past belief rather than a current one.
+
+### Temporal (50 questions)
+
+Twenty occurrence-order, fifteen interval-position, fifteen recency. Events are never dated; they
+are related to each other in a chain ("the X survey came after the Y rewiring"), so ordering them
+requires following the relations rather than reading a timestamp. Like Prospective, the
+conversations carry **no absolute date and no four-digit year**.
+
+`recency` was reshaped in 0.31.0-beta. It had asked about three *adjacent* events, which made the
+answer one transitive step over two sessions that named those events outright — and it scored
+**15/15 at V1, V8 and V9**, the only shape in the family on which no two systems could be told
+apart. It now asks about events **spanning** the chain, so every link between them has to be
+followed. V9 on `recency` is **7/15** where it was 15/15, and the vertical's headroom rose from
+0.16 to **0.34**.
+
+Milestone names are **verified non-referential** (`tools/audit_name_collisions.py`). An earlier bank
+was built from real British place-names, and the reference model answered *"which came first"* from
+world knowledge about a Glasgow shipbuilder with no haystack at all.
+
+### Semantic (50 questions)
+
+Twenty current-value, fifteen co-reference, fifteen source-attribution. These ask the store to
+**resolve** rather than recall: the current value after a chain of replacements, a fact stated under
+a different designation than the question uses, or which earlier conversation a belief came from.
+
+Source-attribution is the awkward one by design — the answer is not a value in the store but a
+property of *where the value came from*, which a system that flattens history into a current-state
+snapshot cannot recover even when it holds the right value.
+
+### Conjunction (50 questions)
+
+Twenty value-then-count, fifteen alias-then-count, fifteen order-then-value. Each question needs a
+fact of one memory type resolved **and** an operation of another type applied to it. Retrieving
+either half is necessary and neither is sufficient, so **a stack strong on one type and weak on the
+other scores like a stack weak on both** — which is exactly what a per-type score cannot show.
+
+**Read the shapes, not the mean.** `order-then-value` is **saturated under BM25** (V9 15/15,
+headroom 0.00) and cannot discriminate retrievers at all; the vertical's headroom is carried
+entirely by the other two. That is declared here rather than left inside an average.
 
 ## Coverage: what the corpora guarantee, and what they don't
 
