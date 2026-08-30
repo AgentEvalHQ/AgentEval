@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The corpora were built from real place-names, and a model was answering from world knowledge.**
+  V2 asked *"Which came first, the Fenn commissioning or the Yarrow move?"* with **no haystack at
+  all** and the reference model replied *"Yarrow moved its shipbuilding operations to Scotstoun,
+  Glasgow in the early 1900s, while the Fenn commissioning was during World War II."* Real facts
+  about Yarrow Shipbuilders. The generator's comment said this could not happen — *"Invented
+  milestone names. Arbitrary by construction (V2): nothing about a name makes it likelier to be
+  first"* — and had never been measured.
+
+  A sweep of **every entity bank in the family** (`tools/audit_name_collisions.py`, 163 names, 0
+  unparsed) found **75 are real-world referents**: Harrow and Kessel are places, Bellamy and Vance
+  and Ruskin are people, Calder is a river, Esker is a company.
+
+  **V2 sees only half of this defect.** It scores a leak only when the leak *agrees with gold*. Five
+  temporal questions show world-knowledge reasoning; V2 flagged **two**. `tme-tem-013` hit 10/10
+  purely because the corpus happened to order those events the way history did — ordered the other
+  way, the model would have been confidently wrong ten times out of ten and the question would have
+  **passed**. The arm that caught this cannot certify its repair, which is why the guard is a
+  deterministic test rather than another probe.
+
+  **Fixed where the harm is, declared where it is not.** A real referent is only exploitable when
+  its real-world facts answer the question asked: *"Meridian Tools"* being a real brand does not tell
+  a model which vendor the **user** chose, but *"Yarrow"* moving in 1906 does tell it which milestone
+  came first. So the three **ordering** banks were remediated — `temporal:MILESTONES` (9 of 12
+  colliding), `temporal:FILLER_MILESTONES` (5 of 6), `conjunction:MILESTONES` (4 of 6) — and the
+  other **61 collisions are declared, not rewritten**, in `tools/name-collision-audit.json` with the
+  reasoning. Rewriting them would move all nine corpus shas and reset every control the consuming
+  project holds, for no measured leak.
+
+  Replacement names were **verified by the instrument that condemned the originals**, not chosen by
+  taste. Re-probed under the V2 condition, the new names produce bare declines (*"I have no way of
+  knowing."*) with no world-knowledge reasoning.
+
+  | | before | after |
+  |---|---|---|
+  | temporal **V2** | 48/50 | **50/50** — both leaks gone |
+  | temporal V9 / headroom | 30/50 / 0.40 | 33/50 / 0.34 |
+  | conjunction V1 | 49/50 | **50/50** |
+  | conjunction V9 / headroom | 18/50 / 0.62 | 18/50 / 0.64 |
+
+  **Corpus shas move: temporal `31d26e60…` → `124458d0…`, conjunction `c62ef477…` → `b756721c…`.**
+  Both verticals' controls reset. No other corpus is touched.
+
+- **V3 was false-failing `recency` seven times in ten.** A clean regeneration took temporal's V3 from
+  30/30 to 26/30 and every one of the four "failures" was a `recency` question. Nothing had leaked.
+  V3 draws 3 ablation samples and condemns a question on a **single** hit, so against a model
+  guessing among the *k* candidates the question itself names, the false-failure rate is
+  `1 − (1 − 1/k)³`:
+
+  | shape | k | false-failure rate | strictest threshold |
+  |---|---|---|---|
+  | `occurrence-order` | 2 | 0.875 | 3-of-3 still leaves p=0.125 — **undecidable** |
+  | `recency` | 3 | **0.704** | 3-of-3 would give p=0.037 |
+
+  `occurrence-order` was already exempt for exactly this reason; `recency` hands the model three
+  candidates and had never been added. It is now, and the arithmetic is written down beside the set
+  instead of left as a curated list. **The previous run's 30/30 was luck, not evidence** — the model
+  usually declines rather than guessing, so the arm's verdict on these shapes swings on whether it
+  happened to guess.
+
+  The proper fix is a **chance-aware threshold** that derives the exempt set rather than curating it,
+  and would keep `recency` measured at 3-of-3 instead of dropping it. That changes V3 semantics for
+  every closed-choice shape in the family, so it is **queued as its own change** rather than
+  smuggled in beside a name fix.
+
+### Added
+
+- **`tools/audit_name_collisions.py`** — asks the reference model whether it can state a concrete
+  fact about each name in every entity bank, and refuses to count an unparseable reply as
+  "invented". Its measured result is committed to `tools/name-collision-audit.json` so the finding
+  and the harm assessment travel with the repository rather than living in a chat log.
+- **`TypedMemEvalNameCollisionTests`** — a deterministic guard, red-first verified against the old
+  corpus, asserting that no remediated name reaches a question or answer in the two verticals whose
+  questions turn on order. It also asserts the audit record still covers all three ordering banks,
+  so a shrunken record cannot make the guard vacuous.
+
 ## [0.31.0-beta] - 2026-08-30
 
 ### Fixed

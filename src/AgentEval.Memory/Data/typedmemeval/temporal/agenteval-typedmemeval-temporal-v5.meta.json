@@ -8,7 +8,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "31d26e60fd21d00e9965d3f9f6c1a732c5d1a3007e34e19605efde619803eb96",
+  "corpus_sha256": "124458d03896a7e952c67883eb747b1da117370e5d25d5caf54cbb569ec3057a",
   "generator": {
     "tool": "tools/gen_typedmemeval_temporal.py",
     "version": "1.0.0",
@@ -19,69 +19,69 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.7833,
-    "echo": 0.75,
+    "mean_realised": 0.7853,
+    "echo": 0.875,
     "iterations": 15,
     "search_trace": [
       [
         1.0,
-        0.8147
+        0.8387
       ],
       [
         0.5,
-        0.885
+        0.9017
       ],
       [
         0.75,
-        0.7833
+        0.857
       ],
       [
         0.875,
-        0.8337
+        0.7853
       ],
       [
         0.9375,
-        0.8327
+        0.8547
       ],
       [
         0.9688,
-        0.8147
+        0.8387
       ],
       [
         0.9844,
-        0.8147
+        0.8387
       ],
       [
         0.9922,
-        0.8147
+        0.8387
       ],
       [
         0.9961,
-        0.8147
+        0.8387
       ],
       [
         0.998,
-        0.8147
+        0.8387
       ],
       [
         0.999,
-        0.8147
+        0.8387
       ],
       [
         0.9995,
-        0.8147
+        0.8387
       ],
       [
         0.9998,
-        0.8147
+        0.8387
       ],
       [
         0.9999,
-        0.8147
+        0.8387
       ],
       [
         0.9999,
-        0.8147
+        0.8387
       ]
     ],
     "per_question": {
@@ -90,7 +90,7 @@
       "tme-tem-003": 1.0,
       "tme-tem-004": 1.0,
       "tme-tem-005": 1.0,
-      "tme-tem-006": 0.0,
+      "tme-tem-006": 1.0,
       "tme-tem-007": 1.0,
       "tme-tem-008": 1.0,
       "tme-tem-009": 1.0,
@@ -99,41 +99,41 @@
       "tme-tem-012": 1.0,
       "tme-tem-013": 1.0,
       "tme-tem-014": 1.0,
-      "tme-tem-015": 0.0,
+      "tme-tem-015": 1.0,
       "tme-tem-016": 1.0,
       "tme-tem-017": 1.0,
-      "tme-tem-018": 1.0,
+      "tme-tem-018": 0.0,
       "tme-tem-019": 1.0,
       "tme-tem-020": 1.0,
-      "tme-tem-021": 1.0,
+      "tme-tem-021": 0.5,
       "tme-tem-022": 0.5,
-      "tme-tem-023": 0.5,
-      "tme-tem-024": 0.5,
-      "tme-tem-025": 1.0,
-      "tme-tem-026": 1.0,
+      "tme-tem-023": 1.0,
+      "tme-tem-024": 1.0,
+      "tme-tem-025": 0.5,
+      "tme-tem-026": 0.5,
       "tme-tem-027": 0.5,
-      "tme-tem-028": 0.5,
+      "tme-tem-028": 1.0,
       "tme-tem-029": 0.5,
-      "tme-tem-030": 0.5,
-      "tme-tem-031": 0.5,
+      "tme-tem-030": 1.0,
+      "tme-tem-031": 0.0,
       "tme-tem-032": 1.0,
-      "tme-tem-033": 1.0,
+      "tme-tem-033": 0.5,
       "tme-tem-034": 0.5,
       "tme-tem-035": 0.5,
       "tme-tem-036": 1.0,
       "tme-tem-037": 1.0,
       "tme-tem-038": 0.2,
-      "tme-tem-039": 1.0,
-      "tme-tem-040": 0.25,
-      "tme-tem-041": 0.6,
-      "tme-tem-042": 0.6667,
-      "tme-tem-043": 0.75,
-      "tme-tem-044": 0.6,
+      "tme-tem-039": 0.0,
+      "tme-tem-040": 1.0,
+      "tme-tem-041": 0.2,
+      "tme-tem-042": 1.0,
+      "tme-tem-043": 1.0,
+      "tme-tem-044": 0.8,
       "tme-tem-045": 1.0,
-      "tme-tem-046": 0.5,
-      "tme-tem-047": 0.8,
-      "tme-tem-048": 1.0,
-      "tme-tem-049": 1.0,
+      "tme-tem-046": 1.0,
+      "tme-tem-047": 0.6,
+      "tme-tem-048": 0.6667,
+      "tme-tem-049": 0.5,
       "tme-tem-050": 0.8
     }
   },
@@ -163,8 +163,8 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": true,
     "empty_turns": {
-      "count": 239,
-      "of_turns": 5240,
+      "count": 249,
+      "of_turns": 5170,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     }
@@ -439,40 +439,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5388,
+        "session_length_chars": 0.5273,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5128,
+        "position_in_haystack": 0.5198,
         "digit_density": 0.5,
-        "uppercase_density": 0.5664,
-        "sentence_count": 0.5022,
-        "punctuation_density": 0.5279,
+        "uppercase_density": 0.528,
+        "sentence_count": 0.5107,
+        "punctuation_density": 0.5057,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5388,
-        "type_token_ratio": 0.5756,
-        "first_user_length_chars": 0.5388,
-        "first_user_uppercase_density": 0.5303,
-        "first_user_sentence_count": 0.5271,
-        "first_assistant_length_chars": 0.5284,
-        "first_assistant_uppercase_density": 0.5124,
-        "first_assistant_sentence_count": 0.5075,
-        "user_slot1_length_chars": 0.5087,
+        "mean_turn_chars": 0.5273,
+        "type_token_ratio": 0.5647,
+        "first_user_length_chars": 0.5664,
+        "first_user_uppercase_density": 0.5111,
+        "first_user_sentence_count": 0.5129,
+        "first_assistant_length_chars": 0.5275,
+        "first_assistant_uppercase_density": 0.5022,
+        "first_assistant_sentence_count": 0.532,
+        "user_slot1_length_chars": 0.5107,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5247,
-        "assistant_slot2_length_chars": 0.5046,
+        "assistant_slot1_length_chars": 0.5069,
+        "assistant_slot2_length_chars": 0.579,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.532,
-        "user_uppercase_density": 0.5325,
-        "user_sentence_count": 0.5218,
-        "user_punctuation_density": 0.5068,
-        "user_type_token_ratio": 0.5068,
-        "user_mean_turn_chars": 0.532,
-        "assistant_length_chars": 0.5196,
-        "assistant_uppercase_density": 0.5545,
-        "assistant_sentence_count": 0.5301,
-        "assistant_punctuation_density": 0.5434,
-        "assistant_type_token_ratio": 0.5417,
-        "assistant_mean_turn_chars": 0.5196,
+        "user_length_chars": 0.5461,
+        "user_uppercase_density": 0.5151,
+        "user_sentence_count": 0.5429,
+        "user_punctuation_density": 0.5161,
+        "user_type_token_ratio": 0.5419,
+        "user_mean_turn_chars": 0.5461,
+        "assistant_length_chars": 0.5057,
+        "assistant_uppercase_density": 0.5312,
+        "assistant_sentence_count": 0.5369,
+        "assistant_punctuation_density": 0.5164,
+        "assistant_type_token_ratio": 0.5131,
+        "assistant_mean_turn_chars": 0.5057,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -482,330 +482,330 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6302,
-        "boilerplate_ngram": 0.5923
+        "gold_marker_ngram": 0.6095,
+        "boilerplate_ngram": 0.5946
       },
       "worst_refused_feature": "gold_marker_ngram",
-      "worst_refused_auc": 0.6302,
+      "worst_refused_auc": 0.6095,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "the wrenfield",
-      "gold_marker_ngram_auc": 0.6302,
-      "worst_boilerplate_ngram": "being",
-      "boilerplate_ngram_auc": 0.5923,
+      "worst_gold_marker_ngram": "the trevuade",
+      "gold_marker_ngram_auc": 0.6095,
+      "worst_boilerplate_ngram": "the kreshory screed",
+      "boilerplate_ngram_auc": 0.5946,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.04,
+          "chance": 0.0455,
+          "observed": 2,
+          "expected": 2.27,
+          "z": -0.19
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_in_haystack": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.04,
+          "chance": 0.0455,
+          "observed": 2,
+          "expected": 2.27,
+          "z": -0.19
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "uppercase_density": {
           "share": 0.02,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "expected": 2.27,
+          "z": -0.89
         },
         "sentence_count": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "punctuation_density": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.1,
+          "chance": 0.0455,
+          "observed": 5,
+          "expected": 2.27,
+          "z": 1.91
         },
         "em_dash_density": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "mean_turn_chars": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.04,
+          "chance": 0.0455,
+          "observed": 2,
+          "expected": 2.27,
+          "z": -0.19
         },
         "type_token_ratio": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.08,
+          "chance": 0.0455,
+          "observed": 4,
+          "expected": 2.27,
+          "z": 1.21
         },
         "first_user_length_chars": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "first_user_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0452,
-          "observed": 2,
-          "expected": 2.26,
-          "z": -0.18
+          "share": 0.02,
+          "chance": 0.0455,
+          "observed": 1,
+          "expected": 2.27,
+          "z": -0.89
         },
         "first_user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "first_assistant_length_chars": {
-          "share": 0.04,
-          "chance": 0.0452,
-          "observed": 2,
-          "expected": 2.26,
-          "z": -0.18
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "first_assistant_uppercase_density": {
           "share": 0.04,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 2,
-          "expected": 2.26,
-          "z": -0.18
+          "expected": 2.27,
+          "z": -0.19
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "user_slot1_length_chars": {
-          "share": 0.06,
-          "chance": 0.0452,
-          "observed": 3,
-          "expected": 2.26,
-          "z": 0.52
+          "share": 0.04,
+          "chance": 0.0455,
+          "observed": 2,
+          "expected": 2.27,
+          "z": -0.19
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "assistant_slot1_length_chars": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "assistant_slot2_length_chars": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "user_length_chars": {
-          "share": 0.06,
-          "chance": 0.0452,
-          "observed": 3,
-          "expected": 2.26,
-          "z": 0.52
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "user_uppercase_density": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "user_sentence_count": {
           "share": 0.04,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 2,
-          "expected": 2.26,
-          "z": -0.18
+          "expected": 2.27,
+          "z": -0.19
         },
         "user_punctuation_density": {
           "share": 0.06,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 3,
-          "expected": 2.26,
-          "z": 0.52
+          "expected": 2.27,
+          "z": 0.51
         },
         "user_type_token_ratio": {
-          "share": 0.02,
-          "chance": 0.0452,
-          "observed": 1,
-          "expected": 2.26,
-          "z": -0.88
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "user_mean_turn_chars": {
-          "share": 0.06,
-          "chance": 0.0452,
-          "observed": 3,
-          "expected": 2.26,
-          "z": 0.52
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "assistant_length_chars": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "assistant_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0452,
-          "observed": 2,
-          "expected": 2.26,
-          "z": -0.18
+          "share": 0.0,
+          "chance": 0.0455,
+          "observed": 0,
+          "expected": 2.27,
+          "z": -1.59
         },
         "assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "assistant_punctuation_density": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.04,
+          "chance": 0.0455,
+          "observed": 2,
+          "expected": 2.27,
+          "z": -0.19
         },
         "assistant_type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "assistant_mean_turn_chars": {
-          "share": 0.08,
-          "chance": 0.0452,
-          "observed": 4,
-          "expected": 2.26,
-          "z": 1.22
+          "share": 0.06,
+          "chance": 0.0455,
+          "observed": 3,
+          "expected": 2.27,
+          "z": 0.51
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0452,
+          "chance": 0.0455,
           "observed": 0,
-          "expected": 2.26,
+          "expected": 2.27,
           "z": -1.59
         },
         "gold_marker_ngram": {
-          "share": 0.06,
-          "chance": 0.0452,
-          "observed": 3,
-          "expected": 2.26,
-          "z": 0.52
+          "share": 0.1,
+          "chance": 0.0455,
+          "observed": 5,
+          "expected": 2.27,
+          "z": 1.91
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "31d26e60fd21d00e9965d3f9f6c1a732c5d1a3007e34e19605efde619803eb96"
+      "probed_corpus_sha256": "124458d03896a7e952c67883eb747b1da117370e5d25d5caf54cbb569ec3057a"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T00:27:53Z",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-30T12:08:59Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -824,15 +824,12 @@
       "reject_at_hits": 2,
       "temperature": "provider default",
       "applicable": 50,
-      "passed": 48,
-      "failed": [
-        "tme-tem-013",
-        "tme-tem-046"
-      ]
+      "passed": 50,
+      "failed": []
     },
     "v3_gold_ablated": {
-      "applicable": 30,
-      "passed": 30,
+      "applicable": 15,
+      "passed": 15,
       "failed": [],
       "not_decidable": [
         "tme-tem-001",
@@ -854,10 +851,26 @@
         "tme-tem-017",
         "tme-tem-018",
         "tme-tem-019",
-        "tme-tem-020"
+        "tme-tem-020",
+        "tme-tem-036",
+        "tme-tem-037",
+        "tme-tem-038",
+        "tme-tem-039",
+        "tme-tem-040",
+        "tme-tem-041",
+        "tme-tem-042",
+        "tme-tem-043",
+        "tme-tem-044",
+        "tme-tem-045",
+        "tme-tem-046",
+        "tme-tem-047",
+        "tme-tem-048",
+        "tme-tem-049",
+        "tme-tem-050"
       ],
       "not_decidable_for_guessable_shapes": [
-        "occurrence-order"
+        "occurrence-order",
+        "recency"
       ],
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
@@ -869,9 +882,7 @@
       "not_applicable_reason": "V6 is not defined for temporal"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 153,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
@@ -885,7 +896,7 @@
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 649,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
         "judge_calls": 350,
@@ -894,12 +905,12 @@
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 90,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 45,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v6": {
         "population": "probe_answers",
@@ -921,7 +932,7 @@
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 54,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
         "judge_calls": 50,
@@ -942,9 +953,9 @@
       "applicable": 50,
       "v1_gold_only": 50,
       "v8_full_haystack": 50,
-      "v9_bm25_top_k": 30,
-      "headroom_over_lexical_retrieval": 0.4,
-      "headroom_unlimited_context_over_lexical": 0.4,
+      "v9_bm25_top_k": 33,
+      "headroom_over_lexical_retrieval": 0.34,
+      "headroom_unlimited_context_over_lexical": 0.34,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "by_shape": {
@@ -957,7 +968,7 @@
         "v8_applicable": 15,
         "v8_passed": 15,
         "v9_applicable": 15,
-        "v9_passed": 6,
+        "v9_passed": 7,
         "required_sessions_median": 2
       },
       "occurrence-order": {
@@ -969,19 +980,19 @@
         "v8_applicable": 20,
         "v8_passed": 20,
         "v9_applicable": 20,
-        "v9_passed": 18,
+        "v9_passed": 19,
         "required_sessions_median": 1
       },
       "recency": {
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 15,
-        "v3_applicable": 15,
-        "v3_passed": 15,
+        "v3_applicable": 0,
+        "v3_passed": 0,
         "v8_applicable": 15,
         "v8_passed": 15,
         "v9_applicable": 15,
-        "v9_passed": 6,
+        "v9_passed": 7,
         "required_sessions_median": 4
       }
     },
@@ -989,9 +1000,9 @@
       "tme-tem-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Bellamy rewiring came first; the Harrow survey happened after it.",
+        "v8_answer": "The Quorlory rewiring came first; the Vreskade survey came after it.",
         "v9": true,
-        "v9_answer": "The Bellamy rewiring came first; the Harrow survey came after it.",
+        "v9_answer": "The Quorlory rewiring came first; the Vreskade survey happened after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1001,9 +1012,9 @@
       "tme-tem-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first, before the Yarrow move.",
+        "v8_answer": "The Traymoor fit-out came first, before the Plennell move.",
         "v9": true,
-        "v9_answer": "The Traymoor fit-out came first, before the Yarrow move.",
+        "v9_answer": "The Traymoor fit-out came first, before the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1013,9 +1024,9 @@
       "tme-tem-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Kessel handover came first, before the Ondrey audit.",
+        "v8_answer": "The Zethisk handover came first; the Ondrey audit came after it.",
         "v9": true,
-        "v9_answer": "The Kessel handover came first, before the Ondrey audit.",
+        "v9_answer": "The Zethisk handover came first; the Ondrey audit came after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1025,9 +1036,9 @@
       "tme-tem-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Fenn commissioning came first; the Wrenfield sign-off happened after it was out of the way.",
+        "v8_answer": "The Traymoor fit-out came first, before the Wrenfield sign-off.",
         "v9": true,
-        "v9_answer": "The Fenn commissioning came first; the Wrenfield sign-off happened after it was out of the way.",
+        "v9_answer": "The Traymoor fit-out came first — it was done well ahead of the Wrenfield sign-off.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1037,9 +1048,9 @@
       "tme-tem-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first, before the Esker retrofit.",
+        "v8_answer": "The Janduisk commissioning came first.",
         "v9": true,
-        "v9_answer": "The Traymoor fit-out came first.",
+        "v9_answer": "The Janduisk commissioning came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1049,11 +1060,11 @@
       "tme-tem-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover came first.",
-        "v9": false,
-        "v9_answer": "The conversations do not say which came first between the Kessel handover and the Dunmow changeover.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 1,
+        "v8_answer": "The Ovridory retrofit came first, followed by the Traymoor fit-out.",
+        "v9": true,
+        "v9_answer": "The Ovridory retrofit came first, before the Traymoor fit-out.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1061,9 +1072,9 @@
       "tme-tem-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey came first, before the Wrenfield sign-off.",
+        "v8_answer": "The Draimune inspection came first.",
         "v9": true,
-        "v9_answer": "The Harrow survey came first, before the Wrenfield sign-off.",
+        "v9_answer": "The Draimune inspection came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1073,9 +1084,9 @@
       "tme-tem-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first; the Fenn commissioning came after it.",
+        "v8_answer": "The Janduisk commissioning came first, before the Plennell move.",
         "v9": true,
-        "v9_answer": "The Traymoor fit-out came first. The Fenn commissioning happened after it.",
+        "v9_answer": "The Janduisk commissioning came first, followed by the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1085,9 +1096,9 @@
       "tme-tem-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining came first; the Wrenfield sign-off came after it.",
+        "v8_answer": "The Draimune inspection came first.",
         "v9": true,
-        "v9_answer": "The Calder relining came first.",
+        "v9_answer": "The Draimune inspection came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1097,9 +1108,9 @@
       "tme-tem-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining came first; it preceded the Traymoor fit-out.",
+        "v8_answer": "The Janduisk commissioning came first; it preceded the Ovridory retrofit.",
         "v9": true,
-        "v9_answer": "The Calder relining came first; it preceded the Traymoor fit-out.",
+        "v9_answer": "The Janduisk commissioning came first, before the Ovridory retrofit.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1109,9 +1120,9 @@
       "tme-tem-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Esker retrofit came first.",
+        "v8_answer": "The Zethisk handover came first, before the Draimune inspection.",
         "v9": true,
-        "v9_answer": "The Esker retrofit came first.",
+        "v9_answer": "The Zethisk handover came first, then the Draimune inspection.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1121,9 +1132,9 @@
       "tme-tem-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Kessel handover came first, before the Wrenfield sign-off.",
+        "v8_answer": "The Vreskade survey came first; the Janduisk commissioning came after it.",
         "v9": true,
-        "v9_answer": "The Kessel handover came first, before the Wrenfield sign-off.",
+        "v9_answer": "The Vreskade survey came first. The Janduisk commissioning came after it.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1133,21 +1144,21 @@
       "tme-tem-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Yarrow move came first.",
+        "v8_answer": "The Skarvarn relining came first, before the Quorlory rewiring.",
         "v9": true,
-        "v9_answer": "The Yarrow move came first.",
+        "v9_answer": "The Skarvarn relining came first.",
         "v9_gold_in_context": 1,
-        "v2_hits": 10,
-        "v2": false,
+        "v2_hits": 0,
+        "v2": true,
         "v3": null,
         "v6": null
       },
       "tme-tem-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Kessel handover came first.",
+        "v8_answer": "The Draimune inspection came first, before the Zethisk handover.",
         "v9": true,
-        "v9_answer": "The Kessel handover came first.",
+        "v9_answer": "The Draimune inspection came first, before the Zethisk handover.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1157,10 +1168,10 @@
       "tme-tem-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey came first, before the Calder relining.",
-        "v9": false,
-        "v9_answer": "The conversations do not say which came first, the Harrow survey or the Calder relining.",
-        "v9_gold_in_context": 0,
+        "v8_answer": "The Ondrey audit came first.",
+        "v9": true,
+        "v9_answer": "The Ondrey audit came first, well ahead of the Ovridory retrofit.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -1169,9 +1180,9 @@
       "tme-tem-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover came first; the Calder relining happened after it was out of the way.",
+        "v8_answer": "The Trevuade changeover came first; the Skarvarn relining happened after it.",
         "v9": true,
-        "v9_answer": "The Dunmow changeover came first; the Calder relining happened after it was out of the way.",
+        "v9_answer": "The Trevuade changeover came first; the Skarvarn relining happened after it was out of the way.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1181,9 +1192,9 @@
       "tme-tem-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off came first; the Kessel handover happened after it was out of the way.",
+        "v8_answer": "The Wrenfield sign-off came first, before the Zethisk handover.",
         "v9": true,
-        "v9_answer": "The Wrenfield sign-off came first; the Kessel handover happened after it.",
+        "v9_answer": "The Wrenfield sign-off came first.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1193,10 +1204,10 @@
       "tme-tem-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first; the Calder relining came later.",
-        "v9": true,
-        "v9_answer": "The Traymoor fit-out came first; the Calder relining came later.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "The Traymoor fit-out came first, before the Skarvarn relining.",
+        "v9": false,
+        "v9_answer": "The Skarvarn relining came first.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3": null,
@@ -1205,9 +1216,9 @@
       "tme-tem-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off came first, before the Yarrow move.",
+        "v8_answer": "The Wrenfield sign-off came first, well ahead of the Plennell move.",
         "v9": true,
-        "v9_answer": "The Wrenfield sign-off came first, well ahead of the Yarrow move.",
+        "v9_answer": "The Wrenfield sign-off came first, well ahead of the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1217,9 +1228,9 @@
       "tme-tem-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Esker retrofit came first.",
+        "v8_answer": "The Ovridory retrofit came first.",
         "v9": true,
-        "v9_answer": "The Esker retrofit came first; the Yarrow move came after it.",
+        "v9_answer": "The Ovridory retrofit came first; the Plennell move came later.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1229,10 +1240,10 @@
       "tme-tem-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Esker retrofit** happened between the **Ondrey audit** and the **Wrenfield sign-off**.\n\nThe conversations state that the Esker retrofit happened after the Ondrey audit, and that the Esker retrofit came before the Wrenfield sign-off.",
-        "v9": true,
-        "v9_answer": "The Esker retrofit happened in between: the Ondrey audit was cleared first, then the Esker retrofit, then the Wrenfield sign-off.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "The Zethisk handover happened in between.\n\nThe conversations give this order:\n\nTrevuade changeover → Zethisk handover → Janduisk commissioning.",
+        "v9": false,
+        "v9_answer": "The conversations do not say what happened between the Janduisk commissioning and the Trevuade changeover.\n\nThey only say:\n- the Ondrey audit came later than the Janduisk commissioning;\n- the Zethisk handover came later than the Trevuade changeover.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1242,9 +1253,9 @@
       "tme-tem-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between: it came after the Harrow survey and before the Esker retrofit.",
+        "v8_answer": "The record only establishes one item in between: **the Janduisk commissioning**.\n\nSequence given:\n\n**Quorlory rewiring → Janduisk commissioning → Vreskade survey**.",
         "v9": false,
-        "v9_answer": "The conversations do not say what happened between the Esker retrofit and the Harrow survey.\n\nThey only establish that the Wrenfield sign-off followed the Esker retrofit, and that the Vance inspection came after the Wrenfield sign-off. There is no recorded ordering involving a Harrow survey.",
+        "v9_answer": "The conversations do not say what happened between the Quorlory rewiring and the Vreskade survey.\n\nThey only state that the Janduisk commissioning came after the Quorlory rewiring, and that the Traymoor fit-out came after the Vreskade survey.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1255,10 +1266,10 @@
       "tme-tem-023": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Bellamy rewiring** happened in between: the records say the **Kessel handover came before the Bellamy rewiring**, and the **Bellamy rewiring came before the Yarrow move**.",
-        "v9": false,
-        "v9_answer": "The conversations do not say what happened between the Kessel handover and the Yarrow move. They only mention the Yarrow move, and that the Bellamy rewiring came before it.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "The **Quorlory rewiring** happened in between.\n\nOrder from the conversations: **Vreskade survey → Quorlory rewiring → Plennell move**.",
+        "v9": true,
+        "v9_answer": "The Quorlory rewiring happened in between: the Vreskade survey came before the Quorlory rewiring, and the Plennell move came after it.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1268,10 +1279,10 @@
       "tme-tem-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining happened in between.\n\nThe recorded order is: Wrenfield sign-off \u2192 Calder relining \u2192 Dunmow changeover.",
-        "v9": false,
-        "v9_answer": "The conversations do not say what happened between the Dunmow changeover and the Wrenfield sign-off.\n\nThey only say:\n\n- the Dunmow changeover preceded the Kessel handover;\n- the Wrenfield sign-off preceded the Calder relining.\n\nNo ordering is given between the Dunmow changeover and the Wrenfield sig",
-        "v9_gold_in_context": 1,
+        "v8_answer": "The Draimune inspection happened in between: the Quorlory rewiring came first, then the Draimune inspection, then the Plennell move.",
+        "v9": true,
+        "v9_answer": "The Draimune inspection happened in between.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1281,10 +1292,10 @@
       "tme-tem-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Kessel handover happened in between.\n\nThe notes say the Fenn commissioning was out of the way before the Kessel handover, and the Kessel handover was done before the Esker retrofit.",
-        "v9": true,
-        "v9_answer": "The Kessel handover happened in between: the Fenn commissioning was out of the way before the Kessel handover, and the Kessel handover was well ahead of the Esker retrofit.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "The **Traymoor fit-out** happened in between: the records say the **Skarvarn relining preceded the Traymoor fit-out**, and later that the **Traymoor fit-out happened before the Trevuade changeover**.",
+        "v9": false,
+        "v9_answer": "The conversations indicate that the **Traymoor fit-out** happened before the **Trevuade changeover**.  \n\nThey do not plainly state where the **Skarvarn relining** fits in the sequence, so I can’t say for certain what was between Skarvarn relining and Trevuade changeover beyond that.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1294,9 +1305,9 @@
       "tme-tem-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Fenn commissioning happened in between: the Harrow survey came before the Fenn commissioning, and the Fenn commissioning came before the Yarrow move.",
+        "v8_answer": "The Janduisk commissioning happened in between: the Vreskade survey came first, then the Janduisk commissioning, then the Wrenfield sign-off.",
         "v9": true,
-        "v9_answer": "The Fenn commissioning happened in between.",
+        "v9_answer": "The Janduisk commissioning happened in between: the Vreskade survey came first, then the Janduisk commissioning, then the Wrenfield sign-off.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1307,9 +1318,9 @@
       "tme-tem-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey happened in between.\n\nThe notes say: Esker retrofit \u2192 Harrow survey \u2192 Dunmow changeover.",
+        "v8_answer": "The Skarvarn relining happened in between.\n\nThe notes say the Zethisk handover happened first, then the Skarvarn relining; and separately that the Skarvarn relining preceded the Quorlory rewiring.",
         "v9": false,
-        "v9_answer": "The conversations do not say.\n\nThey only establish that the Traymoor fit-out happened after the Dunmow changeover, and that the Harrow survey came before Dunmow. They do not give any timing for the Esker retrofit, so there is no recorded \u201cin between\u201d event.",
+        "v9_answer": "The conversations do not say what happened between the Zethisk handover and the Quorlory rewiring. They only mention that the Skarvarn relining preceded the Quorlory rewiring, but they do not place it relative to the Zethisk handover.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1321,9 +1332,9 @@
         "v1": true,
         "v8": true,
         "v8_answer": "The Wrenfield sign-off happened in between.",
-        "v9": false,
-        "v9_answer": "The conversations don\u2019t state that plainly.\n\nThey do say the **Wrenfield sign-off came before the Esker retrofit**, and the **Harrow survey came after the Esker retrofit**. But they do not explicitly say what happened between the **Fenn commissioning** and the **Esker retrofit**, or even place the F",
-        "v9_gold_in_context": 1,
+        "v9": true,
+        "v9_answer": "The Wrenfield sign-off happened in between.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1333,9 +1344,9 @@
       "tme-tem-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between: the Esker retrofit came before it, and the Traymoor fit-out came after it.",
+        "v8_answer": "The **Trevuade changeover** happened in between: the Ovridory retrofit came before it, and the Traymoor fit-out came after it.",
         "v9": false,
-        "v9_answer": "The conversations do not say what happened between the Esker retrofit and the Traymoor fit-out.\n\nThey only establish:\n- the Dunmow changeover came later than the Esker retrofit;\n- the Traymoor fit-out happened before the Ondrey audit.\n\nNo event is placed specifically between the Esker retrofit and t",
+        "v9_answer": "The conversations do not say what happened between the Ovridory retrofit and the Traymoor fit-out. They only say:\n\n- Ovridory retrofit came before the Trevuade changeover.\n- Traymoor fit-out came before the Ondrey audit.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1346,10 +1357,10 @@
       "tme-tem-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey happened in between: the Fenn commissioning came first, then the Harrow survey, then the Yarrow move.",
-        "v9": false,
-        "v9_answer": "The conversations don\u2019t say. They only state that the Harrow survey was after the Fenn commissioning, and that the Kessel handover was after the Yarrow move; they don\u2019t establish what, if anything, happened between the Fenn commissioning and the Yarrow move.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "The Vreskade survey happened in between.",
+        "v9": true,
+        "v9_answer": "The Vreskade survey happened in between.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1359,10 +1370,10 @@
       "tme-tem-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Vance inspection happened in between: the Wrenfield sign-off came first, then the Vance inspection, and the Dunmow changeover came after that.",
+        "v8_answer": "The Draimune inspection happened in between: the Wrenfield sign-off came first, then the Draimune inspection, then the Trevuade changeover.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say plainly what happened between the Wrenfield sign-off and the Dunmow changeover.\n\nThey do say that the Vance inspection was done well ahead of the Dunmow changeover, but they do not state its relation to the Wrenfield sign-off.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "The conversations do not say what, if anything, happened between the Wrenfield sign-off and the Trevuade changeover.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1372,9 +1383,9 @@
       "tme-tem-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining happened in between: the records say it came after the Bellamy rewiring and before the Harrow survey.",
+        "v8_answer": "The Ondrey audit happened in between.",
         "v9": true,
-        "v9_answer": "The Calder relining happened in between: it was after the Bellamy rewiring and before the Harrow survey.",
+        "v9_answer": "The Ondrey audit happened in between: the Traymoor fit-out was completed first, then the Ondrey audit, and later the Draimune inspection.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1385,10 +1396,10 @@
       "tme-tem-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Vance inspection happened in between.",
-        "v9": true,
-        "v9_answer": "The Vance inspection happened in between.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "The Trevuade changeover happened in between: the Skarvarn relining preceded the Trevuade changeover, and the Trevuade changeover preceded the Ovridory retrofit.",
+        "v9": false,
+        "v9_answer": "The conversations do not say what happened between the Ovridory retrofit and the Skarvarn relining.\n\nThey only state that the Ovridory retrofit happened before the Quorlory rewiring, and that the Trevuade changeover preceded the Ovridory retrofit. Skarvarn relining is not placed in the timeline.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3": true,
@@ -1398,9 +1409,9 @@
       "tme-tem-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out happened in between: the Ondrey audit came before the Traymoor fit-out, and the Traymoor fit-out came before the Dunmow changeover.",
+        "v8_answer": "The Trevuade changeover happened in between: the notes say it came after the Skarvarn relining and before the Wrenfield sign-off.",
         "v9": false,
-        "v9_answer": "The conversations do not say what happened between the Dunmow changeover and the Ondrey audit.\n\nThey do say the Dunmow changeover came before the Esker retrofit, but they do not place the Ondrey audit in that sequence.",
+        "v9_answer": "The conversations don’t say what happened between the Skarvarn relining and the Wrenfield sign-off.\n\nThey only say:\n- the Trevuade changeover happened after the Skarvarn relining;\n- the Ovridory retrofit happened after the Wrenfield sign-off.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1411,9 +1422,9 @@
       "tme-tem-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Dunmow changeover happened in between: the Traymoor fit-out came before the Dunmow changeover, and the Wrenfield sign-off came after it.",
+        "v8_answer": "The Trevuade changeover happened in between: Quorlory rewiring → Trevuade changeover → Ondrey audit.",
         "v9": true,
-        "v9_answer": "The conversations indicate that the **Dunmow changeover** happened before the **Wrenfield sign-off**. So, between the **Traymoor fit-out** and the **Wrenfield sign-off**, the event mentioned was the **Dunmow changeover**.",
+        "v9_answer": "The Trevuade changeover happened in between.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1424,199 +1435,184 @@
       "tme-tem-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey happened most recently.",
+        "v8_answer": "The **Plennell move** happened most recently.",
         "v9": true,
-        "v9_answer": "The Harrow survey happened most recently.",
+        "v9_answer": "The Plennell move happened most recently.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Vance inspection happened most recently.",
+        "v8_answer": "The Ovridory retrofit happened most recently.",
         "v9": true,
-        "v9_answer": "The Vance inspection happened most recently.",
+        "v9_answer": "The **Ovridory retrofit** happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Calder relining** happened most recently.\n\nThe conversations give this order:\n\n**Ondrey audit \u2192 Wrenfield sign-off \u2192 Dunmow changeover \u2192 Fenn commissioning \u2192 Traymoor fit-out \u2192 Calder relining**.",
+        "v8_answer": "The **Ondrey audit** happened most recently.\n\nThe conversations give this chain:\n\n**Plennell move → Ovridory retrofit → Quorlory rewiring → Zethisk handover → Wrenfield sign-off → Ondrey audit**.",
         "v9": false,
-        "v9_answer": "The conversations do not say. They mention the Calder relining, but give no timing for the Fenn commissioning or the Ondrey audit relative to it, so the most recent of the three cannot be determined.",
+        "v9_answer": "The Plennell move happened most recently.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off happened most recently.",
-        "v9": true,
-        "v9_answer": "The Wrenfield sign-off happened most recently.",
-        "v9_gold_in_context": 3,
+        "v8_answer": "The **Wrenfield sign-off** happened most recently.\n\nFrom the notes:\n\n- The **Vreskade survey** came later than the **Plennell move**.\n- The **Quorlory rewiring** came after the **Vreskade survey**.\n- The **Quorlory rewiring** came before the **Wrenfield sign-off**.\n\nSo the order is: **Plennell move ",
+        "v9": false,
+        "v9_answer": "The Quorlory rewiring happened most recently.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Harrow survey happened most recently.",
-        "v9": false,
-        "v9_answer": "The conversations do not say which of the Kessel handover, the Yarrow move, and the Harrow survey happened most recently.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "The Vreskade survey happened most recently.",
+        "v9": true,
+        "v9_answer": "The Vreskade survey happened most recently.",
+        "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Yarrow move** happened most recently.\n\nThe notes give the chain: **Kessel handover \u2192 Bellamy rewiring \u2192 Calder relining \u2192 Fenn commissioning \u2192 Wrenfield sign-off \u2192 Yarrow move**.",
+        "v8_answer": "The Plennell move happened most recently.",
         "v9": false,
-        "v9_answer": "The conversations do not say which of the Fenn commissioning, the Kessel handover, and the Yarrow move happened most recently.",
-        "v9_gold_in_context": 3,
+        "v9_answer": "The conversations do not plainly say which of the Janduisk commissioning, the Zethisk handover, and the Plennell move happened most recently.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Wrenfield sign-off** happened most recently.",
-        "v9": false,
-        "v9_answer": "The conversations don\u2019t say plainly.\n\nThey do say the Calder relining happened before the Wrenfield sign-off, but they don\u2019t give enough information about the Traymoor fit-out to determine which of the three was most recent.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-tem-043": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "The **Wrenfield sign-off** happened most recently.",
-        "v9": false,
-        "v9_answer": "The conversations show that the Wrenfield sign-off happened after the Vance inspection, but they do not say when the Yarrow move happened. So the most recent of the three cannot be determined from the record.",
-        "v9_gold_in_context": 3,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-tem-044": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "The **Yarrow move** happened most recently.\n\nThe notes imply: **Kessel handover \u2192 Fenn commissioning \u2192 Traymoor fit-out \u2192 Esker retrofit \u2192 Wrenfield sign-off \u2192 Yarrow move**.",
-        "v9": false,
-        "v9_answer": "Cannot determine from the conversations.\n\nThey say the Esker retrofit happened before the Wrenfield sign-off, and the Yarrow move came after the Wrenfield sign-off \u2014 so the Yarrow move was more recent than the Esker retrofit. But they do not say where the Kessel handover fits in.",
-        "v9_gold_in_context": 3,
-        "v2_hits": 0,
-        "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-tem-045": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "The **Ondrey audit** happened most recently.",
+        "v8_answer": "The Ondrey audit happened most recently.",
         "v9": true,
         "v9_answer": "The Ondrey audit happened most recently.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
+        "v6": null
+      },
+      "tme-tem-043": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The **Trevuade changeover** happened most recently.",
+        "v9": true,
+        "v9_answer": "The Trevuade changeover happened most recently.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-tem-044": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The **Plennell move** happened most recently.\n\nThe notes give this sequence:\n\n**Zethisk handover → Ondrey audit → Trevuade changeover → Vreskade survey → Quorlory rewiring → Plennell move**.",
+        "v9": false,
+        "v9_answer": "The conversations don’t contain enough information to say.\n\nThey do establish:\n\n- Vreskade survey happened before the Quorlory rewiring.\n- Quorlory rewiring happened before the Plennell move.\n\nSo the Plennell move was later than the Vreskade survey.\n\nBut they do not place the Zethisk handover relati",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-tem-045": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The **Plennell move** happened most recently.",
+        "v9": true,
+        "v9_answer": "The Plennell move happened most recently.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
         "v6": null
       },
       "tme-tem-046": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Dunmow changeover** happened most recently.",
-        "v9": false,
-        "v9_answer": "The Fenn commissioning happened most recently.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 5,
-        "v2": false,
-        "v3": true,
-        "ablation_samples": 3,
+        "v8_answer": "The Trevuade changeover happened most recently.",
+        "v9": true,
+        "v9_answer": "The Trevuade changeover happened most recently.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
         "v6": null
       },
       "tme-tem-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Fenn commissioning happened most recently.",
+        "v8_answer": "The **Plennell move** happened most recently.\n\nOrder implied by the notes: **Traymoor fit-out → Skarvarn relining → Ondrey audit → Draimune inspection → Vreskade survey → Plennell move**.",
         "v9": false,
-        "v9_answer": "Cannot determine from the conversations.\n\nThey say the Ondrey audit happened before the Wrenfield sign-off, and the Wrenfield sign-off came before the Fenn commissioning \u2014 so Fenn was later than Ondrey. But they do not place the Esker retrofit relative to either Fenn commissioning or Ondrey audit.",
-        "v9_gold_in_context": 4,
+        "v9_answer": "The conversations do not determine that plainly.\n\nThey do say:\n\n- The Plennell move happened after the Vreskade survey.\n- The Vreskade survey happened after the Draimune inspection.\n\nSo the Plennell move was more recent than the Draimune inspection. But there is no stated ordering between the Traymo",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Esker retrofit happened most recently.",
-        "v9": true,
-        "v9_answer": "The Esker retrofit happened most recently.",
-        "v9_gold_in_context": 3,
+        "v8_answer": "The **Ondrey audit** happened most recently.\n\nThe notes give the sequence: **Skarvarn relining → Quorlory rewiring → Trevuade changeover → Ondrey audit**.",
+        "v9": false,
+        "v9_answer": "The conversations do not say enough to determine that.\n\nThey establish that the Trevuade changeover happened before the Ondrey audit, but they do not place the Skarvarn relining relative to either of those.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Fenn commissioning** happened most recently.",
-        "v9": true,
-        "v9_answer": "The **Fenn commissioning** happened most recently.",
-        "v9_gold_in_context": 4,
+        "v8_answer": "The **Trevuade changeover** happened most recently.\n\nOrder given by the notes: **Zethisk handover → Vreskade survey → Skarvarn relining → Janduisk commissioning → Trevuade changeover**.",
+        "v9": false,
+        "v9_answer": "The conversations establish that:\n\n- Skarvarn relining happened before Janduisk commissioning.\n- Trevuade changeover happened after Janduisk commissioning.\n\nSo Trevuade changeover happened after Skarvarn relining.\n\nBut there is no timing information given for the Zethisk handover relative to either ",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       },
       "tme-tem-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Calder relining happened most recently.\n\nOrder implied by the notes: Kessel handover \u2192 Vance inspection \u2192 Fenn commissioning \u2192 Esker retrofit \u2192 Wrenfield sign-off \u2192 Calder relining.",
+        "v8_answer": "The **Quorlory rewiring** happened most recently.\n\nOrder implied by the conversations: **Plennell move → Ondrey audit → Traymoor fit-out → Zethisk handover → Janduisk commissioning → Quorlory rewiring**.",
         "v9": false,
-        "v9_answer": "The conversations show that the **Esker retrofit happened after the Kessel handover**.\n\nThey do **not** say when the **Calder relining** happened relative to either of those. So the most recent of the three cannot be determined from the record.",
+        "v9_answer": "The conversations don’t contain enough information to determine that.\n\nThey do say the **Quorlory rewiring** happened after the **Zethisk handover**. But they don’t give any timing for the **Plennell move**, so we can’t say which of the three happened most recently.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": true,
-        "ablation_samples": 3,
+        "v3": null,
         "v6": null
       }
     },
-    "probed_corpus_sha256": "31d26e60fd21d00e9965d3f9f6c1a732c5d1a3007e34e19605efde619803eb96"
+    "probed_corpus_sha256": "124458d03896a7e952c67883eb747b1da117370e5d25d5caf54cbb569ec3057a"
   }
 }
