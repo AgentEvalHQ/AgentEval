@@ -744,7 +744,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:30:47Z",
+    "run_at": "2026-08-30T14:44:27Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -764,7 +764,14 @@
       "temperature": "provider default",
       "applicable": 60,
       "passed": 60,
-      "failed": []
+      "failed": [],
+      "closed_choice": {
+        "questions": 0,
+        "by_candidates": {},
+        "chance_floor_exceeds_reject_line": false,
+        "passes_not_evidence_of_non_inferability": 0,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
     },
     "v3_gold_ablated": {
       "applicable": 60,

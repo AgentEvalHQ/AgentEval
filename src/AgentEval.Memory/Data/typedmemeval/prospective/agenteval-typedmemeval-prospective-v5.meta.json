@@ -729,7 +729,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:30:47Z",
+    "run_at": "2026-08-30T14:44:27Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -749,7 +749,16 @@
       "temperature": "provider default",
       "applicable": 50,
       "passed": 50,
-      "failed": []
+      "failed": [],
+      "closed_choice": {
+        "questions": 21,
+        "by_candidates": {
+          "2": 21
+        },
+        "chance_floor_exceeds_reject_line": true,
+        "passes_not_evidence_of_non_inferability": 21,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
     },
     "v3_gold_ablated": {
       "applicable": 29,
@@ -1011,6 +1020,7 @@
         "v9_answer": "No. You started the 30-day Lumen trial on 2026/04/28, so it would have ended around 2026/05/28. Today is 2026/06/03.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1023,6 +1033,7 @@
         "v9_answer": "Yes. You said on 2026/02/16 that you start at Halcyon Systems on the first Monday of the next month, which was 2026/03/02. Current date is 2026/04/20, so you should have started already.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1050,6 +1061,7 @@
         "v9_answer": "I don’t have enough information from those conversations to tell whether your car service is due yet. They mention “service, car, yet” being on someone’s mind, but no actual due date is given.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1062,6 +1074,7 @@
         "v9_answer": "No. You said Meridian Health starts on the first Monday of next month, which is June 1, 2026. Today is May 27, 2026.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1074,6 +1087,7 @@
         "v9_answer": "No. The visa application went in on 2026/04/14, and they said to allow eight weeks for a decision. As of 2026/05/26, it has been six weeks, so you would not necessarily expect to have heard back yet. Eight weeks would be around 2026/06/09.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1086,6 +1100,7 @@
         "v9_answer": "No. The flat inspection was booked for a fortnight from 2026/03/06, i.e. around 2026/03/20, so by 2026/04/02 it has already passed.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1098,6 +1113,7 @@
         "v9_answer": "No. You joined the rowing club on 2026/02/24, and the members’ rate only kicks in after six months, so it would be available around 2026/08/24.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1110,6 +1126,7 @@
         "v9_answer": "No. The allotment lease renewal reminder has not come due yet.\n\nIt is due on **2026/05/30 (Sat)**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1122,6 +1139,7 @@
         "v9_answer": "Yes. The allotment lease renewal reminder was due on **2026/05/30 (Sat)**, so it has already come due.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1134,6 +1152,7 @@
         "v9_answer": "The earlier conversations mention “booking, boiler, service, due,” but they do not give a due date for it.\n\nSo I can’t tell from the record whether it has come due yet, or what date it is/was due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1146,6 +1165,7 @@
         "v9_answer": "The conversations mention a reminder/concern: “booking, boiler, service, due,” but they never give a due date for it.\n\nSo I can’t tell whether it has come due yet, or what date it is/was due.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1158,6 +1178,7 @@
         "v9_answer": "No. It has not come due yet.\n\nThe reminder to send the quarterly figures to Priya was set on 2026/04/17 for seven weeks later, so it is due on 2026/06/05.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1170,6 +1191,7 @@
         "v9_answer": "Yes. The reminder about sending the quarterly figures to Priya was due on **2026/06/05 (Fri)**, so it has already come due.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1182,6 +1204,7 @@
         "v9_answer": "The conversations mention “bike, come, reminder, chain” repeatedly, but they do **not** state any due date for a bike-chain reminder.\n\nSo I can’t tell whether it has come due yet, or what date it is/was due, from the record provided.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1194,6 +1217,7 @@
         "v9_answer": "The conversations mention “bike, come, reminder, chain,” but they do **not** state any due date for a bike-chain reminder.\n\nSo I can’t tell whether it has come due yet, and no due date is available from the record.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1206,6 +1230,7 @@
         "v9_answer": "Yes. The climbing-wall pass is still valid on 2026/07/25.\n\nIt was picked up on 2026/03/27 and was valid for eighteen weeks, so it runs out on 2026/07/31.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1218,6 +1243,7 @@
         "v9_answer": "No. The climbing-wall pass is no longer valid. It was picked up on 2026/03/27 and was valid for 18 weeks, so it ran out on 2026/07/31.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1230,6 +1256,7 @@
         "v9_answer": "Yes. The ferry multi-trip ticket is still valid on 2026/06/08.\n\nIt was picked up on 2026/03/22 and was valid for twelve weeks, so it runs out on 2026/06/14.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1242,6 +1269,7 @@
         "v9_answer": "No. The ferry multi-trip ticket is no longer valid.\n\nIt was bought on **2026/03/22** and was valid for **twelve weeks**, so it ran out on **2026/06/14**.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1254,6 +1282,7 @@
         "v9_answer": "The conversations do not say when the museum membership runs or ran out. They only contain the repeated note “out, museum, membership, valid,” so I can’t determine whether it is still valid on 2026/06/01.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null
@@ -1266,6 +1295,7 @@
         "v9_answer": "The conversations only mention: “out, museum, membership, valid.”\n\nThey do not say when the museum membership runs out, or whether it is still valid on 2026/06/13.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
+        "v2_candidates": 2,
         "v2": true,
         "v3": null,
         "v6": null

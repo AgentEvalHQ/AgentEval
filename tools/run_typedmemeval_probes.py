@@ -574,6 +574,52 @@ def closed_choice_k(question: str) -> int | None:
     return None
 
 
+def _v2_closed_choice_disclosure(records: list[dict]) -> dict:
+    """What V2's verdict does and does not establish on questions that name their own candidates.
+
+    THE ARM IS SOUND AND ITS CLAIM IS TOO BROAD. V2 asks the model each question with no haystack
+    and counts how often it lands gold. On an OPEN question chance is ~0, so any hit is signal and
+    the arm does exactly what it says. On a CLOSED-CHOICE question the model can pick from the
+    candidates the question itself names, so it reaches gold at 1/k without evidence -- and the
+    reject line of 2-in-10 sits BELOW that floor (0.50 at k=2, 0.33 at k=3).
+
+    So a pass here is not evidence of non-inferability. Measured across 7540 cached V2 answers,
+    97.9% are explicit declines -- "I have no way of knowing" -- under a prompt that ends "If you
+    have no way of knowing, say so plainly." The arm is recording that the model DID NOT VOLUNTEER
+    AN ANSWER, which is a real and useful property (it is what caught a milestone name colliding
+    with Yarrow Shipbuilders), but it is not the guessability question.
+
+    THE THRESHOLD WAS NOT MADE CHANCE-AWARE, AND THAT IS DELIBERATE. Raising the bar to the
+    statistically correct value (9-of-10 at k=2, 7-of-10 at k=3) was tested against the leaks
+    actually on record: it keeps tme-tem-013 at 10/10 and MISSES tme-tem-046 at 5/10, whose 5 hits
+    are consistent with guessing (p=0.213) but were not guessing -- the model was reasoning from
+    real-world knowledge and landing right about half the time. Calibrating the bar would trade a
+    real detection for a tidier statistic. The naive threshold is more sensitive precisely BECAUSE
+    the model declines: against a decliner, any hit at all means it volunteered.
+
+    So the number stays and the CLAIM narrows, which is what this block records. Compare with V3,
+    where the same arithmetic produced the opposite disposition -- there the sample budget was 3,
+    no threshold could clear the floor, and "not decidable" was the honest verdict.
+    """
+    closed = [r for r in records
+              if r.get("v2") is not None and r.get("v2_candidates") is not None]
+    passes = [r for r in closed if r.get("v2") is True]
+    return {
+        "questions": len(closed),
+        "by_candidates": {str(k): sum(1 for r in closed if r["v2_candidates"] == k)
+                          for k in sorted({r["v2_candidates"] for r in closed})},
+        "chance_floor_exceeds_reject_line": bool(closed),
+        "passes_not_evidence_of_non_inferability": len(passes),
+        "reading": (
+            "These questions name their own candidates, so a no-evidence model reaches gold at "
+            "1/k -- above the 2-in-10 reject line. A PASS here records that the model did not "
+            "volunteer the answer, not that the question is non-inferable. The threshold is "
+            "deliberately NOT chance-corrected: the correct bar would have missed a known leak "
+            "whose hits were statistically indistinguishable from guessing. Read alongside "
+            "tools/validate_v2_chance_floor.py."),
+    }
+
+
 def _v3_decidable(gold: str, already_known: str) -> bool:
     """Whether an ablation probe can tell "reached the answer" from "said nothing" for this gold.
 
@@ -738,6 +784,11 @@ def probe_question(entry: dict, vertical: str) -> dict:
                          already_known=f"{question} {date}"):
                 hits += 1
         record["v2_hits"] = hits
+        # WHAT A V2 VERDICT IS WORTH depends on whether the question hands the model its
+        # candidates, so the reader gets k rather than having to infer it from the wording.
+        v2_k = closed_choice_k(question)
+        if v2_k is not None:
+            record["v2_candidates"] = v2_k
         # Silence is only disqualifying where it could CHANGE the verdict. V2 draws ten samples and
         # fails on V2_REJECT_AT hits, so a silent draw matters only if the hits already seen plus
         # the silent ones could have reached that threshold; below it the verdict stands on the
@@ -1005,6 +1056,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "reject_at_hits": V2_REJECT_AT,
             "temperature": "provider default",
             **tally("v2"),
+            "closed_choice": _v2_closed_choice_disclosure(records),
         },
         "v3_gold_ablated": {
             **tally("v3"),

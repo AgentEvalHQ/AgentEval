@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **V2 now ships the caveat that makes its own number readable — and the threshold was deliberately
+  NOT "fixed".** The arm asks each question with no haystack and rejects at 2 hits in 10. On an
+  **open** question chance is ~0, so any hit is signal and the arm does exactly what it claims. On a
+  **closed-choice** question the model can pick from the candidates the question itself names, so it
+  reaches gold at `1/k` without evidence — and the reject line of 0.20 sits **below that floor**
+  (0.50 at k=2, 0.33 at k=3). **71 questions** are in that position: temporal 35, prospective 21,
+  episodic 15.
+
+  Measured across **7,540 cached V2 answers, 97.9% are explicit declines** — *"I have no way of
+  knowing"* — under a prompt that ends *"If you have no way of knowing, say so plainly."* So a pass
+  records that the model **did not volunteer an answer**, which is real and useful, and is not the
+  guessability question.
+
+  **The obvious repair was tested and rejected on evidence.** Raising the bar to the statistically
+  correct value — 9-of-10 at k=2, 7-of-10 at k=3 — keeps `tme-tem-013` (10/10) and **misses
+  `tme-tem-046`** (5/10), a question we know was leaking: the model was reasoning from real-world
+  knowledge about Yarrow Shipbuilders and landing right about half the time. Its 5 hits are
+  statistically indistinguishable from guessing (p=0.213) and were not guessing. **Calibrating the
+  bar would trade a real detection for a tidier statistic** — the naive threshold is *more*
+  sensitive precisely because the model declines, so against a decliner any hit means it
+  volunteered.
+
+  So the number stays and **the claim narrows**. Every sidecar now carries a `closed_choice` block
+  with the per-question candidate count and how many passes are **not evidence of
+  non-inferability**. Compare with V3, where the identical arithmetic produced the *opposite*
+  disposition: there the budget was 3 samples, no threshold could clear the floor, and *not
+  decidable* was the honest verdict. Same rule, different budgets, different answers — which is why
+  it had to be derived per arm rather than applied as a policy.
+
+  **No corpus sha moves, no verdict changes, zero model calls** — the hit counts were already
+  recorded, because V2 never short-circuited.
+
 - **V3's leak threshold is now read against the chance floor, and 24 of its passes were never
   earned.** The arm draws 3 ablation samples and condemned a question on a **single** hit. On a
   closed-choice question that is not a measurement: the question hands the model its candidates, so
