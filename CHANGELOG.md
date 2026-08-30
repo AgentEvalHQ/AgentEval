@@ -156,6 +156,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   picked from the air would trade a measured property for an invented one. The point is the number
   is published and moves under review.
 
+  **And "load-bearing" is now measured, not asserted** — `tools/measure_padding_value.py`. Arithmetic
+  as shipped scores **0 of 45 features over the 0.75 separability bar**; padding-free it scores
+  **12**, topping out at 0.898. `uppercase_density` 0.598 → 0.898, `assistant_length_chars`
+  0.523 → 0.858. So the volume is doing its job and **no padding redesign is proposed.**
+
+  What the same numbers do show is *where* the pressure sits: every large mover is an **uppercase**
+  or **assistant-length** feature. Gold user turns carry proper nouns and gold assistant turns are
+  short acknowledgements, while filler is long, chatty and lowercase — padding pays in bulk text for
+  a mismatch living in two specific axes. Whether those could be equalised directly is a real design
+  question this does *not* answer, and no claim is made that it would work. The tool is meant as a
+  **gate on change**: any proposal that alters padding shows its numbers here before the corpus moves.
+
 ## [0.30.0-beta] - 2026-08-29
 
 
