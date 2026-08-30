@@ -160,6 +160,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Forgetting control. That is a declared corpus revision, not a side effect of a reporting fix, and
   it is queued rather than smuggled into a release the consuming project is about to probe.
 
+  **The same tool now publishes per-shape coverage for the five verticals whose sidecars omit it** —
+  all 27 shapes. Two are out of the `[0.50, 0.90]` band and **declared nowhere**, because their
+  verticals publish no per-shape figure at all:
+
+  | shape | realised | |
+  |---|---|---|
+  | `episodic/list-order` | **0.275** | well below band |
+  | `forgetting/still-valid` | **0.467** | below band |
+
+  `episodic/list-order` is the sharper one: a reference retriever surfaces roughly a quarter of its
+  gold, so V9 there is dominated by retrieval failure rather than reasoning — and no reader of the
+  vertical mean (0.682) could tell. Three further shapes sit at or outside the band and are **not**
+  defects: `workingmemory/distance-8` and `distance-15` at 1.000 are a **declared** ladder where
+  coverage is meant to fall with distance, and `forgetting/never-known` at 1.000 is the G=0 constant
+  above. The tool says so in its own output rather than leaving a reader to infer it.
+
 - **A signal-density instrument — and it says 85.7% of the family is scaffolding, not arithmetic's
   problem alone.** `tools/measure_signal_density.py`.
 
