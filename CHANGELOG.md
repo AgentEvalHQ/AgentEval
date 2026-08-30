@@ -79,6 +79,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that edit was built against the imagined failure; the regression landed on existing cases never
   enumerated.
 
+- **The padding stripper ate content.** `_templates()` matched a padding base then consumed to the
+  end of the sentence, and `_PAD_SHORT` holds bare words (`Still.`, `Right.`, `Fine.`) — so `Still`
+  swallowed all of *"Still the same recycling sack size, for the record: Selwick Common."* Three
+  forgetting sessions stripped to nothing, which is what exposed it.
+
+  The fix is **exact rather than a tighter heuristic**. `_pad_block` composes a padding sentence as a
+  whole base with a tail spliced in before the period, at most twice
+  (`pieces[index] = f"{pieces[index][:-1]}, {tail}."`), so every padding sentence is precisely
+  `BASE(, TAIL){0,2}.` and the pattern now says that, with the tail alternation built from the
+  emitter's own banks. **A stripper must only remove what the emitter can emit.**
+
+  Arithmetic padding share `85.8% → 85.5%`; pure-padding sessions family-wide `3 → 0`. Diagnostic
+  cell hashes move with it — Cell B `eaf5f32cf7e72fea…`, Cell C `d3d0acbab75f0bff…`.
+
 ### Added
 
 - **A chance-floor audit for closed-choice questions — and it says 69 of our V2 passes were never
@@ -117,6 +131,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disk. This is the fourth confirmed shape of the gate self-examination rule, after element-missing,
   bar-supplied and diluted-denominator: **floor-below-chance** — the reject line sits beneath the
   item's structural floor, so the gate separates reference-model behaviour rather than corpora.
+
+- **A signal-density instrument — and it says 85.7% of the family is scaffolding, not arithmetic's
+  problem alone.** `tools/measure_signal_density.py`.
+
+  Nothing in the family asked what fraction of the text is *content*. Separability, coverage,
+  answerability and interference are all properties of whether a question can be **answered**; none
+  of them looks at the ratio. That hole cost the consuming project two false findings in a week,
+  both of which root-caused our corpus onto their extractor.
+
+  | | chars | padding | ledger voice |
+  |---|---|---|---|
+  | family | 7,111,367 | **85.7%** | — |
+  | range | | prospective 82.4% … semantic 88.5% | |
+  | arithmetic | 780,138 | 85.5% | **77.5%** of value-bearing sentences |
+  | every other vertical | | | **0.0%** |
+
+  *Ledger voice* is a bare common-noun subject carrying a value directly — `Payment logged against
+  X: $414.30` — a fine English sentence for a human and a **type, not an instance**, to anything
+  building triples. It is arithmetic's alone, which bounds that defect exactly.
+
+  Deliberately **not a gate and not a threshold**: padding is load-bearing — it equalises length,
+  punctuation and role sequence so V7 cannot separate gold from filler on shape alone — so a ceiling
+  picked from the air would trade a measured property for an invented one. The point is the number
+  is published and moves under review.
 
 ## [0.30.0-beta] - 2026-08-29
 
