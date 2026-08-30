@@ -245,13 +245,15 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.700 | 1 (×46), 2 (×4) |
+| Prospective | 50 | 0.617 | 1 (×29), 2 (×13), 3 (×4), 4 (×4) |
 | Episodic | 50 | 0.682 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
-| Arithmetic | 50 | 0.636 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| Arithmetic | 50 | 0.758 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
 | WorkingMemory | 60 | 0.867 | 1 (×60) |
-| Forgetting | 50 | 0.670 | 0 (×15), 2 (×35) |
+| Forgetting | 50 | 0.629 | 0 (×15), 2 (×35) |
 | Bitemporal | 60 | 0.800 | 1 (×60) |
-| Temporal | 50 | 0.900 | 1 (×20), 2 (×30) |
+| Temporal | 50 | 0.785 | 1 (×20), 2 (×15), 3 (×5), 4 (×5), 5 (×5) |
+| Semantic | 50 | 0.677 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
+| Conjunction | 50 | 0.534 | 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -326,13 +328,15 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 45/45 | — | 48/50 | 34/50 | +0.30 |
-| Episodic | 48/50 | — | 50/50 | 50/50 | — | 50/50 | 30/50 | +0.36 |
-| Arithmetic | 49/50 | — | 50/50 | 50/50 | 50/50 | 43/50 | 18/50 | +0.62 |
+| Prospective | 50/50 | 19/19 | 50/50 | 29/29 | — | 36/50 | 23/50 | +0.54 |
+| Episodic | 50/50 | — | 50/50 | 35/35 | — | 50/50 | 30/50 | +0.40 |
+| Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 19/50 | +0.62 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 53/60 | +0.12 |
-| Forgetting | 35/35 | 15/15 | 35/35 | 35/35 | 20/35 | 35/35 | 20/35 | +0.43 |
-| Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.20 |
-| Temporal | 50/50 | — | 49/50 | 30/30 | — | 50/50 | 41/50 | +0.18 |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/35 | 31/35 | 21/35 | +0.37 |
+| Bitemporal | 59/60 | 29/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.18 |
+| Temporal | 50/50 | — | 50/50 | 30/30 | — | 50/50 | 33/50 | +0.34 |
+| Semantic | 50/50 | — | 50/50 | 48/50 | — | 48/50 | 34/50 | +0.32 |
+| Conjunction | 50/50 | — | 50/50 | 49/50 | — | 50/50 | 18/50 | +0.64 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**

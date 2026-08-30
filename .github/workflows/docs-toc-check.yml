@@ -102,3 +102,17 @@ jobs:
         if: always()
         working-directory: tools
         run: python3 validate_typedmemeval_difficulty.py --check
+
+      # The published corpus tables are GENERATED from the shipped sidecars, and nothing ran the
+      # generator's --check. It drifted for THREE releases: getting-started.md was last synced at
+      # 0.27.0-beta and still quoted arithmetic at 0.636 (actually 0.758), temporal at 0.900
+      # (0.785), and omitted Semantic and Conjunction entirely -- two whole verticals that shipped
+      # in 0.30.0-beta and never appeared in the public tables at all.
+      #
+      # The check existed and returned a correct non-zero exit the whole time. Nobody called it.
+      # A gate that is written but unwired is indistinguishable from one that was never written,
+      # except that it reads as covered.
+      # always(), for the same reason as the steps around it.
+      - name: Check the published TypedMemEval tables match the shipped corpora
+        if: always()
+        run: python3 tools/sync_typedmemeval_docs.py --check
