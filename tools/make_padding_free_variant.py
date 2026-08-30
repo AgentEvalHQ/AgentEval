@@ -64,19 +64,37 @@ def _templates() -> list[re.Pattern[str]]:
     Built from the banks themselves rather than typed out, so a bank edit cannot silently leave a
     template unstripped - the same reason the corpus gates read their expectations from code.
 
-    PADDING IS COMPOSED, NOT EMITTED WHOLE. The equaliser appends tails to a base sentence to hit
-    its character and punctuation targets, so a verbatim template match leaves most of it behind:
-    a first version of this matched templates exactly, stripped only 62% of the speech-act phrases
-    and left orphaned ", , ." in the text. Each pattern therefore matches the template's CORE and
-    consumes to the end of the sentence it sits in.
+    PADDING IS COMPOSED, NOT EMITTED WHOLE, AND THE COMPOSITION IS EXACT. `_pad_block` picks whole
+    sentences from the four base banks and then lengthens one by splicing a tail in before its
+    period, at most twice:
+
+        pieces[index] = f"{pieces[index][:-1]}, {tail}."
+
+    So every padding sentence is precisely `BASE(, TAIL){0,2}.` and the pattern below says exactly
+    that. Two earlier versions did not, and both were wrong in a way worth recording:
+
+      1. Matching templates VERBATIM stripped only 62% of the speech-act phrases, because a tailed
+         sentence no longer equals its base, and left orphaned ", , ." behind.
+      2. Matching the base and then consuming to the end of the sentence (`core + [^.]*\\.?`)
+         over-corrected and ATE CONTENT. `_PAD_SHORT` holds bare words - 'Still.', 'Right.',
+         'Fine.' - so "Still" swallowed the whole of "Still the same recycling sack size, for the
+         record: Selwick Common." Three forgetting sessions stripped to nothing, which is what
+         exposed it; the real cost was that the padding share it reported was an over-estimate.
+
+    The rule the second version broke: a stripper must only remove what the emitter can EMIT. The
+    tail alternation is the emitter's own, so content can never sit between a base and its period.
     """
-    banks = (tmc._PAD_PLAIN + tmc._PAD_SHORT + tmc._PAD_NAMED + tmc._PAD_DENSE
-             + tmc._PAD_TAILS + tmc._PAD_NAME_TAILS + tmc._PAD_PUNCT_TAILS)
+    tails = tmc._PAD_TAILS + tmc._PAD_NAME_TAILS + tmc._PAD_PUNCT_TAILS
+    alternatives = sorted((re.escape(t).replace(r"\{n\}", NAME) for t in tails),
+                          key=len, reverse=True)
+    tail_group = rf"(?:,\s*(?:{'|'.join(alternatives)}))"
+    bases = tmc._PAD_PLAIN + tmc._PAD_SHORT + tmc._PAD_NAMED + tmc._PAD_DENSE
     patterns = []
-    for entry in banks:
-        core = re.escape(entry.rstrip(" .")).replace(r"\{n\}", NAME).replace(r"\{m\}", NAME)
-        patterns.append(re.compile(core + r"[^.]*\.?"))
-    # Longest first: a short tail that is a prefix of a longer one must not win and leave a stub.
+    for entry in bases:
+        stem = re.escape(entry.rstrip(".")).replace(r"\{n\}", NAME).replace(r"\{m\}", NAME)
+        patterns.append(re.compile(stem + tail_group + f"{{0,{tmc._PAD_MAX_TAILS_PER_SENTENCE}}}"
+                                   + r"\s*\."))
+    # Longest first, so a base that prefixes another cannot win and leave a stub behind.
     return sorted(patterns, key=lambda p: -len(p.pattern))
 
 
