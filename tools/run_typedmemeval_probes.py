@@ -517,37 +517,61 @@ _NEGATIVE_GOLD = re.compile(
     re.IGNORECASE)
 
 
-#: Shapes whose answer is one of a NAMED, closed set small enough that guessing beats the probe.
-#:
-#: An ablation probe cannot tell "reached the evidence" from "flipped a coin" when the question hands
-#: the model the candidates. Temporal's `occurrence-order` names two events and asks which came
-#: first, so a model with the gold removed is right half the time by construction -- and it measured
-#: 6 leaks in 20, BELOW the 50% chance rate, which is the signature of guessing rather than of a
-#: leak. Reporting those as leaks would assert something this probe cannot see.
-#:
-#: The precedent is ADR-026's: Forgetting's two-way shape is bounded by V2 (ten zero-context samples)
-#: rather than by V3, for exactly this reason. Scoped by SHAPE rather than by vertical, because it is
-#: a property of the question form and the next vertical with a two-way shape will inherit it.
-_V3_GUESSABLE_SHAPES = {"occurrence-order", "recency"}
+def v3_required_hits(k: int | None, samples: int = None) -> int | None:
+    """Hits needed before V3 may call a leak, given a question that offers `k` candidates.
 
-#: WHY THESE TWO, DERIVED RATHER THAN LISTED BY HAND. V3 draws ABLATION_SAMPLES and condemns a
-#: question on a SINGLE hit, so against a model that simply guesses among the k candidates the
-#: question names, the false-failure rate is 1 - (1 - 1/k)**ABLATION_SAMPLES:
-#:
-#:     k=2 (occurrence-order)  0.875     even 3-of-3 leaves p=0.125, so NO threshold decides it
-#:     k=3 (recency)           0.704     3-of-3 would give p=0.037, but the arm stops at one hit
-#:
-#: `recency` was missing and it cost a real investigation: a clean regeneration took temporal's V3
-#: from 30/30 to 26/30, and all four "failures" were recency questions. Nothing had leaked -- the
-#: model guessed, which is what a three-way question invites. The previous run passing 30/30 was
-#: luck, not evidence, because the model usually declines rather than guessing.
-#:
-#: THE PROPER FIX IS A CHANCE-AWARE THRESHOLD, not a longer list: require the smallest h with
-#: P(X>=h | 1/k) < 0.05 and call the shape undecidable when no h <= ABLATION_SAMPLES qualifies --
-#: which DERIVES this set instead of curating it, and would keep recency measured at 3-of-3 rather
-#: than dropping it. That changes V3 semantics for every closed-choice shape in the family
-#: (episodic attribution, prospective yes/no), so it is queued as its own change rather than
-#: smuggled in beside a name fix. Listed here so the next reader knows this set is a stand-in.
+    V3's job is to ask whether removing the evidence removed the answer. On a CLOSED-CHOICE question
+    the model can still pick from the candidates the question itself names, so it reaches gold at
+    1/k without any evidence at all -- and the arm used to condemn a question on a SINGLE hit.
+    Against a pure guesser that is a false-failure rate of 1 - (1 - 1/k)**samples: 0.875 at k=2,
+    0.704 at k=3. The threshold has to be read against that floor, not against zero.
+
+    Returns the smallest h whose one-sided binomial tail P(X >= h | 1/k) falls under 0.05, or None
+    when no h within `samples` reaches it -- which is the honest verdict for k=2 at three samples,
+    where even 3-of-3 leaves p=0.125. An open question has no floor to speak of, so one hit stands.
+
+    THIS REPLACES A HAND-CURATED LIST. `_V3_GUESSABLE_SHAPES` named `occurrence-order`, and later
+    `recency`, as shapes the probe could not decide. Both are consequences of this arithmetic rather
+    than facts about those shapes, and the list silently missed Episodic's `participant-attribution`
+    ("Was that me or you?", k=2) for its whole shipped life -- six of its questions were reported as
+    leaks that were coin flips, and nine more passed a test that could not fail them. A curated
+    exemption list is a chance-floor bug that somebody patched once.
+    """
+    from math import comb
+
+    if samples is None:
+        samples = ABLATION_SAMPLES
+    if k is None or k < 2:
+        return 1
+    p = 1.0 / k
+    for h in range(1, samples + 1):
+        tail = sum(comb(samples, i) * p ** i * (1 - p) ** (samples - i) for i in range(h, samples + 1))
+        if tail < 0.05:
+            return h
+    return None
+
+
+_OF_WHICH = re.compile(r"^Of (.+?), which\b")
+_CAME_FIRST = re.compile(r"\bWhich came first, (.+?)\?")
+_YESNO_Q = re.compile(r"^(Did|Was|Is|Are|Do|Does|Have|Has|Had|Will|Can|Should|Am|Were)\b")
+_OR_TAIL = re.compile(r"\bor\b[^?]*\?$")
+
+
+def closed_choice_k(question: str) -> int | None:
+    """How many candidates the question hands the model, read from its own wording.
+
+    Literal patterns only -- no model, no gold, no probe record. A detector that consulted anything
+    the run produces could be tuned, by accident, toward whichever answer was comfortable.
+    """
+    q = question.strip()
+    m = _OF_WHICH.search(q) or _CAME_FIRST.search(q)
+    if m:
+        return m.group(1).count(",") + 2
+    if _YESNO_Q.match(q):
+        return 2
+    if _OR_TAIL.search(q) and len(q) < 160:
+        return q.count(" or ") + 1
+    return None
 
 
 def _v3_decidable(gold: str, already_known: str) -> bool:
@@ -739,11 +763,15 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # with no evidence saying it has no record, and reporting that as a leak would assert something
     # this probe cannot see. Recorded as not-applicable, exactly as V1 and V2 are on a never-known
     # probe.
-    decidable = (_v3_decidable(gold, f"{question} {date}")
-                 and (entry.get("typedmemeval") or {}).get("shape") not in _V3_GUESSABLE_SHAPES)
+    v3_k = closed_choice_k(question)
+    v3_needs = v3_required_hits(v3_k)
+    decidable = _v3_decidable(gold, f"{question} {date}") and v3_needs is not None
     if non_gold and golds and decidable:
-        leaked = False
+        v3_hits = 0
         silent = 0
+        # No early exit. The old loop broke on the first hit, which is correct only when one hit
+        # condemns; with a chance-aware threshold the COUNT is the evidence, and a question that
+        # stopped at sample 0 can never be compared against a 3-of-3 bar.
         for k in range(ABLATION_SAMPLES):
             answer = complete(ask(question, date, subset(entry, non_gold)),
                               cache_key=f"{key}:v3:{k}",
@@ -753,15 +781,23 @@ def probe_question(entry: dict, vertical: str) -> dict:
                 continue
             if produced_gold(question, gold, answer, f"{key}:v3:{k}:judge",
                              require_distinctive=True, already_known=f"{question} {date}"):
-                leaked = True
-                break
+                v3_hits += 1
+        leaked = v3_hits >= v3_needs
         # A leak found is a leak, whatever the other samples did. But "no leak" is only a finding
         # if every sample actually spoke: a silent sample is a draw that MIGHT have leaked, and
         # counting it as evidence of non-leakage is exactly the anti-conservative failure this arm
         # shipped with.
+        record["v3_hits"] = v3_hits
+        record["v3_required_hits"] = v3_needs
+        if v3_k is not None:
+            record["v3_candidates"] = v3_k
         if leaked:
             record["v3"] = False
-        elif silent:
+        elif silent and v3_hits + silent >= v3_needs:
+            # Silence disqualifies only where it could CHANGE the verdict -- the same rule V2 uses.
+            # It used to be unconditional here because any single sample could have been the one
+            # leak; with a threshold above one, a silent draw only matters if the hits seen plus the
+            # silent ones could have reached the bar.
             record["v3"] = None
             record["v3_silent_samples"] = silent
             _mark_silent(record, "v3")
@@ -975,7 +1011,13 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "not_decidable": sorted(
                 r["question_id"] for r in records
                 if r.get("v3") is None and r.get("v1") is not None),
-            "not_decidable_for_guessable_shapes": sorted(_V3_GUESSABLE_SHAPES),
+            "not_decidable_chance_floor": (
+                "A closed-choice question hands the model its candidates, so with the evidence "
+                "removed it still reaches gold at 1/k. V3 therefore needs the smallest hit "
+                "count whose tail P(X>=h | 1/k) is under 0.05; where no count within "
+                f"{ABLATION_SAMPLES} samples reaches that -- k=2, where even 3-of-3 leaves "
+                "p=0.125 -- the question is not decidable by this arm and is recorded as such "
+                "rather than passed or failed."),
             "not_decidable_reason": (
                 "gold carries no content the prompt did not already supply, so a no-evidence answer "
                 "and a correct one are indistinguishable to this probe"

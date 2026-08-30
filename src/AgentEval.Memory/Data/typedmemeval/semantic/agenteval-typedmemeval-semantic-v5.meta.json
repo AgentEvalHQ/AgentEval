@@ -763,8 +763,8 @@
       "probed_corpus_sha256": "de0b1c22521198ded71ceea5f6fc245686d989182400de3f828bf97a9b79b804"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-28T22:50:07Z",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-30T12:32:27Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -794,9 +794,7 @@
         "tme-sem-048"
       ],
       "not_decidable": [],
-      "not_decidable_for_guessable_shapes": [
-        "occurrence-order"
-      ],
+      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
@@ -807,62 +805,60 @@
       "not_applicable_reason": "V6 is not defined for semantic"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 2,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 405,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 4050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 271,
+        "judge_calls": 1454,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 146,
+        "calls": 1047,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 77,
+        "judge_calls": 347,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 826,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 321,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 405,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 52,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 405,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -936,6 +932,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -945,10 +943,12 @@
         "v8": true,
         "v8_answer": "Culverton Office.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say who you get cartridges from now. They only mention that \u201ccartridges, get\u201d was on your mind.",
+        "v9_answer": "The conversations don’t say who you get cartridges from now. They only mention that “cartridges, get” was on your mind.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -962,6 +962,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -975,6 +977,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -988,6 +992,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1001,6 +1007,8 @@
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1014,6 +1022,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1027,6 +1037,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1040,6 +1052,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1049,10 +1063,12 @@
         "v8": true,
         "v8_answer": "You get cartridges from **Ashcombe Supplies** now.",
         "v9": false,
-        "v9_answer": "I don\u2019t know from these conversations. They mention \u201ccartridges, get\u201d as something on your mind, but they never say who you get cartridges from now.",
+        "v9_answer": "I don’t know from these conversations. They mention “cartridges, get” as something on your mind, but they never say who you get cartridges from now.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1066,6 +1082,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1079,6 +1097,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1092,6 +1112,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1101,10 +1123,12 @@
         "v8": true,
         "v8_answer": "Fairbourne Depot.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say who you get cartridges from now. They only note \u201ccartridges, get\u201d as something on your mind.",
+        "v9_answer": "The conversations don’t say who you get cartridges from now. They only note “cartridges, get” as something on your mind.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1118,6 +1142,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1131,6 +1157,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1140,10 +1168,12 @@
         "v8": true,
         "v8_answer": "Your usual courier is **Oakhurst Transit**.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say who your usual courier is. They only mention \u201ccourier, usual\u201d without naming them.",
+        "v9_answer": "The conversations don’t say who your usual courier is. They only mention “courier, usual” without naming them.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1157,6 +1187,8 @@
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1170,6 +1202,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1183,6 +1217,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1196,6 +1232,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1205,10 +1243,12 @@
         "v8": false,
         "v8_answer": "The workshop is the unit behind the depot, and its lease runs to the end of 2029.",
         "v9": false,
-        "v9_answer": "The conversations only indicate that a \u201clong lease\u201d was on your mind. They do not give a specific duration for the workshop lease.",
+        "v9_answer": "The conversations only indicate that a “long lease” was on your mind. They do not give a specific duration for the workshop lease.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1216,12 +1256,14 @@
       "tme-sem-023": {
         "v1": true,
         "v8": true,
-        "v8_answer": "At head office \u2014 the Calderwick office \u2014 the alarm code was changed after the break-in.",
+        "v8_answer": "At head office — the Calderwick office — the alarm code was changed after the break-in.",
         "v9": true,
-        "v9_answer": "The alarm code at head office\u2014the Calderwick office\u2014was changed after the break-in.",
+        "v9_answer": "The alarm code at head office—the Calderwick office—was changed after the break-in.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1231,10 +1273,12 @@
         "v8": true,
         "v8_answer": "At the runaround, the roof needs doing before winter.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say what work is outstanding at the runaround. They only say that \u201cthe runaround is the overflow space.\u201d",
+        "v9_answer": "The conversations don’t say what work is outstanding at the runaround. They only say that “the runaround is the overflow space.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1242,12 +1286,14 @@
       "tme-sem-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Parking at the weekend place\u2014the cottage at Wray Head\u2014is on the north side.",
+        "v8_answer": "Parking at the weekend place—the cottage at Wray Head—is on the north side.",
         "v9": true,
         "v9_answer": "The parking at the weekend place is on the north side of the cottage at Wray Head.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1261,6 +1307,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1270,10 +1318,12 @@
         "v8": false,
         "v8_answer": "The lease at the new flat runs to the end of 2029.",
         "v9": true,
-        "v9_answer": "The lease runs to the end of next year \u2014 i.e. to the end of 2029.",
+        "v9_answer": "The lease runs to the end of next year — i.e. to the end of 2029.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1287,6 +1337,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1294,12 +1346,14 @@
       "tme-sem-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "At head office \u2014 the Calderwick office \u2014 the roof needs doing before winter.",
+        "v8_answer": "At head office — the Calderwick office — the roof needs doing before winter.",
         "v9": true,
-        "v9_answer": "The roof at the Calderwick office \u2014 the head office \u2014 needs doing before winter.",
+        "v9_answer": "The roof at the Calderwick office — the head office — needs doing before winter.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1313,6 +1367,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1320,12 +1376,14 @@
       "tme-sem-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The boiler at the weekend place \u2014 the cottage at Wray Head \u2014 was replaced in the spring.",
+        "v8_answer": "The boiler at the weekend place — the cottage at Wray Head — was replaced in the spring.",
         "v9": true,
         "v9_answer": "The boiler at the weekend place was replaced in the spring.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1333,12 +1391,14 @@
       "tme-sem-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The annexe is the Peverel building, and its lease runs to the end of next year \u2014 i.e. the end of 2030.",
+        "v8_answer": "The annexe is the Peverel building, and its lease runs to the end of next year — i.e. the end of 2030.",
         "v9": false,
         "v9_answer": "The earlier conversations do not say how long the lease runs at the annexe. They only say that the Peverel building lease runs to the end of next year.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1352,6 +1412,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1361,10 +1423,12 @@
         "v8": true,
         "v8_answer": "The workshop is the unit behind the depot, and the outstanding work there is that the roof needs doing before winter.",
         "v9": false,
-        "v9_answer": "The record does not say any specific work is outstanding at the workshop.\n\nIt only says the workshop is the unit behind the depot. Separately, the coffee order arrived short by two boxes and was \u201cworth chasing.\u201d",
+        "v9_answer": "The record does not say any specific work is outstanding at the workshop.\n\nIt only says the workshop is the unit behind the depot. Separately, the coffee order arrived short by two boxes and was “worth chasing.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1378,6 +1442,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1391,6 +1457,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1404,6 +1472,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1413,10 +1483,12 @@
         "v8": true,
         "v8_answer": "We were discussing the parking permit.",
         "v9": false,
-        "v9_answer": "The conversations do not say that you told me \u201cthe permit does not cover the visitor bay,\u201d nor do they identify a specific discussion tied to that statement. So I can\u2019t determine what we were discussing from the record provided.",
+        "v9_answer": "The conversations do not say that you told me “the permit does not cover the visitor bay,” nor do they identify a specific discussion tied to that statement. So I can’t determine what we were discussing from the record provided.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1426,10 +1498,12 @@
         "v8": true,
         "v8_answer": "We were discussing the broadband change.",
         "v9": false,
-        "v9_answer": "I can\u2019t pin it to a single discussion from the record. The \u201cold line stays live for a month\u201d words appear in the \u201cAlso on my mind\u201d parenthetical in several sessions, alongside these topics:\n\n- Shredding pickup change: Cawdor Secure out, Dilworth Disposal in.\n- Cleaning contract change: Yatesbury Ser",
+        "v9_answer": "I can’t pin it to a single discussion from the record. The “old line stays live for a month” words appear in the “Also on my mind” parenthetical in several sessions, alongside these topics:\n\n- Shredding pickup change: Cawdor Secure out, Dilworth Disposal in.\n- Cleaning contract change: Yatesbury Ser",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1443,6 +1517,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 3,
+        "v3_required_hits": 1,
         "v3": false,
         "ablation_samples": 3,
         "v6": null
@@ -1452,10 +1528,12 @@
         "v8": true,
         "v8_answer": "We were discussing the boiler service.",
         "v9": true,
-        "v9_answer": "We were discussing the boiler service \u2014 specifically that the warranty lapses if a service is missed.",
+        "v9_answer": "We were discussing the boiler service — specifically that the warranty lapses if a service is missed.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1469,6 +1547,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1482,6 +1562,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1495,6 +1577,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1504,10 +1588,12 @@
         "v8": true,
         "v8_answer": "We were discussing the insurance renewal.",
         "v9": false,
-        "v9_answer": "The record doesn\u2019t identify a single unique discussion.\n\nThat \u201cclaim / made / discussing / excess / doubles / twice\u201d note appeared alongside several topics:\n\n- the new visitor sign-in tablet\n- Verney Cartons taking over as archive box supplier\n- the chipped visitor mug\n- the bicycle left in the corr",
+        "v9_answer": "The record doesn’t identify a single unique discussion.\n\nThat “claim / made / discussing / excess / doubles / twice” note appeared alongside several topics:\n\n- the new visitor sign-in tablet\n- Verney Cartons taking over as archive box supplier\n- the chipped visitor mug\n- the bicycle left in the corr",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1517,10 +1603,12 @@
         "v8": true,
         "v8_answer": "We were discussing the parking permit.",
         "v9": true,
-        "v9_answer": "You were discussing the parking permit \u2014 specifically that it does not cover the visitor bay.",
+        "v9_answer": "You were discussing the parking permit — specifically that it does not cover the visitor bay.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1534,6 +1622,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1543,10 +1633,12 @@
         "v8": true,
         "v8_answer": "We were discussing the recycling collection.",
         "v9": true,
-        "v9_answer": "The record doesn\u2019t show you explicitly saying \u201cglass is taken on a different week.\u201d  \n\nThe closest relevant discussion was about **the recycling bins not being emptied**.",
+        "v9_answer": "The record doesn’t show you explicitly saying “glass is taken on a different week.”  \n\nThe closest relevant discussion was about **the recycling bins not being emptied**.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 3,
+        "v3_required_hits": 1,
         "v3": false,
         "ablation_samples": 3,
         "v6": null
@@ -1560,6 +1652,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1569,10 +1663,12 @@
         "v8": true,
         "v8_answer": "We were discussing the window quote.",
         "v9": true,
-        "v9_answer": "We were discussing the window quote \u2014 specifically the window in the back office that would not shut.",
+        "v9_answer": "We were discussing the window quote — specifically the window in the back office that would not shut.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null

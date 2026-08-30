@@ -897,7 +897,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:06:45Z",
+    "run_at": "2026-08-30T12:32:38Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -926,9 +926,7 @@
         "tme-cnj-024"
       ],
       "not_decidable": [],
-      "not_decidable_for_guessable_shapes": [
-        "occurrence-order"
-      ],
+      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
@@ -939,62 +937,60 @@
       "not_applicable_reason": "V6 is not defined for conjunction"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 15,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 100,
+        "calls": 455,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 455,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1008,
+        "calls": 4550,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 500,
+        "judge_calls": 1604,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 236,
+        "calls": 1197,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 86,
+        "judge_calls": 392,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 826,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 321,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 103,
+        "calls": 455,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 455,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 104,
+        "calls": 455,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 455,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1065,6 +1061,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1078,6 +1076,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1091,6 +1091,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1104,6 +1106,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1117,6 +1121,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1130,6 +1136,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1143,6 +1151,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1156,6 +1166,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1169,6 +1181,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1182,6 +1196,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1195,6 +1211,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1208,6 +1226,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1221,6 +1241,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1234,6 +1256,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1247,6 +1271,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1260,6 +1286,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1273,6 +1301,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1286,6 +1316,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1299,6 +1331,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1312,6 +1346,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1325,6 +1361,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1338,6 +1376,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1351,6 +1391,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1364,6 +1406,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 2,
+        "v3_required_hits": 1,
         "v3": false,
         "ablation_samples": 3,
         "v6": null
@@ -1377,6 +1421,8 @@
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1390,6 +1436,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1403,6 +1451,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1416,6 +1466,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1429,6 +1481,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1442,6 +1496,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1455,6 +1511,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1468,6 +1526,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1481,6 +1541,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1494,6 +1556,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1507,6 +1571,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1520,6 +1586,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1533,6 +1601,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1546,6 +1616,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1559,6 +1631,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1572,6 +1646,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1585,6 +1661,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1598,6 +1676,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1611,6 +1691,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1624,6 +1706,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1637,6 +1721,8 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1650,6 +1736,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1663,6 +1751,8 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1676,6 +1766,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1689,6 +1781,8 @@
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1702,6 +1796,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
