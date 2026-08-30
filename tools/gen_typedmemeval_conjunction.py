@@ -36,15 +36,19 @@ computable. The corpus gate that asserts every label equals the vertical's own s
 this vertical DELIBERATELY -- that assertion exists so a mixed corpus cannot appear inside a
 vertical claiming to be single-type, and here the mixture is the point.
 
-ONE SHAPE IS SATURATED UNDER LEXICAL RETRIEVAL, and it is recorded here rather than left inside an
-average. Probed per shape: alias-then-count V9 1/15 (headroom 0.93), value-then-count 2/20 (0.85),
-order-then-value 15/15 (headroom 0.00). BM25 top-5 solves order-then-value outright, because its
-gold is G=5 and every item is lexically reachable from a question that names both the attribute and
-the anchor event. That shape measures REASONING difficulty and cannot discriminate retrievers at
-all; the vertical mean headroom of 0.62 is carried entirely by the other two. Read the per-shape
-figures, never the mean -- this is the mean-satisfiable-by-averaging defect one level up, at
-headroom rather than at coverage, and the vertical would look uniformly hard if only its mean were
-quoted.
+ORDER-THEN-VALUE WAS SATURATED AND IS NOT ANY MORE, and the reason it was is worth keeping. It
+measured V9 15/15, headroom 0.00 -- a shape on which no two retrievers could be told apart -- while
+its BM25 coverage was only 0.667. Those two numbers together are the diagnosis: the retriever was
+fetching two thirds of gold and the model still scored perfectly, so the missing third could not
+have mattered. One gold session read "{anchor} happened while {middle} was the {attribute}", naming
+the anchor and the answer in one sentence, and it was the only session carrying both terms the
+question names -- so it was both the easiest to retrieve and sufficient on its own. The join this
+shape exists to test was never required.
+
+The anchor is now pinned to the SWITCH EVENTS rather than to the value, so answering needs two hops
+in different sessions: place the anchor between the two switches, then read which value that switch
+moved to. Read the per-shape figures, never the mean -- a saturated shape inside a healthy mean is
+the mean-satisfiable-by-averaging defect one level up, at headroom rather than at coverage.
 
 NO DIFFICULTY AXIS IS STAMPED, for the same reason as Semantic: fact-grain competition is held
 pending validation on a non-lexical arm (tools/validate_factgrain_axis.py). Join width -- how many
@@ -194,19 +198,31 @@ def _filler(rng: random.Random, echoed: list[str], avoid: str = "") -> tmc.Sessi
         # Milestone relations AND the anchor construction, so neither the AFTER frames nor
         # "happened while" is an order-only marker. V7 flagged the anchor frame at 15 gold and zero
         # distractors on the first build; a construction only gold receives is a frame, not content.
-        pair = rng.sample(list(MILESTONES), 2)
-        if rng.random() < 0.5:
+        pair = rng.sample(list(MILESTONES), 3)
+        roll = rng.random()
+        if roll < 0.34:
             text = rng.choice(AFTER_FRAMES).format(a=pair[0], b=pair[1])
+        elif roll < 0.67:
+            # The BETWEEN-EVENTS construction gold's anchor now uses. Added with that change: a
+            # construction only gold receives is a frame, not content, and this branch exists
+            # because V7 caught exactly that on the previous anchor frame (15 gold, 0 distractors).
+            text = f"{_lead(pair[0])} happened after {pair[1]} and before {pair[2]}."
         else:
             attribute, values = rng.choice(
                 [a for a in ATTRIBUTES if a[0] != avoid] + list(UNASKED_ATTRIBUTES))
-            text = f"{pair[0].capitalize()} happened while {rng.choice(values)} was the {attribute}."
+            text = f"{_lead(pair[0])} happened while {rng.choice(values)} was the {attribute}."
     elif draw < 0.72:
         pool = [a for a in ATTRIBUTES if a[0] != avoid] + list(UNASKED_ATTRIBUTES)
         attribute, values = rng.choice(pool)
         pair = rng.sample(list(values), 2)
         text = rng.choice(REPLACEMENT_FRAMES + FIRST_FRAMES).format(
             attribute=attribute, previous=pair[0], value=pair[1])
+        # Gold's switches are dated by an event ("That was the week of X") so the anchor can refer
+        # to them without naming a value. Filler dates its switches the same way, at the same rate,
+        # or the clause is a gold frame -- which the separability gate caught on the first build of
+        # this change: 'the week of' in 30 gold sessions and zero distractors.
+        if rng.random() < 0.5:
+            text += f" That was the week of {rng.choice(MILESTONES)}."
     else:
         user, assistant = rng.choice(FILLER_CHAT)
         return tmc.Session(
@@ -215,6 +231,13 @@ def _filler(rng: random.Random, echoed: list[str], avoid: str = "") -> tmc.Sessi
     return tmc.Session(
         turns=[tmc.Turn("user", tmc.weave_echo(text, echoed)), tmc.Turn("assistant", _reply(rng))],
         timestamp=_BASE, is_gold=False, tag="filler-frame")
+
+
+def _lead(phrase: str) -> str:
+    """Sentence-initial form. `str.capitalize()` LOWERCASES the remainder, so "the Zethisk handover"
+    became "The zethisk handover" -- a lowercased proper noun occurring nowhere else in the corpus,
+    which is a gold marker wearing a typo."""
+    return phrase[:1].upper() + phrase[1:]
 
 
 def _gold(user: str, rng: random.Random, tag: str, kind: str) -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -344,7 +367,10 @@ def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Questi
     attribute, values = ATTRIBUTES[index % len(ATTRIBUTES)]
     chosen = rng.sample(list(values), 3)
     early, middle, late = chosen
-    anchor, later = MILESTONES[index % len(MILESTONES)], MILESTONES[(index + 1) % len(MILESTONES)]
+    # Four distinct milestones: the anchor being asked about, one later event that fixes the
+    # anchor's place in the chain, and one event PER SWITCH. The switch events are what make the
+    # join real -- see the gold list below.
+    anchor, later, switch_to_middle, switch_to_late = rng.sample(list(MILESTONES), 4)
     qid = f"tme-cnj-{VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + index + 1:03d}"
     ask = f"Which {attribute} was I using when {anchor} happened?"
     echoed = tmc.echo_terms(ask, echo, random.Random(f"{qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -352,13 +378,27 @@ def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Questi
     golds = [
         _gold(rng.choice(FIRST_FRAMES).format(attribute=attribute, value=early),
               rng, "first", "semantic"),
+        # Each switch is dated by an EVENT rather than a timestamp, so the anchor session above can
+        # refer to it without naming the value it moved to.
         _gold(rng.choice(REPLACEMENT_FRAMES).format(
-            attribute=attribute, previous=early, value=middle), rng, "replacement", "semantic"),
+            attribute=attribute, previous=early, value=middle)
+            + f" That was the week of {switch_to_middle}.", rng, "replacement", "semantic"),
         _gold(rng.choice(REPLACEMENT_FRAMES).format(
-            attribute=attribute, previous=middle, value=late), rng, "replacement", "semantic"),
-        # The temporal half: the anchor is pinned between the two switches by a stated relation.
-        _gold(f"{anchor.capitalize()} happened while {middle} was the {attribute}.",
-              rng, "anchor", "temporal"),
+            attribute=attribute, previous=middle, value=late)
+            + f" That was the week of {switch_to_late}.", rng, "replacement", "semantic"),
+        # THE TEMPORAL HALF, AND THE REASON THIS SHAPE HAS A JOIN AT ALL. This session used to
+        # read "{anchor} happened while {middle} was the {attribute}" -- which names the anchor
+        # AND the answer in one sentence, so retrieving this session alone answered the question
+        # and no join was ever required. It measured 15/15 at V9 against coverage 0.667: the
+        # retriever was fetching two thirds of gold and the model still scored perfectly, because
+        # the one session it reliably fetched (the only one carrying both terms the question names)
+        # was a complete answer by itself.
+        #
+        # The anchor is now pinned to the SWITCH EVENTS instead of to the value. Answering needs
+        # two hops that live in different sessions: place the anchor between the two switch events,
+        # then read which value that switch moved to. No single gold session carries both halves.
+        _gold(f"{_lead(anchor)} happened after {switch_to_middle} "
+              f"and before {switch_to_late}.", rng, "anchor", "temporal"),
         _gold(rng.choice(AFTER_FRAMES).format(a=later, b=anchor), rng, "relation", "temporal"),
     ]
 

@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`conjunction/order-then-value` could not rank any two retrievers, and now it can.** It measured
+  **V9 15/15, headroom 0.00** — a perfect retriever and a plain BM25 retriever scored identically —
+  while its BM25 coverage was only **0.667**. Those two numbers together are the diagnosis: the
+  retriever was fetching two thirds of gold and the model still scored perfectly, so **the missing
+  third could not have mattered**.
+
+  One gold session read `"{anchor} happened while {middle} was the {attribute}."` — naming the
+  anchor and the answer in a single sentence. It was also the only session carrying *both* terms the
+  question names, so it was simultaneously the easiest to retrieve and sufficient on its own. **The
+  join the shape exists to test was never required.**
+
+  The anchor is now pinned to the **switch events** rather than to the value, so answering takes two
+  hops in different sessions: place the anchor between the two switches, then read which value that
+  switch moved to. Asserted at build time — no gold session contains both the anchor and the answer.
+
+  | shape | V9 before | after | headroom |
+  |---|---|---|---|
+  | `order-then-value` | 15/15 | **8/15** | **0.00 → 0.47** |
+  | `alias-then-count` | 1/15 | 1/15 | 0.93 |
+  | `value-then-count` | 2/20 | 2/20 | 0.90 → 0.85 |
+
+  Vertical headroom **0.64 → 0.76**. Corpus sha `b756721c…` → `99f609c9…`; Conjunction controls
+  reset. Folded in before the tag at the consuming project's request — their recall-fan-out router
+  reads this vertical by shape, and a dead cell in that instrument would have cost them two control
+  resets instead of one.
+
+  **The separability gate refused the first two builds**, and both refusals were the same mistake:
+  filler must carry every construction gold uses. The new anchor frame was gold-only on the first
+  build; the `"That was the week of X"` clause dating each switch was gold-only on the second — 30
+  gold sessions, zero distractors. The rule was already written in this file for the *previous*
+  anchor frame, and I applied it to one of the two new constructions and not the other.
+
+### Known
+
+- **`value-then-count` asks for less than its gold requires.** The question is *"How many times did
+  I put an order in with my {attribute}?"* and gold is `"{n} times, with {entity}."` — so a model
+  answering *"4 times"* is responsive to the question as written and scores as wrong. One question
+  (`tme-cnj-006`) fails V1 on exactly this. The wider implication is the reason it is recorded
+  rather than patched: for the other nineteen, naming the entity may be **verbosity rather than
+  evidence the join was performed**. Scoped as its own change under the agreed one-shape-at-a-time
+  sequencing, not folded into a fix for a different shape.
+
 - **Forgetting's coverage was 30% a constant, and the echo search had been optimising it.**
   `realised_coverage` answers `1.0` when a question has no gold — vacuously, all of nothing was
   found. That is the right answer and the wrong thing to average. Forgetting's 15 `never-known`
