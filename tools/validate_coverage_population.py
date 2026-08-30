@@ -78,14 +78,32 @@ def main() -> int:
         for question in questions:
             shape = question.extension.get("shape", "(unshaped)")
             by_shape.setdefault(shape, []).append(tmc.realised_coverage(question))
-        shapes = {
-            shape: {
+        # THE SATURATION SCREEN, named by the consuming project: "a perfect score under partial
+        # coverage means the missing part was never needed". If a shape's V9 pass RATE sits above
+        # its BM25 coverage, the model is answering without the evidence the retriever failed to
+        # fetch -- which means that gold was never load-bearing. It is the cheap, always-available
+        # form of the V6 leave-one-out question, and it runs on two columns already in the record.
+        #
+        # conjunction/order-then-value read coverage 0.667 against V9 15/15 -- a gap of +0.333 --
+        # for its whole shipped life. One gold session named both the anchor and the answer, so the
+        # join was never required and the un-retrieved third could not matter.
+        arms = ((meta.get("probes") or {}).get("by_shape") or {})
+        shapes = {}
+        for shape, values in sorted(by_shape.items()):
+            realised = sum(values) / len(values)
+            d = arms.get(shape) or {}
+            v9_applicable, v9_passed = d.get("v9_applicable", 0), d.get("v9_passed", 0)
+            v9_rate = (v9_passed / v9_applicable) if v9_applicable else None
+            shapes[shape] = {
                 "questions": len(values),
-                "realised": round(sum(values) / len(values), 3),
+                "realised": round(realised, 3),
+                "v9_rate": round(v9_rate, 3) if v9_rate is not None else None,
+                # Positive = scores above its evidence. Negative = reasoning is the constraint,
+                # which is what a healthy hard shape looks like.
+                "scores_above_evidence": (round(v9_rate - realised, 3)
+                                          if v9_rate is not None else None),
                 "published_by_generator": "per_shape_realised" in (meta.get("coverage") or {}),
             }
-            for shape, values in sorted(by_shape.items())
-        }
 
         report[vertical] = {
             "questions": len(questions),
@@ -135,7 +153,7 @@ def main() -> int:
     print("what hid Prospective's not-yet-true at a saturated 1.000 for its whole shipped life.")
     print("Coverage is structural BM25, so these cost nothing to recompute.")
     print()
-    print(f"{'vertical':14s} {'shape':24s} {'q':>3s} {'realised':>9s}  note")
+    print(f"{'vertical':14s} {'shape':24s} {'q':>3s} {'realised':>9s} {'V9':>7s} {'V9-cov':>7s}  note")
     print("-" * 96)
     for vertical, _n, _z, _pub_mean, _pooled, _measured, shapes, published_shapes in rows:
         for shape, d in shapes.items():
@@ -144,9 +162,20 @@ def main() -> int:
                 note = "saturated"
             elif not (BAND_LOW <= d["realised"] <= BAND_HIGH):
                 note = "out of band"
+            gap = d.get("scores_above_evidence")
+            if gap is not None and gap > 0.15:
+                note = ((note + "; ") if note else "") + "SCORES ABOVE ITS EVIDENCE"
             if not published_shapes:
                 note = (note + "; not published") if note else "not published"
-            print(f"{vertical:14s} {shape:24s} {d['questions']:3d} {d['realised']:9.3f}  {note}")
+            v9 = "-" if d.get("v9_rate") is None else f"{d['v9_rate']:.3f}"
+            gp = "-" if gap is None else f"{gap:+.3f}"
+            print(f"{vertical:14s} {shape:24s} {d['questions']:3d} {d['realised']:9.3f} "
+                  f"{v9:>7s} {gp:>7s}  {note}")
+    print()
+    print("V9-cov is the saturation screen: a shape scoring ABOVE its coverage is answering without")
+    print("evidence the retriever failed to fetch, so that gold was never load-bearing.")
+    print("conjunction/order-then-value read +0.333 for its whole shipped life before it was fixed.")
+    print("Negative is healthy -- it means reasoning, not retrieval, is the constraint.")
     print()
     print("A saturated shape is not automatically a defect - WorkingMemory's distance ladder is")
     print("declared, and coverage is MEANT to fall with distance, so its short rungs sit high by")
