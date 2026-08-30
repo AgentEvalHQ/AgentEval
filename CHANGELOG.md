@@ -132,6 +132,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bar-supplied and diluted-denominator: **floor-below-chance** — the reject line sits beneath the
   item's structural floor, so the gate separates reference-model behaviour rather than corpora.
 
+- **Forgetting's published coverage counts 15 questions it cannot measure.**
+  `tools/validate_coverage_population.py`.
+
+  `realised_coverage` is gold recall@K and opens `if not gold: return 1.0` — the right answer to
+  *"what share of gold did we find"* when there is no gold, and the wrong thing to average.
+  Forgetting's 15 `never-known` probes are **G=0 by design** (their gold *is* an absence), so each
+  contributes a constant 1.0 while measuring nothing.
+
+  | | |
+  |---|---|
+  | Forgetting published `mean_realised` | **0.670** |
+  | over questions that have gold | **0.529** |
+  | band | [0.50, 0.90] |
+
+  **Direction: flattering, and materially so.** 0.529 sits 0.029 above the band floor; 0.670 sits
+  comfortably mid-band. The echo calibration that placed Forgetting "safely" in band was optimising a
+  statistic that was **30% constant**, so the vertical is far nearer the floor than anything
+  published says. **Blast radius: Forgetting alone** — every other vertical is verified `0.000`, not
+  assumed.
+
+  This is the **diluted-denominator** shape wearing a statistic rather than a gate — the same error
+  as pooling judge grades into probe-answer denominators, failing in the same direction.
+
+  **Not fixed in this release, deliberately.** Correcting the aggregation changes the calibration
+  target, which changes the echo, which regenerates the corpus, moves the sha and resets every
+  Forgetting control. That is a declared corpus revision, not a side effect of a reporting fix, and
+  it is queued rather than smuggled into a release the consuming project is about to probe.
+
 - **A signal-density instrument — and it says 85.7% of the family is scaffolding, not arithmetic's
   problem alone.** `tools/measure_signal_density.py`.
 
