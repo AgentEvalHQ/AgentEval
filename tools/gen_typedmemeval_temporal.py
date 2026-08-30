@@ -192,8 +192,22 @@ def _question(qid: str, shape: str, qtype: str, band: int, ordinal: int,
         frame = rng.choice(AFTER_FRAMES if rng.random() < 0.5 else BEFORE_FRAMES)
         text = (frame.format(a=later, b=earlier) if frame in AFTER_FRAMES
                 else frame.format(a=earlier, b=later))
+        # ECHO PARITY, IN THE SAME TURN AND AT THE SAME RATE AS FILLER. The calibration clause goes
+        # into filler's ASSISTANT turn to push coverage down; a relation session that omits it is
+        # separable by the clause's ABSENCE, which is the first shipped build's tell inverted.
+        #
+        # It surfaced only when recency's gold grew from two links to the whole chain: more gold
+        # needed a higher echo to hold coverage, which pushed the distractor rate to 1.00 and the
+        # gap past the 0.5 parity bar. The imbalance was always there, just under the threshold.
+        #
+        # A first attempt wove it into the USER turn at 60%, and the gate caught that from two
+        # directions at once - parity still failing at 0.40 vs 1.00, and assistant_punctuation_
+        # density separating at AUC 0.849, because filler assistants carried the clause and gold
+        # assistants did not. Same turn, same rate, no exceptions: this file's own filler comment
+        # already said one bank for both sides means ALL of both sides.
         relation_of[position] = tmc.make_session(
-            _BASE, (f"{rng.choice(OPENERS)} {text}", rng.choice(REPLIES)),
+            _BASE, (f"{rng.choice(OPENERS)} {text}",
+                    tmc.weave_echo(rng.choice(REPLIES), echoed)),
             gold_turn=0, tag=f"link{position}")
 
     gold_links = _links_needed(shape, count)
@@ -240,7 +254,11 @@ def _links_needed(shape: str, count: int) -> list[int]:
     """
     if shape == SHAPE_ORDER:
         return [1]
-    return [count - 2, count - 1] if shape == SHAPE_RECENCY else [1, 2]
+    # recency now spans the chain, so every link between the earliest asked event and the latest is
+    # required. See _ask: the window is events[0], a middle event, events[-1].
+    if shape == SHAPE_RECENCY:
+        return list(range(1, count))
+    return [1, 2]
 
 
 def _ask(shape: str, events: list[str], rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -250,7 +268,11 @@ def _ask(shape: str, events: list[str], rng: random.Random) -> str:  # DevSkim: 
         rng.shuffle(pair)
         return f"Which came first, {pair[0]} or {pair[1]}?"
     if shape == SHAPE_RECENCY:
-        window = [events[-3], events[-2], events[-1]]
+        # SPREAD ACROSS THE CHAIN, not the last three. Asking about three adjacent events made the
+        # answer one transitive step over two sessions that named the asked events outright, and
+        # the shape scored 15/15 at V1, V8 AND V9 - the only one in the family no system could be
+        # ranked by. Spanning the chain means every link has to be followed.
+        window = [events[0], events[len(events) // 2], events[-1]]
         rng.shuffle(window)
         return f"Of {window[0]}, {window[1]} and {window[2]}, which happened most recently?"
     window = [events[0], events[2]]
@@ -325,7 +347,17 @@ def check_temporal(questions: list[tmc.Question]) -> list[str]:
         # would pass on redundant evidence.
         if q.g < 1:
             failures.append(f"{q.question_id}: no gold link")
-        expected_g = 1 if q.extension["shape"] == SHAPE_ORDER else 2
+        # recency spans the chain now, so its gold is every link between the earliest asked event
+        # and the latest -- count - 1 of them. Minimality still holds and is the reason the number
+        # is derived rather than pinned: with a single chain A<B<C<D<E and a question over
+        # {A, C, E}, dropping ANY intermediate link removes a transitive step the answer needs, so
+        # V6 leave-one-out still bites on every one of them.
+        if q.extension["shape"] == SHAPE_ORDER:
+            expected_g = 1
+        elif q.extension["shape"] == SHAPE_RECENCY:
+            expected_g = q.extension["events"] - 1
+        else:
+            expected_g = 2
         if q.g != expected_g:
             failures.append(
                 f"{q.question_id}: G={q.g} for {q.extension['shape']}, expected {expected_g} -- the "
@@ -362,7 +394,10 @@ if __name__ == "__main__":
         vertical="temporal",
         build=build,
         structure=tmc.StructureSpec(
-            h_min=H_MIN, h_max=H_MAX, g_values={1, 2}, gold_position_shuffled=True,
+            h_min=H_MIN, h_max=H_MAX,
+            # 1 for occurrence-order, 2 for interval-position, and 3-5 for recency, which spans the
+            # chain: its gold is every link between the earliest asked event and the latest.
+            g_values={1, 2, 3, 4, 5}, gold_position_shuffled=True,
             no_absolute_dates=True,
         ),
         generator_tool="tools/gen_typedmemeval_temporal.py",
