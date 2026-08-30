@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **V3's leak threshold is now read against the chance floor, and 24 of its passes were never
+  earned.** The arm draws 3 ablation samples and condemned a question on a **single** hit. On a
+  closed-choice question that is not a measurement: the question hands the model its candidates, so
+  with every gold session removed it still reaches gold at `1/k`. Against a pure guesser the
+  false-failure rate is `1 − (1 − 1/k)³` — **0.875 at k=2, 0.704 at k=3**.
+
+  The threshold is now the smallest `h` whose tail `P(X ≥ h | 1/k)` falls under 0.05, and a question
+  is **not decidable** when no `h` within the sample budget reaches it. At 3 samples that gives
+  `k=2 → undecidable` (even 3-of-3 leaves p=0.125), `k=3 → 3-of-3`, open → 1 hit as before. The loop
+  no longer short-circuits on the first hit, because with a threshold above one **the count is the
+  evidence** and a question that stopped at sample 0 can never be compared against a 3-of-3 bar.
+
+  **This retires a hand-curated list.** `_V3_GUESSABLE_SHAPES` named `occurrence-order`, and this
+  session added `recency` after four of its questions "failed" a clean regeneration. Both are
+  consequences of the arithmetic above rather than facts about those shapes — and the list had
+  silently missed Episodic's `participant-attribution` (*"Was that me or you?"*, k=2) for its entire
+  shipped life. **A curated exemption list is a chance-floor bug that somebody patched once.**
+
+  | vertical | V3 before | after | what moved |
+  |---|---|---|---|
+  | prospective | 44/44 | **29/29** | 15 unearned passes removed |
+  | episodic | 44/50 | **35/35** | 9 unearned passes **and 6 false failures** removed |
+  | temporal | 15/15 | **30/30** | `recency` **restored to measurement** — and all 15 pass at 3-of-3 |
+
+  Temporal is the evidence the rule is right: measured against a threshold it can actually fail,
+  every `recency` question passes. They never leaked; the single-hit rule was condemning coin flips.
+
+  **24 unearned passes removed, 6 false failures corrected, and no corpus sha moves** — this is a
+  probe-record change only, so no consumer control resets. No other arm changed: V1, V2, V6, V8 and
+  V9 are identical across all nine verticals. The full family was re-probed under the new rule for
+  **16 new calls**, everything else served from cache.
+
+  Silence handling followed the threshold rather than staying at one: a silent draw now disqualifies
+  only where hits-seen plus silent-draws could have **reached the bar**, which is the rule V2 already
+  used. Records carry `v3_hits`, `v3_required_hits` and `v3_candidates` so the verdict can be
+  re-derived instead of trusted.
+
 - **The corpora were built from real place-names, and a model was answering from world knowledge.**
   V2 asked *"Which came first, the Fenn commissioning or the Yarrow move?"* with **no haystack at
   all** and the reference model replied *"Yarrow moved its shipbuilding operations to Scotstoun,

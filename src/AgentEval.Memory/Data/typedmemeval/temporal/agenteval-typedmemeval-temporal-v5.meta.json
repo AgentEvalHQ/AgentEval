@@ -805,7 +805,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T12:08:59Z",
+    "run_at": "2026-08-30T12:31:59Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -828,8 +828,8 @@
       "failed": []
     },
     "v3_gold_ablated": {
-      "applicable": 15,
-      "passed": 15,
+      "applicable": 30,
+      "passed": 30,
       "failed": [],
       "not_decidable": [
         "tme-tem-001",
@@ -851,27 +851,9 @@
         "tme-tem-017",
         "tme-tem-018",
         "tme-tem-019",
-        "tme-tem-020",
-        "tme-tem-036",
-        "tme-tem-037",
-        "tme-tem-038",
-        "tme-tem-039",
-        "tme-tem-040",
-        "tme-tem-041",
-        "tme-tem-042",
-        "tme-tem-043",
-        "tme-tem-044",
-        "tme-tem-045",
-        "tme-tem-046",
-        "tme-tem-047",
-        "tme-tem-048",
-        "tme-tem-049",
-        "tme-tem-050"
+        "tme-tem-020"
       ],
-      "not_decidable_for_guessable_shapes": [
-        "occurrence-order",
-        "recency"
-      ],
+      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
@@ -887,55 +869,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 3550,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 350,
+        "judge_calls": 1183,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 45,
+        "calls": 897,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 0,
+        "judge_calls": 266,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 826,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 321,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -987,8 +969,8 @@
         "questions": 15,
         "v1_applicable": 15,
         "v1_passed": 15,
-        "v3_applicable": 0,
-        "v3_passed": 0,
+        "v3_applicable": 15,
+        "v3_passed": 15,
         "v8_applicable": 15,
         "v8_passed": 15,
         "v9_applicable": 15,
@@ -1246,6 +1228,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1259,6 +1243,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1272,6 +1258,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1285,6 +1273,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1298,6 +1288,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1311,6 +1303,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1324,6 +1318,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1337,6 +1333,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1350,6 +1348,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1363,6 +1363,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1376,6 +1378,8 @@
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1389,6 +1393,8 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1402,6 +1408,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1415,6 +1423,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1428,6 +1438,8 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
         "v6": null
@@ -1441,7 +1453,11 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-037": {
@@ -1453,7 +1469,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 1,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-038": {
@@ -1465,7 +1485,11 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-039": {
@@ -1477,7 +1501,11 @@
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-040": {
@@ -1489,7 +1517,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 1,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-041": {
@@ -1501,7 +1533,11 @@
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-042": {
@@ -1513,7 +1549,11 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-043": {
@@ -1525,7 +1565,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 1,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-044": {
@@ -1537,7 +1581,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-045": {
@@ -1549,7 +1597,11 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 1,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-046": {
@@ -1561,7 +1613,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-047": {
@@ -1573,7 +1629,11 @@
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-048": {
@@ -1585,7 +1645,11 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-049": {
@@ -1597,7 +1661,11 @@
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       },
       "tme-tem-050": {
@@ -1609,7 +1677,11 @@
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
-        "v3": null,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
         "v6": null
       }
     },
