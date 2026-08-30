@@ -1800,6 +1800,26 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
 
 
 
+def measurable_coverage_mean(questions: list["Question"]) -> float:
+    """Mean realised coverage over the questions this statistic can actually describe.
+
+    :func:`realised_coverage` answers 1.0 when a question has no gold -- vacuously, all of nothing
+    was found. That is the right answer and the wrong thing to average. Forgetting's 15 never-known
+    probes are G=0 BY DESIGN, so 30% of its published mean was a constant, and the echo search
+    optimised that constant: published 0.670, measured over gold-bearing questions 0.529, against a
+    band floor of 0.50. The vertical sat a third of the way to the floor from where it read.
+
+    THE EXCLUSION ALREADY EXISTED IN ONE PLACE. `calibrate_per_shape`'s per-shape search drops these
+    questions, with the reasoning written out beside it -- "no coverage to realise ... excluded
+    rather than allowed to pin a shape at saturation it cannot leave". It was never carried to the
+    vertical mean in either path, and Forgetting has no per-shape calibration, so it fell exactly in
+    the gap between the two. A correct treatment written once and applied once is how a defect
+    survives review: the reviewer sees the reasoning and assumes its reach.
+    """
+    scored = [realised_coverage(q) for q in questions if q.g > 0]
+    return sum(scored) / len(scored) if scored else 0.0
+
+
 def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
     """Bisect the lexical-echo knob toward :data:`BAND_TARGET`. Returns (echo, mean, iterations).
 
@@ -1903,7 +1923,7 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
 
     questions = attempt(echo_map)
     per_q = {q.question_id: realised_coverage(q) for q in questions}
-    mean = sum(per_q.values()) / len(per_q) if per_q else 0.0
+    mean = measurable_coverage_mean(questions)
     return questions, Calibration(
         echo=round(sum(echo_map.values()) / len(echo_map), 4) if echo_map else 0.0,
         mean=round(mean, 4),
@@ -1937,7 +1957,7 @@ def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question
         equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
         equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
         per_q = {q.question_id: realised_coverage(q) for q in questions}
-        mean = sum(per_q.values()) / len(per_q) if per_q else 0.0
+        mean = measurable_coverage_mean(questions)
         trace.append((round(echo, 4), round(mean, 4)))
         return questions, mean, per_q
 

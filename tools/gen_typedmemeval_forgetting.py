@@ -302,12 +302,35 @@ def _arbitrary_value(rng: random.Random) -> str:
 #: a marker; higher would start to crowd out the invalidation-shaped filler V3 needs.
 REAFFIRM_FILLER_SHARE = 0.30
 
+#: Share of filler sessions that state a choice of their own, using the SAME bank gold draws from.
+#:
+#: CHOICES was gold-only for its whole shipped life, which makes every phrasing in it a frame rather
+#: than content -- and the separability gate caught it the moment a recalibration changed the draw:
+#: "went with" appeared in 12 gold sessions and ZERO distractors. It had been under the 20% bar by
+#: luck, not by design.
+#:
+#: The same reasoning is already written above REAFFIRM_FILLER_SHARE, and one line further up this
+#: file says re-affirmation frames are "drawn from ONE bank for gold and filler alike". CHOICES
+#: simply never received the treatment its neighbour did.
+#:
+#: Filler states a PARITY value, never a STEMS/TAILS one, so the invariant the statement session
+#: rests on is untouched: the gold value still lives in the gold session and nowhere else. Sized
+#: below the re-affirmation share so the invalidation-shaped filler V3 needs is not crowded out.
+CHOICE_FILLER_SHARE = 0.20
+
 
 def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
     if rng.random() < REAFFIRM_FILLER_SHARE:
         # Same construction as the control arm's re-affirmation, about something no question asks.
         user = rng.choice(REAFFIRM_FRAMES).format(
             noun=rng.choice(PARITY_NOUNS),
+            value=f"{rng.choice(PARITY_STEMS)} {rng.choice(PARITY_TAILS)}")
+        assistant = rng.choice(("Noted.", "Right.", "Understood.", "Filed."))
+        return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
+    if rng.random() < CHOICE_FILLER_SHARE:
+        # Same construction as the statement session, about something no question asks, so the
+        # phrasing cannot mark gold. A PARITY value, so the gold value stays unique to gold.
+        user = rng.choice(CHOICES).format(
             value=f"{rng.choice(PARITY_STEMS)} {rng.choice(PARITY_TAILS)}")
         assistant = rng.choice(("Noted.", "Right.", "Understood.", "Filed."))
         return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
