@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Temporal's `recency` shape could not rank anything, and now it is the hardest shape in the
+  vertical.** It scored **15/15 at V1, V8 *and* V9** — the only shape in the family on which no two
+  systems could be told apart. The mechanism was that it asked about the **last three** events in the
+  chain, so gold was the two adjacent links and answering was a single transitive step over two
+  sessions that named the asked events outright. Guessability was checked first and came back clean:
+  the answer was first-named 6/15, middle 3/15, last 6/15, all at chance. The construct was sound and
+  simply too easy on both halves.
+
+  It now asks about events **spanning** the chain — earliest, middle, latest — so every link between
+  them has to be followed. **V9 15/15 → 6/15**, and the vertical's headroom **0.16 → 0.40**. Gold
+  grows from 2 links to `count - 1` and stays minimal: on a single chain `A<B<C<D<E` asked over
+  `{A, C, E}`, dropping any intermediate link removes a transitive step the answer needs.
+
+  Two follow-on defects surfaced *because* the change was made and were fixed with it. More gold
+  needed a higher echo to hold coverage, which pushed the calibration clause's distractor rate to
+  1.00 and made a relation session separable by the clause's **absence** — the first shipped build's
+  tell, inverted. A first repair wove the clause into the **user** turn at 60%, and the separability
+  gate caught that from two directions at once: parity still failing (0.40 vs 1.00) *and*
+  `assistant_punctuation_density` separating at **AUC 0.849**, because filler assistants carried the
+  clause and gold assistants did not. Same turn, same rate, no exceptions.
+
+  Coverage `1.000 → 0.744` and `occurrence-order` came into band as a side effect (0.950 → 0.900),
+  clearing both temporal ratchet entries with one change. **The corpus sha moves
+  (`a6c10b3d…` → `31d26e60…`) and temporal's controls reset.**
+
 - **Semantic gained a judge body, and it was built under REACH ENUMERATION.** Semantic shipped
   without one deliberately — it measured 0.958 on the shared preamble alone and nothing failed
   consistently — but that left it as the **only** vertical with nothing to settle the preamble's
@@ -53,6 +78,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sufficient — enumerate what a change can REACH, not only what it targets.** The guard written for
   that edit was built against the imagined failure; the regression landed on existing cases never
   enumerated.
+
+- **The padding stripper ate content.** `_templates()` matched a padding base then consumed to the
+  end of the sentence, and `_PAD_SHORT` holds bare words (`Still.`, `Right.`, `Fine.`) — so `Still`
+  swallowed all of *"Still the same recycling sack size, for the record: Selwick Common."* Three
+  forgetting sessions stripped to nothing, which is what exposed it.
+
+  The fix is **exact rather than a tighter heuristic**. `_pad_block` composes a padding sentence as a
+  whole base with a tail spliced in before the period, at most twice
+  (`pieces[index] = f"{pieces[index][:-1]}, {tail}."`), so every padding sentence is precisely
+  `BASE(, TAIL){0,2}.` and the pattern now says that, with the tail alternation built from the
+  emitter's own banks. **A stripper must only remove what the emitter can emit.**
+
+  Arithmetic padding share `85.8% → 85.5%`; pure-padding sessions family-wide `3 → 0`. Diagnostic
+  cell hashes move with it — Cell B `eaf5f32cf7e72fea…`, Cell C `d3d0acbab75f0bff…`.
+
+### Added
+
+- **A chance-floor audit for closed-choice questions — and it says 69 of our V2 passes were never
+  earned.** `tools/validate_v2_chance_floor.py`.
+
+  V2 asks the reference model each question with no haystack, ten times, and rejects it on two or
+  more gold hits. That is an observed rate of **0.20**. But **71 of 470 questions enumerate their own
+  alternatives** — *"Which came first, X or Y?"*, *"Was that me or you?"*, *"Is my Lumen trial still
+  running?"* — so a model that has never seen the haystack still picks from a set of known size `k`
+  and lands gold at `1/k` by construction. The chance floor is **0.50** at `k=2` and **0.33** at
+  `k=3`. **The reject line sits below the floor.** A model that does nothing but guess is rejected
+  with probability **0.989** at `k=2`.
+
+  So on those questions V2 cannot separate a clean question from a guessable one. What its verdict
+  records is whether the reference model **abstained** — it passes when the model declines and fails
+  when the model guesses, and neither outcome is a property of the corpus. **The direction is the
+  flattering one:** an abstaining reference model turns the uninformative zone into passes, and
+  **69 questions carry a V2 pass on that basis** (temporal 33, prospective 21, episodic 15). Exactly
+  **one** closed-choice question is genuinely above chance, and one more was a **false failure**
+  reported on a hit count below what guessing alone produces.
+
+  **The same floor sits under the arms we publish.** A raw pass count reads as if zero were the
+  floor, and on these questions it is not. Chance-corrected as `(observed − chance) / (1 − chance)`:
+
+  | vertical | closed-choice | V9 raw | V9 corrected |
+  |---|---|---|---|
+  | prospective | 21 | 14/21 (0.67) | **0.33** |
+  | temporal | 35 | 24/35 (0.69) | **0.45** |
+  | episodic | 15 | 14/15 (0.93) | 0.87 |
+
+  Headroom (`V1 − V9`) is a difference and the floor largely cancels, so published headroom is not
+  inflated — if anything it was **understated**. The absolute pass counts were not.
+
+  The audit costs **no model calls**: `k` is read from the question text by literal pattern, so it
+  cannot be tuned toward a comfortable answer, and the hit counts come from probe records already on
+  disk. This is the fourth confirmed shape of the gate self-examination rule, after element-missing,
+  bar-supplied and diluted-denominator: **floor-below-chance** — the reject line sits beneath the
+  item's structural floor, so the gate separates reference-model behaviour rather than corpora.
+
+- **Forgetting's published coverage counts 15 questions it cannot measure.**
+  `tools/validate_coverage_population.py`.
+
+  `realised_coverage` is gold recall@K and opens `if not gold: return 1.0` — the right answer to
+  *"what share of gold did we find"* when there is no gold, and the wrong thing to average.
+  Forgetting's 15 `never-known` probes are **G=0 by design** (their gold *is* an absence), so each
+  contributes a constant 1.0 while measuring nothing.
+
+  | | |
+  |---|---|
+  | Forgetting published `mean_realised` | **0.670** |
+  | over questions that have gold | **0.529** |
+  | band | [0.50, 0.90] |
+
+  **Direction: flattering, and materially so.** 0.529 sits 0.029 above the band floor; 0.670 sits
+  comfortably mid-band. The echo calibration that placed Forgetting "safely" in band was optimising a
+  statistic that was **30% constant**, so the vertical is far nearer the floor than anything
+  published says. **Blast radius: Forgetting alone** — every other vertical is verified `0.000`, not
+  assumed.
+
+  This is the **diluted-denominator** shape wearing a statistic rather than a gate — the same error
+  as pooling judge grades into probe-answer denominators, failing in the same direction.
+
+  **Not fixed in this release, deliberately.** Correcting the aggregation changes the calibration
+  target, which changes the echo, which regenerates the corpus, moves the sha and resets every
+  Forgetting control. That is a declared corpus revision, not a side effect of a reporting fix, and
+  it is queued rather than smuggled into a release the consuming project is about to probe.
+
+  **The same tool now publishes per-shape coverage for the five verticals whose sidecars omit it** —
+  all 27 shapes. Two are out of the `[0.50, 0.90]` band and **declared nowhere**, because their
+  verticals publish no per-shape figure at all:
+
+  | shape | realised | |
+  |---|---|---|
+  | `episodic/list-order` | **0.275** | well below band |
+  | `forgetting/still-valid` | **0.467** | below band |
+
+  `episodic/list-order` is the sharper one: a reference retriever surfaces roughly a quarter of its
+  gold, so V9 there is dominated by retrieval failure rather than reasoning — and no reader of the
+  vertical mean (0.682) could tell. Three further shapes sit at or outside the band and are **not**
+  defects: `workingmemory/distance-8` and `distance-15` at 1.000 are a **declared** ladder where
+  coverage is meant to fall with distance, and `forgetting/never-known` at 1.000 is the G=0 constant
+  above. The tool says so in its own output rather than leaving a reader to infer it.
+
+- **A signal-density instrument — and it says 85.7% of the family is scaffolding, not arithmetic's
+  problem alone.** `tools/measure_signal_density.py`.
+
+  Nothing in the family asked what fraction of the text is *content*. Separability, coverage,
+  answerability and interference are all properties of whether a question can be **answered**; none
+  of them looks at the ratio. That hole cost the consuming project two false findings in a week,
+  both of which root-caused our corpus onto their extractor.
+
+  | | chars | padding | ledger voice |
+  |---|---|---|---|
+  | family | 7,111,367 | **85.7%** | — |
+  | range | | prospective 82.4% … semantic 88.5% | |
+  | arithmetic | 780,138 | 85.5% | **77.5%** of value-bearing sentences |
+  | every other vertical | | | **0.0%** |
+
+  *Ledger voice* is a bare common-noun subject carrying a value directly — `Payment logged against
+  X: $414.30` — a fine English sentence for a human and a **type, not an instance**, to anything
+  building triples. It is arithmetic's alone, which bounds that defect exactly.
+
+  Deliberately **not a gate and not a threshold**: padding is load-bearing — it equalises length,
+  punctuation and role sequence so V7 cannot separate gold from filler on shape alone — so a ceiling
+  picked from the air would trade a measured property for an invented one. The point is the number
+  is published and moves under review.
+
+  **And "load-bearing" is now measured, not asserted** — `tools/measure_padding_value.py`. Arithmetic
+  as shipped scores **0 of 45 features over the 0.75 separability bar**; padding-free it scores
+  **12**, topping out at 0.898. `uppercase_density` 0.598 → 0.898, `assistant_length_chars`
+  0.523 → 0.858. So the volume is doing its job and **no padding redesign is proposed.**
+
+  What the same numbers do show is *where* the pressure sits: every large mover is an **uppercase**
+  or **assistant-length** feature. Gold user turns carry proper nouns and gold assistant turns are
+  short acknowledgements, while filler is long, chatty and lowercase — padding pays in bulk text for
+  a mismatch living in two specific axes. Whether those could be equalised directly is a real design
+  question this does *not* answer, and no claim is made that it would work. The tool is meant as a
+  **gate on change**: any proposal that alters padding shows its numbers here before the corpus moves.
 
 ## [0.30.0-beta] - 2026-08-29
 
