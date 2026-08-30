@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Forgetting's coverage was 30% a constant, and the echo search had been optimising it.**
+  `realised_coverage` answers `1.0` when a question has no gold — vacuously, all of nothing was
+  found. That is the right answer and the wrong thing to average. Forgetting's 15 `never-known`
+  probes are **G=0 by design**, so the published `mean_realised` of **0.670** was three-tenths a
+  constant; measured over the questions that have gold it was **0.529**, against a band floor of
+  0.50. The vertical sat a third of the way to the floor from where it read.
+
+  **The correct treatment already existed in this codebase, in one place.**
+  `calibrate_per_shape`'s per-shape search drops these questions with the reasoning written out
+  beside it — *"no coverage to realise … excluded rather than allowed to pin a shape at saturation
+  it cannot leave"*. It was never carried to the vertical mean in either path, and Forgetting has no
+  per-shape calibration, so it fell exactly in the gap between them. **A correct treatment written
+  once and applied once is how a defect survives review: the reviewer sees the reasoning and assumes
+  its reach.**
+
+  | | before | after |
+  |---|---|---|
+  | `mean_realised` | 0.670 *(30% constant; true 0.529)* | **0.629** *(measured over 35 gold-bearing questions)* |
+  | echo | 0.500 | 0.250 |
+  | V1 | 32/35 | **34/35** |
+  | V8 interference | **−0.0571** | **+0.0857** |
+  | headroom | 0.2857 | **0.3714** |
+
+  A *negative* interference cost meant the full haystack outscored gold-only, which is incoherent;
+  it is now positive. **Which of the three changes fixed it — the echo, the new filler bank, or the
+  redraw — was not isolated**, and isolating it would cost a regeneration that destroys the probe
+  record, so it is reported as resolved rather than explained.
+
+  **Corpus sha `ba759097…` → `7fe6e166…`; Forgetting controls reset.** No other corpus touched.
+
+- **`CHOICES` was a gold-only construction, and the separability gate caught it mid-recalibration.**
+  Regenerating Forgetting under the corrected mean changed the draw, and the gate refused to write:
+  `"went with"` appeared in **12 gold sessions and zero distractors**. Every phrasing in the bank
+  was gold-only for the corpus's whole shipped life — it had stayed under the 20% bar **by luck, not
+  by design**.
+
+  Filler now draws from the same bank, at a share sized below the re-affirmation one so the
+  invalidation-shaped filler V3 needs is not crowded out. Filler states a **parity** value, never a
+  gold one, so the invariant the statement session rests on is untouched: the gold value still lives
+  in the gold session and nowhere else.
+
+  The rule was **already written in this same file**, one bank above: *"Re-affirmation frames, drawn
+  from ONE bank for gold and filler alike."* `CHOICES` simply never received the treatment its
+  neighbour did — the third instance today of a correct treatment applied once and not propagated.
+
 - **V2 now ships the caveat that makes its own number readable — and the threshold was deliberately
   NOT "fixed".** The arm asks each question with no haystack and rejects at 2 hits in 10. On an
   **open** question chance is ~0, so any hit is signal and the arm does exactly what it claims. On a

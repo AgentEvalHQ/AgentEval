@@ -8,7 +8,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656",
+  "corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -19,53 +19,105 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.67,
-    "echo": 0.5,
-    "iterations": 2,
+    "mean_realised": 0.6286,
+    "echo": 0.25,
+    "iterations": 15,
     "search_trace": [
       [
         1.0,
-        0.34
+        0.0286
       ],
       [
         0.5,
-        0.67
+        0.5429
+      ],
+      [
+        0.25,
+        0.6286
+      ],
+      [
+        0.125,
+        0.6286
+      ],
+      [
+        0.0625,
+        0.6286
+      ],
+      [
+        0.0312,
+        0.6286
+      ],
+      [
+        0.0156,
+        0.6286
+      ],
+      [
+        0.0078,
+        0.6286
+      ],
+      [
+        0.0039,
+        0.6286
+      ],
+      [
+        0.002,
+        0.6286
+      ],
+      [
+        0.001,
+        0.6286
+      ],
+      [
+        0.0005,
+        0.6286
+      ],
+      [
+        0.0002,
+        0.6286
+      ],
+      [
+        0.0001,
+        0.6286
+      ],
+      [
+        0.0001,
+        0.6286
       ]
     ],
     "per_question": {
       "tme-for-001": 1.0,
       "tme-for-002": 1.0,
-      "tme-for-003": 1.0,
+      "tme-for-003": 0.5,
       "tme-for-004": 0.5,
       "tme-for-005": 1.0,
-      "tme-for-006": 0.5,
-      "tme-for-007": 1.0,
-      "tme-for-008": 0.5,
-      "tme-for-009": 0.0,
-      "tme-for-010": 0.0,
+      "tme-for-006": 1.0,
+      "tme-for-007": 0.5,
+      "tme-for-008": 0.0,
+      "tme-for-009": 0.5,
+      "tme-for-010": 1.0,
       "tme-for-011": 0.0,
       "tme-for-012": 1.0,
-      "tme-for-013": 0.0,
-      "tme-for-014": 0.0,
+      "tme-for-013": 1.0,
+      "tme-for-014": 1.0,
       "tme-for-015": 0.0,
-      "tme-for-016": 0.5,
-      "tme-for-017": 1.0,
-      "tme-for-018": 1.0,
+      "tme-for-016": 1.0,
+      "tme-for-017": 0.0,
+      "tme-for-018": 0.5,
       "tme-for-019": 1.0,
-      "tme-for-020": 0.5,
-      "tme-for-021": 0.0,
-      "tme-for-022": 0.5,
-      "tme-for-023": 0.5,
+      "tme-for-020": 1.0,
+      "tme-for-021": 0.5,
+      "tme-for-022": 1.0,
+      "tme-for-023": 1.0,
       "tme-for-024": 1.0,
       "tme-for-025": 1.0,
       "tme-for-026": 1.0,
       "tme-for-027": 0.0,
       "tme-for-028": 0.0,
-      "tme-for-029": 0.5,
+      "tme-for-029": 1.0,
       "tme-for-030": 0.0,
       "tme-for-031": 0.0,
       "tme-for-032": 1.0,
-      "tme-for-033": 0.5,
+      "tme-for-033": 0.0,
       "tme-for-034": 1.0,
       "tme-for-035": 0.0,
       "tme-for-036_abs": 1.0,
@@ -105,24 +157,10 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": false,
     "empty_turns": {
-      "count": 253,
-      "of_turns": 5360,
+      "count": 219,
+      "of_turns": 5630,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
-    },
-    "scaffolding_dependence": {
-      "bm25_coverage_as_shipped": 0.5286,
-      "bm25_coverage_without_distractor_echo": 0.8714,
-      "dependence": 0.3429,
-      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
-    },
-    "retrieval_ceiling": {
-      "k_ref": 5,
-      "coverage_scaffolding_stripped": 0.8714,
-      "questions_needing_more_than_k_ref": 0,
-      "questions_scored": 35,
-      "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever.",
-      "accuracy_scaffolding_stripped": 0.8857
     }
   },
   "gold_item_types": {
@@ -340,40 +378,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5088,
+        "session_length_chars": 0.5194,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5336,
+        "position_in_haystack": 0.5171,
         "digit_density": 0.5,
-        "uppercase_density": 0.5577,
-        "sentence_count": 0.504,
-        "punctuation_density": 0.5033,
-        "em_dash_density": 0.5088,
-        "mean_turn_chars": 0.5088,
-        "type_token_ratio": 0.5595,
-        "first_user_length_chars": 0.6336,
-        "first_user_uppercase_density": 0.6708,
-        "first_user_sentence_count": 0.5602,
-        "first_assistant_length_chars": 0.6405,
-        "first_assistant_uppercase_density": 0.5212,
-        "first_assistant_sentence_count": 0.5409,
-        "user_slot1_length_chars": 0.5007,
+        "uppercase_density": 0.5409,
+        "sentence_count": 0.5611,
+        "punctuation_density": 0.5883,
+        "em_dash_density": 0.5177,
+        "mean_turn_chars": 0.5194,
+        "type_token_ratio": 0.5215,
+        "first_user_length_chars": 0.5819,
+        "first_user_uppercase_density": 0.5546,
+        "first_user_sentence_count": 0.6156,
+        "first_assistant_length_chars": 0.5686,
+        "first_assistant_uppercase_density": 0.5184,
+        "first_assistant_sentence_count": 0.6521,
+        "user_slot1_length_chars": 0.5055,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5423,
-        "assistant_slot2_length_chars": 0.5836,
+        "assistant_slot1_length_chars": 0.5259,
+        "assistant_slot2_length_chars": 0.5014,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5956,
-        "user_uppercase_density": 0.6109,
-        "user_sentence_count": 0.5686,
-        "user_punctuation_density": 0.55,
-        "user_type_token_ratio": 0.5296,
-        "user_mean_turn_chars": 0.5956,
-        "assistant_length_chars": 0.5533,
-        "assistant_uppercase_density": 0.5004,
-        "assistant_sentence_count": 0.5391,
-        "assistant_punctuation_density": 0.5146,
-        "assistant_type_token_ratio": 0.5752,
-        "assistant_mean_turn_chars": 0.5533,
+        "user_length_chars": 0.5716,
+        "user_uppercase_density": 0.5617,
+        "user_sentence_count": 0.6068,
+        "user_punctuation_density": 0.5508,
+        "user_type_token_ratio": 0.5658,
+        "user_mean_turn_chars": 0.5716,
+        "assistant_length_chars": 0.5447,
+        "assistant_uppercase_density": 0.5078,
+        "assistant_sentence_count": 0.6429,
+        "assistant_punctuation_density": 0.5617,
+        "assistant_type_token_ratio": 0.5068,
+        "assistant_mean_turn_chars": 0.5447,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -383,346 +421,343 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.5693,
-        "boilerplate_ngram": 0.6051
+        "gold_marker_ngram": 0.6061,
+        "boilerplate_ngram": 0.5754
       },
-      "worst_refused_feature": "first_user_uppercase_density",
-      "worst_refused_auc": 0.6708,
+      "worst_refused_feature": "first_assistant_sentence_count",
+      "worst_refused_auc": 0.6521,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "i",
-      "gold_marker_ngram_auc": 0.5693,
-      "worst_boilerplate_ngram": "week",
-      "boilerplate_ngram_auc": 0.6051,
+      "worst_gold_marker_ngram": "or near",
+      "gold_marker_ngram_auc": 0.6061,
+      "worst_boilerplate_ngram": "of",
+      "boilerplate_ngram_auc": 0.5754,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_in_haystack": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0095,
-          "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "share": 0.0286,
+          "chance": 0.0086,
+          "observed": 1,
+          "expected": 0.3,
+          "z": 1.28
         },
         "sentence_count": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "punctuation_density": {
-          "share": 0.0,
-          "chance": 0.0095,
-          "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "share": 0.0286,
+          "chance": 0.0086,
+          "observed": 1,
+          "expected": 0.3,
+          "z": 1.28
         },
         "em_dash_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_user_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_user_uppercase_density": {
-          "share": 0.0286,
-          "chance": 0.0095,
-          "observed": 1,
-          "expected": 0.33,
-          "z": 1.16
+          "share": 0.0,
+          "chance": 0.0086,
+          "observed": 0,
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_assistant_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_assistant_uppercase_density": {
-          "share": 0.0286,
-          "chance": 0.0095,
-          "observed": 1,
-          "expected": 0.33,
-          "z": 1.16
+          "share": 0.0,
+          "chance": 0.0086,
+          "observed": 0,
+          "expected": 0.3,
+          "z": -0.55
         },
         "first_assistant_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0095,
-          "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "share": 0.0571,
+          "chance": 0.0086,
+          "observed": 2,
+          "expected": 0.3,
+          "z": 3.11
         },
         "user_slot1_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_slot1_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_slot2_length_chars": {
-          "share": 0.0,
-          "chance": 0.0095,
-          "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "share": 0.0286,
+          "chance": 0.0086,
+          "observed": 1,
+          "expected": 0.3,
+          "z": 1.28
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "user_mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_length_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "assistant_mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         },
         "gold_marker_ngram": {
           "share": 0.0,
-          "chance": 0.0095,
+          "chance": 0.0086,
           "observed": 0,
-          "expected": 0.33,
-          "z": -0.58
+          "expected": 0.3,
+          "z": -0.55
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
-      "measured_at": "2026-08-19T06:22:47Z",
-      "probed_corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656"
+      "measured_by": "generator",
+      "probed_corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T14:44:27Z",
+    "run_at": "2026-08-30T16:54:29Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
-      "passed": 32,
+      "passed": 34,
       "failed": [
-        "tme-for-012",
-        "tme-for-013",
-        "tme-for-020"
+        "tme-for-013"
       ]
     },
     "v1_pair_flip": {
       "pairs": 15,
-      "passed": 13,
+      "passed": 14,
       "failed": [
-        "tme-for-p12",
         "tme-for-p13"
       ]
     },
@@ -772,15 +807,99 @@
       ],
       "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against"
     },
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 2,
+      "by_cache_key": {}
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "population": "probe_answers",
+        "calls": 35,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 35,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v2": {
+        "population": "probe_answers",
+        "calls": 350,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v3": {
+        "population": "probe_answers",
+        "calls": 105,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v6": {
+        "population": "probe_answers",
+        "calls": 153,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 85,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v8": {
+        "population": "probe_answers",
+        "calls": 36,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 35,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v9": {
+        "population": "probe_answers",
+        "calls": 36,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 35,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      }
+    },
+    "v8_full_haystack": {
+      "applicable": 35,
+      "v1_passed": 34,
+      "v8_passed": 31,
+      "interference_cost": 0.0857,
+      "regressed_under_interference": [
+        "tme-for-001",
+        "tme-for-004",
+        "tme-for-009",
+        "tme-for-024"
+      ],
+      "failures_with_no_captured_answer": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    },
+    "v9_reference_retrieval": {
+      "applicable": 35,
+      "v1_gold_only": 34,
+      "v8_full_haystack": 31,
+      "v9_bm25_top_k": 21,
+      "headroom_over_lexical_retrieval": 0.3714,
+      "headroom_unlimited_context_over_lexical": 0.2857,
+      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
     "by_shape": {
       "invalidated": {
         "questions": 20,
         "v1_applicable": 20,
-        "v1_passed": 17,
+        "v1_passed": 19,
         "v3_applicable": 20,
         "v3_passed": 20,
         "v8_applicable": 20,
-        "v8_passed": 19,
+        "v8_passed": 17,
         "v9_applicable": 20,
         "v9_passed": 13,
         "required_sessions_median": 2
@@ -804,19 +923,19 @@
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
-        "v8_passed": 15,
+        "v8_passed": 14,
         "v9_applicable": 15,
-        "v9_passed": 9,
+        "v9_passed": 8,
         "required_sessions_median": 2
       }
     },
     "per_question": {
       "tme-for-001": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "I can’t say that you’re driving any car at the moment. The only named car was the **Orrindale Vantage**, but later you said **the car had gone** and that you’d sold it to a dealer up the coast.",
+        "v8": false,
+        "v8_answer": "Orrindale Vantage.",
         "v9": true,
-        "v9_answer": "The conversations don’t say which car you’re driving at the moment. The last car mentioned was the Orrindale Vantage, but you later said the car had been sold to a dealer.",
+        "v9_answer": "The conversations don’t say which car you’re driving now. The only named car was the Orrindale Vantage, but you later said the car had gone and you sold it to a dealer.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -830,9 +949,9 @@
       "tme-for-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You don’t currently have a gym membership — you cancelled it outright. It had been with **Brackmoor Quartz**.",
+        "v8_answer": "You no longer have a gym membership — you cancelled it outright. Before cancelling, it was with **Feskin Verity**.",
         "v9": true,
-        "v9_answer": "Your gym membership was with **Brackmoor Quartz**, but you later said you **cancelled the membership outright**, so there is no current gym membership on record.",
+        "v9_answer": "Your gym membership was with **Feskin Verity**, but you later **cancelled it outright**, so you don’t currently have a gym membership according to the record.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -846,10 +965,10 @@
       "tme-for-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You are not currently registered with a dentist. You had registered with Orrindale Ember, but later came off their books when the practice closed.",
-        "v9": true,
-        "v9_answer": "You’re not currently registered with a dentist, based on the conversations. You had settled on **Orrindale Ember**, but later said you came off their books when the practice closed.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "You had registered with **Vantoro Anvil** near the station, but later said you **came off their books when the practice closed**. So, from these conversations, you are **not currently registered with a dentist**.",
+        "v9": false,
+        "v9_answer": "You’re registered with **Vantoro Anvil**, the dentist near the station.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -861,10 +980,10 @@
       },
       "tme-for-004": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "You chose **Ryhope Reverie** when you switched broadband, but later said you **left the provider mid-contract** after the third outage. No later broadband provider is recorded.",
+        "v8": false,
+        "v8_answer": "Tunbray — the latest broadband record says the tariff is “Tunbray Ordinary.”",
         "v9": false,
-        "v9_answer": "The conversations don’t plainly name your broadband provider. They only say your broadband tariff was **Selwick Regular**, and later that you left the provider mid-contract.",
+        "v9_answer": "The conversations don’t state your broadband provider. They only mention that the tariff is “Tunbray Ordinary” and that you left the provider mid-contract.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -878,9 +997,9 @@
       "tme-for-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "None now — you took the flat off the letting agent and manage it yourself. Previously, it was with Neskett Ember.",
+        "v8_answer": "None now. You took the flat off the letting agent and manage it yourself. Previously, it was with Pellow Ardent.",
         "v9": true,
-        "v9_answer": "No letting agent handles it now. You took the flat off Neskett Ember and manage it yourself.",
+        "v9_answer": "No letting agent handles it now. You took the flat off the letting agent and manage it yourself.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -894,10 +1013,10 @@
       "tme-for-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Neskett Anvil was the storage place chosen for the boxes.  \n\nBut later you said the storage unit was empty and the account had been closed, so it no longer holds them.",
-        "v9": false,
-        "v9_answer": "Neskett Anvil.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "It was **Vintry Anvil** — but later you said the storage unit was empty and you had closed the account, so **no storage place currently holds the boxes**.",
+        "v9": true,
+        "v9_answer": "None currently. Earlier you chose **Vintry Anvil** for the boxes, but later you said the storage unit was empty and the account was closed.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -910,10 +1029,10 @@
       "tme-for-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You aren’t riding a bike now. You had picked a Vintry Meridian, but later said it was stolen outside the library and never replaced.",
-        "v9": true,
-        "v9_answer": "None. You had a Vintry Meridian, but it was stolen outside the library and you never replaced it.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "You aren’t riding a bike now. You had a Kelbrick Solace, but it was stolen from outside the library and never replaced.",
+        "v9": false,
+        "v9_answer": "Kelbrick Solace.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -926,10 +1045,10 @@
       "tme-for-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No one currently. You had gone with Wistan Kindred, but later said the accounts are unattended and you ended the engagement after the filing mess.",
-        "v9": true,
-        "v9_answer": "No one, as far as these conversations say. You said the accounts are unattended, and that you ended the engagement after the filing mess.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "No one currently. You had gone with **Kelbrick Quartz**, but later said the accounts were unattended and you had ended the engagement after the filing mess.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say who does your accounts.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -941,11 +1060,11 @@
       },
       "tme-for-009": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "You were on **Kelbrick Quartz**, but later you said **that tariff is finished** and you let it lapse when the handset died. No later phone tariff is mentioned.",
+        "v8": false,
+        "v8_answer": "Padstowe Plain. The earlier Neskett Quartz tariff had lapsed when the handset died.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They mention broadband tariff details, but not your phone tariff.",
-        "v9_gold_in_context": 0,
+        "v9_answer": "The conversations don’t say which phone tariff you’re on. They only say the tariff is finished and you let it lapse when the handset died.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -958,10 +1077,10 @@
       "tme-for-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No one currently. The flat is uninsured; the Cambourne Cascade policy ran out and was not renewed.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say who insures the flat.",
-        "v9_gold_in_context": 0,
+        "v8_answer": "No one currently insures the flat. The latest note says the flat is uninsured because the policy was allowed to run out and was not renewed.",
+        "v9": true,
+        "v9_answer": "No one currently insures the flat. It was previously with Vintry Vantage, but on 2026/02/21 you said the policy had run out and you did not renew, so the flat is uninsured.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -974,7 +1093,7 @@
       "tme-for-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Nobody is cleaning the flat now. The cleaner visits were stopped when the rate went up.",
+        "v8_answer": "Nobody cleans the flat now — the cleaning visits were stopped when the rate went up.",
         "v9": true,
         "v9_answer": "The conversations do not say who cleans the flat.",
         "v9_gold_in_context": 0,
@@ -988,11 +1107,11 @@
         "v6_redundant_components": []
       },
       "tme-for-012": {
-        "v1": false,
-        "v8": false,
-        "v8_answer": "Your coffee beans were from **Vantoro Quartz**. You later stopped the standing order after a bad batch.",
-        "v9": false,
-        "v9_answer": "Your coffee beans came from Vantoro Quartz, though you later stopped the standing order after a bad batch.",
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No beans are arriving now — you stopped the standing order after the last bad batch. Before that, the coffee beans were from **Brackmoor Reverie**.",
+        "v9": true,
+        "v9_answer": "Your coffee bean standing order was with **Brackmoor Reverie**, but you later stopped it after a bad batch, so **no beans are arriving now**.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1006,10 +1125,10 @@
       "tme-for-013": {
         "v1": false,
         "v8": true,
-        "v8_answer": "You were seeing **Brackmoor Vantage** for shoulder physio — but you later said the physio work was over and you’d been discharged at the final appointment.",
-        "v9": false,
-        "v9_answer": "I don’t know — the conversations only mention “physio” in passing, not which physio you’re seeing.",
-        "v9_gold_in_context": 0,
+        "v8_answer": "The conversations don’t say which physio you were seeing. They only say you started physio for your shoulder, and later that the physio work was over and you were discharged.",
+        "v9": true,
+        "v9_answer": "You’re not seeing a physio now — the physio work is over and you were discharged at the final appointment. Earlier, the name mentioned was **Neskett Reverie**.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1022,10 +1141,10 @@
       "tme-for-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Feskin Vantage taught you guitar, but the lessons have since stopped because the teacher moved away.",
+        "v8_answer": "No one currently — you gave up the guitar lessons when the teacher moved away. The teacher had been Draythe Kindred.",
         "v9": true,
-        "v9_answer": "The conversations don’t say who teaches you guitar.",
-        "v9_gold_in_context": 0,
+        "v9_answer": "No one currently — the guitar lessons stopped when the teacher moved away. The teacher had been Draythe Kindred.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1038,9 +1157,9 @@
       "tme-for-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "No firm is doing them now. You had chosen **Brackmoor Ember**, but later said the window job was dead and you pulled out before any work started.",
-        "v9": true,
-        "v9_answer": "The conversations don’t say which firm is doing your windows. They only mention that the guttering contractor is Aldmoor Plain.",
+        "v8_answer": "No firm is doing your windows now. You had signed with Pellow Solace, but you later pulled out of the contract before any work started.",
+        "v9": false,
+        "v9_answer": "Padstowe Classic.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1054,10 +1173,10 @@
       "tme-for-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You don’t currently use a vet. Earlier you had registered the cat with **Kelbrick Vantage**, but later you said you took her off their books when you stopped going.",
+        "v8_answer": "You don’t use a vet at present. The cat was previously registered with **Vantoro Reverie**, but you took her off their books when you stopped going.",
         "v9": true,
-        "v9_answer": "You don’t currently use a vet. You said you took her off their books when you stopped going.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "You have no vet at present. You previously registered the cat with **Vantoro Reverie**, but later took her off their books when you stopped going.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1070,10 +1189,10 @@
       "tme-for-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You don’t currently have a hairdresser recorded. You had settled on **Cambourne Anvil**, but later stopped going after the price rise.",
+        "v8_answer": "I don’t know from these conversations. They say you settled on **Ulverston Anvil**, but later **stopped going after the price rise**. No current replacement hairdresser is recorded.",
         "v9": true,
-        "v9_answer": "You don’t currently go to the hairdresser mentioned. You had settled on Cambourne Anvil, but later said you stopped going after the price rise. No new hairdresser is mentioned.",
-        "v9_gold_in_context": 2,
+        "v9_answer": "The conversations don’t say which hairdresser you go to.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1086,10 +1205,10 @@
       "tme-for-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re not in a running club now — you said you’re clubless and let the membership lapse. Previously, you had chosen Brackmoor Quartz.",
-        "v9": true,
-        "v9_answer": "You’re not in a running club now — you said you are “clubless for running” because the membership lapsed.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "You’re not in a running club now — you said you were clubless after letting the membership lapse. Previously, you had gone with Kelbrick Cascade.",
+        "v9": false,
+        "v9_answer": "Kelbrick Cascade.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1102,9 +1221,9 @@
       "tme-for-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You aren’t currently a member of a wine club. You had joined **Oswent Ember**, but you later quit after the third duplicate case.",
+        "v8_answer": "You are not currently a member of a wine club, according to the conversations. You signed up with **Orrindale Meridian**, later it was **Ashcombe Classic**, but then you said you **quit the club after the third duplicate case**.",
         "v9": true,
-        "v9_answer": "You’re not currently a member of a wine club, as far as these conversations say. You had signed up with **Oswent Ember**, but later said you quit after the third duplicate case.",
+        "v9_answer": "You are not currently a member of a wine club. You had signed up with **Orrindale Meridian**, but later said you quit the club.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1116,12 +1235,12 @@
         "v6_redundant_components": []
       },
       "tme-for-020": {
-        "v1": false,
+        "v1": true,
         "v8": true,
-        "v8_answer": "Vantoro Ember.  \n\nThough the later note says there are no more osteopath appointments now—the course finished.",
-        "v9": false,
-        "v9_answer": "Vantoro Ember.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "You had gone with **Cambourne Solace**, but later you said there are **no more osteopath appointments** because the course finished.",
+        "v9": true,
+        "v9_answer": "You went with **Cambourne Solace**, though you later said there were **no more osteopath appointments** because the course had finished.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1134,10 +1253,10 @@
       "tme-for-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re driving the **Orrindale Quartz**.",
-        "v9": false,
-        "v9_answer": "The conversations do not say which car you are driving at the moment.",
-        "v9_gold_in_context": 0,
+        "v8_answer": "You’re driving a **Trellick Meridian**.",
+        "v9": true,
+        "v9_answer": "You picked **Trellick Meridian**, so that’s the car indicated by the conversations.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1146,112 +1265,17 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          9,
-          23
+          2,
+          8
         ]
       },
       "tme-for-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your gym membership is with **Draythe Reverie**.",
+        "v8_answer": "Your gym membership is with **Wistan Cascade**.",
         "v9": true,
-        "v9_answer": "Your gym membership is with **Draythe Reverie**.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          9,
-          14
-        ]
-      },
-      "tme-for-023": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You are registered with **Feskin Reverie**.",
-        "v9": true,
-        "v9_answer": "You’re registered with **Feskin Reverie**.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          8,
-          19
-        ]
-      },
-      "tme-for-024": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Your broadband provider is **Larkmead Vantage**.",
-        "v9": true,
-        "v9_answer": "Your broadband provider is Larkmead Vantage.",
+        "v9_answer": "Your gym membership is with **Wistan Cascade**.",
         "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          11,
-          17
-        ]
-      },
-      "tme-for-025": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Cambourne Vantage.",
-        "v9": true,
-        "v9_answer": "Cambourne Vantage.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          3,
-          9
-        ]
-      },
-      "tme-for-026": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Neskett Verity.",
-        "v9": true,
-        "v9_answer": "Neskett Verity.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          13,
-          18
-        ]
-      },
-      "tme-for-027": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Trellick Pilot.",
-        "v9": false,
-        "v9_answer": "I don’t know. The conversations mention “bike” being on your mind, but they don’t say which bike you’re riding.",
-        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1261,13 +1285,107 @@
         "v6": false,
         "v6_redundant_components": [
           10,
-          14
+          16
+        ]
+      },
+      "tme-for-023": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Orrindale Kindred.",
+        "v9": true,
+        "v9_answer": "Orrindale Kindred.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          10,
+          15
+        ]
+      },
+      "tme-for-024": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "The latest relevant record says your broadband is **Herrold Basic** — so the provider is **Herrold**.\n\nEarlier records also mention **Brackmoor Verity**, but the most recent broadband entry says **Herrold Basic**.",
+        "v9": true,
+        "v9_answer": "Your broadband provider is **Brackmoor Verity**.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          15
+        ]
+      },
+      "tme-for-025": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellow Anvil.",
+        "v9": true,
+        "v9_answer": "Pellow Anvil.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          9,
+          13
+        ]
+      },
+      "tme-for-026": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Halbury Ember.",
+        "v9": true,
+        "v9_answer": "Halbury Ember.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          1,
+          15
+        ]
+      },
+      "tme-for-027": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ulverston Reverie.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say which bike you’re riding.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          4,
+          10
         ]
       },
       "tme-for-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ulverston Quartz does your accounts/returns.",
+        "v8_answer": "Draythe Kindred.",
         "v9": false,
         "v9_answer": "The conversations don’t say who does your accounts.",
         "v9_gold_in_context": 0,
@@ -1279,17 +1397,17 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          8,
-          12
+          22,
+          24
         ]
       },
       "tme-for-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You are on the **Neskett Kindred** phone tariff.",
-        "v9": true,
-        "v9_answer": "You’re on the **Neskett Kindred** phone tariff.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "You’re on **Ulverston Vantage**.",
+        "v9": false,
+        "v9_answer": "Bexley Simple.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1298,16 +1416,16 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          11,
-          16
+          16,
+          17
         ]
       },
       "tme-for-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Kelbrick Verity.",
+        "v8_answer": "Feskin Vantage.",
         "v9": false,
-        "v9_answer": "The conversations do not say who insures the flat.",
+        "v9_answer": "Aldmoor Plain.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1317,14 +1435,14 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          13,
-          19
+          20,
+          21
         ]
       },
       "tme-for-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Orrindale Ardent — they were booked as the cleaner for fortnightly visits, and later confirmed as unchanged.",
+        "v8_answer": "Wistan Anvil cleans the flat.",
         "v9": false,
         "v9_answer": "The conversations do not say who cleans the flat.",
         "v9_gold_in_context": 0,
@@ -1336,16 +1454,16 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          3,
-          19
+          8,
+          17
         ]
       },
       "tme-for-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your coffee beans come from Brackmoor Quartz.",
+        "v8_answer": "Your coffee beans come from **Quarrell Cascade**.",
         "v9": true,
-        "v9_answer": "Your coffee beans come from Brackmoor Quartz.",
+        "v9_answer": "Your coffee beans come from Quarrell Cascade.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1355,54 +1473,16 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          4,
-          15
+          17,
+          24
         ]
       },
       "tme-for-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Larkmead Solace.",
-        "v9": true,
-        "v9_answer": "Larkmead Solace.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          5,
-          7
-        ]
-      },
-      "tme-for-034": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Vintry Verity teaches you guitar.",
-        "v9": true,
-        "v9_answer": "Vintry Verity.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          10,
-          20
-        ]
-      },
-      "tme-for-035": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Draythe Ardent.",
+        "v8_answer": "You’re seeing **Pellow Pilot**.",
         "v9": false,
-        "v9_answer": "The conversations don’t say which firm is doing your windows. They only mention “firm” in passing, without naming it.",
+        "v9_answer": "The conversations don’t say which physio you’re seeing. They only mention “physio” being on your mind.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1412,8 +1492,46 @@
         "ablation_samples": 3,
         "v6": false,
         "v6_redundant_components": [
-          8,
+          18,
+          19
+        ]
+      },
+      "tme-for-034": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Trellick Vantage.",
+        "v9": true,
+        "v9_answer": "Trellick Vantage teaches you guitar.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          2,
           9
+        ]
+      },
+      "tme-for-035": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Brackmoor Pilot.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say which firm is doing your windows.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": false,
+        "v6_redundant_components": [
+          13,
+          14
         ]
       },
       "tme-for-036_abs": {
@@ -1537,102 +1655,6 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "ba759097b9bd1fd3eff125afb7ce62d1cdba6bb2c0d9022c705ec6bb6c9e7656",
-    "v8_full_haystack": {
-      "applicable": 35,
-      "v1_passed": 32,
-      "v8_passed": 34,
-      "interference_cost": -0.0571,
-      "regressed_under_interference": [],
-      "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
-    },
-    "v9_reference_retrieval": {
-      "applicable": 35,
-      "v1_gold_only": 32,
-      "v8_full_haystack": 34,
-      "v9_bm25_top_k": 22,
-      "headroom_over_lexical_retrieval": 0.2857,
-      "headroom_unlimited_context_over_lexical": 0.3429,
-      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
-    },
-    "empty_completion_disclosure": {
-      "measured_over": "the 4033 cached reference-model calls present in this tree, attributed by cache-key arm and split into probe answers and judge grades; not necessarily the full historical run",
-      "empty_completion_rate": {
-        "v1": "0/110",
-        "v2": "0/1100",
-        "v3": "258/330 (78.2%)",
-        "v6": "182/675 (27.0%)",
-        "v8": "3/110 (2.7%)",
-        "v9": "8/110 (7.3%)",
-        "v9strip": "4/352 (1.1%)"
-      },
-      "direction": {
-        "v8_v9": "CONSERVATIVE. An empty completion cannot match gold, so it scores as a failure and the published pass count is a lower bound.",
-        "v3_v6": "ANTI-CONSERVATIVE, and this is the serious one. V3 passes when an ablated context FAILS to reproduce the answer, and an empty completion cannot reproduce anything, so silence scores as a PASS. V6 has the same shape. Two thirds of V3's calls are empty, so its 50/50 results certify less than they appear to."
-      },
-      "reading": "An empty completion is not evidence of anything, but the probe arms treated it as evidence in both directions at once. The likely cause is a reasoning deployment spending the completion budget on reasoning tokens before emitting content -- V2, whose prompt carries no session context, has a zero rate, while V3 and V6, which ask the model to work hard over a context that no longer contains the answer, have the highest. V3 AND V6 MUST BE RE-RUN BEFORE THEY ARE CITED AGAIN. V1, V2, V7 are unaffected. The capture path now retries a length-truncated empty at a larger budget, records finish_reason, filter verdict and usage for any that remain, and no longer serves an empty cache entry as a purchased answer.",
-      "correction": "SUPERSEDES the figures published in 0.27.0-beta, which were UNDERSTATED in every affected arm. That cut parsed an arm token as `v` plus digits only, so the 700 `v9strip` calls fell through a fallback into v1 (denominator 220 -> 920) and `v9strip` itself got no bucket and so no ceiling; judge grades were also pooled into each arm's denominator. Corrected, probe-answer only: v3 66.7% -> 78.2%, v6 21.1% -> 27.0%, v9 3.8% -> 7.3%, v1 0.4% -> 0.0%. Judge grades are healthy at 0/1246 empty, so the pooling diluted the rates without changing their direction. The V3/V6 re-run requirement is unchanged and slightly larger than first stated."
-    },
-    "empty_rate_by_arm": {
-      "v1": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v2": {
-        "population": "probe_answers",
-        "calls": 2450,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 833,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v3": {
-        "population": "probe_answers",
-        "calls": 627,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 221,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v6": {
-        "population": "probe_answers",
-        "calls": 826,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 321,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v8": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v9": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      }
-    },
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
-    "empty_completions": {
-      "count": 0
-    }
+    "probed_corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743"
   }
 }
