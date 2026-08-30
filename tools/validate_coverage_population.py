@@ -69,9 +69,28 @@ def main() -> int:
                     if with_gold else None)
         published = meta.get("coverage", {}).get("mean_realised")
 
+        # PER-SHAPE, FOR THE FIVE VERTICALS THAT DO NOT PUBLISH IT. Only four verticals opted into
+        # per-shape calibration, and the vertical mean is exactly what hid Prospective's
+        # `not-yet-true` at a saturated 1.000 for its whole shipped life. Coverage is structural
+        # BM25, so recomputing it costs nothing - there is no reason for these numbers to be absent
+        # from a report just because they are absent from a sidecar.
+        by_shape: dict[str, list[float]] = {}
+        for question in questions:
+            shape = question.extension.get("shape", "(unshaped)")
+            by_shape.setdefault(shape, []).append(tmc.realised_coverage(question))
+        shapes = {
+            shape: {
+                "questions": len(values),
+                "realised": round(sum(values) / len(values), 3),
+                "published_by_generator": "per_shape_realised" in (meta.get("coverage") or {}),
+            }
+            for shape, values in sorted(by_shape.items())
+        }
+
         report[vertical] = {
             "questions": len(questions),
             "questions_with_no_gold": len(no_gold),
+            "per_shape_realised": shapes,
             "published_mean_realised": published,
             "recomputed_over_all": round(pooled, 4),
             "recomputed_over_gold_bearing": round(measured, 4) if measured is not None else None,
@@ -79,7 +98,8 @@ def main() -> int:
             "in_band_as_published": published is not None and BAND_LOW <= published <= BAND_HIGH,
             "in_band_as_measured": measured is not None and BAND_LOW <= measured <= BAND_HIGH,
         }
-        rows.append((vertical, len(questions), len(no_gold), published, pooled, measured))
+        rows.append((vertical, len(questions), len(no_gold), published, pooled, measured, shapes,
+                     "per_shape_realised" in (meta.get("coverage") or {})))
 
     if as_json:
         print(json.dumps(report, indent=2))
@@ -91,7 +111,7 @@ def main() -> int:
           f"{'dilution':>9s}")
     print("-" * 96)
     diluted = 0
-    for vertical, n, zero, published, pooled, measured in rows:
+    for vertical, n, zero, published, pooled, measured, _shapes, _pub in rows:
         gap = (measured - pooled) if measured is not None else 0.0
         flag = ""
         if zero:
@@ -107,6 +127,31 @@ def main() -> int:
     print("the calibration search optimises a partly constant statistic.")
     print()
     print(f"VERTICALS AFFECTED: {diluted}. The rest are verified 0.000, not assumed.")
+
+    print()
+    print("PER-SHAPE COVERAGE, INCLUDING THE FIVE VERTICALS THAT DO NOT PUBLISH IT")
+    print("=" * 96)
+    print("Only four verticals opted into per-shape calibration, and the vertical mean is exactly")
+    print("what hid Prospective's not-yet-true at a saturated 1.000 for its whole shipped life.")
+    print("Coverage is structural BM25, so these cost nothing to recompute.")
+    print()
+    print(f"{'vertical':14s} {'shape':24s} {'q':>3s} {'realised':>9s}  note")
+    print("-" * 96)
+    for vertical, _n, _z, _pub_mean, _pooled, _measured, shapes, published_shapes in rows:
+        for shape, d in shapes.items():
+            note = ""
+            if d["realised"] >= 1.0:
+                note = "saturated"
+            elif not (BAND_LOW <= d["realised"] <= BAND_HIGH):
+                note = "out of band"
+            if not published_shapes:
+                note = (note + "; not published") if note else "not published"
+            print(f"{vertical:14s} {shape:24s} {d['questions']:3d} {d['realised']:9.3f}  {note}")
+    print()
+    print("A saturated shape is not automatically a defect - WorkingMemory's distance ladder is")
+    print("declared, and coverage is MEANT to fall with distance, so its short rungs sit high by")
+    print("design. Forgetting's never-known sits at 1.000 because it is G=0 and measures nothing.")
+    print("Read the generator's declaration before calling any row here a fault.")
     return 0
 
 
