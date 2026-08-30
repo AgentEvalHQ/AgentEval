@@ -1895,8 +1895,12 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
     def scored(questions: list[Question], shape: str) -> list[float]:
         # Questions with no gold have no coverage to realise -- the ratio is 0/0 and reads 1.0 --
         # so they are excluded rather than allowed to pin a shape at saturation it cannot leave.
+        # Spelled `q.g > 0`, the same predicate measurable_coverage_mean uses. It read
+        # `any(s.is_gold for s in q.sessions)` here, which is equivalent -- and two spellings of one
+        # rule is how the rule ends up applied in one place and not the other, which is exactly the
+        # defect this exclusion was missing from everywhere else.
         return [realised_coverage(q) for q in questions
-                if shape_of(q) == shape and any(s.is_gold for s in q.sessions)]
+                if shape_of(q) == shape and q.g > 0]
 
     probe = attempt({})
     shapes = sorted({shape_of(q) for q in probe})
