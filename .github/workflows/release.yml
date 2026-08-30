@@ -103,6 +103,102 @@ jobs:
         }
         Write-Host "All packed AgentEval assemblies report $expected."
 
+    - name: Verify the packed corpora are the corpora in this repository
+      shell: pwsh
+      run: |
+        # The step above proves the packed assemblies carry the right VERSION. It does not prove they
+        # carry the right CORPUS, and those are different failures: a glob that stops matching, a
+        # stale obj/ artifact surviving an incremental build, or a corpus regenerated after the last
+        # rebuild all ship a correct version number wrapped around the wrong bytes. Until this step
+        # existed, the link between "the sidecar says 31d26e60" and "the bytes a consumer downloads
+        # are 31d26e60" was held by the build being correct, not by anything checking.
+        #
+        # ALL FRAMEWORKS, NOT ONE. The package ships net8.0/net9.0/net10.0, each with its own
+        # AgentEval.Memory.dll and its own embedded copy of every corpus. This repo has a recorded
+        # multi-TFM stale-binary trap, and a per-TFM divergence is that trap wearing a corpus: a
+        # consumer on net8 would probe different bytes than one on net10 while every published sha
+        # names only one of them.
+        $repoCorpora = Join-Path $env:GITHUB_WORKSPACE 'src/AgentEval.Memory/Data/typedmemeval'
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        function Get-NormalisedHash([string] $text) {
+          # Exactly the sidecar convention: CRLF -> LF, UTF-8, SHA256. A check that normalised
+          # differently would measure normalisation rather than content.
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes(($text -replace "`r`n", "`n"))
+          return ((($sha.ComputeHash($bytes)) | ForEach-Object { $_.ToString('x2') }) -join '')
+        }
+
+        $expectedCorpora = @{}
+        foreach ($f in Get-ChildItem $repoCorpora -Recurse -Filter '*.json') {
+          if ($f.Name -like '*.meta.json') { continue }
+          $expectedCorpora[$f.Name] = Get-NormalisedHash ([System.IO.File]::ReadAllText($f.FullName))
+        }
+        if ($expectedCorpora.Count -eq 0) {
+          Write-Host "::error::No corpora found under $repoCorpora. Refusing to pass a check with nothing in it."
+          exit 1
+        }
+        Write-Host "Reference corpora in the working tree: $($expectedCorpora.Count)"
+
+        $failures = @()
+        $mvids = @()
+        $assertions = 0
+        foreach ($pkg in Get-ChildItem ./nupkgs/*.nupkg) {
+          $dir = Join-Path $env:RUNNER_TEMP ("c_" + $pkg.BaseName)
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          [IO.Compression.ZipFile]::ExtractToDirectory($pkg.FullName, $dir)
+          foreach ($dll in Get-ChildItem $dir -Recurse -Filter 'AgentEval.Memory.dll') {
+            $tfm = Split-Path -Leaf (Split-Path -Parent $dll.FullName)
+            $label = "$($pkg.Name)/$tfm"
+            $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll.FullName))
+            # The MVID is unique per compilation. Collecting them lets the step PROVE it opened a
+            # different assembly each time instead of trusting the loader not to hand back a cached
+            # one -- a gate that verified a single framework three times would pass while two were
+            # never read.
+            $mvids += $asm.ManifestModule.ModuleVersionId
+            $seen = @{}
+            foreach ($res in $asm.GetManifestResourceNames()) {
+              if ($res -notmatch 'typedmemeval' -or $res -like '*.meta.json') { continue }
+              $name = ($res -replace '^.*?([^.]+-v[0-9]+)\.json$', '$1') + '.json'
+              $stream = $asm.GetManifestResourceStream($res)
+              $ms = New-Object IO.MemoryStream
+              $stream.CopyTo($ms)
+              $actual = Get-NormalisedHash ([Text.Encoding]::UTF8.GetString($ms.ToArray()))
+              if (-not $expectedCorpora.ContainsKey($name)) {
+                $failures += "$label : embedded '$name' has no counterpart in the repository"
+                continue
+              }
+              $seen[$name] = $true
+              $assertions++
+              if ($actual -ne $expectedCorpora[$name]) {
+                $failures += "$label/$name : packed $($actual.Substring(0,16)) != repo $($expectedCorpora[$name].Substring(0,16))"
+              }
+            }
+            # A framework that embedded nothing must fail loudly rather than contribute zero
+            # comparisons and leave the totals looking healthy.
+            foreach ($missing in ($expectedCorpora.Keys | Where-Object { -not $seen.ContainsKey($_) })) {
+              $failures += "$label : '$missing' is MISSING from the packed assembly"
+            }
+          }
+        }
+
+        if ($mvids.Count -eq 0) {
+          Write-Host "::error::No AgentEval.Memory.dll found in any package. Nothing was verified."
+          exit 1
+        }
+        $distinct = ($mvids | Select-Object -Unique).Count
+        if ($distinct -ne $mvids.Count) {
+          Write-Host "::error::Read $($mvids.Count) assemblies but only $distinct distinct MVIDs -- the same assembly was verified more than once and some framework was never opened."
+          exit 1
+        }
+
+        Write-Host "Frameworks verified: $($mvids.Count) (all distinct assemblies)"
+        Write-Host "Corpus assertions:   $assertions"
+        if ($failures) {
+          Write-Host "::error::Packed corpora do not match the repository. Nothing was pushed."
+          $failures | Select-Object -Unique | ForEach-Object { Write-Host "  $_" }
+          exit 1
+        }
+        Write-Host "All packed corpora are byte-identical to the repository."
+
     - name: Push to NuGet
       run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
