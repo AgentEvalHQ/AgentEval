@@ -251,8 +251,28 @@ _ABLATION_MAX_TOKENS = 16_000
 _empty_reasons: dict[str, dict] = {}
 
 
+#: Set by --dry-run. Every completion is answered by a stub, so the ENTIRE code path around the
+#: model runs -- prompt assembly, retrieval, the evidence and silence screens, arm attribution,
+#: record building -- while nothing is purchased and no credentials are needed.
+#:
+#: This exists because the standing rule before any paid run is "dry-run every case first, then one
+#: real item, then the full run", and the tool had no way to do the first step. It was improvised
+#: with a throwaway script each time, which is the same defect this family keeps finding elsewhere:
+#: a rule written down is not a rule enforced. A dry run must also never WRITE, or a free check can
+#: overwrite real measurements with stub answers -- see main().
+_DRY_RUN = False
+
+#: What the stub returns. Deliberately NOT a plausible answer: a dry run is checking that the
+#: plumbing carries a value end to end, and a stub that looked like a real answer would let a
+#: broken screen score it as correct and report a green run that measured nothing.
+_DRY_RUN_ANSWER = "DRY-RUN-STUB-ANSWER"
+
+
 def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
     """One chat completion, cached so an interrupted run resumes instead of re-paying."""
+    if _DRY_RUN:
+        _arm_calls[_arm_and_kind(cache_key)] += 1
+        return _DRY_RUN_ANSWER
     load_cache()
     with _cache_lock:
         # An EMPTY cached value is not a purchased answer, so it is not served as one. The cache
@@ -984,8 +1004,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
     gold_counts = {e["question_id"]: len(e.get("answer_session_ids") or []) for e in entries}
     # Paired arms, for the shapes that have them. See _pair_discrimination.
-    arms = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
-                               (e.get("typedmemeval") or {}).get("arm")) for e in entries}
+    #
+    # NAMED `arm_of`, NOT `arms`. The V1-pair loop below rebinds `arms` to the two questions of one
+    # pair -- `for pid, arms in sorted(pairs.items())` -- so a dict built here under that name is a
+    # LIST by the time the by_shape block reads it, and only on verticals that actually have pairs:
+    # the one vertical this instrument exists for. Caught by the first --dry-run, which is the
+    # entire argument for having one.
+    arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
+                                 (e.get("typedmemeval") or {}).get("arm")) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -1141,7 +1167,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v9_passed": sum(1 for r in group if r.get("v9") is True),
                 "required_sessions_median": _median_g(group, gold_counts),
                 **_discrimination(group),
-                **_pair_discrimination(group, arms),
+                **_pair_discrimination(group, arm_of),
             }
             for shape, group in sorted(
                 {s: [r for r in records if shapes.get(r["question_id"]) == s]
@@ -1553,6 +1579,11 @@ def main() -> None:
     parser.add_argument("verticals", nargs="*", default=[], help="verticals to probe; default all")
     parser.add_argument("--limit", type=int, default=None, help="probe only the first N questions")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--dry-run", action="store_true",
+                        help="exercise every case through the real code path with a stub model: no "
+                             "API calls, no credentials, and NOTHING written. The first stage of "
+                             "the standing three-stage protocol (dry-run all, then one real item, "
+                             "then the full run)")
     parser.add_argument("--self-test", action="store_true",
                         help="check the evidence screen against known-bad cases; needs no credentials")
     parser.add_argument("--restamp-empty-rates-from-cache", action="store_true",
@@ -1563,6 +1594,9 @@ def main() -> None:
     if args.self_test:
         self_test()
         return
+
+    if args.dry_run:
+        globals()["_DRY_RUN"] = True
 
     if args.restamp_empty_rates_from_cache:
         restamp_empty_rates_from_cache(args.verticals or list(tmc.VERTICALS))
@@ -1582,9 +1616,12 @@ def main() -> None:
             # difference was a truncation rather than a corpus that shrank. Same failure as every
             # other one this family has had -- a partial measurement stored where a measurement is
             # expected -- so the smoke test now prints and writes nothing.
-            if args.limit:
-                print(f"{vertical}: --limit run, metadata NOT written (partial measurement)",
-                      flush=True)
+            if args.limit or args.dry_run:
+                # A dry run writes NOTHING for the same reason a --limit run does not, only more
+                # so: its answers are stubs. Writing them would replace real reference-model
+                # measurements with a placeholder, and the sidecar would look probed.
+                why = "--limit run, partial measurement" if args.limit else "--dry-run, stub answers"
+                print(f"{vertical}: {why}, metadata NOT written", flush=True)
                 continue
             corpus_id = f"agenteval-typedmemeval-{vertical}-{tmc.CORPUS_REVISION}"
             meta_path = tmc.DATA_ROOT / vertical / f"{corpus_id}.meta.json"

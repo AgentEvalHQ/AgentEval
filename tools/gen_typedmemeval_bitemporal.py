@@ -64,6 +64,11 @@ DEPTH_PAIRS = 12
 H_MIN, H_MAX = 14, 24
 _BASE = datetime(2026, 1, 5, 9, 15)
 
+#: Same-subject, other-month distractors per question. Three is enough to push the sessions naming
+#: the asked subject past K_REF=5 once the record and its corrections are counted, which is the
+#: point: below that a retriever can return every subject match and never choose.
+_SIDE_FACTS = 3
+
 #: Months named as instants. Bitemporal cannot avoid naming a time -- "as of June" IS the question --
 #: so this vertical declares `no_absolute_dates=False` rather than pretending otherwise. Bare month
 #: names carry no year and no day, so they cannot be resolved to a calendar date from the text alone;
@@ -269,7 +274,11 @@ def _pair(qid_valid: str, qid_txn: str, pair_id: str, shape: str, qtype: str,
     # evidence on two clocks. Getting this wrong is quiet: adding the gold on top read H=27 against
     # a declared [14,24], and reserving it out of the total read H=13.
     distractors = rng.randint(H_MIN, H_MAX)
-    filler_count = distractors - corrections
+    # The same-subject distractors below are non-gold sessions, so they count toward H exactly as
+    # the corrections do and come out of the filler budget rather than being added on top. Getting
+    # this wrong is quiet -- an earlier version of this arithmetic read H=27 against a declared
+    # [14,24] by adding gold on top, and H=13 by reserving it out of the total.
+    filler_count = distractors - corrections - _SIDE_FACTS
     frame_at = ordinal % len(VALID_FRAMES)
     question_text = _sentence(VALID_FRAMES[frame_at].format(
         which=which, who=who, when=event_month))
@@ -291,12 +300,59 @@ def _pair(qid_valid: str, qid_txn: str, pair_id: str, shape: str, qtype: str,
     # assistant turn while filler always has one is a construction asymmetry, and the gate found it:
     # `assistant_slot1_length_chars` separated gold perfectly in 22% of questions at 2.9 sd. The
     # shared-bank rule applies to the acknowledgement here exactly as it does everywhere else.
+    # ECHO PARITY, IN THE SAME TURN AND AT THE SAME RATE AS FILLER. Filler's assistant turn carries
+    # the woven calibration clause and gold's did not, so gold was identifiable by that clause's
+    # ABSENCE. Under one shared knob at 0.5 the asymmetry sat just under the bar; per-shape
+    # calibration raised one shape's echo and the gate failed at once --
+    # assistant_punctuation_density separating gold perfectly in 22% of questions, 2.8 sd. The
+    # imbalance was always there, and only the knob moving exposed it. Temporal carries the same
+    # note for the same reason: one bank for both sides means ALL of both sides.
     record = tmc.make_session(
         _BASE,
         (rng.choice(STATEMENT_FRAMES).format(who=who, value=original, when=event_month),
-         rng.choice(REPLIES)),
+         tmc.weave_echo(rng.choice(REPLIES), echoed)),
         gold_turn=0, tag=f"record:{original}")
     sessions.insert(rng.randint(0, max(0, len(sessions) - gap)), record)
+
+    # SAME-SUBJECT DISTRACTORS, ON OTHER MONTHS. Naming the subject used to hand BM25 everything it
+    # needed: only two sessions in the haystack mentioned this person at all, so "which city for
+    # Alice Renwick in February" retrieved the record and its correction and nothing had to be
+    # discriminated. V9 ran 31/36 against V1 35/36 -- headroom 0.11, a shape that cannot rank two
+    # systems. Filler could not fix it because filler is about OTHER people by construction (class
+    # parity with instance divergence), so it never competes on the subject term.
+    #
+    # These do compete: same person, same construction, values drawn from the same PLACES pool a
+    # question could answer with, so a retriever that matches on the subject alone now returns
+    # sessions that do not answer the question and must select on the MONTH.
+    #
+    # THE MONTH MUST BE LATER THAN THE ASKED ONE, and this is the part that is easy to get wrong. A
+    # distractor reading "Alice Renwick is at Garrowby, as of January" against a question about
+    # February is not a distractor, it is a second true answer -- "as of January" carries forward
+    # until something supersedes it. Later months cannot reach back over the asked one, so they are
+    # unambiguous by construction rather than by careful reading.
+    later_months = [m for m in MONTHS if MONTHS.index(m) > MONTHS.index(event_month)]
+    side_values = [p for p in PLACES if p not in values]
+    # Enforced, not assumed. `event_month` is drawn from the first three of eight months so there
+    # are always at least five later ones, and PLACES holds sixteen values against at most five in
+    # use -- but both are consequences of constants declared elsewhere in this file, and a later
+    # edit to either would otherwise produce a silent modulo-by-zero or a distractor that repeats a
+    # gold value as if it were a distinct fact.
+    if len(later_months) < _SIDE_FACTS or len(side_values) < _SIDE_FACTS:
+        raise SystemExit(
+            f"bitemporal: {_SIDE_FACTS} same-subject distractors requested but only "
+            f"{len(later_months)} later months and {len(side_values)} unused values are available "
+            f"for {who} in {event_month}")
+    for step in range(_SIDE_FACTS):
+        side_month = later_months[(ordinal + step) % len(later_months)]
+        side_value = side_values[(ordinal * 3 + step) % len(side_values)]
+        frames = CORRECTION_FRAMES if step % 2 else STATEMENT_FRAMES
+        sessions.insert(
+            rng.randint(0, len(sessions)),
+            tmc.make_session(
+                _BASE,
+                (rng.choice(frames).format(who=who, value=side_value, when=side_month),
+                 tmc.weave_echo(rng.choice(REPLIES), echoed)),
+                tag=f"othermonth{step}:{side_month}"))
 
     # Successive corrections, each recorded later than the last.
     correction_sessions = []
@@ -306,7 +362,8 @@ def _pair(qid_valid: str, qid_txn: str, pair_id: str, shape: str, qtype: str,
         node = tmc.make_session(
             _BASE,
             (rng.choice(CORRECTION_FRAMES).format(
-                who=who, value=value, when=event_month), rng.choice(REPLIES)),
+                who=who, value=value, when=event_month),
+             tmc.weave_echo(rng.choice(REPLIES), echoed)),
             gold_turn=0, tag=f"correction{step}:{value}")
         # The FIRST correction lands at the banded latency after the record; the rest follow it.
         # Always after the record they correct -- "recorded later" is this vertical's whole subject.
@@ -362,7 +419,11 @@ def _pair(qid_valid: str, qid_txn: str, pair_id: str, shape: str, qtype: str,
     return [valid_arm, txn_arm]
 
 
-def build(echo: float, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS148264 - deterministic corpus generation
+def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """`echo` is a float or, under per-shape calibration, a dict keyed by shape."""
+    def knob(shape: str) -> float:
+        return echo.get(shape, 0.0) if isinstance(echo, dict) else echo
+
     questions: list[tmc.Question] = []
     index = 1
     pair_no = 1
@@ -377,7 +438,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ig
         questions += _pair(
             f"tme-bit-{index:03d}", f"tme-bit-{index + 1:03d}", f"tme-bit-p{pair_no:02d}",
             SHAPE_BELIEF, TYPE_BELIEF, SUBJECTS[i % len(SUBJECTS)],
-            corrections=1, band=(i % 5) + 1, ordinal=i, rng=rng, echo=echo)
+            corrections=1, band=(i % 5) + 1, ordinal=i, rng=rng, echo=knob(SHAPE_BELIEF))
         index += 2
         pair_no += 1
 
@@ -389,7 +450,7 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ig
             f"tme-bit-{index:03d}", f"tme-bit-{index + 1:03d}", f"tme-bit-p{pair_no:02d}",
             SHAPE_DEPTH, TYPE_DEPTH, SUBJECTS[(i + 3) % len(SUBJECTS)],
             corrections=2 + (i % 3), band=(i % 5) + 1, ordinal=BELIEF_PAIRS + i,
-            rng=rng, echo=echo)
+            rng=rng, echo=knob(SHAPE_DEPTH))
         index += 2
         pair_no += 1
 
@@ -469,4 +530,11 @@ if __name__ == "__main__":
         ),
         generator_tool="tools/gen_typedmemeval_bitemporal.py",
         extra_checks=check_bitemporal,
+        # PER-SHAPE, not one knob for both. belief-at-instant carries exactly one correction and
+        # correction-depth carries two to four, which is a difficulty dial by construction -- so a
+        # single knob tuned on the vertical MEAN is satisfiable by letting one shape drift while the
+        # other compensates, which is the defect calibrate_per_shape exists to refuse (ADR-026 s19,
+        # and Episodic's #205). Measured, the two shapes' headroom differed 0.11 against 0.29 under
+        # one shared echo.
+        shape_of=lambda q: (q.extension or {}).get("shape"),
     )
