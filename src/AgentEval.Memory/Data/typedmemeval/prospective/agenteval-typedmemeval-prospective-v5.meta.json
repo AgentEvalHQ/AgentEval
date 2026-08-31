@@ -729,7 +729,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-31T13:29:35Z",
+    "run_at": "2026-08-31T22:01:42Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -905,7 +905,17 @@
         "discriminates": true,
         "headroom_reachable": 0.5,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 4,
+        "pair_v1_both_arms": "4/4",
+        "pair_v9_both_arms": "2/4",
+        "pair_headroom": 0.5,
+        "pair_floor_scaled": 0.225,
+        "pair_separation_sd": 2.0,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": true,
+        "pair_v8_both_arms": "4/4",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "due-window": {
         "questions": 18,
@@ -922,7 +932,17 @@
         "discriminates": true,
         "headroom_reachable": 0.1667,
         "limited_by": "reasoning",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 9,
+        "pair_v1_both_arms": "9/9",
+        "pair_v9_both_arms": "0/9",
+        "pair_headroom": 1.0,
+        "pair_floor_scaled": 0.1583,
+        "pair_separation_sd": 13.765,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": true,
+        "pair_v8_both_arms": "1/9",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "expiring-validity": {
         "questions": 6,
@@ -939,7 +959,17 @@
         "discriminates": true,
         "headroom_reachable": 0.3333,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 3,
+        "pair_v1_both_arms": "3/3",
+        "pair_v9_both_arms": "2/3",
+        "pair_headroom": 0.3333,
+        "pair_floor_scaled": 0.25,
+        "pair_separation_sd": 1.193,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": false,
+        "pair_v8_both_arms": "3/3",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "not-yet-true": {
         "questions": 6,
@@ -956,7 +986,17 @@
         "discriminates": true,
         "headroom_reachable": 0.1667,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 3,
+        "pair_v1_both_arms": "3/3",
+        "pair_v9_both_arms": "2/3",
+        "pair_headroom": 0.3333,
+        "pair_floor_scaled": 0.275,
+        "pair_separation_sd": 1.193,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": false,
+        "pair_v8_both_arms": "3/3",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "seed-carry-over": {
         "questions": 12,

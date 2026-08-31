@@ -1311,8 +1311,15 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     # about 1.7 sd, which no reading of the amplification rescues.
     #
     # A shape must now clear BOTH. Either alone can be argued with; together they cannot.
-    v9_rate = v9_hits / v9_n
-    spread = math.sqrt(max(v9_n * v9_rate * (1.0 - v9_rate), 1e-9))
+    # SMOOTHED FOR THE STANDARD ERROR ONLY. A binomial SE is ZERO at rates 0 and 1, and both occur
+    # here -- prospective/due-window came in at 0/9 both-arms. Guarding with max(..., 1e-9) does not
+    # handle that, it disguises it: the reported separation was 284,604 sd, a number that means
+    # nothing and would sail through any floor. The rate is nudged half an observation off the
+    # boundary (Jeffreys-style) before the SE is taken, so a degenerate split reports a large but
+    # FINITE separation -- 0/9 becomes about 13.8 sd, which is the honest reading of "no overlap on
+    # nine pairs". The headroom itself is still computed from the raw rates.
+    smoothed = (v9_hits + 0.5) / (v9_n + 1)
+    spread = math.sqrt(v9_n * smoothed * (1.0 - smoothed))
     separation_sd = (v1_hits - v9_hits) / spread if spread else 0.0
 
     row = {
@@ -1531,6 +1538,17 @@ def self_test() -> None:
     check("so it does NOT discriminate, on the sample rather than the metric",
           row["pair_discriminates"], False)
 
+    # THE BOUNDARY CASE, which the first version of this reported as 284,604 sd. A both-arms V9 of
+    # 0/n has a binomial SE of exactly zero, so the separation is only finite because the rate is
+    # smoothed off the boundary first. An infinity here is worse than a wrong number: it clears
+    # every floor by construction, which is the shape of a guard that cannot fail.
+    degenerate = [({**hit}, {**hit, "v9": False}) for _ in range(9)]
+    records, arms = paired(degenerate)
+    row = _pair_discrimination(records, arms)
+    check("a 0/n split reports a FINITE separation", row["pair_separation_sd"] < 100, True)
+    check("and still reads as clearly separated", row["pair_separation_sd"] > 5, True)
+    check("and discriminates", row["pair_discriminates"], True)
+
     # Unpaired shapes must emit NOTHING rather than a degenerate row -- eight of the nine verticals
     # have no arms, and a zero-filled block there would read as a measured result.
     unpaired = [{"question_id": "solo", **hit}]
@@ -1546,7 +1564,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "11 paired-arm cases)")
+          "14 paired-arm cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
