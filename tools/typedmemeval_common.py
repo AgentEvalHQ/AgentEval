@@ -2217,6 +2217,12 @@ def finalise(
                 "measured_by": "generator",
                 "probed_corpus_sha256": corpus_sha,
             }
+            # `gold_item_types` is written by a later stamper, so it is absent from the literal
+            # above and carrying it back APPENDS it after `probes`. That reorders the file and
+            # turns a no-op regeneration into a 220-line diff whose only real content is one
+            # changed integer. Churn on that scale is how a genuine change stops being visible, so
+            # `probes` is moved back to last and the original key order is restored.
+            metadata["probes"] = metadata.pop("probes")
 
     (out_dir / f"{corpus_id}.json").write_text(corpus_json, encoding="utf-8", newline="\n")
     (out_dir / f"{corpus_id}.meta.json").write_text(_dump(metadata), encoding="utf-8", newline="\n")
