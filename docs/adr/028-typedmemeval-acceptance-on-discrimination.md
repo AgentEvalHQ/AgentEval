@@ -187,6 +187,69 @@ the instrument and re-baselining on it are separate decisions, and only the firs
 This is what the structural dry run is for: it answered a question that would otherwise have been
 settled by spending.
 
+## 11. Correction to §10, same day — the convergence claim was wrong, and so was the decision
+
+§10 concluded that the corrected search picks the same echoes as the bisection it replaced, and
+therefore that **"the code fix ships and the re-baseline does not."** Both halves are withdrawn.
+
+| §10 published | Corrected |
+|---|---|
+| "The two searches converge to the same answer, including on both non-monotone shapes." | Holds for `episodic` and `semantic`. **Fails for `arithmetic` and `conjunction`.** |
+| "The old bisection landed correctly by luck rather than by construction." | It landed correctly *on the two verticals that were measured*. |
+| "Correcting the instrument and re-baselining on it are separate decisions, and only the first is justified here." | The separation is still the right principle. The conclusion drawn from it was wrong. |
+| `episodic/assistant-stated` 0.75 → 0.625; `participant-attribution` 0.625 → 0.617 | **Spurious.** Both are stable. |
+
+Measured through the real calibration entry points, with no model calls:
+
+| vertical | shipped → corrected | vertical mean |
+|---|---|---|
+| `arithmetic` | `delta` 0.3125 → **1.0** | 0.758 → 0.609 |
+| `conjunction` | all three shapes move | 0.581 → **0.632** |
+| `prospective` | `due-window` 0.125 → 0.0, `expiring-validity` 0.625 → 0.875, `not-yet-true` 0.75 → 0.625 | 0.617 → 0.592 |
+| `workingmemory` | 0.75 → 0.875 | **0.867 → 0.683** |
+| `forgetting` | 0.25 → 0.125 | 0.629 → 0.629 |
+| `episodic`, `semantic` | unchanged | unchanged |
+
+Conjunction's mean moves **toward** the 0.70 target, not away: the shipped calibration was not
+merely different, it was further from the band the search aims at.
+
+**Two questions, not one, and they have different answers.** A moved echo means the recorded
+sidecar is inaccurate; it does not by itself mean the corpus changed. `forgetting` is the case that
+separates them -- its echo moves and its corpus regenerates BYTE-IDENTICALLY, so its published
+measurements stand and it is owed no probe run. The re-probe list therefore comes from
+`tools/check_corpus_reproducibility.py`, which compares corpus bytes, and not from the echo diff.
+
+**A consequence for §3a's exemption list.** WorkingMemory's three ladder rungs are exempted at
+headroom 0.00 as declared design. That vertical's coverage falls 0.867 → 0.683 under the corrected
+search, so part of the saturation the exemption describes may be a search artefact rather than the
+ladder. The exemption is re-examined against the re-baselined numbers rather than carried forward on
+its original reasoning.
+
+### Two causes, and the second is the one worth keeping
+
+**Scope.** Six shapes across two verticals were measured and a conclusion was written about nine.
+
+**Method — and this is §5b's own lesson, repeated inside the measurement meant to settle §5b.** The
+convergence table called the search per shape directly instead of going through
+`calibrate_per_shape`, which pins each shape's knob as it advances. Off-pipeline it invented
+movement in `episodic` and never touched the two verticals that actually move. §5b already records:
+*"When measuring a pipeline, go through the pipeline."* It was written after the first monotone
+measurement was invalid for the same reason, and then not applied to the second.
+
+**The instrument that settles it is `tools/compare_calibration_search.py`,** which recomputes every
+vertical through the real calibration entry point and diffs against the shipped sidecar. It costs
+nothing to run because calibration is structural. It exists so this question is answered by a
+command rather than by an argument, and so a shape whose echo does NOT move is never regenerated for
+tidiness.
+
+### Consequence
+
+The re-baseline proceeds as its own arc, which is also what the consuming project's coordinator
+independently asked for on cost grounds — their reasoning (the controls a reset would destroy are
+already lapsed or unheld, so now is the cheap moment) and this measurement (the echoes genuinely
+move) are independent arguments reaching the same place. Cheap and warranted are different claims;
+this section supplies the second.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best

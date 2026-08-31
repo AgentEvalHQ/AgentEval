@@ -2185,6 +2185,39 @@ def finalise(
 
     out_dir = DATA_ROOT / vertical
     out_dir.mkdir(parents=True, exist_ok=True)
+    # MEASUREMENTS SURVIVE A REGENERATION THAT CHANGED NOTHING.
+    #
+    # This used to reset `probes` to "not_run" unconditionally, so rebuilding a corpus to CHECK
+    # something destroyed the probe records even when the rebuild produced identical bytes -- 1141
+    # lines of reference-model results and `gold_item_types` wiped by a verification step that found
+    # nothing wrong. The records were recoverable from git, but only because the sha happened to be
+    # unchanged, and that is exactly the condition worth deciding on rather than relying on.
+    #
+    # THE CONDITION IS THE CORPUS HASH, and it is the same binding the probe records already carry:
+    # a probe result describes the bytes it was measured against, so it stays valid for those bytes
+    # and for no others. Where the hash matches, carrying the records forward is not a convenience,
+    # it is the correct reading. Where it differs, "not_run" remains the only honest state, and
+    # restoring the old block from version control would be a DEFECT -- stale measurements attached
+    # to a corpus that never produced them.
+    existing = out_dir / f"{corpus_id}.meta.json"
+    if existing.exists():
+        try:
+            previous = json.loads(existing.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previous = {}
+        if previous.get("corpus_sha256") == corpus_sha:
+            for carried in ("probes", "gold_item_types"):
+                if carried in previous:
+                    metadata[carried] = previous[carried]
+            # V7 is the one probe the generator owns and has just recomputed from the questions in
+            # hand, so it is put back on top of the restored block rather than carried.
+            metadata["probes"]["v7_separability"] = {
+                **separability_report(questions, structure.separability_exempt),
+                "status": "run",
+                "measured_by": "generator",
+                "probed_corpus_sha256": corpus_sha,
+            }
+
     (out_dir / f"{corpus_id}.json").write_text(corpus_json, encoding="utf-8", newline="\n")
     (out_dir / f"{corpus_id}.meta.json").write_text(_dump(metadata), encoding="utf-8", newline="\n")
 
