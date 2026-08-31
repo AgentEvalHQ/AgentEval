@@ -1,0 +1,46 @@
+name: TypedMemEval corpus reproducibility
+
+# Every TypedMemEval sidecar records `generator.tool`, `generator.version` and `generator.seed`,
+# which together assert that the committed corpus is reproducible from the committed generator.
+# Nothing tested that assertion until this job, and it had already stopped being true: PR #210
+# replaced the calibration search (bisection over a monotone that 2 of 3 shapes violate) with a
+# sweep plus local refinement, which is the correct fix and which changes the echo four verticals
+# converge on. The corpora were not regenerated with it, so the generators no longer produced the
+# files beside them and no gate said so.
+#
+# WHY IT IS FAST NOW. Calibration is pinned: a plain rebuild uses the echo the sidecar records
+# instead of searching for one, so this re-derives nine corpora in seconds rather than re-running a
+# sweep per shape. That is also the fix for the underlying problem -- a corpus is now a function of
+# (generator, seed, recorded echo) rather than of whichever search algorithm happened to be checked
+# in. `--recalibrate` is the deliberate act that moves a corpus, and it obliges a re-probe.
+#
+# SCOPED BY PATH, NOT BY SCHEDULE. Reproducibility can only break when a generator or the shared
+# generation code changes, so that is when this runs -- on the change that could break it, while
+# that change is still in review. A nightly job would have reported this days after the PR merged,
+# to nobody in particular.
+on:
+  pull_request:
+    paths:
+      - 'tools/gen_typedmemeval_*.py'
+      - 'tools/typedmemeval_common.py'
+      - 'tools/check_corpus_reproducibility.py'
+      - 'src/AgentEval.Memory/Data/typedmemeval/**'
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    # Pinned rebuilds do no searching, so nine verticals take well under a minute. The allowance is
+    # for a runner under load, not for the work.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regenerate every corpus and compare bytes
+        # The checker restores the tree whatever the outcome, so a failure here leaves nothing
+        # behind to clean up and the diff it reports is the whole story.
+        run: python tools/check_corpus_reproducibility.py
