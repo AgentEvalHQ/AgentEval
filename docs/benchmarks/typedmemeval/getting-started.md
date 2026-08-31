@@ -78,6 +78,22 @@ as sensitive data: restrict access, retention, and publication.
 
 ### Typed outcomes, never one percentage
 
+> **Thirteen of the 31 shapes carry fewer than 15 questions, and their figures support diagnosis
+> rather than claims.** ADR-026 says this about the family's cell sizes and the published tables never
+> repeated it, so a six-question rate has been reading like a measurement. The threshold is a
+> judgement — 15 is where a single question stops moving a rate by more than ~7 points — but the
+> shapes below it are a fact:
+>
+> | vertical | shapes under 15 questions |
+> |---|---|
+> | `prospective` | `expiring-validity` (6), `not-yet-true` (6), `due-later-reminder` (8), `seed-carry-over` (12) |
+> | `workingmemory` | all five distance rungs (12 each) |
+> | `arithmetic` | `delta` (10), `duration` (12), `count` (14), `sum` (14) |
+>
+> On a six-question shape one question is 0.167 of the rate, so `not-yet-true`'s headroom of 0.1667
+> **is one question**. Quote these shapes to diagnose where a system struggles; do not quote them as
+> a measured capability, and do not rank two systems on a difference of one or two items.
+
 Every result reports a vector, per vertical and per shape, always with its `n`:
 
 | Outcome | Meaning |
@@ -407,12 +423,31 @@ gold is itself an abstention.
 > - `V9` — accuracy given the **top-`K_ref` sessions a plain BM25 retriever returns**. A lexical
 >   baseline selector, and the arm that was missing.
 >
-> **`V1 − V9` is the headroom a better retriever can capture.** `V1 − V8` is not a headroom number:
-> it only asks whether distractors confuse a reader who already has everything, and on these corpora
-> the answer is mostly no. Reading `V1 − V8 ≈ 0` as "retrieval quality cannot matter here" was a
-> mistake — a real system does not dump the haystack into context, it *selects*, and selecting badly
-> is far worse than either arm above. Measured against a lexical baseline, **every vertical has
+> **`V1 − V9` is what a PERFECT SELECTOR would capture — an upper bound, and on some shapes an
+> unreachable one.** `V1 − V8` is not a headroom number: it only asks whether distractors confuse a
+> reader who already has everything. Reading `V1 − V8 ≈ 0` as "retrieval quality cannot matter here"
+> was a mistake — a real system does not dump the haystack into context, it *selects*, and selecting
+> badly is far worse than either arm above. Measured against a lexical baseline, **every vertical has
 > substantial headroom, from 0.12 to 0.62.**
+>
+> **But `V1 − V9` is NOT "the headroom a better retriever can capture", which is what this passage
+> used to say.** A real retriever returns gold *plus* whatever else it ranks highly, so it can never
+> beat having everything: **its ceiling is V8, not V1.** Where the two diverge, most of the published
+> headroom is unbuyable. `V9 − V8` is the reachable half, and it is published per shape as
+> `headroom_reachable` alongside `limited_by`, which says whether a shape is retrieval-limited or
+> reasoning-limited (ADR-028 §3e).
+>
+> | shape | `V1 − V9` published | `V8 − V9` reachable | limited by |
+> |---|---|---|---|
+> | `prospective/due-window` | **0.94** | **0.17** | reasoning |
+> | `episodic/participant-attribution` | 0.20 | 0.13 | retrieval |
+> | `bitemporal/belief-at-instant` | 0.31 | 0.22 | retrieval |
+> | `temporal/occurrence-order` | 0.75 | 0.75 | retrieval |
+>
+> **Read the reachable column before buying retrieval work.** `due-window`'s V8 is 4/18 — a reader
+> holding the entire haystack still fails 78% of the time — so a team that responds to its 0.94 by
+> improving retrieval gets almost nothing. `occurrence-order`, where the two columns agree, is the
+> shape where retrieval work pays in full.
 >
 > Episodic's interference cost of **−0.04** is real rather than rounding: two `participant-attribution`
 > questions fail on gold alone and succeed on the whole haystack, because gold-only strips the
