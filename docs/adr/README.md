@@ -48,6 +48,7 @@ Each ADR follows this structure:
 | [025](025-gatekeeper-runtime-fail-closed-enforcement.md) | Gatekeeper — Runtime Fail-Closed Enforcement Middleware | Accepted | 2026-07-05 |
 | [026](026-typedmemeval-benchmark-family.md) | TypedMemEval — A Mechanism-Isolating Memory Benchmark Family | Accepted (implemented v0.22.0-beta) | 2026-08-15 |
 | [027](027-typedmemeval-semantic-temporal-bitemporal.md) | TypedMemEval — Semantic, Temporal and Bitemporal Verticals (design) | Proposed (design only; generation gated) | 2026-08-18 |
+| [028](028-typedmemeval-acceptance-on-discrimination.md) | TypedMemEval — accept a shape on measured discrimination, not a coverage proxy | Proposed | 2026-08-31 |
 
 ---
 
