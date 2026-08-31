@@ -162,10 +162,30 @@ responds to echo.
 directly, and the search cannot even be trusted to find a chosen coverage. §7.3 is withdrawn pending
 the search fix.
 
-**The fix, not attempted here:** replace bisection with a coarse sweep plus local refinement, which
-assumes nothing about shape. It is contained — one function — but it re-calibrates **every** vertical,
-moves **every** sha, and resets every control the consuming project holds. That is a full-family
-re-baseline and must be declared and sequenced as one, not folded into a reporting change.
+**The fix, and the measurement that decided its scope.** Bisection is replaced by a coarse sweep
+plus local refinement, which assumes nothing about shape. Calibration is *structural* — no model
+calls — so what the new search picks could be measured before spending anything:
+
+| vertical / shape | new echo → coverage | shipped (bisection) |
+|---|---|---|
+| `episodic/assistant-stated` | 0.625 → 0.700 | 0.75 → 0.700 |
+| `episodic/list-order` | 0.250 → 0.729 | 0.250 → 0.692 |
+| `episodic/participant-attribution` | 0.617 → 0.733 | 0.625 → 0.667 |
+| `semantic/current-value` | **0.750** → 0.575 | **0.750** → 0.600 |
+| `semantic/co-reference` | **0.375** → 0.689 | **0.375** → 0.689 |
+| `semantic/source-attribution` | **0.875** → 0.733 | **0.875** → 0.733 |
+
+**The two searches converge to the same answer, including on both non-monotone shapes.** The old
+bisection landed correctly by luck rather than by construction.
+
+**So the code fix ships and the re-baseline does not.** The premise was false and the hazard was
+real — a differently-shaped curve *would* have been mis-calibrated — but no shipped corpus is
+affected, and regenerating nine verticals to move coverage within draw noise would cost ~12,000
+probe calls and reset every control the consuming project holds for no measured gain. **Correcting
+the instrument and re-baselining on it are separate decisions, and only the first is justified here.**
+
+This is what the structural dry run is for: it answered a question that would otherwise have been
+settled by spending.
 
 ## 9. Provenance
 
