@@ -132,6 +132,41 @@ Step 1 is free. Step 2 changes no corpus. Step 3 regenerates Episodic once — o
 reset for the consuming project, and it should ride whatever release carries it rather than being
 cut on its own. Step 4 is unscoped by design.
 
+## 10. Amendment, 2026-08-31 — §7.3 is not implementable as stated, and why that matters more
+
+Implementing §7.3 (restore `episodic/list-order`) exposed a defect in the calibration search itself,
+which supersedes the step that found it.
+
+**`search_echo` states its premise explicitly:** *"coverage must fall as echo rises (distractors
+compete harder); the bracket rides that monotone."* Measured through the real per-shape pipeline,
+that premise is false for most shapes tested:
+
+| shape | e=0 | 0.25 | 0.50 | 0.75 | 1.00 | monotone falling? |
+|---|---|---|---|---|---|---|
+| `episodic/list-order` | 0.871 | 0.783 | **0.401** | 0.490 | 0.838 | **no** |
+| `semantic/current-value` | 1.000 | 0.900 | **0.917** | 0.575 | 0.450 | **no** |
+| `conjunction/alias-then-count` | 0.340 | 0.332 | 0.303 | 0.061 | 0.000 | yes |
+
+Bisection on a non-monotone function returns **wherever the bracket started**, not a point chosen
+against the function. `list-order` has a minimum near echo 0.50 (coverage 0.401); the search landed
+on 0.25 and stopped, never seeing it. So a "calibrated" echo is, for these shapes, an artefact of
+the search path rather than a property of the corpus — and the difficulty of every per-shape vertical
+rests on it.
+
+**This is the same shape as everything else in this arc:** an assumption written into a comment,
+load-bearing, and never measured. It was found only because §7.3 required knowing how coverage
+responds to echo.
+
+**Consequences for this ADR.** §7.3 cannot be done as a search change — the search is *structural*
+(pre-probe) while discrimination is *measured*, so no search can optimise for discrimination
+directly, and the search cannot even be trusted to find a chosen coverage. §7.3 is withdrawn pending
+the search fix.
+
+**The fix, not attempted here:** replace bisection with a coarse sweep plus local refinement, which
+assumes nothing about shape. It is contained — one function — but it re-calibrates **every** vertical,
+moves **every** sha, and resets every control the consuming project holds. That is a full-family
+re-baseline and must be declared and sequenced as one, not folded into a reporting change.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best
