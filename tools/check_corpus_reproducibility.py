@@ -52,7 +52,29 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("verticals", nargs="*",
                         default=sorted(p.name for p in DATA.iterdir() if p.is_dir()))
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="run even though the corpus directory has uncommitted changes, which "
+                             "this tool will overwrite when it restores its snapshot")
     args = parser.parse_args()
+
+    # REFUSE TO RUN OVER UNCOMMITTED WORK. This snapshots the data directory and restores it at the
+    # end, which silently DISCARDS anything written to those files while it runs -- it ate a
+    # regenerated corpus that way, and the loss was invisible because the restore looks exactly like
+    # a clean pass. A snapshot-and-restore tool and a concurrent edit cannot both be right about
+    # what the files should contain, so this stops rather than guessing. CI always starts clean, so
+    # the guard costs nothing there.
+    if not args.allow_dirty:
+        status = subprocess.run(  # DevSkim: ignore DS107369 - fixed argv
+            ["git", "status", "--porcelain", "--", str(DATA)],
+            capture_output=True, text=True, cwd=str(DATA.parents[3]))
+        dirty = [line for line in status.stdout.splitlines() if line.strip()]
+        if dirty:
+            print('refusing to run: the corpus directory has uncommitted changes, and this '
+                  'tool restores a snapshot over them when it finishes. Commit or stash them '
+                  'first, or pass --allow-dirty if losing them is fine.')
+            for line in dirty[:10]:
+                print(f'  {line}')
+            return 2
 
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
