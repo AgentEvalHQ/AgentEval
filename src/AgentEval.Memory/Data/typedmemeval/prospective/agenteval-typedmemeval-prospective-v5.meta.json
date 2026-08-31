@@ -83,10 +83,10 @@
       "seed-carry-over": 0.6562
     },
     "per_shape_realised": {
-      "due-later-reminder": 0.75,
-      "due-window": 0.2222,
-      "expiring-validity": 0.8333,
-      "not-yet-true": 0.6667,
+      "due-later-reminder": 0.5,
+      "due-window": 0.4352,
+      "expiring-validity": 0.6667,
+      "not-yet-true": 1.0,
       "seed-carry-over": 0.75
     }
   },

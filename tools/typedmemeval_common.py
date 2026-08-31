@@ -1871,20 +1871,55 @@ def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
         if best_mean is None or abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
             best_echo, best_mean = echo, mean
 
-    # Saturated across the ENTIRE range, not merely at one end. The old check read only echo=1.0,
-    # which on a non-monotone curve is not the hardest point -- list-order is EASIER at 1.0 than at
-    # 0.5, so a shape could be refused on its worst rung while a good one existed.
+    # SATURATED means saturated ACROSS THE RANGE, and the first version of this check did not say
+    # that -- it read `best_mean > BAND_HIGH`, i.e. one point, while its own comment claimed to test
+    # the whole sweep. That is not a nitpick; it made this search WORSE than the bisection it
+    # replaced on `arithmetic/delta`, whose curve is a cliff:
     #
-    # When it IS saturated everywhere, report the HARDEST point the sweep found rather than the one
-    # nearest the target. The caller refuses on this, and the number it prints is a claim about how
-    # close the corpus can get: "even at our hardest setting it still sits at X" is the useful
-    # sentence, and the nearest-to-target point would understate the gap.
-    if best_mean > BAND_HIGH:
+    #     echo 0.000 0.125 0.250 | 0.375 0.500 0.625 0.750 1.000
+    #     cov  .967  .967  .947  | .377  .153  .025  .000  .000
+    #
+    # Nothing on the grid is in band; the whole in-band window lies between 0.25 and 0.375, which is
+    # narrower than the grid spacing. The nearest-to-target grid point is 0.947, above BAND_HIGH, so
+    # the "saturated" branch fired and returned the HARDEST point -- echo 1.0 at coverage 0.000,
+    # off the band in the other direction and unusable. Bisection found 0.3125 (coverage 0.735)
+    # precisely because bisection NARROWS. And nothing downstream would have caught it: per-shape
+    # calibration does not gate each shape's band, and arithmetic's vertical mean stays in range at
+    # 0.609 -- the averaging defect this file exists to refuse, reintroduced by its own fix.
+    if min(mean for _, mean in swept) > BAND_HIGH:
         # Lowest coverage wins; ties break toward the HIGHEST echo, so a flat saturated curve
         # still reports "even at maximum echo" -- the sentence the caller's refusal prints.
         hardest_echo, hardest_mean = min(swept, key=lambda pair: (pair[1], -pair[0]))
         return hardest_echo, hardest_mean, iterations
 
+    # THE TWO SEARCHES DO DIFFERENT JOBS AND BOTH ARE NEEDED. A sweep LOCATES -- it evaluates the
+    # whole range, so it cannot be fooled by a non-monotone curve into riding the wrong bracket.
+    # Bisection RESOLVES -- it narrows, so it can find an in-band window thinner than any grid.
+    # Using only the sweep loses narrow windows (delta above); using only bisection lands wherever
+    # the bracket started (list-order, which has a minimum near 0.50 the old search never saw).
+    # So: sweep to find where the curve crosses the target, then bisect inside that bracket.
+    for (echo_lo, mean_lo), (echo_hi, mean_hi) in zip(swept, swept[1:]):
+        if (mean_lo - BAND_TARGET) * (mean_hi - BAND_TARGET) > 0:
+            continue                     # the target is not crossed between these two rungs
+        low, high = echo_lo, echo_hi
+        while iterations < max_iterations and (high - low) > BAND_RESOLUTION:
+            if abs(best_mean - BAND_TARGET) <= BAND_TOLERANCE:
+                break
+            middle = (low + high) / 2
+            mean = evaluate(middle)
+            iterations += 1
+            if abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
+                best_echo, best_mean = middle, mean
+            # Keep the half that still straddles the target.
+            if (mean_lo - BAND_TARGET) * (mean - BAND_TARGET) <= 0:
+                high, mean_hi = middle, mean
+            else:
+                low, mean_lo = middle, mean
+        if abs(best_mean - BAND_TARGET) <= BAND_TOLERANCE:
+            break
+
+    # Local refinement around the winner, for the case where no rung straddles the target at all
+    # (a curve that approaches it without crossing) and to polish what the bisection left.
     step = 1.0 / (SWEEP_POINTS - 1)
     while iterations < max_iterations and step > BAND_RESOLUTION:
         if abs(best_mean - BAND_TARGET) <= BAND_TOLERANCE:
@@ -2504,11 +2539,46 @@ def self_test() -> None:
     check("bimodal curve reports a reachable point", gap_mean in (0.86, 0.52), True)
     check("bimodal curve is still inside the band", BAND_LOW <= gap_mean <= BAND_HIGH, True)
 
+    # A CLIFF WHOSE IN-BAND WINDOW IS NARROWER THAN THE SWEEP GRID. This is arithmetic/delta's real
+    # measured response, and it is the case that made the sweep WORSE than the bisection it
+    # replaced. Nothing on a 9-point grid is in band -- the window lies between 0.25 and 0.375,
+    # thinner than the 0.125 spacing -- so a sweep-only search saw its best point saturated at
+    # 0.947, took the "saturated" branch, and returned echo 1.0 at coverage 0.000: off the band in
+    # the OTHER direction and unusable. Bisection found 0.3125 because bisection narrows.
+    #
+    # Nothing downstream would have caught it. Per-shape calibration does not gate each shape's
+    # band, and arithmetic's vertical mean stays in range at 0.609 -- the averaging defect this file
+    # exists to refuse, reintroduced by its own fix. Hence this case.
+    DELTA_CLIFF = _staircase([
+        (0.13, 0.9667), (0.26, 0.9467), (0.30, 0.8200), (0.33, 0.7350),
+        (0.38, 0.3767), (0.51, 0.1533), (0.63, 0.0250), (1.01, 0.0000),
+    ])
+    cliff_echo, cliff_mean, _ = search_echo(DELTA_CLIFF)
+    check("a cliff with a sub-grid window is still brought into band",
+          BAND_LOW <= cliff_mean <= BAND_HIGH, True)
+    check("and it is NOT mistaken for a saturated corpus", cliff_echo < 1.0, True)
+    check("and it is not driven off the bottom of the band either", cliff_mean > 0.0, True)
+
+    # Saturation must mean saturated ACROSS THE RANGE. The condition that broke the cliff above read
+    # one point -- the nearest-to-target rung -- while claiming to test the whole sweep, so a curve
+    # holding 0.000 at its hard end could still be called saturated.
+    check("a curve reaching 0.0 is never reported as saturated",
+          min(DELTA_CLIFF(i / 100) for i in range(101)) > BAND_HIGH, False)
+
+    # NON-MONOTONE, which is why the sweep exists at all: episodic/list-order falls to a minimum
+    # near 0.50 and RISES again, so a bracket that starts at one end rides the wrong slope.
+    LIST_ORDER = _staircase([
+        (0.13, 0.871), (0.38, 0.783), (0.63, 0.401), (0.88, 0.490), (1.01, 0.838),
+    ])
+    nm_echo, nm_mean, _ = search_echo(LIST_ORDER)
+    check("a non-monotone curve is still brought into band",
+          BAND_LOW <= nm_mean <= BAND_HIGH, True)
+
     if failures:
         for f in failures:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
-    print("self-test OK  (11 calibration-search cases)")
+    print("self-test OK  (11 calibration-search cases, 5 cliff/non-monotone cases)")
 
 
 if __name__ == "__main__":
