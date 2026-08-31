@@ -45,6 +45,7 @@ from pathlib import Path
 
 import typedmemeval_common as tmc
 from measure_padding_value import load
+from run_typedmemeval_probes import closed_choice_k
 
 BASE = Path(__file__).resolve().parent.parent / "src/AgentEval.Memory/Data/typedmemeval"
 BAND_LOW, BAND_HIGH = 0.50, 0.90
@@ -75,9 +76,11 @@ def main() -> int:
         # BM25, so recomputing it costs nothing - there is no reason for these numbers to be absent
         # from a report just because they are absent from a sidecar.
         by_shape: dict[str, list[float]] = {}
+        by_question: dict[str, list] = {}
         for question in questions:
             shape = question.extension.get("shape", "(unshaped)")
             by_shape.setdefault(shape, []).append(tmc.realised_coverage(question))
+            by_question.setdefault(shape, []).append(question)
         # THE SATURATION SCREEN, named by the consuming project: "a perfect score under partial
         # coverage means the missing part was never needed". If a shape's V9 pass RATE sits above
         # its BM25 coverage, the model is answering without the evidence the retriever failed to
@@ -94,13 +97,25 @@ def main() -> int:
             d = arms.get(shape) or {}
             v9_applicable, v9_passed = d.get("v9_applicable", 0), d.get("v9_passed", 0)
             v9_rate = (v9_passed / v9_applicable) if v9_applicable else None
+
+            # THE BASELINE IS NOT COVERAGE ON A CLOSED-CHOICE SHAPE. When gold is missing the
+            # model can still pick from the candidates the question names and lands on it at 1/k,
+            # so the score to beat is `coverage + (1 - coverage) / k`, not coverage. Comparing
+            # against bare coverage reports the CHANCE FLOOR as if it were evidence of saturation:
+            # episodic/participant-attribution (k=2) read +0.133 against coverage and -0.033
+            # against its actual floor -- a false positive produced by the screen, not the shape.
+            ks = {closed_choice_k(q.question) for q in by_question[shape]}
+            k = ks.pop() if len(ks) == 1 else None
+            floor = realised + (1 - realised) / k if k else realised
             shapes[shape] = {
                 "questions": len(values),
                 "realised": round(realised, 3),
+                "candidates": k,
+                "expected_floor": round(floor, 3),
                 "v9_rate": round(v9_rate, 3) if v9_rate is not None else None,
-                # Positive = scores above its evidence. Negative = reasoning is the constraint,
-                # which is what a healthy hard shape looks like.
-                "scores_above_evidence": (round(v9_rate - realised, 3)
+                # Positive = scores above what evidence plus guessing can explain. Negative =
+                # reasoning is the constraint, which is what a healthy hard shape looks like.
+                "scores_above_evidence": (round(v9_rate - floor, 3)
                                           if v9_rate is not None else None),
                 "published_by_generator": "per_shape_realised" in (meta.get("coverage") or {}),
             }
@@ -153,7 +168,7 @@ def main() -> int:
     print("what hid Prospective's not-yet-true at a saturated 1.000 for its whole shipped life.")
     print("Coverage is structural BM25, so these cost nothing to recompute.")
     print()
-    print(f"{'vertical':14s} {'shape':24s} {'q':>3s} {'realised':>9s} {'V9':>7s} {'V9-cov':>7s}  note")
+    print(f"{'vertical':14s} {'shape':24s} {'q':>3s} {'realised':>9s} {'V9':>7s} {'V9-flr':>7s}  note")
     print("-" * 96)
     for vertical, _n, _z, _pub_mean, _pooled, _measured, shapes, published_shapes in rows:
         for shape, d in shapes.items():
@@ -172,7 +187,9 @@ def main() -> int:
             print(f"{vertical:14s} {shape:24s} {d['questions']:3d} {d['realised']:9.3f} "
                   f"{v9:>7s} {gp:>7s}  {note}")
     print()
-    print("V9-cov is the saturation screen: a shape scoring ABOVE its coverage is answering without")
+    print("V9-floor is the saturation screen. The floor is coverage for an open question and")
+    print("coverage + (1-coverage)/k for a CLOSED-CHOICE one, because a model with gold missing")
+    print("still guesses right at 1/k. A shape scoring above its floor is answering without")
     print("evidence the retriever failed to fetch, so that gold was never load-bearing.")
     print("conjunction/order-then-value read +0.333 for its whole shipped life before it was fixed.")
     print("Negative is healthy -- it means reasoning, not retrieval, is the constraint.")

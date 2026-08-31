@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Episodic ran one echo knob across three shapes whose coverage spanned 0.66, and the vertical
+  mean reported none of it.** Single-knob calibration put the mean at a healthy **0.682** while the
+  shapes sat at `participant-attribution` **0.933**, `assistant-stated` 0.800, `list-order`
+  **0.275**. Attribution was effectively saturated — V9 14/15, **headroom 0.07**, no two retrievers
+  distinguishable — and list-order was far below band. This is the mean-satisfiable-by-averaging
+  defect the family already fixed for Arithmetic; Episodic simply never received it.
+
+  Opted into per-shape calibration, which four verticals already use. Spread **0.66 → 0.033**:
+
+  | shape | coverage | headroom |
+  |---|---|---|
+  | `participant-attribution` | 0.933 → **0.667** | 0.07 → **0.20** |
+  | `assistant-stated` | 0.800 → 0.700 | 0.20 → **0.30** |
+  | `list-order` | 0.275 → **0.692** | 1.00 → 0.73 |
+
+  `list-order` traded extreme headroom for being in band — it was out of spec at 0.275 and is still
+  the widest shape in the vertical. **Attribution's residual limit is structural**: it is a k=2
+  question (*"was that me or you?"*), so a retriever that finds the gold session gets it right and
+  guessing covers half the rest. 0.20 is what calibration can buy.
+
+  Corpus sha `2c6000a6…` → `542da3fa…`; Episodic controls reset.
+
+- **The saturation screen reported the chance floor as if it were evidence of saturation.** Added
+  yesterday comparing V9 pass rate against BM25 coverage, it flagged the recalibrated
+  `participant-attribution` at **+0.133**. That was the screen, not the shape: on a closed-choice
+  question a model with gold missing still picks from the named candidates and lands at `1/k`, so
+  the score to beat is **`coverage + (1 − coverage) / k`**, not coverage.
+
+  Against its actual floor of 0.833, attribution reads **−0.033** — slightly *below* what evidence
+  plus guessing explains. The screen now computes `k` from the question text. Nothing in the family
+  exceeds its floor; the largest positive is +0.083 on a declared ladder rung.
+
+  The same arithmetic has now corrected V2's reading, V3's threshold, and this screen. **A floor
+  derived once does not transfer** — each instrument needs it computed against its own budget and
+  its own baseline.
+
 - **The judge's default completion budget could silently void it on the deployments its own claim
   was measured on, and CI was certifying a different judge.** Two coupled defects, fixed together
   because fixing either alone makes things worse.

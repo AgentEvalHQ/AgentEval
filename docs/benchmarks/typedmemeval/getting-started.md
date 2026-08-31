@@ -305,7 +305,7 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
 | Prospective | 50 | 0.617 | 1 (×29), 2 (×13), 3 (×4), 4 (×4) |
-| Episodic | 50 | 0.682 | 1 (×35), 4 (×5), 5 (×4), 6 (×4), 7 (×2) |
+| Episodic | 50 | 0.688 | 1 (×35), 4 (×4), 5 (×4), 6 (×3), 7 (×4) |
 | Arithmetic | 50 | 0.758 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
 | WorkingMemory | 60 | 0.867 | 1 (×60) |
 | Forgetting | 50 | 0.629 | 0 (×15), 2 (×35) |
@@ -388,7 +388,7 @@ gold is itself an abstention.
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
 | Prospective | 50/50 | 19/19 | 50/50 | 29/29 | — | 36/50 | 23/50 | +0.54 |
-| Episodic | 50/50 | — | 50/50 | 35/35 | — | 50/50 | 30/50 | +0.40 |
+| Episodic | 50/50 | — | 50/50 | 35/35 | — | 49/50 | 30/50 | +0.40 |
 | Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 19/50 | +0.62 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 53/60 | +0.12 |
 | Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/35 | 31/35 | 21/35 | +0.37 |
