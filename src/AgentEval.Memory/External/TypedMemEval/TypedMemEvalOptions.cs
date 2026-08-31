@@ -94,9 +94,24 @@ public sealed class TypedMemEvalOptions
     /// <summary>Judge sampling temperature; null uses the provider default.</summary>
     public double? JudgeTemperature { get; init; }
 
-    /// <summary>Judge output-token budget. Raised above the LongMemEval default because the
-    /// five-way verdict carries more fields than a yes/no.</summary>
-    public int JudgeMaxOutputTokens { get; init; } = 512;
+    /// <summary>Judge output-token budget.</summary>
+    /// <remarks>
+    /// 1500 because that is the value the SHIPPED CALIBRATION WAS MEASURED AT — agreement 0.987
+    /// over 230 cases on a reasoning deployment. A default that differs from the configuration the
+    /// published number came from means the out-of-box judge is not the judge the claim describes.
+    ///
+    /// It was 512, which is ample for a non-reasoning model and DANGEROUS on a reasoning one: the
+    /// budget covers reasoning tokens too, so the model can spend the whole allowance thinking and
+    /// return an empty completion. This family has already paid for that once — empty completions
+    /// scored as answers until the silence accounting was built — and a consumer pointing the judge
+    /// at a gpt-5.x deployment on defaults would have hit it silently.
+    ///
+    /// BEHAVIOUR-AFFECTING. Raising a cap can flip a formerly-truncated verdict, so the effective
+    /// value is stamped per run in <c>BenchmarkRunProvenance.JudgeMaxOutputTokens</c>: two runs
+    /// differing only in this number are not comparable, and that has to be visible rather than
+    /// inferred.
+    /// </remarks>
+    public int JudgeMaxOutputTokens { get; init; } = 1500;
 
     /// <summary>Retries after the first judge attempt, 0–3.</summary>
     public int MaxJudgeRetries { get; init; } = 1;

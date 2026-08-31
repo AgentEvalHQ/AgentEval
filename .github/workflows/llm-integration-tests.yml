@@ -16,11 +16,22 @@ on:
         default: 'Category=Integration'
         type: string
       model:
-        description: 'Model to use for testing'
+        # THE DEFAULT IS THE CALIBRATED DEPLOYMENT, and that is the whole point of it. The judge's
+        # shipped validity claim -- agreement 0.987 over 230 cases, prompt fingerprint
+        # b1d3f721... -- was measured on gpt-5.5. A gate exercising a different model certifies
+        # nothing about that claim: its green is decoration, and a regression on the deployment the
+        # number describes would not turn it red.
+        #
+        # The schedule is weekly rather than daily for cost. If it ever needs to be cheaper, run the
+        # calibrated judge LESS OFTEN rather than a different judge more often -- an honest weekly
+        # beats a misleading daily. The cheaper models stay selectable for manual runs where the
+        # question is "does the plumbing work", not "is the judge still valid".
+        description: 'Deployment to test against. Default is the CALIBRATED judge deployment.'
         required: false
-        default: 'gpt-4o-mini'
+        default: 'gpt-5.5'
         type: choice
         options:
+          - gpt-5.5
           - gpt-4o-mini
           - gpt-4o
           - gpt-4.1
@@ -112,7 +123,7 @@ jobs:
       env:
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-        AZURE_OPENAI_DEPLOYMENT: ${{ inputs.model || 'gpt-4o-mini' }}
+        AZURE_OPENAI_DEPLOYMENT: ${{ inputs.model || 'gpt-5.5' }}
         # Secondary model for comparison tests
         AZURE_OPENAI_DEPLOYMENT_2: ${{ inputs.model == 'gpt-4o' && 'gpt-4o-mini' || 'gpt-4o' }}
 

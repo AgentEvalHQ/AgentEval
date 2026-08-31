@@ -122,7 +122,8 @@ internal static class TypedMemEvalReportBuilder
                 options, results.Select(q => q.AnswerSampling).ToList()),
             OracleProjection = oracleProjection,
             TypedOutcomes = typed,
-            Provenance = BuildProvenance(descriptor, results, totalQuestionsInCorpus, corpusSha256),
+            Provenance = BuildProvenance(
+                descriptor, results, totalQuestionsInCorpus, corpusSha256, options),
             JudgeSystemFingerprints = results
                 .Select(q => q.JudgeSystemFingerprint)
                 .Where(f => !string.IsNullOrEmpty(f))
@@ -288,12 +289,14 @@ internal static class TypedMemEvalReportBuilder
         TypedMemEvalVerticalDescriptor descriptor,
         IReadOnlyList<QuestionResult> results,
         int totalQuestionsInCorpus,
-        string corpusSha256)
+        string corpusSha256,
+        ExternalBenchmarkOptions options)
         => new()
         {
             Mode = RunProvenanceMode.Full,
             JudgePromptFingerprint = TypedMemEvalJudge.PromptFingerprint,
             JudgePromptTemplateNames = TemplateNames,
+            JudgeMaxOutputTokens = options.JudgeMaxOutputTokens,
             AgentEvalVersion = LongMemEvalProvenance.TryGetAgentEvalVersion(),
             // No path by design: the family is embedded-only, and the identifier plus hash pin the
             // corpus more precisely than a path ever could.
