@@ -312,7 +312,7 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Bitemporal | 60 | 0.800 | 1 (×60) |
 | Temporal | 50 | 0.785 | 1 (×20), 2 (×15), 3 (×5), 4 (×5), 5 (×5) |
 | Semantic | 50 | 0.677 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
-| Conjunction | 50 | 0.545 | 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
+| Conjunction | 50 | 0.581 | 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -395,7 +395,7 @@ gold is itself an abstention.
 | Bitemporal | 59/60 | 29/30 | 60/60 | 60/60 | — | 59/60 | 48/60 | +0.18 |
 | Temporal | 50/50 | — | 50/50 | 30/30 | — | 50/50 | 33/50 | +0.34 |
 | Semantic | 50/50 | — | 50/50 | 48/50 | — | 48/50 | 34/50 | +0.32 |
-| Conjunction | 49/50 | — | 50/50 | 50/50 | — | 49/50 | 11/50 | +0.76 |
+| Conjunction | 50/50 | — | 50/50 | 49/50 | — | 49/50 | 14/50 | +0.72 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**

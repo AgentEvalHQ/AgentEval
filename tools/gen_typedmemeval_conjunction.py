@@ -100,11 +100,27 @@ FIRST_FRAMES = (
 )
 
 #: (event phrasing, the predicate a counting question asks about).
+#: (event as the session records it, predicate for the judge, HOW THE QUESTION ASKS FOR IT).
+#:
+#: The third element is new and it fixes a real defect: the question hard-coded "put an order in
+#: with" for every draw, so nineteen of twenty questions asked how many times the speaker ORDERED
+#: while the gold sessions recorded sending paperwork, booking collections, or raising jobs. The
+#: question asked about an event that never happened, and the shape's apparent difficulty was partly
+#: that incoherence rather than the join it exists to test.
+#:
+#: It is stated EXPLICITLY rather than parsed out of the predicate. The disabled attempt that stood
+#: here derived it as `predicate.split("the speaker ")[1].split(" with")[0]`, which silently returns
+#: the whole phrase for "sent paperwork TO {entity}" -- there is no " with" to split on. A bank of
+#: three parallel forms is longer and cannot go quietly wrong.
 COUNTABLE = (
-    ("Put an order in with {entity} today.", "the speaker put an order in with {entity}"),
-    ("Sent the paperwork over to {entity}.", "the speaker sent paperwork to {entity}"),
-    ("Booked a collection with {entity}.", "the speaker booked a collection with {entity}"),
-    ("Raised a job with {entity} this morning.", "the speaker raised a job with {entity}"),
+    ("Put an order in with {entity} today.", "the speaker put an order in with {entity}",
+     "put an order in with"),
+    ("Sent the paperwork over to {entity}.", "the speaker sent paperwork to {entity}",
+     "send paperwork over to"),
+    ("Booked a collection with {entity}.", "the speaker booked a collection with {entity}",
+     "book a collection with"),
+    ("Raised a job with {entity} this morning.", "the speaker raised a job with {entity}",
+     "raise a job with"),
 )
 
 #: Near-miss events: the same action against a DIFFERENT party. These are what a system counts if
@@ -281,15 +297,21 @@ def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
     attribute is NOW. Counting against a superseded value returns a confident wrong number, which is
     the failure a per-type score cannot see."""
     attribute, values = ATTRIBUTES[index % len(ATTRIBUTES)]
-    event, predicate = COUNTABLE[index % len(COUNTABLE)]
+    event, predicate, asked_as = COUNTABLE[index % len(COUNTABLE)]
     k = (index % 3) + 1
     chosen = rng.sample(list(values), k + 1)
     current, superseded = chosen[-1], chosen[0]
     hits = 2 + (index % 3)
     qid = f"tme-cnj-{index + 1:03d}"
-    ask = f"How many times did I put an order in with my {attribute}? Count only the current one."
-    ask = ask.replace("put an order in with", predicate.split("the speaker ")[1].split(" with")[0]
-                      if False else "put an order in with")
+    # ASKS FOR BOTH HALVES, because gold requires both. Gold is "{hits} times, with {current}" and
+    # names the entity deliberately -- without it a judge cannot tell a correct count attached to a
+    # SUPERSEDED value from a correct answer. But the question used to ask only for the count, so
+    # "4 times" was fully responsive and scored wrong (tme-cnj-006 failed V1 on exactly that), and
+    # for the questions that passed, naming the entity was verbosity rather than evidence the
+    # semantic half had been performed. A conjunction shape has to ask for both halves or it cannot
+    # observe that the join happened.
+    ask = (f"How many times did I {asked_as} my current {attribute}, "
+           f"and which one is that?")
     echoed = tmc.echo_terms(ask, echo, random.Random(f"{qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
 
     golds = [_gold(rng.choice(FIRST_FRAMES).format(attribute=attribute, value=chosen[0]),

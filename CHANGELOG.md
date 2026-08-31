@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`value-then-count` asked how many times the speaker ORDERED while its sessions recorded sending
+  paperwork, booking collections and raising jobs.** The question hard-coded *"put an order in with"*
+  for every draw while `COUNTABLE` supplies four different actions, so **19 of 20 questions asked
+  about an event that never happened.** V1 sat at 19/20 only because the model treated the recorded
+  events as orders anyway — leniency, not soundness — and part of the shape's apparent difficulty
+  was that incoherence rather than the join it exists to test.
+
+  A disabled attempt at this fix stood in the file as `if False`, deriving the verb by
+  `predicate.split("the speaker ")[1].split(" with")[0]` — which silently returns the whole phrase
+  for *"sent paperwork **to** {entity}"*, because there is no `" with"` to split on. The verb is now
+  a third, explicit element of `COUNTABLE`: three parallel forms are longer and cannot go quietly
+  wrong.
+
+- **And the question asked for less than its gold required.** Gold is `"{n} times, with {entity}"`
+  and names the entity deliberately — *without it a judge cannot tell a correct count attached to a
+  **superseded** value from a correct answer*. But the question asked only for a count, so *"4
+  times"* was fully responsive and scored wrong (`tme-cnj-006` failed V1 on exactly that), and for
+  the nineteen that passed, naming the entity was **verbosity rather than evidence the semantic half
+  had been performed**. A conjunction shape has to ask for both halves or it cannot observe that the
+  join happened. It now asks for both.
+
+  | | before | after |
+  |---|---|---|
+  | V1 | 49/50 | **50/50** — `tme-cnj-006` resolved |
+  | `value-then-count` V9 | 2/20 | 6/20 |
+  | `value-then-count` headroom | 0.85 | **0.70** |
+  | vertical headroom | 0.76 | 0.72 |
+
+  **The headroom drop is the honest part.** Some of the old difficulty was the question asking about
+  an event the corpus never recorded; a shape is not hard because it is incoherent. 0.70 is what the
+  join is worth once the question is answerable as written.
+
+  Corpus sha `99f609c9…` → `9f6a0f37…`; Conjunction controls reset — its third move this arc, all
+  inside the pre-tag window.
+
 - **Episodic ran one echo knob across three shapes whose coverage spanned 0.66, and the vertical
   mean reported none of it.** Single-knob calibration put the mean at a healthy **0.682** while the
   shapes sat at `participant-attribution` **0.933**, `assistant-stated` 0.800, `list-order`
