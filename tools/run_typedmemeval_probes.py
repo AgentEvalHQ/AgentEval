@@ -1224,6 +1224,20 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     discrimination floor multiplied by that same factor, so the comparison is like for like; on the
     shipped corpus belief-at-instant cleared the raw floor and MISSED the scaled one, which is the
     honest reading and the one that kept it on the redesign list.
+
+    THE SCALING IS A HEURISTIC AND ITS ASSUMPTION IS MEASURABLY FALSE. (q^2 - p^2) = (q - p)(q + p)
+    holds when the arms are INDEPENDENT. They are not: both arms read the same haystack, and on the
+    shipped corpus pair-V9 came in at 14/18 = 0.778 against the 0.735 independence predicts, so the
+    arms are positively correlated and the true amplification is SMALLER than (V1 + V9). The scaled
+    floor is therefore conservative -- it can fail a shape that would survive an exact correction,
+    and the verdict on belief-at-instant turns on precisely that margin (0.167 against 0.275, where
+    the unscaled floor would have passed it).
+
+    SO THE FLOOR IS NOT WHAT CARRIES THE belief-at-instant VERDICT, and it should not be quoted as
+    though it were. What carries it is the raw separation: 3 pairs out of 18, against a binomial
+    standard error near 1.75 pairs -- about 1.7 sd, which no reading of the amplification rescues.
+    A shape whose entire discrimination is three pairs on n=18 cannot rank two systems whatever
+    floor it is compared against, and the sample size is itself worth revisiting.
     """
     paired = [(r, arms.get(r["question_id"], (None, None))) for r in group]
     pairs: dict[str, dict[str, dict]] = {}

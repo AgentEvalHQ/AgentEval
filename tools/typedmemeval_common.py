@@ -44,6 +44,7 @@ import json
 import math
 import random  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this selects filler text, not secrets.
 import re
+import sys
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
@@ -1963,6 +1964,16 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
         iterations += iters
 
     questions = attempt(echo_map)
+    # RE-READ PER-SHAPE COVERAGE FROM THE FINAL CORPUS. `per_shape` used to hold each shape's
+    # `best_mean` -- the value its search saw, taken while every LATER shape's knob was still 0.0.
+    # The final build sets them all, which moves the earlier shapes, so the published number
+    # described a corpus that was never shipped: arithmetic reported delta 0.7767 against an actual
+    # 0.7350, and conjunction alias-then-count 0.3444 against 0.3356. Small, and exactly the class
+    # this family keeps finding -- a published figure measured off the artifact it names.
+    for shape in shapes:
+        values = scored(questions, shape)
+        if values:
+            per_shape[shape] = round(sum(values) / len(values), 4)
     per_q = {q.question_id: realised_coverage(q) for q in questions}
     mean = measurable_coverage_mean(questions)
     return questions, Calibration(
@@ -2036,6 +2047,112 @@ def _dump(payload) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
+def calibrate_pinned(build, seed: int, echo, shape_of=None,
+                     iterations: int = 0, trace=None) -> tuple[list[Question], Calibration]:
+    """Rebuilds at a RECORDED echo instead of searching for one.
+
+    CALIBRATION IS AN AUTHORING STEP, NOT A BUILD STEP, and treating it as a build step is what
+    broke reproducibility across the whole family. A corpus used to be a function of (generator,
+    seed, SEARCH ALGORITHM): every regeneration re-ran the search, so #210's correction to that
+    search silently desynchronised nine committed corpora from the generators that are supposed to
+    produce them, and the sidecars went on asserting `generator.tool`/`version`/`seed` as though
+    they still reproduced it. Nothing was wrong with the corpora -- they passed every gate and their
+    probe records honestly describe their bytes -- but their provenance claim had quietly become
+    false.
+
+    Pinning makes a corpus a function of (generator, seed, RECORDED ECHO), which is reproducible by
+    construction and removes the failure mode rather than re-fixing it after each search change.
+    The echo is already published in the sidecar, so nothing new has to be stored.
+
+    The band gate still applies. A pinned rebuild landing outside the band means the GENERATOR
+    changed in a way that moved difficulty, which is exactly the case that should stop the build
+    loudly rather than silently re-tune around itself.
+    """
+    per_shape_mode = shape_of is not None
+    questions = build(echo, random.Random(seed))  # DevSkim: ignore DS148264 - deterministic corpus generation
+    # Mirrors the equalisation each search path uses, INCLUDING the argument they differ on:
+    # calibrate_per_shape neutralises at 0.0 because its knob is per shape, while calibrate passes
+    # the single knob through. Getting this wrong reproduces nothing and looks like a generator bug.
+    equalise_echo(questions, 0.0 if per_shape_mode else echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
+    equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
+    equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
+
+    per_q = {q.question_id: realised_coverage(q) for q in questions}
+    mean = measurable_coverage_mean(questions)
+    if not (BAND_LOW <= mean <= BAND_HIGH):
+        raise SystemExit(
+            f"calibration gate: rebuilding at the RECORDED echo {echo} gives mean realised coverage "
+            f"{mean:.3f}, outside the [{BAND_LOW}, {BAND_HIGH}] band. The pinned echo no longer "
+            f"suits this generator, which means the generator's difficulty moved. Re-run with "
+            f"--recalibrate to search for a new echo, and re-probe the corpus that produces.")
+
+    per_shape = None
+    if per_shape_mode:
+        grouped: dict[str, list[float]] = {}
+        for q in questions:
+            if q.g > 0:                       # same exclusion measurable_coverage_mean uses
+                grouped.setdefault(shape_of(q), []).append(realised_coverage(q))
+        per_shape = {k: round(sum(v) / len(v), 4) for k, v in sorted(grouped.items()) if v}
+
+    return questions, Calibration(
+        echo=round(sum(echo.values()) / len(echo), 4) if isinstance(echo, dict) else round(echo, 4),
+        mean=round(mean, 4),
+        # The AUTHORING search's count, carried forward: the field describes how this echo was
+        # found, and it was found once. Recomputing it as 0 would be true of this build and would
+        # also rewrite the sidecar on every rebuild, so a reproducible build would still produce a
+        # diff -- which is the property pinning exists to provide.
+        iterations=iterations,
+        per_question=per_q,
+        # Carried for the same reason as `iterations`: the trace records the authoring search that
+        # chose this echo, and dropping it on every rebuild would both lose the record and rewrite
+        # the sidecar that pinning exists to keep stable.
+        trace=list(trace or []),
+        echo_by_shape=({k: round(v, 4) for k, v in sorted(echo.items())}
+                       if isinstance(echo, dict) else None),
+        per_shape=per_shape,
+    )
+
+
+def recorded_echo(vertical: str, corpus_id: str, per_shape: bool):
+    """The (echo, iterations, trace) the sidecar was built at, or (None, 0, []) if nothing to pin."""
+    sidecar = DATA_ROOT / vertical / f"{corpus_id}.meta.json"
+    if not sidecar.exists():
+        return None, 0, []
+    try:
+        coverage = json.loads(sidecar.read_text(encoding="utf-8")).get("coverage") or {}
+    except json.JSONDecodeError:
+        return None, 0, []
+    iterations = coverage.get("iterations") or 0
+    trace = coverage.get("search_trace") or []
+    if per_shape:
+        by_shape = coverage.get("echo_by_shape")
+        return (dict(by_shape) if by_shape else None), iterations, trace
+    # A per-shape vertical's `echo` is the MEAN of its knobs and is not a usable setting, so it is
+    # only read back for verticals that genuinely calibrate on one.
+    if coverage.get("echo_by_shape") is not None:
+        return None, iterations, trace
+    return coverage.get("echo"), iterations, trace
+
+
+def _carry_measurements(previous: dict, rebuilt: dict) -> None:
+    """Copies anything the previous sidecar holds that this build does not produce, at ANY depth.
+
+    Only ever called when the corpus hash matches, which is what makes it correct: a key present in
+    the old sidecar and absent from the new one is a measurement some later tool stamped against
+    these exact bytes, and those bytes have not changed.
+
+    DEPTH IS THE POINT. A top-level-only version of this still dropped WorkingMemory's
+    `structure.retrieval_ceiling`, because `structure` IS rebuilt and the stamped block lives inside
+    it -- so the parent looked "produced" while its contents were quietly lost. Values the build
+    does compute always win; this only fills gaps.
+    """
+    for key, value in previous.items():
+        if key not in rebuilt:
+            rebuilt[key] = value
+        elif isinstance(value, dict) and isinstance(rebuilt[key], dict):
+            _carry_measurements(value, rebuilt[key])
+
+
 def finalise(
     vertical: str,
     build,
@@ -2057,9 +2174,25 @@ def finalise(
     # `shape_of` opts a vertical into PER-SHAPE calibration. Without it the vertical is calibrated
     # on its mean, which is satisfiable by averaging one shape's collapse against another's
     # saturation; with it, every shape must reach its own band on its own knob.
-    questions, calibration = (
-        calibrate_per_shape(build, seed, shape_of) if shape_of is not None
-        else calibrate(build, seed))
+    # BUILD REPRODUCES; AUTHORING RE-SEARCHES. Plain `python gen_typedmemeval_X.py` rebuilds at the
+    # echo the committed sidecar records, so it reproduces the committed corpus byte for byte and
+    # the provenance the sidecar asserts is true. `--recalibrate` runs the search, and is the
+    # deliberate act that moves a corpus and therefore obliges a re-probe.
+    #
+    # sys.argv rather than a parameter: all nine generators call finalise() directly with no CLI of
+    # their own, and threading a flag through every one of them is nine chances to wire it up
+    # differently.
+    recalibrate = "--recalibrate" in sys.argv[1:]
+    pinned, pinned_iterations, pinned_trace = (
+        (None, 0, []) if recalibrate
+        else recorded_echo(vertical, corpus_id, shape_of is not None))
+    if pinned is not None:
+        questions, calibration = calibrate_pinned(
+            build, seed, pinned, shape_of, pinned_iterations, pinned_trace)
+    elif shape_of is not None:
+        questions, calibration = calibrate_per_shape(build, seed, shape_of)
+    else:
+        questions, calibration = calibrate(build, seed)
 
     if len(questions) != expected_count:
         raise SystemExit(
@@ -2206,9 +2339,14 @@ def finalise(
         except json.JSONDecodeError:
             previous = {}
         if previous.get("corpus_sha256") == corpus_sha:
-            for carried in ("probes", "gold_item_types"):
-                if carried in previous:
-                    metadata[carried] = previous[carried]
+            # EVERY key the previous sidecar carries that this build does not produce. An allowlist
+            # drifts: it started as ("probes", "gold_item_types") and silently dropped
+            # WorkingMemory's `retrieval_ceiling`, which is stamped by yet another tool. When the
+            # corpus hash matches, any such key is BY DEFINITION a measurement of these exact bytes,
+            # so carrying it is the correct reading and enumerating them is not.
+            _carry_measurements(previous, metadata)
+            if "probes" in previous:
+                metadata["probes"] = previous["probes"]
             # V7 is the one probe the generator owns and has just recomputed from the questions in
             # hand, so it is put back on top of the restored block rather than carried.
             metadata["probes"]["v7_separability"] = {

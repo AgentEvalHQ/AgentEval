@@ -43,8 +43,8 @@ def shipped(vertical: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))["coverage"]
 
 
-def recompute(vertical: str) -> tuple[dict[str, float], float, float]:
-    """Returns (echo_by_shape, overall echo, mean) under the search as it stands today."""
+def recompute(vertical: str) -> tuple[dict[str, float], float, float, dict[str, float]]:
+    """Returns (echo_by_shape, overall echo, mean, per_shape_realised) under today's search."""
     module = importlib.import_module(f"gen_typedmemeval_{vertical}")
     # Read from the signature rather than a positional index into __defaults__, so adding a
     # keyword to finalise cannot silently re-point this at the wrong value.
@@ -52,20 +52,33 @@ def recompute(vertical: str) -> tuple[dict[str, float], float, float]:
     if vertical in PER_SHAPE:
         _, cal = tmc.calibrate_per_shape(
             module.build, seed, lambda q: (q.extension or {}).get("shape"))
-        return cal.echo_by_shape, cal.echo, cal.mean
+        return cal.echo_by_shape, cal.echo, cal.mean, cal.per_shape
     _, cal = tmc.calibrate(module.build, seed)
-    return {}, cal.echo, cal.mean
+    return {}, cal.echo, cal.mean, {}
 
 
 def compare(vertical: str) -> dict:
     was = shipped(vertical)
-    by_shape, echo, mean = recompute(vertical)
+    by_shape, echo, mean, realised = recompute(vertical)
     rows = []
     if by_shape:
         old = was.get("echo_by_shape") or {}
         for shape in sorted(set(by_shape) | set(old)):
             a, b = old.get(shape), by_shape.get(shape)
+            # COVERAGE, not just the knob. A moved echo says the search chose differently; only
+            # the realised coverage says whether it chose BETTER, and "better" here means closer to
+            # BAND_TARGET. A shape pinned at echo 1.0 whose coverage is still above the band is not
+            # improved, it is SATURATED and cannot be calibrated at all -- which is a finding about
+            # the corpus rather than a win for the search.
+            was_cov = (was.get("per_shape_realised") or {}).get(shape)
+            now_cov = realised.get(shape)
+            closer = None
+            if was_cov is not None and now_cov is not None:
+                closer = abs(now_cov - tmc.BAND_TARGET) < abs(was_cov - tmc.BAND_TARGET)
             rows.append({"shape": shape, "shipped": a, "recomputed": b,
+                         "coverage_shipped": was_cov, "coverage_now": now_cov,
+                         "closer_to_target": closer,
+                         "saturated": now_cov is not None and now_cov > tmc.BAND_HIGH,
                          "moved": a is None or b is None or abs(a - b) > 1e-9})
     else:
         a, b = was.get("echo"), echo
@@ -90,7 +103,12 @@ def main() -> int:
         print(f"\n== {vertical}  [{flag}]  mean {result['shipped_mean']} -> {result['recomputed_mean']}")
         for row in result["rows"]:
             mark = "  <-- MOVED" if row["moved"] else ""
-            print(f"   {row['shape']:26} shipped {str(row['shipped']):8} -> {str(row['recomputed']):8}{mark}")
+            verdict = ("" if row.get("closer_to_target") is None
+                       else ("  CLOSER to target" if row["closer_to_target"] else "  FURTHER from target"))
+            if row.get("saturated"):
+                verdict += "  SATURATED (above the band at every echo)"
+            print(f"   {row['shape']:26} echo {str(row['shipped']):8} -> {str(row['recomputed']):8}"
+                  f" cov {str(row['coverage_shipped']):8} -> {str(row['coverage_now']):8}{mark}{verdict}")
         sys.stdout.flush()
 
     moved = [r["vertical"] for r in results if r["moved"]]
