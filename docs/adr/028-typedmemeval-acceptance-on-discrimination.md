@@ -187,7 +187,11 @@ the instrument and re-baselining on it are separate decisions, and only the firs
 This is what the structural dry run is for: it answered a question that would otherwise have been
 settled by spending.
 
-## 11. Correction to §10, same day — the convergence claim was wrong, and so was the decision
+## 11. Correction to §10 — SUPERSEDED BY §12, which withdraws most of it
+
+> **Read §12 first.** The movement this section reports was produced by a defect in the corrected
+> search itself, not by the corpora. The section is kept because the reasoning it applies is sound
+> and the process failure it records is real; its *conclusion* is withdrawn.
 
 §10 concluded that the corrected search picks the same echoes as the bisection it replaced, and
 therefore that **"the code fix ships and the re-baseline does not."** Both halves are withdrawn.
@@ -249,6 +253,69 @@ independently asked for on cost grounds — their reasoning (the controls a rese
 already lapsed or unheld, so now is the cheap moment) and this measurement (the echoes genuinely
 move) are independent arguments reaching the same place. Cheap and warranted are different claims;
 this section supplies the second.
+
+## 12. Resolution — the search was broken; the echoes never moved
+
+§10 said the corrected search picks the same echoes as the bisection it replaced, and concluded
+against a re-baseline. §11 said that was wrong and four verticals move. **§11's evidence came from a
+bug in the search, and the answer is closer to §10's.**
+
+| claim | status |
+|---|---|
+| §10: "both searches converge to the same echoes" | **Substantially correct.** Its method was still flawed — measured off-pipeline, and it invented movement in `episodic`. |
+| §11: "`arithmetic`, `conjunction`, `prospective`, `workingmemory` move" | **Withdrawn.** `arithmetic` recalibrates to its shipped echoes exactly once the search is fixed. |
+| §11: "the re-baseline is warranted" | **Withdrawn.** There is nothing to re-baseline. |
+
+### The defect, which was mine and shipped in the fix
+
+A sweep replaced bisection because bisection assumes a monotone most shapes violate. That reasoning
+holds. The implementation was a **regression on any curve whose in-band window is narrower than the
+sweep grid.** `arithmetic/delta`, measured:
+
+    echo 0.000 0.125 0.250 | 0.375 0.500 0.625 0.750 1.000
+    cov  .967  .967  .947  | .377  .153  .025  .000  .000
+
+Nothing on a nine-point grid is in band; the window lies between 0.25 and 0.375, thinner than the
+0.125 spacing. The nearest-to-target rung is 0.947, above `BAND_HIGH`, so the "saturated" branch
+fired and returned the **hardest** point — echo 1.0 at coverage **0.000**, off the band in the other
+direction and unusable. Bisection found 0.3125 (coverage 0.735) because bisection NARROWS. The
+saturation test also did not do what its own comment claimed: it read one point while describing a
+test of the whole sweep.
+
+**A sweep LOCATES and bisection RESOLVES, and both are needed.** The sweep evaluates the whole range
+so a non-monotone curve cannot fool it into the wrong bracket; bisection finds windows thinner than
+any grid. Sweep to the crossing, then bisect inside that bracket. Arithmetic then recalibrates to
+`count` 0.125, `delta` 0.3125, `duration` 0.125, `sum` 0.1875 — its shipped values, every one.
+
+### Why no gate caught it
+
+Per-shape calibration does not gate each shape's band, and arithmetic's **vertical mean stays in
+range at 0.609** while `delta` sits at 0.000. That is §2's averaging defect — one shape collapsed,
+hidden inside a healthy mean — reintroduced by the fix meant to prevent it. The eleven existing
+search self-tests covered saturation and bimodality and had no case where the band sits BETWEEN two
+rungs, so the one shape of curve that breaks a grid search was the one shape untested.
+
+### What survives from §11
+
+The process failures are real and stand: §10 was measured off-pipeline, against §5b's own written
+rule. So was the conclusion that **correcting an instrument and re-baselining on it are separate
+decisions** — which is what limited the damage, since no corpus was regenerated on the strength of a
+search that was itself broken.
+
+The pinning change (calibration is an authoring step, not a build step) also stands on its own. It
+was motivated by §11's now-withdrawn finding, but its justification is provenance, not calibration
+quality: a corpus must be a function of (generator, seed, recorded echo) rather than of whichever
+search algorithm is checked in. Had that been true earlier, this entire episode would have been a
+CI failure on one pull request.
+
+### A saturated shape found on the way
+
+`prospective` was the one vertical not rebuilt under the per-shape coverage fix, so its sidecar
+still published mid-search values. **`not-yet-true` published 0.6667 and is actually 1.0000** —
+fully saturated, BM25 returning gold for every question, reported as comfortably mid-band. The probe
+records agree: V9 5/6, the highest in the vertical, headroom 0.1667, which is one question out of
+six clearing the 0.15 floor. Corpus unchanged, so no probe is invalidated — but §3c's claim that
+saturation is the failure mode the ceiling exists to catch was not being met for that shape.
 
 ## 9. Provenance
 

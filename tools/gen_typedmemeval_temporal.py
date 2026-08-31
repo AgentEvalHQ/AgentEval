@@ -264,15 +264,26 @@ def _links_needed(shape: str, count: int) -> list[int]:
 
     Each shape is therefore scoped to a window it can close on its own:
 
-      occurrence-order   two ADJACENT events, decided by the single link between them
+      occurrence-order   the two ENDS of the chain, needing every link between them
       interval-position  a three-event window, needing both links inside it
-      recency            a three-event window, most recent decided by the same two links
+      recency            spans the chain, most recent decided by every link
 
-    Asking about non-adjacent events would need the whole chain, and then dropping a link at the far
-    end would leave the answer derivable -- which is exactly the redundancy this avoids.
+    THIS PARAGRAPH USED TO SAY THE OPPOSITE, and it was wrong in a way worth keeping visible:
+    "asking about non-adjacent events would need the whole chain, and then dropping a link at the
+    far end would leave the answer derivable -- which is exactly the redundancy this avoids."
+    Dropping ANY link splits the chain into two segments; events[0] and events[-1] land on opposite
+    sides and cannot be related at all, so every link is NECESSARY rather than redundant. The
+    argument was never checked against the construction it described.
+
+    What it cost: with the asked pair ADJACENT, the single link between them is one session stating
+    the answer outright -- "we only got to the Vreskade survey after the Quorlory rewiring" -- while
+    the question hands BM25 both rare names. required_sessions_median was 1 and V9 was 19/20 against
+    V1 20/20, headroom 0.05: a lexical lookup wearing an ordering costume, in the vertical whose
+    entire premise is that narration order must be followed rather than read off. Spanning the chain
+    is the same repair recency already carries, for the same reason (ADR-028 s7.4).
     """
     if shape == SHAPE_ORDER:
-        return [1]
+        return list(range(1, count))
     # recency now spans the chain, so every link between the earliest asked event and the latest is
     # required. See _ask: the window is events[0], a middle event, events[-1].
     if shape == SHAPE_RECENCY:
@@ -283,7 +294,10 @@ def _links_needed(shape: str, count: int) -> list[int]:
 def _ask(shape: str, events: list[str], rng: random.Random) -> str:  # DevSkim: ignore DS148264 - deterministic corpus generation
     """Every question names its events in a SHUFFLED order, so position in the prompt carries nothing."""
     if shape == SHAPE_ORDER:
-        pair = [events[0], events[1]]
+        # THE TWO ENDS OF THE CHAIN, not the first two events. An adjacent pair is decided by the
+        # one link that names both of them, which is a single-session lookup; the ends are related
+        # only by following every link in between. See _links_needed.
+        pair = [events[0], events[-1]]
         rng.shuffle(pair)
         return f"Which came first, {pair[0]} or {pair[1]}?"
     if shape == SHAPE_RECENCY:
@@ -366,13 +380,15 @@ def check_temporal(questions: list[tmc.Question]) -> list[str]:
         # would pass on redundant evidence.
         if q.g < 1:
             failures.append(f"{q.question_id}: no gold link")
-        # recency spans the chain now, so its gold is every link between the earliest asked event
-        # and the latest -- count - 1 of them. Minimality still holds and is the reason the number
-        # is derived rather than pinned: with a single chain A<B<C<D<E and a question over
-        # {A, C, E}, dropping ANY intermediate link removes a transitive step the answer needs, so
-        # V6 leave-one-out still bites on every one of them.
+        # recency AND occurrence-order both span the chain now, so their gold is every link between
+        # the earliest asked event and the latest -- count - 1 of them. Minimality still holds and
+        # is the reason the number is derived rather than pinned: with a single chain A<B<C<D<E and
+        # a question over {A, C, E}, dropping ANY intermediate link removes a transitive step the
+        # answer needs, so V6 leave-one-out still bites on every one of them.
         if q.extension["shape"] == SHAPE_ORDER:
-            expected_g = 1
+            # Spans the chain: every link between the two asked ends. Derived, not pinned, for the
+            # same reason recency's is -- a literal would silently stop matching the construction.
+            expected_g = q.extension["events"] - 1
         elif q.extension["shape"] == SHAPE_RECENCY:
             expected_g = q.extension["events"] - 1
         else:
@@ -414,8 +430,8 @@ if __name__ == "__main__":
         build=build,
         structure=tmc.StructureSpec(
             h_min=H_MIN, h_max=H_MAX,
-            # 1 for occurrence-order, 2 for interval-position, and 3-5 for recency, which spans the
-            # chain: its gold is every link between the earliest asked event and the latest.
+            # 2 for interval-position, and 3-5 for occurrence-order and recency, which both span
+            # the chain: gold is every link between the earliest asked event and the latest.
             g_values={1, 2, 3, 4, 5}, gold_position_shuffled=True,
             no_absolute_dates=True,
         ),
