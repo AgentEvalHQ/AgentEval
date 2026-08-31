@@ -744,7 +744,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T16:54:29Z",
+    "run_at": "2026-08-31T13:29:36Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -808,62 +808,60 @@
       "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 2,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 35,
+        "calls": 245,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 35,
+        "judge_calls": 245,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 350,
+        "calls": 2450,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 0,
+        "judge_calls": 831,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 105,
+        "calls": 627,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 0,
+        "judge_calls": 226,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 153,
+        "calls": 828,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 85,
+        "judge_calls": 315,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 36,
+        "calls": 245,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 35,
+        "judge_calls": 245,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 36,
+        "calls": 245,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 35,
+        "judge_calls": 245,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -902,7 +900,12 @@
         "v8_passed": 17,
         "v9_applicable": 20,
         "v9_passed": 13,
-        "required_sessions_median": 2
+        "required_sessions_median": 2,
+        "headroom_perfect_selector": 0.3,
+        "discriminates": true,
+        "headroom_reachable": 0.2,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "never-known": {
         "questions": 15,
@@ -926,7 +929,12 @@
         "v8_passed": 14,
         "v9_applicable": 15,
         "v9_passed": 8,
-        "required_sessions_median": 2
+        "required_sessions_median": 2,
+        "headroom_perfect_selector": 0.4667,
+        "discriminates": true,
+        "headroom_reachable": 0.4,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       }
     },
     "per_question": {

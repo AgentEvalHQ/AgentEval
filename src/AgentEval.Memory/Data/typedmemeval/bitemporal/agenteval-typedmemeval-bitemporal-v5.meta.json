@@ -739,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T14:44:27Z",
+    "run_at": "2026-08-31T13:29:36Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -809,7 +809,12 @@
         "v8_passed": 35,
         "v9_applicable": 36,
         "v9_passed": 31,
-        "required_sessions_median": 1
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.1111,
+        "discriminates": false,
+        "headroom_reachable": 0.1111,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "correction-depth": {
         "questions": 24,
@@ -821,7 +826,12 @@
         "v8_passed": 24,
         "v9_applicable": 24,
         "v9_passed": 17,
-        "required_sessions_median": 1
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.2917,
+        "discriminates": true,
+        "headroom_reachable": 0.2917,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       }
     },
     "per_question": {
@@ -1779,7 +1789,7 @@
         "calls": 3050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 833,
+        "judge_calls": 831,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -1788,16 +1798,16 @@
         "calls": 807,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 221,
+        "judge_calls": 226,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 826,
+        "calls": 828,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 321,
+        "judge_calls": 315,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
