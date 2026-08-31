@@ -1800,6 +1800,12 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
 
 
 
+#: Points in the coarse sweep that opens :func:`search_echo`. Nine gives a step of 0.125, which is
+#: finer than the tread the echo knob actually moves on (arithmetic's grid reads 0.9240 / 0.6363 /
+#: 0.2733 at 0.125 / 0.250 / 0.375), so a real minimum cannot hide between two sweep points.
+SWEEP_POINTS = 9
+
+
 def measurable_coverage_mean(questions: list["Question"]) -> float:
     """Mean realised coverage over the questions this statistic can actually describe.
 
@@ -1841,27 +1847,58 @@ def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
     rather than forcing one, because a corpus that cannot be calibrated to mid-band is itself a
     finding about the calibration model.
     """
-    lo, hi = 0.0, 1.0
-    mean = evaluate(hi)
-    best_echo, best_mean = hi, mean
-    iterations = 1
-    if mean > BAND_HIGH:
-        return best_echo, best_mean, iterations   # saturated even at maximum echo; caller refuses
+    # SWEEP, THEN REFINE. The previous implementation bisected, which is only valid on a monotone
+    # response curve -- and this docstring asserted that monotone for a year without measuring it.
+    # Measured through the real per-shape pipeline, it is false for most shapes:
+    #
+    #     episodic/list-order      0.871  0.783  0.401  0.490  0.838   falls then RISES
+    #     semantic/current-value   1.000  0.900  0.917  0.575  0.450   not monotone
+    #     conjunction/alias-count  0.340  0.332  0.303  0.061  0.000   monotone
+    #
+    # Bisection on a curve like that returns wherever the bracket started, not a point chosen
+    # against the function: list-order has a minimum near 0.50 and the old search stopped at 0.25,
+    # never seeing it. A coarse sweep assumes NOTHING about shape -- it evaluates the whole range
+    # and keeps the best -- and the refinement then walks downhill around the winner, which is safe
+    # because it is local to a point the sweep already proved good.
+    grid = [i / (SWEEP_POINTS - 1) for i in range(SWEEP_POINTS)]
+    swept: list[tuple[float, float]] = []
+    best_echo, best_mean, iterations = None, None, 0
+    for echo in grid:
+        mean = evaluate(echo)
+        swept.append((echo, mean))
+        iterations += 1
+        if best_mean is None or abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
+            best_echo, best_mean = echo, mean
 
-    for _ in range(max_iterations):
+    # Saturated across the ENTIRE range, not merely at one end. The old check read only echo=1.0,
+    # which on a non-monotone curve is not the hardest point -- list-order is EASIER at 1.0 than at
+    # 0.5, so a shape could be refused on its worst rung while a good one existed.
+    #
+    # When it IS saturated everywhere, report the HARDEST point the sweep found rather than the one
+    # nearest the target. The caller refuses on this, and the number it prints is a claim about how
+    # close the corpus can get: "even at our hardest setting it still sits at X" is the useful
+    # sentence, and the nearest-to-target point would understate the gap.
+    if best_mean > BAND_HIGH:
+        # Lowest coverage wins; ties break toward the HIGHEST echo, so a flat saturated curve
+        # still reports "even at maximum echo" -- the sentence the caller's refusal prints.
+        hardest_echo, hardest_mean = min(swept, key=lambda pair: (pair[1], -pair[0]))
+        return hardest_echo, hardest_mean, iterations
+
+    step = 1.0 / (SWEEP_POINTS - 1)
+    while iterations < max_iterations and step > BAND_RESOLUTION:
         if abs(best_mean - BAND_TARGET) <= BAND_TOLERANCE:
             break
-        if hi - lo < BAND_RESOLUTION:
-            break                                 # no step on this staircase nearer the target
-        mid = (lo + hi) / 2
-        mean = evaluate(mid)
-        iterations += 1
-        if abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
-            best_echo, best_mean = mid, mean
-        if mean > BAND_TARGET:
-            lo = mid                              # still too easy to find -- echo harder
-        else:
-            hi = mid                              # past the target -- back off
+        step /= 2
+        improved = False
+        for echo in (best_echo - step, best_echo + step):
+            if not 0.0 <= echo <= 1.0:
+                continue
+            mean = evaluate(echo)
+            iterations += 1
+            if abs(mean - BAND_TARGET) < abs(best_mean - BAND_TARGET):
+                best_echo, best_mean, improved = echo, mean, True
+        if not improved:
+            continue        # halve again around the same point; the tread may be wider than a step
     return best_echo, best_mean, iterations
 
 
