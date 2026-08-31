@@ -48,6 +48,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -1189,6 +1190,15 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
 #: retriever exists, because the entire scale is BM25-relative.
 DISCRIMINATION_FLOOR = 0.15
 
+#: Standard errors of separation a PAIRED shape must show, beside the scaled headroom floor.
+#:
+#: Two is the conventional "not noise" bar and is deliberately modest: this is a second condition on
+#: an already-scaled floor, not the primary one. It exists because a headroom floor on a small pair
+#: count can be cleared by a difference of two or three pairs -- belief-at-instant once sat at
+#: 3 of 18, about 1.7 sd -- and no scaling of the floor detects that, because the problem is the
+#: SAMPLE, not the metric.
+PAIR_SEPARATION_FLOOR_SD = 2.0
+
 
 def _discrimination(group: list[dict]) -> dict:
     """How this shape is hard, and whether it can rank anything. ADR-028 SS3e.
@@ -1289,13 +1299,32 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
 
     pair_headroom = v1_hits / v1_n - v9_hits / v9_n
     amplification = arm_rate("v1") + arm_rate("v9")
+
+    # SEPARATION IN STANDARD ERRORS, because the scaled floor alone cannot carry the verdict.
+    #
+    # The scaling assumes independent arms and they measurably are not, so it is conservative by an
+    # unknown amount -- and correcting it from the observed data would be the artifact supplying its
+    # own pass, which is the exact failure this family keeps finding. So the floor STAYS as declared,
+    # and this is added beside it: how many standard errors separate the two arms, on a binomial
+    # error for the pair count. It assumes nothing about correlation, and it is the argument that
+    # actually decided belief-at-instant on the previous corpus -- 3 pairs of separation on n=18,
+    # about 1.7 sd, which no reading of the amplification rescues.
+    #
+    # A shape must now clear BOTH. Either alone can be argued with; together they cannot.
+    v9_rate = v9_hits / v9_n
+    spread = math.sqrt(max(v9_n * v9_rate * (1.0 - v9_rate), 1e-9))
+    separation_sd = (v1_hits - v9_hits) / spread if spread else 0.0
+
     row = {
         "pairs": len(complete),
         "pair_v1_both_arms": f"{v1_hits}/{v1_n}",
         "pair_v9_both_arms": f"{v9_hits}/{v9_n}",
         "pair_headroom": round(pair_headroom, 4),
         "pair_floor_scaled": round(DISCRIMINATION_FLOOR * amplification, 4),
-        "pair_discriminates": pair_headroom >= DISCRIMINATION_FLOOR * amplification,
+        "pair_separation_sd": round(separation_sd, 3),
+        "pair_separation_floor_sd": PAIR_SEPARATION_FLOOR_SD,
+        "pair_discriminates": (pair_headroom >= DISCRIMINATION_FLOOR * amplification
+                               and separation_sd >= PAIR_SEPARATION_FLOOR_SD),
     }
     v8_hits, v8_n = both("v8")
     if v8_n:
@@ -1304,7 +1333,10 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
         "Both arms of one pair scored together, because a system that answers only the valid-time "
         "arm has not shown it can represent two clocks. Compare pair_headroom against "
         "pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens "
-        "headroom mechanically, and the scaled floor removes that gain rather than banking it.")
+        "headroom mechanically, and the scaled floor removes that gain rather than banking it. "
+        "pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's "
+        "independence assumption is measurably false and conservative by an unknown amount, while "
+        "the standard-error separation assumes nothing about correlation.")
     return row
 
 
@@ -1479,6 +1511,26 @@ def self_test() -> None:
     check("a separating shape passes", row["pair_discriminates"], True)
     check("its pair headroom", row["pair_headroom"], round(1.0 - 7 / 12, 4))
 
+    # THE CASE THE SCALED FLOOR ALONE CANNOT CATCH, chosen by searching the space rather than
+    # guessed: over pair counts 4-40 the floor passes while the separation fails in 1,567
+    # configurations, so the second condition is load-bearing rather than decorative. This is one of
+    # them -- 4 pairs, V1 3/4 against V9 2/4, which reads headroom 0.25 against a floor of 0.1875
+    # and is one standard error. A difference of a single pair, reported as discrimination.
+    #
+    # (My first attempt at this case was arithmetically wrong -- it computed to exactly 2.0 sd and
+    # passed. The searched version replaces a guess with a measurement, which is the whole habit.)
+    tiny = [({**hit, "v1": False, "v9": False}, {**hit, "v1": False, "v9": False}),
+            ({**hit, "v9": False}, {**hit, "v9": False}),
+            ({**hit}, {**hit}),
+            ({**hit}, {**hit})]
+    records, arms = paired(tiny)
+    row = _pair_discrimination(records, arms)
+    check("a 4-pair shape clears the scaled headroom floor",
+          row["pair_headroom"] > row["pair_floor_scaled"], True)
+    check("its separation is one standard error", row["pair_separation_sd"], 1.0)
+    check("so it does NOT discriminate, on the sample rather than the metric",
+          row["pair_discriminates"], False)
+
     # Unpaired shapes must emit NOTHING rather than a degenerate row -- eight of the nine verticals
     # have no arms, and a zero-filled block there would read as a measured result.
     unpaired = [{"question_id": "solo", **hit}]
@@ -1494,7 +1546,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "8 paired-arm cases)")
+          "11 paired-arm cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
