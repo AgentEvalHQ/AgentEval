@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The judge's default completion budget could silently void it on the deployments its own claim
+  was measured on, and CI was certifying a different judge.** Two coupled defects, fixed together
+  because fixing either alone makes things worse.
+
+  **The budget.** `TypedMemEvalOptions.JudgeMaxOutputTokens` defaulted to **512**. That is ample for
+  a non-reasoning model and dangerous on a reasoning one, where the budget covers reasoning tokens
+  too: the model can spend the whole allowance thinking and return an **empty completion**. This
+  family has already paid for that once — empty completions scored as answers until the silence
+  accounting was built — and any consumer pointing the judge at a `gpt-5.x` deployment on defaults
+  would have hit it silently.
+
+  Now **1500**, which is not a guess: it is the value the calibration test floors at, and therefore
+  the configuration the published agreement number (**0.987** over 230 cases) was actually measured
+  under. **A default that differs from the configuration the claim came from means the out-of-box
+  judge is not the judge the claim describes.**
+
+  **The deployment.** The integration workflow defaulted to `gpt-4o-mini` while the judge's validity
+  claim is measured on `gpt-5.5`. A gate exercising a different model **certifies nothing about that
+  claim** — its green is decoration, and a regression on the calibrated deployment would not turn it
+  red. The default is now the calibrated deployment; the cheaper models stay selectable for manual
+  runs where the question is *"does the plumbing work"* rather than *"is the judge still valid"*.
+  If cost ever bites, run the calibrated judge **less often** rather than a different judge more
+  often.
+
+  **Behaviour-affecting, and recorded as such.** Raising a cap can flip a formerly-truncated
+  verdict, so the effective value is now stamped per run in
+  `BenchmarkRunProvenance.JudgeMaxOutputTokens`. Two runs differing only in this number are not
+  comparable, and that has to be visible rather than inferred.
+
+  Pinned by tests rather than left to a comment — and the first draft of that test **failed**,
+  correctly: `ExternalBenchmarkOptions` carries the same setting at a default of 256 and serves
+  LongMemEval, whose own calibration was measured there. The guarantee is not "the base default is
+  1500" but that the TypedMemEval facade **overrides it on the way through**. A value corrected in
+  one of two places is the applied-once shape, caught here by its own guard.
+
 - **`conjunction/order-then-value` could not rank any two retrievers, and now it can.** It measured
   **V9 15/15, headroom 0.00** — a perfect retriever and a plain BM25 retriever scored identically —
   while its BM25 coverage was only **0.667**. Those two numbers together are the diagnosis: the

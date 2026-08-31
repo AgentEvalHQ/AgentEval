@@ -41,6 +41,19 @@ public sealed class BenchmarkRunProvenance
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? JudgePromptTemplateNames { get; init; }
 
+    /// <summary>
+    /// The completion budget the judge actually ran with, in tokens.
+    /// </summary>
+    /// <remarks>
+    /// Stamped because RAISING THIS CAP CAN FLIP A VERDICT. On a reasoning deployment the budget
+    /// covers reasoning tokens too, so a judge that was silently truncated at one cap returns a
+    /// real verdict at a higher one — and two runs that differ only in this value are not
+    /// comparable, which is invisible unless the value travels with the run. The consuming project
+    /// asked for it explicitly when the default was raised from 512.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? JudgeMaxOutputTokens { get; init; }
+
     /// <summary>Informational version of the AgentEval.Memory assembly that produced the run.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AgentEvalVersion { get; init; }
