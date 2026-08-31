@@ -983,6 +983,9 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     by_id = {r["question_id"]: r for r in records}
     shapes = {e["question_id"]: (e.get("typedmemeval") or {}).get("shape") for e in entries}
     gold_counts = {e["question_id"]: len(e.get("answer_session_ids") or []) for e in entries}
+    # Paired arms, for the shapes that have them. See _pair_discrimination.
+    arms = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
+                               (e.get("typedmemeval") or {}).get("arm")) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -1138,6 +1141,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v9_passed": sum(1 for r in group if r.get("v9") is True),
                 "required_sessions_median": _median_g(group, gold_counts),
                 **_discrimination(group),
+                **_pair_discrimination(group, arms),
             }
             for shape, group in sorted(
                 {s: [r for r in records if shapes.get(r["question_id"]) == s]
@@ -1198,6 +1202,69 @@ def _discrimination(group: list[dict]) -> dict:
             "headroom_reachable is V8-V9, what a real retriever can reach, because returning more "
             "than gold cannot beat having everything. Where these diverge the shape is "
             "reasoning-limited and retrieval work will not move it.")
+    return row
+
+
+def _pair_discrimination(group: list[dict], arms: dict) -> dict:
+    """For a shape built as PAIRED ARMS, score the pair rather than the arm. ADR-028 SS7.4.
+
+    Bitemporal asks one haystack on two clocks: valid time (what is true) and transaction time
+    (what the record said at a named earlier instant). Measured on the shipped corpus, all 30 pairs
+    have DIFFERENT correct answers and DISJOINT gold, so answering one arm tells you nothing about
+    the other -- and a system that answers valid-time whatever it is asked scores 1.0 on one arm and
+    0.0 on the other. Per-question `V1 - V9` averages those two into a middling number and cannot
+    see the difference. The unit of capability here is the PAIR, so the pair is the unit of
+    measurement, and this is the number a consumer should read for this vertical.
+
+    THE CAVEAT IS PART OF THE NUMBER, and it is why this ships alongside `headroom_perfect_selector`
+    rather than replacing it. A conjunction of two measurements is harder than either, so pair
+    headroom is WIDER than per-question headroom by construction -- for independent arms it scales
+    by roughly (V1_arm + V9_arm), about 1.7x at these rates. Reading 0.17 here as comparable to 0.17
+    on an unpaired shape would be reading an artefact of the conjunction. `pair_floor_scaled` is the
+    discrimination floor multiplied by that same factor, so the comparison is like for like; on the
+    shipped corpus belief-at-instant cleared the raw floor and MISSED the scaled one, which is the
+    honest reading and the one that kept it on the redesign list.
+    """
+    paired = [(r, arms.get(r["question_id"], (None, None))) for r in group]
+    pairs: dict[str, dict[str, dict]] = {}
+    for record, (pair_id, arm) in paired:
+        if pair_id and arm:
+            pairs.setdefault(pair_id, {})[arm] = record
+    complete = [a for a in pairs.values() if len(a) == 2]
+    if not complete:
+        return {}
+
+    def both(key: str) -> tuple[int, int]:
+        usable = [a for a in complete if all(r.get(key) is not None for r in a.values())]
+        return sum(1 for a in usable if all(r[key] for r in a.values())), len(usable)
+
+    v1_hits, v1_n = both("v1")
+    v9_hits, v9_n = both("v9")
+    if not v1_n or not v9_n:
+        return {}
+
+    def arm_rate(key: str) -> float:
+        usable = [r for r in group if r.get(key) is not None]
+        return (sum(1 for r in usable if r[key]) / len(usable)) if usable else 0.0
+
+    pair_headroom = v1_hits / v1_n - v9_hits / v9_n
+    amplification = arm_rate("v1") + arm_rate("v9")
+    row = {
+        "pairs": len(complete),
+        "pair_v1_both_arms": f"{v1_hits}/{v1_n}",
+        "pair_v9_both_arms": f"{v9_hits}/{v9_n}",
+        "pair_headroom": round(pair_headroom, 4),
+        "pair_floor_scaled": round(DISCRIMINATION_FLOOR * amplification, 4),
+        "pair_discriminates": pair_headroom >= DISCRIMINATION_FLOOR * amplification,
+    }
+    v8_hits, v8_n = both("v8")
+    if v8_n:
+        row["pair_v8_both_arms"] = f"{v8_hits}/{v8_n}"
+    row["pair_reading"] = (
+        "Both arms of one pair scored together, because a system that answers only the valid-time "
+        "arm has not shown it can represent two clocks. Compare pair_headroom against "
+        "pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens "
+        "headroom mechanically, and the scaled floor removes that gain rather than banking it.")
     return row
 
 
@@ -1328,11 +1395,66 @@ def self_test() -> None:
     check("silence is named on every arm it blocked",
           sorted(set(rec.get("silent_arms") or [])), ["v1", "v2", "v3", "v6", "v8", "v9"])
 
+    # ---- the paired-arm instrument -------------------------------------------------------
+    #
+    # A conjunction of two measurements is HARDER than either, so pair headroom is wider than
+    # per-question headroom by construction. That makes it a tempting way to talk a weak shape over
+    # the bar, and these cases exist to stop that: the scaled floor must reject the very shape whose
+    # raw pair headroom clears the unscaled one.
+    def paired(spec: list[tuple[dict, dict]]) -> tuple[list[dict], dict]:
+        """`spec` is one (valid_arm, transaction_arm) outcome dict per pair."""
+        records, arms = [], {}
+        for index, (valid, txn) in enumerate(spec):
+            for arm, outcome in (("valid-time", valid), ("transaction-time", txn)):
+                qid = f"q{index}-{arm}"
+                records.append({"question_id": qid, **outcome})
+                arms[qid] = (f"p{index}", arm)
+        return records, arms
+
+    hit = {"v1": True, "v8": True, "v9": True}
+    # Reproduces the shipped belief-at-instant distribution exactly: valid V1 18/18 V9 17/18,
+    # transaction V1 17/18 V9 14/18, both-arms V1 17/18 V9 14/18.
+    spec = [({**hit, "v9": False}, {**hit, "v1": False, "v9": False})]    # both arms fail V9
+    spec += [({**hit}, {**hit, "v9": False}) for _ in range(3)]           # transaction fails V9
+    spec += [({**hit}, {**hit}) for _ in range(14)]
+    records, arms = paired(spec)
+    row = _pair_discrimination(records, arms)
+    check("pair count", row["pairs"], 18)
+    check("both arms at V1", row["pair_v1_both_arms"], "17/18")
+    check("both arms at V9", row["pair_v9_both_arms"], "14/18")
+    check("pair headroom", row["pair_headroom"], 0.1667)
+    # 0.15 * (35/36 + 31/36). The raw floor is 0.15 and this shape's pair headroom is 0.1667, so an
+    # unscaled comparison would PASS it -- the conjunction's mechanical gain banked as discrimination.
+    check("floor is scaled by the amplification", row["pair_floor_scaled"], 0.275)
+    check("a shape that clears the RAW floor still fails the SCALED one",
+          row["pair_discriminates"], False)
+
+    # The other direction: a genuinely separating shape must still pass, or the scaled floor is
+    # merely a way of failing everything.
+    strong = [({**hit}, {**hit}) for _ in range(12)]
+    for index in range(5):
+        strong[index] = ({**hit, "v9": False}, {**hit, "v9": False})
+    records, arms = paired(strong)
+    row = _pair_discrimination(records, arms)
+    check("a separating shape passes", row["pair_discriminates"], True)
+    check("its pair headroom", row["pair_headroom"], round(1.0 - 7 / 12, 4))
+
+    # Unpaired shapes must emit NOTHING rather than a degenerate row -- eight of the nine verticals
+    # have no arms, and a zero-filled block there would read as a measured result.
+    unpaired = [{"question_id": "solo", **hit}]
+    check("unpaired shapes publish no pair block",
+          _pair_discrimination(unpaired, {"solo": (None, None)}), {})
+    # A half-collected pair is not a pair: one arm missing means the conjunction is undefined.
+    half, half_arms = paired([({**hit}, {**hit})])
+    half, half_arms = half[:1], {half[0]["question_id"]: half_arms[half[0]["question_id"]]}
+    check("a pair missing an arm is skipped", _pair_discrimination(half, half_arms), {})
+
     if failures:
         for f in failures:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
-    print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases)")
+    print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
+          "8 paired-arm cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
