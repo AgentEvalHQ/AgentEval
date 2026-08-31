@@ -764,7 +764,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-30T14:44:28Z",
+    "run_at": "2026-08-31T13:29:36Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -829,7 +829,7 @@
         "calls": 4050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1454,
+        "judge_calls": 1452,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -838,16 +838,16 @@
         "calls": 1047,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 347,
+        "judge_calls": 352,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 826,
+        "calls": 828,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 321,
+        "judge_calls": 315,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -902,7 +902,12 @@
         "v8_passed": 13,
         "v9_applicable": 15,
         "v9_passed": 9,
-        "required_sessions_median": 2
+        "required_sessions_median": 2,
+        "headroom_perfect_selector": 0.4,
+        "discriminates": true,
+        "headroom_reachable": 0.2667,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "current-value": {
         "questions": 20,
@@ -914,7 +919,12 @@
         "v8_passed": 20,
         "v9_applicable": 20,
         "v9_passed": 13,
-        "required_sessions_median": 4
+        "required_sessions_median": 4,
+        "headroom_perfect_selector": 0.35,
+        "discriminates": true,
+        "headroom_reachable": 0.35,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "source-attribution": {
         "questions": 15,
@@ -926,7 +936,12 @@
         "v8_passed": 15,
         "v9_applicable": 15,
         "v9_passed": 12,
-        "required_sessions_median": 1
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.2,
+        "discriminates": true,
+        "headroom_reachable": 0.2,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       }
     },
     "per_question": {

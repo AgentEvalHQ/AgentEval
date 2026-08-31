@@ -1137,6 +1137,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v9_applicable": sum(1 for r in group if r.get("v9") is not None),
                 "v9_passed": sum(1 for r in group if r.get("v9") is True),
                 "required_sessions_median": _median_g(group, gold_counts),
+                **_discrimination(group),
             }
             for shape, group in sorted(
                 {s: [r for r in records if shapes.get(r["question_id"]) == s]
@@ -1148,6 +1149,56 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             for r in records
         },
     }
+
+
+#: The minimum V1 - V9 at which a shape can tell two systems apart. ADR-028.
+#:
+#: A JUDGEMENT, not a measurement -- nothing in the data derives it. It sits where the current
+#: distribution has a natural gap: three shapes at 0.00 (all declared ladder rungs), two between
+#: 0.05 and 0.11, twenty-five at 0.17 or above. It should be revisited once a second reference
+#: retriever exists, because the entire scale is BM25-relative.
+DISCRIMINATION_FLOOR = 0.15
+
+
+def _discrimination(group: list[dict]) -> dict:
+    """How this shape is hard, and whether it can rank anything. ADR-028 SS3e.
+
+    `V1 - V9` is what a PERFECT selector buys over a lexical baseline, and that remains its meaning.
+    What it does not say is how much of that a real retriever can reach: a retriever returns gold
+    PLUS whatever else it ranks highly, so its ceiling is V8, not V1. Where V8 is far below V1 the
+    published headroom is unreachable, and a consumer reading it will buy retrieval work that cannot
+    help.
+
+    Measured, the two kinds look nothing alike and read identically today:
+
+        episodic/list-order     V1 1.00  V8 1.00  V9 0.27  ->  RETRIEVAL-limited, headroom real
+        prospective/due-window  V1 1.00  V8 0.22  V9 0.06  ->  REASONING-limited, headroom is not
+
+    So both numbers ship, and the classification with them.
+    """
+    def rate(arm: str) -> float | None:
+        applicable = [r for r in group if r.get(arm) is not None]
+        return (sum(1 for r in applicable if r[arm]) / len(applicable)) if applicable else None
+
+    v1, v8, v9 = rate("v1"), rate("v8"), rate("v9")
+    if v1 is None or v9 is None:
+        return {}
+
+    headroom = v1 - v9
+    row = {
+        "headroom_perfect_selector": round(headroom, 4),
+        "discriminates": headroom >= DISCRIMINATION_FLOOR,
+    }
+    if v8 is not None:
+        # What a real retriever can actually reach: it cannot do better than having everything.
+        row["headroom_reachable"] = round(max(0.0, v8 - v9), 4)
+        row["limited_by"] = "reasoning" if (v1 - v8) > headroom / 2 else "retrieval"
+        row["reading"] = (
+            "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. "
+            "headroom_reachable is V8-V9, what a real retriever can reach, because returning more "
+            "than gold cannot beat having everything. Where these diverge the shape is "
+            "reasoning-limited and retrieval work will not move it.")
+    return row
 
 
 def _median_g(group: list, gold_counts: dict) -> int | None:

@@ -761,7 +761,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-31T09:37:16Z",
+    "run_at": "2026-08-31T13:29:35Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -824,35 +824,33 @@
       "not_applicable_reason": "V6 is not defined for episodic"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 32,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 100,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 100,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 522,
+        "calls": 1000,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 355,
+        "judge_calls": 495,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 105,
+        "calls": 192,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 66,
+        "judge_calls": 96,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -867,19 +865,19 @@
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 100,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 100,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 60,
+        "calls": 100,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 100,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -915,7 +913,12 @@
         "v8_passed": 20,
         "v9_applicable": 20,
         "v9_passed": 14,
-        "required_sessions_median": 1
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.3,
+        "discriminates": true,
+        "headroom_reachable": 0.3,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "list-order": {
         "questions": 15,
@@ -927,7 +930,12 @@
         "v8_passed": 15,
         "v9_applicable": 15,
         "v9_passed": 4,
-        "required_sessions_median": 5
+        "required_sessions_median": 5,
+        "headroom_perfect_selector": 0.7333,
+        "discriminates": true,
+        "headroom_reachable": 0.7333,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
       "participant-attribution": {
         "questions": 15,
@@ -939,7 +947,12 @@
         "v8_passed": 14,
         "v9_applicable": 15,
         "v9_passed": 12,
-        "required_sessions_median": 1
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.2,
+        "discriminates": true,
+        "headroom_reachable": 0.1333,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       }
     },
     "per_question": {

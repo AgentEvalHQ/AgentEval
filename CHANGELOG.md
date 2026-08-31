@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Every shape now publishes what KIND of hard it is, and a gate on whether it can rank anything.**
+  Implements [ADR-028](docs/adr/028-typedmemeval-acceptance-on-discrimination.md) §3a and §3e.
+
+  `V1 − V9` is what a **perfect selector** buys — a retriever returning gold and nothing else. A real
+  retriever returns gold *plus* whatever else it ranks highly, so it cannot beat having everything:
+  **its ceiling is V8, not V1.** Where those diverge the published headroom is unreachable, and a
+  consumer reading it buys retrieval work that cannot help.
+
+  | shape | headroom (perfect) | reachable | limited by |
+  |---|---|---|---|
+  | `prospective/due-window` | **0.94** | **0.17** | **reasoning** |
+  | `semantic/co-reference` | 0.40 | 0.27 | retrieval |
+  | `arithmetic/delta` | 0.90 | 0.90 | retrieval |
+
+  `due-window` is the case that motivated it: 0.94 published, 0.17 actually reachable. Both figures
+  and the classification now ship in every sidecar.
+
+  **The gate** asserts each shape clears a 0.15 discrimination floor. It is a **ratchet**, not a
+  wall — a gate that stays red for the life of a known-weak shape stops being read, and a regression
+  introduced while fixing something else then lands invisibly. Two lists, both with reasons:
+  *saturated by design* (WorkingMemory's three short ladder rungs, where the gradient **is** the
+  measurement and deleting the saturation deletes the construct) and *pending redesign*
+  (`temporal/occurrence-order` 0.05, `bitemporal/belief-at-instant` 0.11 — near-closed-choice forms
+  where the question names the entity it asks about, the same structural cap that limited
+  `participant-attribution` to 0.20). Listed shapes may improve and may not regress; anything
+  unlisted must clear the floor outright.
+
+  Red-first verified: raising the floor to 0.25 turns three verticals red; restored, 1073/1073 green.
+  **No corpus regenerates and no consumer control moves** — the raw arm counts were already recorded,
+  so this is reporting and acceptance only.
+
+  The **0.15 floor is a judgement, not a measurement.** Nothing in the data derives it; it sits where
+  the distribution has a natural gap (three at 0.00, two between 0.05 and 0.11, twenty-five at 0.17+)
+  and should be revisited once a second reference retriever exists, because the whole scale is
+  BM25-relative.
+
 ### Fixed
 
 - **`value-then-count` asked how many times the speaker ORDERED while its sessions recorded sending
