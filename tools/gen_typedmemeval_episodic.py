@@ -470,10 +470,14 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
     return out
 
 
-def build(echo: float, rng: random.Random) -> list[tmc.Question]:
-    questions = _stated_questions(rng, echo, start=1)
-    questions += _order_questions(rng, echo, start=21)
-    questions += _attribution_questions(rng, echo, start=36)
+def build(echo, rng: random.Random) -> list[tmc.Question]:
+    """`echo` is a float or, under per-shape calibration, a dict keyed by shape."""
+    def knob(shape: str) -> float:
+        return echo.get(shape, 0.0) if isinstance(echo, dict) else echo
+
+    questions = _stated_questions(rng, knob(SHAPE_STATED), start=1)
+    questions += _order_questions(rng, knob(SHAPE_ORDER), start=21)
+    questions += _attribution_questions(rng, knob(SHAPE_ATTRIB), start=36)
     return questions
 
 
@@ -588,4 +592,12 @@ if __name__ == "__main__":
         ),
         generator_tool="tools/gen_typedmemeval_episodic.py",
         extra_checks=check_episodic,
+        # PER-SHAPE, because one knob cannot serve three shapes this far apart. On the single-knob
+        # build the vertical mean sat at a healthy 0.682 while its shapes ran
+        # participant-attribution 0.933 / assistant-stated 0.800 / list-order 0.275 -- a spread of
+        # 0.66. attribution was effectively saturated (V9 14/15, headroom 0.07: no two retrievers
+        # could be told apart on it) and list-order was far below band, and the mean reported
+        # neither. That is the mean-satisfiable-by-averaging defect the family already fixed for
+        # Arithmetic; Episodic simply never received it.
+        shape_of=lambda q: (q.extension or {}).get("shape"),
     )
