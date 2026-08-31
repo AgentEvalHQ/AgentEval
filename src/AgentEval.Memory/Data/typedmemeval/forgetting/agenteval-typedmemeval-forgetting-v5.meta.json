@@ -428,7 +428,7 @@
       "worst_refused_auc": 0.6521,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "or near",
+      "worst_gold_marker_ngram": "or near enough",
       "gold_marker_ngram_auc": 0.6061,
       "worst_boilerplate_ngram": "of",
       "boilerplate_ngram_auc": 0.5754,

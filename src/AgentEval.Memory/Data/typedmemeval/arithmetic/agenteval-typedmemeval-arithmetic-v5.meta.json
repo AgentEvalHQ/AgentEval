@@ -83,8 +83,8 @@
     },
     "per_shape_realised": {
       "count": 0.8274,
-      "delta": 0.7767,
-      "duration": 0.6528,
+      "delta": 0.735,
+      "duration": 0.625,
       "sum": 0.8179
     }
   },
@@ -553,7 +553,7 @@
       "worst_refused_auc": 0.6615,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "against the",
+      "worst_gold_marker_ngram": "payment logged against",
       "gold_marker_ngram_auc": 0.6615,
       "worst_boilerplate_ngram": "on the",
       "boilerplate_ngram_auc": 0.572,
