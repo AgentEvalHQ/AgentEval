@@ -63,8 +63,23 @@ public class TypedMemEvalDiscriminationTests
     private static readonly Dictionary<(TypedMemEvalVertical, string), double> PendingRedesign =
         new()
         {
-            [(TypedMemEvalVertical.Temporal, "occurrence-order")] = 0.05,
-            [(TypedMemEvalVertical.Bitemporal, "belief-at-instant")] = 0.11,
+            // EMPTY, and the two entries it held are worth recording rather than deleting silently.
+            //
+            // temporal/occurrence-order sat at 0.05 because it asked about two ADJACENT events on
+            // the relation chain, so the single link between them stated the answer outright while
+            // the question handed BM25 both rare names -- a lexical lookup in the vertical whose
+            // premise is that narration order must be FOLLOWED. It now asks the two ENDS of the
+            // chain, so every link is necessary: headroom 0.05 -> 0.75, and it is the strongest
+            // shape in its vertical.
+            //
+            // bitemporal/belief-at-instant sat at 0.11 because naming the asked subject retrieved
+            // everything -- only two sessions in the haystack mentioned that person. Same-subject,
+            // other-month distractors now compete (median 2 -> 5, which is K_REF exactly):
+            // headroom 0.11 -> 0.3056, and pair headroom 0.167 -> 0.5556 against a scaled floor of
+            // 0.254, which it previously MISSED.
+            //
+            // Both were fixed rather than re-baselined around, which is the point of keeping a
+            // ratchet: a list that only ever grows is a list nobody reads.
         };
 
     public static TheoryData<TypedMemEvalVertical> AllVerticals()

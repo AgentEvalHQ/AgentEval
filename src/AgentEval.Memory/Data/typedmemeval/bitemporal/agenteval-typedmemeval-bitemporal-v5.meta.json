@@ -118,8 +118,190 @@
       "separates_gold": false
     }
   },
+  "gold_item_types": {
+    "tme-bit-001": [
+      "bitemporal"
+    ],
+    "tme-bit-002": [
+      "bitemporal"
+    ],
+    "tme-bit-003": [
+      "bitemporal"
+    ],
+    "tme-bit-004": [
+      "bitemporal"
+    ],
+    "tme-bit-005": [
+      "bitemporal"
+    ],
+    "tme-bit-006": [
+      "bitemporal"
+    ],
+    "tme-bit-007": [
+      "bitemporal"
+    ],
+    "tme-bit-008": [
+      "bitemporal"
+    ],
+    "tme-bit-009": [
+      "bitemporal"
+    ],
+    "tme-bit-010": [
+      "bitemporal"
+    ],
+    "tme-bit-011": [
+      "bitemporal"
+    ],
+    "tme-bit-012": [
+      "bitemporal"
+    ],
+    "tme-bit-013": [
+      "bitemporal"
+    ],
+    "tme-bit-014": [
+      "bitemporal"
+    ],
+    "tme-bit-015": [
+      "bitemporal"
+    ],
+    "tme-bit-016": [
+      "bitemporal"
+    ],
+    "tme-bit-017": [
+      "bitemporal"
+    ],
+    "tme-bit-018": [
+      "bitemporal"
+    ],
+    "tme-bit-019": [
+      "bitemporal"
+    ],
+    "tme-bit-020": [
+      "bitemporal"
+    ],
+    "tme-bit-021": [
+      "bitemporal"
+    ],
+    "tme-bit-022": [
+      "bitemporal"
+    ],
+    "tme-bit-023": [
+      "bitemporal"
+    ],
+    "tme-bit-024": [
+      "bitemporal"
+    ],
+    "tme-bit-025": [
+      "bitemporal"
+    ],
+    "tme-bit-026": [
+      "bitemporal"
+    ],
+    "tme-bit-027": [
+      "bitemporal"
+    ],
+    "tme-bit-028": [
+      "bitemporal"
+    ],
+    "tme-bit-029": [
+      "bitemporal"
+    ],
+    "tme-bit-030": [
+      "bitemporal"
+    ],
+    "tme-bit-031": [
+      "bitemporal"
+    ],
+    "tme-bit-032": [
+      "bitemporal"
+    ],
+    "tme-bit-033": [
+      "bitemporal"
+    ],
+    "tme-bit-034": [
+      "bitemporal"
+    ],
+    "tme-bit-035": [
+      "bitemporal"
+    ],
+    "tme-bit-036": [
+      "bitemporal"
+    ],
+    "tme-bit-037": [
+      "bitemporal"
+    ],
+    "tme-bit-038": [
+      "bitemporal"
+    ],
+    "tme-bit-039": [
+      "bitemporal"
+    ],
+    "tme-bit-040": [
+      "bitemporal"
+    ],
+    "tme-bit-041": [
+      "bitemporal"
+    ],
+    "tme-bit-042": [
+      "bitemporal"
+    ],
+    "tme-bit-043": [
+      "bitemporal"
+    ],
+    "tme-bit-044": [
+      "bitemporal"
+    ],
+    "tme-bit-045": [
+      "bitemporal"
+    ],
+    "tme-bit-046": [
+      "bitemporal"
+    ],
+    "tme-bit-047": [
+      "bitemporal"
+    ],
+    "tme-bit-048": [
+      "bitemporal"
+    ],
+    "tme-bit-049": [
+      "bitemporal"
+    ],
+    "tme-bit-050": [
+      "bitemporal"
+    ],
+    "tme-bit-051": [
+      "bitemporal"
+    ],
+    "tme-bit-052": [
+      "bitemporal"
+    ],
+    "tme-bit-053": [
+      "bitemporal"
+    ],
+    "tme-bit-054": [
+      "bitemporal"
+    ],
+    "tme-bit-055": [
+      "bitemporal"
+    ],
+    "tme-bit-056": [
+      "bitemporal"
+    ],
+    "tme-bit-057": [
+      "bitemporal"
+    ],
+    "tme-bit-058": [
+      "bitemporal"
+    ],
+    "tme-bit-059": [
+      "bitemporal"
+    ],
+    "tme-bit-060": [
+      "bitemporal"
+    ]
+  },
   "probes": {
-    "status": "not_run",
+    "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -539,6 +721,1090 @@
       "status": "run",
       "measured_by": "generator",
       "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446"
-    }
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-08-31T17:51:59Z",
+    "questions_probed": 60,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 60,
+      "passed": 60,
+      "failed": []
+    },
+    "v1_pair_flip": {
+      "pairs": 30,
+      "passed": 30,
+      "failed": []
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 60,
+      "passed": 60,
+      "failed": [],
+      "closed_choice": {
+        "questions": 0,
+        "by_candidates": {},
+        "chance_floor_exceeds_reject_line": false,
+        "passes_not_evidence_of_non_inferability": 0,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
+    },
+    "v3_gold_ablated": {
+      "applicable": 60,
+      "passed": 60,
+      "failed": [],
+      "not_decidable": [],
+      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for bitemporal"
+    },
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 7,
+      "by_cache_key": {}
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "population": "probe_answers",
+        "calls": 60,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 60,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v2": {
+        "population": "probe_answers",
+        "calls": 607,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v3": {
+        "population": "probe_answers",
+        "calls": 180,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v6": {
+        "population": "probe_answers",
+        "calls": 0,
+        "empty": 0,
+        "rate": null,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v8": {
+        "population": "probe_answers",
+        "calls": 60,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 60,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v9": {
+        "population": "probe_answers",
+        "calls": 60,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 60,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      }
+    },
+    "v8_full_haystack": {
+      "applicable": 60,
+      "v1_passed": 60,
+      "v8_passed": 57,
+      "interference_cost": 0.05,
+      "regressed_under_interference": [
+        "tme-bit-002",
+        "tme-bit-022",
+        "tme-bit-024"
+      ],
+      "failures_with_no_captured_answer": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    },
+    "v9_reference_retrieval": {
+      "applicable": 60,
+      "v1_gold_only": 60,
+      "v8_full_haystack": 57,
+      "v9_bm25_top_k": 41,
+      "headroom_over_lexical_retrieval": 0.3167,
+      "headroom_unlimited_context_over_lexical": 0.2667,
+      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
+    "by_shape": {
+      "belief-at-instant": {
+        "questions": 36,
+        "v1_applicable": 36,
+        "v1_passed": 36,
+        "v3_applicable": 36,
+        "v3_passed": 36,
+        "v8_applicable": 36,
+        "v8_passed": 33,
+        "v9_applicable": 36,
+        "v9_passed": 25,
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.3056,
+        "discriminates": true,
+        "headroom_reachable": 0.2222,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 18,
+        "pair_v1_both_arms": "18/18",
+        "pair_v9_both_arms": "8/18",
+        "pair_headroom": 0.5556,
+        "pair_floor_scaled": 0.2542,
+        "pair_discriminates": true,
+        "pair_v8_both_arms": "15/18",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it."
+      },
+      "correction-depth": {
+        "questions": 24,
+        "v1_applicable": 24,
+        "v1_passed": 24,
+        "v3_applicable": 24,
+        "v3_passed": 24,
+        "v8_applicable": 24,
+        "v8_passed": 24,
+        "v9_applicable": 24,
+        "v9_passed": 16,
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.3333,
+        "discriminates": true,
+        "headroom_reachable": 0.3333,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 12,
+        "pair_v1_both_arms": "12/12",
+        "pair_v9_both_arms": "5/12",
+        "pair_headroom": 0.5833,
+        "pair_floor_scaled": 0.25,
+        "pair_discriminates": true,
+        "pair_v8_both_arms": "12/12",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it."
+      }
+    },
+    "per_question": {
+      "tme-bit-001": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ardenholm.",
+        "v9": true,
+        "v9_answer": "Ardenholm.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-002": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "As of 11 January, the record showed Alice Renwick at **Ardenholm** in February.",
+        "v9": false,
+        "v9_answer": "As of 11 January, the record showed Alice Renwick at **Ardenholm** in February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-003": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Kelsford** for March.",
+        "v9": true,
+        "v9_answer": "Tomas Beddoe is down as **Kelsford** for March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-004": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 21 January, Tomas Beddoe was down as at **Ardenholm** for March.",
+        "v9": true,
+        "v9_answer": "As of 21 January, Tomas Beddoe was down as being at **Ardenholm** for March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-005": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v9": true,
+        "v9_answer": "Lowick.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-006": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Bank.",
+        "v9": true,
+        "v9_answer": "Jarrow Bank.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-007": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Colm Whitaker was at **Calderwick** in February.",
+        "v9": true,
+        "v9_answer": "Colm Whitaker was at **Calderwick** in February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-008": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Elverton.",
+        "v9": true,
+        "v9_answer": "Elverton.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-009": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v9": true,
+        "v9_answer": "Fenwick Cross.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-010": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Halstead Vale.",
+        "v9": true,
+        "v9_answer": "Halstead Vale.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-011": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Bank.",
+        "v9": true,
+        "v9_answer": "The record shows Ravi Ellory at **Jarrow Bank** in April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-012": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 07 February, the record showed Ravi Ellory at **Lowick** in April.",
+        "v9": false,
+        "v9_answer": "As of 07 February, the conversations do not show any April branch for Ravi Ellory. The record only showed Ravi Ellory went to Bexmoor in May.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-013": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nell Cortazar is down as **Fenwick Cross** for February.",
+        "v9": false,
+        "v9_answer": "Nell Cortazar is down as **Bexmoor** for February.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-014": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 15 February, Nell Cortazar was down as **Bexmoor** for February.",
+        "v9": false,
+        "v9_answer": "As things stood on 15 February, the conversations do not say which unit Nell Cortazar was down as for February.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-015": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Bank.",
+        "v9": true,
+        "v9_answer": "Jarrow Bank.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-016": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ilminster.",
+        "v9": true,
+        "v9_answer": "Ilminster.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-017": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Sara Mbeki was at **Halstead Vale** in April.",
+        "v9": true,
+        "v9_answer": "Sara Mbeki was at **Halstead Vale** in April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-018": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Marchmont.",
+        "v9": false,
+        "v9_answer": "The conversations do not say which region the file gave for Sara Mbeki in April as of 21 February.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-019": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jonas Pfeiffer was at **Ilminster** for February.",
+        "v9": true,
+        "v9_answer": "Ilminster.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-020": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As the record stood on 26 February, Jonas Pfeiffer\u2019s February depot was **Lowick**.",
+        "v9": false,
+        "v9_answer": "The 26 February record does not state which depot Jonas Pfeiffer was at in February.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-021": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Halstead Vale.",
+        "v9": true,
+        "v9_answer": "Halstead Vale.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-022": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "As of 17 March, the record showed Alice Renwick in **Halstead Vale** for March.",
+        "v9": false,
+        "v9_answer": "As of 17 March, the record showed Alice Renwick at **Halstead Vale** in March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-023": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Marchmont** for April.",
+        "v9": true,
+        "v9_answer": "Tomas Beddoe is down as **Marchmont** for April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-024": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "Marchmont.",
+        "v9": false,
+        "v9_answer": "The conversations don\u2019t say which team Tomas Beddoe was down as for April. As of 17 March, the only correction recorded was that he was Garrowby from July, not Halstead Vale in August.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-025": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Priya Nandra is listed at **Northolt Bay** from February.",
+        "v9": true,
+        "v9_answer": "Northolt Bay.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-026": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Bank.",
+        "v9": false,
+        "v9_answer": "Ilminster. At 13 March, the file said Priya Nandra had been at Ilminster since August, so that covers February.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-027": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Calderwick.",
+        "v9": true,
+        "v9_answer": "According to the record, Colm Whitaker was at **Calderwick** in March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-028": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "At 23 March, the file gave **Elverton** for Colm Whitaker in March.",
+        "v9": false,
+        "v9_answer": "The conversations do not say. As of 23 March, no department for Colm Whitaker in March is stated.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-029": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ardenholm.",
+        "v9": true,
+        "v9_answer": "Ardenholm.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-030": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellworth.",
+        "v9": false,
+        "v9_answer": "The record as it stood on 25 March does not say which site Ines Vargas was at in April. It only records Ines Vargas at Dunmarsh as of June.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-031": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Orrindale.",
+        "v9": true,
+        "v9_answer": "Orrindale.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-032": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 22 March, the record showed Ravi Ellory at **Ilminster** in February.",
+        "v9": true,
+        "v9_answer": "As of 22 March, the record showed Ravi Ellory at **Ilminster** in February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-033": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v9": true,
+        "v9_answer": "Nell Cortazar is down as **Bexmoor** for March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-034": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 17 April, Nell Cortazar was down as being at **Kelsford** for March.",
+        "v9": true,
+        "v9_answer": "Kelsford.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-035": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ardenholm.",
+        "v9": true,
+        "v9_answer": "Ardenholm.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-036": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v9": true,
+        "v9_answer": "Lowick.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-037": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "According to the record, Colm Whitaker was at **Marchmont** in February.",
+        "v9": true,
+        "v9_answer": "According to the record, Colm Whitaker was at **Marchmont** in February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-038": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "At 10 April, before later corrections, the file gave **Pellworth** for Colm Whitaker in February.",
+        "v9": true,
+        "v9_answer": "Pellworth.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-039": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v9": false,
+        "v9_answer": "Ardenholm.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-040": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 17 April, the record had Ines Vargas at **Garrowby** in **March**.",
+        "v9": false,
+        "v9_answer": "As of 17 April, the record does not say which site Ines Vargas was at in March.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-041": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ravi Ellory is recorded as being at **Ilminster** in April.",
+        "v9": false,
+        "v9_answer": "Marchmont. The latest revision says Ravi Ellory was at Marchmont from April.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-042": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 23 April, the record showed Ravi Ellory at **Fenwick Cross** for **April**.",
+        "v9": true,
+        "v9_answer": "As of 23 April, the record showed Ravi Ellory at **Fenwick Cross** for April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-043": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nell Cortazar is down as **Calderwick** for February.",
+        "v9": true,
+        "v9_answer": "Nell Cortazar is down as **Calderwick** for February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-044": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 26 April, Nell Cortazar was down as being at **Halstead Vale** for February.",
+        "v9": true,
+        "v9_answer": "As things stood on 26 April, Nell Cortazar was down as at **Halstead Vale** for February.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-045": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Dunmarsh.",
+        "v9": true,
+        "v9_answer": "Dunmarsh.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-046": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v9": false,
+        "v9_answer": "I can\u2019t tell from the conversations. Nothing on or before 03 May mentions Otto Lindqvist\u2019s March campus.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-047": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "According to the record, Sara Mbeki was at **Fenwick Cross** in April. Later, she was recorded at **Halstead Vale from May**.",
+        "v9": true,
+        "v9_answer": "According to the record, Sara Mbeki was at **Fenwick Cross** in April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-048": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowick.",
+        "v9": true,
+        "v9_answer": "Lowick.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-049": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Kelsford.",
+        "v9": true,
+        "v9_answer": "Kelsford.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-050": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 20 May, the record had Jonas Pfeiffer at **Orrindale** in February.",
+        "v9": true,
+        "v9_answer": "Orrindale.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-051": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Bexmoor.",
+        "v9": false,
+        "v9_answer": "Garrowby.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-052": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 19 May, the record showed Alice Renwick at **Halstead Vale** in March.",
+        "v9": true,
+        "v9_answer": "As of 19 May, the record showed **Halstead Vale** for Alice Renwick in March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-053": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Tomas Beddoe is down as **Bexmoor** for April.",
+        "v9": true,
+        "v9_answer": "Tomas Beddoe is down as **Bexmoor** for April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-054": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As things stood on 22 May, Tomas Beddoe was down as being at Orrindale for April.",
+        "v9": false,
+        "v9_answer": "The conversations don\u2019t say. As of 22 May, Tomas Beddoe is only alluded to (\u201cdown, beddoe\u201d), but no April team is given.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-055": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Fenwick Cross.",
+        "v9": true,
+        "v9_answer": "Fenwick Cross.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-056": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ardenholm.",
+        "v9": true,
+        "v9_answer": "Ardenholm.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-057": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Colm Whitaker was at **Fenwick Cross** in March.",
+        "v9": true,
+        "v9_answer": "Colm Whitaker was at **Fenwick Cross** in March.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-058": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Calm Whitaker\u2019s March department/location was recorded as **Calderwick** at that point.",
+        "v9": false,
+        "v9_answer": "The conversations do not say that the file gave any department for Colm Whitaker in March as of 09 June. By then, it only said he went to Dunmarsh in April.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-059": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Pellworth.",
+        "v9": false,
+        "v9_answer": "Fenwick Cross.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-bit-060": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "As of 08 June, the record put Ines Vargas at **Kelsford** in April.",
+        "v9": true,
+        "v9_answer": "As of the record on 08 June, Ines Vargas was listed at **Kelsford** for April.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446"
   }
 }
