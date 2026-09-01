@@ -116,6 +116,19 @@
       "of_turns": 5595,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.6877,
+      "bm25_coverage_without_distractor_echo": 0.9643,
+      "dependence": 0.2766,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
+    },
+    "retrieval_ceiling": {
+      "k_ref": 5,
+      "coverage_scaffolding_stripped": 0.9643,
+      "questions_needing_more_than_k_ref": 7,
+      "questions_scored": 50,
+      "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever."
     }
   },
   "gold_item_types": {
@@ -829,55 +842,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 100,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1000,
+        "calls": 11770,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 495,
+        "judge_calls": 4419,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 192,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 96,
+        "calls": 3181,
+        "empty": 9,
+        "rate": 0.0028,
+        "judge_calls": 1062,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 2329,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 872,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 100,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 100,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 100,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1677,6 +1690,7 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "542da3fa176701e44a8ba8dd8c0aa69252196b03dd7db83f31eae00bc6147f3a"
+    "probed_corpus_sha256": "542da3fa176701e44a8ba8dd8c0aa69252196b03dd7db83f31eae00bc6147f3a",
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

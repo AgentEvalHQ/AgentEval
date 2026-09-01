@@ -141,6 +141,12 @@
       "of_turns": 5525,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.7037,
+      "bm25_coverage_without_distractor_echo": 1.0,
+      "dependence": 0.2963,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "gold_item_types": {
@@ -839,7 +845,7 @@
       "probed_corpus_sha256": "9b83da0cd8eaa954acdfe93b0663b7dfd2d56f061641f7cce3cba23451588c42"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-31T17:09:20Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -916,55 +922,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 503,
+        "calls": 11770,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 350,
+        "judge_calls": 4419,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 90,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 45,
+        "calls": 3181,
+        "empty": 9,
+        "rate": 0.0028,
+        "judge_calls": 1062,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 2329,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 872,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 53,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1044,9 +1050,9 @@
       "tme-tem-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Quorlory rewiring came first.\n\nThe recorded order is:\n\nQuorlory rewiring \u2192 Vreskade survey \u2192 Skarvarn relining \u2192 Trevuade changeover \u2192 Plennell move.",
+        "v8_answer": "The Quorlory rewiring came first.\n\nThe recorded order is:\n\nQuorlory rewiring → Vreskade survey → Skarvarn relining → Trevuade changeover → Plennell move.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say which came first between the Plennell move and the Quorlory rewiring. They only say the Plennell move came after the Trevuade changeover, and the Vreskade survey came after the Quorlory rewiring.",
+        "v9_answer": "The conversations don’t say which came first between the Plennell move and the Quorlory rewiring. They only say the Plennell move came after the Trevuade changeover, and the Vreskade survey came after the Quorlory rewiring.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2_candidates": 2,
@@ -1057,7 +1063,7 @@
       "tme-tem-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Ovridory retrofit came first.\n\nThe recorded sequence implies:\n\nOvridory retrofit \u2192 Janduisk commissioning \u2192 Traymoor fit-out \u2192 Quorlory rewiring \u2192 Trevuade changeover \u2192 Vreskade survey.",
+        "v8_answer": "The Ovridory retrofit came first.\n\nThe recorded sequence implies:\n\nOvridory retrofit → Janduisk commissioning → Traymoor fit-out → Quorlory rewiring → Trevuade changeover → Vreskade survey.",
         "v9": false,
         "v9_answer": "The conversations do not say. They mention the Ovridory retrofit, but they do not give the timing of the Vreskade survey relative to it.",
         "v9_gold_in_context": 2,
@@ -1070,7 +1076,7 @@
       "tme-tem-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Zethisk handover came first. The notes imply:\n\nZethisk handover \u2192 Ovridory retrofit \u2192 Janduisk commissioning \u2192 Draimune inspection.",
+        "v8_answer": "The Zethisk handover came first. The notes imply:\n\nZethisk handover → Ovridory retrofit → Janduisk commissioning → Draimune inspection.",
         "v9": false,
         "v9_answer": "The conversations do not say which came first between the Draimune inspection and the Zethisk handover.",
         "v9_gold_in_context": 2,
@@ -1083,7 +1089,7 @@
       "tme-tem-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Vreskade survey came first.\n\nThe conversations give this chain:\n\nVreskade survey \u2192 Draimune inspection \u2192 Quorlory rewiring \u2192 Wrenfield sign-off \u2192 Zethisk handover.",
+        "v8_answer": "The Vreskade survey came first.\n\nThe conversations give this chain:\n\nVreskade survey → Draimune inspection → Quorlory rewiring → Wrenfield sign-off → Zethisk handover.",
         "v9": false,
         "v9_answer": "The conversations do not say which came first between the Vreskade survey and the Zethisk handover.",
         "v9_gold_in_context": 3,
@@ -1096,7 +1102,7 @@
       "tme-tem-005": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first.  \nThe notes imply: Traymoor fit-out \u2192 Draimune inspection \u2192 Quorlory rewiring \u2192 Skarvarn relining \u2192 Ondrey audit \u2192 Ovridory retrofit.",
+        "v8_answer": "The Traymoor fit-out came first.  \nThe notes imply: Traymoor fit-out → Draimune inspection → Quorlory rewiring → Skarvarn relining → Ondrey audit → Ovridory retrofit.",
         "v9": true,
         "v9_answer": "The Traymoor fit-out came first.",
         "v9_gold_in_context": 4,
@@ -1109,7 +1115,7 @@
       "tme-tem-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Trevuade changeover came first.\n\nThe conversations give this sequence:\n\nTrevuade changeover \u2192 Quorlory rewiring \u2192 Janduisk commissioning \u2192 Vreskade survey.",
+        "v8_answer": "The Trevuade changeover came first.\n\nThe conversations give this sequence:\n\nTrevuade changeover → Quorlory rewiring → Janduisk commissioning → Vreskade survey.",
         "v9": false,
         "v9_answer": "The Vreskade survey came first.",
         "v9_gold_in_context": 2,
@@ -1148,7 +1154,7 @@
       "tme-tem-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Skarvarn relining came first.\n\nFrom the notes: Skarvarn relining came before the Plennell move; the Plennell move came before the Ondrey audit; and the Zethisk handover came after the Ondrey audit. So the order is:\n\nSkarvarn relining \u2192 Plennell move \u2192 Ondrey audit \u2192 Zethisk handover.",
+        "v8_answer": "The Skarvarn relining came first.\n\nFrom the notes: Skarvarn relining came before the Plennell move; the Plennell move came before the Ondrey audit; and the Zethisk handover came after the Ondrey audit. So the order is:\n\nSkarvarn relining → Plennell move → Ondrey audit → Zethisk handover.",
         "v9": false,
         "v9_answer": "The Zethisk handover came first.",
         "v9_gold_in_context": 2,
@@ -1161,7 +1167,7 @@
       "tme-tem-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Zethisk handover came first.\n\nThe conversations give the chain: Zethisk handover \u2192 Ovridory retrofit \u2192 Vreskade survey \u2192 Traymoor fit-out \u2192 Quorlory rewiring.",
+        "v8_answer": "The Zethisk handover came first.\n\nThe conversations give the chain: Zethisk handover → Ovridory retrofit → Vreskade survey → Traymoor fit-out → Quorlory rewiring.",
         "v9": true,
         "v9_answer": "The Zethisk handover came first.",
         "v9_gold_in_context": 2,
@@ -1174,7 +1180,7 @@
       "tme-tem-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off came first.\n\nThe recorded sequence implies:\n\nWrenfield sign-off \u2192 Plennell move \u2192 Skarvarn relining \u2192 Ondrey audit \u2192 Traymoor fit-out \u2192 Draimune inspection.",
+        "v8_answer": "The Wrenfield sign-off came first.\n\nThe recorded sequence implies:\n\nWrenfield sign-off → Plennell move → Skarvarn relining → Ondrey audit → Traymoor fit-out → Draimune inspection.",
         "v9": false,
         "v9_answer": "The Draimune inspection came first.",
         "v9_gold_in_context": 2,
@@ -1187,7 +1193,7 @@
       "tme-tem-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off came first.\n\nThe recorded order is:\n\nWrenfield sign-off \u2192 Trevuade changeover \u2192 Janduisk commissioning \u2192 Quorlory rewiring.",
+        "v8_answer": "The Wrenfield sign-off came first.\n\nThe recorded order is:\n\nWrenfield sign-off → Trevuade changeover → Janduisk commissioning → Quorlory rewiring.",
         "v9": false,
         "v9_answer": "The conversations do not say which came first between the Quorlory rewiring and the Wrenfield sign-off.",
         "v9_gold_in_context": 2,
@@ -1200,9 +1206,9 @@
       "tme-tem-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Quorlory rewiring came first.\n\nThe sequence in the notes is:\n\nQuorlory rewiring \u2192 Zethisk handover \u2192 Trevuade changeover \u2192 Wrenfield sign-off \u2192 Vreskade survey.",
+        "v8_answer": "The Quorlory rewiring came first.\n\nThe sequence in the notes is:\n\nQuorlory rewiring → Zethisk handover → Trevuade changeover → Wrenfield sign-off → Vreskade survey.",
         "v9": false,
-        "v9_answer": "The Vreskade survey came first, before the Quorlory rewiring.\n\nThe relevant repeated note is: \u201csurvey, first, rewiring, came.\u201d",
+        "v9_answer": "The Vreskade survey came first, before the Quorlory rewiring.\n\nThe relevant repeated note is: “survey, first, rewiring, came.”",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2_candidates": 2,
@@ -1213,7 +1219,7 @@
       "tme-tem-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Zethisk handover came first.\n\nThe conversations imply this sequence:\n\nZethisk handover \u2192 Traymoor fit-out \u2192 Quorlory rewiring \u2192 Janduisk commissioning \u2192 Plennell move \u2192 Draimune inspection.",
+        "v8_answer": "The Zethisk handover came first.\n\nThe conversations imply this sequence:\n\nZethisk handover → Traymoor fit-out → Quorlory rewiring → Janduisk commissioning → Plennell move → Draimune inspection.",
         "v9": false,
         "v9_answer": "The conversations do not say which came first between the Draimune inspection and the Zethisk handover.",
         "v9_gold_in_context": 3,
@@ -1265,9 +1271,9 @@
       "tme-tem-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Skarvarn relining** came first.\n\nThe conversations establish: **Skarvarn relining \u2192 Ovridory retrofit \u2192 Vreskade survey \u2192 Ondrey audit**.",
+        "v8_answer": "The **Skarvarn relining** came first.\n\nThe conversations establish: **Skarvarn relining → Ovridory retrofit → Vreskade survey → Ondrey audit**.",
         "v9": true,
-        "v9_answer": "The Skarvarn relining came first.\n\nThe conversations establish: Skarvarn relining \u2192 Ovridory retrofit \u2192 Vreskade survey \u2192 Ondrey audit.",
+        "v9_answer": "The Skarvarn relining came first.\n\nThe conversations establish: Skarvarn relining → Ovridory retrofit → Vreskade survey → Ondrey audit.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2_candidates": 2,
@@ -1278,9 +1284,9 @@
       "tme-tem-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out came first.\n\nThe conversations give this sequence:\n\nTraymoor fit-out \u2192 Skarvarn relining \u2192 Janduisk commissioning \u2192 Wrenfield sign-off \u2192 Draimune inspection\n\nSo the Draimune inspection was after the Traymoor fit-out.",
+        "v8_answer": "The Traymoor fit-out came first.\n\nThe conversations give this sequence:\n\nTraymoor fit-out → Skarvarn relining → Janduisk commissioning → Wrenfield sign-off → Draimune inspection\n\nSo the Draimune inspection was after the Traymoor fit-out.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say which came first between the Draimune inspection and the Traymoor fit-out.",
+        "v9_answer": "The conversations don’t say which came first between the Draimune inspection and the Traymoor fit-out.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2_candidates": 2,
@@ -1291,7 +1297,7 @@
       "tme-tem-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Janduisk commissioning came first.\n\nThe conversations give this sequence:\n\nJanduisk commissioning \u2192 Draimune inspection \u2192 Ondrey audit \u2192 Trevuade changeover \u2192 Traymoor fit-out \u2192 Zethisk handover.",
+        "v8_answer": "The Janduisk commissioning came first.\n\nThe conversations give this sequence:\n\nJanduisk commissioning → Draimune inspection → Ondrey audit → Trevuade changeover → Traymoor fit-out → Zethisk handover.",
         "v9": false,
         "v9_answer": "The conversations do not say which came first between the Janduisk commissioning and the Zethisk handover.",
         "v9_gold_in_context": 2,
@@ -1349,7 +1355,7 @@
       "tme-tem-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Zethisk handover** happened in between.\n\nOrder given by the notes:\n\n**Vreskade survey \u2192 Zethisk handover \u2192 Skarvarn relining**.",
+        "v8_answer": "The **Zethisk handover** happened in between.\n\nOrder given by the notes:\n\n**Vreskade survey → Zethisk handover → Skarvarn relining**.",
         "v9": false,
         "v9_answer": "The conversations do not say. They mention the Skarvarn relining, and that it came before the Plennell move, but they do not establish where the Vreskade survey fits or what happened between the two.",
         "v9_gold_in_context": 1,
@@ -1366,7 +1372,7 @@
         "v8": true,
         "v8_answer": "The Zethisk handover happened in between: the Trevuade changeover came before the Zethisk handover, and the Zethisk handover came before the Ovridory retrofit.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say what happened between the Trevuade changeover and an Ovridory retrofit.\n\nThey only say that the Trevuade changeover happened first, then the Zethisk handover. The Ovridory retrofit is not actually placed in the sequence.",
+        "v9_answer": "The conversations don’t say what happened between the Trevuade changeover and an Ovridory retrofit.\n\nThey only say that the Trevuade changeover happened first, then the Zethisk handover. The Ovridory retrofit is not actually placed in the sequence.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1381,7 +1387,7 @@
         "v8": true,
         "v8_answer": "The Zethisk handover happened between them: the Vreskade survey came before the Zethisk handover, and the Zethisk handover came before the Ovridory retrofit.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say what happened between the Ovridory retrofit and the Vreskade survey.\n\nThey only state that:\n- the Ovridory retrofit preceded the Wrenfield sign-off, and\n- the Zethisk handover came after the Vreskade survey.",
+        "v9_answer": "The conversations don’t say what happened between the Ovridory retrofit and the Vreskade survey.\n\nThey only state that:\n- the Ovridory retrofit preceded the Wrenfield sign-off, and\n- the Zethisk handover came after the Vreskade survey.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1396,7 +1402,7 @@
         "v8": true,
         "v8_answer": "The Draimune inspection happened in between: the Ovridory retrofit came first, then the Draimune inspection, then the Plennell move.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say what happened between the Plennell move and the Ovridory retrofit. They only mention that the Draimune inspection came before the Plennell move.",
+        "v9_answer": "The conversations don’t say what happened between the Plennell move and the Ovridory retrofit. They only mention that the Draimune inspection came before the Plennell move.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1411,7 +1417,7 @@
         "v8": true,
         "v8_answer": "The **Skarvarn relining** happened in between: it was done after the **Ondrey audit** was out of the way, and well before the **Draimune inspection**.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say what happened between the Ondrey audit and the Draimune inspection.\n\nThey only say that the Skarvarn relining was done well ahead of the Draimune inspection; they do not place it relative to the Ondrey audit.",
+        "v9_answer": "The conversations don’t say what happened between the Ondrey audit and the Draimune inspection.\n\nThey only say that the Skarvarn relining was done well ahead of the Draimune inspection; they do not place it relative to the Ondrey audit.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1441,7 +1447,7 @@
         "v8": true,
         "v8_answer": "The Vreskade survey happened in between: the Skarvarn relining came first, then the Vreskade survey, and the Wrenfield sign-off came after that.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t state the full sequence up to the Wrenfield sign-off.\n\nThey do say:\n\n- Skarvarn relining happened first.\n- Vreskade survey came after the Skarvarn relining.\n- Prazzarn resurfacing came before the Wexilune clear-out.\n- Wexilune clear-out came before the Kreshory screed.\n- Kres",
+        "v9_answer": "The conversations don’t state the full sequence up to the Wrenfield sign-off.\n\nThey do say:\n\n- Skarvarn relining happened first.\n- Vreskade survey came after the Skarvarn relining.\n- Prazzarn resurfacing came before the Wexilune clear-out.\n- Wexilune clear-out came before the Kreshory screed.\n- Kres",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1471,7 +1477,7 @@
         "v8": true,
         "v8_answer": "The Vreskade survey happened in between: the Zethisk handover came first, then the Vreskade survey, then the Ondrey audit.",
         "v9": false,
-        "v9_answer": "I don\u2019t have enough information from the conversations to say what happened between the Ondrey audit and the Zethisk handover.",
+        "v9_answer": "I don’t have enough information from the conversations to say what happened between the Ondrey audit and the Zethisk handover.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1499,7 +1505,7 @@
       "tme-tem-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Janduisk commissioning** happened in between.\n\nThe conversations say:\n\n- **Wrenfield sign-off** came earlier than **Janduisk commissioning**.\n- **Draimune inspection** happened once **Janduisk commissioning** was out of the way.\n\nSo the order is:\n\n**Wrenfield sign-off \u2192 Janduisk commissioning ",
+        "v8_answer": "The **Janduisk commissioning** happened in between.\n\nThe conversations say:\n\n- **Wrenfield sign-off** came earlier than **Janduisk commissioning**.\n- **Draimune inspection** happened once **Janduisk commissioning** was out of the way.\n\nSo the order is:\n\n**Wrenfield sign-off → Janduisk commissioning ",
         "v9": true,
         "v9_answer": "The Janduisk commissioning happened in between.",
         "v9_gold_in_context": 2,
@@ -1514,9 +1520,9 @@
       "tme-tem-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Traymoor fit-out happened in between: Janduisk commissioning \u2192 Traymoor fit-out \u2192 Quorlory rewiring.",
+        "v8_answer": "The Traymoor fit-out happened in between: Janduisk commissioning → Traymoor fit-out → Quorlory rewiring.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say plainly what happened in between the Quorlory rewiring and the Janduisk commissioning.\n\nThey do say:\n- the Draimune inspection came after the Quorlory rewiring;\n- the Traymoor fit-out followed the Janduisk commissioning.\n\nBut they don\u2019t establish that the Draimune inspect",
+        "v9_answer": "The conversations don’t say plainly what happened in between the Quorlory rewiring and the Janduisk commissioning.\n\nThey do say:\n- the Draimune inspection came after the Quorlory rewiring;\n- the Traymoor fit-out followed the Janduisk commissioning.\n\nBut they don’t establish that the Draimune inspect",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1546,9 +1552,9 @@
       "tme-tem-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Trevuade changeover** happened most recently.\n\nOrder from the notes: **Ovridory retrofit \u2192 Skarvarn relining \u2192 Ondrey audit \u2192 Janduisk commissioning \u2192 Trevuade changeover**.",
+        "v8_answer": "The **Trevuade changeover** happened most recently.\n\nOrder from the notes: **Ovridory retrofit → Skarvarn relining → Ondrey audit → Janduisk commissioning → Trevuade changeover**.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t contain that answer. They don\u2019t establish an ordering among the Trevuade changeover, the Ovridory retrofit, and the Ondrey audit.",
+        "v9_answer": "The conversations don’t contain that answer. They don’t establish an ordering among the Trevuade changeover, the Ovridory retrofit, and the Ondrey audit.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1563,7 +1569,7 @@
       "tme-tem-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off happened most recently.\n\nThe notes imply:\n\nTrevuade changeover \u2192 Plennell move \u2192 Draimune inspection \u2192 Vreskade survey \u2192 Zethisk handover \u2192 Wrenfield sign-off.",
+        "v8_answer": "The Wrenfield sign-off happened most recently.\n\nThe notes imply:\n\nTrevuade changeover → Plennell move → Draimune inspection → Vreskade survey → Zethisk handover → Wrenfield sign-off.",
         "v9": false,
         "v9_answer": "The conversations do not say which of the Trevuade changeover, the Vreskade survey, and the Wrenfield sign-off happened most recently.",
         "v9_gold_in_context": 2,
@@ -1597,7 +1603,7 @@
       "tme-tem-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Skarvarn relining** happened most recently.\n\nThe conversations give this order:\n\n**Janduisk commissioning \u2192 Plennell move \u2192 Ovridory retrofit \u2192 Draimune inspection \u2192 Skarvarn relining**.",
+        "v8_answer": "The **Skarvarn relining** happened most recently.\n\nThe conversations give this order:\n\n**Janduisk commissioning → Plennell move → Ovridory retrofit → Draimune inspection → Skarvarn relining**.",
         "v9": true,
         "v9_answer": "The Skarvarn relining happened most recently.",
         "v9_gold_in_context": 4,
@@ -1614,7 +1620,7 @@
       "tme-tem-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Wrenfield sign-off happened most recently.\n\nThe conversations imply:\n\nJanduisk commissioning \u2192 Vreskade survey \u2192 Ondrey audit \u2192 Zethisk handover \u2192 Trevuade changeover \u2192 Wrenfield sign-off.",
+        "v8_answer": "The Wrenfield sign-off happened most recently.\n\nThe conversations imply:\n\nJanduisk commissioning → Vreskade survey → Ondrey audit → Zethisk handover → Trevuade changeover → Wrenfield sign-off.",
         "v9": false,
         "v9_answer": "The conversations establish that the **Wrenfield sign-off** happened after the **Zethisk handover**.\n\nThey do **not** say where the **Janduisk commissioning** fits relative to those two. So the most recent of the three cannot be determined from the record.",
         "v9_gold_in_context": 3,
@@ -1648,9 +1654,9 @@
       "tme-tem-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Wrenfield sign-off** happened most recently.\n\nThe conversations establish:\n\n**Plennell move \u2192 Zethisk handover \u2192 Draimune inspection \u2192 Quorlory rewiring \u2192 Wrenfield sign-off**.",
+        "v8_answer": "The **Wrenfield sign-off** happened most recently.\n\nThe conversations establish:\n\n**Plennell move → Zethisk handover → Draimune inspection → Quorlory rewiring → Wrenfield sign-off**.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t contain enough information to determine that.\n\nThey do show that the Wrenfield sign-off happened after the Draimune inspection, but they do not give the timing of the Plennell move.",
+        "v9_answer": "The conversations don’t contain enough information to determine that.\n\nThey do show that the Wrenfield sign-off happened after the Draimune inspection, but they do not give the timing of the Plennell move.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1667,7 +1673,7 @@
         "v8": true,
         "v8_answer": "The Plennell move happened most recently.",
         "v9": false,
-        "v9_answer": "I can\u2019t determine that from the conversations.\n\nThey only say:\n- the Ovridory retrofit happened before the Wrenfield sign-off;\n- the Zethisk handover happened before the Janduisk commissioning;\n- nothing definite about the Plennell move\u2019s timing relative to either.\n\nSo the most recent of those three",
+        "v9_answer": "I can’t determine that from the conversations.\n\nThey only say:\n- the Ovridory retrofit happened before the Wrenfield sign-off;\n- the Zethisk handover happened before the Janduisk commissioning;\n- nothing definite about the Plennell move’s timing relative to either.\n\nSo the most recent of those three",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1718,7 +1724,7 @@
         "v8": true,
         "v8_answer": "The Janduisk commissioning happened most recently.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say enough to determine that.\n\nThey establish that the Ondrey audit happened before the Wrenfield sign-off, and the Wrenfield sign-off happened before the Janduisk commissioning \u2014 so Janduisk was later than Ondrey. But they don\u2019t place the Ovridory retrofit relative to either",
+        "v9_answer": "The conversations don’t say enough to determine that.\n\nThey establish that the Ondrey audit happened before the Wrenfield sign-off, and the Wrenfield sign-off happened before the Janduisk commissioning — so Janduisk was later than Ondrey. But they don’t place the Ovridory retrofit relative to either",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1733,7 +1739,7 @@
       "tme-tem-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The Ovridory retrofit happened most recently.\n\nThe conversations give this order: Trevuade changeover \u2192 Draimune inspection \u2192 Vreskade survey \u2192 Ovridory retrofit.",
+        "v8_answer": "The Ovridory retrofit happened most recently.\n\nThe conversations give this order: Trevuade changeover → Draimune inspection → Vreskade survey → Ovridory retrofit.",
         "v9": true,
         "v9_answer": "The Ovridory retrofit happened most recently.",
         "v9_gold_in_context": 3,
@@ -1767,7 +1773,7 @@
       "tme-tem-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The **Skarvarn relining** happened most recently.\n\nRelevant sequence from the conversations:\n\n**Zethisk handover \u2192 Draimune inspection \u2192 Janduisk commissioning \u2192 Ovridory retrofit \u2192 Wrenfield sign-off \u2192 Skarvarn relining**.",
+        "v8_answer": "The **Skarvarn relining** happened most recently.\n\nRelevant sequence from the conversations:\n\n**Zethisk handover → Draimune inspection → Janduisk commissioning → Ovridory retrofit → Wrenfield sign-off → Skarvarn relining**.",
         "v9": false,
         "v9_answer": "Cannot be determined from the conversations.\n\nThey establish that the Ovridory retrofit happened before the Skarvarn relining, but they do not say where the Zethisk handover fits relative to either of those.",
         "v9_gold_in_context": 4,
@@ -1782,6 +1788,7 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "9b83da0cd8eaa954acdfe93b0663b7dfd2d56f061641f7cce3cba23451588c42"
+    "probed_corpus_sha256": "9b83da0cd8eaa954acdfe93b0663b7dfd2d56f061641f7cce3cba23451588c42",
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

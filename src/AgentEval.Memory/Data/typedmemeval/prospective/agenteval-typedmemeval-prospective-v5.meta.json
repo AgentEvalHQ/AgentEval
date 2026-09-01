@@ -118,6 +118,12 @@
       "of_turns": 4453,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.61,
+      "bm25_coverage_without_distractor_echo": 0.7817,
+      "dependence": 0.1717,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "gold_item_types": {
@@ -803,55 +809,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 11770,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 140,
+        "judge_calls": 4419,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 87,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 30,
+        "calls": 3181,
+        "empty": 9,
+        "rate": 0.0028,
+        "judge_calls": 1062,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 2329,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 872,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1726,6 +1732,7 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "a570b890a5b92c3be9fa042ab53e93a2f1cf15479558b609d5192ff985986f10"
+    "probed_corpus_sha256": "a570b890a5b92c3be9fa042ab53e93a2f1cf15479558b609d5192ff985986f10",
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

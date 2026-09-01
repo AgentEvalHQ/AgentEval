@@ -116,6 +116,20 @@
       "of_turns": 5990,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
+    },
+    "retrieval_ceiling": {
+      "k_ref": 5,
+      "coverage_scaffolding_stripped": 1.0,
+      "questions_needing_more_than_k_ref": 0,
+      "questions_scored": 60,
+      "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever.",
+      "accuracy_scaffolding_stripped": 0.9167
+    },
+    "scaffolding_dependence": {
+      "bm25_coverage_as_shipped": 0.75,
+      "bm25_coverage_without_distractor_echo": 1.0,
+      "dependence": 0.25,
+      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "gold_item_types": {
@@ -723,7 +737,7 @@
       "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446"
     },
     "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity \u2014 a deployment may be repointed at a different model without this value changing.",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
     "run_at": "2026-08-31T17:51:59Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
@@ -776,55 +790,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 60,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 60,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 607,
+        "calls": 11770,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 0,
+        "judge_calls": 4419,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 180,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 0,
+        "calls": 3181,
+        "empty": 9,
+        "rate": 0.0028,
+        "judge_calls": 1062,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 2329,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 872,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 60,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 60,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 60,
+        "calls": 1177,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 60,
+        "judge_calls": 1177,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1192,7 +1206,7 @@
       "tme-bit-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "As the record stood on 26 February, Jonas Pfeiffer\u2019s February depot was **Lowick**.",
+        "v8_answer": "As the record stood on 26 February, Jonas Pfeiffer’s February depot was **Lowick**.",
         "v9": false,
         "v9_answer": "The 26 February record does not state which depot Jonas Pfeiffer was at in February.",
         "v9_gold_in_context": 0,
@@ -1254,7 +1268,7 @@
         "v8": false,
         "v8_answer": "Marchmont.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say which team Tomas Beddoe was down as for April. As of 17 March, the only correction recorded was that he was Garrowby from July, not Halstead Vale in August.",
+        "v9_answer": "The conversations don’t say which team Tomas Beddoe was down as for April. As of 17 March, the only correction recorded was that he was Garrowby from July, not Halstead Vale in August.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1584,7 +1598,7 @@
         "v8": true,
         "v8_answer": "Lowick.",
         "v9": false,
-        "v9_answer": "I can\u2019t tell from the conversations. Nothing on or before 03 May mentions Otto Lindqvist\u2019s March campus.",
+        "v9_answer": "I can’t tell from the conversations. Nothing on or before 03 May mentions Otto Lindqvist’s March campus.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1704,7 +1718,7 @@
         "v8": true,
         "v8_answer": "As things stood on 22 May, Tomas Beddoe was down as being at Orrindale for April.",
         "v9": false,
-        "v9_answer": "The conversations don\u2019t say. As of 22 May, Tomas Beddoe is only alluded to (\u201cdown, beddoe\u201d), but no April team is given.",
+        "v9_answer": "The conversations don’t say. As of 22 May, Tomas Beddoe is only alluded to (“down, beddoe”), but no April team is given.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1762,7 +1776,7 @@
       "tme-bit-058": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Calm Whitaker\u2019s March department/location was recorded as **Calderwick** at that point.",
+        "v8_answer": "Calm Whitaker’s March department/location was recorded as **Calderwick** at that point.",
         "v9": false,
         "v9_answer": "The conversations do not say that the file gave any department for Colm Whitaker in March as of 09 June. By then, it only said he went to Dunmarsh in April.",
         "v9_gold_in_context": 0,
@@ -1805,6 +1819,7 @@
         "v6": null
       }
     },
-    "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446"
+    "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446",
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }
