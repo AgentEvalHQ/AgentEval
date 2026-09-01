@@ -147,7 +147,26 @@ jobs:
           Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
           [IO.Compression.ZipFile]::ExtractToDirectory($pkg.FullName, $dir)
           foreach ($dll in Get-ChildItem $dir -Recurse -Filter 'AgentEval.Memory.dll') {
-            $tfm = Split-Path -Leaf (Split-Path -Parent $dll.FullName)
+            # DERIVED BY SEARCHING THE PATH, not by taking the parent directory.
+            #
+            # `lib/<tfm>/X.dll` puts the framework in the parent, but a dotnet TOOL package uses
+            # `tools/<tfm>/any/X.dll`, so the parent is the literal string "any". Taking the parent
+            # blindly labelled all three CLI builds "any", and the per-framework MVID check then
+            # correctly reported that framework "any" ships two different builds -- a true statement
+            # about a label that does not exist. This walks up until it finds a real framework
+            # folder.
+            $tfm = $null
+            $probe = $dll.Directory
+            while ($probe -and -not $tfm) {
+              if ($probe.Name -match '^net(standard)?[0-9]') { $tfm = $probe.Name }
+              $probe = $probe.Parent
+            }
+            if (-not $tfm) {
+              # Refuse rather than group under a made-up label. A check that cannot say WHICH
+              # framework it just verified cannot claim to have verified them all.
+              Write-Host "::error::Could not derive a target framework from $($dll.FullName). Refusing to verify an assembly it cannot attribute."
+              exit 1
+            }
             $label = "$($pkg.Name)/$tfm"
             $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll.FullName))
             # The MVID is unique per compilation. Collecting them lets the step PROVE it opened a
