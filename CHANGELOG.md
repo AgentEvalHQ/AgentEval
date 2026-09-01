@@ -7,6 +7,156 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0-beta] - 2026-09-01
+
+### Breaking — five corpora changed bytes, and the collision is SILENT
+
+**`temporal`, `bitemporal`, `conjunction`, `episodic` and `forgetting` all moved `corpus_sha256`.**
+`arithmetic`, `prospective` and `semantic` did not — their sidecars changed; their corpora did not.
+
+| vertical | `corpus_sha256` | hops |
+|---|---|---|
+| `temporal` | `31d26e60fd21` → `9b83da0cd8ea` | 2 |
+| `conjunction` | `c62ef4773597` → `9f6a0f37a506` | 3 |
+| `bitemporal` | `f5b384d7f0ff` → `abf2f3f43219` | 1 |
+| `episodic` | `2c6000a6912e` → `542da3fa1767` | 1 |
+| `forgetting` | `ba759097b9bd` → `7fe6e166dbf1` | 1 |
+
+**Read this before comparing any number to a 0.31.0-beta baseline.** All five redrawn corpora keep
+**100% identical `question_id` sets with 0 byte-identical items**, and `corpus_id`
+(`agenteval-typedmemeval-<vertical>-v5`) and `revision` (`v5`) do not move either. **`corpus_sha256`
+is the only field that distinguishes the two corpora.**
+
+In `bitemporal`, **27 of 60 items keep the exact same question text with a different gold answer**
+(`tme-bit-003`: same question, gold `Northolt Bay` → `Kelsford`); only 4 kept both. A consumer keying
+a cache, leaderboard row or regression baseline on `question_id` will **silently mis-grade** rather
+than fail loudly. **Compare on the sha, never on the corpus id, revision or question id.**
+
+`temporal` additionally **lost its entire G=1 stratum** — the 20 single-gold questions are gone,
+redistributing to G=3 (5→11), G=4 (5→12), G=5 (5→12). Retrieval controls change in kind, not only in
+value.
+
+### Added — two shapes that could not rank anything now can
+
+- **`temporal/occurrence-order`: headroom 0.05 → 0.75**, now the strongest shape in its vertical. It
+  asked about two *adjacent* chain events, so the single link between them stated the answer outright
+  while the question handed BM25 both rare names — a lexical lookup in the vertical whose premise is
+  that narration order must be *followed*. It now asks the two **ends**, so every link is necessary.
+  V9 19/20 → 5/20; gold 1 → 3–5 sessions; **0 of 20 questions have any single session naming both
+  asked events**, against 20 of 20 before. V1 held at 20/20.
+
+- **`bitemporal/belief-at-instant`: headroom 0.11 → 0.31**, and on pairs **0.167 → 0.556** against a
+  scaled floor of 0.254 it previously missed. Only two sessions per haystack named the asked subject;
+  same-subject, other-month distractors now compete (median 2 → 5, exactly `K_REF`).
+
+- **`conjunction/order-then-value`: V9 15/15 → 7/15** — the second-largest per-shape V9 move in the
+  release. It was saturated under BM25 and could not discriminate retrievers at all.
+
+- **Paired-arm discrimination.** Bitemporal's 30 pairs have different correct answers and disjoint
+  gold, so per-question scoring averages the capability away. `pair_headroom` ships with
+  `pair_floor_scaled` **and** `pair_separation_sd`: a shape must clear both, because the floor assumes
+  independent arms and they measurably are not, while the standard-error separation assumes nothing
+  about correlation.
+
+- **A per-shape coverage band gate**, which immediately found three shapes outside ADR-026's
+  [0.50, 0.90] that nothing had reported.
+
+- **`--dry-run` for the probe runner** — every case through the real code path against a stub: no API
+  calls, no credentials, nothing written. It found a real bug on its first execution.
+
+- **`--recalibrate` on all nine generators. Calibration is now an authoring step, not a build step:**
+  a plain regeneration rebuilds at the echo the sidecar records and reproduces byte for byte.
+  Previously a corpus was a function of (generator, seed, *search algorithm*), so changing the search
+  silently desynchronised every committed corpus from the generator that produces it.
+
+### Fixed — previously published numbers that were wrong
+
+**Per-shape realised coverage never described the shipped corpus.** `calibrate_per_shape` recorded
+each shape's value *mid-search*, while later shapes' knobs were still 0, then rebuilt with all knobs
+set.
+
+| shape | published | actual |
+|---|---|---|
+| `arithmetic/delta` | 0.7767 | 0.7350 |
+| `arithmetic/duration` | 0.6528 | 0.6250 |
+| `conjunction/alias-then-count` | 0.3444 | 0.3356 |
+| `semantic/co-reference` | 0.6889 | 0.7222 |
+| `prospective/not-yet-true` | 0.6667 | **1.0000 — saturated** |
+| `prospective/due-later-reminder` | 0.75 | 0.50 |
+| `prospective/due-window` | 0.2222 | 0.4352 |
+| `prospective/expiring-validity` | 0.8333 | 0.6667 |
+
+`semantic`'s echo never moved, so this was long-standing and independent of the calibration work.
+
+**The guide asserted something false.** It read *"`V1 − V9` is the headroom a better retriever can
+capture."* It is not — a real retriever returns gold *plus* what else it ranks highly, so its ceiling
+is **V8, not V1**. `headroom_reachable` had been in the sidecar since 0.31 and the word "reachable"
+appeared **zero times** in the docs. `prospective/due-window` publishes 0.94 of which **0.17** is
+reachable.
+
+**The calibration search was fixed twice.** Bisection assumed a monotone most shapes violate; the
+sweep that replaced it was itself a regression on cliff-shaped curves, returning coverage **0.000**
+on `arithmetic/delta` where bisection returned 0.735. A sweep *locates* and bisection *resolves*;
+both are needed. See ADR-028 §12.
+
+**Three sidecars had lost fields** they carried at 0.31.0-beta — `structure.retrieval_ceiling` and
+`structure.scaffolding_dependence` on `bitemporal`, `episodic` and `forgetting`. Regenerating those
+corpora dropped them correctly (the values described the old bytes) and nothing re-ran the stampers.
+Restored, with no sha change.
+
+### Known defects shipping in this release
+
+- **`prospective/due-window`'s answer key is wrong.** Class parity requires filler to use gold's own
+  construction, and this shape asks a set-membership question *whose membership criterion is that
+  construction* — so filler reminders falling inside the window satisfy the question and are not
+  gold. The reference model is marked wrong for being right. A fix is written and measured
+  (V8 4/18 → 13/18, reachable headroom 0.17 → 0.44) but **is not in this release**; it cannot land
+  while the separability tell below is unfixed. Read its published 0.94 / 0.17 as *mis-keyed*, not
+  *hard*.
+
+- **`prospective/not-yet-true` is saturated** at coverage 1.0 — BM25 returns gold for every question.
+  Its headroom of 0.1667 is **one question out of six**.
+
+- **A measured, unfixed separability tell.** Gold's first assistant turn is longer than every
+  distractor's in 8–10 of 50 `prospective` questions against 4.1 expected by chance, and 6 of 50 in
+  `episodic`. Diagnosed in `tools/diagnose_padding_asymmetry.py`: gold's first assistant turn starts
+  45 and 36 characters shorter than filler's in those two verticals, so it takes the most
+  whole-sentence padding steps and the last one overshoots. `semantic`, `temporal` and `bitemporal`
+  have comparable base texts and show no tell.
+
+- **61 of 75 measured real-world name collisions remain unremediated**, declared in
+  `tools/name-collision-audit.json`. The guard scans only `temporal` and `conjunction`, and only for
+  the 14 remediated names.
+
+- **`forgetting/never-known` is checked by nothing.** Its 15 questions have no gold, so every validity
+  arm reports 0/0 and both discrimination assertions silently `continue`.
+
+### Changed — defaults and CI a fork inherits
+
+- **`TypedMemEvalOptions.JudgeMaxOutputTokens` 512 → 1500**, the value the shipped judge calibration
+  was measured at. `ExternalBenchmarkOptions.JudgeMaxOutputTokens` is unchanged at 256, so LongMemEval
+  judge budgets are untouched.
+- **`llm-integration-tests.yml` default deployment `gpt-4o-mini` → `gpt-5.5`.**
+- **A release-blocking gate** in `release.yml`, between `dotnet pack` and `dotnet nuget push`, verifies
+  every embedded corpus against the working tree — 9 corpora × 3 frameworks. **A release can now fail
+  after packing;** that is this gate, not a packaging outage.
+- **`corpus-reproducibility.yml`** regenerates all nine corpora and compares bytes, triggered by changes
+  to `tools/gen_*`, `typedmemeval_common.py` or the corpora.
+- New test classes: `TypedMemEvalPackagedCorpusTests`, `TypedMemEvalNameCollisionTests`,
+  `TypedMemEvalCoverageBandTests`, `TypedMemEvalDiscriminationTests`, `TypedMemEvalJudgeBudgetTests`.
+  Several read from disk, so **the suite is no longer runnable outside a full repo checkout.**
+
+### Sidecar schema
+
+- **Added:** `coverage.echo_by_shape`, `coverage.per_shape_realised`, and per shape
+  `headroom_perfect_selector`, `headroom_reachable`, `limited_by`, `discriminates`, plus `pair_*`
+  fields where a shape has arms.
+- **Removed, and the absence is the disclosure:** `probes.empty_completion_disclosure`,
+  `probes.empty_rate_scope` and `probes.no_answer_captured` are conditionally emitted. With zero empty
+  completions on the current corpora there is nothing to disclose. **Read their absence as "none",
+  not as "not measured".**
+
+
 ### Added
 
 - **Every shape now publishes what KIND of hard it is, and a gate on whether it can rank anything.**
@@ -30,11 +180,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall — a gate that stays red for the life of a known-weak shape stops being read, and a regression
   introduced while fixing something else then lands invisibly. Two lists, both with reasons:
   *saturated by design* (WorkingMemory's three short ladder rungs, where the gradient **is** the
-  measurement and deleting the saturation deletes the construct) and *pending redesign*
-  (`temporal/occurrence-order` 0.05, `bitemporal/belief-at-instant` 0.11 — near-closed-choice forms
-  where the question names the entity it asks about, the same structural cap that limited
-  `participant-attribution` to 0.20). Listed shapes may improve and may not regress; anything
-  unlisted must clear the floor outright.
+  measurement and deleting the saturation deletes the construct) and *pending redesign*. Listed
+  shapes may improve and may not regress; anything unlisted must clear the floor outright.
+
+  **The pending-redesign list shipped empty.** It held `temporal/occurrence-order` at 0.05 and
+  `bitemporal/belief-at-instant` at 0.11 when the gate was written; both were fixed later in this
+  same release, to 0.75 and 0.31, and removed. Their reasons are kept in the now-empty dictionary
+  rather than deleted with the entries — a list that only ever grows is a list nobody reads.
 
   Red-first verified: raising the floor to 0.25 turns three verticals red; restored, 1073/1073 green.
   **No corpus regenerates and no consumer control moves** — the raw arm counts were already recorded,
