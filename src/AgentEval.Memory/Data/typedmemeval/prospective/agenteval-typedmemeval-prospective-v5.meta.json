@@ -121,8 +121,193 @@
       "separates_gold": false
     }
   },
+  "gold_item_types": {
+    "tme-pro-001": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-002": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-003": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-004": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-005": [
+      "prospective"
+    ],
+    "tme-pro-006": [
+      "prospective"
+    ],
+    "tme-pro-007": [
+      "prospective"
+    ],
+    "tme-pro-008": [
+      "prospective"
+    ],
+    "tme-pro-009": [
+      "prospective"
+    ],
+    "tme-pro-010": [
+      "prospective"
+    ],
+    "tme-pro-011": [
+      "prospective"
+    ],
+    "tme-pro-012": [
+      "prospective"
+    ],
+    "tme-pro-013": [
+      "prospective"
+    ],
+    "tme-pro-014": [
+      "prospective"
+    ],
+    "tme-pro-015": [
+      "prospective"
+    ],
+    "tme-pro-016": [
+      "prospective"
+    ],
+    "tme-pro-017": [
+      "prospective"
+    ],
+    "tme-pro-018": [
+      "prospective"
+    ],
+    "tme-pro-019": [
+      "prospective"
+    ],
+    "tme-pro-020": [
+      "prospective"
+    ],
+    "tme-pro-021": [
+      "prospective"
+    ],
+    "tme-pro-022": [
+      "prospective"
+    ],
+    "tme-pro-023": [
+      "prospective"
+    ],
+    "tme-pro-024": [
+      "prospective"
+    ],
+    "tme-pro-025": [
+      "prospective"
+    ],
+    "tme-pro-026": [
+      "prospective"
+    ],
+    "tme-pro-027": [
+      "prospective"
+    ],
+    "tme-pro-028": [
+      "prospective"
+    ],
+    "tme-pro-029": [
+      "prospective"
+    ],
+    "tme-pro-030": [
+      "prospective"
+    ],
+    "tme-pro-031": [
+      "prospective"
+    ],
+    "tme-pro-032": [
+      "prospective"
+    ],
+    "tme-pro-033": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-034": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-035": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-036": [
+      "prospective",
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-037": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-038": [
+      "prospective"
+    ],
+    "tme-pro-039": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-040": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-041": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-042": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-043": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-044": [
+      "prospective"
+    ],
+    "tme-pro-045": [
+      "prospective",
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-046": [
+      "prospective",
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-047": [
+      "prospective"
+    ],
+    "tme-pro-048": [
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-049": [
+      "prospective",
+      "prospective",
+      "prospective"
+    ],
+    "tme-pro-050": [
+      "prospective",
+      "prospective"
+    ]
+  },
   "probes": {
-    "status": "not_run",
+    "status": "run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -542,6 +727,1083 @@
       "status": "run",
       "measured_by": "generator",
       "probed_corpus_sha256": "39f205b722948949cfa38eea8ca2c88798b64311506520162cd675437831a2a4"
-    }
+    },
+    "reference_deployment": "gpt-5.5",
+    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
+    "run_at": "2026-09-01T16:29:35Z",
+    "questions_probed": 50,
+    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
+    "v1_oracle_answerability": {
+      "applicable": 50,
+      "passed": 49,
+      "failed": [
+        "tme-pro-032"
+      ]
+    },
+    "v1_pair_flip": {
+      "pairs": 19,
+      "passed": 18,
+      "failed": [
+        "tme-pro-p10"
+      ]
+    },
+    "ablation_samples_per_question": 3,
+    "v2_non_inferability": {
+      "samples_per_question": 10,
+      "reject_at_hits": 2,
+      "temperature": "provider default",
+      "applicable": 50,
+      "passed": 50,
+      "failed": [],
+      "closed_choice": {
+        "questions": 21,
+        "by_candidates": {
+          "2": 21
+        },
+        "chance_floor_exceeds_reject_line": true,
+        "passes_not_evidence_of_non_inferability": 21,
+        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
+      }
+    },
+    "v3_gold_ablated": {
+      "applicable": 27,
+      "passed": 27,
+      "failed": [],
+      "not_decidable": [
+        "tme-pro-005",
+        "tme-pro-006",
+        "tme-pro-008",
+        "tme-pro-009",
+        "tme-pro-010",
+        "tme-pro-011",
+        "tme-pro-012",
+        "tme-pro-013",
+        "tme-pro-014",
+        "tme-pro-015",
+        "tme-pro-016",
+        "tme-pro-017",
+        "tme-pro-018",
+        "tme-pro-019",
+        "tme-pro-020",
+        "tme-pro-021",
+        "tme-pro-022",
+        "tme-pro-023",
+        "tme-pro-024",
+        "tme-pro-025",
+        "tme-pro-026",
+        "tme-pro-028",
+        "tme-pro-030"
+      ],
+      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
+      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
+    },
+    "v6_leave_one_out": {
+      "applicable": 0,
+      "passed": 0,
+      "failed": [],
+      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "not_applicable_reason": "V6 is not defined for prospective"
+    },
+    "empty_completions": {
+      "count": 0,
+      "retried_for_length": 16,
+      "by_cache_key": {}
+    },
+    "empty_rate_by_arm": {
+      "v1": {
+        "population": "probe_answers",
+        "calls": 50,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v2": {
+        "population": "probe_answers",
+        "calls": 500,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 120,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v3": {
+        "population": "probe_answers",
+        "calls": 81,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 17,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v6": {
+        "population": "probe_answers",
+        "calls": 0,
+        "empty": 0,
+        "rate": null,
+        "judge_calls": 0,
+        "judge_empty": 0,
+        "judge_rate": null
+      },
+      "v8": {
+        "population": "probe_answers",
+        "calls": 63,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v9": {
+        "population": "probe_answers",
+        "calls": 53,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 50,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      }
+    },
+    "v8_full_haystack": {
+      "applicable": 50,
+      "v1_passed": 49,
+      "v8_passed": 48,
+      "interference_cost": 0.02,
+      "regressed_under_interference": [
+        "tme-pro-045",
+        "tme-pro-049"
+      ],
+      "failures_with_no_captured_answer": [],
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+    },
+    "v9_reference_retrieval": {
+      "applicable": 50,
+      "v1_gold_only": 49,
+      "v8_full_haystack": 48,
+      "v9_bm25_top_k": 22,
+      "headroom_over_lexical_retrieval": 0.54,
+      "headroom_unlimited_context_over_lexical": 0.52,
+      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
+    },
+    "by_shape": {
+      "due-later-reminder": {
+        "questions": 8,
+        "v1_applicable": 8,
+        "v1_passed": 8,
+        "v3_applicable": 0,
+        "v3_passed": 0,
+        "v8_applicable": 8,
+        "v8_passed": 8,
+        "v9_applicable": 8,
+        "v9_passed": 6,
+        "ci95": {
+          "v1": [
+            0.6756,
+            1.0
+          ],
+          "v8": [
+            0.6756,
+            1.0
+          ],
+          "v9": [
+            0.4093,
+            0.9285
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.25,
+        "discriminates": true,
+        "headroom_reachable": 0.25,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 4,
+        "pair_v1_both_arms": "4/4",
+        "pair_v9_both_arms": "3/4",
+        "pair_headroom": 0.25,
+        "pair_floor_scaled": 0.2625,
+        "pair_separation_sd": 1.091,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": false,
+        "pair_v8_both_arms": "4/4",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+      },
+      "due-window": {
+        "questions": 18,
+        "v1_applicable": 18,
+        "v1_passed": 18,
+        "v3_applicable": 18,
+        "v3_passed": 18,
+        "v8_applicable": 18,
+        "v8_passed": 16,
+        "v9_applicable": 18,
+        "v9_passed": 2,
+        "ci95": {
+          "v1": [
+            0.8241,
+            1.0
+          ],
+          "v3": [
+            0.8241,
+            1.0
+          ],
+          "v8": [
+            0.672,
+            0.969
+          ],
+          "v9": [
+            0.031,
+            0.328
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 3,
+        "headroom_perfect_selector": 0.8889,
+        "discriminates": true,
+        "headroom_reachable": 0.7778,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 9,
+        "pair_v1_both_arms": "9/9",
+        "pair_v9_both_arms": "0/9",
+        "pair_headroom": 1.0,
+        "pair_floor_scaled": 0.1667,
+        "pair_separation_sd": 13.765,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": true,
+        "pair_v8_both_arms": "7/9",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+      },
+      "expiring-validity": {
+        "questions": 6,
+        "v1_applicable": 6,
+        "v1_passed": 6,
+        "v3_applicable": 0,
+        "v3_passed": 0,
+        "v8_applicable": 6,
+        "v8_passed": 6,
+        "v9_applicable": 6,
+        "v9_passed": 4,
+        "ci95": {
+          "v1": [
+            0.6097,
+            1.0
+          ],
+          "v8": [
+            0.6097,
+            1.0
+          ],
+          "v9": [
+            0.3,
+            0.9032
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.3333,
+        "discriminates": true,
+        "headroom_reachable": 0.3333,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 3,
+        "pair_v1_both_arms": "3/3",
+        "pair_v9_both_arms": "2/3",
+        "pair_headroom": 0.3333,
+        "pair_floor_scaled": 0.25,
+        "pair_separation_sd": 1.193,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": false,
+        "pair_v8_both_arms": "3/3",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+      },
+      "not-yet-true": {
+        "questions": 6,
+        "v1_applicable": 6,
+        "v1_passed": 5,
+        "v3_applicable": 4,
+        "v3_passed": 4,
+        "v8_applicable": 6,
+        "v8_passed": 6,
+        "v9_applicable": 6,
+        "v9_passed": 2,
+        "ci95": {
+          "v1": [
+            0.4365,
+            0.9699
+          ],
+          "v3": [
+            0.5101,
+            1.0
+          ],
+          "v8": [
+            0.6097,
+            1.0
+          ],
+          "v9": [
+            0.0968,
+            0.7
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.5,
+        "discriminates": true,
+        "headroom_reachable": 0.6667,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 3,
+        "pair_v1_both_arms": "2/3",
+        "pair_v9_both_arms": "1/3",
+        "pair_headroom": 0.3333,
+        "pair_floor_scaled": 0.175,
+        "pair_separation_sd": 1.193,
+        "pair_separation_floor_sd": 2.0,
+        "pair_discriminates": false,
+        "pair_v8_both_arms": "3/3",
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+      },
+      "seed-carry-over": {
+        "questions": 12,
+        "v1_applicable": 12,
+        "v1_passed": 12,
+        "v3_applicable": 5,
+        "v3_passed": 5,
+        "v8_applicable": 12,
+        "v8_passed": 12,
+        "v9_applicable": 12,
+        "v9_passed": 8,
+        "ci95": {
+          "v1": [
+            0.7575,
+            1.0
+          ],
+          "v3": [
+            0.5655,
+            1.0
+          ],
+          "v8": [
+            0.7575,
+            1.0
+          ],
+          "v9": [
+            0.3906,
+            0.8619
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 1,
+        "headroom_perfect_selector": 0.3333,
+        "discriminates": true,
+        "headroom_reachable": 0.3333,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+      }
+    },
+    "per_question": {
+      "tme-pro-001": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Riverside Fitness.",
+        "v9": false,
+        "v9_answer": "I don’t know. The conversations only mention “gym, start,” but they don’t say which gym you were a member of at the start of March.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-002": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "One tablet each morning.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say how many allergy tablets you were taking each morning during March.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-003": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "April 27, 2026 — eight weeks from the Harbour kickoff on March 2.",
+        "v9": false,
+        "v9_answer": "I don’t know — the conversations only say the Harbour delivery was pushed back by three weeks, not what the original delivery date was.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-004": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "About four weeks — from your first physio session on 2026/01/20 to the “shoulder felt better” update on 2026/02/17.",
+        "v9": true,
+        "v9_answer": "About four weeks — from your first physio session on Jan 20 to the “shoulder felt better” note on Feb 17.",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-005": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The conversations say you started a 30-day Lumen free trial on 2026/04/28; by 2026/06/03, that trial period would have ended.",
+        "v9": true,
+        "v9_answer": "No. Based on the conversations, you started a 30-day Lumen trial on 2026/04/28, so by 2026/06/03 it would have expired.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-006": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes — based on the earlier conversation, you accepted the Halcyon Systems offer on 2026/02/16 and said you’d start the first Monday of the next month, which would have been 2026/03/02. Since it’s now 2026/04/20, you should have started already.",
+        "v9": true,
+        "v9_answer": "Yes. You accepted on 2026/02/16 and said you start the first Monday of the next month, which would be 2026/03/02. Since today is 2026/04/20, you should have started already.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-007": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The puppy is about **20 weeks old** now — roughly **4½ months old**.",
+        "v9": true,
+        "v9_answer": "The puppy is **20 weeks old** now — about **4½ months**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-008": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. Your car went in for its service on 2026/01/29, and you said they do it every six months. That would make the next one due around 2026/07/29, so as of 2026/06/20 it is not due yet.",
+        "v9": true,
+        "v9_answer": "No. Your car was serviced on 2026/01/29, and you said it is done every six months, so it would be due around 2026/07/29. Current date is 2026/06/20.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-009": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. As of 2026/05/27, you have not started yet. You said Meridian Health day one is the first Monday of next month, which would be 2026/06/01.",
+        "v9": true,
+        "v9_answer": "No. You said day one at Meridian Health is the first Monday of next month, which would be June 1, 2026. The current date is May 27, 2026, so you have not started yet.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-010": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The visa application went in on 2026/04/14, and they said to allow eight weeks.\n\nAs of 2026/05/26, it has been about six weeks, so you would not necessarily expect a decision yet. You should still have roughly two weeks before the stated timeframe is up.",
+        "v9": false,
+        "v9_answer": "I don’t know from these conversations. They only mention “application, visa” being on your mind, but give no submission date, expected timeline, or status.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-011": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The conversations say it was booked on 2026/03/05 for “a fortnight from tomorrow,” which would be 2026/03/20. Since it is now 2026/04/02, it should have already passed.",
+        "v9": true,
+        "v9_answer": "No. Based on the Mar 5 conversation, it was booked for a fortnight from the next day — around Mar 20, 2026 — so by Apr 2 it should have already passed.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-012": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. You joined on 2026/02/24, and the members’ rate only kicks in after six months — so it would be around 2026/08/24.",
+        "v9": true,
+        "v9_answer": "No. You joined on 2026/02/24, and the members’ rate only kicks in after six months, so it should be available around 2026/08/24.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-013": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. It has not come due yet.\n\nThe allotment lease renewal reminder was set on 2026/03/23 for eighteen weeks later, so it is due on 2026/07/27.",
+        "v9": true,
+        "v9_answer": "No. The allotment lease renewal reminder is due on **2026/07/27 (Mon)**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-014": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The allotment lease renewal reminder was due on **2026/07/27 (Mon)**, eighteen weeks after **2026/03/23**.\n\nAs of **2026/08/02**, it has already come due.",
+        "v9": true,
+        "v9_answer": "Yes. The allotment lease renewal reminder came due on **2026/07/27**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-015": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The boiler service booking reminder is not due yet.\n\nIt was set on 2026/04/01 for eleven weeks later, so it is due on 2026/06/17.",
+        "v9": true,
+        "v9_answer": "No. The boiler service booking reminder is due on **2026/06/17**, so as of **2026/06/11** it has **not come due yet**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-016": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The boiler service booking reminder came due on **2026/06/17 (Wed)**.",
+        "v9": true,
+        "v9_answer": "Yes. The boiler service booking reminder came due on **2026/06/17 (Wed)**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-017": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The reminder to send the quarterly figures to Priya was set on 2026/04/11 for six weeks later, so it is due on 2026/05/23. Current date is 2026/05/17, so it has not come due yet.",
+        "v9": false,
+        "v9_answer": "The conversations mention “priya, figures, come, due,” but they do not give a due date for the figures for Priya.\n\nSo I can’t tell whether it has come due yet, or what date it is/was due, from the provided record.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-018": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The reminder to send the quarterly figures to Priya was due on **2026/05/23 (Sat)**, so it has already come due.",
+        "v9": false,
+        "v9_answer": "The conversations do not state a due date for the reminder about the figures for Priya. They only mention “priya, figures, come, due” as something “on my mind.”\n\nSo I can’t tell from the record whether it has come due yet, or what date it is/was due.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-019": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The bike-chain reminder is due on **2026/05/21 (Thu)**, four weeks after it was set on **2026/04/23**. Current date is **2026/05/15**, so it has not come due yet.",
+        "v9": true,
+        "v9_answer": "No. The bike chain reminder is due on 2026/05/21.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-020": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The bike-chain reminder was due on **2026/05/21 (Thu)**, four weeks after it was set on **2026/04/23**. It has come due already.",
+        "v9": true,
+        "v9_answer": "Yes. The bike chain reminder was due on **2026/05/21 (Thu)**, so it has already come due.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-021": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. It was picked up on 2026/03/21 and was valid for seven weeks, so it runs out on or around 2026/05/09. As of 2026/05/03, it is still valid.",
+        "v9": false,
+        "v9_answer": "The conversations only say the climbing-wall pass was “still valid” at the time of the earlier sessions. They do not say when it runs out, or whether it is still valid on 2026/05/03.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-022": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The climbing-wall pass was picked up on 2026/03/21 and was valid for seven weeks, so it ran out on 2026/05/09.",
+        "v9": false,
+        "v9_answer": "The earlier conversations only say that the climbing-wall pass was “still valid” during March 2026. They do not give an expiry date, so I can’t tell whether it is still valid on 2026/05/15 or when it runs/ran out.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-023": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The ferry multi-trip ticket is still valid.\n\nIt was bought on 2026/03/24 and is valid for nine weeks, so it runs out on 2026/05/26. Current date is 2026/05/20.",
+        "v9": true,
+        "v9_answer": "Yes. The ferry multi-trip ticket was bought on 2026/03/24 and was valid for nine weeks, so it runs out on 2026/05/26. As of 2026/05/20, it is still valid.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-024": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The ferry multi-trip ticket was picked up on 2026/03/24 and was valid for nine weeks, so it ran out on 2026/05/26. Since today is 2026/06/01, it is no longer valid.",
+        "v9": true,
+        "v9_answer": "No. The ferry multi-trip ticket was picked up on 2026/03/24 and was valid for nine weeks, so it ran out on 2026/05/26.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-025": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Yes. The museum membership is still valid.\n\nIt was picked up on 2026/03/27 and lasts four weeks, so it runs out on 2026/04/24.",
+        "v9": true,
+        "v9_answer": "Yes. The museum membership is still valid.\n\nIt was picked up on 2026/03/27 and was valid for four weeks, so it runs out around 2026/04/24.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-026": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "No. The museum membership was picked up on **2026/03/27** and was valid for **four weeks**, so it **ran out on 2026/04/24**.",
+        "v9": true,
+        "v9_answer": "No. The museum membership was picked up on 2026/03/27 and was valid for four weeks, so it ran out around 2026/04/24.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 2,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-027": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to start at Halloway Instruments **sixteen weeks after 2026/03/13**, which works out to **2026/07/03 (Friday)**.\n\nAs of **2026/06/27**, that date is **still ahead of you** — about **six days away**.",
+        "v9": false,
+        "v9_answer": "The record does not say when you are due to start at Halloway Instruments.\n\nIt only mentions that there was a piece about Halloway Instruments in the local paper. It does not give a start date, so I can’t tell from the record whether that date is still ahead of you.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-028": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The record says that on **2026/03/13** you were due to start at **Halloway Instruments in sixteen weeks**.\n\nThat works out to **2026/07/03**.\n\nAs of **2026/07/09**, that date is **not still ahead of you** — it was **six days ago**.",
+        "v9": false,
+        "v9_answer": "The record does not give a start date for Halloway Instruments.\n\nIt only mentions that you “mentioned Halloway Instruments to Dad” and includes vague reminders about “start, date, … due, … instruments,” but no actual date is stated. So I can’t tell from the record whether the start date is still ahe",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-029": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The record says that on **2026/03/21** you were **due to move into the flat on Ferrier Row in eleven weeks**.\n\nThat works out to **2026/06/06 (Sat)**.\n\nAs of **2026/05/31**, yes — that date is still ahead of you, by about **six days**.",
+        "v9": true,
+        "v9_answer": "The record says you were due to move into the flat on Ferrier Row **eleven weeks after 2026/03/21**, which works out to **2026/06/06**.\n\nGiven the current date is **2026/05/31**, that date is **still ahead of you** — about **six days away**.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-030": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The record says you were due to move into the flat on Ferrier Row **eleven weeks after 2026/03/21**, which is **2026/06/06**.\n\nAs of **2026/06/12**, that date is **not still ahead of you** — it was **six days ago**.",
+        "v9": true,
+        "v9_answer": "The record says that on **2026/03/21** you were **due to move into the flat on Ferrier Row in eleven weeks**.\n\nThat points to **2026/06/06**.\n\nGiven the current date is **2026/06/12**, that date is **not still ahead of you**; it has already passed.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3": null,
+        "v6": null
+      },
+      "tme-pro-031": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The record says on **2026/04/15** that you were due to take over the Tuesday pottery class **in nine weeks**.\n\nThat works out to **2026/06/17**. As of **2026/06/11**, that date is still ahead of you — in about six days.",
+        "v9": false,
+        "v9_answer": "The record says that on **2026/04/15** you said:\n\n> “I am due to take over the Tuesday pottery class in nine weeks.”\n\nCounting nine weeks from then puts it at **around 2026/06/17**. Since the current date is **2026/06/11**, that is **still ahead of you**.\n\nBecause it specifically says the **Tuesday*",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-032": {
+        "v1": false,
+        "v8": true,
+        "v8_answer": "The record says you were due to take over the Tuesday pottery class **nine weeks after 2026/04/15**, which works out to **2026/06/17**.\n\nAs of **2026/06/23**, that date is **not still ahead of you** — it was about **six days ago**.",
+        "v9": false,
+        "v9_answer": "The record says on **2026/04/15** that you were due to take over the **Tuesday pottery class in nine weeks**.\n\nThat points to **Tuesday, 2026/06/16**. As of **2026/06/23**, that date is **no longer ahead of you**; it was a week ago.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-033": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The reminders due in the next fortnight are:\n\n- **Re-tension the bike chain** — **2026/04/05 (Sun)**\n- **Reorder the printer toner** — **2026/04/14 (Tue)**\n- **Book the boiler service** — **2026/04/16 (Thu)**",
+        "v9": false,
+        "v9_answer": "- Re-tension the bike chain — 2026/04/05\n- Book the boiler service — 2026/04/16",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-034": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The reminders falling due in the next fortnight are:\n\n- **Reorder the printer toner** — **2026/04/14**\n- **Book the boiler service** — **2026/04/16**\n- **Return the borrowed telescope** — **2026/04/21**",
+        "v9": false,
+        "v9_answer": "You asked me to remind/nudge you about:\n\n- **Reordering the printer toner** — **2026/04/14 (Tue)**",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-035": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Return the borrowed telescope — 2026/04/14 (Tue)\n- Chase the deposit refund — 2026/04/21 (Tue)\n- Swap the smoke-alarm batteries — 2026/05/01 (Fri)",
+        "v9": false,
+        "v9_answer": "- Return the borrowed telescope — 2026/04/14 (Tue)\n- Chase the deposit refund — 2026/04/21 (Tue)",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-036": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Due in the next three weeks:\n\n- **2026/04/21 (Tue)** — Chase the deposit refund.\n- **2026/05/01 (Fri)** — Swap the smoke-alarm batteries.\n- **2026/05/06 (Wed)** — File the allotment water claim.\n- **2026/05/11 (Mon)** — Submit the conference abstract.",
+        "v9": false,
+        "v9_answer": "None. The conversations do not contain any reminder due between 2026/04/20 and 2026/05/11.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-037": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Falls due in the next ten days:\n\n- **File the allotment water claim** — **2026/04/20 (Mon)**\n- **Submit the conference abstract** — **2026/04/25 (Sat)**",
+        "v9": false,
+        "v9_answer": "- File the allotment water claim — 2026/04/20 (Mon)",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-038": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- **Submit the conference abstract** — **2026/04/25 (Sat)**",
+        "v9": true,
+        "v9_answer": "- Submit the conference abstract — 2026/04/25.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-039": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "In the next fortnight, you asked to be reminded about:\n\n- **2026/04/27** — Collect the repaired lamp.\n- **2026/05/03** — Re-tension the bike chain.\n- **2026/05/09** — Reorder the printer toner.",
+        "v9": false,
+        "v9_answer": "- Collect the repaired lamp — 2026/04/27 (Mon)\n- Re-tension the bike chain — 2026/05/03 (Sun)",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-040": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Re-tension the bike chain — 2026/05/03  \n- Reorder the printer toner — 2026/05/09  \n- Book the boiler service — 2026/05/15",
+        "v9": false,
+        "v9_answer": "- Re-tension the bike chain — 2026/05/03  \n- Book the boiler service — 2026/05/15",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-041": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "In the next three weeks, you asked to be reminded about:\n\n- **Book the boiler service** — **2026/04/30 (Thu)**\n- **Return the borrowed telescope** — **2026/05/08 (Fri)**\n- **Chase the deposit refund** — **2026/05/14 (Thu)**",
+        "v9": false,
+        "v9_answer": "- Book the boiler service — due 2026/04/30\n- Chase the deposit refund — due 2026/05/14",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-042": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Between now and three weeks from 2026/05/07, you asked to be reminded about:\n\n- **2026/05/08 (Fri)** — return the borrowed telescope.\n- **2026/05/14 (Thu)** — chase the deposit refund.\n- **2026/05/23 (Sat)** — swap the smoke-alarm batteries.",
+        "v9": false,
+        "v9_answer": "- Chase the deposit refund — 2026/05/14\n- Swap the smoke-alarm batteries — 2026/05/23",
+        "v9_gold_in_context": 2,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-043": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Swap the smoke-alarm batteries — 2026/05/11 (Mon)\n- File the allotment water claim — 2026/05/19 (Tue)",
+        "v9": false,
+        "v9_answer": "None. The earlier conversations do not contain any reminder that falls due between 2026/05/10 and 2026/05/20.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-044": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- **File the allotment water claim** — **2026/05/19 (Tue)**\n\nI don’t see any other reminders in the conversations due within the next ten days.",
+        "v9": false,
+        "v9_answer": "None. The conversations do not contain any reminder that falls due in the next ten days, i.e. 2026/05/18 through 2026/05/28.",
+        "v9_gold_in_context": 0,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-045": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "You asked me to remind you about these items falling due in the next three weeks:\n\n- **Descale the shower head** — **2026/05/25**\n- **Reorder the printer toner** — **2026/05/26**\n- **Book the boiler service** — **2026/06/03**\n- **Return the borrowed telescope** — **2026/06/05**\n- **Chase the deposit",
+        "v9": false,
+        "v9_answer": "You asked me to remind you about:\n\n- **Reorder the printer toner** — **2026/05/26 (Tue)**\n- **Book the boiler service** — **2026/06/03 (Wed)**\n- **Chase the deposit refund** — **2026/06/13 (Sat)**",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-046": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Book the boiler service — 2026/06/03 (Wed)\n- Return the borrowed telescope — 2026/06/05 (Fri)\n- Chase the deposit refund — 2026/06/13 (Sat)\n- Swap the smoke-alarm batteries — 2026/06/18 (Thu)",
+        "v9": false,
+        "v9_answer": "Book the boiler service — 2026/06/03 (Wed).",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-047": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You asked me to remind you to:\n\n- **Chase the deposit refund** — **2026/05/30**",
+        "v9": true,
+        "v9_answer": "Chase the deposit refund — 2026/05/30.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-048": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Swap the smoke-alarm batteries — 2026/06/09\n- File the allotment water claim — 2026/06/13",
+        "v9": false,
+        "v9_answer": "- File the allotment water claim — 2026/06/13 (Sat)",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-049": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "In the next fortnight, the items due are:\n\n- **Submit the conference abstract** — **2026/06/07**\n- **Car-wash loyalty card validity ends** — **2026/06/11**\n- **Renew the parking permit** — **2026/06/15**\n- **Collect the repaired lamp** — **2026/06/19**",
+        "v9": false,
+        "v9_answer": "Renew the parking permit — 2026/06/15 (Mon).",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      },
+      "tme-pro-050": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "- Renew the parking permit — 2026/06/15 (Mon)\n- Collect the repaired lamp — 2026/06/19 (Fri)",
+        "v9": false,
+        "v9_answer": "- Renew the parking permit — 2026/06/15\n\nNo other reminders in the conversations fall due in the next fortnight.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null
+      }
+    },
+    "probed_corpus_sha256": "39f205b722948949cfa38eea8ca2c88798b64311506520162cd675437831a2a4"
   }
 }
