@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-prospective-v5",
   "vertical": "prospective",
-  "revision": "v5+2ba46d05a0e6",
+  "revision": "v5+39f205b72294",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "2ba46d05a0e6a3144461e9d5c93e7741dd93b16d211d0e1d895417c403005326",
+  "corpus_sha256": "39f205b722948949cfa38eea8ca2c88798b64311506520162cd675437831a2a4",
   "generator": {
     "tool": "tools/gen_typedmemeval_prospective.py",
     "version": "1.0.0",
@@ -20,21 +20,21 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.7017,
-    "echo": 0.425,
-    "iterations": 267,
+    "mean_realised": 0.6333,
+    "echo": 0.55,
+    "iterations": 313,
     "search_trace": [],
     "per_question": {
       "tme-pro-001": 0.0,
-      "tme-pro-002": 1.0,
-      "tme-pro-003": 1.0,
+      "tme-pro-002": 0.0,
+      "tme-pro-003": 0.5,
       "tme-pro-004": 1.0,
       "tme-pro-005": 1.0,
       "tme-pro-006": 1.0,
       "tme-pro-007": 1.0,
       "tme-pro-008": 1.0,
       "tme-pro-009": 1.0,
-      "tme-pro-010": 1.0,
+      "tme-pro-010": 0.0,
       "tme-pro-011": 1.0,
       "tme-pro-012": 1.0,
       "tme-pro-013": 1.0,
@@ -51,44 +51,44 @@
       "tme-pro-024": 1.0,
       "tme-pro-025": 1.0,
       "tme-pro-026": 1.0,
-      "tme-pro-027": 1.0,
-      "tme-pro-028": 1.0,
+      "tme-pro-027": 0.0,
+      "tme-pro-028": 0.0,
       "tme-pro-029": 1.0,
       "tme-pro-030": 1.0,
       "tme-pro-031": 1.0,
       "tme-pro-032": 1.0,
-      "tme-pro-033": 0.5,
-      "tme-pro-034": 0.0,
-      "tme-pro-035": 0.0,
+      "tme-pro-033": 0.6667,
+      "tme-pro-034": 0.3333,
+      "tme-pro-035": 0.6667,
       "tme-pro-036": 0.0,
-      "tme-pro-037": 0.0,
+      "tme-pro-037": 0.5,
       "tme-pro-038": 1.0,
-      "tme-pro-039": 0.3333,
-      "tme-pro-040": 0.75,
-      "tme-pro-041": 1.0,
-      "tme-pro-042": 0.3333,
-      "tme-pro-043": 1.0,
+      "tme-pro-039": 0.6667,
+      "tme-pro-040": 0.6667,
+      "tme-pro-041": 0.6667,
+      "tme-pro-042": 0.6667,
+      "tme-pro-043": 0.0,
       "tme-pro-044": 0.0,
       "tme-pro-045": 0.75,
       "tme-pro-046": 0.25,
       "tme-pro-047": 1.0,
-      "tme-pro-048": 0.6667,
-      "tme-pro-049": 0.5,
-      "tme-pro-050": 0.0
+      "tme-pro-048": 0.5,
+      "tme-pro-049": 0.3333,
+      "tme-pro-050": 0.5
     },
     "echo_by_shape": {
       "due-later-reminder": 0.625,
-      "due-window": 0.0,
+      "due-window": 0.125,
       "expiring-validity": 0.75,
-      "not-yet-true": 0.0,
-      "seed-carry-over": 0.75
+      "not-yet-true": 0.625,
+      "seed-carry-over": 0.625
     },
     "per_shape_realised": {
       "due-later-reminder": 0.75,
-      "due-window": 0.4491,
+      "due-window": 0.5093,
       "expiring-validity": 0.6667,
-      "not-yet-true": 1.0,
-      "seed-carry-over": 0.9167
+      "not-yet-true": 0.6667,
+      "seed-carry-over": 0.7083
     }
   },
   "ceiling": {
@@ -104,19 +104,19 @@
   },
   "structure": {
     "g_distribution": {
-      "1": 30,
-      "2": 12,
-      "3": 5,
+      "1": 31,
+      "2": 8,
+      "3": 8,
       "4": 3
     },
     "h_min": 12,
-    "h_max": 18,
+    "h_max": 19,
     "gold_position_shuffled": true,
     "h_is_independent_variable": false,
     "no_absolute_dates": true,
     "empty_turns": {
-      "count": 175,
-      "of_turns": 4495,
+      "count": 193,
+      "of_turns": 4553,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     }
@@ -179,40 +179,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5542,
+        "session_length_chars": 0.5293,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5171,
+        "position_in_haystack": 0.5355,
         "digit_density": 0.5,
-        "uppercase_density": 0.5096,
-        "sentence_count": 0.5054,
-        "punctuation_density": 0.5254,
-        "em_dash_density": 0.5296,
-        "mean_turn_chars": 0.5542,
-        "type_token_ratio": 0.5701,
-        "first_user_length_chars": 0.5259,
-        "first_user_uppercase_density": 0.5088,
-        "first_user_sentence_count": 0.5601,
-        "first_assistant_length_chars": 0.5071,
-        "first_assistant_uppercase_density": 0.5546,
-        "first_assistant_sentence_count": 0.5959,
-        "user_slot1_length_chars": 0.5555,
-        "user_slot2_length_chars": 0.5267,
+        "uppercase_density": 0.5175,
+        "sentence_count": 0.5228,
+        "punctuation_density": 0.5216,
+        "em_dash_density": 0.5281,
+        "mean_turn_chars": 0.5293,
+        "type_token_ratio": 0.5102,
+        "first_user_length_chars": 0.5306,
+        "first_user_uppercase_density": 0.5326,
+        "first_user_sentence_count": 0.5118,
+        "first_assistant_length_chars": 0.5713,
+        "first_assistant_uppercase_density": 0.5012,
+        "first_assistant_sentence_count": 0.5391,
+        "user_slot1_length_chars": 0.5151,
+        "user_slot2_length_chars": 0.5196,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5563,
-        "assistant_slot2_length_chars": 0.5288,
-        "assistant_slot3_length_chars": 0.5025,
-        "user_length_chars": 0.6076,
-        "user_uppercase_density": 0.5375,
-        "user_sentence_count": 0.5463,
-        "user_punctuation_density": 0.5275,
-        "user_type_token_ratio": 0.6893,
-        "user_mean_turn_chars": 0.6076,
-        "assistant_length_chars": 0.5067,
-        "assistant_uppercase_density": 0.5125,
-        "assistant_sentence_count": 0.5388,
-        "assistant_punctuation_density": 0.5334,
-        "assistant_type_token_ratio": 0.5238,
-        "assistant_mean_turn_chars": 0.5067,
+        "assistant_slot1_length_chars": 0.5729,
+        "assistant_slot2_length_chars": 0.5306,
+        "assistant_slot3_length_chars": 0.5412,
+        "user_length_chars": 0.5424,
+        "user_uppercase_density": 0.5061,
+        "user_sentence_count": 0.5151,
+        "user_punctuation_density": 0.5905,
+        "user_type_token_ratio": 0.6691,
+        "user_mean_turn_chars": 0.5424,
+        "assistant_length_chars": 0.5143,
+        "assistant_uppercase_density": 0.5546,
+        "assistant_sentence_count": 0.5371,
+        "assistant_punctuation_density": 0.5782,
+        "assistant_type_token_ratio": 0.5363,
+        "assistant_mean_turn_chars": 0.5143,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -222,326 +222,326 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.633,
-        "boilerplate_ngram": 0.5988
+        "gold_marker_ngram": 0.6467,
+        "boilerplate_ngram": 0.7225
       },
-      "worst_refused_feature": "user_type_token_ratio",
-      "worst_refused_auc": 0.6893,
+      "worst_refused_feature": "boilerplate_ngram",
+      "worst_refused_auc": 0.7225,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "remind",
-      "gold_marker_ngram_auc": 0.633,
-      "worst_boilerplate_ngram": "s",
-      "boilerplate_ngram_auc": 0.5988,
+      "worst_gold_marker_ngram": "note",
+      "gold_marker_ngram_auc": 0.6467,
+      "worst_boilerplate_ngram": "ten",
+      "boilerplate_ngram_auc": 0.7225,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.12,
+          "chance": 0.0827,
+          "observed": 6,
+          "expected": 4.13,
+          "z": 0.98
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_in_haystack": {
-          "share": 0.06,
-          "chance": 0.0824,
-          "observed": 3,
-          "expected": 4.12,
-          "z": -0.59
+          "share": 0.12,
+          "chance": 0.0827,
+          "observed": 6,
+          "expected": 4.13,
+          "z": 0.98
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "uppercase_density": {
           "share": 0.08,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "expected": 4.13,
+          "z": -0.07
         },
         "sentence_count": {
           "share": 0.04,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 2,
-          "expected": 4.12,
+          "expected": 4.13,
           "z": -1.12
         },
         "punctuation_density": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.16,
+          "chance": 0.0827,
+          "observed": 8,
+          "expected": 4.13,
+          "z": 2.04
         },
         "em_dash_density": {
-          "share": 0.02,
-          "chance": 0.0824,
-          "observed": 1,
-          "expected": 4.12,
-          "z": -1.65
+          "share": 0.04,
+          "chance": 0.0827,
+          "observed": 2,
+          "expected": 4.13,
+          "z": -1.12
         },
         "mean_turn_chars": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.12,
+          "chance": 0.0827,
+          "observed": 6,
+          "expected": 4.13,
+          "z": 0.98
         },
         "type_token_ratio": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.06,
+          "chance": 0.0827,
+          "observed": 3,
+          "expected": 4.13,
+          "z": -0.6
         },
         "first_user_length_chars": {
           "share": 0.04,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 2,
-          "expected": 4.12,
+          "expected": 4.13,
           "z": -1.12
         },
         "first_user_uppercase_density": {
-          "share": 0.16,
-          "chance": 0.0824,
-          "observed": 8,
-          "expected": 4.12,
-          "z": 2.05
+          "share": 0.14,
+          "chance": 0.0827,
+          "observed": 7,
+          "expected": 4.13,
+          "z": 1.51
         },
         "first_user_sentence_count": {
-          "share": 0.02,
-          "chance": 0.0824,
-          "observed": 1,
-          "expected": 4.12,
-          "z": -1.65
+          "share": 0.0,
+          "chance": 0.0827,
+          "observed": 0,
+          "expected": 4.13,
+          "z": -2.18
         },
         "first_assistant_length_chars": {
           "share": 0.1,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
+          "expected": 4.13,
+          "z": 0.46
         },
         "first_assistant_uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0824,
-          "observed": 2,
-          "expected": 4.12,
-          "z": -1.12
+          "share": 0.12,
+          "chance": 0.0827,
+          "observed": 6,
+          "expected": 4.13,
+          "z": 0.98
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "user_slot1_length_chars": {
-          "share": 0.02,
-          "chance": 0.0824,
-          "observed": 1,
-          "expected": 4.12,
-          "z": -1.65
+          "share": 0.08,
+          "chance": 0.0827,
+          "observed": 4,
+          "expected": 4.13,
+          "z": -0.07
         },
         "user_slot2_length_chars": {
-          "share": 0.02,
-          "chance": 0.0824,
-          "observed": 1,
-          "expected": 4.12,
-          "z": -1.65
+          "share": 0.0,
+          "chance": 0.0827,
+          "observed": 0,
+          "expected": 4.13,
+          "z": -2.18
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "assistant_slot1_length_chars": {
           "share": 0.1,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
+          "expected": 4.13,
+          "z": 0.46
         },
         "assistant_slot2_length_chars": {
           "share": 0.08,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "expected": 4.13,
+          "z": -0.07
         },
         "assistant_slot3_length_chars": {
           "share": 0.02,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 1,
-          "expected": 4.12,
+          "expected": 4.13,
           "z": -1.65
         },
         "user_length_chars": {
-          "share": 0.1,
-          "chance": 0.0824,
-          "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
+          "share": 0.08,
+          "chance": 0.0827,
+          "observed": 4,
+          "expected": 4.13,
+          "z": -0.07
         },
         "user_uppercase_density": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.16,
+          "chance": 0.0827,
+          "observed": 8,
+          "expected": 4.13,
+          "z": 2.04
         },
         "user_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0824,
-          "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "share": 0.02,
+          "chance": 0.0827,
+          "observed": 1,
+          "expected": 4.13,
+          "z": -1.65
         },
         "user_punctuation_density": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
-        },
-        "user_type_token_ratio": {
-          "share": 0.1,
-          "chance": 0.0824,
-          "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
-        },
-        "user_mean_turn_chars": {
-          "share": 0.1,
-          "chance": 0.0824,
-          "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
-        },
-        "assistant_length_chars": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
-        },
-        "assistant_uppercase_density": {
-          "share": 0.12,
-          "chance": 0.0824,
-          "observed": 6,
-          "expected": 4.12,
-          "z": 0.99
-        },
-        "assistant_sentence_count": {
-          "share": 0.06,
-          "chance": 0.0824,
-          "observed": 3,
-          "expected": 4.12,
-          "z": -0.59
-        },
-        "assistant_punctuation_density": {
-          "share": 0.1,
-          "chance": 0.0824,
-          "observed": 5,
-          "expected": 4.12,
-          "z": 0.47
-        },
-        "assistant_type_token_ratio": {
           "share": 0.04,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 2,
-          "expected": 4.12,
+          "expected": 4.13,
           "z": -1.12
         },
-        "assistant_mean_turn_chars": {
+        "user_type_token_ratio": {
           "share": 0.08,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "expected": 4.13,
+          "z": -0.07
+        },
+        "user_mean_turn_chars": {
+          "share": 0.08,
+          "chance": 0.0827,
+          "observed": 4,
+          "expected": 4.13,
+          "z": -0.07
+        },
+        "assistant_length_chars": {
+          "share": 0.16,
+          "chance": 0.0827,
+          "observed": 8,
+          "expected": 4.13,
+          "z": 2.04
+        },
+        "assistant_uppercase_density": {
+          "share": 0.14,
+          "chance": 0.0827,
+          "observed": 7,
+          "expected": 4.13,
+          "z": 1.51
+        },
+        "assistant_sentence_count": {
+          "share": 0.04,
+          "chance": 0.0827,
+          "observed": 2,
+          "expected": 4.13,
+          "z": -1.12
+        },
+        "assistant_punctuation_density": {
+          "share": 0.16,
+          "chance": 0.0827,
+          "observed": 8,
+          "expected": 4.13,
+          "z": 2.04
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.02,
+          "chance": 0.0827,
+          "observed": 1,
+          "expected": 4.13,
+          "z": -1.65
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.16,
+          "chance": 0.0827,
+          "observed": 8,
+          "expected": 4.13,
+          "z": 2.04
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0824,
+          "chance": 0.0827,
           "observed": 0,
-          "expected": 4.12,
-          "z": -2.17
+          "expected": 4.13,
+          "z": -2.18
         },
         "gold_marker_ngram": {
-          "share": 0.08,
-          "chance": 0.0824,
-          "observed": 4,
-          "expected": 4.12,
-          "z": -0.06
+          "share": 0.14,
+          "chance": 0.0827,
+          "observed": 7,
+          "expected": 4.13,
+          "z": 1.51
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "2ba46d05a0e6a3144461e9d5c93e7741dd93b16d211d0e1d895417c403005326"
+      "probed_corpus_sha256": "39f205b722948949cfa38eea8ca2c88798b64311506520162cd675437831a2a4"
     }
   }
 }

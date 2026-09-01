@@ -270,6 +270,62 @@ WINDOW_FRAMES = (
 )
 
 
+#: Every WHENS phrase and the interval a reader takes from it. WEEK_WORDS cannot serve: it has no
+#: entry for "two" or "a couple of", and a phrase the map misses is a phrase the guard silently
+#: skips.
+_WHENS_WEEKS = {
+    "in two weeks": 2, "in three weeks or so": 3, "in four weeks": 4, "in five weeks": 5,
+    "in six weeks": 6, "in seven weeks": 7, "in about ten weeks": 10, "in a couple of weeks": 2,
+}
+
+#: Intervals the guard may substitute -- long, so a rewritten filler reminder lands clear of any
+#: window, and still drawn from WHENS so vocabulary parity holds.
+_FAR_WHENS = ("in about ten weeks", "in seven weeks", "in six weeks")
+
+
+def _filler_due_dates(session) -> list[tuple[str, int]]:
+    """Which WHENS phrases a filler session uses, longest first so overlaps resolve correctly."""
+    text = session.turns[0].content
+    return [(phrase, weeks) for phrase, weeks in
+            sorted(_WHENS_WEEKS.items(), key=lambda kv: -len(kv[0])) if phrase in text]
+
+
+def _clear_filler_from_windows(sessions, windows) -> None:
+    """Push every FILLER reminder's implied due date outside every arm's window.
+
+    THE ANSWER KEY WAS WRONG, and it was measured rather than suspected. due-window asks "what did I
+    ask you to remind me about that falls due in <span>?", and class parity (ADR-026 §19) requires
+    filler to carry reminder requests in gold's own construction -- "Remind me to top up the parking
+    app in four weeks" -- or the corpus is separable on the phrase itself.
+
+    For every other shape that is harmless: they name a specific entity, so filler about a different
+    task cannot be a candidate answer. Here the membership criterion IS the class. A filler reminder
+    falling due inside the window satisfies the question exactly and is not in gold, so the
+    reference model is marked WRONG FOR BEING RIGHT: V8 was 4/18, and the failures are the model
+    correctly naming reminders the key omits.
+
+    Parity and membership are both preserved by changing the DUE DATE rather than the construction:
+    filler still says "Remind me to ...", it simply falls outside every window the pair asks about.
+    """
+    for session in sessions:
+        if session.tag != "filler":
+            continue
+        for phrase, weeks in _filler_due_dates(session):
+            due = session.timestamp + timedelta(weeks=weeks)
+            if not any(asked < due <= asked + timedelta(days=span) for asked, span in windows):
+                continue
+            replacement = next(
+                (candidate for candidate in _FAR_WHENS
+                 if not any(asked < session.timestamp + timedelta(weeks=_WHENS_WEEKS[candidate])
+                            <= asked + timedelta(days=span) for asked, span in windows)), None)
+            if replacement is None:
+                raise SystemExit(
+                    "prospective: no filler interval falls outside every due-window arm; the "
+                    "windows have grown wide enough that class-parity filler cannot avoid them, "
+                    "and the shape's answer set is no longer well defined.")
+            session.turns[0].content = session.turns[0].content.replace(phrase, replacement)
+
+
 def _window_pair(
     qid_before: str,
     qid_after: str,
@@ -352,6 +408,11 @@ def _window_pair(
     if before_at is None:
         return []
 
+    # Filler carries reminder requests in gold's own construction for class parity, and this shape's
+    # answer is the SET of things asked about -- so any filler reminder inside a window is a correct
+    # answer the key omits. Pushed clear before the arms are built, so both arms see the same fix.
+    _clear_filler_from_windows(sessions, [(before_at, span_days), (after_at, span_days)])
+
     def arm(asked, qid, label):
         window = [(t, d) for t, d in ordered if asked < d <= asked + timedelta(days=span_days)]
         copy = _copy(sessions)
@@ -379,6 +440,30 @@ def _window_pair(
     return [arm(before_at, qid_before, "before"), arm(after_at, qid_after, "after")]
 
 
+#: Date-free mentions of the asked entity, for the shapes that NAME the thing.
+#:
+#: not-yet-true is SATURATED at coverage 1.000 and no echo can move it: its response curve holds
+#: 1.000 through echo 0.50 and drops to 0.333 at 0.75, so the [0.50, 0.90] band has no rung at all.
+#: That is a corpus problem wearing a calibration costume -- exactly ONE session in each haystack
+#: mentions the asked entity, so a lexical retriever matching that single term scores what a perfect
+#: selector scores, and the shape cannot rank two systems.
+#:
+#: The repair is the one that fixed bitemporal/belief-at-instant: make the entity term stop being
+#: sufficient. EVERY FRAME IS DATE-FREE, deliberately -- a distractor mentioning the entity AND a
+#: date would be a second candidate answer to "when am I due to ...", which is the defect fixed in
+#: due-window reintroduced one shape over. These compete on the retrieval term and on nothing else.
+ENTITY_MENTIONS = [
+    "{entity} came up with Marta again, though nothing was decided.",
+    "I still keep meaning to look up the address for {entity}.",
+    "Someone at the allotment turned out to know {entity} rather well.",
+    "There was a piece about {entity} in the local paper, of all places.",
+    "I mentioned {entity} to Dad and he had opinions, naturally.",
+]
+
+#: Same-entity distractors per question. Three puts the entity term in four sessions against
+#: K_REF=5, so a retriever matching on it alone returns mostly non-answers.
+_ENTITY_DISTRACTORS = 3
+
 def _pair(
     qid_before: str,
     qid_after: str,
@@ -394,6 +479,7 @@ def _pair(
     rng: random.Random,
     echo: float,
     filler_count: int,
+    entity: str | None = None,
 ) -> list[tmc.Question]:
     """Builds one before/after pair over a single shared haystack.
 
@@ -434,7 +520,18 @@ def _pair(
     # same release by giving gold the reaction filler gets, and its tell went away.
     gold_reaction = gold_assistant or rng.choice(FILLER)[1]
     gold = tmc.make_session(anchor, ("", gold_reaction), gold_turn=0, tag="gold")
-    filler = [_filler_session(rng, echoed, anchor) for _ in range(filler_count)]
+    # Entity distractors come OUT of the filler budget, so H stays inside its declared range --
+    # the accounting bitemporal got wrong twice before it was written down.
+    plain = filler_count - (_ENTITY_DISTRACTORS if entity else 0)
+    filler = [_filler_session(rng, echoed, anchor) for _ in range(plain)]
+    if entity:
+        for offset in range(_ENTITY_DISTRACTORS):
+            session = _filler_session(rng, echoed, anchor)
+            mention = ENTITY_MENTIONS[(len(filler) + offset) % len(ENTITY_MENTIONS)]
+            sentences = session.turns[0].content.split(". ")
+            sentences[0] = mention.format(entity=entity).rstrip(".")
+            session.turns[0].content = ". ".join(sentences)
+            filler.insert(((offset + 1) * len(filler)) // (_ENTITY_DISTRACTORS + 1), session)
     sessions = list(filler)
     gold_index = rng.randint(0, len(sessions))
     sessions.insert(gold_index, gold)
@@ -512,7 +609,7 @@ def _copy(sessions: list[tmc.Session]) -> list[tmc.Session]:
 
 def _seed_filler_session(raw, exclude_index: int,
                          rng: random.Random,  # DevSkim: ignore DS148264 - deterministic corpus generation
-                         stamp):
+                         stamp, echoed):
     """A NON-GOLD session lifted from a different carried entry, re-stamped.
 
     Parity of AUTHORSHIP, which is the one kind of parity a bank cannot provide. Gold here is real
@@ -534,8 +631,24 @@ def _seed_filler_session(raw, exclude_index: int,
     if not candidates:
         return None
     turns = candidates[rng.randrange(len(candidates))]
-    return tmc.Session(
-        [tmc.Turn(t["role"], t["content"], False) for t in turns], stamp, tag="tg-filler")
+    built = [tmc.Turn(t["role"], t["content"], False) for t in turns]
+
+    # THE CALIBRATION CLAUSE GOES IN HERE TOO, and leaving it out cost the shape its difficulty dial.
+    #
+    # `_filler_session` weaves the echo into generated filler; borrowing real sessions instead
+    # replaced the very text the knob acts on, so coverage went FLAT at 0.9167 across the entire
+    # echo range -- 0.000 to 1.000, no movement. A shape with no working knob cannot be calibrated
+    # into band at all, which is a worse defect than the authorship gap this borrowing fixed.
+    #
+    # It also matters for parity in its own right: filler split into two kinds -- some carrying the
+    # clause and some not -- is a distractor population with two modes, which is the bimodal-pool
+    # defect this generator's own filler comment already records paying for once.
+    for turn in built:
+        if turn.role == "assistant":
+            turn.content = tmc.weave_echo(turn.content, echoed)
+            break
+
+    return tmc.Session(built, stamp, tag="tg-filler")
 
 
 def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[tmc.Question]:
@@ -590,7 +703,7 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             # at padding this vertical each moved the tell instead of removing it. Non-gold sessions
             # from OTHER carried entries are the same author, the same register and the same
             # vocabulary distribution as the gold they sit beside.
-            borrowed = _seed_filler_session(raw, offset, rng, stamp)
+            borrowed = _seed_filler_session(raw, offset, rng, stamp, echoed)
             sessions.append(borrowed if borrowed is not None
                             else _filler_session(rng, echoed, stamp))
         sessions.sort(key=lambda s: s.timestamp)
@@ -765,6 +878,7 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
             f"passed; nothing since then records whether it went ahead.",
             base + timedelta(days=13 * i + 2), rng, knob(SHAPE_NOT_YET),
             filler_count=rng.randint(12, 17),
+            entity=noun,
         )
         index += 2
         pair_no += 1
@@ -834,6 +948,7 @@ def check_pairs(questions: list[tmc.Question]) -> list[str]:
         failures.append(f"{len(pairs)} pairs, ADR §5.1 declares {expected}")
 
     failures += _check_arithmetic(questions)
+    failures += _check_window_membership(questions)
     return failures
 
 
@@ -841,6 +956,36 @@ WEEK_WORDS = {
     "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     "eleven": 11, "twelve": 12, "thirteen": 13, "fifteen": 15, "sixteen": 16, "eighteen": 18,
 }
+
+
+def _check_window_membership(questions: list[tmc.Question]) -> list[str]:
+    """No NON-GOLD session may satisfy a due-window question's own membership criterion.
+
+    Checked rather than trusted, because the guard rewrites text and a rewrite that silently missed
+    a phrasing would restore the defect without failing anything. Re-derives membership from the
+    SHIPPED session content, the way _check_arithmetic re-derives dates.
+    """
+    failures: list[str] = []
+    for q in questions:
+        if q.extension.get("shape") != SHAPE_WINDOW:
+            continue
+        span = q.extension["window_days"]
+        asked = q.question_date
+        for session in q.sessions:
+            if session.is_gold:
+                continue
+            text = session.turns[0].content
+            if not any(cue in text.lower() for cue in ("remind me to", "can you remind me")):
+                continue
+            for phrase, weeks in _filler_due_dates(session):
+                due = session.timestamp + timedelta(weeks=weeks)
+                if asked < due <= asked + timedelta(days=span):
+                    failures.append(
+                        f"{q.question_id}: a NON-GOLD session states a reminder request falling due "
+                        f"{due:%Y-%m-%d}, inside this arm's window ({asked:%Y-%m-%d} +{span}d) -- it "
+                        f"satisfies the question and is not in the answer, so the key is wrong: "
+                        f"{text[:70]!r}")
+    return failures
 
 
 def _check_arithmetic(questions: list[tmc.Question]) -> list[str]:
