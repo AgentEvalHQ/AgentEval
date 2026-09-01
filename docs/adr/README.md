@@ -49,7 +49,7 @@ Each ADR follows this structure:
 | [026](026-typedmemeval-benchmark-family.md) | TypedMemEval — A Mechanism-Isolating Memory Benchmark Family | Accepted (implemented v0.22.0-beta) | 2026-08-15 |
 | [027](027-typedmemeval-semantic-temporal-bitemporal.md) | TypedMemEval — Semantic, Temporal and Bitemporal Verticals (design) | Proposed (design only; generation gated) | 2026-08-18 |
 | [028](028-typedmemeval-acceptance-on-discrimination.md) | TypedMemEval — accept a shape on measured discrimination, not a coverage proxy | Proposed | 2026-08-31 |
-| [029](029-procedural-memory-declarative-and-enacted.md) | Procedural memory — split the excluded category in two, and reopen only half of it | Proposed (decision requested) | 2026-08-31 |
+| [029](029-procedural-memory-declarative-and-enacted.md) | Procedural memory — a finding, and a request to reopen a bilateral agreement | Proposed (not ratifiable by this project alone) | 2026-09-01 |
 
 ---
 
