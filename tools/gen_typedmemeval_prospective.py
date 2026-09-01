@@ -305,7 +305,10 @@ def _window_pair(
     count = 5 + (index % 3)
     tasks = [WINDOW_TASKS[(index * 3 + k) % len(WINDOW_TASKS)] for k in range(count)]
 
-    reminders = [tmc.make_session(anchor, ("", ""), gold_turn=0, tag="reminder") for _ in tasks]
+    # Same parity fix as _pair: the reminder's assistant turn is empty and gets only an
+    # acknowledgement, so it starts far below filler's and is padded past it.
+    reminders = [tmc.make_session(anchor, ("", rng.choice(FILLER)[1]), gold_turn=0, tag="reminder")
+                 for _ in tasks]
     filler = [_filler_session(rng, echoed, anchor) for _ in range(rng.randint(10, 14))]
 
     sessions = list(filler)
@@ -416,7 +419,21 @@ def _pair(
     """
     echoed = tmc.echo_terms(question_text, echo, rng)
 
-    gold = tmc.make_session(anchor, ("", gold_assistant), gold_turn=0, tag="gold")
+    # FIRST-ASSISTANT PARITY, and it is a LENGTH fix rather than a vocabulary one.
+    #
+    # Filler's assistant turn carries a reaction from FILLER; gold's is empty for most shapes here,
+    # because the evidence sits in the USER turn and equalise_reply later prepends only a short
+    # acknowledgement. Measured at the point the padder receives them, gold's first assistant turn
+    # is 26 characters against filler's 71 -- a 45-character gap gold must close with whole-sentence
+    # padding, so it takes the most steps and the last one overshoots. That is why gold finishes
+    # LONGEST in 8 of 50 questions against 4.1 expected by chance, and why the tell sits in this one
+    # slot and in no other.
+    #
+    # Correlates exactly across the family: episodic -36 shows the same tell at 0.120, while
+    # semantic (-4), bitemporal (-2) and temporal (+1) show none. Bitemporal's gap was closed this
+    # same release by giving gold the reaction filler gets, and its tell went away.
+    gold_reaction = gold_assistant or rng.choice(FILLER)[1]
+    gold = tmc.make_session(anchor, ("", gold_reaction), gold_turn=0, tag="gold")
     filler = [_filler_session(rng, echoed, anchor) for _ in range(filler_count)]
     sessions = list(filler)
     gold_index = rng.randint(0, len(sessions))
