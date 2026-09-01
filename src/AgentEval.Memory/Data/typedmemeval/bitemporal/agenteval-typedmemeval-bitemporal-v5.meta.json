@@ -1,7 +1,8 @@
 {
   "corpus_id": "agenteval-typedmemeval-bitemporal-v5",
   "vertical": "bitemporal",
-  "revision": "v5",
+  "revision": "v5+abf2f3f43219",
+  "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
     "shipped_in": "0.24.0-beta",
@@ -424,7 +425,7 @@
       "role_sequence_auc": 0.5,
       "worst_gold_marker_ngram": "at",
       "gold_marker_ngram_auc": 0.6384,
-      "worst_boilerplate_ngram": "either way",
+      "worst_boilerplate_ngram": "either",
       "boilerplate_ngram_auc": 0.594,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
@@ -738,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-31T17:51:59Z",
+    "run_at": "2026-09-01T13:40:20Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -783,62 +784,60 @@
       "not_applicable_reason": "V6 is not defined for bitemporal"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 7,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 305,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 11770,
+        "calls": 3050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 4419,
+        "judge_calls": 831,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 3181,
-        "empty": 9,
-        "rate": 0.0028,
-        "judge_calls": 1062,
+        "calls": 807,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 226,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2329,
+        "calls": 828,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 872,
+        "judge_calls": 315,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 305,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 305,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -876,6 +875,25 @@
         "v8_passed": 33,
         "v9_applicable": 36,
         "v9_passed": 25,
+        "ci95": {
+          "v1": [
+            0.9036,
+            1.0
+          ],
+          "v3": [
+            0.9036,
+            1.0
+          ],
+          "v8": [
+            0.7817,
+            0.9713
+          ],
+          "v9": [
+            0.5314,
+            0.82
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 1,
         "headroom_perfect_selector": 0.3056,
         "discriminates": true,
@@ -887,9 +905,11 @@
         "pair_v9_both_arms": "8/18",
         "pair_headroom": 0.5556,
         "pair_floor_scaled": 0.2542,
+        "pair_separation_sd": 4.74,
+        "pair_separation_floor_sd": 2.0,
         "pair_discriminates": true,
         "pair_v8_both_arms": "15/18",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "correction-depth": {
         "questions": 24,
@@ -901,6 +921,25 @@
         "v8_passed": 24,
         "v9_applicable": 24,
         "v9_passed": 16,
+        "ci95": {
+          "v1": [
+            0.862,
+            1.0
+          ],
+          "v3": [
+            0.862,
+            1.0
+          ],
+          "v8": [
+            0.862,
+            1.0
+          ],
+          "v9": [
+            0.4671,
+            0.8203
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 1,
         "headroom_perfect_selector": 0.3333,
         "discriminates": true,
@@ -912,9 +951,11 @@
         "pair_v9_both_arms": "5/12",
         "pair_headroom": 0.5833,
         "pair_floor_scaled": 0.25,
+        "pair_separation_sd": 4.09,
+        "pair_separation_floor_sd": 2.0,
         "pair_discriminates": true,
         "pair_v8_both_arms": "12/12",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       }
     },
     "per_question": {

@@ -1166,6 +1166,19 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v8_passed": sum(1 for r in group if r.get("v8") is True),
                 "v9_applicable": sum(1 for r in group if r.get("v9") is not None),
                 "v9_passed": sum(1 for r in group if r.get("v9") is True),
+                # Bands beside every point estimate, so a rate over six questions cannot be read
+                # as though it were a rate over sixty. See wilson_interval.
+                "ci95": {
+                    arm: wilson_interval(
+                        sum(1 for r in group if r.get(arm) is True),
+                        sum(1 for r in group if r.get(arm) is not None))
+                    for arm in ("v1", "v3", "v8", "v9")
+                    if any(r.get(arm) is not None for r in group)
+                },
+                "ci95_reading": (
+                    "95% Wilson intervals on the pass rates above, from the recorded counts. Every "
+                    "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
+                    "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
                 **_discrimination(group),
                 **_pair_discrimination(group, arm_of),
@@ -1239,6 +1252,32 @@ def _discrimination(group: list[dict]) -> dict:
             "than gold cannot beat having everything. Where these diverge the shape is "
             "reasoning-limited and retrieval work will not move it.")
     return row
+
+
+def wilson_interval(hits: int, total: int, z: float = 1.96) -> list[float] | None:
+    """A 95% Wilson score interval for a pass rate. Arithmetic on recorded counts; no model calls.
+
+    EVERY ARM FIGURE IN THIS FAMILY IS n=1 OVER 6 TO 18 QUESTIONS. One question moves a shape by 5
+    to 17 points, so a point estimate reads with a precision the sample cannot support -- and the
+    "diagnosis-only" note added for shapes under 15 questions covers the smallest cells and not the
+    middle ones. The consuming project asked for bands as a standing column, which is the oldest
+    rule in the shared ledger pointed back at our own numbers.
+
+    Wilson rather than the normal approximation, for the same reason the paired-arm separation is
+    smoothed: the normal interval degenerates at rates 0 and 1, which are common here -- V1 is
+    routinely n/n -- and would report a zero-width band on exactly the cells whose sample is
+    smallest. Wilson stays finite and asymmetric at the boundaries, which is the honest shape.
+
+    Returns None when there is nothing to measure, rather than a band around no data.
+    """
+    if not total:
+        return None
+    proportion = hits / total
+    denominator = 1.0 + (z * z) / total
+    centre = (proportion + (z * z) / (2 * total)) / denominator
+    margin = (z / denominator) * math.sqrt(
+        (proportion * (1.0 - proportion) / total) + (z * z) / (4 * total * total))
+    return [round(max(0.0, centre - margin), 4), round(min(1.0, centre + margin), 4)]
 
 
 def _pair_discrimination(group: list[dict], arms: dict) -> dict:
@@ -1474,6 +1513,23 @@ def self_test() -> None:
     check("silence is named on every arm it blocked",
           sorted(set(rec.get("silent_arms") or [])), ["v1", "v2", "v3", "v6", "v8", "v9"])
 
+    # ---- Wilson intervals ----------------------------------------------------------------
+    #
+    # The boundary cases are the ones that matter: this family's V1 is routinely n/n, and a normal
+    # approximation reports a ZERO-WIDTH band there -- infinite confidence from the smallest
+    # samples in the corpus, which is the opposite of the truth.
+    check("a perfect 6/6 does NOT read as certainty",
+          wilson_interval(6, 6), [0.6097, 1.0])
+    check("a zero 0/12 does not read as certainty either",
+          wilson_interval(0, 12), [0.0, 0.2425])
+    check("nothing measured yields no band, rather than a band around no data",
+          wilson_interval(0, 0), None)
+    # The interval must NARROW with n: same rate, ten times the sample.
+    narrow = wilson_interval(50, 100)
+    wide = wilson_interval(5, 10)
+    check("more evidence gives a tighter band",
+          (narrow[1] - narrow[0]) < (wide[1] - wide[0]), True)
+
     # ---- the paired-arm instrument -------------------------------------------------------
     #
     # A conjunction of two measurements is HARDER than either, so pair headroom is wider than
@@ -1564,7 +1620,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "14 paired-arm cases)")
+          "14 paired-arm cases, 4 interval cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

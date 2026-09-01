@@ -2263,7 +2263,24 @@ def finalise(
     metadata = {
         "corpus_id": corpus_id,
         "vertical": vertical,
-        "revision": CORPUS_REVISION,
+        # THE REVISION MOVES WITH THE BYTES, and that is the point of folding the hash in.
+        #
+        # v0.32.0-beta redrew five corpora while `corpus_id`, `revision` and all 470 question_ids
+        # stayed byte-identical -- so `corpus_sha256` was the ONLY field distinguishing old from
+        # new. In bitemporal, 27 of 60 items kept the exact same question text with a DIFFERENT gold
+        # answer, which means a consumer keying a cache or a baseline on (corpus_id, question_id)
+        # mis-grades SILENTLY instead of failing. The consuming project reported it and fixed their
+        # side by keying on the sha; this is the benchmark-side fix, which protects every consumer
+        # that comes after them rather than the one that happened to notice.
+        #
+        # `corpus_id` stays stable because it names the resource that ships. Identity is
+        # (corpus_id, revision), and revision now carries the content -- so a corpus that changed
+        # cannot present the same identity as the one it replaced.
+        #
+        # Metadata that does not move when content moves is a claim the artifact makes and does not
+        # keep. That rule already governs the probe records; it governs the label too.
+        "revision": f"{CORPUS_REVISION}+{corpus_sha[:12]}",
+        "design_revision": CORPUS_REVISION,
         # Carried by the generator, not patched in afterwards. It was patched in once and lost on
         # the next regeneration, which is exactly how a supersession notice stops being told.
         "supersedes": SUPERSEDES,

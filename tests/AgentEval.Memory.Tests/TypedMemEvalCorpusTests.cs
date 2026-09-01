@@ -1182,6 +1182,37 @@ public sealed class TypedMemEvalCorpusTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void Revision_MovesWithTheBytes(TypedMemEvalVertical vertical)
+    {
+        // A CORPUS THAT CHANGED MUST NOT PRESENT THE SAME IDENTITY AS THE ONE IT REPLACED.
+        //
+        // v0.32.0-beta redrew five corpora while corpus_id, revision and all 470 question_ids
+        // stayed byte-identical, leaving corpus_sha256 as the only distinguishing field. In
+        // Bitemporal, 27 of 60 items kept the exact same question TEXT with a different gold
+        // ANSWER — so a consumer keying a cache or a regression baseline on (corpus_id,
+        // question_id) mis-grades silently instead of failing loudly. The consuming project hit
+        // this, reported it, and fixed their own side by keying on the sha; this is the
+        // benchmark-side fix, which protects the consumers who have not hit it yet.
+        //
+        // Checked rather than trusted, because the failure mode is a label that QUIETLY stops
+        // tracking its content — which is exactly what happened, and which no other gate would
+        // notice.
+        var metadata = Metadata(vertical);
+        var revision = metadata.GetProperty("revision").GetString();
+        var sha = metadata.GetProperty("corpus_sha256").GetString();
+
+        Assert.NotNull(revision);
+        Assert.NotNull(sha);
+        Assert.EndsWith(sha![..12], revision!, StringComparison.Ordinal);
+        Assert.StartsWith(
+            TypedMemEvalVerticalDescriptor.CorpusRevision, revision, StringComparison.Ordinal);
+        Assert.Equal(
+            TypedMemEvalVerticalDescriptor.CorpusRevision,
+            metadata.GetProperty("design_revision").GetString());
+    }
+
     [Fact]
     public void EveryRuntimeStringNamesTheShippedRevision()
     {

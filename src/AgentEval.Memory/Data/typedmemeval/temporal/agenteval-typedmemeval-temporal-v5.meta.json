@@ -1,7 +1,8 @@
 {
   "corpus_id": "agenteval-typedmemeval-temporal-v5",
   "vertical": "temporal",
-  "revision": "v5",
+  "revision": "v5+9b83da0cd8ea",
+  "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
     "shipped_in": "0.24.0-beta",
@@ -532,7 +533,7 @@
       "role_sequence_auc": 0.5,
       "worst_gold_marker_ngram": "the janduisk",
       "gold_marker_ngram_auc": 0.6146,
-      "worst_boilerplate_ngram": "prazzarn resurfacing",
+      "worst_boilerplate_ngram": "the prazzarn resurfacing",
       "boilerplate_ngram_auc": 0.5997,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
@@ -846,7 +847,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-31T17:09:20Z",
+    "run_at": "2026-09-01T13:40:20Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -915,62 +916,60 @@
       "not_applicable_reason": "V6 is not defined for temporal"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 6,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 11770,
+        "calls": 3550,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 4419,
+        "judge_calls": 1181,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 3181,
-        "empty": 9,
-        "rate": 0.0028,
-        "judge_calls": 1062,
+        "calls": 897,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 271,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2329,
+        "calls": 828,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 872,
+        "judge_calls": 315,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 355,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -1004,6 +1003,25 @@
         "v8_passed": 15,
         "v9_applicable": 15,
         "v9_passed": 6,
+        "ci95": {
+          "v1": [
+            0.7961,
+            1.0
+          ],
+          "v3": [
+            0.7961,
+            1.0
+          ],
+          "v8": [
+            0.7961,
+            1.0
+          ],
+          "v9": [
+            0.1982,
+            0.6425
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 2,
         "headroom_perfect_selector": 0.6,
         "discriminates": true,
@@ -1021,6 +1039,21 @@
         "v8_passed": 20,
         "v9_applicable": 20,
         "v9_passed": 5,
+        "ci95": {
+          "v1": [
+            0.8389,
+            1.0
+          ],
+          "v8": [
+            0.8389,
+            1.0
+          ],
+          "v9": [
+            0.1119,
+            0.4687
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
         "headroom_perfect_selector": 0.75,
         "discriminates": true,
@@ -1038,6 +1071,25 @@
         "v8_passed": 15,
         "v9_applicable": 15,
         "v9_passed": 8,
+        "ci95": {
+          "v1": [
+            0.7961,
+            1.0
+          ],
+          "v3": [
+            0.7961,
+            1.0
+          ],
+          "v8": [
+            0.7961,
+            1.0
+          ],
+          "v9": [
+            0.3012,
+            0.7519
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
         "headroom_perfect_selector": 0.4667,
         "discriminates": true,
