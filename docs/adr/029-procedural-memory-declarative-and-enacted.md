@@ -1,9 +1,11 @@
-# ADR-029: Procedural memory — a finding, and a request to reopen a bilateral agreement
+# ADR-029: Build the conditional, not procedural memory
 
-- **Status:** **Proposed — and NOT ratifiable by this project alone.** An earlier draft of this ADR
-  proposed narrowing ADR-027's exclusion and was put to an adversarial review that refuted three of
-  its four decisions. §8 records what was refuted, because the refutations are more useful than the
-  proposal was.
+- **Status:** **Accepted**, scoped to ONE shape — `conjunction/conditional-branch`. Procedural memory
+  as a memory type stays out and ADR-026 §8 is untouched.
+- **How it got here, which is the useful part:** an earlier draft proposed narrowing ADR-027's
+  exclusion and was put to an adversarial review that refuted three of its four decisions (§8). The
+  maintainer then set aside the one political objection, leaving the two technical ones — and
+  re-examining those produced a smaller, better design that dissolves all of them (§7b).
 - **Date:** 2026-08-31, rewritten 2026-09-01 after review.
 - **Relates to:** [ADR-026](026-typedmemeval-benchmark-family.md) §8, which is where the exclusion
   actually lives; [ADR-027](027-typedmemeval-semantic-temporal-bitemporal.md) §1;
@@ -124,6 +126,77 @@ resolved in writing.
 Whether the agreement recorded in ADR-026 §8 should be reopened, given that the mechanism it was
 struck on (§2) does not hold. Nothing else in this ADR needs their answer; nothing in this ADR
 proceeds without it.
+
+## 7b. RESOLUTION — build the CONDITIONAL, not "procedural memory"
+
+**Added 2026-09-01 after the maintainer set aside the ownership objection** ("we can decide this
+alone; the other party is simply not ready to use it, but if it works, it will"). That removes §1 as
+a blocker. It does not remove §4 or §8's boundary refutation, which are technical and decide whether
+the thing would WORK — so they were re-examined rather than waved through, and one of them turns out
+to point at a much better design.
+
+### The gap, verified rather than asserted
+
+Of the five properties §3 claimed were distinct, four have existing homes. **One does not, and it is
+now measured:** across all 470 shipped questions, **not one requires the model to resolve a
+conditional.** Five questions contain the word "if" or "unless", and in every case the conditional is
+quoted PAYLOAD, never the thing being asked:
+
+> *"…it sticks unless you lift before you push. **Was that me or you?**"* — attribution
+> *"…the warranty lapses if a service is missed?"* — context recall
+
+Nothing in the family tests **"if X, then what?"**
+
+### Why this is the whole opportunity, and procedural memory is not
+
+Scoping to the conditional dissolves every objection at once, which is the sign it is the right
+shape rather than a smaller version of the wrong one:
+
+| objection | why it no longer applies |
+|---|---|
+| §1 ownership (ADR-026 §8) | A conditional-resolution shape does not claim to BE procedural memory, so the agreement is never touched — regardless of whose call it is |
+| §8 naming | No invented vocabulary, no over-claim; it is a shape, not a memory type |
+| §4 contradiction | Never arises. The distinctness claim is not about causally-required order at all |
+| §8 boundary refuted by construction | The new rule is not an ordering rule, so it cannot collapse into Temporal's membership test |
+
+**And §4's contradiction turns out to have had a resolution neither the draft nor the review named,
+worth recording even though it is no longer needed: INVENTED CAUSALITY.** "The Vreskade check must
+run before the Quorlory sync, because Quorlory consumes Vreskade's output" is causally required
+inside the fiction and unguessable from outside it, because no model holds a prior about Vreskade.
+ADR-026 §5.2 bans orderings a model can INFER, not causality as such. That would have rescued the
+ordering argument; it is simply no longer the argument being made.
+
+### The decision
+
+**One shape, `conditional-branch`, inside Conjunction.** Not a tenth vertical.
+
+Conjunction is already defined as questions no single memory type can answer, and resolving a branch
+is *find the procedure -> find the condition's state -> select the branch* — structurally the same
+join as `alias-then-count` and `order-then-value`. ADR-027 §11.1's standard ("a vertical whose shapes
+each have a plausible existing home is a weak vertical") is therefore satisfied by NOT making it a
+vertical.
+
+**The boundary rule is mechanically checkable and cannot collapse into an existing vertical:**
+
+> The answer must CHANGE depending on a condition stated in the haystack. A question whose answer is
+> the same under both branches is not a conditional question and is refused at generation.
+
+That is enforceable the way `check_temporal` refuses a digit, and no existing vertical can express it
+— which is exactly why the gap exists.
+
+### The one real cost
+
+Conjunction ships 50 questions across three shapes (15/15/20). A fourth at parity puts every shape
+near 12, below the ~15 line at which this family's own guidance says a shape supports diagnosis
+rather than a claim. **So Conjunction grows to ~65** — one declared size moves, and the consuming
+project is told before it does.
+
+### What is NOT decided
+
+Procedural memory as a MEMORY TYPE remains out, and ADR-026 §8 stands untouched. If it is ever
+revisited, §8's naming finding applies: it should be called **Procedural**, scoped explicitly to the
+memory layer, because that is what the consuming engine already calls it and inventing a word to
+dodge an over-claim helps nobody.
 
 ## 8. What the review refuted, kept because it is the useful part
 
