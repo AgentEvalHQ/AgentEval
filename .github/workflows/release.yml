@@ -140,6 +140,7 @@ jobs:
 
         $failures = @()
         $mvids = @()
+        $mvidByTfm = @{}
         $assertions = 0
         foreach ($pkg in Get-ChildItem ./nupkgs/*.nupkg) {
           $dir = Join-Path $env:RUNNER_TEMP ("c_" + $pkg.BaseName)
@@ -154,6 +155,9 @@ jobs:
             # one -- a gate that verified a single framework three times would pass while two were
             # never read.
             $mvids += $asm.ManifestModule.ModuleVersionId
+            # Keyed by FRAMEWORK, because the same assembly ships in more than one package.
+            if (-not $mvidByTfm.ContainsKey($tfm)) { $mvidByTfm[$tfm] = @() }
+            $mvidByTfm[$tfm] += $asm.ManifestModule.ModuleVersionId
             $seen = @{}
             foreach ($res in $asm.GetManifestResourceNames()) {
               if ($res -notmatch 'typedmemeval' -or $res -like '*.meta.json') { continue }
@@ -184,13 +188,30 @@ jobs:
           Write-Host "::error::No AgentEval.Memory.dll found in any package. Nothing was verified."
           exit 1
         }
+        # COUNTED PER FRAMEWORK, NOT PER READ. AgentEval.Memory.dll ships in more than one package
+        # -- the Memory package, the umbrella and the CLI -- so reading the same net8.0 build from
+        # two packages is expected and duplicate MVIDs across packages prove nothing wrong. The
+        # earlier form asserted distinct == reads and failed the 0.32.0-beta release on exactly
+        # that: 5 assemblies read across 3 frameworks, 3 distinct MVIDs, which is correct.
+        #
+        # The hazard this guards is real and unchanged: the loader can hand back a cached assembly,
+        # so a step that believes it opened net8/net9/net10 could have opened one of them three
+        # times. The invariant that actually tests it is ONE DISTINCT MVID PER FRAMEWORK -- every
+        # read of a given framework must agree, and different frameworks must differ.
+        foreach ($tfm in $mvidByTfm.Keys) {
+          $perTfm = ($mvidByTfm[$tfm] | Select-Object -Unique).Count
+          if ($perTfm -ne 1) {
+            Write-Host "::error::Framework $tfm produced $perTfm different MVIDs across packages -- the packages do not agree on which build they ship."
+            exit 1
+          }
+        }
         $distinct = ($mvids | Select-Object -Unique).Count
-        if ($distinct -ne $mvids.Count) {
-          Write-Host "::error::Read $($mvids.Count) assemblies but only $distinct distinct MVIDs -- the same assembly was verified more than once and some framework was never opened."
+        if ($distinct -ne $mvidByTfm.Keys.Count) {
+          Write-Host "::error::Read $($mvidByTfm.Keys.Count) frameworks but only $distinct distinct MVIDs -- the loader handed back a cached assembly and some framework was never opened."
           exit 1
         }
 
-        Write-Host "Frameworks verified: $($mvids.Count) (all distinct assemblies)"
+        Write-Host "Frameworks verified: $($mvidByTfm.Keys.Count) ($($mvids.Count) assembly reads across packages, $distinct distinct builds)"
         Write-Host "Corpus assertions:   $assertions"
         if ($failures) {
           Write-Host "::error::Packed corpora do not match the repository. Nothing was pushed."
