@@ -747,6 +747,11 @@ def equalise_reply(questions: list[Question], rng: random.Random) -> None:  # De
             session.turns[index].content = f"{reply} {existing}".strip()
 
 
+#: How many times each shape is re-searched against the full echo map. Per-shape calibration pins
+#: knobs as it advances, so early shapes are searched under neighbours that later move; on a cliff
+#: that lands them on the wrong side of the edge. Three rounds settles the coupling in practice.
+_PER_SHAPE_CONVERGE_ROUNDS = 3
+
 _PAD_MAX_ROUNDS = 8
 #: Cap on sentences one padding call may emit; a backstop on the greedy search, not a target.
 _PAD_MAX_PIECES = 24
@@ -1938,7 +1943,27 @@ def search_echo(evaluate, max_iterations: int = 24) -> tuple[float, float, int]:
     return best_echo, best_mean, iterations
 
 
-def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
+def _balance(balance, questions: list[Question], seed: int) -> None:  # DevSkim: ignore DS148264 - deterministic
+    """Runs a vertical's optional BASE-PARITY pass, between reply equalisation and shape padding.
+
+    THE POSITION IS THE WHOLE POINT. A vertical that needs its gold and filler to start from
+    comparable text cannot do it inside `build`, because `equalise_echo` and `equalise_reply` then
+    add text of their own and undo the balance -- measured: a balancer run in `build` left every slot
+    flipped from gold-short to gold-long. And it cannot be left to `equalise_shape`, which only ever
+    ADDS and stops within one phrase of its target, so whichever side starts further from the target
+    finishes further from it.
+
+    So the hook sits exactly between them: after every pass that adds text on its own terms, before
+    the pass that assumes both sides are already comparable. Verticals that do not pass one are
+    unaffected.
+    """
+    if balance is None:
+        return
+    for question in questions:
+        balance(question, random.Random(seed + 4))  # DevSkim: ignore DS148264 - deterministic
+
+
+def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24, balance=None
                         ) -> tuple[list[Question], Calibration]:
     """Calibrate each SHAPE to its own band instead of the vertical's mean.
 
@@ -1962,6 +1987,7 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
         questions = build(echo_map, random.Random(seed))  # DevSkim: ignore DS148264 - deterministic corpus generation
         equalise_echo(questions, 0.0, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
         equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
+        _balance(balance, questions, seed)
         equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
         return questions
 
@@ -1998,6 +2024,43 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
         per_shape[shape] = round(best_mean, 4)
         iterations += iters
 
+    # CONVERGE, DO NOT SETTLE FOR ONE PASS.
+    #
+    # Each shape above was searched with the shapes AFTER it still at echo 0.0, because the loop
+    # pins knobs as it advances. The final build sets them all, which moves every shape that was
+    # searched early -- an approximation that was harmless while the response curves were gentle.
+    #
+    # They are not always gentle. Prospective's named-entity shapes are CLIFFS: coverage sits at
+    # 1.000 through echo 0.50, then falls to 0.500 / 0.833 / 0.333 at 0.75 and to 0.000 at 1.00, so
+    # the entire in-band window is one grid step wide. A shape searched under the wrong neighbours
+    # lands on the wrong side of that edge and STAYS there: the first pass chose 0.375 / 0.500 /
+    # 0.375 and shipped three shapes saturated at 1.000 while the band gate said nothing, because
+    # the vertical mean was a healthy 0.733.
+    #
+    # So each shape is re-searched against the FULL map until the choices stop moving. Bounded
+    # rather than open: three rounds is enough for a coupling this weak, and a map that has not
+    # settled by then is reported as it stands rather than iterated forever.
+    for _ in range(_PER_SHAPE_CONVERGE_ROUNDS):
+        settled = True
+        for shape in shapes:
+            if not scored(probe, shape):
+                continue
+
+            def evaluate_final(echo: float, _shape=shape) -> float:
+                trial = dict(echo_map)
+                trial[_shape] = echo
+                values = scored(attempt(trial), _shape)
+                return sum(values) / len(values) if values else 0.0
+
+            best_echo, best_mean, iters = search_echo(evaluate_final, max_iterations)
+            iterations += iters
+            if abs(best_echo - echo_map[shape]) > 1e-9:
+                echo_map[shape] = best_echo
+                per_shape[shape] = round(best_mean, 4)
+                settled = False
+        if settled:
+            break
+
     questions = attempt(echo_map)
     # RE-READ PER-SHAPE COVERAGE FROM THE FINAL CORPUS. `per_shape` used to hold each shape's
     # `best_mean` -- the value its search saw, taken while every LATER shape's knob was still 0.0.
@@ -2022,7 +2085,8 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24
     )
 
 
-def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question], Calibration]:
+def calibrate(build, seed: int, max_iterations: int = 24, balance=None
+              ) -> tuple[list[Question], Calibration]:
     """Binary-searches the lexical-echo knob until mean realised coverage lands in band.
 
     `build(echo, rng)` must be a pure function of its arguments: same echo and same seed,
@@ -2042,6 +2106,7 @@ def calibrate(build, seed: int, max_iterations: int = 24) -> tuple[list[Question
         # Replies before shape: the acknowledgement is text, so equalising it after the shape pass
         # would put characters back that the shape pass had already balanced around.
         equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
+        _balance(balance, questions, seed)
         equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
         per_q = {q.question_id: realised_coverage(q) for q in questions}
         mean = measurable_coverage_mean(questions)
@@ -2083,7 +2148,8 @@ def _dump(payload) -> str:
 
 
 def calibrate_pinned(build, seed: int, echo, shape_of=None,
-                     iterations: int = 0, trace=None) -> tuple[list[Question], Calibration]:
+                     iterations: int = 0, trace=None, balance=None
+                     ) -> tuple[list[Question], Calibration]:
     """Rebuilds at a RECORDED echo instead of searching for one.
 
     CALIBRATION IS AN AUTHORING STEP, NOT A BUILD STEP, and treating it as a build step is what
@@ -2110,6 +2176,7 @@ def calibrate_pinned(build, seed: int, echo, shape_of=None,
     # the single knob through. Getting this wrong reproduces nothing and looks like a generator bug.
     equalise_echo(questions, 0.0 if per_shape_mode else echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
     equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
+    _balance(balance, questions, seed)
     equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
 
     per_q = {q.question_id: realised_coverage(q) for q in questions}
@@ -2196,6 +2263,7 @@ def finalise(
     seed: int = 20260815,
     extra_checks=None,
     shape_of=None,
+    balance=None,
 ) -> None:
     """Calibrates, verifies, and writes the corpus and its metadata sidecar.
 
@@ -2223,11 +2291,11 @@ def finalise(
         else recorded_echo(vertical, corpus_id, shape_of is not None))
     if pinned is not None:
         questions, calibration = calibrate_pinned(
-            build, seed, pinned, shape_of, pinned_iterations, pinned_trace)
+            build, seed, pinned, shape_of, pinned_iterations, pinned_trace, balance)
     elif shape_of is not None:
-        questions, calibration = calibrate_per_shape(build, seed, shape_of)
+        questions, calibration = calibrate_per_shape(build, seed, shape_of, balance=balance)
     else:
-        questions, calibration = calibrate(build, seed)
+        questions, calibration = calibrate(build, seed, balance=balance)
 
     if len(questions) != expected_count:
         raise SystemExit(

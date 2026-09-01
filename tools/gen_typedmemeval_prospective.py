@@ -510,6 +510,34 @@ def _copy(sessions: list[tmc.Session]) -> list[tmc.Session]:
     ]
 
 
+def _seed_filler_session(raw, exclude_index: int,
+                         rng: random.Random,  # DevSkim: ignore DS148264 - deterministic corpus generation
+                         stamp):
+    """A NON-GOLD session lifted from a different carried entry, re-stamped.
+
+    Parity of AUTHORSHIP, which is the one kind of parity a bank cannot provide. Gold here is real
+    human text carried from the time-grounded corpus, so its distractors must be too -- generated
+    filler beside carried gold is two writers in one haystack, and type/token ratio finds that
+    without reading a word of the content.
+
+    A DIFFERENT entry, so nothing from this question's own answer set can be reintroduced as a
+    distractor. Returns None when no candidate is available, and the caller falls back rather than
+    shipping a haystack short of its declared H.
+    """
+    candidates = []
+    for index, entry in enumerate(raw):
+        if index == exclude_index:
+            continue
+        for turns in entry.get("haystack_sessions", []):
+            if not any(t.get("has_answer") for t in turns):
+                candidates.append(turns)
+    if not candidates:
+        return None
+    turns = candidates[rng.randrange(len(candidates))]
+    return tmc.Session(
+        [tmc.Turn(t["role"], t["content"], False) for t in turns], stamp, tag="tg-filler")
+
+
 def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[tmc.Question]:
     """Carries the twelve time-grounded probe questions in as the vertical's seed.
 
@@ -548,7 +576,23 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             later = latest + timedelta(hours=30 * (i + 1))
             stamp = (later if rng.random() < 0.5 and later < question_date - timedelta(days=1)
                      else earliest - timedelta(hours=30 * (i + 1)))
-            sessions.append(_filler_session(rng, echoed, stamp))
+            # PADDED FROM THE SEED CORPUS ITSELF, NOT FROM THE GENERATED BANKS.
+            #
+            # The carried gold is REAL HUMAN TEXT lifted from the time-grounded corpus; padding it
+            # with generated filler put two different AUTHORS in one haystack, and the screen sees
+            # that immediately. Measured: user-turn type/token ratio separated gold perfectly in 3
+            # of 12 seed questions -- the largest single contributor in the vertical -- with gold at
+            # 0.855 ("First physio session for the shoulder tonight. Twice a week from here.")
+            # against generated filler at 0.822 ("I am due to order more printer paper in six
+            # weeks, going by the letter.").
+            #
+            # No amount of post-hoc balancing closes an authorship gap, which is why eight attempts
+            # at padding this vertical each moved the tell instead of removing it. Non-gold sessions
+            # from OTHER carried entries are the same author, the same register and the same
+            # vocabulary distribution as the gold they sit beside.
+            borrowed = _seed_filler_session(raw, offset, rng, stamp)
+            sessions.append(borrowed if borrowed is not None
+                            else _filler_session(rng, echoed, stamp))
         sessions.sort(key=lambda s: s.timestamp)
 
         out.append(tmc.Question(
@@ -561,6 +605,88 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             {"shape": SHAPE_SEED, "seeded_from": entry["question_id"]},
         ))
     return out
+
+
+#: How close a slot's gold and filler medians must sit before base-parity stops padding. Below one
+#: sentence of the filler bank, so the remaining difference is smaller than the smallest move the
+#: shape equaliser can make -- there is no point closing further than the next stage's granularity.
+_BASE_PARITY_TOLERANCE = 14
+
+
+def _balance_gold_base(question, rng) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """Bring gold and filler to comparable BASE text in every turn slot, before shape equalisation.
+
+    THIS IS THE FIX FOR S3, AND IT IS DELIBERATELY ONE FUNCTION OVER ALL THREE CONSTRUCTION PATHS.
+    Six earlier attempts failed by patching a single site, and the measurement says why -- every path
+    carries gaps, in several slots, in BOTH directions:
+
+        _pair            due-later-reminder  user0        -54   assistant0  -20
+        _pair            not-yet-true        user0        -51   assistant0  -40
+        _pair            expiring-validity   user0        -23   assistant0  -18
+        _window_pair     due-window          user0        -38
+        _seed_questions  seed-carry-over     user0        -28   assistant0  -30
+        _seed_questions  seed-carry-over     assistant1   +68   <-- gold LONGER
+
+    A fix applied to `_pair` alone never touched 30 of 50 questions, which is why the median barely
+    moved and the tell relocated instead of closing.
+
+    WHY BASE TEXT AND NOT PADDING. `equalise_shape` pads every slot toward a common target and can
+    only ADD, and it stops within one phrase of that target because overshoot is scored as harshly as
+    shortfall. So it cannot close a systematic gap in either direction: whichever side starts further
+    away finishes further away, and gold's position is then decided by where it STARTED. Closing the
+    gap here leaves the equaliser doing what it is good at -- absorbing the remainder.
+
+    Both directions matter. `seed-carry-over`'s second assistant turn has gold 68 characters LONGER
+    than filler, and padding gold further would be the exact wrong move; there, filler is raised
+    instead.
+    """
+    slots: dict[str, tuple[list, list]] = {}
+    for session in question.sessions:
+        seen: dict[str, int] = {}
+        for turn in session.turns:
+            index = seen.get(turn.role, 0)
+            seen[turn.role] = index + 1
+            gold, filler = slots.setdefault(f"{turn.role}{index}", ([], []))
+            (gold if session.is_gold else filler).append(turn)
+
+    for turns_gold, turns_filler in slots.values():
+        if not turns_gold or not turns_filler:
+            continue                       # a slot only one side has is handled by _drop/_normalise
+        # BALANCED ON THE PROFILE, NOT ON LENGTH. A chars-only version closed every length gap and
+        # the tell simply moved AXIS rather than slot: `user_type_token_ratio` went to 4.1 sd while
+        # `first_assistant_length_chars` disappeared. The separability screen refuses six features,
+        # so parity has to be measured on the same six the padder uses -- matching one axis while
+        # the others drift is how a tell relocates instead of closing.
+        for _ in range(6):
+            def profile(turns):
+                vectors = [tmc._profile_vector(t.content) for t in turns]
+                middle = len(vectors) // 2
+                return {axis: sorted(v[axis] for v in vectors)[middle] for axis in tmc._PAD_AXES}
+
+            gold_profile, filler_profile = profile(turns_gold), profile(turns_filler)
+            # Normalised by the same weights the padder scores with, so "one sentence apart" and
+            # "forty characters apart" are comparable quantities rather than raw counts.
+            def distance(a, b):
+                return sum(abs(a[axis] - b[axis]) * tmc._PAD_WEIGHTS[axis] for axis in tmc._PAD_AXES)
+
+            current = distance(gold_profile, filler_profile)
+            if current <= _BASE_PARITY_TOLERANCE * tmc._PAD_WEIGHTS["chars"]:
+                break
+
+            short = turns_gold if gold_profile["chars"] < filler_profile["chars"] else turns_filler
+            other = filler_profile if short is turns_gold else gold_profile
+            best, best_distance = None, current
+            for _, candidate in FILLER:
+                added = tmc._profile_vector(" " + candidate)
+                moved = {axis: (gold_profile if short is turns_gold else filler_profile)[axis]
+                         + added[axis] for axis in tmc._PAD_AXES}
+                after = distance(moved, other)
+                if after < best_distance:
+                    best, best_distance = candidate, after
+            if best is None:
+                break            # nothing in the bank reduces the distance; stop rather than churn
+            for turn in short:
+                turn.content = f"{turn.content} {best}".strip()
 
 
 def build(echo, rng: random.Random) -> list[tmc.Question]:
@@ -840,6 +966,9 @@ if __name__ == "__main__":
             no_absolute_dates=True,
         ),
         generator_tool="tools/gen_typedmemeval_prospective.py",
+        # Runs between reply equalisation and shape padding -- see typedmemeval_common._balance for
+        # why that position is the whole point.
+        balance=_balance_gold_base,
         extra_checks=lambda qs: (check_pairs(qs) + _check_window(qs)
                                  + _check_window_arms_differ(qs)),
         shape_of=lambda q: (q.extension or {}).get("shape"),
