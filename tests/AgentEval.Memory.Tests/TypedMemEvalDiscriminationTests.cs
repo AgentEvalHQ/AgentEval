@@ -82,6 +82,32 @@ public class TypedMemEvalDiscriminationTests
             // ratchet: a list that only ever grows is a list nobody reads.
         };
 
+    /// <summary>
+    /// Shapes scored on <b>abstention</b> rather than retrieval headroom, with the reason.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A shape whose questions carry <b>no gold session</b> cannot be scored on <c>V1 − V9</c>:
+    /// every arm above is defined in terms of reaching a gold fact, so all three are undefined and
+    /// the difference cannot be formed. That is correct arithmetic and it used to be the end of it
+    /// — the shape published no <c>headroom_perfect_selector</c>, both assertions above hit their
+    /// <c>continue</c>, and 15 of Forgetting's 50 questions shipped <b>certified by nothing</b>
+    /// while the suite stayed green. Absence read as a pass, which is the shape this family gates
+    /// against everywhere else and had here in its own gate.
+    /// </para>
+    /// <para>
+    /// So the skip is now a <b>declaration</b>. A shape may go unscored on headroom only if it is
+    /// listed here and publishes the abstention axis instead; anything else unscored fails.
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical, string), string> ScoredOnAbstention =
+        new()
+        {
+            [(TypedMemEvalVertical.Forgetting, "never-known")] =
+                "every question has zero gold sessions — the thing asked about was never "
+                + "mentioned — so V1, V8 and V9 are undefined. Scored on V10/V11 abstention.",
+        };
+
     public static TheoryData<TypedMemEvalVertical> AllVerticals()
     {
         var data = new TheoryData<TypedMemEvalVertical>();
@@ -153,6 +179,59 @@ public class TypedMemEvalDiscriminationTests
                 $"{vertical} shape '{shape}' publishes no retrieval/reasoning classification.");
             Assert.Contains(limitedBy.GetString(), new[] { "retrieval", "reasoning" });
             Assert.True(reachable.GetDouble() >= 0);
+        }
+    }
+
+    /// <summary>
+    /// No shape may be skipped by the two gates above without saying so in the sidecar.
+    /// </summary>
+    /// <remarks>
+    /// The bug this exists for shipped in the gate itself, not in the corpus: both assertions above
+    /// open with <c>if (!record.TryGetProperty("headroom_perfect_selector", …)) continue;</c>, so a
+    /// shape that publishes no headroom is waved through in silence. That is exactly the
+    /// element-missing form of pass-by-absence — the artifact under test decides whether it gets
+    /// tested — and it hid Forgetting's <c>never-known</c> for the whole life of the vertical.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void NoShape_GoesUnscoredInSilence(TypedMemEvalVertical vertical)
+    {
+        foreach (var (shape, record) in ByShape(vertical))
+        {
+            if (record.TryGetProperty("headroom_perfect_selector", out _))
+                continue;   // scored on headroom; the two gates above own it
+
+            Assert.True(
+                ScoredOnAbstention.ContainsKey((vertical, shape)),
+                $"{vertical} shape '{shape}' publishes no headroom and is not declared as scored "
+                + "on another axis, so both discrimination gates skip it without a word. Either "
+                + "give it gold sessions, or add it to ScoredOnAbstention with the reason.");
+
+            Assert.True(
+                record.TryGetProperty("discrimination_basis", out var basis),
+                $"{vertical} shape '{shape}' is declared exempt but names no basis.");
+            Assert.Equal("abstention", basis.GetString());
+
+            Assert.True(
+                record.TryGetProperty("discrimination_exempt_reason", out var reason)
+                && !string.IsNullOrWhiteSpace(reason.GetString()),
+                $"{vertical} shape '{shape}' declares an exemption with no reason attached.");
+
+            // The exemption buys a different axis, not a free pass: the abstention arms must
+            // actually be published, and `unmeasured` must be absent — a shape whose every draw
+            // was silent is NOT MEASURED, and shipping that as an accepted exemption is the same
+            // absence-reads-as-a-pass move one level down.
+            Assert.True(
+                record.TryGetProperty("abstention_full_haystack", out var full)
+                && record.TryGetProperty("abstention_reference_retrieval", out _),
+                $"{vertical} shape '{shape}' is scored on abstention but publishes neither arm.");
+            Assert.False(
+                record.TryGetProperty("unmeasured", out _),
+                $"{vertical} shape '{shape}' publishes an abstention exemption whose arms were "
+                + "never measured. Re-run the probes before shipping this corpus.");
+            Assert.True(
+                full.GetProperty("questions").GetInt32() > 0,
+                $"{vertical} shape '{shape}' publishes an abstention arm over zero questions.");
         }
     }
 

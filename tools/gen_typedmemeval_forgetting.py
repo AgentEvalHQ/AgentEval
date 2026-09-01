@@ -128,7 +128,11 @@ FACTS = [
      "No beans arriving now.", "stopped the standing order after the last bad batch"),
     ("physio", "Which physio am I seeing?",
      "Started with a physio for the shoulder.",
-     "The physio work is over.", "was discharged at the final appointment"),
+     # "got", not "was". The clause is composed BOTH as "I {event}" in the session and as
+     # "you {event}" in the gold answer, and `was` is the only verb in this table that inflects
+     # between the two persons -- the shipped gold read "you was discharged at the final
+     # appointment". Enforced below rather than left to the next author's eye.
+     "The physio work is over.", "got discharged at the final appointment"),
     ("guitar teacher", "Who teaches me guitar?",
      "Started guitar lessons.",
      "The guitar lessons have stopped.", "gave them up when the teacher moved away"),
@@ -291,6 +295,20 @@ for _parity in PARITY_NOUNS:
             f"parity noun {_parity!r} collides with an absent noun: {_words & _absent_tokens}")
 
 
+# Every invalidation clause is composed twice -- "I {event}" in the session that speaks it, and
+# "you {event}" in the gold answer that reports it -- so it must read correctly in both persons.
+# `was discharged` shipped and produced "you was discharged at the final appointment" in the gold
+# of tme-for-013. One verb, one question, and the kind of thing a reader blames on their own
+# pipeline before they blame the corpus.
+_PERSON_INFLECTED = {"was", "am", "is", "have", "do", "go", "has", "does"}
+for _fact in FACTS:
+    _head = _fact[4].split()[0].lower()
+    if _head in _PERSON_INFLECTED:
+        raise AssertionError(
+            f"invalidation clause {_fact[4]!r} starts with {_head!r}, which does not read the same "
+            f'after "I" and after "you"; the clause is composed both ways')
+
+
 def _arbitrary_value(rng: random.Random) -> str:
     """Two invented words. Arbitrary by construction (V2) -- nothing about the fact makes
     one value likelier than another, so zero-context guessing has nothing to work with."""
@@ -383,9 +401,32 @@ def _gap_band(gap: int) -> int:
     return 5
 
 
+#: Appended to the question of BOTH arms of every paired fact, and the reason is a measured
+#: grading defect rather than a stylistic preference.
+#:
+#: The shipped question was "Which letting agent handles my flat?", and to THAT question "no letting
+#: agent handles it now" is a complete and correct answer. So the gold named the superseded value
+#: while the question never asked for it, and the equivalence judge -- correctly reading the
+#: response as answering what was asked -- passed responses that named nobody. Eleven grades across
+#: V1, V8 and V9, including tme-for-011's "The conversations do not say who cleans the flat": a
+#: system that retrieved NOTHING, scored as a success on the vertical about knowing what you used
+#: to know.
+#:
+#: The arms held one gold to two standards, which is how it was found. V6 ablates the statement and
+#: the invalidation separately and grades with `require_distinctive` on, so it demands the value and
+#: passes 20/20; V1/V8/V9 graded the same gold without it. Both cannot be describing the same
+#: target.
+#:
+#: Appended to BOTH arms, so the pair is preserved: the clause is a conditional either way and does
+#: not say which arm the reader is in. The control's gold already named its value, so only the
+#: question moves there.
+_PRIOR_VALUE_CLAUSE = " And if that has changed, who was it before?"
+
+
 def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
                           rng: random.Random, echo: float) -> tmc.Question:
     noun, question, statement_setup, invalidation_setup, event = fact
+    question = question + _PRIOR_VALUE_CLAUSE
     value = _arbitrary_value(rng)
     echoed = tmc.echo_terms(question, echo, rng)
 
@@ -448,6 +489,7 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     the pair would stop being a control.
     """
     noun, question, statement_setup, _, _ = fact
+    question = question + _PRIOR_VALUE_CLAUSE
     value = _arbitrary_value(rng)
     echoed = tmc.echo_terms(question, echo, rng)
 
@@ -519,24 +561,50 @@ def _never_known_question(entry, qid: str, ordinal: int,
                         {"shape": SHAPE_NEVER_KNOWN})
 
 
-def build(echo: float, rng: random.Random) -> list[tmc.Question]:
+def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """`echo` is a float or, under per-shape calibration, a dict keyed by shape."""
+    def knob(shape: str) -> float:
+        return echo.get(shape, 0.0) if isinstance(echo, dict) else echo
+
+    def absent_knob() -> float:
+        """The echo for `never-known`, which cannot calibrate itself.
+
+        Coverage is the share of a question's GOLD sessions BM25 surfaces, and these questions have
+        none -- the ratio is 0/0 -- so `calibrate_per_shape` correctly declines to search them and
+        pins the knob at 0.0. Left there, this becomes the only shape in the vertical whose filler
+        does not compete lexically with its own question, and that matters in exactly one place:
+        V11 hands the reader the BM25 top-K, so a haystack with no echo returns a context of
+        near-arbitrary sessions instead of topically NEAR ones. Near-miss context is when a
+        confident wrong answer is most available, so zero echo makes the abstention arm easier than
+        its siblings' for a reason that has nothing to do with the shape.
+
+        Borrowing the mean of the shapes that COULD be calibrated is the neutral choice: it makes
+        this shape's distractors as competitive as the rest of the vertical's and nothing more. It
+        is also deterministic given the recorded map, so a pinned rebuild still reproduces byte for
+        byte. The asked noun is stripped from the echo terms downstream regardless, so more echo
+        can never leak the absence the question turns on.
+        """
+        calibrated = [v for v in (knob(SHAPE_INVALIDATED), knob(SHAPE_STILL_VALID)) if v > 0]
+        return sum(calibrated) / len(calibrated) if calibrated else knob(SHAPE_NEVER_KNOWN)
+
     questions: list[tmc.Question] = []
     ordinal = 0
 
     for i, fact in enumerate(FACTS):
         pair_id = f"tme-for-p{i + 1:02d}" if i < PAIRED_FACTS else None
         questions.append(_invalidated_question(fact, f"tme-for-{i + 1:03d}", pair_id,
-                                               ordinal, rng, echo))
+                                               ordinal, rng, knob(SHAPE_INVALIDATED)))
         ordinal += 1
 
     for i in range(PAIRED_FACTS):
         questions.append(_control_question(FACTS[i], f"tme-for-{21 + i:03d}",
-                                           f"tme-for-p{i + 1:02d}", ordinal, rng, echo))
+                                           f"tme-for-p{i + 1:02d}", ordinal, rng,
+                                           knob(SHAPE_STILL_VALID)))
         ordinal += 1
 
     for i, entry in enumerate(ABSENT):
         questions.append(_never_known_question(entry, f"tme-for-{36 + i:03d}_abs",
-                                               ordinal, rng, echo))
+                                               ordinal, rng, absent_knob()))
         ordinal += 1
 
     return questions
@@ -644,4 +712,10 @@ if __name__ == "__main__":
         ),
         generator_tool="tools/gen_typedmemeval_forgetting.py",
         extra_checks=check_forgetting,
+        # Per shape, because the three shapes take the echo knob in three different directions and
+        # a single value cannot serve them. `never-known` strips the asked noun from its echo terms
+        # by construction -- a haystack that mentions the kiteboard cannot support "you never
+        # mentioned a kiteboard" -- so it always sits below whatever the other two land on, and the
+        # single knob was set by their average.
+        shape_of=lambda q: (q.extension or {}).get("shape"),
     )

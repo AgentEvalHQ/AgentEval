@@ -317,6 +317,135 @@ records agree: V9 5/6, the highest in the vertical, headroom 0.1667, which is on
 six clearing the 0.15 floor. Corpus unchanged, so no probe is invalidated — but §3c's claim that
 saturation is the failure mode the ceiling exists to catch was not being met for that shape.
 
+## 13. Amendment, 2026-09-02 — a shape with no gold is still a shape, and ours was scored by nothing
+
+§3a accepts a shape on `V1 − V9`. Every one of those arms is defined in terms of reaching a **gold
+fact**, so a question with **no gold session** makes all three undefined and the difference
+unformable. That is correct arithmetic, and for the life of this family it was also the end of it:
+the shape published no `headroom_perfect_selector`, both C# discrimination assertions hit their
+`if (!record.TryGetProperty(...)) continue;`, and **15 of Forgetting's 50 questions — 30% of the
+vertical — shipped certified by nothing while the suite stayed green.**
+
+The gate had the defect, not the corpus. It is the **element-missing** form of pass-by-absence: the
+artifact under test decides whether it gets tested. This family gates against that everywhere else
+and had it in its own gate.
+
+### 13a. What is checkable when there is no gold
+
+Two claims, and conflating them is the error this amendment mostly exists to prevent:
+
+| claim | who certifies it |
+|---|---|
+| **corpus** — the haystack contains no evidence for the asked thing | `check_forgetting`, already: model-free, exhaustive, fatal at generation. The asked noun may not appear as a substring anywhere in the haystack. |
+| **system** — asked something the evidence cannot answer, the reader declines instead of inventing | nothing, until now. **V10 / V11.** |
+
+### 13b. The arms
+
+Two contexts, mirroring V8 and V9 exactly, so the pair is a like-for-like difference on one
+question set:
+
+- **V10** — abstention given the **entire haystack**
+- **V11** — abstention given **BM25 top-`K_ref`**, the same reference retriever
+
+`V10 − V11` is then **the cost of retrieval to a system's calibration**, and which way it runs is
+not obvious in advance: a narrow context has fewer sessions to mis-attribute from, but the ones it
+does have are the topically nearest, which is when a confident wrong answer is most available.
+Measured, not predicted.
+
+Three design points, each of which was a wrong first answer:
+
+1. **The grade is about COMMITMENT, not equivalence.** Reusing `produced_gold` against the
+   abstention gold was the cheap option and it grades the dangerous case as good: *"you never
+   mentioned a kiteboard, though from your other gear it was probably a Slingshot"* does convey
+   "no record at all". **Abstain-then-guess is a commit.** A dedicated one-word grade also keeps
+   the verdict off the gold's wording, which matters because that gold is boilerplate — fifteen
+   questions share one sentence with the noun swapped.
+
+2. **A question passes only on a CLEAN SWEEP.** One commit in three draws is a reader that will
+   invent an answer here; a rate that averages it away hides the single event a consumer needs.
+   Same asymmetry V3 has always had.
+
+3. **`discriminates` is `null`, not `true` or `false`.** The retrieval floor is a statement about a
+   *baseline being beatable* — V9 saturated at 1.0 means no retriever can be told apart, whatever
+   it does. V10 and V11 have no baseline system between them: they are one model under two
+   contexts, so 1.0 in both means the reference model is well calibrated here, **not** that the
+   shape cannot separate a confabulator from an abstainer. `true` would claim a separation never
+   observed; `false` would condemn the shape on evidence that does not bear on it. Null, with the
+   reason published beside it, and a C# gate that refuses any *undeclared* unscored shape.
+
+### 13c. The `unmeasured` case, found by `--dry-run`
+
+The first implementation returned an empty dict when no draw could be graded — arithmetically the
+same as "this shape has no such questions", semantically the opposite, and **it reproduced the hole
+exactly**: a run whose judge returns garbage would publish no exemption row and both assertions
+would skip the shape in silence again. `--dry-run`'s stub grade is unparseable by construction, so
+it drives precisely that path and failed on its first execution. Applicability is now keyed on the
+**questions**, never on the results.
+
+## 14. Amendment, 2026-09-02 — two arms grading one gold to two standards
+
+Found by asking why Forgetting's V1 was 34/35, which turned out to be the least of it.
+
+**`tme-for-013`, same response, opposite grades.** V1 answered *"The conversations don't say which
+physio you were seeing"* and was graded **no**; V8 answered the same thing and was graded **yes** —
+against a gold naming `Neskett Reverie`.
+
+Auditing the shipped cache for the class: **11 grades across V1, V8 and V9 passed on responses that
+named nothing at all**, every one of them on Forgetting. `tme-for-011` is the clearest —
+*"The conversations do not say who cleans the flat"* graded a pass, a system that retrieved
+**nothing** scored as a success on the vertical whose entire subject is retaining what is no longer
+true.
+
+**The internal contradiction is the useful part.** V6 ablates this same gold with
+`require_distinctive` on, demands the value, and passes 20/20. V1/V8/V9 graded it without. Both
+cannot be describing the same target.
+
+### 14a. The question was wrong, and only then the grader
+
+*"Which letting agent handles my flat?"* — to **that** question, *"no letting agent handles it now"*
+is complete and correct. The gold named the superseded value; the question never asked for it; the
+judge read the response as answering what was asked and passed it. Fixing this in the grader alone
+would mark the model wrong for correctly answering the question put to it — the same error as
+`prospective/due-window`, in the other direction.
+
+So **the question moves first**: both arms of every paired fact now append
+*"And if that has changed, who was it before?"* The clause is a conditional either way, so it does
+not say which arm the reader is in and the control is preserved. Neither gold changes — both
+already named their value. The question now asks for what the gold contains.
+
+**Then the grader follows.** `require_distinctive` extends to V1/V8/V9 **only on a negative gold
+that names a value**, because there "no record of it" and "it was X, and that is no longer true"
+are different answers and only the value tells them apart. Scoping is the whole point: turning it
+on across the board would reject correct paraphrases elsewhere (*"one thousand two hundred and
+forty"* for *"1,240"*), which on V1 rejects a **valid question** — the worse error. Measured over
+the shipped cache **before** the rule was written: it fires on Forgetting's 20 invalidated
+questions and Prospective's 11, flips 11 grades on Forgetting and **zero** on Prospective, and
+touches no other vertical.
+
+### 14b. V6's 20/35 was fifteen not-applicables, and the corpus already said so
+
+The 15 failures are `tme-for-021` through `-035` — the `still-valid` controls, **exactly**, which
+is what a structural cause looks like beside a real one. Each carries a statement *and* a
+re-affirmation of the same value, so ablating either leaves the other; the generator publishes
+`gold_components_redundant: true` on every one of them and its comment says *"V6 fails all fifteen
+of these by construction."*
+
+The runner scoped V6 per **vertical** while the redundancy is declared per **shape**, so the flag
+published for this purpose was never read. **20/35 reads as fifteen invalid questions and the arm
+is 20/20 where it is defined.** The exclusion is now published with its ids and reason, and a C#
+test asserts the two sets are equal in both directions — the corpus's declaration and the sidecar's
+exclusion — because a runner that supplied its own applicability would be the artifact grading
+itself.
+
+### 14c. A grammar defect the same audit surfaced
+
+The invalidation clause is composed **twice** — `"I {event}"` in the session that speaks it and
+`"you {event}"` in the gold that reports it. `"was discharged at the final appointment"` is the one
+clause in the table whose verb inflects between the two persons, so `tme-for-013` shipped a gold
+reading **"you was discharged at the final appointment."** One verb, one question, and exactly the
+kind of thing a consumer root-causes onto their own pipeline before they blame the corpus. Now
+`"got discharged"`, with an import-time assertion over the whole table.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best

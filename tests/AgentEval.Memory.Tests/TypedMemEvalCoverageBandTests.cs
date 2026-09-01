@@ -67,12 +67,39 @@ public class TypedMemEvalCoverageBandTests
     /// fact: each is fixed by opting into per-shape calibration, which changes the corpus and so owes
     /// a re-probe.
     /// </remarks>
+    /// <summary>
+    /// Shapes whose questions carry <b>no gold session</b>, so realised coverage is not defined.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Coverage is the share of a question's gold sessions a K-budget BM25 retriever surfaces. With
+    /// no gold the ratio is 0/0, which the generator reports as 1.0 — and 1.0 in this gate means
+    /// SATURATED, the one failure the band exists to catch. Reading it that way would be exactly
+    /// backwards: nothing is saturated, there is simply nothing to retrieve.
+    /// </para>
+    /// <para>
+    /// So it is exempt, and exempt by DECLARATION rather than by a value-based guess like "skip
+    /// shapes at exactly 1.0" — that rule would also skip a genuinely saturated shape, which is how
+    /// <c>prospective/not-yet-true</c> would have escaped. These shapes are scored on abstention
+    /// instead (V10/V11, ADR-028 §13); the exemption is from the coverage band only.
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical, string), string> NoGoldSoNoCoverage =
+        new()
+        {
+            [(TypedMemEvalVertical.Forgetting, "never-known")] =
+                "zero gold sessions by construction — the thing asked about was never mentioned",
+        };
+
     private static readonly HashSet<TypedMemEvalVertical> NoPerShapeCoverage =
         new()
         {
             TypedMemEvalVertical.Temporal,
-            TypedMemEvalVertical.Forgetting,
             TypedMemEvalVertical.WorkingMemory,
+            // Forgetting left this list on 2026-09-02 by opting into per-shape calibration. Its
+            // shapes had been taking the knob in different directions under one value: invalidated
+            // and still-valid now land at 0.65 and 0.70, and never-known cannot be calibrated at
+            // all (see NoGoldSoNoCoverage).
         };
 
     public static TheoryData<TypedMemEvalVertical> AllVerticals()
@@ -98,6 +125,18 @@ public class TypedMemEvalCoverageBandTests
 
         foreach (var (shape, coverage) in perShape)
         {
+            if (NoGoldSoNoCoverage.ContainsKey((vertical, shape)))
+            {
+                // Not a pass — a different question. Assert the reading is the one the exemption
+                // claims, so a shape that quietly GAINS gold stops being exempt.
+                Assert.True(
+                    coverage >= 1.0 - 1e-9,
+                    $"{vertical} shape '{shape}' is declared as having no gold, so its coverage "
+                    + $"should be the 0/0 reading of 1.0 — it is {coverage:F4}. If this shape now "
+                    + "has gold sessions, remove it from NoGoldSoNoCoverage and calibrate it.");
+                continue;
+            }
+
             if (OutOfBand.TryGetValue((vertical, shape), out var recorded))
             {
                 // May move TOWARD the band, never further from it. Distance is measured from

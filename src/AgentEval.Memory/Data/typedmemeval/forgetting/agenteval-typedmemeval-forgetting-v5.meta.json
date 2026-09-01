@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-forgetting-v5",
   "vertical": "forgetting",
-  "revision": "v5+7fe6e166dbf1",
+  "revision": "v5+8999efa6fc33",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743",
+  "corpus_sha256": "8999efa6fc33fac2e183b9137fbeee2fb132300252eb59b9439b40cd3d5eb429",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -20,93 +20,32 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6286,
-    "echo": 0.25,
-    "iterations": 15,
-    "search_trace": [
-      [
-        1.0,
-        0.0286
-      ],
-      [
-        0.5,
-        0.5429
-      ],
-      [
-        0.25,
-        0.6286
-      ],
-      [
-        0.125,
-        0.6286
-      ],
-      [
-        0.0625,
-        0.6286
-      ],
-      [
-        0.0312,
-        0.6286
-      ],
-      [
-        0.0156,
-        0.6286
-      ],
-      [
-        0.0078,
-        0.6286
-      ],
-      [
-        0.0039,
-        0.6286
-      ],
-      [
-        0.002,
-        0.6286
-      ],
-      [
-        0.001,
-        0.6286
-      ],
-      [
-        0.0005,
-        0.6286
-      ],
-      [
-        0.0002,
-        0.6286
-      ],
-      [
-        0.0001,
-        0.6286
-      ],
-      [
-        0.0001,
-        0.6286
-      ]
-    ],
+    "mean_realised": 0.6714,
+    "echo": 0.1667,
+    "iterations": 36,
+    "search_trace": [],
     "per_question": {
       "tme-for-001": 1.0,
       "tme-for-002": 1.0,
       "tme-for-003": 0.5,
       "tme-for-004": 0.5,
       "tme-for-005": 1.0,
-      "tme-for-006": 1.0,
-      "tme-for-007": 0.5,
-      "tme-for-008": 0.0,
-      "tme-for-009": 0.5,
+      "tme-for-006": 0.5,
+      "tme-for-007": 1.0,
+      "tme-for-008": 0.5,
+      "tme-for-009": 0.0,
       "tme-for-010": 1.0,
       "tme-for-011": 0.0,
-      "tme-for-012": 1.0,
+      "tme-for-012": 0.0,
       "tme-for-013": 1.0,
       "tme-for-014": 1.0,
-      "tme-for-015": 0.0,
+      "tme-for-015": 0.5,
       "tme-for-016": 1.0,
       "tme-for-017": 0.0,
       "tme-for-018": 0.5,
       "tme-for-019": 1.0,
       "tme-for-020": 1.0,
-      "tme-for-021": 0.5,
+      "tme-for-021": 1.0,
       "tme-for-022": 1.0,
       "tme-for-023": 1.0,
       "tme-for-024": 1.0,
@@ -115,10 +54,10 @@
       "tme-for-027": 0.0,
       "tme-for-028": 0.0,
       "tme-for-029": 1.0,
-      "tme-for-030": 0.0,
+      "tme-for-030": 0.5,
       "tme-for-031": 0.0,
       "tme-for-032": 1.0,
-      "tme-for-033": 0.0,
+      "tme-for-033": 1.0,
       "tme-for-034": 1.0,
       "tme-for-035": 0.0,
       "tme-for-036_abs": 1.0,
@@ -136,6 +75,16 @@
       "tme-for-048_abs": 1.0,
       "tme-for-049_abs": 1.0,
       "tme-for-050_abs": 1.0
+    },
+    "echo_by_shape": {
+      "invalidated": 0.375,
+      "never-known": 0.0,
+      "still-valid": 0.125
+    },
+    "per_shape_realised": {
+      "invalidated": 0.65,
+      "never-known": 1.0,
+      "still-valid": 0.7
     }
   },
   "ceiling": {
@@ -158,184 +107,14 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": false,
     "empty_turns": {
-      "count": 219,
-      "of_turns": 5630,
+      "count": 226,
+      "of_turns": 5430,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
-    },
-    "scaffolding_dependence": {
-      "bm25_coverage_as_shipped": 0.6286,
-      "bm25_coverage_without_distractor_echo": 0.8571,
-      "dependence": 0.2286,
-      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
-    },
-    "retrieval_ceiling": {
-      "k_ref": 5,
-      "coverage_scaffolding_stripped": 0.8571,
-      "questions_needing_more_than_k_ref": 0,
-      "questions_scored": 35,
-      "reading": "Accuracy a retriever can reach at K_ref if it discounts the calibration scaffolding. Where questions_needing_more_than_k_ref is non-zero, part of the V1 - V9 headroom is unreachable by ANY ranker at this budget -- it is a G-against-K property of the corpus, and a larger K buys it more cheaply than a better retriever."
     }
   },
-  "gold_item_types": {
-    "tme-for-001": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-002": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-003": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-004": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-005": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-006": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-007": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-008": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-009": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-010": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-011": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-012": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-013": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-014": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-015": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-016": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-017": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-018": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-019": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-020": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-021": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-022": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-023": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-024": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-025": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-026": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-027": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-028": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-029": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-030": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-031": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-032": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-033": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-034": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-035": [
-      "forgetting",
-      "forgetting"
-    ],
-    "tme-for-036_abs": [],
-    "tme-for-037_abs": [],
-    "tme-for-038_abs": [],
-    "tme-for-039_abs": [],
-    "tme-for-040_abs": [],
-    "tme-for-041_abs": [],
-    "tme-for-042_abs": [],
-    "tme-for-043_abs": [],
-    "tme-for-044_abs": [],
-    "tme-for-045_abs": [],
-    "tme-for-046_abs": [],
-    "tme-for-047_abs": [],
-    "tme-for-048_abs": [],
-    "tme-for-049_abs": [],
-    "tme-for-050_abs": []
-  },
   "probes": {
-    "status": "run",
+    "status": "not_run",
     "v7_separability": {
       "method": "single-feature AUC over (gold, distractor) pairs formed WITHIN a question, pooled across questions and folded once to [0.5, 1.0]; questions with no gold contribute no pairs; boilerplate n-grams (sizes 1-3) restricted to phrases recurring in at least 20% of questions so per-question content is not mistaken for a marker",
       "exempt": [
@@ -392,40 +171,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5194,
+        "session_length_chars": 0.5032,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5171,
+        "position_in_haystack": 0.5716,
         "digit_density": 0.5,
-        "uppercase_density": 0.5409,
-        "sentence_count": 0.5611,
-        "punctuation_density": 0.5883,
-        "em_dash_density": 0.5177,
-        "mean_turn_chars": 0.5194,
-        "type_token_ratio": 0.5215,
-        "first_user_length_chars": 0.5819,
-        "first_user_uppercase_density": 0.5546,
-        "first_user_sentence_count": 0.6156,
-        "first_assistant_length_chars": 0.5686,
-        "first_assistant_uppercase_density": 0.5184,
-        "first_assistant_sentence_count": 0.6521,
-        "user_slot1_length_chars": 0.5055,
+        "uppercase_density": 0.5098,
+        "sentence_count": 0.5572,
+        "punctuation_density": 0.5046,
+        "em_dash_density": 0.5102,
+        "mean_turn_chars": 0.5032,
+        "type_token_ratio": 0.5467,
+        "first_user_length_chars": 0.6612,
+        "first_user_uppercase_density": 0.552,
+        "first_user_sentence_count": 0.5755,
+        "first_assistant_length_chars": 0.6763,
+        "first_assistant_uppercase_density": 0.5186,
+        "first_assistant_sentence_count": 0.5463,
+        "user_slot1_length_chars": 0.526,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5259,
-        "assistant_slot2_length_chars": 0.5014,
+        "assistant_slot1_length_chars": 0.5495,
+        "assistant_slot2_length_chars": 0.5004,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5716,
-        "user_uppercase_density": 0.5617,
-        "user_sentence_count": 0.6068,
-        "user_punctuation_density": 0.5508,
-        "user_type_token_ratio": 0.5658,
-        "user_mean_turn_chars": 0.5716,
-        "assistant_length_chars": 0.5447,
-        "assistant_uppercase_density": 0.5078,
-        "assistant_sentence_count": 0.6429,
-        "assistant_punctuation_density": 0.5617,
-        "assistant_type_token_ratio": 0.5068,
-        "assistant_mean_turn_chars": 0.5447,
+        "user_length_chars": 0.6022,
+        "user_uppercase_density": 0.532,
+        "user_sentence_count": 0.5846,
+        "user_punctuation_density": 0.5004,
+        "user_type_token_ratio": 0.5358,
+        "user_mean_turn_chars": 0.6022,
+        "assistant_length_chars": 0.5727,
+        "assistant_uppercase_density": 0.5091,
+        "assistant_sentence_count": 0.5039,
+        "assistant_punctuation_density": 0.5376,
+        "assistant_type_token_ratio": 0.5579,
+        "assistant_mean_turn_chars": 0.5727,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -435,1289 +214,326 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6061,
-        "boilerplate_ngram": 0.5754
+        "gold_marker_ngram": 0.6043,
+        "boilerplate_ngram": 0.6706
       },
-      "worst_refused_feature": "first_assistant_sentence_count",
-      "worst_refused_auc": 0.6521,
+      "worst_refused_feature": "first_assistant_length_chars",
+      "worst_refused_auc": 0.6763,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "near enough",
-      "gold_marker_ngram_auc": 0.6061,
-      "worst_boilerplate_ngram": "of",
-      "boilerplate_ngram_auc": 0.5754,
+      "worst_gold_marker_ngram": "so it",
+      "gold_marker_ngram_auc": 0.6043,
+      "worst_boilerplate_ngram": "changed",
+      "boilerplate_ngram_auc": 0.6706,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_in_haystack": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "uppercase_density": {
-          "share": 0.0286,
-          "chance": 0.0086,
-          "observed": 1,
-          "expected": 0.3,
-          "z": 1.28
+          "share": 0.0,
+          "chance": 0.0088,
+          "observed": 0,
+          "expected": 0.31,
+          "z": -0.56
         },
         "sentence_count": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "punctuation_density": {
-          "share": 0.0286,
-          "chance": 0.0086,
-          "observed": 1,
-          "expected": 0.3,
-          "z": 1.28
+          "share": 0.0,
+          "chance": 0.0088,
+          "observed": 0,
+          "expected": 0.31,
+          "z": -0.56
         },
         "em_dash_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "mean_turn_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "first_user_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "first_user_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "first_user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "first_assistant_length_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "first_assistant_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "first_assistant_sentence_count": {
-          "share": 0.0571,
-          "chance": 0.0086,
-          "observed": 2,
-          "expected": 0.3,
-          "z": 3.11
+          "share": 0.0,
+          "chance": 0.0088,
+          "observed": 0,
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_slot1_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_slot1_length_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "assistant_slot2_length_chars": {
-          "share": 0.0286,
-          "chance": 0.0086,
-          "observed": 1,
-          "expected": 0.3,
-          "z": 1.28
+          "share": 0.0,
+          "chance": 0.0088,
+          "observed": 0,
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_length_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "user_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "user_type_token_ratio": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "user_mean_turn_chars": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "assistant_length_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0086,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "share": 0.0286,
+          "chance": 0.0088,
+          "observed": 1,
+          "expected": 0.31,
+          "z": 1.26
         },
         "assistant_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "assistant_mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         },
         "gold_marker_ngram": {
           "share": 0.0,
-          "chance": 0.0086,
+          "chance": 0.0088,
           "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
+          "expected": 0.31,
+          "z": -0.56
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743"
-    },
-    "reference_deployment": "gpt-5.5",
-    "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-01T13:40:20Z",
-    "questions_probed": 50,
-    "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
-    "v1_oracle_answerability": {
-      "applicable": 35,
-      "passed": 34,
-      "failed": [
-        "tme-for-013"
-      ]
-    },
-    "v1_pair_flip": {
-      "pairs": 15,
-      "passed": 14,
-      "failed": [
-        "tme-for-p13"
-      ]
-    },
-    "ablation_samples_per_question": 3,
-    "v2_non_inferability": {
-      "samples_per_question": 10,
-      "reject_at_hits": 2,
-      "temperature": "provider default",
-      "applicable": 35,
-      "passed": 35,
-      "failed": [],
-      "closed_choice": {
-        "questions": 0,
-        "by_candidates": {},
-        "chance_floor_exceeds_reject_line": false,
-        "passes_not_evidence_of_non_inferability": 0,
-        "reading": "These questions name their own candidates, so a no-evidence model reaches gold at 1/k -- above the 2-in-10 reject line. A PASS here records that the model did not volunteer the answer, not that the question is non-inferable. The threshold is deliberately NOT chance-corrected: the correct bar would have missed a known leak whose hits were statistically indistinguishable from guessing. Read alongside tools/validate_v2_chance_floor.py."
-      }
-    },
-    "v3_gold_ablated": {
-      "applicable": 35,
-      "passed": 35,
-      "failed": [],
-      "not_decidable": [],
-      "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
-      "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
-    },
-    "v6_leave_one_out": {
-      "applicable": 35,
-      "passed": 20,
-      "failed": [
-        "tme-for-021",
-        "tme-for-022",
-        "tme-for-023",
-        "tme-for-024",
-        "tme-for-025",
-        "tme-for-026",
-        "tme-for-027",
-        "tme-for-028",
-        "tme-for-029",
-        "tme-for-030",
-        "tme-for-031",
-        "tme-for-032",
-        "tme-for-033",
-        "tme-for-034",
-        "tme-for-035"
-      ],
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against"
-    },
-    "empty_completions": {
-      "count": 0
-    },
-    "empty_rate_by_arm": {
-      "v1": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v2": {
-        "population": "probe_answers",
-        "calls": 2450,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 831,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v3": {
-        "population": "probe_answers",
-        "calls": 627,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 226,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v6": {
-        "population": "probe_answers",
-        "calls": 828,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 315,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v8": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      },
-      "v9": {
-        "population": "probe_answers",
-        "calls": 245,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 245,
-        "judge_empty": 0,
-        "judge_rate": 0.0
-      }
-    },
-    "v8_full_haystack": {
-      "applicable": 35,
-      "v1_passed": 34,
-      "v8_passed": 31,
-      "interference_cost": 0.0857,
-      "regressed_under_interference": [
-        "tme-for-001",
-        "tme-for-004",
-        "tme-for-009",
-        "tme-for-024"
-      ],
-      "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
-    },
-    "v9_reference_retrieval": {
-      "applicable": 35,
-      "v1_gold_only": 34,
-      "v8_full_haystack": 31,
-      "v9_bm25_top_k": 21,
-      "headroom_over_lexical_retrieval": 0.3714,
-      "headroom_unlimited_context_over_lexical": 0.2857,
-      "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
-    },
-    "by_shape": {
-      "invalidated": {
-        "questions": 20,
-        "v1_applicable": 20,
-        "v1_passed": 19,
-        "v3_applicable": 20,
-        "v3_passed": 20,
-        "v8_applicable": 20,
-        "v8_passed": 17,
-        "v9_applicable": 20,
-        "v9_passed": 13,
-        "ci95": {
-          "v1": [
-            0.7639,
-            0.9911
-          ],
-          "v3": [
-            0.8389,
-            1.0
-          ],
-          "v8": [
-            0.6396,
-            0.9476
-          ],
-          "v9": [
-            0.4329,
-            0.8188
-          ]
-        },
-        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
-        "required_sessions_median": 2,
-        "headroom_perfect_selector": 0.3,
-        "discriminates": true,
-        "headroom_reachable": 0.2,
-        "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
-      },
-      "never-known": {
-        "questions": 15,
-        "v1_applicable": 0,
-        "v1_passed": 0,
-        "v3_applicable": 0,
-        "v3_passed": 0,
-        "v8_applicable": 0,
-        "v8_passed": 0,
-        "v9_applicable": 0,
-        "v9_passed": 0,
-        "ci95": {},
-        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
-        "required_sessions_median": 0
-      },
-      "still-valid": {
-        "questions": 15,
-        "v1_applicable": 15,
-        "v1_passed": 15,
-        "v3_applicable": 15,
-        "v3_passed": 15,
-        "v8_applicable": 15,
-        "v8_passed": 14,
-        "v9_applicable": 15,
-        "v9_passed": 8,
-        "ci95": {
-          "v1": [
-            0.7961,
-            1.0
-          ],
-          "v3": [
-            0.7961,
-            1.0
-          ],
-          "v8": [
-            0.7018,
-            0.9881
-          ],
-          "v9": [
-            0.3012,
-            0.7519
-          ]
-        },
-        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
-        "required_sessions_median": 2,
-        "headroom_perfect_selector": 0.4667,
-        "discriminates": true,
-        "headroom_reachable": 0.4,
-        "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
-      }
-    },
-    "per_question": {
-      "tme-for-001": {
-        "v1": true,
-        "v8": false,
-        "v8_answer": "Orrindale Vantage.",
-        "v9": true,
-        "v9_answer": "The conversations don’t say which car you’re driving now. The only named car was the Orrindale Vantage, but you later said the car had gone and you sold it to a dealer.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-002": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You no longer have a gym membership — you cancelled it outright. Before cancelling, it was with **Feskin Verity**.",
-        "v9": true,
-        "v9_answer": "Your gym membership was with **Feskin Verity**, but you later **cancelled it outright**, so you don’t currently have a gym membership according to the record.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-003": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You had registered with **Vantoro Anvil** near the station, but later said you **came off their books when the practice closed**. So, from these conversations, you are **not currently registered with a dentist**.",
-        "v9": false,
-        "v9_answer": "You’re registered with **Vantoro Anvil**, the dentist near the station.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-004": {
-        "v1": true,
-        "v8": false,
-        "v8_answer": "Tunbray — the latest broadband record says the tariff is “Tunbray Ordinary.”",
-        "v9": false,
-        "v9_answer": "The conversations don’t state your broadband provider. They only mention that the tariff is “Tunbray Ordinary” and that you left the provider mid-contract.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-005": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "None now. You took the flat off the letting agent and manage it yourself. Previously, it was with Pellow Ardent.",
-        "v9": true,
-        "v9_answer": "No letting agent handles it now. You took the flat off the letting agent and manage it yourself.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-006": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "It was **Vintry Anvil** — but later you said the storage unit was empty and you had closed the account, so **no storage place currently holds the boxes**.",
-        "v9": true,
-        "v9_answer": "None currently. Earlier you chose **Vintry Anvil** for the boxes, but later you said the storage unit was empty and the account was closed.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-007": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You aren’t riding a bike now. You had a Kelbrick Solace, but it was stolen from outside the library and never replaced.",
-        "v9": false,
-        "v9_answer": "Kelbrick Solace.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-008": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "No one currently. You had gone with **Kelbrick Quartz**, but later said the accounts were unattended and you had ended the engagement after the filing mess.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say who does your accounts.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-009": {
-        "v1": true,
-        "v8": false,
-        "v8_answer": "Padstowe Plain. The earlier Neskett Quartz tariff had lapsed when the handset died.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which phone tariff you’re on. They only say the tariff is finished and you let it lapse when the handset died.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-010": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "No one currently insures the flat. The latest note says the flat is uninsured because the policy was allowed to run out and was not renewed.",
-        "v9": true,
-        "v9_answer": "No one currently insures the flat. It was previously with Vintry Vantage, but on 2026/02/21 you said the policy had run out and you did not renew, so the flat is uninsured.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-011": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Nobody cleans the flat now — the cleaning visits were stopped when the rate went up.",
-        "v9": true,
-        "v9_answer": "The conversations do not say who cleans the flat.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-012": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "No beans are arriving now — you stopped the standing order after the last bad batch. Before that, the coffee beans were from **Brackmoor Reverie**.",
-        "v9": true,
-        "v9_answer": "Your coffee bean standing order was with **Brackmoor Reverie**, but you later stopped it after a bad batch, so **no beans are arriving now**.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-013": {
-        "v1": false,
-        "v8": true,
-        "v8_answer": "The conversations don’t say which physio you were seeing. They only say you started physio for your shoulder, and later that the physio work was over and you were discharged.",
-        "v9": true,
-        "v9_answer": "You’re not seeing a physio now — the physio work is over and you were discharged at the final appointment. Earlier, the name mentioned was **Neskett Reverie**.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-014": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "No one currently — you gave up the guitar lessons when the teacher moved away. The teacher had been Draythe Kindred.",
-        "v9": true,
-        "v9_answer": "No one currently — the guitar lessons stopped when the teacher moved away. The teacher had been Draythe Kindred.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-015": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "No firm is doing your windows now. You had signed with Pellow Solace, but you later pulled out of the contract before any work started.",
-        "v9": false,
-        "v9_answer": "Padstowe Classic.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-016": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You don’t use a vet at present. The cat was previously registered with **Vantoro Reverie**, but you took her off their books when you stopped going.",
-        "v9": true,
-        "v9_answer": "You have no vet at present. You previously registered the cat with **Vantoro Reverie**, but later took her off their books when you stopped going.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-017": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "I don’t know from these conversations. They say you settled on **Ulverston Anvil**, but later **stopped going after the price rise**. No current replacement hairdresser is recorded.",
-        "v9": true,
-        "v9_answer": "The conversations don’t say which hairdresser you go to.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-018": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You’re not in a running club now — you said you were clubless after letting the membership lapse. Previously, you had gone with Kelbrick Cascade.",
-        "v9": false,
-        "v9_answer": "Kelbrick Cascade.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-019": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You are not currently a member of a wine club, according to the conversations. You signed up with **Orrindale Meridian**, later it was **Ashcombe Classic**, but then you said you **quit the club after the third duplicate case**.",
-        "v9": true,
-        "v9_answer": "You are not currently a member of a wine club. You had signed up with **Orrindale Meridian**, but later said you quit the club.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-020": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You had gone with **Cambourne Solace**, but later you said there are **no more osteopath appointments** because the course finished.",
-        "v9": true,
-        "v9_answer": "You went with **Cambourne Solace**, though you later said there were **no more osteopath appointments** because the course had finished.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": true,
-        "v6_redundant_components": []
-      },
-      "tme-for-021": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You’re driving a **Trellick Meridian**.",
-        "v9": true,
-        "v9_answer": "You picked **Trellick Meridian**, so that’s the car indicated by the conversations.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          2,
-          8
-        ]
-      },
-      "tme-for-022": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Your gym membership is with **Wistan Cascade**.",
-        "v9": true,
-        "v9_answer": "Your gym membership is with **Wistan Cascade**.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          10,
-          16
-        ]
-      },
-      "tme-for-023": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Orrindale Kindred.",
-        "v9": true,
-        "v9_answer": "Orrindale Kindred.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          10,
-          15
-        ]
-      },
-      "tme-for-024": {
-        "v1": true,
-        "v8": false,
-        "v8_answer": "The latest relevant record says your broadband is **Herrold Basic** — so the provider is **Herrold**.\n\nEarlier records also mention **Brackmoor Verity**, but the most recent broadband entry says **Herrold Basic**.",
-        "v9": true,
-        "v9_answer": "Your broadband provider is **Brackmoor Verity**.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          15
-        ]
-      },
-      "tme-for-025": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Pellow Anvil.",
-        "v9": true,
-        "v9_answer": "Pellow Anvil.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          9,
-          13
-        ]
-      },
-      "tme-for-026": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Halbury Ember.",
-        "v9": true,
-        "v9_answer": "Halbury Ember.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          1,
-          15
-        ]
-      },
-      "tme-for-027": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Ulverston Reverie.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which bike you’re riding.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          4,
-          10
-        ]
-      },
-      "tme-for-028": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Draythe Kindred.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say who does your accounts.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          22,
-          24
-        ]
-      },
-      "tme-for-029": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You’re on **Ulverston Vantage**.",
-        "v9": false,
-        "v9_answer": "Bexley Simple.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          16,
-          17
-        ]
-      },
-      "tme-for-030": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Feskin Vantage.",
-        "v9": false,
-        "v9_answer": "Aldmoor Plain.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          20,
-          21
-        ]
-      },
-      "tme-for-031": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Wistan Anvil cleans the flat.",
-        "v9": false,
-        "v9_answer": "The conversations do not say who cleans the flat.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          8,
-          17
-        ]
-      },
-      "tme-for-032": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Your coffee beans come from **Quarrell Cascade**.",
-        "v9": true,
-        "v9_answer": "Your coffee beans come from Quarrell Cascade.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          17,
-          24
-        ]
-      },
-      "tme-for-033": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You’re seeing **Pellow Pilot**.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which physio you’re seeing. They only mention “physio” being on your mind.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          18,
-          19
-        ]
-      },
-      "tme-for-034": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Trellick Vantage.",
-        "v9": true,
-        "v9_answer": "Trellick Vantage teaches you guitar.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          2,
-          9
-        ]
-      },
-      "tme-for-035": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Brackmoor Pilot.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which firm is doing your windows.",
-        "v9_gold_in_context": 0,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          13,
-          14
-        ]
-      },
-      "tme-for-036_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-037_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-038_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-039_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-040_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-041_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-042_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-043_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-044_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-045_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-046_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-047_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-048_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-049_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      },
-      "tme-for-050_abs": {
-        "v1": null,
-        "v8": null,
-        "v9": null,
-        "v2": null,
-        "v3": null,
-        "v6": null
-      }
-    },
-    "probed_corpus_sha256": "7fe6e166dbf1454e40ed914c8ce311d8bbc8556905498975d6522e7d6dd86743",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+      "probed_corpus_sha256": "8999efa6fc33fac2e183b9137fbeee2fb132300252eb59b9439b40cd3d5eb429"
+    }
   }
 }

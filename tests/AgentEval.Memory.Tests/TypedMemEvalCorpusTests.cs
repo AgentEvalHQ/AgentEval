@@ -927,7 +927,7 @@ public sealed class TypedMemEvalCorpusTests
     /// The stamp describes the calls the RUNNER made, so this list has to be the runner's arms.
     /// </remarks>
     private static readonly string[] ExpectedProbeArms =
-        ["v1", "v2", "v3", "v6", "v8", "v9"];
+        ["v1", "v2", "v3", "v6", "v8", "v9", "v10", "v11"];
 
     private const double SeparabilityMaxAuc = 0.75;
 
@@ -1309,6 +1309,72 @@ public sealed class TypedMemEvalCorpusTests
             Assert.False(
                 string.IsNullOrWhiteSpace(extension.Shape),
                 $"{questionId} has no shape, so its outcomes could not be reported per stratum.");
+        }
+    }
+
+    /// <summary>
+    /// V6 must skip exactly the questions the <b>corpus</b> declares redundant — no more, no fewer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Wired in both directions on purpose. The corpus states which questions have interchangeable
+    /// gold components (<c>gold_components_redundant</c>); the probe runner decides which questions
+    /// leave-one-out applies to. Checking only that the sidecar's exclusion list is "reasonable"
+    /// would let the runner supply its own applicability, which is the artifact-grades-itself shape.
+    /// The two sets must be equal, and neither excluded id may appear in the arm's counts.
+    /// </para>
+    /// <para>
+    /// The defect this catches shipped for the life of the vertical: V6 read <b>20/35</b> on
+    /// Forgetting, which any reader takes as fifteen invalid questions. All fifteen were
+    /// <c>still-valid</c> controls carrying a statement and a re-affirmation of the same value —
+    /// ablating either leaves the other, exactly as designed and exactly as the corpus said. The
+    /// runner scoped V6 per <i>vertical</i> while the redundancy is declared per <i>shape</i>, so
+    /// the flag published for this purpose was never read.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void V6_SkipsExactlyTheQuestionsTheCorpusDeclaresRedundant(TypedMemEvalVertical vertical)
+    {
+        var declared = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var question in JsonDocument.Parse(TypedMemEvalCorpus.ReadJson(vertical))
+                     .RootElement.EnumerateArray())
+        {
+            if (question.TryGetProperty("typedmemeval", out var extension)
+                && extension.TryGetProperty("gold_components_redundant", out var flag)
+                && flag.ValueKind == JsonValueKind.True)
+            {
+                declared.Add(question.GetProperty("question_id").GetString()!);
+            }
+        }
+
+        if (!Metadata(vertical).TryGetProperty("probes", out var probes)
+            || !probes.TryGetProperty("v6_leave_one_out", out var v6))
+        {
+            Assert.Empty(declared);
+            return;
+        }
+
+        var excluded = new SortedSet<string>(StringComparer.Ordinal);
+        if (v6.TryGetProperty("excluded_declared_redundant", out var list))
+        {
+            foreach (var id in list.EnumerateArray())
+                excluded.Add(id.GetString()!);
+        }
+
+        Assert.Equal(declared, excluded);
+
+        // And an excluded question may not also be counted. A denominator that shrinks while the
+        // ids stay in `failed` would report the exclusion and score it anyway.
+        if (v6.TryGetProperty("failed", out var failed))
+        {
+            foreach (var id in failed.EnumerateArray())
+            {
+                Assert.False(
+                    excluded.Contains(id.GetString()!),
+                    $"{vertical}: {id.GetString()} is excluded from V6 as declared-redundant and "
+                    + "is also listed as a V6 failure.");
+            }
         }
     }
 
