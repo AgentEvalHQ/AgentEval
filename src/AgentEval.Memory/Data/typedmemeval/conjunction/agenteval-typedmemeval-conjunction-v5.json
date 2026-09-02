@@ -775,6 +775,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        1,
+        13,
+        25
+      ],
       "current_value": "Oakhurst Transit",
       "superseded_value": "Pellham Freight",
       "join": [
@@ -1452,6 +1457,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        5,
+        7,
+        13,
+        20
+      ],
       "current_value": "Denhurst Bindery",
       "superseded_value": "Brentwood Litho",
       "join": [
@@ -2133,6 +2144,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        4,
+        10,
+        13,
+        15,
+        21
+      ],
       "current_value": "Garrowby Build",
       "superseded_value": "Kelsall Group",
       "join": [
@@ -2725,6 +2743,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        10,
+        13,
+        14
+      ],
       "current_value": "Marlow Carriage",
       "superseded_value": "Corvin Dispatch",
       "join": [
@@ -3431,6 +3454,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        8,
+        9,
+        11,
+        19
+      ],
       "current_value": "Brentwood Litho",
       "superseded_value": "Culverton Print",
       "join": [
@@ -4286,6 +4315,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        0,
+        6,
+        8,
+        24,
+        25
+      ],
       "current_value": "Garrowby Build",
       "superseded_value": "Ilminster Trades",
       "join": [
@@ -4849,6 +4885,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        3,
+        13,
+        15
+      ],
       "current_value": "Oakhurst Transit",
       "superseded_value": "Pellham Freight",
       "join": [
@@ -5526,6 +5567,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        8,
+        12,
+        17,
+        21
+      ],
       "current_value": "Fairbourne Plate",
       "superseded_value": "Elmsworth Type",
       "join": [
@@ -6236,6 +6283,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        7,
+        9,
+        14,
+        16,
+        19
+      ],
       "current_value": "Kelsall Group",
       "superseded_value": "Halstead Works",
       "join": [
@@ -6915,6 +6969,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        5,
+        13,
+        21
+      ],
       "current_value": "Corvin Dispatch",
       "superseded_value": "Oakhurst Transit",
       "join": [
@@ -7534,6 +7593,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        10,
+        13,
+        16,
+        17
+      ],
       "current_value": "Brentwood Litho",
       "superseded_value": "Fairbourne Plate",
       "join": [
@@ -8331,6 +8396,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        3,
+        5,
+        13,
+        15,
+        21
+      ],
       "current_value": "Jarrow Contracting",
       "superseded_value": "Garrowby Build",
       "join": [
@@ -9068,6 +9140,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        10,
+        13,
+        21
+      ],
       "current_value": "Marlow Carriage",
       "superseded_value": "Oakhurst Transit",
       "join": [
@@ -9919,6 +9996,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        1,
+        21,
+        23,
+        26
+      ],
       "current_value": "Denhurst Bindery",
       "superseded_value": "Culverton Print",
       "join": [
@@ -10803,6 +10886,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        3,
+        14,
+        15,
+        23,
+        28
+      ],
       "current_value": "Lowther Site",
       "superseded_value": "Garrowby Build",
       "join": [
@@ -11656,6 +11746,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        0,
+        3,
+        25
+      ],
       "current_value": "Corvin Dispatch",
       "superseded_value": "Oakhurst Transit",
       "join": [
@@ -12449,6 +12544,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        1,
+        16,
+        19,
+        25
+      ],
       "current_value": "Denhurst Bindery",
       "superseded_value": "Ashcombe Press",
       "join": [
@@ -13188,6 +13289,13 @@
       "shape": "value-then-count",
       "replacement_depth": 3,
       "event_count": 4,
+      "gold_components_load_bearing_indices": [
+        9,
+        10,
+        12,
+        13,
+        20
+      ],
       "current_value": "Halstead Works",
       "superseded_value": "Garrowby Build",
       "join": [
@@ -13954,6 +14062,11 @@
       "shape": "value-then-count",
       "replacement_depth": 1,
       "event_count": 2,
+      "gold_components_load_bearing_indices": [
+        2,
+        6,
+        12
+      ],
       "current_value": "Nettleford Runners",
       "superseded_value": "Bardsey Logistics",
       "join": [
@@ -14776,6 +14889,12 @@
       "shape": "value-then-count",
       "replacement_depth": 2,
       "event_count": 3,
+      "gold_components_load_bearing_indices": [
+        3,
+        12,
+        19,
+        26
+      ],
       "current_value": "Elmsworth Type",
       "superseded_value": "Culverton Print",
       "join": [
@@ -15365,6 +15484,13 @@
       "shape": "alias-then-count",
       "event_count": 2,
       "stated_as": "the place on Ferrow Row",
+      "gold_components_load_bearing_indices": [
+        11,
+        13,
+        18
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the new flat",
       "decoy_as": "the unit behind the depot",
       "decoy_event_count": 3,
@@ -15982,6 +16108,14 @@
       "shape": "alias-then-count",
       "event_count": 3,
       "stated_as": "the unit behind the depot",
+      "gold_components_load_bearing_indices": [
+        6,
+        7,
+        9,
+        12
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the workshop",
       "decoy_as": "the Calderwick office",
       "decoy_event_count": 4,
@@ -16717,6 +16851,15 @@
       "shape": "alias-then-count",
       "event_count": 4,
       "stated_as": "the Calderwick office",
+      "gold_components_load_bearing_indices": [
+        0,
+        2,
+        9,
+        13,
+        19
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "head office",
       "decoy_as": "the cottage at Wray Head",
       "decoy_event_count": 2,
@@ -17480,6 +17623,13 @@
       "shape": "alias-then-count",
       "event_count": 2,
       "stated_as": "the cottage at Wray Head",
+      "gold_components_load_bearing_indices": [
+        2,
+        6,
+        14
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the weekend place",
       "decoy_as": "the Peverel building",
       "decoy_event_count": 3,
@@ -18097,6 +18247,14 @@
       "shape": "alias-then-count",
       "event_count": 3,
       "stated_as": "the Peverel building",
+      "gold_components_load_bearing_indices": [
+        3,
+        10,
+        18,
+        19
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the annexe",
       "decoy_as": "the place on Ferrow Row",
       "decoy_event_count": 4,
@@ -18948,6 +19106,15 @@
       "shape": "alias-then-count",
       "event_count": 4,
       "stated_as": "the place on Ferrow Row",
+      "gold_components_load_bearing_indices": [
+        4,
+        11,
+        14,
+        15,
+        16
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the new flat",
       "decoy_as": "the unit behind the depot",
       "decoy_event_count": 2,
@@ -19508,6 +19675,13 @@
       "shape": "alias-then-count",
       "event_count": 2,
       "stated_as": "the unit behind the depot",
+      "gold_components_load_bearing_indices": [
+        2,
+        6,
+        9
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the workshop",
       "decoy_as": "the Calderwick office",
       "decoy_event_count": 3,
@@ -20096,6 +20270,14 @@
       "shape": "alias-then-count",
       "event_count": 3,
       "stated_as": "the Calderwick office",
+      "gold_components_load_bearing_indices": [
+        6,
+        10,
+        13,
+        16
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "head office",
       "decoy_as": "the cottage at Wray Head",
       "decoy_event_count": 4,
@@ -20773,6 +20955,15 @@
       "shape": "alias-then-count",
       "event_count": 4,
       "stated_as": "the cottage at Wray Head",
+      "gold_components_load_bearing_indices": [
+        2,
+        6,
+        8,
+        13,
+        16
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the weekend place",
       "decoy_as": "the Peverel building",
       "decoy_event_count": 2,
@@ -21304,6 +21495,13 @@
       "shape": "alias-then-count",
       "event_count": 2,
       "stated_as": "the Peverel building",
+      "gold_components_load_bearing_indices": [
+        1,
+        4,
+        9
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the annexe",
       "decoy_as": "the place on Ferrow Row",
       "decoy_event_count": 3,
@@ -22124,6 +22322,14 @@
       "shape": "alias-then-count",
       "event_count": 3,
       "stated_as": "the place on Ferrow Row",
+      "gold_components_load_bearing_indices": [
+        2,
+        12,
+        18,
+        23
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the new flat",
       "decoy_as": "the unit behind the depot",
       "decoy_event_count": 4,
@@ -22743,6 +22949,15 @@
       "shape": "alias-then-count",
       "event_count": 4,
       "stated_as": "the unit behind the depot",
+      "gold_components_load_bearing_indices": [
+        0,
+        5,
+        9,
+        13,
+        15
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the workshop",
       "decoy_as": "the Calderwick office",
       "decoy_event_count": 2,
@@ -23535,6 +23750,13 @@
       "shape": "alias-then-count",
       "event_count": 2,
       "stated_as": "the Calderwick office",
+      "gold_components_load_bearing_indices": [
+        9,
+        12,
+        14
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "head office",
       "decoy_as": "the cottage at Wray Head",
       "decoy_event_count": 3,
@@ -24210,6 +24432,14 @@
       "shape": "alias-then-count",
       "event_count": 3,
       "stated_as": "the cottage at Wray Head",
+      "gold_components_load_bearing_indices": [
+        2,
+        11,
+        13,
+        17
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the weekend place",
       "decoy_as": "the Peverel building",
       "decoy_event_count": 4,
@@ -24829,6 +25059,15 @@
       "shape": "alias-then-count",
       "event_count": 4,
       "stated_as": "the Peverel building",
+      "gold_components_load_bearing_indices": [
+        3,
+        4,
+        11,
+        17,
+        18
+      ],
+      "chance_floor": 0.5,
+      "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
       "asked_as": "the annexe",
       "decoy_as": "the place on Ferrow Row",
       "decoy_event_count": 2,
@@ -25709,6 +25948,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Draimune inspection",
+      "gold_components_load_bearing_indices": [
+        7
+      ],
       "value_at_anchor": "Corvin Dispatch",
       "join": [
         "semantic",
@@ -26529,6 +26771,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Ondrey audit",
+      "gold_components_load_bearing_indices": [
+        11
+      ],
       "value_at_anchor": "Ashcombe Press",
       "join": [
         "semantic",
@@ -27233,6 +27478,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Quorlory rewiring",
+      "gold_components_load_bearing_indices": [
+        15
+      ],
       "value_at_anchor": "Ilminster Trades",
       "join": [
         "semantic",
@@ -27966,6 +28214,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Vreskade survey",
+      "gold_components_load_bearing_indices": [
+        0
+      ],
       "value_at_anchor": "Marlow Carriage",
       "join": [
         "semantic",
@@ -28815,6 +29066,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Draimune inspection",
+      "gold_components_load_bearing_indices": [
+        5
+      ],
       "value_at_anchor": "Fairbourne Plate",
       "join": [
         "semantic",
@@ -29664,6 +29918,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Ondrey audit",
+      "gold_components_load_bearing_indices": [
+        20
+      ],
       "value_at_anchor": "Jarrow Contracting",
       "join": [
         "semantic",
@@ -30281,6 +30538,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Quorlory rewiring",
+      "gold_components_load_bearing_indices": [
+        0
+      ],
       "value_at_anchor": "Bardsey Logistics",
       "join": [
         "semantic",
@@ -30898,6 +31158,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Vreskade survey",
+      "gold_components_load_bearing_indices": [
+        12
+      ],
       "value_at_anchor": "Culverton Print",
       "join": [
         "semantic",
@@ -31689,6 +31952,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Draimune inspection",
+      "gold_components_load_bearing_indices": [
+        19
+      ],
       "value_at_anchor": "Jarrow Contracting",
       "join": [
         "semantic",
@@ -32480,6 +32746,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Ondrey audit",
+      "gold_components_load_bearing_indices": [
+        6
+      ],
       "value_at_anchor": "Oakhurst Transit",
       "join": [
         "semantic",
@@ -33155,6 +33424,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Traymoor fit-out",
+      "gold_components_load_bearing_indices": [
+        9
+      ],
       "value_at_anchor": "Fairbourne Plate",
       "join": [
         "semantic",
@@ -34033,6 +34305,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Ondrey audit",
+      "gold_components_load_bearing_indices": [
+        25
+      ],
       "value_at_anchor": "Garrowby Build",
       "join": [
         "semantic",
@@ -34853,6 +35128,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Quorlory rewiring",
+      "gold_components_load_bearing_indices": [
+        19
+      ],
       "value_at_anchor": "Pellham Freight",
       "join": [
         "semantic",
@@ -35470,6 +35748,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Draimune inspection",
+      "gold_components_load_bearing_indices": [
+        2
+      ],
       "value_at_anchor": "Elmsworth Type",
       "join": [
         "semantic",
@@ -36261,6 +36542,9 @@
     "typedmemeval": {
       "shape": "order-then-value",
       "anchor_event": "the Traymoor fit-out",
+      "gold_components_load_bearing_indices": [
+        13
+      ],
       "value_at_anchor": "Lowther Site",
       "join": [
         "semantic",

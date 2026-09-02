@@ -1029,7 +1029,23 @@ def probe_question(entry: dict, vertical: str) -> dict:
     extension = entry.get("typedmemeval") or {}
     redundant = bool(extension.get("gold_components_redundant"))
     load_bearing = bool(extension.get("gold_components_load_bearing"))
-    if len(golds) > 1 and load_bearing and decidable and not redundant:
+
+    # PER-COMPONENT SCOPE, for the shapes whose gold MIXES the two kinds.
+    #
+    # The whole-question flag could not describe Conjunction's chain shapes: every count event is
+    # load-bearing, and the head of the replacement chain is not, because the replacement session
+    # names both the old and the new value. Declaring the whole question load-bearing was refuted
+    # at once (22/65); removing the flag left 50 questions with NO V6 coverage, which is worse than
+    # the over-claim. So a question may instead name the SUBSET it claims, and V6 ablates only
+    # those. The components it does not name are not asserted either way and are never dropped.
+    declared_indices = extension.get("gold_components_load_bearing_indices")
+    if declared_indices is not None:
+        ablate = [i for i in golds if i in set(declared_indices)]
+        applies = bool(ablate) and len(golds) > 1
+    else:
+        ablate = golds
+        applies = len(golds) > 1 and load_bearing
+    if applies and decidable and not redundant:
         # V6 NEEDS THE SAME CHANCE FLOOR V3 GOT, and it never received it.
         #
         # V3 draws 3 ablation samples and used to condemn on ONE hit; that was corrected on
@@ -1054,7 +1070,7 @@ def probe_question(entry: dict, vertical: str) -> dict:
         survived = []
         silent_drops = []
         undecidable_drops = []
-        for dropped in golds:
+        for dropped in ablate:
             keep = [i for i in everything if i != dropped]
             saw_silence = False
             # Sampled, for the same reason as V3: one draw can miss a component that is in fact
@@ -1091,6 +1107,11 @@ def probe_question(entry: dict, vertical: str) -> dict:
         if v6_k is not None:
             record["v6_candidates"] = v6_k
             record["v6_required_hits"] = v6_needs
+        if declared_indices is not None:
+            # Which components were tested, so a reader can see the arm's reach on this question
+            # rather than assuming it covered every gold session.
+            record["v6_components_tested"] = len(ablate)
+            record["v6_components_total"] = len(golds)
         if survived:
             record["v6"] = False
         elif undecidable_drops:
@@ -1105,7 +1126,7 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v6_redundant_components"] = survived
     else:
         record["v6"] = None
-        if len(golds) > 1:
+        if len(golds) > 1 and declared_indices is None:
             # WHICH of the reasons, because they are different facts. `redundant` is a design that
             # says the components are interchangeable; `undeclared` is a design that makes no claim
             # either way, and the arm has nothing to test. Collapsing them is how the 15 Forgetting
@@ -1440,6 +1461,13 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "excluded_not_decidable": sorted(
                     r["question_id"] for r in records
                     if r.get("v6_not_applicable") == "not_decidable"),
+                # THE FOURTH REASON. A question whose components CAN be ablated but whose
+                # candidate count leaves no hit threshold inside the sample budget -- k=2, where
+                # even 3 of 3 leaves p=0.125 -- is undecidable for a different reason than an
+                # undecidable GOLD. alias-then-count lands all 15 here once its haystack-borne
+                # two-way choice is declared. Without this list they vanish from the accounting.
+                "excluded_chance_undecidable": sorted(
+                    r["question_id"] for r in records if r.get("v6_undecidable_drops")),
                 "excluded_reading": (
                     "These questions publish `gold_components_redundant: true`: the design states "
                     "either component suffices, so ablating one leaves the other and V6 fails them "
@@ -1447,7 +1475,13 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "as failures. Scoring them is what made this arm read 20/35 -- fifteen "
                     "declared-by-design cases pooled with twenty real passes, which reads as a 57% "
                     "validity rate on an arm that is clean where it is defined.")}
-               if any(r.get("v6_not_applicable") for r in records) else {}),
+               # Gated on EITHER reason. It used to fire only on `v6_not_applicable`, which the
+               # chance-undecidable path never sets -- so conjunction, where all 15
+               # alias-then-count questions land there, published no exclusion lists at all and
+               # the accounting could not close. An exclusion block that goes missing is the
+               # silent-{} shape one more time.
+               if any(r.get("v6_not_applicable") or r.get("v6_undecidable_drops")
+                      for r in records) else {}),
             "applies_to": (
                 "questions that DECLARE `gold_components_load_bearing` and have more than one gold "
                 "session. The scope used to be a hardcoded list of two verticals; it is now a "

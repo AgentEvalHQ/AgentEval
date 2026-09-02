@@ -1427,11 +1427,19 @@ public sealed class TypedMemEvalCorpusTests
         {
             if (!question.TryGetProperty("typedmemeval", out var extension))
                 continue;
+            // TWO DECLARATION FORMS. The whole-question flag says every gold component is
+            // individually necessary; the index list says WHICH ones are, for shapes whose gold
+            // mixes the two kinds. Conjunction's chain shapes need the second — every count event
+            // is load-bearing and the head of a replacement chain is not — and counting only the
+            // flag would report 15 declared against 50 scored.
             var loadBearing = extension.TryGetProperty("gold_components_load_bearing", out var lb)
                               && lb.ValueKind == JsonValueKind.True;
+            var perComponent =
+                extension.TryGetProperty("gold_components_load_bearing_indices", out var ix)
+                && ix.ValueKind == JsonValueKind.Array && ix.GetArrayLength() > 0;
             var redundant = extension.TryGetProperty("gold_components_redundant", out var rd)
                             && rd.ValueKind == JsonValueKind.True;
-            if (loadBearing && !redundant
+            if ((loadBearing || perComponent) && !redundant
                 && question.GetProperty("answer_session_ids").GetArrayLength() > 1)
             {
                 declared++;
@@ -1448,8 +1456,10 @@ public sealed class TypedMemEvalCorpusTests
         var applicable = v6.GetProperty("applicable").GetInt32();
         var unmeasured = v6.TryGetProperty("unmeasured_no_answer", out var un)
             ? un.GetArrayLength() : 0;
-        var undecidable = v6.TryGetProperty("excluded_not_decidable", out var nd)
-            ? nd.GetArrayLength() : 0;
+        var undecidable = (v6.TryGetProperty("excluded_not_decidable", out var nd)
+                ? nd.GetArrayLength() : 0)
+            + (v6.TryGetProperty("excluded_chance_undecidable", out var cu)
+                ? cu.GetArrayLength() : 0);
 
         Assert.True(
             applicable + unmeasured + undecidable == declared || declared == 0,

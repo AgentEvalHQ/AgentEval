@@ -367,6 +367,28 @@ def _types_of(question: tmc.Question) -> list[str]:
     return [getattr(s, "kind", "unknown") for s in question.sessions if s.is_gold]
 
 
+def _load_bearing(sessions: list[tmc.Session], golds: list[tmc.Session],
+                  tags: set[str], last_of: str | None = None) -> list[int]:
+    """Session indices of the gold components this shape CLAIMS are individually necessary.
+
+    Per component, not per question, because these shapes mix the two kinds. Every count event is
+    load-bearing -- drop one and the count changes -- while the HEAD of a replacement chain is not:
+    the replacement session names both the old and the new value, so the head adds nothing the
+    reader cannot already get. Declaring the whole question load-bearing was refuted immediately
+    (V6 22/65, every survivor a chain head).
+
+    `last_of` names a tag whose LAST occurrence is load-bearing and whose earlier ones are not --
+    the replacement that sets the value actually asked about, as against the ones it superseded.
+    """
+    position = {id(session): i for i, session in enumerate(sessions)}
+    chosen = [g for g in golds if g.tag in tags]
+    if last_of:
+        matching = [g for g in golds if g.tag == last_of]
+        if matching:
+            chosen.append(matching[-1])
+    return sorted(position[id(g)] for g in chosen)
+
+
 def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Question:  # DevSkim: ignore DS148264 - deterministic corpus generation
     """Semantic current-value joined to Arithmetic count: count the events involving whatever the
     attribute is NOW. Counting against a superseded value returns a confident wrong number, which is
@@ -421,6 +443,11 @@ def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=index * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_VALUE_COUNT, "replacement_depth": k, "event_count": hits,
+                   # Every event (drop one, the count changes) and the LAST replacement (drop it,
+                   # the count is taken against a superseded entity). The chain head and the middle
+                   # replacements are NOT claimed: each is named by the replacement that follows it.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"event"}, last_of="replacement"),
                    # NOT gold_components_load_bearing, and the measurement is why.
                    #
                    # It was declared here and V6 refuted it at once: value-then-count 0/20,
@@ -488,6 +515,24 @@ def _alias_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=(VALUE_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ALIAS_COUNT, "event_count": hits, "stated_as": stated,
+                   # Every event, and the link: without it the asked designation cannot be tied to
+                   # the sessions that record the deliveries. Both halves of the join, per session.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"event", "link"}),
+                   # A HAYSTACK-BORNE CLOSED CHOICE, which the question cannot show.
+                   #
+                   # Ablate the link and exactly two designations in the haystack carry delivery
+                   # events -- the one gold states under and the decoy -- with different counts
+                   # since those were separated. The reference model says so itself: "the unit
+                   # behind the depot: 3 times / the place on Ferrow Row: 2 times ... none are
+                   # identified as the new flat". So a reader that cannot resolve the alias is
+                   # choosing between two, and a single lucky draw in three is not evidence that
+                   # the link was redundant. `closed_choice_k` cannot see this: it parses the
+                   # question, and the question names no candidates.
+                   "chance_floor": 0.5,
+                   "chance_floor_reason": (
+                       "with the co-reference link removed, exactly two designations in the "
+                       "haystack carry delivery events and they carry different counts"),
                    # NOT gold_components_load_bearing, and the measurement is why.
                    #
                    # It was declared here and V6 refuted it at once: value-then-count 0/20,
@@ -565,6 +610,22 @@ def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Questi
             days=(VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ORDER_VALUE, "anchor_event": anchor,
+                   # THE ANCHOR ONLY, and the switches are the correction.
+                   #
+                   # The claim above read "all three are needed" and V6 refuted it 0/15. Every
+                   # REPLACEMENT_FRAME names BOTH values -- "Corvin Dispatch has taken over from
+                   # Pellham Freight", "I have switched from Corvin Dispatch to Marlow Carriage" --
+                   # so either switch alone identifies the middle value and neither is INDIVIDUALLY
+                   # necessary. The pair is jointly necessary, which is a real claim and one a
+                   # single-drop probe cannot express: V6 removes one component at a time.
+                   #
+                   # So the shape claims what it can support. The anchor is individually
+                   # load-bearing -- without it the asked event cannot be placed between the
+                   # switches at all -- and V6 confirms it (the anchor was never among the
+                   # survivors). Joint necessity is recorded as unclaimed rather than asserted
+                   # where the instrument would have to take it on trust.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"anchor"}),
                    # NOT gold_components_load_bearing, and the measurement is why.
                    #
                    # It was declared here and V6 refuted it at once: value-then-count 0/20,
