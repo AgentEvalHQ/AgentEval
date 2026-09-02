@@ -1294,13 +1294,35 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # retriever actually sees, and a generator declaration that disagreed with it would be the
     # artifact stating its own bar.
     def _floor_of(entry: dict) -> tuple[float | None, str]:
+        extension = entry.get("typedmemeval") or {}
+        declared = extension.get("chance_floor")
         k = closed_choice_k(entry["question"])
         if k:
-            return round(1.0 / k, 4), (
+            derived = round(1.0 / k, 4)
+            if declared is not None and abs(declared - derived) > 1e-9:
+                # THEY DISAGREE. The derived value still wins -- a generator that could override
+                # its own floor would be the artifact supplying an input to its own pass/fail --
+                # but the disagreement is PUBLISHED rather than resolved silently, because the
+                # likeliest cause is a detector limit rather than a lying generator.
+                #
+                # `closed_choice_k` is a literal-pattern heuristic with two known limits, both
+                # currently latent and both pinned by self-tests:
+                #   (a) it counts " or " occurrences and does not parse comma-separated
+                #       alternatives, so "me, you, or both of us" reads as k=2;
+                #   (b) `_YESNO_Q` matches first, so a question opening with a yes/no verb short-
+                #       circuits to 2 however many candidates it then lists.
+                # Neither can be fixed by counting commas: 34 shipped questions read "...come due
+                # yet, and on what date is or was it due?", where the "or" is a verb-phrase
+                # disjunction inside a yes/no question, and every comma rule tried so far promotes
+                # them to k=3 in the WRONG direction.
+                return derived, (
+                    f"DISPUTED: the question parses to {k} candidates (floor {derived}) while the "
+                    f"generator declares {declared}. The derived value is used. Check whether the "
+                    f"question's phrasing defeats closed_choice_k before trusting either.")
+            return derived, (
                 f"the question names its own {k} candidates, so a reader with no evidence still "
                 f"reaches gold at 1/{k}")
-        extension = entry.get("typedmemeval") or {}
-        return extension.get("chance_floor"), extension.get("chance_floor_reason") or ""
+        return declared, extension.get("chance_floor_reason") or ""
 
     floors = {e["question_id"]: _floor_of(e) for e in entries}
 
@@ -2345,6 +2367,23 @@ def self_test() -> None:
     check("and the halves partition the shape",
           split["guessable"]["questions"] + split["open"]["questions"], split["questions"])
 
+    # closed_choice_k IS A HEURISTIC AND THESE PIN IT. Anyone changing it has to confront these
+    # cases first -- the live ones especially, because the obvious fix breaks them.
+    check("a two-candidate tail", closed_choice_k("Was that me or you?"), 2)
+    check("repeated 'or' counts the alternatives",
+          closed_choice_k("Earlier, about X, someone said Y. Was that me or you or both of us?"), 3)
+    check("KNOWN LIMIT (a): a comma enumeration is NOT parsed",
+          closed_choice_k("Earlier someone said Y. Was that me, you, or both of us?"), 2)
+    check("KNOWN LIMIT (b): a yes/no opener short-circuits before the tail is read",
+          closed_choice_k("Was that me or you or both of us?"), 2)
+    # And the reason (a) cannot be fixed by counting commas: 34 shipped Prospective questions have
+    # a comma AND an ' or ' in their final clause where the 'or' is a verb-phrase disjunction.
+    check("a yes/no question with a disjunctive verb phrase stays k=2",
+          closed_choice_k("Has the reminder about the bike chain come due yet, and on what date "
+                          "is or was it due?"), 2)
+    check("and so does the validity form",
+          closed_choice_k("Is the ferry ticket still valid, and when does or did it run out?"), 2)
+
     # The question-derived floor, which is the half that had never reached the accuracy arms.
     check("a two-candidate question yields k=2", closed_choice_k("Was that me or you?"), 2)
     check("and an open question yields none", closed_choice_k("Which courier is it?"), None)
@@ -2360,7 +2399,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 16 chance-floor cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 22 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
