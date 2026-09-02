@@ -1220,11 +1220,27 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # entire argument for having one.
     arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
                                  (e.get("typedmemeval") or {}).get("arm")) for e in entries}
-    # A closed choice the HAYSTACK hands the reader, which `closed_choice_k` cannot see because it
-    # parses the question. Declared by the generator per question; see _chance_floor.
-    floors = {e["question_id"]: ((e.get("typedmemeval") or {}).get("chance_floor"),
-                                 (e.get("typedmemeval") or {}).get("chance_floor_reason"))
-              for e in entries}
+    # WHAT A GUESSER SCORES, from either of the two places a closed choice can live.
+    #
+    # These were two mechanisms for one concept, which is the two-spellings-of-one-rule defect this
+    # project keeps finding: `closed_choice_k` reads the QUESTION and fed only V2 and V3, while
+    # `chance_floor` is declared by the generator for a choice the HAYSTACK hands the reader and fed
+    # only the new column. Six shapes and 71 questions enumerate their own alternatives and none of
+    # them published a floor beside their ACCURACY arms.
+    #
+    # The question-derived floor is preferred where both exist: it is derived from the text a
+    # retriever actually sees, and a generator declaration that disagreed with it would be the
+    # artifact stating its own bar.
+    def _floor_of(entry: dict) -> tuple[float | None, str]:
+        k = closed_choice_k(entry["question"])
+        if k:
+            return round(1.0 / k, 4), (
+                f"the question names its own {k} candidates, so a reader with no evidence still "
+                f"reaches gold at 1/{k}")
+        extension = entry.get("typedmemeval") or {}
+        return extension.get("chance_floor"), extension.get("chance_floor_reason") or ""
+
+    floors = {e["question_id"]: _floor_of(e) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -1608,16 +1624,34 @@ def _chance_floor(group: list[dict], floors: dict) -> dict:
     where the family had no instrument for it: derive the floor per arm, publish it beside the
     number it bounds, and let the reader subtract.
     """
-    declared = {floors.get(r["question_id"], (None, None))[0] for r in group}
-    declared.discard(None)
-    if len(declared) != 1:
-        # Mixed or absent. A shape whose questions disagree about their own chance floor has a
-        # generator bug, and averaging the two would hide it.
-        return {"chance_floor_mixed": sorted(declared)} if len(declared) > 1 else {}
+    rows = [floors.get(r["question_id"], (None, None)) for r in group]
+    values = {f for f, _ in rows if f is not None}
+    if not values:
+        return {}
+    if len(values) > 1:
+        # A shape whose questions disagree about their own floor cannot be summarised by one
+        # number, and averaging them would hide the disagreement.
+        return {"chance_floor_mixed": sorted(values)}
 
-    floor = declared.pop()
-    reason = next((floors[r["question_id"]][1] for r in group
-                   if floors.get(r["question_id"], (None, None))[0] is not None), "")
+    floor = values.pop()
+    covered = sum(1 for f, _ in rows if f is not None)
+    if covered != len(group):
+        # PARTIAL, AND SAID SO. `prospective/seed-carry-over` has 7 of 12 questions naming their
+        # own candidates and 5 that do not. Publishing 0.5 as the shape's floor would apply a
+        # guesser's advantage to five questions that never offered one -- a diluted denominator,
+        # in the flattering direction for whichever arm sits above it.
+        return {
+            "chance_floor_partial": {
+                "floor": floor,
+                "questions_with_a_floor": covered,
+                "questions": len(group),
+                "reading": (
+                    "Only some questions in this shape name their own candidates, so no single "
+                    "floor describes it. Read the shape's arms as a MIXTURE of guessable and "
+                    "non-guessable items, and decompose before comparing two systems on it."),
+            }
+        }
+    reason = next(r for f, r in rows if f is not None)
     applicable = [r for r in group if r.get("v9") is not None]
     if not applicable:
         return {"chance_floor": floor, "chance_floor_reason": reason}
@@ -2168,6 +2202,21 @@ def self_test() -> None:
     mixed = [cf(True, 0.5), {"question_id": "other", "v9": True}]
     row = _chance_floor(mixed, {"qTrue0.5": (0.5, "a"), "other": (0.25, "b")})
     check("mixed floors are reported, not averaged", row, {"chance_floor_mixed": [0.25, 0.5]})
+    # PARTIAL COVERAGE is not a shape-level floor. prospective/seed-carry-over has 7 of 12
+    # questions naming their own candidates; publishing 0.5 for the shape would hand a guesser's
+    # advantage to the five that never offered one -- diluted denominator, flattering direction.
+    part = [cf(True, 0.5), cf(False, 0.5), {"question_id": "plain", "v9": True}]
+    row = _chance_floor(part, {"qTrue0.5": (0.5, "a"), "qFalse0.5": (0.5, "a"),
+                               "plain": (None, None)})
+    check("a partly-guessable shape publishes no single floor", "chance_floor" in row, False)
+    check("and says how many questions have one",
+          row["chance_floor_partial"]["questions_with_a_floor"], 2)
+    check("out of how many", row["chance_floor_partial"]["questions"], 3)
+
+    # The question-derived floor, which is the half that had never reached the accuracy arms.
+    check("a two-candidate question yields k=2", closed_choice_k("Was that me or you?"), 2)
+    check("and an open question yields none", closed_choice_k("Which courier is it?"), None)
+
     check("a shape declaring no floor publishes none",
           _chance_floor([{"question_id": "n", "v9": True}], {"n": (None, None)}), {})
 
@@ -2179,7 +2228,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 6 chance-floor cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 11 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

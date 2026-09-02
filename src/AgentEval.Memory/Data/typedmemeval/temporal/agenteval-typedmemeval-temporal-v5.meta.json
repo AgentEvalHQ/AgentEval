@@ -847,7 +847,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-01T13:40:20Z",
+    "run_at": "2026-09-02T05:33:54Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -921,75 +921,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1491,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 14910,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5036,
+        "judge_calls": 350,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4054,
-        "empty": 9,
-        "rate": 0.0022,
-        "judge_calls": 1243,
+        "calls": 90,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2623,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 1019,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1491,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1475,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
@@ -1073,6 +1073,10 @@
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
+        "chance_floor": 0.5,
+        "chance_floor_reason": "the question names its own 2 candidates, so a reader with no evidence still reaches gold at 1/2",
+        "v9_above_chance": -0.25,
+        "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
         "headroom_perfect_selector": 0.75,
         "discriminates": true,
         "headroom_reachable": 0.75,
@@ -1109,6 +1113,10 @@
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
+        "chance_floor": 0.3333,
+        "chance_floor_reason": "the question names its own 3 candidates, so a reader with no evidence still reaches gold at 1/3",
+        "v9_above_chance": 0.2,
+        "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
         "headroom_perfect_selector": 0.4667,
         "discriminates": true,
         "headroom_reachable": 0.4667,
@@ -1128,7 +1136,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-002": {
         "v1": true,
@@ -1141,7 +1151,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-003": {
         "v1": true,
@@ -1154,7 +1166,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-004": {
         "v1": true,
@@ -1167,7 +1181,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-005": {
         "v1": true,
@@ -1180,7 +1196,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-006": {
         "v1": true,
@@ -1193,7 +1211,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-007": {
         "v1": true,
@@ -1206,7 +1226,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-008": {
         "v1": true,
@@ -1219,7 +1241,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-009": {
         "v1": true,
@@ -1232,7 +1256,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-010": {
         "v1": true,
@@ -1245,7 +1271,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-011": {
         "v1": true,
@@ -1258,7 +1286,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-012": {
         "v1": true,
@@ -1271,7 +1301,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-013": {
         "v1": true,
@@ -1284,7 +1316,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-014": {
         "v1": true,
@@ -1297,7 +1331,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-015": {
         "v1": true,
@@ -1310,7 +1346,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-016": {
         "v1": true,
@@ -1323,7 +1361,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-017": {
         "v1": true,
@@ -1336,7 +1376,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-018": {
         "v1": true,
@@ -1349,7 +1391,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-019": {
         "v1": true,
@@ -1362,7 +1406,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-020": {
         "v1": true,
@@ -1375,7 +1421,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-021": {
         "v1": true,
@@ -1390,7 +1438,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-022": {
         "v1": true,
@@ -1405,7 +1455,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-023": {
         "v1": true,
@@ -1420,7 +1472,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-024": {
         "v1": true,
@@ -1435,7 +1489,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-025": {
         "v1": true,
@@ -1450,7 +1506,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-026": {
         "v1": true,
@@ -1465,7 +1523,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-027": {
         "v1": true,
@@ -1480,7 +1540,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-028": {
         "v1": true,
@@ -1495,7 +1557,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-029": {
         "v1": true,
@@ -1510,7 +1574,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-030": {
         "v1": true,
@@ -1525,7 +1591,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-031": {
         "v1": true,
@@ -1540,7 +1608,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-032": {
         "v1": true,
@@ -1555,7 +1625,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-033": {
         "v1": true,
@@ -1570,7 +1642,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-034": {
         "v1": true,
@@ -1585,7 +1659,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-035": {
         "v1": true,
@@ -1600,7 +1676,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-036": {
         "v1": true,
@@ -1617,7 +1695,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-037": {
         "v1": true,
@@ -1634,7 +1714,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-038": {
         "v1": true,
@@ -1651,7 +1733,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-039": {
         "v1": true,
@@ -1668,7 +1752,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-040": {
         "v1": true,
@@ -1685,7 +1771,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-041": {
         "v1": true,
@@ -1702,7 +1790,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-042": {
         "v1": true,
@@ -1719,7 +1809,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-043": {
         "v1": true,
@@ -1736,7 +1828,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-044": {
         "v1": true,
@@ -1753,7 +1847,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-045": {
         "v1": true,
@@ -1770,7 +1866,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-046": {
         "v1": true,
@@ -1787,7 +1885,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-047": {
         "v1": true,
@@ -1804,7 +1904,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-048": {
         "v1": true,
@@ -1821,7 +1923,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-049": {
         "v1": true,
@@ -1838,7 +1942,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-tem-050": {
         "v1": true,
@@ -1855,7 +1961,9 @@
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       }
     },
     "probed_corpus_sha256": "9b83da0cd8eaa954acdfe93b0663b7dfd2d56f061641f7cce3cba23451588c42",

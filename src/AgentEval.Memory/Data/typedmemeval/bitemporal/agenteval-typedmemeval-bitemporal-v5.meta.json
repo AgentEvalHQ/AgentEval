@@ -739,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T00:59:30Z",
+    "run_at": "2026-09-02T05:33:52Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -789,75 +789,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 60,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1491,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 14910,
+        "calls": 600,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5036,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4054,
-        "empty": 9,
-        "rate": 0.0022,
-        "judge_calls": 1243,
+        "calls": 180,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2623,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 1019,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 60,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1491,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1491,
+        "calls": 60,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1475,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
