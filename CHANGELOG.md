@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Derived by diffing `v0.32.0-beta`, not written from memory.** Every table below comes from
+`git show v0.32.0-beta:<corpus>` against the working tree.
+
+### Breaking — EIGHT of nine corpora changed bytes, and Conjunction changed size
+
+| vertical | questions | `corpus_sha256` |
+|---|---|---|
+| `arithmetic` | 50 | `2feda94be7e8` → `535f4ed01b92` |
+| `conjunction` | **50 → 65** | `9f6a0f37a506` → `a949006ce182` |
+| `episodic` | 50 | `542da3fa1767` → `bfb35552ec82` |
+| `forgetting` | 50 | `7fe6e166dbf1` → `be14b81ae4e2` |
+| `prospective` | 50 | `a570b890a5b9` → `39f205b72294` |
+| `semantic` | 50 | `de0b1c225211` → `d5eff38bc74e` |
+| `temporal` | 50 | `9b83da0cd8ea` → `3c459ed5866a` |
+| `workingmemory` | 60 | `7e04e4cb1717` → `ba49f2528ace` |
+| `bitemporal` | 60 | **unchanged** |
+
+`question_id` sets remain stable, so **compare on the sha, never on the id** — the same warning
+0.32.0-beta shipped, and it applies to eight corpora this time. Two declared control changes:
+**`conjunction` grows 50 → 65** (ADR-029's one stated cost) and **`workingmemory` holds H constant
+at 60 non-gold sessions on every rung**, which changes its retrieval control in kind.
+
+### Added — three arms, and every shape is now scored
+
+**No shape is skipped in silence any more.** 32 shapes: 29 on retrieval headroom, 3 on a declared
+other axis, each carrying its own bar.
+
+- **V10 / V11 — abstention**, for questions with no gold. `forgetting/never-known` is 15 questions,
+  30% of its vertical, and every existing arm recorded not-applicable while both C# discrimination
+  assertions hit their `continue`. The grade is about COMMITMENT, not equivalence:
+  abstain-then-guess is a commit. **15/15 and 15/15.**
+- **`paired_arms` at the vertical level.** `_pair_discrimination` groups per shape, which is right
+  for Bitemporal (both arms in one shape) and empty for Forgetting, whose arms ARE its shapes.
+  `forgetting` 0.4667 @ 3.68 sd and `prospective` 0.6316 @ 5.878 sd had never been published.
+- **`conjunction/conditional-branch`** — 15 new questions (ADR-029). Across the 470 shipped
+  questions, not one required resolving a conditional. V1 15/15, V9 0/15, headroom **1.00**.
+- **`chance_floor` / `v9_above_chance` / `v8_above_chance`.** 71 questions across 6 shapes enumerate
+  their own alternatives and none published a floor beside their accuracy arms.
+  **`temporal/occurrence-order`'s 0.75 headroom includes 0.50 a coin captures.** Where a shape is
+  only partly guessable it publishes the SPLIT, not a warning.
+- **V6 per-question and per-component scope.** Was a hardcoded two-vertical list.
+
+### Fixed — numbers that were wrong, and one corpus defect that shipped
+
+**`v0.32.0-beta` shipped 72 distractors that answer any question asked.** Forgetting's parity filler
+stated a value without the setup naming the noun — *"I settled on Marloe Basic."* is about nothing
+NAMED. 29 of 50 questions, including **13 of the 15 haystacks whose premise is that no answer
+exists.** No existing arm could see it: they all ask whether the model produced THE GOLD, and this
+produces something else. **72 → 0**, with a model-free guard. The other eight generators were
+audited and are clean.
+
+**WorkingMemory's ladder measured context VOLUME and called it distance.** `H = distance + 1`
+exactly, and BM25 is position-blind — moving one gold to eleven indices of its own haystack left
+top-5 membership identical at every one. **2 of 5 rungs discriminated; now 5 of 5.**
+
+**V6 read 20/35 on Forgetting** where it is 20/20 — the other 15 are `still-valid` controls
+publishing `gold_components_redundant: true`, which the runner never read.
+
+**11 accuracy grades passed on responses naming nothing**, including a total retrieval failure
+scored as success on the vertical about retaining what is no longer true.
+
+**16 of 18 V6 hits on `semantic/co-reference` were responses that DECLINED the co-reference** —
+*"the conversations do not mention a workshop by that name; at the unit behind the depot…"* — graded
+as reaching a gold that names no place.
+
+### Changed — headroom moved on 17 shapes, both ways
+
+| shape | was | now | |
+|---|---|---|---|
+| `workingmemory/distance-8` | 0.00 | **0.25** | ↑ |
+| `workingmemory/distance-15` | 0.00 | **0.4167** | ↑ |
+| `workingmemory/distance-25` | 0.00 | **0.4167** | ↑ |
+| `workingmemory/distance-40` | 0.3333 | 0.50 | ↑ |
+| `workingmemory/distance-60` | 0.25 | 0.3333 | ↑ |
+| `prospective/not-yet-true` | 0.1667 | **0.50** | ↑ |
+| `semantic/co-reference` | 0.40 | 0.5333 | ↑ |
+| `forgetting/invalidated` | 0.30 | 0.45 | ↑ |
+| `conjunction/value-then-count` | 0.70 | 0.75 | ↑ |
+| `semantic/source-attribution` | 0.20 | 0.2667 | ↑ |
+| `prospective/seed-carry-over` | 0.25 | 0.3333 | ↑ — but see the split |
+| `conjunction/alias-then-count` | 0.9333 | 0.8667 | ↓ |
+| `conjunction/order-then-value` | 0.5333 | 0.40 | ↓ |
+| `prospective/due-window` | 0.9444 | 0.8889 | ↓ |
+| `prospective/due-later-reminder` | 0.50 | **0.25** | ↓ |
+| `forgetting/still-valid` | 0.4667 | **0.0667** | ↓ — now scored on pairs |
+| `episodic/participant-attribution` | 0.20 | **−0.0667** | ↓ — now scored on the reader |
+
+**Two of those drops are the point, not damage.** `forgetting/still-valid` is the over-forgetting
+control: the capability is the PAIR, which reads 0.4667 at 3.68 sd.
+`episodic/participant-attribution`'s entire 0.20 was manufactured by a leak — the calibration echo
+scattered the quoted statement across both speaker roles, which is also what let a gold-ablated
+reader answer "both of us" 3 draws of 3. Removing the leak removed the difficulty; `render()` labels
+every turn with its role, so our stack cannot fail that shape for the reason it exists to test.
+
+**V6 scope, 85 → 200 declared questions:** `conjunction` 0/0 → **50/50**, `semantic` 0/0 → **15/15**,
+`temporal` 0/0 → **30/30**, `forgetting` 20/35 → **20/20**. Family **164/165**.
+
+### Known defects and declared residuals
+
+- **`arithmetic` V6 49/50.** `tme-ari-002` answers "3 times" on two draws of three — correct, the
+  answer was removed — and miscounts a mention-only session on the third. A chance floor over
+  "plausible small integers" would make it 50/50 and would be tuning to the number.
+- **`conjunction/alias-then-count`'s V6 is UNDECIDABLE**, not passing. With the link ablated exactly
+  two designations carry delivery events, and a 2-way choice leaves no hit threshold inside 3
+  samples.
+- **`order-then-value` claims only its anchor.** Its two switches are *jointly* necessary and
+  neither is individually so, which a single-drop probe cannot express. Recorded as unclaimed.
+- **`prospective/seed-carry-over` mixes two populations**: 5 open questions at headroom 0.60 and 7
+  yes/no at 0.1429, below the floor. The questions are carried from the timegrounded corpus, so the
+  mixture cannot be rewritten away.
+- **`closed_choice_k` has two pinned limits** — no comma-enumeration parsing, and a yes/no opener
+  short-circuits. Both latent; the obvious fix breaks 34 live questions.
+- **The unmeasured dimension WorkingMemory gave up**: holding H constant isolates distance and
+  abandons volume sensitivity. The honest decomposition is two ladders and only one exists.
+
 ## [0.32.0-beta] - 2026-09-01
 
 ### Breaking — five corpora changed bytes, and the collision is SILENT
