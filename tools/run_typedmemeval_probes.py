@@ -1653,6 +1653,20 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
             pairs.setdefault(pair_id, {})[arm] = record
     complete = [a for a in pairs.values() if len(a) == 2]
     if not complete:
+        # NOTHING TO REPORT AND SOMETHING TO REPORT ARE DIFFERENT. A group with no pair ids at all
+        # is eight of the nine verticals and publishes nothing, correctly. A group that HAS pair ids
+        # whose arms never came together is a broken pairing, and returning {} for it says exactly
+        # what "this vertical has no pairs" says.
+        if any(pid for _, (pid, _) in paired):
+            return {
+                "pairs": 0,
+                "pairs_incomplete": sorted(pairs),
+                "pairs_incomplete_reading": (
+                    "These pair ids appear on questions in this group but never with both arms, so "
+                    "no pair could be scored. Read as BROKEN PAIRING, not as 'this shape has no "
+                    "pairs' -- the two look identical in an empty block, which is why this row "
+                    "exists."),
+            }
         return {}
 
     def both(key: str) -> tuple[int, int]:
@@ -1662,7 +1676,21 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     v1_hits, v1_n = both("v1")
     v9_hits, v9_n = both("v9")
     if not v1_n or not v9_n:
-        return {}
+        # Complete pairs exist and neither arm could be measured on both sides. Same rule as above
+        # and as `_abstention`: the pairs are real, so the block publishes and says it is undefined.
+        # Silently returning {} here would read as "this shape has no paired design" on a shape
+        # whose entire acceptance argument is its paired design.
+        return {
+            "pairs": len(complete),
+            "unmeasured": {
+                "v1_pairs_both_arms": v1_n,
+                "v9_pairs_both_arms": v9_n,
+                "reading": (
+                    "Complete pairs exist, but no pair has BOTH arms measured on V1 and V9 "
+                    "together, so pair headroom is undefined. Read as NOT MEASURED, never as "
+                    "measured-and-clean. Re-probe before citing this shape."),
+            },
+        }
 
     def arm_rate(key: str) -> float:
         usable = [r for r in group if r.get(key) is not None]
@@ -1709,8 +1737,9 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
         row["pair_v8_both_arms"] = f"{v8_hits}/{v8_n}"
     row["pair_reading"] = (
         "Both arms of one pair scored together, because a system that answers only one arm has "
-        "not shown it can tell the two apart -- two clocks in Bitemporal, a superseded fact from a "
-        "still-valid one in Forgetting. Compare pair_headroom against "
+        "not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a "
+        "still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom "
+        "against "
         "pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens "
         "headroom mechanically, and the scaled floor removes that gain rather than banking it. "
         "pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's "
@@ -1943,10 +1972,26 @@ def self_test() -> None:
     unpaired = [{"question_id": "solo", **hit}]
     check("unpaired shapes publish no pair block",
           _pair_discrimination(unpaired, {"solo": (None, None)}), {})
-    # A half-collected pair is not a pair: one arm missing means the conjunction is undefined.
+    # A half-collected pair is not a pair -- but it is also not "no pairs here", and the two used
+    # to be the same empty dict. A broken pairing now says so.
     half, half_arms = paired([({**hit}, {**hit})])
     half, half_arms = half[:1], {half[0]["question_id"]: half_arms[half[0]["question_id"]]}
-    check("a pair missing an arm is skipped", _pair_discrimination(half, half_arms), {})
+    broken = _pair_discrimination(half, half_arms)
+    check("a pair missing an arm scores nothing", broken["pairs"], 0)
+    check("and names the pair it could not complete", broken["pairs_incomplete"], ["p0"])
+    check("and is distinguishable from having no pairs at all",
+          "pairs_incomplete" in broken and "pairs_incomplete" not in
+          _pair_discrimination(unpaired, {"solo": (None, None)}), True)
+
+    # Complete pairs whose arms were never measured: the block publishes and says UNDEFINED, for
+    # the same reason the abstention block does. This is the third instance of the class in one
+    # release, so it is now a self-test rather than a comment.
+    blank = {"v1": None, "v9": None, "v8": None}
+    dead, dead_arms = paired([({**blank}, {**blank})])
+    row = _pair_discrimination(dead, dead_arms)
+    check("complete-but-unmeasured pairs still publish", row["pairs"], 1)
+    check("and say they were NOT MEASURED", "NOT MEASURED" in row["unmeasured"]["reading"], True)
+    check("and publish no headroom they could not compute", "pair_headroom" in row, False)
 
     # ---- abstention (V10/V11) -----------------------------------------------------------
     #
@@ -2062,7 +2107,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "14 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

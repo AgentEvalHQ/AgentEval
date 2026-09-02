@@ -739,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-01T13:40:20Z",
+    "run_at": "2026-09-02T00:59:30Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -927,7 +927,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": true,
         "pair_v8_both_arms": "15/18",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "correction-depth": {
         "questions": 24,
@@ -973,7 +973,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": true,
         "pair_v8_both_arms": "12/12",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       }
     },
     "per_question": {
@@ -990,7 +990,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-002": {
         "v1": true,
@@ -1005,7 +1007,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-003": {
         "v1": true,
@@ -1020,7 +1024,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-004": {
         "v1": true,
@@ -1035,7 +1041,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-005": {
         "v1": true,
@@ -1050,7 +1058,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-006": {
         "v1": true,
@@ -1065,7 +1075,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-007": {
         "v1": true,
@@ -1080,7 +1092,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-008": {
         "v1": true,
@@ -1095,7 +1109,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-009": {
         "v1": true,
@@ -1110,7 +1126,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-010": {
         "v1": true,
@@ -1125,7 +1143,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-011": {
         "v1": true,
@@ -1140,7 +1160,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-012": {
         "v1": true,
@@ -1155,7 +1177,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-013": {
         "v1": true,
@@ -1170,7 +1194,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-014": {
         "v1": true,
@@ -1185,7 +1211,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-015": {
         "v1": true,
@@ -1200,7 +1228,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-016": {
         "v1": true,
@@ -1215,7 +1245,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-017": {
         "v1": true,
@@ -1230,7 +1262,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-018": {
         "v1": true,
@@ -1245,7 +1279,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-019": {
         "v1": true,
@@ -1260,7 +1296,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-020": {
         "v1": true,
@@ -1275,7 +1313,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-021": {
         "v1": true,
@@ -1290,7 +1330,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-022": {
         "v1": true,
@@ -1305,7 +1347,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-023": {
         "v1": true,
@@ -1320,7 +1364,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-024": {
         "v1": true,
@@ -1335,7 +1381,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-025": {
         "v1": true,
@@ -1350,7 +1398,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-026": {
         "v1": true,
@@ -1365,7 +1415,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-027": {
         "v1": true,
@@ -1380,7 +1432,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-028": {
         "v1": true,
@@ -1395,7 +1449,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-029": {
         "v1": true,
@@ -1410,7 +1466,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-030": {
         "v1": true,
@@ -1425,7 +1483,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-031": {
         "v1": true,
@@ -1440,7 +1500,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-032": {
         "v1": true,
@@ -1455,7 +1517,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-033": {
         "v1": true,
@@ -1470,7 +1534,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-034": {
         "v1": true,
@@ -1485,7 +1551,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-035": {
         "v1": true,
@@ -1500,7 +1568,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-036": {
         "v1": true,
@@ -1515,7 +1585,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-037": {
         "v1": true,
@@ -1530,7 +1602,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-038": {
         "v1": true,
@@ -1545,7 +1619,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-039": {
         "v1": true,
@@ -1560,7 +1636,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-040": {
         "v1": true,
@@ -1575,7 +1653,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-041": {
         "v1": true,
@@ -1590,7 +1670,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-042": {
         "v1": true,
@@ -1605,7 +1687,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-043": {
         "v1": true,
@@ -1620,7 +1704,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-044": {
         "v1": true,
@@ -1635,7 +1721,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-045": {
         "v1": true,
@@ -1650,7 +1738,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-046": {
         "v1": true,
@@ -1665,7 +1755,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-047": {
         "v1": true,
@@ -1680,7 +1772,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-048": {
         "v1": true,
@@ -1695,7 +1789,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-049": {
         "v1": true,
@@ -1710,7 +1806,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-050": {
         "v1": true,
@@ -1725,7 +1823,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-051": {
         "v1": true,
@@ -1740,7 +1840,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-052": {
         "v1": true,
@@ -1755,7 +1857,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-053": {
         "v1": true,
@@ -1770,7 +1874,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-054": {
         "v1": true,
@@ -1785,7 +1891,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-055": {
         "v1": true,
@@ -1800,7 +1908,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-056": {
         "v1": true,
@@ -1815,7 +1925,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-057": {
         "v1": true,
@@ -1830,7 +1942,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-058": {
         "v1": true,
@@ -1845,7 +1959,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-059": {
         "v1": true,
@@ -1860,7 +1976,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-bit-060": {
         "v1": true,
@@ -1875,10 +1993,24 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       }
     },
     "probed_corpus_sha256": "abf2f3f4321947b7947f1fada3b45c7d2b5f2efbfa4ee1ad8e207319739d6446",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
+    "paired_arms": {
+      "pairs": 30,
+      "pair_v1_both_arms": "30/30",
+      "pair_v9_both_arms": "13/30",
+      "pair_headroom": 0.5667,
+      "pair_floor_scaled": 0.2525,
+      "pair_separation_sd": 6.26,
+      "pair_separation_floor_sd": 2.0,
+      "pair_discriminates": true,
+      "pair_v8_both_arms": "27/30",
+      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+    }
   }
 }

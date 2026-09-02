@@ -567,10 +567,39 @@ Two details, both of which were wrong first:
 
 ### 15d. Scope, stated rather than assumed
 
-The guard is in `check_forgetting` because the construction is Forgetting's, and **this ADR does not
-claim the other eight verticals are clean of the class.** The general form — *a distractor that
-names a value but no subject* — is worth one pass per vertical against each generator's own value
-construction, and that pass has not been run. Recorded as owed, not as done.
+The guard is in `check_forgetting` because the construction is Forgetting's. The other eight
+verticals were audited separately, and the result is below. The general form is *a distractor that names
+a value but no subject*, and the mechanism is specific: **the filler template omits a field the gold
+template includes.** That is a property of the templates, not of a draw, so the audit is a read of
+all eight remaining filler constructions rather than a corpus scan.
+
+**Run 2026-09-02. Forgetting was the only one.** Every other generator anchors its filler to a
+subject it names:
+
+| vertical | how filler names its subject |
+|---|---|
+| `bitemporal` | `who, noun = rng.choice(FILLER_SUBJECTS)`, and every frame takes `who` |
+| `conjunction` | a designation drawn with the asked attribute excluded via `avoid` |
+| `episodic` | `topic = rng.choice(TOPICS)`, formatted into the shared detail frames |
+| `semantic` | `attribute, values = rng.choice(UNASKED_ATTRIBUTES)`, formatted into the frame |
+| `arithmetic` | the near-miss names the rival vendor: *"I put an order in with {rival}…"* |
+| `temporal` | both milestones of the relation are named |
+| `prospective` | the parity reminder or validity item is the object of the verb |
+| `workingmemory` | the subject is carried by the verb phrase — *"turned down an offer from {other}"*, *"called the stray {other}"*, *"viewed a flat on {other}"* |
+
+**Stated as what it is: a code review, not a measurement.** It establishes that no other generator
+has the structural omission Forgetting had. It does not establish that no individual draw is
+ambiguous for some other reason — that question needs a behavioural arm, and the behavioural arm
+exists only where there is no gold to compare against (§15b).
+
+**A generic proxy was also attempted and does not work**, which is worth recording so it is not
+tried again. Detecting "states a value" as *an adjacent pair of capitalised words* matches **100% of
+sessions in all nine verticals**, because the family's ambient narrative filler is built from
+invented names (*"Between Quenn Lorrinwraith and Kesse Ruskxby the story was consistent"*). The
+denominator is then every session and the resulting share means nothing — Forgetting reads 80%
+against 4–25% elsewhere, on a measurement too coarse for either number to be quoted. A working
+check has to key on **each generator's own value-stating bank**, the way `_VALUE_ANYWHERE` is
+derived from `CHOICES`.
 
 **A generic proxy was attempted and does not work**, which is worth recording so it is not tried
 again. Detecting "states a value" as *an adjacent pair of capitalised words* matches **100% of
@@ -591,6 +620,64 @@ generator then derives the shape's actual echo as the **mean of its calibrated s
 filler does not compete lexically — which makes V11 easier for a reason that has nothing to do with
 the shape. Deterministic from the recorded map, so a pinned rebuild still reproduces byte for byte.
 **Read that 0.0 as "not searched", never as "no echo applied".**
+
+## 16. Amendment, 2026-09-02 — the silent `{}`, swept rather than tripped over
+
+Three of this release's findings are the same defect in three instruments, and after the third it
+stopped being worth waiting to trip over the fourth. **The class:**
+
+> An instrument returns an empty result when it declines to measure, and an empty result is
+> indistinguishable from *"there was nothing here to measure."* Every gate downstream then skips
+> the case in silence.
+
+It is the **element-missing** entry in this project's gate self-examination list, one level up: the
+artifact does not supply its own pass, it supplies its own *applicability*.
+
+| instrument | returned `{}` when | what that hid |
+|---|---|---|
+| `_discrimination` | V1 or V9 undefined | `forgetting/never-known` — 15 questions, 30% of a vertical, certified by nothing |
+| `_abstention` (as first written) | no draw could be graded | the same hole, restored, on any run whose judge misbehaves — caught by `--dry-run` |
+| `_pair_discrimination` | no complete pair in the group | Forgetting's 30 paired questions: it groups per shape, and Forgetting's arms **are** its shapes |
+
+So the remaining `return {}` sites were read rather than waited for, and **two more were live**:
+
+- **`_pair_discrimination`, second exit.** Complete pairs exist but no pair has both arms measured
+  on V1 and V9 — the block vanished. It now publishes `pairs` with an `unmeasured` row.
+- **A broken pairing reads as no pairing.** A group carrying pair ids whose arms never came
+  together returned exactly what eight verticals with no pairs at all return. It now publishes
+  `pairs_incomplete` with the ids.
+
+### 16a. What the new gate found before it ever ran in CI
+
+`VerticalsWithPairedArms_PublishAPairFigure` is wired **from the corpus**, not from the sidecar: the
+corpus says which questions carry a `pair_id`, and the sidecar must then report a pair figure over
+them. Asking only whether the published block looks reasonable lets the runner decide what it is
+willing to measure, which is the whole defect restated.
+
+It immediately found a **third** vertical: **`prospective` ships 38 paired questions and published
+no pair figure.** Measured once published:
+
+| vertical | paired questions | pair headroom | scaled floor | separation | discriminates |
+|---|---|---|---|---|---|
+| `bitemporal` | 60 | 0.5556 | 0.254 | — | ✔ (already published, per shape) |
+| `forgetting` | 30 | **0.4667** | 0.240 | **3.68 sd** | ✔ — never published |
+| `prospective` | 38 | **0.6316** | 0.213 | **5.878 sd** | ✔ — never published |
+
+Two of the three paired verticals were carrying their strongest acceptance argument unpublished, and
+in Forgetting's case it is the argument that rescues a shape the per-shape floor now fails (§14d).
+
+### 16b. The rule this leaves behind
+
+**An instrument that declines to measure must say which of the two reasons applies**, and the
+reasons are not interchangeable:
+
+- *not applicable* — there is nothing of this kind here. Publish nothing.
+- *not measured* — there is something of this kind here and it could not be scored. **Publish a row
+  saying so.**
+
+Keyed on the **input**, never on the result: `_abstention` decides applicability from whether the
+group contains no-gold questions, not from whether any draw was gradeable. Deciding from the result
+is how the first implementation reproduced the exact hole it was written to close.
 
 ## 9. Provenance
 

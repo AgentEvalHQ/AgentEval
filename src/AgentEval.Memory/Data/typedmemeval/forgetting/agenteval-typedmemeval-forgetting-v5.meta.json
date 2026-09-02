@@ -694,7 +694,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T00:48:02Z",
+    "run_at": "2026-09-02T00:59:30Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -906,7 +906,26 @@
         "discriminates": true,
         "headroom_reachable": 0.45,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 0,
+        "pairs_incomplete": [
+          "tme-for-p01",
+          "tme-for-p02",
+          "tme-for-p03",
+          "tme-for-p04",
+          "tme-for-p05",
+          "tme-for-p06",
+          "tme-for-p07",
+          "tme-for-p08",
+          "tme-for-p09",
+          "tme-for-p10",
+          "tme-for-p11",
+          "tme-for-p12",
+          "tme-for-p13",
+          "tme-for-p14",
+          "tme-for-p15"
+        ],
+        "pairs_incomplete_reading": "These pair ids appear on questions in this group but never with both arms, so no pair could be scored. Read as BROKEN PAIRING, not as 'this shape has no pairs' -- the two look identical in an empty block, which is why this row exists."
       },
       "never-known": {
         "questions": 15,
@@ -979,7 +998,26 @@
         "discriminates": false,
         "headroom_reachable": 0.2,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "pairs": 0,
+        "pairs_incomplete": [
+          "tme-for-p01",
+          "tme-for-p02",
+          "tme-for-p03",
+          "tme-for-p04",
+          "tme-for-p05",
+          "tme-for-p06",
+          "tme-for-p07",
+          "tme-for-p08",
+          "tme-for-p09",
+          "tme-for-p10",
+          "tme-for-p11",
+          "tme-for-p12",
+          "tme-for-p13",
+          "tme-for-p14",
+          "tme-for-p15"
+        ],
+        "pairs_incomplete_reading": "These pair ids appear on questions in this group but never with both arms, so no pair could be scored. Read as BROKEN PAIRING, not as 'this shape has no pairs' -- the two look identical in an empty block, which is why this row exists."
       }
     },
     "per_question": {
@@ -1885,7 +1923,7 @@
       "pair_separation_floor_sd": 2.0,
       "pair_discriminates": true,
       "pair_v8_both_arms": "15/15",
-      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart -- two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
     },
     "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }

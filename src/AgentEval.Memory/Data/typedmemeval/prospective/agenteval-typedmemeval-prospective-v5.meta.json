@@ -730,7 +730,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-01T16:29:35Z",
+    "run_at": "2026-09-02T00:59:31Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -805,9 +805,7 @@
       "not_applicable_reason": "V6 is not defined for prospective"
     },
     "empty_completions": {
-      "count": 0,
-      "retried_for_length": 16,
-      "by_cache_key": {}
+      "count": 0
     },
     "empty_rate_by_arm": {
       "v1": {
@@ -945,7 +943,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": false,
         "pair_v8_both_arms": "4/4",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "due-window": {
         "questions": 18,
@@ -991,7 +989,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": true,
         "pair_v8_both_arms": "7/9",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "expiring-validity": {
         "questions": 6,
@@ -1033,7 +1031,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": false,
         "pair_v8_both_arms": "3/3",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "not-yet-true": {
         "questions": 6,
@@ -1079,7 +1077,7 @@
         "pair_separation_floor_sd": 2.0,
         "pair_discriminates": false,
         "pair_v8_both_arms": "3/3",
-        "pair_reading": "Both arms of one pair scored together, because a system that answers only the valid-time arm has not shown it can represent two clocks. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+        "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
       },
       "seed-carry-over": {
         "questions": 12,
@@ -1132,7 +1130,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-002": {
         "v1": true,
@@ -1147,7 +1147,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-003": {
         "v1": true,
@@ -1162,7 +1164,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-004": {
         "v1": true,
@@ -1177,9 +1181,12 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-005": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The conversations say you started a 30-day Lumen free trial on 2026/04/28; by 2026/06/03, that trial period would have ended.",
@@ -1190,7 +1197,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-006": {
         "v1": true,
@@ -1203,7 +1212,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-007": {
         "v1": true,
@@ -1218,9 +1229,12 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-008": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. Your car went in for its service on 2026/01/29, and you said they do it every six months. That would make the next one due around 2026/07/29, so as of 2026/06/20 it is not due yet.",
@@ -1231,7 +1245,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-009": {
         "v1": true,
@@ -1244,9 +1260,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-010": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The visa application went in on 2026/04/14, and they said to allow eight weeks.\n\nAs of 2026/05/26, it has been about six weeks, so you would not necessarily expect a decision yet. You should still have roughly two weeks before the stated timeframe is up.",
@@ -1257,9 +1276,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-011": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The conversations say it was booked on 2026/03/05 for “a fortnight from tomorrow,” which would be 2026/03/20. Since it is now 2026/04/02, it should have already passed.",
@@ -1270,9 +1292,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-012": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. You joined on 2026/02/24, and the members’ rate only kicks in after six months — so it would be around 2026/08/24.",
@@ -1283,9 +1308,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-013": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. It has not come due yet.\n\nThe allotment lease renewal reminder was set on 2026/03/23 for eighteen weeks later, so it is due on 2026/07/27.",
@@ -1296,7 +1324,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-014": {
         "v1": true,
@@ -1309,9 +1339,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-015": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The boiler service booking reminder is not due yet.\n\nIt was set on 2026/04/01 for eleven weeks later, so it is due on 2026/06/17.",
@@ -1322,7 +1355,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-016": {
         "v1": true,
@@ -1335,9 +1370,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-017": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The reminder to send the quarterly figures to Priya was set on 2026/04/11 for six weeks later, so it is due on 2026/05/23. Current date is 2026/05/17, so it has not come due yet.",
@@ -1348,7 +1386,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-018": {
         "v1": true,
@@ -1361,7 +1401,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-019": {
         "v1": true,
@@ -1374,7 +1416,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-020": {
         "v1": true,
@@ -1387,7 +1431,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-021": {
         "v1": true,
@@ -1400,7 +1446,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-022": {
         "v1": true,
@@ -1413,7 +1461,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-023": {
         "v1": true,
@@ -1426,9 +1476,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-024": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The ferry multi-trip ticket was picked up on 2026/03/24 and was valid for nine weeks, so it ran out on 2026/05/26. Since today is 2026/06/01, it is no longer valid.",
@@ -1439,7 +1492,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-025": {
         "v1": true,
@@ -1452,9 +1507,12 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-026": {
+        "gold_value_required": true,
         "v1": true,
         "v8": true,
         "v8_answer": "No. The museum membership was picked up on **2026/03/27** and was valid for **four weeks**, so it **ran out on 2026/04/24**.",
@@ -1465,7 +1523,9 @@
         "v2_candidates": 2,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-027": {
         "v1": true,
@@ -1480,7 +1540,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-028": {
         "v1": true,
@@ -1492,7 +1554,9 @@
         "v2_hits": 0,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-029": {
         "v1": true,
@@ -1507,7 +1571,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-030": {
         "v1": true,
@@ -1519,7 +1585,9 @@
         "v2_hits": 0,
         "v2": true,
         "v3": null,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-031": {
         "v1": true,
@@ -1534,9 +1602,12 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-032": {
+        "gold_value_required": true,
         "v1": false,
         "v8": true,
         "v8_answer": "The record says you were due to take over the Tuesday pottery class **nine weeks after 2026/04/15**, which works out to **2026/06/17**.\n\nAs of **2026/06/23**, that date is **not still ahead of you** — it was about **six days ago**.",
@@ -1549,7 +1620,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-033": {
         "v1": true,
@@ -1564,7 +1637,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-034": {
         "v1": true,
@@ -1579,7 +1654,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-035": {
         "v1": true,
@@ -1594,7 +1671,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-036": {
         "v1": true,
@@ -1609,7 +1688,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-037": {
         "v1": true,
@@ -1624,7 +1705,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-038": {
         "v1": true,
@@ -1639,7 +1722,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-039": {
         "v1": true,
@@ -1654,7 +1739,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-040": {
         "v1": true,
@@ -1669,7 +1756,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-041": {
         "v1": true,
@@ -1684,7 +1773,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-042": {
         "v1": true,
@@ -1699,7 +1790,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-043": {
         "v1": true,
@@ -1714,7 +1807,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-044": {
         "v1": true,
@@ -1729,7 +1824,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-045": {
         "v1": true,
@@ -1744,7 +1841,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-046": {
         "v1": true,
@@ -1759,7 +1858,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-047": {
         "v1": true,
@@ -1774,7 +1875,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-048": {
         "v1": true,
@@ -1789,7 +1892,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-049": {
         "v1": true,
@@ -1804,7 +1909,9 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       },
       "tme-pro-050": {
         "v1": true,
@@ -1819,10 +1926,24 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6": null,
+        "v10": null,
+        "v11": null
       }
     },
     "probed_corpus_sha256": "39f205b722948949cfa38eea8ca2c88798b64311506520162cd675437831a2a4",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run.",
+    "paired_arms": {
+      "pairs": 19,
+      "pair_v1_both_arms": "18/19",
+      "pair_v9_both_arms": "6/19",
+      "pair_headroom": 0.6316,
+      "pair_floor_scaled": 0.213,
+      "pair_separation_sd": 5.878,
+      "pair_separation_floor_sd": 2.0,
+      "pair_discriminates": true,
+      "pair_v8_both_arms": "17/19",
+      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
+    }
   }
 }

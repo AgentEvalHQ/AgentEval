@@ -283,6 +283,65 @@ public class TypedMemEvalDiscriminationTests
         }
     }
 
+    /// <summary>
+    /// A corpus that declares paired arms must have a sidecar that scores them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Wired from the corpus, not from the sidecar, for the same reason the V6 redundancy check is:
+    /// asking only whether the published block looks reasonable lets the runner decide what it is
+    /// willing to measure. The corpus says which questions carry a <c>pair_id</c>; the sidecar must
+    /// then report a pair figure over them.
+    /// </para>
+    /// <para>
+    /// Forgetting shipped 30 paired questions and no pair figure for the life of the vertical.
+    /// <c>_pair_discrimination</c> is called per shape — right for Bitemporal, whose arms are two
+    /// questions in one shape, and empty for Forgetting, whose arms ARE its shapes. An instrument
+    /// that returns nothing is indistinguishable from a vertical that has nothing to report, and
+    /// this release found three of those in one arc.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void VerticalsWithPairedArms_PublishAPairFigure(TypedMemEvalVertical vertical)
+    {
+        var paired = 0;
+        foreach (var question in JsonDocument.Parse(TypedMemEvalCorpus.ReadJson(vertical))
+                     .RootElement.EnumerateArray())
+        {
+            if (question.TryGetProperty("typedmemeval", out var extension)
+                && extension.TryGetProperty("pair_id", out var pairId)
+                && !string.IsNullOrWhiteSpace(pairId.GetString()))
+            {
+                paired++;
+            }
+        }
+
+        if (paired == 0)
+        {
+            Assert.Null(PairedArms(vertical));
+            return;
+        }
+
+        var block = PairedArms(vertical);
+        Assert.True(
+            block.HasValue,
+            $"{vertical} has {paired} questions carrying a pair_id and publishes no `paired_arms` "
+            + "block. The pairing is the vertical's acceptance argument; an unreported pair figure "
+            + "reads identically to a vertical that has no pairs.");
+
+        // Publishing the block is not the same as measuring it. A block that scored nothing must
+        // say so, and must not be read as a clean result.
+        Assert.True(
+            block!.Value.GetProperty("pairs").GetInt32() > 0,
+            $"{vertical} publishes a pair block over zero scored pairs. See its "
+            + "`pairs_incomplete` list: the arms never came together.");
+        Assert.False(
+            block.Value.TryGetProperty("unmeasured", out _),
+            $"{vertical}'s pairs are complete but were never measured on both arms. Re-probe "
+            + "before shipping this corpus.");
+    }
+
     private static JsonElement? PairedArms(TypedMemEvalVertical vertical)
     {
         var metadata = JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical)).RootElement;
