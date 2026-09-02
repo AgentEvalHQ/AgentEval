@@ -190,6 +190,23 @@ public class TypedMemEvalDiscriminationTests
     /// <summary>Minimum <c>V8 − chance</c> for a shape scored on the reader.</summary>
     private const double ReaderMarginOverChance = 0.30;
 
+    /// <summary>
+    /// Sub-populations of a shape whose halves discriminate differently, with the measured value.
+    /// </summary>
+    /// <remarks>
+    /// A shape that mixes questions naming their own candidates with questions that do not has two
+    /// populations and one headline number. <c>prospective/seed-carry-over</c> publishes headroom
+    /// <b>0.3333</b>, which is the average of <b>0.60</b> over its 5 open questions and <b>0.1429</b>
+    /// over its 7 yes/no ones — the second below the floor, and against a 0.50 chance floor at that.
+    /// The questions are CARRIED from the timegrounded corpus, so the mixture is a property of the
+    /// source and cannot be rewritten away; reporting it is the whole remedy.
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical, string, string), double> WeakHalves =
+        new()
+        {
+            [(TypedMemEvalVertical.Prospective, "seed-carry-over", "guessable")] = 0.1429,
+        };
+
     public static TheoryData<TypedMemEvalVertical> AllVerticals()
     {
         var data = new TheoryData<TypedMemEvalVertical>();
@@ -267,6 +284,53 @@ public class TypedMemEvalDiscriminationTests
                 + $"{DiscriminationFloor} floor: a perfect selector and a plain lexical one score "
                 + "close enough that this shape cannot rank two systems. Either redesign it, or "
                 + "add it to PendingRedesign with its measured value and a reason.");
+        }
+    }
+
+    /// <summary>
+    /// Where a shape publishes a split, BOTH halves are checked — never just the mean.
+    /// </summary>
+    /// <remarks>
+    /// The mean is what hides a weak half, so a gate that reads only the mean is the averaging
+    /// defect wearing a passing grade. Halves may be declared in <see cref="WeakHalves"/> with
+    /// their measured value and may then improve but not regress.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void SplitShapes_AreCheckedOnBothHalves(TypedMemEvalVertical vertical)
+    {
+        foreach (var (shape, record) in ByShape(vertical))
+        {
+            if (!record.TryGetProperty("chance_floor_partial", out var partial))
+                continue;
+
+            foreach (var name in new[] { "guessable", "open" })
+            {
+                Assert.True(
+                    partial.TryGetProperty(name, out var half),
+                    $"{vertical} shape '{shape}' publishes a partial chance floor without its "
+                    + $"'{name}' half. The warning without the split is not actionable.");
+
+                if (!half.TryGetProperty("headroom_perfect_selector", out var h))
+                    continue;
+
+                var headroom = h.GetDouble();
+                if (WeakHalves.TryGetValue((vertical, shape, name), out var recorded))
+                {
+                    Assert.True(
+                        headroom >= recorded - 1e-4,
+                        $"{vertical} shape '{shape}' half '{name}' REGRESSED: {headroom:F4} "
+                        + $"against a recorded {recorded:F4}.");
+                    continue;
+                }
+
+                Assert.True(
+                    headroom >= DiscriminationFloor,
+                    $"{vertical} shape '{shape}' half '{name}' has headroom {headroom:F4}, below "
+                    + $"the {DiscriminationFloor} floor, while the shape's MEAN passes. That mean "
+                    + "is the average of two populations; declare the half in WeakHalves with its "
+                    + "measured value, or fix it.");
+            }
         }
     }
 

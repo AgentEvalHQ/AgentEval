@@ -769,7 +769,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T06:19:55Z",
+    "run_at": "2026-09-02T13:08:09Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -814,7 +814,32 @@
       "applicable": 0,
       "passed": 0,
       "failed": [],
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "excluded_declared_redundant": [],
+      "excluded_no_load_bearing_claim": [
+        "tme-epi-021",
+        "tme-epi-022",
+        "tme-epi-023",
+        "tme-epi-024",
+        "tme-epi-025",
+        "tme-epi-026",
+        "tme-epi-027",
+        "tme-epi-028",
+        "tme-epi-029",
+        "tme-epi-030",
+        "tme-epi-031",
+        "tme-epi-032",
+        "tme-epi-033",
+        "tme-epi-034",
+        "tme-epi-035",
+        "tme-epi-038",
+        "tme-epi-039",
+        "tme-epi-041",
+        "tme-epi-042",
+        "tme-epi-047"
+      ],
+      "excluded_not_decidable": [],
+      "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
+      "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one",
       "not_applicable_reason": "V6 is not defined for episodic"
     },
     "empty_completions": {
@@ -823,75 +848,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 15440,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 355,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4213,
-        "empty": 9,
-        "rate": 0.0021,
-        "judge_calls": 1392,
+        "calls": 150,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 111,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 3762,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 2010,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1528,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
@@ -1382,6 +1407,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1399,6 +1425,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1416,6 +1443,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1433,6 +1461,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1450,6 +1479,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1467,6 +1497,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1484,6 +1515,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1501,6 +1533,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1518,6 +1551,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1535,6 +1569,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1552,6 +1587,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1569,6 +1605,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1586,6 +1623,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1603,6 +1641,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1620,6 +1659,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1677,6 +1717,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1696,6 +1737,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1734,6 +1776,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1753,6 +1796,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1848,6 +1892,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },

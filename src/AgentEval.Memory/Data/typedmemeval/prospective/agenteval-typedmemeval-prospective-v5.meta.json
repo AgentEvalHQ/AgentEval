@@ -730,7 +730,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T06:19:56Z",
+    "run_at": "2026-09-02T13:08:09Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -801,7 +801,31 @@
       "applicable": 0,
       "passed": 0,
       "failed": [],
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "excluded_declared_redundant": [],
+      "excluded_no_load_bearing_claim": [
+        "tme-pro-001",
+        "tme-pro-002",
+        "tme-pro-003",
+        "tme-pro-004",
+        "tme-pro-033",
+        "tme-pro-034",
+        "tme-pro-035",
+        "tme-pro-036",
+        "tme-pro-037",
+        "tme-pro-039",
+        "tme-pro-040",
+        "tme-pro-041",
+        "tme-pro-042",
+        "tme-pro-043",
+        "tme-pro-045",
+        "tme-pro-046",
+        "tme-pro-048",
+        "tme-pro-049",
+        "tme-pro-050"
+      ],
+      "excluded_not_decidable": [],
+      "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
+      "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one",
       "not_applicable_reason": "V6 is not defined for prospective"
     },
     "empty_completions": {
@@ -810,75 +834,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 49,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 15440,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 120,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4213,
-        "empty": 9,
-        "rate": 0.0021,
-        "judge_calls": 1392,
+        "calls": 81,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 17,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 3762,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 2010,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1528,
+        "judge_calls": 47,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
@@ -1123,7 +1147,29 @@
           "floor": 0.5,
           "questions_with_a_floor": 7,
           "questions": 12,
-          "reading": "Only some questions in this shape name their own candidates, so no single floor describes it. Read the shape's arms as a MIXTURE of guessable and non-guessable items, and decompose before comparing two systems on it."
+          "reading": "Only some questions in this shape name their own candidates, so no single floor describes it, and the shape's headline arms average two populations with different properties. The split is published below: compare two systems on the halves, never on the shape's mean.",
+          "guessable": {
+            "questions": 7,
+            "v1_passed": 7,
+            "v1_applicable": 7,
+            "v8_passed": 7,
+            "v8_applicable": 7,
+            "v9_passed": 6,
+            "v9_applicable": 7,
+            "headroom_perfect_selector": 0.1429,
+            "chance_floor": 0.5
+          },
+          "open": {
+            "questions": 5,
+            "v1_passed": 5,
+            "v1_applicable": 5,
+            "v8_passed": 5,
+            "v8_applicable": 5,
+            "v9_passed": 2,
+            "v9_applicable": 5,
+            "headroom_perfect_selector": 0.6,
+            "chance_floor": null
+          }
         },
         "headroom_perfect_selector": 0.3333,
         "discriminates": true,
@@ -1147,6 +1193,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1164,6 +1211,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1181,6 +1229,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1198,6 +1247,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1654,6 +1704,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1671,6 +1722,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1688,6 +1740,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1705,6 +1758,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1722,6 +1776,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1756,6 +1811,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1773,6 +1829,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1790,6 +1847,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1807,6 +1865,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1824,6 +1883,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1858,6 +1918,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1875,6 +1936,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1909,6 +1971,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1926,6 +1989,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
@@ -1943,6 +2007,7 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       }

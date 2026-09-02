@@ -1715,6 +1715,36 @@ def _chance_floor(group: list[dict], floors: dict) -> dict:
         # own candidates and 5 that do not. Publishing 0.5 as the shape's floor would apply a
         # guesser's advantage to five questions that never offered one -- a diluted denominator,
         # in the flattering direction for whichever arm sits above it.
+        # AND PUBLISH THE DECOMPOSITION, not just the warning.
+        #
+        # The first version of this block said "decompose before comparing two systems on it" and
+        # then handed the reader nothing to decompose with. Doing it here costs nothing -- the
+        # per-question records are already in hand -- and it turns a caveat into data.
+        #
+        # It matters. `prospective/seed-carry-over` publishes headroom 0.3333 over 12 questions
+        # whose two halves behave nothing alike: its 5 open questions run V9 2/5 for a headroom of
+        # 0.60, its 7 yes/no questions run V9 6/7 for 0.143 -- BELOW the discrimination floor, and
+        # against a 0.50 chance floor at that. One number over two populations with opposite
+        # properties is the diluted-denominator shape at the level of a shape rather than a rate.
+        #
+        # The questions are CARRIED from the timegrounded corpus, so the mixture is a property of
+        # the source and not something to rewrite away. Reporting it is the whole remedy available.
+        with_floor = {r["question_id"] for r, (f, _) in zip(group, rows) if f is not None}
+
+        def half(ids: set) -> dict:
+            members = [r for r in group if r["question_id"] in ids]
+            row = {"questions": len(members)}
+            for arm in ("v1", "v8", "v9"):
+                usable = [r for r in members if r.get(arm) is not None]
+                if usable:
+                    row[f"{arm}_passed"] = sum(1 for r in usable if r[arm])
+                    row[f"{arm}_applicable"] = len(usable)
+            v1n, v9n = row.get("v1_applicable"), row.get("v9_applicable")
+            if v1n and v9n:
+                row["headroom_perfect_selector"] = round(
+                    row["v1_passed"] / v1n - row["v9_passed"] / v9n, 4)
+            return row
+
         return {
             "chance_floor_partial": {
                 "floor": floor,
@@ -1722,8 +1752,12 @@ def _chance_floor(group: list[dict], floors: dict) -> dict:
                 "questions": len(group),
                 "reading": (
                     "Only some questions in this shape name their own candidates, so no single "
-                    "floor describes it. Read the shape's arms as a MIXTURE of guessable and "
-                    "non-guessable items, and decompose before comparing two systems on it."),
+                    "floor describes it, and the shape's headline arms average two populations "
+                    "with different properties. The split is published below: compare two systems "
+                    "on the halves, never on the shape's mean."),
+                "guessable": {**half(with_floor), "chance_floor": floor},
+                "open": {**half({r["question_id"] for r in group} - with_floor),
+                         "chance_floor": None},
             }
         }
     reason = next(r for f, r in rows if f is not None)
@@ -2301,6 +2335,16 @@ def self_test() -> None:
           row["chance_floor_partial"]["questions_with_a_floor"], 2)
     check("out of how many", row["chance_floor_partial"]["questions"], 3)
 
+    # The partial block must carry the SPLIT, not just a warning to go and find one.
+    split = _chance_floor(part, {"qTrue0.5": (0.5, "a"), "qFalse0.5": (0.5, "a"),
+                                 "plain": (None, None)})["chance_floor_partial"]
+    check("the guessable half is counted", split["guessable"]["questions"], 2)
+    check("the open half is counted", split["open"]["questions"], 1)
+    check("the guessable half carries the floor", split["guessable"]["chance_floor"], 0.5)
+    check("the open half carries none", split["open"]["chance_floor"], None)
+    check("and the halves partition the shape",
+          split["guessable"]["questions"] + split["open"]["questions"], split["questions"])
+
     # The question-derived floor, which is the half that had never reached the accuracy arms.
     check("a two-candidate question yields k=2", closed_choice_k("Was that me or you?"), 2)
     check("and an open question yields none", closed_choice_k("Which courier is it?"), None)
@@ -2316,7 +2360,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 11 chance-floor cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 16 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
