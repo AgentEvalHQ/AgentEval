@@ -78,7 +78,7 @@ as sensitive data: restrict access, retention, and publication.
 
 ### Typed outcomes, never one percentage
 
-> **Thirteen of the 31 shapes carry fewer than 15 questions, and their figures support diagnosis
+> **Thirteen of the 32 shapes carry fewer than 15 questions, and their figures support diagnosis
 > rather than claims.** ADR-026 says this about the family's cell sizes and the published tables never
 > repeated it, so a six-question rate has been reading like a measurement. The threshold is a
 > judgement — 15 is where a single question stops moving a rate by more than ~7 points — but the
@@ -90,9 +90,11 @@ as sensitive data: restrict access, retention, and publication.
 > | `workingmemory` | all five distance rungs (12 each) |
 > | `arithmetic` | `delta` (10), `duration` (12), `count` (14), `sum` (14) |
 >
-> On a six-question shape one question is 0.167 of the rate, so `not-yet-true`'s headroom of 0.1667
-> **is one question**. Quote these shapes to diagnose where a system struggles; do not quote them as
-> a measured capability, and do not rank two systems on a difference of one or two items.
+> On a six-question shape one question is 0.167 of the rate. `not-yet-true` illustrates both
+> directions: its headroom was **0.1667 — one question** while the shape was saturated, and is
+> **0.50** now that its distractors compete. Quote these shapes to diagnose where a system
+> struggles; do not quote them as a measured capability, and do not rank two systems on a
+> difference of one or two items.
 
 Every result reports a vector, per vertical and per shape, always with its `n`:
 
@@ -183,6 +185,15 @@ the framing from a bank of five, selected per question and **independently of wh
 answer**, so the wording no longer carries it. The shape got harder in exactly the way that predicts:
 its oracle pass rate moved 13/15 → 12/15, and V2 non-inferability reads 50/50 on a corpus where the
 turn-role sequence also carries nothing (see ADR-026 §18).
+
+**Superseded as of the current corpus.** The shape now has three arms — `me`, `you`, and
+`both of us` — which drops the chance floor from 1/2 to 1/3, and its calibration echo no longer
+scatters the quoted statement across both speaker roles. That echo was the shape's only source of
+retrieval difficulty AND an answer leak, so removing it took V9 from 12/15 to 15/15 and headroom
+from 0.20 to −0.0667. The shape is now scored on the READER rather than on retrieval: the probe
+harness labels every turn with its role, so provenance is free for our reference stack and it
+cannot fail this shape for the reason the shape exists to test. What it discriminates is a memory
+layer that flattens conversations and drops the speaker. See ADR-028 §18.
 
 The caveat: the frame is fixed *within* a question and there are five of them across fifteen
 questions, so each recurs about three times. That bounds how much framing variety the shape
@@ -282,7 +293,7 @@ Source-attribution is the awkward one by design — the answer is not a value in
 property of *where the value came from*, which a system that flattens history into a current-state
 snapshot cannot recover even when it holds the right value.
 
-### Conjunction (50 questions)
+### Conjunction (65 questions)
 
 Twenty value-then-count, fifteen alias-then-count, fifteen order-then-value. Each question needs a
 fact of one memory type resolved **and** an operation of another type applied to it. Retrieving
@@ -320,15 +331,15 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.617 | 1 (×29), 2 (×13), 3 (×4), 4 (×4) |
-| Episodic | 50 | 0.688 | 1 (×35), 4 (×4), 5 (×4), 6 (×3), 7 (×4) |
+| Prospective | 50 | 0.633 | 1 (×31), 2 (×8), 3 (×8), 4 (×3) |
+| Episodic | 50 | 0.788 | 1 (×30), 2 (×5), 4 (×4), 5 (×4), 6 (×3), 7 (×4) |
 | Arithmetic | 50 | 0.758 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
-| WorkingMemory | 60 | 0.867 | 1 (×60) |
-| Forgetting | 50 | 0.629 | 0 (×15), 2 (×35) |
+| WorkingMemory | 60 | 0.600 | 1 (×60) |
+| Forgetting | 50 | 0.686 | 0 (×15), 2 (×35) |
 | Bitemporal | 60 | 0.750 | 1 (×60) |
 | Temporal | 50 | 0.704 | 2 (×15), 3 (×11), 4 (×12), 5 (×12) |
-| Semantic | 50 | 0.677 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
-| Conjunction | 50 | 0.581 | 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
+| Semantic | 50 | 0.667 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
+| Conjunction | 65 | 0.604 | 2 (×15), 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -390,7 +401,7 @@ means those four were measured against *this* corpus, not that they were measure
 | **V3** Distractor plausibility | Given only the *non-gold* sessions, the model must **not** produce the gold answer — the dual of V1, and the only real defence against a distractor that accidentally contains the answer. |
 | **V4** No absolute dates | For time-dependent verticals, no four-digit year and no absolute date in any message content. |
 | **V5** Gold derived, not typed | Generators derive every gold answer from the sessions they emitted. |
-| **V6** Component non-redundancy | For Arithmetic and Forgetting, ablating any single gold component must stop the model producing the gold. |
+| **V6** Component non-redundancy | Wherever a question DECLARES its gold components load-bearing — a per-question, and where a shape mixes the two kinds a per-component, declaration — ablating one must stop the model producing the gold. |
 
 Shipped probe records (reference deployment `gpt-5.5`, per-question outcomes in each corpus's
 `.meta.json`). Dashes are not-applicable rather than skipped, but for different reasons per column, and the
@@ -403,15 +414,15 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
-| Prospective | 50/50 | 19/19 | 50/50 | 29/29 | — | 36/50 | 23/50 | +0.54 |
-| Episodic | 50/50 | — | 50/50 | 35/35 | — | 49/50 | 30/50 | +0.40 |
+| Prospective | 49/50 | 18/19 | 50/50 | 27/27 | — | 48/50 | 22/50 | +0.54 |
+| Episodic | 49/50 | — | 50/50 | 50/50 | — | 50/50 | 33/50 | +0.32 |
 | Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 19/50 | +0.62 |
-| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 53/60 | +0.12 |
-| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/35 | 31/35 | 21/35 | +0.37 |
+| WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 37/60 | +0.38 |
+| Forgetting | 33/35 | 13/15 | 35/35 | 35/35 | 20/20 | 35/35 | 23/35 | +0.29 |
 | Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 57/60 | 41/60 | +0.32 |
-| Temporal | 50/50 | — | 50/50 | 30/30 | — | 50/50 | 19/50 | +0.62 |
-| Semantic | 50/50 | — | 50/50 | 48/50 | — | 48/50 | 34/50 | +0.32 |
-| Conjunction | 50/50 | — | 50/50 | 49/50 | — | 49/50 | 14/50 | +0.72 |
+| Temporal | 50/50 | — | 50/50 | 30/30 | 30/30 | 50/50 | 19/50 | +0.62 |
+| Semantic | 49/50 | — | 48/50 | 50/50 | 15/15 | 49/50 | 30/50 | +0.38 |
+| Conjunction | 65/65 | — | 65/65 | 65/65 | 50/50 | 63/65 | 16/65 | +0.75 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**
@@ -437,17 +448,27 @@ gold is itself an abstention.
 > `headroom_reachable` alongside `limited_by`, which says whether a shape is retrieval-limited or
 > reasoning-limited (ADR-028 §3e).
 >
-> | shape | `V1 − V9` published | `V8 − V9` reachable | limited by |
-> |---|---|---|---|
-> | `prospective/due-window` | **0.94** | **0.17** | reasoning |
-> | `episodic/participant-attribution` | 0.20 | 0.13 | retrieval |
-> | `bitemporal/belief-at-instant` | 0.31 | 0.22 | retrieval |
-> | `temporal/occurrence-order` | 0.75 | 0.75 | retrieval |
+> | shape | `V1 − V9` published | `V8 − V9` reachable | limited by | chance floor |
+> |---|---|---|---|---|
+> | `prospective/due-window` | 0.8889 | 0.7778 | retrieval | — |
+> | `episodic/participant-attribution` | −0.0667 | 0.00 | — | 0.333 |
+> | `bitemporal/belief-at-instant` | 0.3056 | 0.2222 | retrieval | — |
+> | `temporal/occurrence-order` | **0.75** | **0.75** | retrieval | **0.500** |
 >
-> **Read the reachable column before buying retrieval work.** `due-window`'s V8 is 4/18 — a reader
-> holding the entire haystack still fails 78% of the time — so a team that responds to its 0.94 by
-> improving retrieval gets almost nothing. `occurrence-order`, where the two columns agree, is the
-> shape where retrieval work pays in full.
+> **Read the reachable column before buying retrieval work** — and now the chance floor beside it.
+>
+> `due-window` used to be the cautionary case here at 0.94 published against 0.17 reachable, because
+> a reader holding the entire haystack failed 78% of the time. Its answer key was wrong; V8 is now
+> 16/18 and the two columns nearly agree.
+>
+> `occurrence-order` replaces it as the number to read carefully, for a different reason. Its two
+> columns agree, so retrieval work does pay — but the question names its own two candidates, so a
+> reader with no evidence still reaches gold half the time. **Its 0.75 contains 0.50 that a coin
+> captures**, and its `v9_above_chance` is **−0.25**: our baseline scores *below* chance because it
+> declines rather than guessing. Compare systems on the distance above the floor, not on 0.75.
+>
+> `participant-attribution` is no longer a retrieval shape at all — see the note in its section
+> above and ADR-028 §18.
 >
 > Episodic's interference cost of **−0.04** is real rather than rounding: two `participant-attribution`
 > questions fail on gold alone and succeed on the whole haystack, because gold-only strips the
@@ -498,21 +519,37 @@ gold is itself an abstention.
 > scaffolding in and by **0.000** with it out — the artifact was covering for the ceiling.
 >
 > With both corrections applied, every band of every vertical sits on its ceiling. WorkingMemory,
-> which this guide previously named as the one validated ladder, reads 1.00 / 1.00 / 1.00 / 0.67 /
+> which this guide previously named as the one validated ladder, read 1.00 / 1.00 / 1.00 / 0.67 /
 > 0.75 as gated and **1.00 / 1.00 / 1.00 / 1.00 / 1.00** scaffolding-stripped: the gradient was the
 > clause. It could not have been otherwise — its dial is measured in *sessions between*, and BM25
 > has no position component.
 >
+> **That last sentence was right and its consequence was larger than this note drew.** If BM25 has
+> no position component then it cannot see the ladder's independent variable at all — so whatever
+> gradient the gated numbers showed was not distance. It was SIZE: the generator built
+> `distance + 1` sessions with gold pinned to session 0, so the haystack grew with the rung label
+> and the two variables moved as one. Confirmed by moving one gold to eleven indices of its own
+> haystack, with top-5 membership identical at every one.
+>
+> **The ladder now holds H constant at 60 non-gold sessions on every rung**, so gold position is the
+> only thing that moves and the reference retriever goes flat — V9 **9 / 7 / 7 / 6 / 8** of 12,
+> non-monotone and well inside the sampling noise at n=12. A control that cannot see the independent
+> variable is what makes a gradient in a consumer's system attributable to that variable. Two of the
+> five rungs discriminated before; all five do now. See ADR-028 §17.
+>
 > See ADR-026 §20. `validate_typedmemeval_difficulty.py` now applies both corrections, and would
 > refuse every stamp this family has issued.
 
-**Forgetting's V6 is 20/35 by construction, not by defect.** Its twenty invalidated questions pass:
+**Forgetting's V6 is 20/20, and it used to read 20/35.** Its twenty invalidated questions pass:
 ablating either the statement or the invalidation stops the model producing the gold, so both
 components are load-bearing. Its fifteen still-valid controls fail all fifteen, because their two
 components are a statement and a *re-affirmation of the same value* — ablating either leaves the
 other. That redundancy is deliberate: the control exists to catch over-forgetting, and a system
 that finds either mention has what it needs to say the fact still stands. Those questions carry
-`gold_components_redundant: true`. Read their per-component coverage as "either suffices", never as
+`gold_components_redundant: true` — **and the probe runner now reads that flag**, so they are
+excluded from the arm rather than counted as fifteen failures. A denominator of 35 pooled twenty
+real passes with fifteen declared not-applicables and read as a 57% validity rate on an arm that is
+clean where it is defined. Read their per-component coverage as "either suffices", never as
 "both were needed".
 
 V3 and V6 take **three** ablation samples per question, not one. A single sample can miss a leak
