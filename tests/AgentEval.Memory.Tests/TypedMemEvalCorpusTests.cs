@@ -1480,6 +1480,12 @@ public sealed class TypedMemEvalCorpusTests
     /// <summary>V6 pass rates that may improve but not regress.</summary>
     private static readonly Dictionary<TypedMemEvalVertical, double> V6Ratchet = new()
     {
+        // 49/50, and the one failure is understood: tme-ari-002 drops one of four order sessions
+        // and the reader answers "3 times" on two draws of three and "4 times" on the third,
+        // miscounting a mention-only session ("Meridian Tools sent their new catalogue over") as
+        // an order. Two draws show the answer WAS removed. V6 condemns on one hit because the
+        // question names no candidates, and inventing a chance floor over "plausible small
+        // integers" to make this 50/50 would be tuning to the number rather than deriving a bar.
         [TypedMemEvalVertical.Arithmetic] = 49.0 / 50.0,
         [TypedMemEvalVertical.Forgetting] = 1.0,
         [TypedMemEvalVertical.Conjunction] = 1.0,
