@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0-beta] - 2026-09-03
+
+**Cut for AgentMemory's C-D full-family run.** It carries the two fixes they named as blocking: `forgetting` at `be14b81ae4e2` (not `7fe6e166dbf1`), and the `prospective` due-window answer-key fix at `39f205b72294`.
+
 **Derived by diffing `v0.32.0-beta`, not written from memory.** Every table below comes from
 `git show v0.32.0-beta:<corpus>` against the working tree.
 
