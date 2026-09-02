@@ -746,15 +746,23 @@ public sealed class TypedMemEvalCorpusTests
             //
             // Declared rather than ratcheted so a future session reads "the band does not apply"
             // instead of "fix this". I nearly regenerated this corpus on the opposite reading.
-            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] =
-                "Easy rung of a declared distance ladder (h_is_independent_variable). A ladder " +
-                "needs rungs the system passes; calibrating this into band would mean making an " +
-                "eight-session-old fact hard to retrieve and would destroy the curve's baseline.",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] =
-                "Easy rung of a declared distance ladder — see distance-8.",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] =
-                "Middle rung of a declared distance ladder, 0.917 and falling as distance grows " +
-                "(40 -> 8/12, 60 -> 9/12). The descent IS the measurement.",
+            // WORKINGMEMORY'S THREE ENTRIES ARE GONE, and the reason is the comment above them.
+            // They read "an eight-session-old fact is easy to retrieve" — but the haystack was
+            // `distance + 1` sessions long, so the short rungs were easy because they were SMALL,
+            // not because the fact was recent, and BM25 cannot see recency at all. With H held
+            // constant every rung lands in band (0.667 / 0.583 / 0.583 / 0.500 / 0.667) and needs
+            // no exemption. An exemption that stops being necessary should be deleted, not kept.
+
+            [(TypedMemEvalVertical.Episodic, "participant-attribution")] =
+                "The question names a topic AND quotes the statement, so gold is the only session " +
+                "in the haystack carrying the whole query and no distractor can outrank it: " +
+                "coverage is 1.000 and no knob moves it. Its previous 0.667 was manufactured by a " +
+                "LEAK — the calibration echo scattered the quoted statement across both roles' " +
+                "filler, which is what made filler compete AND what let a gold-ablated reader " +
+                "answer \"both of us\" on 3 draws of 3. Removing the leak removed the difficulty. " +
+                "Two kinds of near-miss (same topic/other claim, same claim/other topic) were " +
+                "added and do not move it either. This shape is scored on the READER instead — " +
+                "see ScoredOnTheReader in TypedMemEvalDiscriminationTests.",
 
             [(TypedMemEvalVertical.Prospective, "due-window")] =
                 "Names no entity by construction, so BM25 has nothing to match on and coverage " +

@@ -730,7 +730,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T05:33:53Z",
+    "run_at": "2026-09-02T06:19:56Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -810,75 +810,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 49,
+        "judge_calls": 1509,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 15090,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 120,
+        "judge_calls": 5216,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 81,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 17,
+        "calls": 4108,
+        "empty": 9,
+        "rate": 0.0022,
+        "judge_calls": 1297,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 2623,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 1019,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1509,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 47,
+        "judge_calls": 1493,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       }
     },
     "v8_full_haystack": {
@@ -932,6 +932,7 @@
         "chance_floor": 0.5,
         "chance_floor_reason": "the question names its own 2 candidates, so a reader with no evidence still reaches gold at 1/2",
         "v9_above_chance": 0.25,
+        "v8_above_chance": 0.5,
         "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
         "headroom_perfect_selector": 0.25,
         "discriminates": true,
@@ -1024,6 +1025,7 @@
         "chance_floor": 0.5,
         "chance_floor_reason": "the question names its own 2 candidates, so a reader with no evidence still reaches gold at 1/2",
         "v9_above_chance": 0.1667,
+        "v8_above_chance": 0.5,
         "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
         "headroom_perfect_selector": 0.3333,
         "discriminates": true,

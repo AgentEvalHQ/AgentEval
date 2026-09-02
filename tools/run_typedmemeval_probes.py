@@ -1652,14 +1652,24 @@ def _chance_floor(group: list[dict], floors: dict) -> dict:
             }
         }
     reason = next(r for f, r in rows if f is not None)
-    applicable = [r for r in group if r.get("v9") is not None]
-    if not applicable:
+    def above(arm: str) -> float | None:
+        rows_for = [r for r in group if r.get(arm) is not None]
+        if not rows_for:
+            return None
+        return round(sum(1 for r in rows_for if r[arm]) / len(rows_for) - floor, 4)
+
+    v9_above = above("v9")
+    if v9_above is None:
         return {"chance_floor": floor, "chance_floor_reason": reason}
-    v9 = sum(1 for r in applicable if r["v9"]) / len(applicable)
     return {
         "chance_floor": floor,
         "chance_floor_reason": reason,
-        "v9_above_chance": round(v9 - floor, 4),
+        "v9_above_chance": v9_above,
+        # V8 TOO, because a shape can be scored on the reader rather than the retriever. Where the
+        # reference stack cannot fail a shape's retrieval -- episodic/participant-attribution, whose
+        # answer is a role and whose transcript labels every turn with its role -- V9 says nothing
+        # and V8-above-chance is the quantity that carries a bar.
+        **({"v8_above_chance": above("v8")} if above("v8") is not None else {}),
         "chance_floor_reading": (
             "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this "
             "shape. At or below zero the lexical baseline is not beating chance, so read the "

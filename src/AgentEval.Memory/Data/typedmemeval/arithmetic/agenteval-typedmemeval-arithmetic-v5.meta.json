@@ -929,75 +929,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1509,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 15090,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 140,
+        "judge_calls": 5216,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 150,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 45,
+        "calls": 4108,
+        "empty": 9,
+        "rate": 0.0022,
+        "judge_calls": 1297,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 675,
+        "calls": 2623,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 230,
+        "judge_calls": 1019,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1509,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1509,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1493,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       }
     },
     "v8_full_haystack": {

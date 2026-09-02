@@ -56,6 +56,10 @@ public class TypedMemEvalCoverageBandTests
             // BETTER value so it cannot drift back: the decoy designation's event count now
             // differs from gold's, which changed how many sessions the shape carries.
             [(TypedMemEvalVertical.Conjunction, "alias-then-count")] = 0.4344,
+            // Structural, not debt: the question carries the whole gold session's content, so
+            // nothing can outrank it. Declared here rather than tuned — its old in-band 0.667 came
+            // from an answer leak. See UncalibratableShapes in TypedMemEvalCorpusTests.
+            [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 1.0000,
             [(TypedMemEvalVertical.Prospective, "due-window")] = 0.4352,
             [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
         };

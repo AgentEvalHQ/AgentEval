@@ -753,6 +753,90 @@ decomposition would be two ladders — distance at constant H, and volume at con
 only the first exists. A consumer whose system degrades with context length will see that as a flat
 line here, not as a finding. **That dimension is unmeasured, not clean.**
 
+## 18. Amendment, 2026-09-02 — the calibration echo was the difficulty AND the leak
+
+`episodic/participant-attribution` published headroom **0.20**. All of it came from an answer leak,
+and removing the leak removed the headroom. That is the finding; the rest is how it surfaced.
+
+### 18a. Found by adding a third arm
+
+The shape asked *"Was that me or you?"* — **k=2**, so a reader with no evidence lands gold half the
+time. Measured: gold sat in BM25's top-5 on **10 of 15** questions and V9 scored **12 of 15**.
+Retrieve ten, guess half the remaining five: 12.5. The published headroom was the gap between a
+perfect selector and *a lexical one plus a coin*, and no amount of retrieval work closes the coin's
+half.
+
+The floor is 1/k, so the only lever is a third candidate. **`both`** is the right one: it keeps
+G > 0 — a `neither` arm would recreate the no-gold hole §13 just closed in Forgetting — and it tests
+a real attribution failure, a system that finds one mention and stops. Marginal 5/5/5, so
+majority-class guessing is worth exactly the 1/3 floor.
+
+The arm was phrased *"me or you or both of us"* rather than *"me, you, or both of us"* deliberately:
+`closed_choice_k` counts `" or "` occurrences and does not parse comma-separated alternatives, so
+the comma form reads as k=2. **That detector feeds V2's and V3's chance-aware thresholds**, so
+changing it needs its own measured arc — and no shipped question trips the comma case, making the
+bug latent rather than live. Recorded here so the next author does not discover it by shipping it.
+
+### 18b. What the `both` arm exposed
+
+V3 failed it immediately — 3 draws of 3, with **both** gold sessions ablated — and the model said
+why:
+
+> *"the 'corner / pharmacy / shuts / hour / lunch' pieces show up in both your messages and mine …
+> it appears only as fragments in the 'Also on my mind' lists from both you and me."*
+
+`weave_echo` splices the echo source's content words into filler turns, **alternating the role** it
+attaches to — deliberately, because parking it on the user turn would tilt every answer toward "you
+said it". But the question quotes the statement verbatim, so echoing the whole question scattered
+the statement's own vocabulary across **both roles'** filler. For a shape whose answer *is* which
+role said it, that is the answer.
+
+**It had been there for every arm.** The single-speaker arms hid it because naming the right one of
+*two* speakers from scattered fragments is a coin flip, and a coin flip does not reach V3's
+threshold. Three candidates and a `both` answer made the same leak reach 3-of-3.
+
+### 18c. The trade, stated plainly
+
+Echoing the topic instead of the whole question closes the leak — V3 goes to 15/15 — and
+**coverage went straight to 1.000**. Two further attempts did not move it:
+
+| distractor | competes on | coverage |
+|---|---|---|
+| other claims about the **same topic** | topic words | 1.000 |
+| the **same claim** about other topics | statement words | 1.000 |
+| both kinds together | most of the query | 1.000 |
+
+The question names a topic **and** quotes a statement, so gold is the only session carrying the whole
+query and nothing can outrank it. **The shape's entire retrieval difficulty had been manufactured by
+the mechanism that was also giving away the answer**, and no distractor engineering restores it
+without restoring the leak.
+
+Measured after: V1 14/15, V8 15/15, **V9 15/15**, headroom −0.0667.
+
+### 18d. So it is scored on the reader, and the bar is on the reader
+
+`render()` emits every turn as `"{role}: {content}"`. **Provenance is free for any reader of the
+transcript**, so our reference stack cannot fail this shape for the reason it exists to test. What
+it discriminates is a consumer's memory layer that *flattens* conversations into facts and drops the
+speaker — a real and common design — and it cannot discriminate ours.
+
+That is the same situation as §17's WorkingMemory ladder read from the other end: there the
+reference retriever was **blind** to the independent variable, here it has **perfect** access to it.
+Both mean the baseline is a control, not a measurement.
+
+Declared as `ScoredOnTheReader`, exempt from the retrieval-headroom floor, and taking a bar it could
+fail: **V8 − chance ≥ 0.30**. Failing that would mean the reference model mis-attributes with the
+labelled answer in front of it, which is a corpus defect — ambiguous gold — not a retrieval result.
+It currently reads **+0.667**.
+
+### 18e. Two stale exemptions deleted on the way past
+
+`UncalibratableShapes` still carried WorkingMemory's three short rungs, reading *"an eight-session-old
+fact is easy to retrieve"*. They were easy because the haystack was **small** (§17), not because the
+fact was recent, and BM25 cannot see recency at all. Every rung is now in band and needs no
+exemption. They had been passing silently — an exemption never fails, so a stale one is invisible
+until someone reads it.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best

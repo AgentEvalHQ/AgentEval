@@ -151,6 +151,45 @@ public class TypedMemEvalDiscriminationTests
                 "over-forgetting control — the capability is the pair, not the arm",
         };
 
+    /// <summary>
+    /// Shapes whose answer the <b>harness itself</b> hands the reference reader, scored on the
+    /// reader rather than on retrieval.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>episodic/participant-attribution</c> asks which participant said something, and
+    /// <c>render()</c> emits every turn as <c>"{role}: {content}"</c>. So provenance is free for any
+    /// reader of the transcript, and our reference stack cannot fail this shape for the reason it
+    /// exists to test. It discriminates a consumer's memory layer that <i>flattens</i> conversations
+    /// into facts and drops the speaker — which is a real and common design — and it cannot
+    /// discriminate ours.
+    /// </para>
+    /// <para>
+    /// <b>This was not visible until a leak was fixed.</b> The shape published headroom 0.20, and
+    /// all of that difficulty came from the calibration echo scattering the quoted statement across
+    /// both roles' filler — which is also what let a gold-ablated reader answer "both of us", 3
+    /// draws of 3. Removing the leak removed the difficulty with it: V9 went 12/15 to 15/15.
+    /// Distractor engineering cannot restore it, because the question names a topic AND quotes a
+    /// statement, so gold is the only session carrying the whole query.
+    /// </para>
+    /// <para>
+    /// <b>The bar is on the reader.</b> With the full labelled transcript, attribution must land
+    /// well above the 1/3 chance floor the three-way question sets. Failing that would mean the
+    /// reference model mis-attributes with the answer in front of it, which is a corpus defect
+    /// (ambiguous gold), not a retrieval result.
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical, string), string> ScoredOnTheReader =
+        new()
+        {
+            [(TypedMemEvalVertical.Episodic, "participant-attribution")] =
+                "the answer is a role and the transcript labels every turn with its role, so the "
+                + "reference retriever cannot fail it; the bar is V8 against the chance floor",
+        };
+
+    /// <summary>Minimum <c>V8 − chance</c> for a shape scored on the reader.</summary>
+    private const double ReaderMarginOverChance = 0.30;
+
     public static TheoryData<TypedMemEvalVertical> AllVerticals()
     {
         var data = new TheoryData<TypedMemEvalVertical>();
@@ -178,6 +217,21 @@ public class TypedMemEvalDiscriminationTests
 
             if (SaturatedByDesign.ContainsKey((vertical, shape)))
                 continue;
+
+            if (ScoredOnTheReader.ContainsKey((vertical, shape)))
+            {
+                // Not a skip — a different bar, on the arm this shape can actually fail.
+                Assert.True(
+                    record.TryGetProperty("v8_above_chance", out var v8Above),
+                    $"{vertical} shape '{shape}' is scored on the reader but publishes no "
+                    + "`v8_above_chance`. It needs a chance floor to be scored against one.");
+                Assert.True(
+                    v8Above.GetDouble() >= ReaderMarginOverChance,
+                    $"{vertical} shape '{shape}' attributes at only {v8Above.GetDouble():F4} above "
+                    + "chance WITH the full labelled transcript in context. That is a corpus "
+                    + "defect — ambiguous gold — not a retrieval result.");
+                continue;
+            }
 
             if (ScoredOnPairedArms.ContainsKey((vertical, shape)))
             {
@@ -261,7 +315,8 @@ public class TypedMemEvalDiscriminationTests
                 continue;   // scored on headroom; the two gates above own it
 
             Assert.True(
-                ScoredOnAbstention.ContainsKey((vertical, shape)),
+                ScoredOnAbstention.ContainsKey((vertical, shape))
+                || ScoredOnTheReader.ContainsKey((vertical, shape)),
                 $"{vertical} shape '{shape}' publishes no headroom and is not declared as scored "
                 + "on another axis, so both discrimination gates skip it without a word. Either "
                 + "give it gold sessions, or add it to ScoredOnAbstention with the reason.");
