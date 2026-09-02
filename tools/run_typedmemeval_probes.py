@@ -1009,10 +1009,51 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # exactly, which is what a structural cause looks like next to a real one. The instrument was
     # scoped per VERTICAL and the redundancy is declared per SHAPE, so the flag the corpus
     # publishes for this purpose was never read. The arm is 20/20 where it is defined.
-    redundant = bool((entry.get("typedmemeval") or {}).get("gold_components_redundant"))
-    if len(golds) > 1 and vertical in ("arithmetic", "forgetting") and decidable and not redundant:
+    #
+    # SCOPE IS DECLARED PER QUESTION, NOT HARDCODED PER VERTICAL.
+    #
+    # It used to read `vertical in ("arithmetic", "forgetting")`, which is a right rule with too
+    # small a reach -- the applied-once shape. Three more generators state the same claim in their
+    # own comments and nothing tested it:
+    #
+    #   temporal      "every link is NECESSARY rather than redundant" -- all three shapes, each
+    #                 scoped to a window it can close on its own
+    #   semantic      co-reference: "the chain is the evidence, not just its endpoint"
+    #   conjunction   every gold session changes the answer if dropped: a count loses an event, a
+    #                 switch chain loses a hop, the conditional loses its rule or its state
+    #
+    # And the same list was hiding the opposite case: `semantic/current-value` must NOT be in scope.
+    # Dropping a MIDDLE replacement still leaves the latest one, so the answer survives and the
+    # component genuinely is redundant. A per-vertical list cannot express that; a per-question
+    # declaration can, which is the argument for the change rather than the coverage it buys.
+    extension = entry.get("typedmemeval") or {}
+    redundant = bool(extension.get("gold_components_redundant"))
+    load_bearing = bool(extension.get("gold_components_load_bearing"))
+    if len(golds) > 1 and load_bearing and decidable and not redundant:
+        # V6 NEEDS THE SAME CHANCE FLOOR V3 GOT, and it never received it.
+        #
+        # V3 draws 3 ablation samples and used to condemn on ONE hit; that was corrected on
+        # 2026-08-30 to the smallest h with P(X>=h | 1/k) < 0.05, because against a guesser
+        # choosing among k candidates a single hit in three arrives with probability
+        # 1-(1-1/k)^3 -- 0.875 at k=2, 0.704 at k=3. V6 is the dual arm and kept the old rule.
+        # Applied-once, the same shape as the curated exemption list that correction retired.
+        #
+        # It went unnoticed while no V6 question had candidates. Adding rival same-kind facts to
+        # semantic/co-reference created a three-way choice and V6 started condemning components
+        # that were doing their job: on tme-sem-021 the reader ABSTAINED on sample 0 -- "the
+        # conversations do not say when the boiler was replaced at the new flat" -- and guessed
+        # right on sample 1, and the component was recorded redundant on the strength of the guess.
+        #
+        # k comes from the same place the published chance floor does: the generator's declaration
+        # where the candidates live in the HAYSTACK, `closed_choice_k` where they are named in the
+        # question. Where neither applies, k is None and one hit still condemns, which is the
+        # correct rule for an open question.
+        v6_k = (round(1 / extension["chance_floor"]) if extension.get("chance_floor")
+                else closed_choice_k(question))
+        v6_needs = v3_required_hits(v6_k)
         survived = []
         silent_drops = []
+        undecidable_drops = []
         for dropped in golds:
             keep = [i for i in everything if i != dropped]
             saw_silence = False
@@ -1021,6 +1062,10 @@ def probe_question(entry: dict, vertical: str) -> dict:
             # `already_known` matters here too — without it the screen counts the year and the
             # numbers the prompt itself supplied as evidence the model reached the gold, which is
             # precisely the false positive the subtraction exists to remove.
+            # NO EARLY BREAK. With a bar above one hit the COUNT is the evidence, and a loop that
+            # stopped at the first hit could never be compared against a 3-of-3 threshold. Same
+            # correction, same reason, as V3's.
+            hits = 0
             for k in range(ABLATION_SAMPLES):
                 answer = complete(ask(question, date, subset(entry, keep)),
                                   cache_key=f"{key}:v6:{dropped}:{k}",
@@ -1031,16 +1076,26 @@ def probe_question(entry: dict, vertical: str) -> dict:
                 if produced_gold(
                         question, gold, answer, f"{key}:v6:{dropped}:{k}:judge",
                         require_distinctive=True, already_known=f"{question} {date}"):
-                    survived.append(dropped)
-                    break
-            else:
-                # No sample reproduced the answer without this component. That is only evidence
-                # the component is load-bearing if the model actually answered; silence here is
-                # the same false PASS as in V3, one level down.
-                if saw_silence:
-                    silent_drops.append(dropped)
+                    hits += 1
+            if v6_needs is None:
+                # No hit count within the sample budget separates a reproduction from a guess --
+                # k=2 leaves p=0.125 even at 3 of 3. Undecidable, and recorded as such rather than
+                # resolved in whichever direction is convenient.
+                undecidable_drops.append(dropped)
+            elif hits >= v6_needs:
+                survived.append(dropped)
+            elif saw_silence and hits + ABLATION_SAMPLES - hits >= v6_needs:
+                # Silence disqualifies only where it could CHANGE the verdict, the rule V2 and V3
+                # already use.
+                silent_drops.append(dropped)
+        if v6_k is not None:
+            record["v6_candidates"] = v6_k
+            record["v6_required_hits"] = v6_needs
         if survived:
             record["v6"] = False
+        elif undecidable_drops:
+            record["v6"] = None
+            record["v6_undecidable_drops"] = undecidable_drops
         elif silent_drops:
             record["v6"] = None
             record["v6_silent_drops"] = silent_drops
@@ -1050,8 +1105,15 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v6_redundant_components"] = survived
     else:
         record["v6"] = None
-        if redundant and len(golds) > 1:
-            record["v6_not_applicable"] = "gold_components_redundant"
+        if len(golds) > 1:
+            # WHICH of the reasons, because they are different facts. `redundant` is a design that
+            # says the components are interchangeable; `undeclared` is a design that makes no claim
+            # either way, and the arm has nothing to test. Collapsing them is how the 15 Forgetting
+            # controls read as failures for the life of that vertical.
+            record["v6_not_applicable"] = (
+                "gold_components_redundant" if redundant
+                else "not_decidable" if not decidable
+                else "no_load_bearing_claim")
 
     # V10 / V11 -- ABSTENTION. The only arms a never-known probe can carry, and until now it
     # carried none.
@@ -1343,7 +1405,19 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         "v6_leave_one_out": {
             **tally("v6"),
             **({"excluded_declared_redundant": sorted(
-                    r["question_id"] for r in records if r.get("v6_not_applicable")),
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "gold_components_redundant"),
+                "excluded_no_load_bearing_claim": sorted(
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "no_load_bearing_claim"),
+                # THE THIRD REASON, and it has to be published for the accounting to close. A
+                # question whose gold carries no content the prompt did not already supply is
+                # undecidable for the ablation arms -- V3 says so in its own block, and V6 shares
+                # the predicate. Temporal declares all 50 load-bearing and 20 land here; without
+                # this list, 20 declared claims would go unscored with nothing naming them.
+                "excluded_not_decidable": sorted(
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "not_decidable"),
                 "excluded_reading": (
                     "These questions publish `gold_components_redundant: true`: the design states "
                     "either component suffices, so ablating one leaves the other and V6 fails them "
@@ -1353,11 +1427,12 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "validity rate on an arm that is clean where it is defined.")}
                if any(r.get("v6_not_applicable") for r in records) else {}),
             "applies_to": (
-                "Arithmetic and Forgetting, on questions with more than one gold session. Those are "
-                "the verticals whose design claims every gold component is load-bearing; elsewhere "
-                "a question may have several gold sessions without the design promising each one is "
-                "individually necessary, and ablating them would report a defect never promised "
-                "against"
+                "questions that DECLARE `gold_components_load_bearing` and have more than one gold "
+                "session. The scope used to be a hardcoded list of two verticals; it is now a "
+                "per-question declaration, because three more generators state the same claim in "
+                "their own comments and nothing tested it, while `semantic/current-value` states "
+                "the opposite within a vertical the list would have swept in wholesale -- dropping "
+                "a middle replacement still leaves the latest one"
             ),
             **({"not_applicable_reason": (
                 f"V6 is not defined for {vertical}" if vertical not in ("arithmetic", "forgetting")
@@ -1954,7 +2029,10 @@ def self_test() -> None:
                            "2026/02/25 (Wed) 09:00"],
         "haystack_session_ids": ["s0", "s1", "s2"],
         "answer_session_ids": ["s0", "s1"],
-        "typedmemeval": {"shape": "duration"},
+        # DECLARES THE FLAG, because V6's scope is now a per-question declaration rather than a
+        # hardcoded vertical list. Without it this fixture stops exercising V6 at all and the
+        # silence case below quietly covers one arm fewer -- which is what the assertion caught.
+        "typedmemeval": {"shape": "duration", "gold_components_load_bearing": True},
     }
     real_complete = globals()["complete"]
     globals()["complete"] = lambda *a, **k: ""      # a model that returns nothing, every time

@@ -742,6 +742,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -1562,6 +1563,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -2382,6 +2384,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -2999,6 +3002,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -3703,6 +3707,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -4349,6 +4354,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -5024,6 +5030,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -5670,6 +5677,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -6229,6 +6237,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -6759,6 +6768,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -7289,6 +7299,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -7848,6 +7859,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -8552,6 +8564,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -9314,6 +9327,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -10018,6 +10032,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -10780,6 +10795,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -11540,6 +11556,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -12068,6 +12085,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -12828,6 +12846,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",
@@ -13530,6 +13549,7 @@
     ],
     "typedmemeval": {
       "shape": "invalidated",
+      "gold_components_load_bearing": true,
       "gold_components": [
         {
           "kind": "statement",

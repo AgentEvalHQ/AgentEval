@@ -1397,6 +1397,89 @@ public sealed class TypedMemEvalCorpusTests
         }
     }
 
+    /// <summary>
+    /// V6 must run on exactly the questions that DECLARE their components load-bearing, and its
+    /// pass rate may not regress.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Wired from the corpus like the redundancy check beside it. The scope used to be a hardcoded
+    /// <c>vertical in ("arithmetic", "forgetting")</c> — a right rule with too small a reach, which
+    /// is the applied-once shape. Three more generators state the same claim in their own comments
+    /// and nothing tested it. Extending it immediately refuted two of them.
+    /// </para>
+    /// <para>
+    /// The RATCHET is the useful half here. <c>semantic/co-reference</c> reads 9 of 15: six
+    /// questions still have a component that can be dropped without losing the answer, at a 3-of-3
+    /// bar against a declared 1/3 floor. That is a real declared residual, not a tolerance — it was
+    /// 4 of 15 before a chance-floor correction to V6 and a rival-fact fix to the corpus, and it may
+    /// improve but not get worse.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void V6_RunsOnEveryQuestionThatDeclaresItsComponentsLoadBearing(
+        TypedMemEvalVertical vertical)
+    {
+        var declared = 0;
+        foreach (var question in JsonDocument.Parse(TypedMemEvalCorpus.ReadJson(vertical))
+                     .RootElement.EnumerateArray())
+        {
+            if (!question.TryGetProperty("typedmemeval", out var extension))
+                continue;
+            var loadBearing = extension.TryGetProperty("gold_components_load_bearing", out var lb)
+                              && lb.ValueKind == JsonValueKind.True;
+            var redundant = extension.TryGetProperty("gold_components_redundant", out var rd)
+                            && rd.ValueKind == JsonValueKind.True;
+            if (loadBearing && !redundant
+                && question.GetProperty("answer_session_ids").GetArrayLength() > 1)
+            {
+                declared++;
+            }
+        }
+
+        if (!Metadata(vertical).TryGetProperty("probes", out var probes)
+            || !probes.TryGetProperty("v6_leave_one_out", out var v6))
+        {
+            Assert.Equal(0, declared);
+            return;
+        }
+
+        var applicable = v6.GetProperty("applicable").GetInt32();
+        var unmeasured = v6.TryGetProperty("unmeasured_no_answer", out var un)
+            ? un.GetArrayLength() : 0;
+        var undecidable = v6.TryGetProperty("excluded_not_decidable", out var nd)
+            ? nd.GetArrayLength() : 0;
+
+        Assert.True(
+            applicable + unmeasured + undecidable == declared || declared == 0,
+            $"{vertical}: {declared} questions declare gold_components_load_bearing but V6 accounts "
+            + $"for {applicable} scored + {unmeasured} unmeasured + {undecidable} undecidable. A "
+            + "declared claim that the arm silently skips is a claim nothing tests.");
+
+        if (V6Ratchet.TryGetValue(vertical, out var floor) && applicable > 0)
+        {
+            var rate = (double)v6.GetProperty("passed").GetInt32() / applicable;
+            Assert.True(
+                rate >= floor - 1e-4,
+                $"{vertical} V6 REGRESSED to {rate:F4} against a recorded {floor:F4}. Components "
+                + "declared load-bearing are being dropped without losing the answer.");
+        }
+    }
+
+    /// <summary>V6 pass rates that may improve but not regress.</summary>
+    private static readonly Dictionary<TypedMemEvalVertical, double> V6Ratchet = new()
+    {
+        [TypedMemEvalVertical.Arithmetic] = 49.0 / 50.0,
+        [TypedMemEvalVertical.Forgetting] = 1.0,
+        [TypedMemEvalVertical.Conjunction] = 1.0,
+        [TypedMemEvalVertical.Temporal] = 28.0 / 30.0,
+        // A DECLARED RESIDUAL: six of fifteen co-reference questions still carry a component that
+        // can be dropped without losing the answer. Was 4/15 before V6 gained a chance floor and
+        // the shape gained rival same-kind facts.
+        [TypedMemEvalVertical.Semantic] = 9.0 / 15.0,
+    };
+
     private static JsonElement Metadata(TypedMemEvalVertical vertical)
         => JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical)).RootElement.Clone();
 }

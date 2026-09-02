@@ -244,6 +244,10 @@ def _question(qid: str, shape: str, qtype: str, band: int, ordinal: int,
     question = tmc.Question(
         qid, qtype, question_text, answer, asked_at, sessions,
         {"shape": shape, "events": count, "narration_inversions": disorder,
+         # Every link is NECESSARY rather than redundant -- see _links_needed. Dropping any link
+         # splits the chain, and the asked events land on opposite sides. Each shape is scoped to a
+         # window it can close on its own, so the claim holds for all three.
+         "gold_components_load_bearing": True,
          "difficulty": _band_of(disorder), "difficulty_dial": "narration-disorder",
          "difficulty_validated": False})
     for session in question.sessions:

@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-forgetting-v5",
   "vertical": "forgetting",
-  "revision": "v5+1e34916f485c",
+  "revision": "v5+be14b81ae4e2",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "1e34916f485c18ddf0c3a5caef8fb16ecefb60d04e60cac17ad7ddd827cb861b",
+  "corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -83,7 +83,6 @@
     },
     "per_shape_realised": {
       "invalidated": 0.7,
-      "never-known": 1.0,
       "still-valid": 0.6667
     }
   },
@@ -690,11 +689,11 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "1e34916f485c18ddf0c3a5caef8fb16ecefb60d04e60cac17ad7ddd827cb861b"
+      "probed_corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T05:33:53Z",
+    "run_at": "2026-09-02T09:26:55Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -758,8 +757,10 @@
         "tme-for-034",
         "tme-for-035"
       ],
+      "excluded_no_load_bearing_claim": [],
+      "excluded_not_decidable": [],
       "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against"
+      "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one"
     },
     "empty_completions": {
       "count": 0
@@ -767,73 +768,73 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1509,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1509,
+        "judge_calls": 35,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 15090,
+        "calls": 350,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5216,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4108,
-        "empty": 9,
-        "rate": 0.0022,
-        "judge_calls": 1297,
+        "calls": 105,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2623,
+        "calls": 120,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1019,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1509,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1509,
+        "judge_calls": 35,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1509,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1493,
+        "judge_calls": 28,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -852,6 +853,18 @@
         "passed": 15,
         "failed": []
       }
+    },
+    "paired_arms": {
+      "pairs": 15,
+      "pair_v1_both_arms": "13/15",
+      "pair_v9_both_arms": "6/15",
+      "pair_headroom": 0.4667,
+      "pair_floor_scaled": 0.24,
+      "pair_separation_sd": 3.68,
+      "pair_separation_floor_sd": 2.0,
+      "pair_discriminates": true,
+      "pair_v8_both_arms": "15/15",
+      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
     },
     "v8_full_haystack": {
       "applicable": 35,
@@ -1912,19 +1925,7 @@
         "v11": true
       }
     },
-    "probed_corpus_sha256": "1e34916f485c18ddf0c3a5caef8fb16ecefb60d04e60cac17ad7ddd827cb861b",
-    "paired_arms": {
-      "pairs": 15,
-      "pair_v1_both_arms": "13/15",
-      "pair_v9_both_arms": "6/15",
-      "pair_headroom": 0.4667,
-      "pair_floor_scaled": 0.24,
-      "pair_separation_sd": 3.68,
-      "pair_separation_floor_sd": 2.0,
-      "pair_discriminates": true,
-      "pair_v8_both_arms": "15/15",
-      "pair_reading": "Both arms of one pair scored together, because a system that answers only one arm has not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom against pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens headroom mechanically, and the scaled floor removes that gain rather than banking it. pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's independence assumption is measurably false and conservative by an unknown amount, while the standard-error separation assumes nothing about correlation."
-    },
+    "probed_corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e",
     "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

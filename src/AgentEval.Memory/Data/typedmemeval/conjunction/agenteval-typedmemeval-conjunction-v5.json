@@ -36874,6 +36874,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -37675,6 +37676,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -38360,6 +38362,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -39074,6 +39077,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -39585,6 +39589,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -40270,6 +40275,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -40839,6 +40845,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -41495,6 +41502,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -42209,6 +42217,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -42894,6 +42903,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -43666,6 +43676,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -44438,6 +44449,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -45239,6 +45251,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -45924,6 +45937,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"
@@ -46435,6 +46449,7 @@
     ],
     "typedmemeval": {
       "shape": "conditional-branch",
+      "gold_components_load_bearing": true,
       "join": [
         "semantic",
         "episodic"

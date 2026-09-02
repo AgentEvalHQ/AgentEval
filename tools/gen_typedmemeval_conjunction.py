@@ -421,6 +421,26 @@ def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=index * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_VALUE_COUNT, "replacement_depth": k, "event_count": hits,
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
                    "current_value": current, "superseded_value": superseded,
                    "join": ["semantic", "arithmetic"]})
 
@@ -468,6 +488,26 @@ def _alias_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=(VALUE_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ALIAS_COUNT, "event_count": hits, "stated_as": stated,
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
                    "asked_as": asked, "decoy_as": decoy_as,
                    "decoy_event_count": decoy_hits,
                    "join": ["semantic", "arithmetic"]})
@@ -525,6 +565,26 @@ def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Questi
             days=(VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ORDER_VALUE, "anchor_event": anchor,
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
                    "value_at_anchor": middle, "join": ["semantic", "temporal"]})
 
 
@@ -598,6 +658,8 @@ def _conditional_branch(index: int, echo: float, rng: random.Random) -> tmc.Ques
         sessions=sessions,
         extension={
             "shape": SHAPE_CONDITIONAL,
+            # Two sessions, both required: the rule names the condition, the state selects a branch.
+            "gold_components_load_bearing": True,
             # The rule is a standing policy the speaker states once and does not restate; the state
             # is a specific thing heard on a specific day. Semantic joined to Episodic, and the
             # declared join is checked against the per-item kinds below.

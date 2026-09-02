@@ -527,6 +527,11 @@ def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
 
     extension = {
         "shape": SHAPE_INVALIDATED,
+        # Statement AND invalidation: drop the statement and there is no value to report as stale;
+        # drop the invalidation and the value reads as current. Its `still-valid` twin declares the
+        # OPPOSITE (gold_components_redundant) a few lines below, which is why this has to be a
+        # per-question declaration.
+        "gold_components_load_bearing": True,
         "gold_components": [
             {"kind": "statement", "session_index": statement_index},
             {"kind": "invalidation", "session_index": invalidation_index},

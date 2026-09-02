@@ -837,6 +837,105 @@ fact was recent, and BM25 cannot see recency at all. Every rung is now in band a
 exemption. They had been passing silently — an exemption never fails, so a stale one is invisible
 until someone reads it.
 
+## 19. Amendment, 2026-09-02 — V6's scope was a two-vertical list; three more verticals made the same claim
+
+V6 applied where `vertical in ("arithmetic", "forgetting")`. **Three more generators state the same
+claim in their own comments and nothing tested it:**
+
+| generator | the written claim |
+|---|---|
+| `temporal` | *"every link is NECESSARY rather than redundant"* — each shape scoped to a window it can close on its own |
+| `semantic` | co-reference: *"the chain is the evidence, not just its endpoint"* |
+| `conjunction` | *"Both halves must be load-bearing"* |
+
+That is the **applied-once** shape: a right rule with too small a reach. It also *hid the opposite
+case* — `semantic/current-value` must **not** be in scope, because dropping a middle replacement
+still leaves the latest one and the component genuinely is redundant. A per-vertical list cannot
+express that. **The scope is now a per-question declaration**, `gold_components_load_bearing`, the
+mirror of the `gold_components_redundant` flag §14b added, with a C# gate asserting the corpus's
+declarations and the arm's accounting agree in both directions.
+
+Scope: **85 → 200 questions.**
+
+### 19a. What it found, including in my own declaration
+
+**`conjunction` 22/65 — and the over-declaration was mine.** The survivors are always the same
+thing: the **head of a replacement chain**. Gold carries *"my usual courier is Pellham Freight"* and
+later *"Oakhurst Transit has taken over from Pellham Freight"*; the second names both values, so
+dropping the first leaves the current value fully derivable. That is `semantic/current-value`'s
+structure, and `check_conjunction`'s "both halves must be load-bearing" is about the two TYPE halves
+each contributing gold — not about every session being necessary. Flag removed from the three chain
+shapes; `conditional-branch` keeps it and passes **15/15**.
+
+Expressing the real claim needs a **per-component** declaration, since those shapes mix load-bearing
+sessions (each count event; the switch that sets the current value) with redundant ones (the chain
+head). V6 is per question and cannot say that. **Recorded as owed rather than declared wrongly.**
+
+**`temporal` 28/30** — the claim holds. The other 20 are undecidable for the ablation arms and are
+now published as `excluded_not_decidable`; without that list, 20 declared claims went unscored with
+nothing naming them.
+
+**`semantic/co-reference` 4/15 — a real defect, and a familiar one.** The haystack held exactly ONE
+lease fact, ONE boiler fact, ONE roof fact. So *"How long does the lease run at the workshop?"* is
+answerable by finding the only lease statement in the corpus, whatever place it is filed under, and
+the co-reference hop the shape exists to measure is never required. With the link ablated:
+
+> *tme-sem-022 → "The lease runs to the end of next year."* — correct, no hop taken.
+
+This is `conjunction/alias-then-count`'s decoy defect in another vertical: **resolving the alias
+wrong, or not at all, still gives the right answer.** Fixed with rival same-kind facts under other
+designations carrying different answers.
+
+### 19b. V6 never got the chance floor V3 got
+
+Adding the rivals made V6 *worse*-looking, and the reason was in V6, not the corpus. V3 was
+corrected on 2026-08-30 to require the smallest `h` with `P(X≥h | 1/k) < 0.05`, because against a
+guesser a single hit in three arrives with probability `1−(1−1/k)³` — **0.875 at k=2, 0.704 at k=3**.
+**V6 is the dual arm and kept the old one-hit rule.** Applied-once, again, and this time the same
+correction had already been written thirty lines away.
+
+It went unnoticed while no V6 question had candidates. The rivals created a three-way choice and V6
+began condemning components that were doing their job:
+
+> `tme-sem-021`, link ablated — sample 0: *"the conversations do not say when the boiler was replaced
+> at the new flat"* (abstained). Sample 1: guessed, landed. **Component recorded redundant on the
+> strength of the guess.**
+
+V6 now takes `k` from the same place the published chance floor does — the generator's declaration
+where the candidates live in the haystack, `closed_choice_k` where the question names them — and
+counts hits instead of breaking on the first. `semantic/co-reference`: **4/15 → 9/15.**
+
+### 19c. The residual, declared
+
+Six of fifteen co-reference questions still carry a component droppable at a **3-of-3** bar against a
+declared 1/3 floor. Ratcheted, not tolerated: it may improve and may not regress. One contributing
+cause was found and fixed — the `roof` entry's rivals changed the *subject* (flooring, guttering)
+rather than the answer, so picking the only roof fact was right regardless of place — and it did not
+move the number, so the remaining cause is not that. **Stated as unexplained rather than attributed.**
+
+## 20. Amendment, 2026-09-02 — the §18 echo class is BOUNDED, and episodic was the only instance
+
+§18 found that `episodic/participant-attribution`'s entire retrieval difficulty was manufactured by
+the calibration echo leaking the answer. **Audited across all nine generators** (five parallel
+agents, findings adversarially verified; one claim refuted on reproduction).
+
+**The mechanism bounds it.** `echo_terms` returns `rng.sample(sorted(set(tokenize(source))), take)`
+and `weave_echo` emits them as an unordered bag — *"(Also on my mind: a, b, c.)"* — with no syntax.
+Every generator passes the **question text** as the source. So the echo can only carry answer content
+**when the question already contains the answer**, and it can never add a token the reader was not
+handed anyway.
+
+Measured: questions with any non-gold echo term outside the question's own vocabulary — **semantic
+0/50, temporal 0/50**; every answer token found in a non-gold echo clause is also a question token,
+across all 100 audited questions. `temporal/occurrence-order` and `recency` are the interesting near
+misses: both name their candidates in the question, so the echo *does* scatter the answer's tokens —
+but the discriminating content is the ORDER, and a comma bag carries no relation. Correlation of the
+echoed name with the answer: z = 0.00 and z = 1.12, indistinguishable from chance.
+
+**`episodic/participant-attribution` was the only shape whose question quoted its own gold**, which
+is exactly the condition the mechanism requires. The class is closed, with the reason rather than by
+enumeration.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best
