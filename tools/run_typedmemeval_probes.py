@@ -570,6 +570,60 @@ def drawn_from_haystack(response: str, haystack: str, already_known: str = "") -
                for token in tokens)
 
 
+#: The resolution grade, kept out of the function for the same reason the abstention one is.
+_RESOLUTION_PROMPT = """You are checking whether a response ties its answer to a NAMED thing.
+Reply with exactly one word, lowercase, nothing else.
+
+  resolved   the response states its answer AS BEING ABOUT the named thing.
+  declined   the response does not connect its answer to the named thing: it says it cannot
+             identify it, says the record does not mention it, offers the answer about some
+             OTHER thing, or answers only conditionally ("if you mean X").
+
+A response that gives the right fact about a DIFFERENT thing is declined, not resolved.
+A response that names the thing only to say it cannot find it is declined.
+
+THE NAMED THING
+{entity}
+
+QUESTION
+{question}
+
+RESPONSE
+{response}
+
+One word:"""
+
+
+def resolved_to_entity(question: str, entity: str, response: str, cache_key: str) -> bool | None:
+    """Whether a response ties its answer to the entity the question asked about.
+
+    FOR ABLATION ARMS ONLY, and the reason is specific. V3 and V6 ask whether removing a component
+    removed the answer. When the removed component is the LINK between the asked designation and
+    the session stating the fact, a response that reports the fact under the OTHER designation --
+    or says outright it cannot identify the asked one -- has demonstrably not made the link. It
+    says so. Scoring it as a reproduction records the component as redundant on the strength of a
+    response that proves the opposite.
+
+    `judged_equivalent` cannot see this: it asks whether the response conveys the reference answer,
+    and "the conversations do not mention a workshop; at the unit behind the depot the alarm code
+    was changed after the break-in" does convey it. Sixteen of eighteen scored V6 hits on
+    semantic/co-reference were of exactly that shape.
+
+    A JUDGE RATHER THAN A PATTERN, deliberately. A lexical disclaimer regex only ever REFUSES
+    hits, and on an ablation arm refusing a hit makes the corpus look better -- the flattering
+    direction, which this project has been caught by often enough to distrust a heuristic that
+    points that way. A one-word grade can also say `declined` for a reason nobody enumerated.
+    """
+    verdict = complete(
+        _RESOLUTION_PROMPT.format(entity=entity, question=question, response=response),
+        cache_key=cache_key, max_tokens=1500)
+    word = verdict.strip().lower()
+    if word.startswith("resolved"):
+        return True
+    if word.startswith("declined"):
+        return False
+    return None
+
 def produced_gold(
     question: str,
     gold: str,
@@ -579,6 +633,7 @@ def produced_gold(
     screen: bool = False,
     require_distinctive: bool = False,
     already_known: str = "",
+    must_name: str = "",
 ) -> bool:
     """Whether a response reached the gold fact.
 
@@ -608,7 +663,14 @@ def produced_gold(
         _stats["distinctive_absent"] += 1
         return False
     _stats["escalated"] += 1
-    return judged_equivalent(question, gold, response, cache_key)
+    if not judged_equivalent(question, gold, response, cache_key):
+        return False
+    if must_name:
+        # See resolved_to_entity. An UNREADABLE grade is not a reproduction: on an ablation arm the
+        # conservative direction is to refuse, because calling a component redundant is the claim
+        # that needs evidence.
+        return resolved_to_entity(question, must_name, response, f"{cache_key}:resolved") is True
+    return True
 
 
 # --------------------------------------------------------------------------------------
@@ -819,6 +881,13 @@ def probe_question(entry: dict, vertical: str) -> dict:
     needs_value = negative_gold_requires_value(gold, known)
     if needs_value:
         record["gold_value_required"] = True
+    # The entity an answer must be ABOUT, for the ablation arms. Declared by the generator, because
+    # only it knows which phrase in the question is the thing being resolved. Applied to V3 and V6
+    # alone -- V1/V8/V9 correctly accept "Roof work, due before winter" without repeating the
+    # place, since nothing was removed and the tie is not in question there.
+    must_name = ((entry.get("typedmemeval") or {}).get("answer_must_name") or "")
+    if must_name:
+        record["answer_must_name"] = must_name
 
     # V1 -- the ceiling. A question the reference model cannot answer with perfect retrieval is
     # measuring the model, not the memory system, and does not belong in the corpus.
@@ -965,7 +1034,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
                 silent += 1
                 continue
             if produced_gold(question, gold, answer, f"{key}:v3:{k}:judge",
-                             require_distinctive=True, already_known=f"{question} {date}"):
+                             require_distinctive=True, already_known=f"{question} {date}",
+                             must_name=must_name):
                 v3_hits += 1
         leaked = v3_hits >= v3_needs
         # A leak found is a leak, whatever the other samples did. But "no leak" is only a finding
@@ -1091,7 +1161,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
                     continue
                 if produced_gold(
                         question, gold, answer, f"{key}:v6:{dropped}:{k}:judge",
-                        require_distinctive=True, already_known=f"{question} {date}"):
+                        require_distinctive=True, already_known=f"{question} {date}",
+                        must_name=must_name):
                     hits += 1
             if v6_needs is None:
                 # No hit count within the sample budget separates a reproduction from a guess --
@@ -2339,6 +2410,26 @@ def self_test() -> None:
     check("and publishes no calibration cost it could not compute",
           "retrieval_cost_to_calibration" in silent_row, False)
 
+    # ---- resolution grade (ablation arms) ------------------------------------------------
+    for text, expected, label in (
+            ("resolved", True, "bare resolved"),
+            ("Resolved.", True, "capitalised"),
+            ("declined", False, "bare declined"),
+            ("declined - it names the other place", False, "declined with a clause"),
+            ("", None, "an empty grade is undefined"),
+            ("unclear", None, "an unparseable grade is undefined, not a pass")):
+        original = globals()["complete"]
+        globals()["complete"] = lambda *a, _t=text, **k: _t
+        try:
+            check(f"resolution grade: {label}",
+                  resolved_to_entity("q?", "the workshop", "r", "k"), expected)
+        finally:
+            globals()["complete"] = original
+    check("the resolution prompt names both verdicts",
+          "resolved" in _RESOLUTION_PROMPT and "declined" in _RESOLUTION_PROMPT, True)
+    check("and rules on the case it exists for -- the right fact about another thing",
+          "DIFFERENT thing is declined" in _RESOLUTION_PROMPT, True)
+
     # ---- negative-gold value requirement ------------------------------------------------
     neg = ("No longer valid. Your cleaner was Orrindale Solace, but that is out of date: you "
            "stopped the visits. There is no current cleaner on record.")
@@ -2433,7 +2524,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 22 chance-floor cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 8 resolution cases, 22 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

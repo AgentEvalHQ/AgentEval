@@ -1047,75 +1047,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 65,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 65,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 650,
+        "calls": 15440,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 150,
+        "judge_calls": 5506,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 195,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 46,
+        "calls": 4213,
+        "empty": 9,
+        "rate": 0.0021,
+        "judge_calls": 1392,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 552,
+        "calls": 3855,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 464,
+        "judge_calls": 2078,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 65,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 65,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 65,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 65,
+        "judge_calls": 1528,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       }
     },
     "v8_full_haystack": {
@@ -2717,6 +2717,7 @@
         "v11": null
       }
     },
-    "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858"
+    "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858",
+    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

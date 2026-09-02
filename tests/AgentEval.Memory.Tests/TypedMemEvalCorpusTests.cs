@@ -1484,10 +1484,13 @@ public sealed class TypedMemEvalCorpusTests
         [TypedMemEvalVertical.Forgetting] = 1.0,
         [TypedMemEvalVertical.Conjunction] = 1.0,
         [TypedMemEvalVertical.Temporal] = 28.0 / 30.0,
-        // A DECLARED RESIDUAL: six of fifteen co-reference questions still carry a component that
-        // can be dropped without losing the answer. Was 4/15 before V6 gained a chance floor and
-        // the shape gained rival same-kind facts.
-        [TypedMemEvalVertical.Semantic] = 9.0 / 15.0,
+        // 4/15 -> 9/15 -> 15/15 over three corrections, and the residual is GONE rather than
+        // declared. The last step was not a corpus change: 16 of the 18 remaining "reproductions"
+        // were responses that explicitly DECLINED the co-reference ("the conversations do not
+        // mention a workshop by that name; at the unit behind the depot...") and an equivalence
+        // judge scored them as reaching a gold that names no place. The ablation arms now require
+        // the answer to be tied to the asked entity.
+        [TypedMemEvalVertical.Semantic] = 1.0,
     };
 
     private static JsonElement Metadata(TypedMemEvalVertical vertical)

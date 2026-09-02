@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-semantic-v5",
   "vertical": "semantic",
-  "revision": "v5+d2a35d5bbb1d",
+  "revision": "v5+d5eff38bc74e",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "d2a35d5bbb1de1ace56c32c07feec4b6feb2224d4ca1275c21a66f52989d2861",
+  "corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c",
   "generator": {
     "tool": "gen_typedmemeval_semantic.py",
     "version": "1.0.0",
@@ -449,7 +449,7 @@
       "worst_refused_auc": 0.6085,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "this",
+      "worst_gold_marker_ngram": "this down",
       "gold_marker_ngram_auc": 0.6085,
       "worst_boilerplate_ngram": "will",
       "boilerplate_ngram_auc": 0.6047,
@@ -761,11 +761,11 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "d2a35d5bbb1de1ace56c32c07feec4b6feb2224d4ca1275c21a66f52989d2861"
+      "probed_corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T13:18:53Z",
+    "run_at": "2026-09-02T17:40:17Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -809,15 +809,8 @@
     },
     "v6_leave_one_out": {
       "applicable": 15,
-      "passed": 9,
-      "failed": [
-        "tme-sem-024",
-        "tme-sem-027",
-        "tme-sem-028",
-        "tme-sem-030",
-        "tme-sem-031",
-        "tme-sem-034"
-      ],
+      "passed": 15,
+      "failed": [],
       "excluded_declared_redundant": [],
       "excluded_no_load_bearing_claim": [
         "tme-sem-001",
@@ -842,6 +835,7 @@
         "tme-sem-020"
       ],
       "excluded_not_decidable": [],
+      "excluded_chance_undecidable": [],
       "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
       "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one"
     },
@@ -851,75 +845,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 500,
+        "calls": 15440,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 271,
+        "judge_calls": 5506,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 150,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 89,
+        "calls": 4213,
+        "empty": 9,
+        "rate": 0.0021,
+        "judge_calls": 1392,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 105,
+        "calls": 3855,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 97,
+        "judge_calls": 2078,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 50,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 50,
+        "judge_calls": 1528,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 0,
+        "calls": 93,
         "empty": 0,
-        "rate": null,
-        "judge_calls": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
-        "judge_rate": null
+        "judge_rate": 0.0
       }
     },
     "v8_full_haystack": {
@@ -1419,6 +1413,7 @@
         "v11": null
       },
       "tme-sem-021": {
+        "answer_must_name": "the new flat",
         "v1": true,
         "v8": true,
         "v8_answer": "At the new flat — the second address, the place on Ferrow Row — the boiler was replaced **in the spring**.",
@@ -1439,6 +1434,7 @@
         "v11": null
       },
       "tme-sem-022": {
+        "answer_must_name": "the workshop",
         "v1": true,
         "v8": true,
         "v8_answer": "At the workshop — the unit behind the depot — the lease runs to the end of next year, i.e. the end of 2029.",
@@ -1459,6 +1455,7 @@
         "v11": null
       },
       "tme-sem-023": {
+        "answer_must_name": "head office",
         "v1": true,
         "v8": true,
         "v8_answer": "At head office — the Calderwick office — the alarm code was changed after the break-in.",
@@ -1479,6 +1476,7 @@
         "v11": null
       },
       "tme-sem-024": {
+        "answer_must_name": "the runaround",
         "v1": true,
         "v8": false,
         "v8_answer": "The conversations only say that **the runaround is the overflow space**. They do **not** mention any outstanding work at the runaround.",
@@ -1493,14 +1491,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          6
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-025": {
+        "answer_must_name": "the weekend place",
         "v1": true,
         "v8": true,
         "v8_answer": "At the weekend place — the cottage at Wray Head — parking is on the north side.",
@@ -1521,6 +1518,7 @@
         "v11": null
       },
       "tme-sem-026": {
+        "answer_must_name": "the annexe",
         "v1": true,
         "v8": true,
         "v8_answer": "The annexe is the Peverel building, and the boiler there was replaced **in the spring**.",
@@ -1541,6 +1539,7 @@
         "v11": null
       },
       "tme-sem-027": {
+        "answer_must_name": "the new flat",
         "v1": false,
         "v8": true,
         "v8_answer": "The new flat is the second address, which is the place on Ferrow Row. Its lease runs to the end of next year — i.e. the end of 2029.",
@@ -1555,14 +1554,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          8
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-028": {
+        "answer_must_name": "the workshop",
         "v1": true,
         "v8": true,
         "v8_answer": "At the workshop — the unit behind the depot — the alarm code was changed after the break-in.",
@@ -1577,14 +1575,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          7
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-029": {
+        "answer_must_name": "head office",
         "v1": true,
         "v8": true,
         "v8_answer": "The outstanding work at head office is: the roof at the Calderwick office needs doing before winter.",
@@ -1605,6 +1602,7 @@
         "v11": null
       },
       "tme-sem-030": {
+        "answer_must_name": "the runaround",
         "v1": true,
         "v8": true,
         "v8_answer": "Parking at the runaround is on the north side.",
@@ -1619,14 +1617,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          23
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-031": {
+        "answer_must_name": "the weekend place",
         "v1": true,
         "v8": true,
         "v8_answer": "The boiler at the weekend place was replaced in the spring.",
@@ -1641,14 +1638,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          23
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-032": {
+        "answer_must_name": "the annexe",
         "v1": true,
         "v8": true,
         "v8_answer": "The annexe is the Peverel building, and the lease there runs to the end of next year.",
@@ -1669,6 +1665,7 @@
         "v11": null
       },
       "tme-sem-033": {
+        "answer_must_name": "the new flat",
         "v1": true,
         "v8": true,
         "v8_answer": "The alarm code at the new flat was changed after the break-in.",
@@ -1689,6 +1686,7 @@
         "v11": null
       },
       "tme-sem-034": {
+        "answer_must_name": "the workshop",
         "v1": true,
         "v8": true,
         "v8_answer": "The workshop is the unit behind the depot, and the outstanding work there is that the roof needs doing before winter.",
@@ -1703,14 +1701,13 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": false,
-        "v6_redundant_components": [
-          16
-        ],
+        "v6": true,
+        "v6_redundant_components": [],
         "v10": null,
         "v11": null
       },
       "tme-sem-035": {
+        "answer_must_name": "head office",
         "v1": true,
         "v8": true,
         "v8_answer": "Parking at head office is on the north side.",
@@ -1986,7 +1983,7 @@
         "v11": null
       }
     },
-    "probed_corpus_sha256": "d2a35d5bbb1de1ace56c32c07feec4b6feb2224d4ca1275c21a66f52989d2861",
+    "probed_corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c",
     "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

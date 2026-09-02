@@ -400,6 +400,15 @@ def _co_reference(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         question_date=_BASE + timedelta(days=(CURRENT_QUESTIONS + index) * 37 + 60),
         sessions=sessions,
         extension={"shape": SHAPE_COREF, "designation_distance": hops,
+                   # THE ANSWER MUST BE ABOUT THE ASKED DESIGNATION, on the ablation arms.
+                   #
+                   # The component V6 removes here IS the link from `asked` to the session stating
+                   # the fact. A response that reports the fact under the OTHER designation, or
+                   # says it cannot identify the asked one, has not made the link -- and 16 of the
+                   # 18 scored V6 hits on this shape were exactly that: "The conversations do not
+                   # mention a workshop by that name. They do say that at the unit behind the
+                   # depot, the alarm code was changed after the break-in."
+                   "answer_must_name": asked,
                    # THE RIVALS CREATE A CLOSED CHOICE, so the shape declares its own floor.
                    # After the co-reference link is removed the haystack still holds the gold fact
                    # and its rivals -- same kind, other places, different answers -- so a reader

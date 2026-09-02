@@ -14055,6 +14055,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 2,
+      "answer_must_name": "the new flat",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -14749,6 +14750,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the workshop",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -15240,6 +15242,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "head office",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -15877,6 +15880,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 2,
+      "answer_must_name": "the runaround",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -16426,6 +16430,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the weekend place",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -16917,6 +16922,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the annexe",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -17583,6 +17589,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 2,
+      "answer_must_name": "the new flat",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -18306,6 +18313,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the workshop",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -18884,6 +18892,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "head office",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -19608,6 +19617,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 2,
+      "answer_must_name": "the runaround",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -20389,6 +20399,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the weekend place",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -20909,6 +20920,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the annexe",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -21430,6 +21442,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 2,
+      "answer_must_name": "the new flat",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -22211,6 +22224,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "the workshop",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
@@ -22992,6 +23006,7 @@
     "typedmemeval": {
       "shape": "co-reference",
       "designation_distance": 1,
+      "answer_must_name": "head office",
       "chance_floor": 0.3333,
       "chance_floor_reason": "after the link is ablated the haystack holds 3 facts of the asked kind, filed under different designations",
       "gold_components_load_bearing": true,
