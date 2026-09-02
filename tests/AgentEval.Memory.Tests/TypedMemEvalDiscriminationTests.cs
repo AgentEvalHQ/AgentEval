@@ -108,6 +108,38 @@ public class TypedMemEvalDiscriminationTests
                 + "mentioned — so V1, V8 and V9 are undefined. Scored on V10/V11 abstention.",
         };
 
+    /// <summary>
+    /// Shapes that are one <b>arm of a paired design</b>, scored on the pair rather than alone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>forgetting/still-valid</c> is the <b>over-forgetting control</b>: same fact, same question
+    /// text, same statement as its <c>invalidated</c> twin, and nothing that cancels it. What it
+    /// exists to catch is a system reporting a still-valid fact as superseded — and that is a
+    /// property of the <b>pair</b>, not of either arm's retrieval headroom. Scoring the arm alone
+    /// averages the capability away, exactly as ADR-028 §7.4 says of Bitemporal.
+    /// </para>
+    /// <para>
+    /// <b>The exemption carries its own bar, and a harder one.</b> A shape listed here is skipped by
+    /// the headroom floor only if its vertical's <c>paired_arms</c> block clears BOTH pair
+    /// conditions. Measured on the shipped corpus: pair headroom <b>0.4667</b> against a scaled
+    /// floor of 0.24, and <b>3.68 sd</b> of separation against a floor of 2.0 — while the arm alone
+    /// reads 0.0667. This is not a way around a red gate; it is the gate pointed at the right
+    /// quantity.
+    /// </para>
+    /// <para>
+    /// None of it was published until 2026-09-02. <c>_pair_discrimination</c> runs per shape, which
+    /// is correct for Bitemporal (both arms live in one shape) and returns <c>{}</c> for Forgetting,
+    /// whose arms ARE its shapes. Thirty paired questions, no pair figure, nothing saying so.
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<(TypedMemEvalVertical, string), string> ScoredOnPairedArms =
+        new()
+        {
+            [(TypedMemEvalVertical.Forgetting, "still-valid")] =
+                "over-forgetting control — the capability is the pair, not the arm",
+        };
+
     public static TheoryData<TypedMemEvalVertical> AllVerticals()
     {
         var data = new TheoryData<TypedMemEvalVertical>();
@@ -135,6 +167,22 @@ public class TypedMemEvalDiscriminationTests
 
             if (SaturatedByDesign.ContainsKey((vertical, shape)))
                 continue;
+
+            if (ScoredOnPairedArms.ContainsKey((vertical, shape)))
+            {
+                // Not a skip — a harder bar, applied to the quantity this shape actually measures.
+                var pair = PairedArms(vertical);
+                Assert.True(
+                    pair.HasValue,
+                    $"{vertical} shape '{shape}' is declared as scored on paired arms, but the "
+                    + "sidecar publishes no `paired_arms` block. Re-probe the vertical.");
+                Assert.True(
+                    pair!.Value.GetProperty("pair_discriminates").GetBoolean(),
+                    $"{vertical} shape '{shape}' is exempt from the per-shape floor BECAUSE its "
+                    + "capability is a pair property — and the pair does not discriminate. The "
+                    + "exemption is void; this is a real regression.");
+                continue;
+            }
 
             if (PendingRedesign.TryGetValue((vertical, shape), out var recorded))
             {
@@ -233,6 +281,18 @@ public class TypedMemEvalDiscriminationTests
                 full.GetProperty("questions").GetInt32() > 0,
                 $"{vertical} shape '{shape}' publishes an abstention arm over zero questions.");
         }
+    }
+
+    private static JsonElement? PairedArms(TypedMemEvalVertical vertical)
+    {
+        var metadata = JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical)).RootElement;
+        if (metadata.TryGetProperty("probes", out var probes)
+            && probes.TryGetProperty("paired_arms", out var paired))
+        {
+            return paired.Clone();
+        }
+
+        return null;
     }
 
     private static Dictionary<string, JsonElement> ByShape(TypedMemEvalVertical vertical)

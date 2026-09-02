@@ -1244,6 +1244,9 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "passed": bool(ra.get("v1")) and bool(rb.get("v1")) and flipped,
         })
 
+    # Computed once: _pair_discrimination is not free and the block below needs it twice.
+    _cross_shape_pairs = _pair_discrimination(records, arm_of)
+
     def tally(key):
         applicable = [r for r in records if r.get(key) is not None]
         # Questions this arm could not measure because the model returned nothing. They are already
@@ -1374,6 +1377,21 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "v10_full_haystack": tally("v10"),
             "v11_reference_retrieval": tally("v11"),
         }} if any(r.get("v10") is not None or r.get("v11") is not None for r in records) else {}),
+        # PAIRS ACROSS SHAPES, which the per-shape block cannot see.
+        #
+        # `_pair_discrimination` is called per shape, and that is right for Bitemporal, whose two
+        # arms are two questions inside ONE shape. Forgetting's arms ARE its shapes --
+        # `invalidated` and `still-valid` -- so every per-shape group holds one arm of each pair,
+        # `len(arms) != 2` on all fifteen, and the instrument returned {} for the whole vertical.
+        # Thirty paired questions, no pair figure, and nothing said so: the same silent-{} shape as
+        # the abstention hole this release closes.
+        #
+        # It matters here more than anywhere. The control arm's job is catching OVER-forgetting --
+        # a system reporting a still-valid fact as superseded -- and that is a property of the
+        # PAIR, not of either arm's retrieval headroom. Measured: pair headroom 0.4667 against a
+        # scaled floor of 0.24 and 3.68 sd of separation, so the capability the vertical is about
+        # is comfortably measurable while `still-valid` alone reads 0.0667.
+        **({"paired_arms": _cross_shape_pairs} if _cross_shape_pairs else {}),
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
@@ -1690,8 +1708,9 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     if v8_n:
         row["pair_v8_both_arms"] = f"{v8_hits}/{v8_n}"
     row["pair_reading"] = (
-        "Both arms of one pair scored together, because a system that answers only the valid-time "
-        "arm has not shown it can represent two clocks. Compare pair_headroom against "
+        "Both arms of one pair scored together, because a system that answers only one arm has "
+        "not shown it can tell the two apart -- two clocks in Bitemporal, a superseded fact from a "
+        "still-valid one in Forgetting. Compare pair_headroom against "
         "pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens "
         "headroom mechanically, and the scaled floor removes that gain rather than banking it. "
         "pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's "

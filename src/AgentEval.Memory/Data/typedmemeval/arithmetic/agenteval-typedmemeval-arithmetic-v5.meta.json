@@ -929,55 +929,73 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 150,
+        "calls": 1321,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 150,
+        "judge_calls": 1321,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 1500,
+        "calls": 13210,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 635,
+        "judge_calls": 4539,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 342,
-        "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 141,
+        "calls": 3544,
+        "empty": 9,
+        "rate": 0.0025,
+        "judge_calls": 1079,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 675,
+        "calls": 2623,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 230,
+        "judge_calls": 1019,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 150,
+        "calls": 1321,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 150,
+        "judge_calls": 1321,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 150,
+        "calls": 1321,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 150,
+        "judge_calls": 1305,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v10": {
+        "population": "probe_answers",
+        "calls": 93,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v11": {
+        "population": "probe_answers",
+        "calls": 93,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
         "judge_rate": 0.0
       }

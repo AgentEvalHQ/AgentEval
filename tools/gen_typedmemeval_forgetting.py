@@ -118,7 +118,11 @@ FACTS = [
      "Moved my number onto a new tariff.",
      "That tariff is finished.", "let it lapse when the handset died"),
     ("home insurer", "Who insures the flat?",
-     "Insured the flat this morning.",
+     # Names the noun, unlike the "Insured the flat this morning." it replaces -- that was
+     # the one setup in the table naming NEITHER word of its noun, so its statement session
+     # stated a value and said nothing about what the value was of. Caught by the
+     # check_forgetting guard below on its first run, on tme-for-010 and its control -030.
+     "Sorted a home insurer for the flat this morning.",
      "The flat is uninsured.", "let the policy run out and did not renew"),
     ("cleaner", "Who cleans the flat?",
      "Booked a cleaner for fortnightly visits.",
@@ -234,6 +238,15 @@ _VALUE_RE = re.compile(
         re.escape(choice).replace(r"\{value\}", r"([^.]+)") for choice in CHOICES) + r")\s*$")
 _EVENT_RE = re.compile(r"\bI ([^.]+)\.\s*$")
 
+#: The same bank, UNANCHORED. `_VALUE_RE` is anchored at end-of-string because it parses the
+#: value out of a statement session, where the choice is the last sentence; the corpus check in
+#: check_forgetting needs to find a value ANYWHERE in a session's text. Derived from CHOICES for
+#: the reason stated above it -- a hand-kept second copy drifts, and this one drifting means the
+#: guard silently stops guarding. re.escape on both sides, so the two spellings cannot disagree.
+_VALUE_ANYWHERE = re.compile(
+    "(?:" + "|".join(
+        re.escape(choice).replace(re.escape("{value}"), "[^.]+") for choice in CHOICES) + ")")
+
 
 #: Re-affirmation frames, drawn from ONE bank for gold and filler alike.
 #:
@@ -336,6 +349,36 @@ REAFFIRM_FILLER_SHARE = 0.30
 #: below the re-affirmation share so the invalidation-shaped filler V3 needs is not crowded out.
 CHOICE_FILLER_SHARE = 0.20
 
+#: The setup half of the choice-filler construction, and the reason it exists is a defect the
+#: abstention arm found on its first real draw.
+#:
+#: A gold statement is TWO sentences -- a setup that names the noun ("Started with a physio for the
+#: shoulder.") and a choice that names the value ("I settled on Neskett Reverie."). The filler above
+#: drew only the second, and its comment claimed it was "the same construction as the statement
+#: session, about something no question asks". It was neither. A bare "I settled on Marloe Basic."
+#: is about nothing NAMED, which makes it about whatever the reader is looking for -- and asked
+#: "Which kiteboard did I end up with?" against a haystack that by construction contains no
+#: kiteboard, the reference model answered "Marloe Basic" on three draws out of three, once
+#: explaining itself: "though the record doesn't explicitly say 'kiteboard,' it says you 'settled on
+#: Marloe Basic.'"
+#:
+#: NO EXISTING ARM COULD SEE THIS, and that is the general lesson. check_forgetting asserts the
+#: asked noun is absent, and it was. Every validity arm asks whether the model produced THE GOLD,
+#: and the filler's value comes from a disjoint pool, so V2, V3 and V6 all passed while the corpus
+#: carried an alternative defensible answer to every question in the vertical. Only an arm that
+#: asks whether the model produced ANYTHING can find a wrong answer that is not the right one.
+#:
+#: Enforced below rather than trusted: check_forgetting now refuses any session that states a value
+#: without naming a noun.
+PARITY_SETUPS = [
+    "Sorted the {noun} out at last.",
+    "Had to deal with the {noun} this week.",
+    "Spent the morning on the {noun}.",
+    "Got round to the {noun} finally.",
+    "Sorting the {noun} took longer than it should have.",
+    "The {noun} needed doing.",
+]
+
 
 def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
     if rng.random() < REAFFIRM_FILLER_SHARE:
@@ -346,10 +389,14 @@ def _filler_session(rng: random.Random, echoed: list[str], stamp: datetime) -> t
         assistant = rng.choice(("Noted.", "Right.", "Understood.", "Filed."))
         return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
     if rng.random() < CHOICE_FILLER_SHARE:
-        # Same construction as the statement session, about something no question asks, so the
-        # phrasing cannot mark gold. A PARITY value, so the gold value stays unique to gold.
-        user = rng.choice(CHOICES).format(
-            value=f"{rng.choice(PARITY_STEMS)} {rng.choice(PARITY_TAILS)}")
+        # Setup AND choice, which is what "same construction as the statement session" actually
+        # means -- the setup names the noun, so this really is about something no question asks.
+        # A PARITY value, so the gold value stays unique to gold; a PARITY noun, so the sentence
+        # cannot be read as an answer to any question in the corpus. See PARITY_SETUPS.
+        user = "{setup} {choice}".format(
+            setup=rng.choice(PARITY_SETUPS).format(noun=rng.choice(PARITY_NOUNS)),
+            choice=rng.choice(CHOICES).format(
+                value=f"{rng.choice(PARITY_STEMS)} {rng.choice(PARITY_TAILS)}"))
         assistant = rng.choice(("Noted.", "Right.", "Understood.", "Filed."))
         return tmc.make_session(stamp, (user, tmc.weave_echo(assistant, echoed)), tag="filler")
     user, assistant = rng.choice(FILLER)
@@ -417,18 +464,37 @@ def _gap_band(gap: int) -> int:
 #: passes 20/20; V1/V8/V9 graded the same gold without it. Both cannot be describing the same
 #: target.
 #:
-#: Appended to BOTH arms, so the pair is preserved: the clause is a conditional either way and does
-#: not say which arm the reader is in. The control's gold already named its value, so only the
-#: question moves there.
-_PRIOR_VALUE_CLAUSE = " And if that has changed, who was it before?"
+#: Appended to BOTH arms, identically, so it cannot say which arm the reader is in. Neither gold
+#: changes: both already name their value and both already state their currency.
+#:
+#: THE FIRST VERSION OF THIS CLAUSE WAS WRONG, and the way it failed is worth keeping. It read
+#: "And if that has changed, who was it before?" -- which fixed `invalidated` exactly as intended
+#: (V1 19/20 -> 20/20, headroom 0.30 -> 0.35, and the unearned passes gone) and broke `still-valid`
+#: from 15/15 to 12/15. The three failing responses were all CORRECT: they named the value and then
+#: said the record does not give a previous one.
+#:
+#: They were right, and the control's own setups are why. "Switched broadband this week." "Moved my
+#: number onto a new tariff." Those narrate a change, so a question asking what it was BEFORE finds
+#: an implied earlier value the corpus never states -- a contradiction that had always been in the
+#: control arm and that no question had ever been pointed at. Rewording the gold to close the clause
+#: made it worse (32/35 -> 31/35), because the disagreement was never about wording.
+#:
+#: So the clause asks for CURRENCY instead of history. Both arms have a currency; only one has a
+#: history. It still forces the value to be named, which is the whole point -- under the original
+#: question, "no letting agent handles it now" was a complete answer and a system that had
+#: forgotten the value passed.
+_CURRENCY_CLAUSE = " Give the name, and say whether that is still current."
 
 
 def _invalidated_question(fact, qid: str, pair_id: str | None, ordinal: int,
                           rng: random.Random, echo: float) -> tmc.Question:
     noun, question, statement_setup, invalidation_setup, event = fact
-    question = question + _PRIOR_VALUE_CLAUSE
     value = _arbitrary_value(rng)
+    # ECHO FROM THE BASE QUESTION, then append. The clause is identical on all 35
+    # paired questions, so its words are a CONSTANT: echoing them into filler adds
+    # no lexical competition and only dilutes the terms that do.
     echoed = tmc.echo_terms(question, echo, rng)
+    question = question + _CURRENCY_CLAUSE
 
     h = rng.randint(H_MIN, H_MAX)
     sessions = [_filler_session(rng, echoed, _BASE) for _ in range(h)]
@@ -489,9 +555,12 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     the pair would stop being a control.
     """
     noun, question, statement_setup, _, _ = fact
-    question = question + _PRIOR_VALUE_CLAUSE
     value = _arbitrary_value(rng)
+    # ECHO FROM THE BASE QUESTION, then append. The clause is identical on all 35
+    # paired questions, so its words are a CONSTANT: echoing them into filler adds
+    # no lexical competition and only dilutes the terms that do.
     echoed = tmc.echo_terms(question, echo, rng)
+    question = question + _CURRENCY_CLAUSE
 
     h = rng.randint(H_MIN, H_MAX)
     sessions = [_filler_session(rng, echoed, _BASE) for _ in range(h)]
@@ -515,6 +584,17 @@ def _control_question(fact, qid: str, pair_id: str, ordinal: int,
     question_date = _lay_out(sessions, ordinal)
 
     read_value = _derive_value(statement)
+    # The second clause answers the second clause of the question, and it has to.
+    #
+    # When the question was "Which bike am I riding?", "nothing has cancelled it" was a complete
+    # gold. The question now also asks "and if that has changed, who was it before?", and the old
+    # gold never addressed it -- so a reader that answered BOTH halves correctly ("Larkmead
+    # Kindred... the conversations do not say what it was before") was graded a miss against a gold
+    # that only spoke to the first. Three of fifteen controls, and all three responses were right.
+    #
+    # Changing the question without changing the gold that answers it is the same class of error as
+    # the one this arc started from, one turn later: there, the gold named a value the question
+    # never asked for; here, the question asks for something the gold never named.
     answer = (f"{read_value}. That is still your {noun} — nothing in the record has cancelled "
               f"or replaced it.")
     return tmc.Question(
@@ -619,6 +699,37 @@ def check_forgetting(questions: list[tmc.Question]) -> list[str]:
     mislabelled invalidation, and an unpaired control cannot catch over-forgetting.
     """
     failures: list[str] = []
+
+    # NO SESSION MAY STATE A VALUE WITHOUT NAMING WHAT IT IS THE VALUE OF.
+    #
+    # A sentence in this vertical's value construction that names no noun is an answer to any
+    # question the reader happens to be holding. The choice-filler shipped exactly that -- "I
+    # settled on Marloe Basic." -- and it was an alternative defensible answer to every question in
+    # the corpus, including the never-known probes whose whole premise is that no answer exists.
+    #
+    # Model-free and exhaustive, deliberately: the arm that found it (V10) costs a probe run and
+    # samples, so it can only ever be a triage signal. This is the check that certifies the corpus,
+    # and it is the companion the never-known absence assertion below was missing -- that one asks
+    # whether the asked noun is present, which the offending sentence passes precisely BECAUSE it
+    # names nothing.
+    _nouns = {n for noun, *_ in FACTS for n in noun.split()} | {
+        w for parity in PARITY_NOUNS for w in parity.split()}
+    for q in questions:
+        for j, session in enumerate(q.sessions):
+            for turn in session.turns:
+                # THE TURN, NOT THE SESSION. `weave_echo` splices the question's own content
+                # words into the assistant reply of every filler session, so a session-level
+                # check lets a noun-free user statement borrow a noun it never said -- and
+                # borrow it from the question it would then be answering, which is the worst
+                # direction for this particular guard to be loose in.
+                if not _VALUE_ANYWHERE.search(turn.content):
+                    continue
+                lowered = turn.content.lower()
+                if not any(n in lowered for n in _nouns):
+                    failures.append(
+                        f"{q.question_id} s{j}: states a value ({turn.content[:70]!r}...) "
+                        f"without naming what it is the value of, so it answers any question")
+
     counts = Counter(q.extension.get("shape") for q in questions)
     expected = {SHAPE_INVALIDATED: 20, SHAPE_STILL_VALID: 15, SHAPE_NEVER_KNOWN: 15}
     for shape, n in expected.items():
