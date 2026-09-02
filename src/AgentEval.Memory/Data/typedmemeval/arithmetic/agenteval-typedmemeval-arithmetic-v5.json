@@ -651,6 +651,7 @@
         "value": 4,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -1290,6 +1291,7 @@
         "value": 4,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -2037,6 +2039,7 @@
         "value": 4,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -2731,6 +2734,7 @@
         "value": 5,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -3462,6 +3466,7 @@
         "value": 5,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -4202,6 +4207,7 @@
         "value": 6,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -5039,6 +5045,7 @@
         "value": 3,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -5727,6 +5734,7 @@
         "value": 3,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -6546,6 +6554,7 @@
         "value": 6,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -7372,6 +7381,7 @@
         "value": 5,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -8234,6 +8244,7 @@
         "value": 3,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -9074,6 +9085,7 @@
         "value": 6,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -9774,6 +9786,7 @@
         "value": 3,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -10525,6 +10538,7 @@
         "value": 4,
         "unit": "count"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -11309,6 +11323,7 @@
         "value": 1171.51,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -12107,6 +12122,7 @@
         "value": 716.46,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -12934,6 +12950,7 @@
         "value": 1040.7,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -13558,6 +13575,7 @@
         "value": 1113.71,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -14158,6 +14176,7 @@
         "value": 731.73,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -14990,6 +15009,7 @@
         "value": 838.72,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -15735,6 +15755,7 @@
         "value": 1325.07,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -16490,6 +16511,7 @@
         "value": 1190.14,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -17230,6 +17252,7 @@
         "value": 717.42,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -17980,6 +18003,7 @@
         "value": 1432.52,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -18817,6 +18841,7 @@
         "value": 1126.6,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -19480,6 +19505,7 @@
         "value": 1096.48,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -20438,6 +20464,7 @@
         "value": 1542.49,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -21251,6 +21278,7 @@
         "value": 1954.63,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -21919,6 +21947,7 @@
         "value": 155.31,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -22633,6 +22662,7 @@
         "value": 126.8,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -23423,6 +23453,7 @@
         "value": 166.93,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -24172,6 +24203,7 @@
         "value": 764.24,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -25049,6 +25081,7 @@
         "value": 333.73,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -25653,6 +25686,7 @@
         "value": 60.96,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -26512,6 +26546,7 @@
         "value": 319.97,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -27139,6 +27174,7 @@
         "value": 104.2,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 2,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -27836,6 +27872,7 @@
         "value": 635.03,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 4,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -28672,6 +28709,7 @@
         "value": 635.24,
         "unit": "USD"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -29440,6 +29478,7 @@
         "value": 15,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -30331,6 +30370,7 @@
         "value": 19,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -31077,6 +31117,7 @@
         "value": 15,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -31997,6 +32038,7 @@
         "value": 19,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -32823,6 +32865,7 @@
         "value": 11,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -33707,6 +33750,7 @@
         "value": 19,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -34359,6 +34403,7 @@
         "value": 11,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -35105,6 +35150,7 @@
         "value": 11,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -35960,6 +36006,7 @@
         "value": 17,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -36844,6 +36891,7 @@
         "value": 11,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 3,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -37619,6 +37667,7 @@
         "value": 12,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,
@@ -38365,6 +38414,7 @@
         "value": 15,
         "unit": "days"
       },
+      "gold_components_load_bearing": true,
       "difficulty": 5,
       "difficulty_dial": "dispersion",
       "difficulty_validated": false,

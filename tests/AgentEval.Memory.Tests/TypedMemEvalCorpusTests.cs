@@ -294,10 +294,15 @@ public sealed class TypedMemEvalCorpusTests
 
         if (vertical == TypedMemEvalVertical.WorkingMemory)
         {
-            // Declared carve-out (ADR §5.4): the fact is stated in session 0 by design, which means
-            // distance is deliberately confounded with absolute position and recency. That
-            // composite IS the construct, and the ADR names it rather than hiding it.
-            Assert.Equal(1.0, share);
+            // WAS a declared carve-out: the fact was stated in session 0 on every question, and the
+            // note here called the resulting confound of distance with position and recency "the
+            // construct". It was not — it made the haystack grow with the rung label, and BM25
+            // scores documents independently of position, so the whole published gradient was a
+            // context-volume effect. Gold now sits `distance` sessions before the query with H held
+            // constant, so NO question pins gold to session 0 and this vertical takes the ordinary
+            // bar. Kept as its own branch because the expectation is the opposite of every other
+            // vertical's: zero, not "at most half".
+            Assert.Equal(0.0, share);
         }
         else
         {
@@ -566,9 +571,15 @@ public sealed class TypedMemEvalCorpusTests
         // refused_features array trimmed to two entries, or a threshold_auc of 0.99, would sail
         // through. The record supplies only the corpus hash, which is the one thing it can be
         // trusted to state about itself.
-        var exempt = vertical == TypedMemEvalVertical.WorkingMemory
-            ? new HashSet<string>(StringComparer.Ordinal) { "position_in_haystack" }
-            : [];
+        // NO VERTICAL IS EXEMPT ANY MORE. WorkingMemory held the only entry —
+        // `position_in_haystack` — because it pinned its fact to session 0 on every question,
+        // which made position a perfect gold predictor across the whole corpus. That pinning was
+        // also what confounded distance with haystack size (see SaturatedByDesign in
+        // TypedMemEvalDiscriminationTests), and removing it removed the need for the exemption:
+        // gold now sits at a different index on each rung and the feature is measured like any
+        // other. It passes. An exemption that stops being necessary should be deleted, not kept
+        // as a courtesy.
+        var exempt = new HashSet<string>(StringComparer.Ordinal);
 
         // Re-measured from the corpus text, not read back from `features`. A stamped number that
         // nothing recomputes is a claim; this is the check. It is also deliberately a SECOND
@@ -735,15 +746,23 @@ public sealed class TypedMemEvalCorpusTests
             //
             // Declared rather than ratcheted so a future session reads "the band does not apply"
             // instead of "fix this". I nearly regenerated this corpus on the opposite reading.
-            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] =
-                "Easy rung of a declared distance ladder (h_is_independent_variable). A ladder " +
-                "needs rungs the system passes; calibrating this into band would mean making an " +
-                "eight-session-old fact hard to retrieve and would destroy the curve's baseline.",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] =
-                "Easy rung of a declared distance ladder — see distance-8.",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] =
-                "Middle rung of a declared distance ladder, 0.917 and falling as distance grows " +
-                "(40 -> 8/12, 60 -> 9/12). The descent IS the measurement.",
+            // WORKINGMEMORY'S THREE ENTRIES ARE GONE, and the reason is the comment above them.
+            // They read "an eight-session-old fact is easy to retrieve" — but the haystack was
+            // `distance + 1` sessions long, so the short rungs were easy because they were SMALL,
+            // not because the fact was recent, and BM25 cannot see recency at all. With H held
+            // constant every rung lands in band (0.667 / 0.583 / 0.583 / 0.500 / 0.667) and needs
+            // no exemption. An exemption that stops being necessary should be deleted, not kept.
+
+            [(TypedMemEvalVertical.Episodic, "participant-attribution")] =
+                "The question names a topic AND quotes the statement, so gold is the only session " +
+                "in the haystack carrying the whole query and no distractor can outrank it: " +
+                "coverage is 1.000 and no knob moves it. Its previous 0.667 was manufactured by a " +
+                "LEAK — the calibration echo scattered the quoted statement across both roles' " +
+                "filler, which is what made filler compete AND what let a gold-ablated reader " +
+                "answer \"both of us\" on 3 draws of 3. Removing the leak removed the difficulty. " +
+                "Two kinds of near-miss (same topic/other claim, same claim/other topic) were " +
+                "added and do not move it either. This shape is scored on the READER instead — " +
+                "see ScoredOnTheReader in TypedMemEvalDiscriminationTests.",
 
             [(TypedMemEvalVertical.Prospective, "due-window")] =
                 "Names no entity by construction, so BM25 has nothing to match on and coverage " +
@@ -927,7 +946,7 @@ public sealed class TypedMemEvalCorpusTests
     /// The stamp describes the calls the RUNNER made, so this list has to be the runner's arms.
     /// </remarks>
     private static readonly string[] ExpectedProbeArms =
-        ["v1", "v2", "v3", "v6", "v8", "v9"];
+        ["v1", "v2", "v3", "v6", "v8", "v9", "v10", "v11"];
 
     private const double SeparabilityMaxAuc = 0.75;
 
@@ -1182,6 +1201,37 @@ public sealed class TypedMemEvalCorpusTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void Revision_MovesWithTheBytes(TypedMemEvalVertical vertical)
+    {
+        // A CORPUS THAT CHANGED MUST NOT PRESENT THE SAME IDENTITY AS THE ONE IT REPLACED.
+        //
+        // v0.32.0-beta redrew five corpora while corpus_id, revision and all 470 question_ids
+        // stayed byte-identical, leaving corpus_sha256 as the only distinguishing field. In
+        // Bitemporal, 27 of 60 items kept the exact same question TEXT with a different gold
+        // ANSWER — so a consumer keying a cache or a regression baseline on (corpus_id,
+        // question_id) mis-grades silently instead of failing loudly. The consuming project hit
+        // this, reported it, and fixed their own side by keying on the sha; this is the
+        // benchmark-side fix, which protects the consumers who have not hit it yet.
+        //
+        // Checked rather than trusted, because the failure mode is a label that QUIETLY stops
+        // tracking its content — which is exactly what happened, and which no other gate would
+        // notice.
+        var metadata = Metadata(vertical);
+        var revision = metadata.GetProperty("revision").GetString();
+        var sha = metadata.GetProperty("corpus_sha256").GetString();
+
+        Assert.NotNull(revision);
+        Assert.NotNull(sha);
+        Assert.EndsWith(sha![..12], revision!, StringComparison.Ordinal);
+        Assert.StartsWith(
+            TypedMemEvalVerticalDescriptor.CorpusRevision, revision, StringComparison.Ordinal);
+        Assert.Equal(
+            TypedMemEvalVerticalDescriptor.CorpusRevision,
+            metadata.GetProperty("design_revision").GetString());
+    }
+
     [Fact]
     public void EveryRuntimeStringNamesTheShippedRevision()
     {
@@ -1280,6 +1330,174 @@ public sealed class TypedMemEvalCorpusTests
                 $"{questionId} has no shape, so its outcomes could not be reported per stratum.");
         }
     }
+
+    /// <summary>
+    /// V6 must skip exactly the questions the <b>corpus</b> declares redundant — no more, no fewer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Wired in both directions on purpose. The corpus states which questions have interchangeable
+    /// gold components (<c>gold_components_redundant</c>); the probe runner decides which questions
+    /// leave-one-out applies to. Checking only that the sidecar's exclusion list is "reasonable"
+    /// would let the runner supply its own applicability, which is the artifact-grades-itself shape.
+    /// The two sets must be equal, and neither excluded id may appear in the arm's counts.
+    /// </para>
+    /// <para>
+    /// The defect this catches shipped for the life of the vertical: V6 read <b>20/35</b> on
+    /// Forgetting, which any reader takes as fifteen invalid questions. All fifteen were
+    /// <c>still-valid</c> controls carrying a statement and a re-affirmation of the same value —
+    /// ablating either leaves the other, exactly as designed and exactly as the corpus said. The
+    /// runner scoped V6 per <i>vertical</i> while the redundancy is declared per <i>shape</i>, so
+    /// the flag published for this purpose was never read.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void V6_SkipsExactlyTheQuestionsTheCorpusDeclaresRedundant(TypedMemEvalVertical vertical)
+    {
+        var declared = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var question in JsonDocument.Parse(TypedMemEvalCorpus.ReadJson(vertical))
+                     .RootElement.EnumerateArray())
+        {
+            if (question.TryGetProperty("typedmemeval", out var extension)
+                && extension.TryGetProperty("gold_components_redundant", out var flag)
+                && flag.ValueKind == JsonValueKind.True)
+            {
+                declared.Add(question.GetProperty("question_id").GetString()!);
+            }
+        }
+
+        if (!Metadata(vertical).TryGetProperty("probes", out var probes)
+            || !probes.TryGetProperty("v6_leave_one_out", out var v6))
+        {
+            Assert.Empty(declared);
+            return;
+        }
+
+        var excluded = new SortedSet<string>(StringComparer.Ordinal);
+        if (v6.TryGetProperty("excluded_declared_redundant", out var list))
+        {
+            foreach (var id in list.EnumerateArray())
+                excluded.Add(id.GetString()!);
+        }
+
+        Assert.Equal(declared, excluded);
+
+        // And an excluded question may not also be counted. A denominator that shrinks while the
+        // ids stay in `failed` would report the exclusion and score it anyway.
+        if (v6.TryGetProperty("failed", out var failed))
+        {
+            foreach (var id in failed.EnumerateArray())
+            {
+                Assert.False(
+                    excluded.Contains(id.GetString()!),
+                    $"{vertical}: {id.GetString()} is excluded from V6 as declared-redundant and "
+                    + "is also listed as a V6 failure.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// V6 must run on exactly the questions that DECLARE their components load-bearing, and its
+    /// pass rate may not regress.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Wired from the corpus like the redundancy check beside it. The scope used to be a hardcoded
+    /// <c>vertical in ("arithmetic", "forgetting")</c> — a right rule with too small a reach, which
+    /// is the applied-once shape. Three more generators state the same claim in their own comments
+    /// and nothing tested it. Extending it immediately refuted two of them.
+    /// </para>
+    /// <para>
+    /// The RATCHET is the useful half here. <c>semantic/co-reference</c> reads 9 of 15: six
+    /// questions still have a component that can be dropped without losing the answer, at a 3-of-3
+    /// bar against a declared 1/3 floor. That is a real declared residual, not a tolerance — it was
+    /// 4 of 15 before a chance-floor correction to V6 and a rival-fact fix to the corpus, and it may
+    /// improve but not get worse.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(AllVerticals))]
+    public void V6_RunsOnEveryQuestionThatDeclaresItsComponentsLoadBearing(
+        TypedMemEvalVertical vertical)
+    {
+        var declared = 0;
+        foreach (var question in JsonDocument.Parse(TypedMemEvalCorpus.ReadJson(vertical))
+                     .RootElement.EnumerateArray())
+        {
+            if (!question.TryGetProperty("typedmemeval", out var extension))
+                continue;
+            // TWO DECLARATION FORMS. The whole-question flag says every gold component is
+            // individually necessary; the index list says WHICH ones are, for shapes whose gold
+            // mixes the two kinds. Conjunction's chain shapes need the second — every count event
+            // is load-bearing and the head of a replacement chain is not — and counting only the
+            // flag would report 15 declared against 50 scored.
+            var loadBearing = extension.TryGetProperty("gold_components_load_bearing", out var lb)
+                              && lb.ValueKind == JsonValueKind.True;
+            var perComponent =
+                extension.TryGetProperty("gold_components_load_bearing_indices", out var ix)
+                && ix.ValueKind == JsonValueKind.Array && ix.GetArrayLength() > 0;
+            var redundant = extension.TryGetProperty("gold_components_redundant", out var rd)
+                            && rd.ValueKind == JsonValueKind.True;
+            if ((loadBearing || perComponent) && !redundant
+                && question.GetProperty("answer_session_ids").GetArrayLength() > 1)
+            {
+                declared++;
+            }
+        }
+
+        if (!Metadata(vertical).TryGetProperty("probes", out var probes)
+            || !probes.TryGetProperty("v6_leave_one_out", out var v6))
+        {
+            Assert.Equal(0, declared);
+            return;
+        }
+
+        var applicable = v6.GetProperty("applicable").GetInt32();
+        var unmeasured = v6.TryGetProperty("unmeasured_no_answer", out var un)
+            ? un.GetArrayLength() : 0;
+        var undecidable = (v6.TryGetProperty("excluded_not_decidable", out var nd)
+                ? nd.GetArrayLength() : 0)
+            + (v6.TryGetProperty("excluded_chance_undecidable", out var cu)
+                ? cu.GetArrayLength() : 0);
+
+        Assert.True(
+            applicable + unmeasured + undecidable == declared || declared == 0,
+            $"{vertical}: {declared} questions declare gold_components_load_bearing but V6 accounts "
+            + $"for {applicable} scored + {unmeasured} unmeasured + {undecidable} undecidable. A "
+            + "declared claim that the arm silently skips is a claim nothing tests.");
+
+        if (V6Ratchet.TryGetValue(vertical, out var floor) && applicable > 0)
+        {
+            var rate = (double)v6.GetProperty("passed").GetInt32() / applicable;
+            Assert.True(
+                rate >= floor - 1e-4,
+                $"{vertical} V6 REGRESSED to {rate:F4} against a recorded {floor:F4}. Components "
+                + "declared load-bearing are being dropped without losing the answer.");
+        }
+    }
+
+    /// <summary>V6 pass rates that may improve but not regress.</summary>
+    private static readonly Dictionary<TypedMemEvalVertical, double> V6Ratchet = new()
+    {
+        // 49/50, and the one failure is understood: tme-ari-002 drops one of four order sessions
+        // and the reader answers "3 times" on two draws of three and "4 times" on the third,
+        // miscounting a mention-only session ("Meridian Tools sent their new catalogue over") as
+        // an order. Two draws show the answer WAS removed. V6 condemns on one hit because the
+        // question names no candidates, and inventing a chance floor over "plausible small
+        // integers" to make this 50/50 would be tuning to the number rather than deriving a bar.
+        [TypedMemEvalVertical.Arithmetic] = 49.0 / 50.0,
+        [TypedMemEvalVertical.Forgetting] = 1.0,
+        [TypedMemEvalVertical.Conjunction] = 1.0,
+        [TypedMemEvalVertical.Temporal] = 28.0 / 30.0,
+        // 4/15 -> 9/15 -> 15/15 over three corrections, and the residual is GONE rather than
+        // declared. The last step was not a corpus change: 16 of the 18 remaining "reproductions"
+        // were responses that explicitly DECLINED the co-reference ("the conversations do not
+        // mention a workshop by that name; at the unit behind the depot...") and an equivalence
+        // judge scored them as reaching a gold that names no place. The ablation arms now require
+        // the answer to be tied to the asked entity.
+        [TypedMemEvalVertical.Semantic] = 1.0,
+    };
 
     private static JsonElement Metadata(TypedMemEvalVertical vertical)
         => JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical)).RootElement.Clone();

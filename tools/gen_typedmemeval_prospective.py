@@ -270,6 +270,62 @@ WINDOW_FRAMES = (
 )
 
 
+#: Every WHENS phrase and the interval a reader takes from it. WEEK_WORDS cannot serve: it has no
+#: entry for "two" or "a couple of", and a phrase the map misses is a phrase the guard silently
+#: skips.
+_WHENS_WEEKS = {
+    "in two weeks": 2, "in three weeks or so": 3, "in four weeks": 4, "in five weeks": 5,
+    "in six weeks": 6, "in seven weeks": 7, "in about ten weeks": 10, "in a couple of weeks": 2,
+}
+
+#: Intervals the guard may substitute -- long, so a rewritten filler reminder lands clear of any
+#: window, and still drawn from WHENS so vocabulary parity holds.
+_FAR_WHENS = ("in about ten weeks", "in seven weeks", "in six weeks")
+
+
+def _filler_due_dates(session) -> list[tuple[str, int]]:
+    """Which WHENS phrases a filler session uses, longest first so overlaps resolve correctly."""
+    text = session.turns[0].content
+    return [(phrase, weeks) for phrase, weeks in
+            sorted(_WHENS_WEEKS.items(), key=lambda kv: -len(kv[0])) if phrase in text]
+
+
+def _clear_filler_from_windows(sessions, windows) -> None:
+    """Push every FILLER reminder's implied due date outside every arm's window.
+
+    THE ANSWER KEY WAS WRONG, and it was measured rather than suspected. due-window asks "what did I
+    ask you to remind me about that falls due in <span>?", and class parity (ADR-026 §19) requires
+    filler to carry reminder requests in gold's own construction -- "Remind me to top up the parking
+    app in four weeks" -- or the corpus is separable on the phrase itself.
+
+    For every other shape that is harmless: they name a specific entity, so filler about a different
+    task cannot be a candidate answer. Here the membership criterion IS the class. A filler reminder
+    falling due inside the window satisfies the question exactly and is not in gold, so the
+    reference model is marked WRONG FOR BEING RIGHT: V8 was 4/18, and the failures are the model
+    correctly naming reminders the key omits.
+
+    Parity and membership are both preserved by changing the DUE DATE rather than the construction:
+    filler still says "Remind me to ...", it simply falls outside every window the pair asks about.
+    """
+    for session in sessions:
+        if session.tag != "filler":
+            continue
+        for phrase, weeks in _filler_due_dates(session):
+            due = session.timestamp + timedelta(weeks=weeks)
+            if not any(asked < due <= asked + timedelta(days=span) for asked, span in windows):
+                continue
+            replacement = next(
+                (candidate for candidate in _FAR_WHENS
+                 if not any(asked < session.timestamp + timedelta(weeks=_WHENS_WEEKS[candidate])
+                            <= asked + timedelta(days=span) for asked, span in windows)), None)
+            if replacement is None:
+                raise SystemExit(
+                    "prospective: no filler interval falls outside every due-window arm; the "
+                    "windows have grown wide enough that class-parity filler cannot avoid them, "
+                    "and the shape's answer set is no longer well defined.")
+            session.turns[0].content = session.turns[0].content.replace(phrase, replacement)
+
+
 def _window_pair(
     qid_before: str,
     qid_after: str,
@@ -305,7 +361,10 @@ def _window_pair(
     count = 5 + (index % 3)
     tasks = [WINDOW_TASKS[(index * 3 + k) % len(WINDOW_TASKS)] for k in range(count)]
 
-    reminders = [tmc.make_session(anchor, ("", ""), gold_turn=0, tag="reminder") for _ in tasks]
+    # Same parity fix as _pair: the reminder's assistant turn is empty and gets only an
+    # acknowledgement, so it starts far below filler's and is padded past it.
+    reminders = [tmc.make_session(anchor, ("", rng.choice(FILLER)[1]), gold_turn=0, tag="reminder")
+                 for _ in tasks]
     filler = [_filler_session(rng, echoed, anchor) for _ in range(rng.randint(10, 14))]
 
     sessions = list(filler)
@@ -349,6 +408,11 @@ def _window_pair(
     if before_at is None:
         return []
 
+    # Filler carries reminder requests in gold's own construction for class parity, and this shape's
+    # answer is the SET of things asked about -- so any filler reminder inside a window is a correct
+    # answer the key omits. Pushed clear before the arms are built, so both arms see the same fix.
+    _clear_filler_from_windows(sessions, [(before_at, span_days), (after_at, span_days)])
+
     def arm(asked, qid, label):
         window = [(t, d) for t, d in ordered if asked < d <= asked + timedelta(days=span_days)]
         copy = _copy(sessions)
@@ -376,6 +440,30 @@ def _window_pair(
     return [arm(before_at, qid_before, "before"), arm(after_at, qid_after, "after")]
 
 
+#: Date-free mentions of the asked entity, for the shapes that NAME the thing.
+#:
+#: not-yet-true is SATURATED at coverage 1.000 and no echo can move it: its response curve holds
+#: 1.000 through echo 0.50 and drops to 0.333 at 0.75, so the [0.50, 0.90] band has no rung at all.
+#: That is a corpus problem wearing a calibration costume -- exactly ONE session in each haystack
+#: mentions the asked entity, so a lexical retriever matching that single term scores what a perfect
+#: selector scores, and the shape cannot rank two systems.
+#:
+#: The repair is the one that fixed bitemporal/belief-at-instant: make the entity term stop being
+#: sufficient. EVERY FRAME IS DATE-FREE, deliberately -- a distractor mentioning the entity AND a
+#: date would be a second candidate answer to "when am I due to ...", which is the defect fixed in
+#: due-window reintroduced one shape over. These compete on the retrieval term and on nothing else.
+ENTITY_MENTIONS = [
+    "{entity} came up with Marta again, though nothing was decided.",
+    "I still keep meaning to look up the address for {entity}.",
+    "Someone at the allotment turned out to know {entity} rather well.",
+    "There was a piece about {entity} in the local paper, of all places.",
+    "I mentioned {entity} to Dad and he had opinions, naturally.",
+]
+
+#: Same-entity distractors per question. Three puts the entity term in four sessions against
+#: K_REF=5, so a retriever matching on it alone returns mostly non-answers.
+_ENTITY_DISTRACTORS = 3
+
 def _pair(
     qid_before: str,
     qid_after: str,
@@ -391,6 +479,7 @@ def _pair(
     rng: random.Random,
     echo: float,
     filler_count: int,
+    entity: str | None = None,
 ) -> list[tmc.Question]:
     """Builds one before/after pair over a single shared haystack.
 
@@ -416,8 +505,33 @@ def _pair(
     """
     echoed = tmc.echo_terms(question_text, echo, rng)
 
-    gold = tmc.make_session(anchor, ("", gold_assistant), gold_turn=0, tag="gold")
-    filler = [_filler_session(rng, echoed, anchor) for _ in range(filler_count)]
+    # FIRST-ASSISTANT PARITY, and it is a LENGTH fix rather than a vocabulary one.
+    #
+    # Filler's assistant turn carries a reaction from FILLER; gold's is empty for most shapes here,
+    # because the evidence sits in the USER turn and equalise_reply later prepends only a short
+    # acknowledgement. Measured at the point the padder receives them, gold's first assistant turn
+    # is 26 characters against filler's 71 -- a 45-character gap gold must close with whole-sentence
+    # padding, so it takes the most steps and the last one overshoots. That is why gold finishes
+    # LONGEST in 8 of 50 questions against 4.1 expected by chance, and why the tell sits in this one
+    # slot and in no other.
+    #
+    # Correlates exactly across the family: episodic -36 shows the same tell at 0.120, while
+    # semantic (-4), bitemporal (-2) and temporal (+1) show none. Bitemporal's gap was closed this
+    # same release by giving gold the reaction filler gets, and its tell went away.
+    gold_reaction = gold_assistant or rng.choice(FILLER)[1]
+    gold = tmc.make_session(anchor, ("", gold_reaction), gold_turn=0, tag="gold")
+    # Entity distractors come OUT of the filler budget, so H stays inside its declared range --
+    # the accounting bitemporal got wrong twice before it was written down.
+    plain = filler_count - (_ENTITY_DISTRACTORS if entity else 0)
+    filler = [_filler_session(rng, echoed, anchor) for _ in range(plain)]
+    if entity:
+        for offset in range(_ENTITY_DISTRACTORS):
+            session = _filler_session(rng, echoed, anchor)
+            mention = ENTITY_MENTIONS[(len(filler) + offset) % len(ENTITY_MENTIONS)]
+            sentences = session.turns[0].content.split(". ")
+            sentences[0] = mention.format(entity=entity).rstrip(".")
+            session.turns[0].content = ". ".join(sentences)
+            filler.insert(((offset + 1) * len(filler)) // (_ENTITY_DISTRACTORS + 1), session)
     sessions = list(filler)
     gold_index = rng.randint(0, len(sessions))
     sessions.insert(gold_index, gold)
@@ -493,6 +607,50 @@ def _copy(sessions: list[tmc.Session]) -> list[tmc.Session]:
     ]
 
 
+def _seed_filler_session(raw, exclude_index: int,
+                         rng: random.Random,  # DevSkim: ignore DS148264 - deterministic corpus generation
+                         stamp, echoed):
+    """A NON-GOLD session lifted from a different carried entry, re-stamped.
+
+    Parity of AUTHORSHIP, which is the one kind of parity a bank cannot provide. Gold here is real
+    human text carried from the time-grounded corpus, so its distractors must be too -- generated
+    filler beside carried gold is two writers in one haystack, and type/token ratio finds that
+    without reading a word of the content.
+
+    A DIFFERENT entry, so nothing from this question's own answer set can be reintroduced as a
+    distractor. Returns None when no candidate is available, and the caller falls back rather than
+    shipping a haystack short of its declared H.
+    """
+    candidates = []
+    for index, entry in enumerate(raw):
+        if index == exclude_index:
+            continue
+        for turns in entry.get("haystack_sessions", []):
+            if not any(t.get("has_answer") for t in turns):
+                candidates.append(turns)
+    if not candidates:
+        return None
+    turns = candidates[rng.randrange(len(candidates))]
+    built = [tmc.Turn(t["role"], t["content"], False) for t in turns]
+
+    # THE CALIBRATION CLAUSE GOES IN HERE TOO, and leaving it out cost the shape its difficulty dial.
+    #
+    # `_filler_session` weaves the echo into generated filler; borrowing real sessions instead
+    # replaced the very text the knob acts on, so coverage went FLAT at 0.9167 across the entire
+    # echo range -- 0.000 to 1.000, no movement. A shape with no working knob cannot be calibrated
+    # into band at all, which is a worse defect than the authorship gap this borrowing fixed.
+    #
+    # It also matters for parity in its own right: filler split into two kinds -- some carrying the
+    # clause and some not -- is a distractor population with two modes, which is the bimodal-pool
+    # defect this generator's own filler comment already records paying for once.
+    for turn in built:
+        if turn.role == "assistant":
+            turn.content = tmc.weave_echo(turn.content, echoed)
+            break
+
+    return tmc.Session(built, stamp, tag="tg-filler")
+
+
 def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[tmc.Question]:
     """Carries the twelve time-grounded probe questions in as the vertical's seed.
 
@@ -531,7 +689,23 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             later = latest + timedelta(hours=30 * (i + 1))
             stamp = (later if rng.random() < 0.5 and later < question_date - timedelta(days=1)
                      else earliest - timedelta(hours=30 * (i + 1)))
-            sessions.append(_filler_session(rng, echoed, stamp))
+            # PADDED FROM THE SEED CORPUS ITSELF, NOT FROM THE GENERATED BANKS.
+            #
+            # The carried gold is REAL HUMAN TEXT lifted from the time-grounded corpus; padding it
+            # with generated filler put two different AUTHORS in one haystack, and the screen sees
+            # that immediately. Measured: user-turn type/token ratio separated gold perfectly in 3
+            # of 12 seed questions -- the largest single contributor in the vertical -- with gold at
+            # 0.855 ("First physio session for the shoulder tonight. Twice a week from here.")
+            # against generated filler at 0.822 ("I am due to order more printer paper in six
+            # weeks, going by the letter.").
+            #
+            # No amount of post-hoc balancing closes an authorship gap, which is why eight attempts
+            # at padding this vertical each moved the tell instead of removing it. Non-gold sessions
+            # from OTHER carried entries are the same author, the same register and the same
+            # vocabulary distribution as the gold they sit beside.
+            borrowed = _seed_filler_session(raw, offset, rng, stamp, echoed)
+            sessions.append(borrowed if borrowed is not None
+                            else _filler_session(rng, echoed, stamp))
         sessions.sort(key=lambda s: s.timestamp)
 
         out.append(tmc.Question(
@@ -544,6 +718,88 @@ def _seed_questions(rng: random.Random, echo: float, start_index: int) -> list[t
             {"shape": SHAPE_SEED, "seeded_from": entry["question_id"]},
         ))
     return out
+
+
+#: How close a slot's gold and filler medians must sit before base-parity stops padding. Below one
+#: sentence of the filler bank, so the remaining difference is smaller than the smallest move the
+#: shape equaliser can make -- there is no point closing further than the next stage's granularity.
+_BASE_PARITY_TOLERANCE = 14
+
+
+def _balance_gold_base(question, rng) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """Bring gold and filler to comparable BASE text in every turn slot, before shape equalisation.
+
+    THIS IS THE FIX FOR S3, AND IT IS DELIBERATELY ONE FUNCTION OVER ALL THREE CONSTRUCTION PATHS.
+    Six earlier attempts failed by patching a single site, and the measurement says why -- every path
+    carries gaps, in several slots, in BOTH directions:
+
+        _pair            due-later-reminder  user0        -54   assistant0  -20
+        _pair            not-yet-true        user0        -51   assistant0  -40
+        _pair            expiring-validity   user0        -23   assistant0  -18
+        _window_pair     due-window          user0        -38
+        _seed_questions  seed-carry-over     user0        -28   assistant0  -30
+        _seed_questions  seed-carry-over     assistant1   +68   <-- gold LONGER
+
+    A fix applied to `_pair` alone never touched 30 of 50 questions, which is why the median barely
+    moved and the tell relocated instead of closing.
+
+    WHY BASE TEXT AND NOT PADDING. `equalise_shape` pads every slot toward a common target and can
+    only ADD, and it stops within one phrase of that target because overshoot is scored as harshly as
+    shortfall. So it cannot close a systematic gap in either direction: whichever side starts further
+    away finishes further away, and gold's position is then decided by where it STARTED. Closing the
+    gap here leaves the equaliser doing what it is good at -- absorbing the remainder.
+
+    Both directions matter. `seed-carry-over`'s second assistant turn has gold 68 characters LONGER
+    than filler, and padding gold further would be the exact wrong move; there, filler is raised
+    instead.
+    """
+    slots: dict[str, tuple[list, list]] = {}
+    for session in question.sessions:
+        seen: dict[str, int] = {}
+        for turn in session.turns:
+            index = seen.get(turn.role, 0)
+            seen[turn.role] = index + 1
+            gold, filler = slots.setdefault(f"{turn.role}{index}", ([], []))
+            (gold if session.is_gold else filler).append(turn)
+
+    for turns_gold, turns_filler in slots.values():
+        if not turns_gold or not turns_filler:
+            continue                       # a slot only one side has is handled by _drop/_normalise
+        # BALANCED ON THE PROFILE, NOT ON LENGTH. A chars-only version closed every length gap and
+        # the tell simply moved AXIS rather than slot: `user_type_token_ratio` went to 4.1 sd while
+        # `first_assistant_length_chars` disappeared. The separability screen refuses six features,
+        # so parity has to be measured on the same six the padder uses -- matching one axis while
+        # the others drift is how a tell relocates instead of closing.
+        for _ in range(6):
+            def profile(turns):
+                vectors = [tmc._profile_vector(t.content) for t in turns]
+                middle = len(vectors) // 2
+                return {axis: sorted(v[axis] for v in vectors)[middle] for axis in tmc._PAD_AXES}
+
+            gold_profile, filler_profile = profile(turns_gold), profile(turns_filler)
+            # Normalised by the same weights the padder scores with, so "one sentence apart" and
+            # "forty characters apart" are comparable quantities rather than raw counts.
+            def distance(a, b):
+                return sum(abs(a[axis] - b[axis]) * tmc._PAD_WEIGHTS[axis] for axis in tmc._PAD_AXES)
+
+            current = distance(gold_profile, filler_profile)
+            if current <= _BASE_PARITY_TOLERANCE * tmc._PAD_WEIGHTS["chars"]:
+                break
+
+            short = turns_gold if gold_profile["chars"] < filler_profile["chars"] else turns_filler
+            other = filler_profile if short is turns_gold else gold_profile
+            best, best_distance = None, current
+            for _, candidate in FILLER:
+                added = tmc._profile_vector(" " + candidate)
+                moved = {axis: (gold_profile if short is turns_gold else filler_profile)[axis]
+                         + added[axis] for axis in tmc._PAD_AXES}
+                after = distance(moved, other)
+                if after < best_distance:
+                    best, best_distance = candidate, after
+            if best is None:
+                break            # nothing in the bank reduces the distance; stop rather than churn
+            for turn in short:
+                turn.content = f"{turn.content} {best}".strip()
 
 
 def build(echo, rng: random.Random) -> list[tmc.Question]:
@@ -622,6 +878,7 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
             f"passed; nothing since then records whether it went ahead.",
             base + timedelta(days=13 * i + 2), rng, knob(SHAPE_NOT_YET),
             filler_count=rng.randint(12, 17),
+            entity=noun,
         )
         index += 2
         pair_no += 1
@@ -691,6 +948,7 @@ def check_pairs(questions: list[tmc.Question]) -> list[str]:
         failures.append(f"{len(pairs)} pairs, ADR §5.1 declares {expected}")
 
     failures += _check_arithmetic(questions)
+    failures += _check_window_membership(questions)
     return failures
 
 
@@ -698,6 +956,36 @@ WEEK_WORDS = {
     "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     "eleven": 11, "twelve": 12, "thirteen": 13, "fifteen": 15, "sixteen": 16, "eighteen": 18,
 }
+
+
+def _check_window_membership(questions: list[tmc.Question]) -> list[str]:
+    """No NON-GOLD session may satisfy a due-window question's own membership criterion.
+
+    Checked rather than trusted, because the guard rewrites text and a rewrite that silently missed
+    a phrasing would restore the defect without failing anything. Re-derives membership from the
+    SHIPPED session content, the way _check_arithmetic re-derives dates.
+    """
+    failures: list[str] = []
+    for q in questions:
+        if q.extension.get("shape") != SHAPE_WINDOW:
+            continue
+        span = q.extension["window_days"]
+        asked = q.question_date
+        for session in q.sessions:
+            if session.is_gold:
+                continue
+            text = session.turns[0].content
+            if not any(cue in text.lower() for cue in ("remind me to", "can you remind me")):
+                continue
+            for phrase, weeks in _filler_due_dates(session):
+                due = session.timestamp + timedelta(weeks=weeks)
+                if asked < due <= asked + timedelta(days=span):
+                    failures.append(
+                        f"{q.question_id}: a NON-GOLD session states a reminder request falling due "
+                        f"{due:%Y-%m-%d}, inside this arm's window ({asked:%Y-%m-%d} +{span}d) -- it "
+                        f"satisfies the question and is not in the answer, so the key is wrong: "
+                        f"{text[:70]!r}")
+    return failures
 
 
 def _check_arithmetic(questions: list[tmc.Question]) -> list[str]:
@@ -823,6 +1111,9 @@ if __name__ == "__main__":
             no_absolute_dates=True,
         ),
         generator_tool="tools/gen_typedmemeval_prospective.py",
+        # Runs between reply equalisation and shape padding -- see typedmemeval_common._balance for
+        # why that position is the whole point.
+        balance=_balance_gold_base,
         extra_checks=lambda qs: (check_pairs(qs) + _check_window(qs)
                                  + _check_window_arms_differ(qs)),
         shape_of=lambda q: (q.extension or {}).get("shape"),

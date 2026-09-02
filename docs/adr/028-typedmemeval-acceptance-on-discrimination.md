@@ -317,6 +317,625 @@ records agree: V9 5/6, the highest in the vertical, headroom 0.1667, which is on
 six clearing the 0.15 floor. Corpus unchanged, so no probe is invalidated — but §3c's claim that
 saturation is the failure mode the ceiling exists to catch was not being met for that shape.
 
+## 13. Amendment, 2026-09-02 — a shape with no gold is still a shape, and ours was scored by nothing
+
+§3a accepts a shape on `V1 − V9`. Every one of those arms is defined in terms of reaching a **gold
+fact**, so a question with **no gold session** makes all three undefined and the difference
+unformable. That is correct arithmetic, and for the life of this family it was also the end of it:
+the shape published no `headroom_perfect_selector`, both C# discrimination assertions hit their
+`if (!record.TryGetProperty(...)) continue;`, and **15 of Forgetting's 50 questions — 30% of the
+vertical — shipped certified by nothing while the suite stayed green.**
+
+The gate had the defect, not the corpus. It is the **element-missing** form of pass-by-absence: the
+artifact under test decides whether it gets tested. This family gates against that everywhere else
+and had it in its own gate.
+
+### 13a. What is checkable when there is no gold
+
+Two claims, and conflating them is the error this amendment mostly exists to prevent:
+
+| claim | who certifies it |
+|---|---|
+| **corpus** — the haystack contains no evidence for the asked thing | `check_forgetting`, already: model-free, exhaustive, fatal at generation. The asked noun may not appear as a substring anywhere in the haystack. |
+| **system** — asked something the evidence cannot answer, the reader declines instead of inventing | nothing, until now. **V10 / V11.** |
+
+### 13b. The arms
+
+Two contexts, mirroring V8 and V9 exactly, so the pair is a like-for-like difference on one
+question set:
+
+- **V10** — abstention given the **entire haystack**
+- **V11** — abstention given **BM25 top-`K_ref`**, the same reference retriever
+
+`V10 − V11` is then **the cost of retrieval to a system's calibration**, and which way it runs is
+not obvious in advance: a narrow context has fewer sessions to mis-attribute from, but the ones it
+does have are the topically nearest, which is when a confident wrong answer is most available.
+Measured, not predicted.
+
+Three design points, each of which was a wrong first answer:
+
+1. **The grade is about COMMITMENT, not equivalence.** Reusing `produced_gold` against the
+   abstention gold was the cheap option and it grades the dangerous case as good: *"you never
+   mentioned a kiteboard, though from your other gear it was probably a Slingshot"* does convey
+   "no record at all". **Abstain-then-guess is a commit.** A dedicated one-word grade also keeps
+   the verdict off the gold's wording, which matters because that gold is boilerplate — fifteen
+   questions share one sentence with the noun swapped.
+
+2. **A question passes only on a CLEAN SWEEP.** One commit in three draws is a reader that will
+   invent an answer here; a rate that averages it away hides the single event a consumer needs.
+   Same asymmetry V3 has always had.
+
+3. **`discriminates` is `null`, not `true` or `false`.** The retrieval floor is a statement about a
+   *baseline being beatable* — V9 saturated at 1.0 means no retriever can be told apart, whatever
+   it does. V10 and V11 have no baseline system between them: they are one model under two
+   contexts, so 1.0 in both means the reference model is well calibrated here, **not** that the
+   shape cannot separate a confabulator from an abstainer. `true` would claim a separation never
+   observed; `false` would condemn the shape on evidence that does not bear on it. Null, with the
+   reason published beside it, and a C# gate that refuses any *undeclared* unscored shape.
+
+### 13c. The `unmeasured` case, found by `--dry-run`
+
+The first implementation returned an empty dict when no draw could be graded — arithmetically the
+same as "this shape has no such questions", semantically the opposite, and **it reproduced the hole
+exactly**: a run whose judge returns garbage would publish no exemption row and both assertions
+would skip the shape in silence again. `--dry-run`'s stub grade is unparseable by construction, so
+it drives precisely that path and failed on its first execution. Applicability is now keyed on the
+**questions**, never on the results.
+
+## 14. Amendment, 2026-09-02 — two arms grading one gold to two standards
+
+Found by asking why Forgetting's V1 was 34/35, which turned out to be the least of it.
+
+**`tme-for-013`, same response, opposite grades.** V1 answered *"The conversations don't say which
+physio you were seeing"* and was graded **no**; V8 answered the same thing and was graded **yes** —
+against a gold naming `Neskett Reverie`.
+
+Auditing the shipped cache for the class: **11 grades across V1, V8 and V9 passed on responses that
+named nothing at all**, every one of them on Forgetting. `tme-for-011` is the clearest —
+*"The conversations do not say who cleans the flat"* graded a pass, a system that retrieved
+**nothing** scored as a success on the vertical whose entire subject is retaining what is no longer
+true.
+
+**The internal contradiction is the useful part.** V6 ablates this same gold with
+`require_distinctive` on, demands the value, and passes 20/20. V1/V8/V9 graded it without. Both
+cannot be describing the same target.
+
+### 14a. The question was wrong, and only then the grader
+
+*"Which letting agent handles my flat?"* — to **that** question, *"no letting agent handles it now"*
+is complete and correct. The gold named the superseded value; the question never asked for it; the
+judge read the response as answering what was asked and passed it. Fixing this in the grader alone
+would mark the model wrong for correctly answering the question put to it — the same error as
+`prospective/due-window`, in the other direction.
+
+So **the question moves first**, and both arms of every paired fact now append the same clause.
+**The first clause was wrong, and how it failed is the useful part.**
+
+It read *"And if that has changed, who was it before?"*, which did exactly what it was meant to on
+`invalidated` — V1 **19/20 → 20/20**, headroom **0.30 → 0.35**, the unearned passes gone — and broke
+`still-valid` from **15/15 to 12/15**. The three failing responses were all **correct**: each named
+its value and then said the record does not give a previous one.
+
+They were right, and **the control's own setups are why.** *"Switched broadband this week."*
+*"Moved my number onto a new tariff."* Those narrate a change, so a question asking what it was
+*before* finds an implied earlier value the corpus never states — a contradiction that had always
+been in the control arm and that no question had ever been pointed at. Rewording the control's gold
+to close the clause made it **worse** (32/35 → 31/35), because the disagreement was never about
+wording.
+
+The clause now asks for **currency**, not history: *"Give the name, and say whether that is still
+current."* Both arms have a currency; only one has a history. It still forces the value to be
+named, which was the entire point. **Neither gold needed changing** — both already name their value
+and state their currency, which is the sign the question had been the thing out of step all along.
+
+One incidental improvement fell out of it: the echo terms are now drawn from the **base** question
+before the clause is appended. The clause is identical on all 35 paired questions, so its words are
+a constant, and weaving a constant into filler adds no lexical competition while diluting the terms
+that do.
+
+**Then the grader follows.** `require_distinctive` extends to V1/V8/V9 **only on a negative gold
+that names a value**, because there "no record of it" and "it was X, and that is no longer true"
+are different answers and only the value tells them apart. Scoping is the whole point: turning it
+on across the board would reject correct paraphrases elsewhere (*"one thousand two hundred and
+forty"* for *"1,240"*), which on V1 rejects a **valid question** — the worse error. Measured over
+the shipped cache **before** the rule was written: it fires on Forgetting's 20 invalidated
+questions and Prospective's 11, flips 11 grades on Forgetting and **zero** on Prospective, and
+touches no other vertical.
+
+### 14a-i. Where it landed
+
+| | v0.32.0-beta | now |
+|---|---|---|
+| `invalidated` V1 / V8 / V9 | 19/20 · 17/20 · 13/20 | **20/20 · 20/20 · 11/20** |
+| `invalidated` headroom (reachable) | 0.30 (0.20) | **0.45 (0.45)** |
+| `still-valid` V1 / V8 / V9 | 15/15 · 14/15 · 8/15 | 13/15 · 15/15 · 12/15 |
+| `still-valid` headroom | 0.4667 | **0.0667** — see §14d |
+| V6 | 20/35 | **20/20** |
+| `never-known` | scored by nothing | **V10 15/15 · V11 15/15** |
+
+Every accuracy figure above is now graded under `require_distinctive`, so it is a **stricter** bar
+than the column beside it, not the same one.
+
+### 14b. V6's 20/35 was fifteen not-applicables, and the corpus already said so
+
+The 15 failures are `tme-for-021` through `-035` — the `still-valid` controls, **exactly**, which
+is what a structural cause looks like beside a real one. Each carries a statement *and* a
+re-affirmation of the same value, so ablating either leaves the other; the generator publishes
+`gold_components_redundant: true` on every one of them and its comment says *"V6 fails all fifteen
+of these by construction."*
+
+The runner scoped V6 per **vertical** while the redundancy is declared per **shape**, so the flag
+published for this purpose was never read. **20/35 reads as fifteen invalid questions and the arm
+is 20/20 where it is defined.** The exclusion is now published with its ids and reason, and a C#
+test asserts the two sets are equal in both directions — the corpus's declaration and the sidecar's
+exclusion — because a runner that supplied its own applicability would be the artifact grading
+itself.
+
+### 14c. A grammar defect the same audit surfaced
+
+The invalidation clause is composed **twice** — `"I {event}"` in the session that speaks it and
+`"you {event}"` in the gold that reports it. `"was discharged at the final appointment"` is the one
+clause in the table whose verb inflects between the two persons, so `tme-for-013` shipped a gold
+reading **"you was discharged at the final appointment."** One verb, one question, and exactly the
+kind of thing a consumer root-causes onto their own pipeline before they blame the corpus. Now
+`"got discharged"`, with an import-time assertion over the whole table.
+
+### 14d. `still-valid` reads 0.0667, and the arm is not the quantity
+
+The control's headroom fell below the 0.15 floor, and the honest reading is that **the floor is
+pointed at the wrong thing for this shape.** `still-valid` is the **over-forgetting control**: same
+fact, same question text, same statement as its `invalidated` twin, and nothing that cancels it.
+What it exists to catch is a system reporting a still-valid fact as superseded — a property of the
+**pair**, not of either arm's retrieval headroom. ADR-028 §7.4 already says exactly this of
+Bitemporal.
+
+**And the pair figure existed and was never published.** `_pair_discrimination` runs per shape,
+which is right for Bitemporal — both arms are two questions inside one shape — and returns `{}` for
+Forgetting, whose arms **are** its shapes: every per-shape group holds one arm of each pair,
+`len(arms) != 2` on all fifteen. Thirty paired questions, no pair figure, and nothing saying so.
+The same silent-`{}` shape as §13's hole, found the same way — by asking what a gate does when it
+declines to measure.
+
+Measured once published: **pair headroom 0.4667** against a scaled floor of **0.24**, and **3.68 sd**
+of separation against a floor of **2.0**. Both conditions clear, comfortably.
+
+So `still-valid` is exempt from the per-shape floor **and takes a harder bar in its place**: a C#
+gate skips it only while its vertical's `paired_arms` block discriminates, and fails outright if
+that stops being true. An exemption that carries no bar is a way around a red gate; this one is the
+gate pointed at the right quantity.
+
+## 15. Amendment, 2026-09-02 — the distractor that answered every question, and why nothing could see it
+
+**The abstention arm found this on its first real draw, which is the argument for having built it.**
+
+`tme-for-036_abs` asks *"Which kiteboard did I end up with?"* against a haystack that by construction
+contains no kiteboard. Given the full haystack, the reference model answered **"Marloe Basic"** on
+**three draws out of three**, and on one of them explained itself:
+
+> *"though the record doesn't explicitly say 'kiteboard,' it says you 'settled on Marloe Basic.'"*
+
+### 15a. The cause
+
+A gold statement in Forgetting is **two sentences** — a setup naming the noun (*"Started with a
+physio for the shoulder."*) and a choice naming the value (*"I settled on Neskett Reverie."*). The
+parity filler drew only the second. Its comment claimed it was *"the same construction as the
+statement session, about something no question asks."* It was **neither**: a bare *"I settled on
+Marloe Basic."* is about nothing **named**, which makes it about whatever the reader is looking for.
+
+Measured on the corpus that shipped in **v0.32.0-beta**: **72 noun-free value statements across 29
+of 50 questions**, including **13 of the 15 never-known haystacks** — the ones whose entire premise
+is that no answer exists.
+
+### 15b. Why every existing arm passed it
+
+This is the part worth generalising.
+
+| arm | what it asks | why it missed this |
+|---|---|---|
+| `check_forgetting` | is the asked noun absent from the haystack? | it was. The offending sentence passes *because* it names nothing. |
+| V2 | can the model guess the gold with no context? | it cannot — the filler's value comes from a **disjoint pool**. |
+| V3 | with gold removed, does the gold answer survive? | the answer that survives is a **different** value, so `require_distinctive` correctly refuses it. |
+| V6 | is each gold component load-bearing? | same. |
+| V1 / V8 / V9 | did the model produce **the gold**? | it produced something else. |
+
+Every arm in this family asks whether the model produced **the right answer**. **Only an arm that
+asks whether the model produced *anything* can find a wrong answer that is not the right one** — and
+that arm exists only where there is no right answer to compare against. The no-gold shape, the one
+that had been certified by nothing, turns out to be the only place in the family where this class is
+visible at all.
+
+### 15c. The fix, and the guard that outlives it
+
+Filler now draws **setup and choice**, which is what "the same construction" actually meant, from a
+`PARITY_SETUPS` bank naming a `PARITY_NOUN`. Noun-free value statements: **72 → 0**.
+
+The behavioural arm cannot be the guard — it costs a probe run and three samples, so it will always
+be a triage signal. `check_forgetting` now carries the model-free companion:
+
+> No turn may state a value without naming what it is the value of.
+
+Two details, both of which were wrong first:
+
+- **The turn, not the session.** `weave_echo` splices the question's own content words into the
+  assistant reply of every filler session, so a session-level check lets a noun-free user statement
+  borrow a noun it never said — and borrow it *from the question it would then be answering*, which
+  is the worst direction for this particular guard to be loose in.
+- It immediately caught a **gold** session too. `home insurer` was the one fact in the table whose
+  setup named **neither** word of its noun (*"Insured the flat this morning."*), so `tme-for-010`
+  and its control `tme-for-030` stated a value and said nothing about what the value was of. Now
+  *"Sorted a home insurer for the flat this morning."*
+
+### 15d. Scope, stated rather than assumed
+
+The guard is in `check_forgetting` because the construction is Forgetting's. The other eight
+verticals were audited separately, and the result is below. The general form is *a distractor that names
+a value but no subject*, and the mechanism is specific: **the filler template omits a field the gold
+template includes.** That is a property of the templates, not of a draw, so the audit is a read of
+all eight remaining filler constructions rather than a corpus scan.
+
+**Run 2026-09-02. Forgetting was the only one.** Every other generator anchors its filler to a
+subject it names:
+
+| vertical | how filler names its subject |
+|---|---|
+| `bitemporal` | `who, noun = rng.choice(FILLER_SUBJECTS)`, and every frame takes `who` |
+| `conjunction` | a designation drawn with the asked attribute excluded via `avoid` |
+| `episodic` | `topic = rng.choice(TOPICS)`, formatted into the shared detail frames |
+| `semantic` | `attribute, values = rng.choice(UNASKED_ATTRIBUTES)`, formatted into the frame |
+| `arithmetic` | the near-miss names the rival vendor: *"I put an order in with {rival}…"* |
+| `temporal` | both milestones of the relation are named |
+| `prospective` | the parity reminder or validity item is the object of the verb |
+| `workingmemory` | the subject is carried by the verb phrase — *"turned down an offer from {other}"*, *"called the stray {other}"*, *"viewed a flat on {other}"* |
+
+**Stated as what it is: a code review, not a measurement.** It establishes that no other generator
+has the structural omission Forgetting had. It does not establish that no individual draw is
+ambiguous for some other reason — that question needs a behavioural arm, and the behavioural arm
+exists only where there is no gold to compare against (§15b).
+
+**A generic proxy was also attempted and does not work**, which is worth recording so it is not
+tried again. Detecting "states a value" as *an adjacent pair of capitalised words* matches **100% of
+sessions in all nine verticals**, because the family's ambient narrative filler is built from
+invented names (*"Between Quenn Lorrinwraith and Kesse Ruskxby the story was consistent"*). The
+denominator is then every session and the resulting share means nothing — Forgetting reads 80%
+against 4–25% elsewhere, on a measurement too coarse for either number to be quoted. A working
+check has to key on **each generator's own value-stating bank**, the way `_VALUE_ANYWHERE` is
+derived from `CHOICES`.
+
+**A generic proxy was attempted and does not work**, which is worth recording so it is not tried
+again. Detecting "states a value" as *an adjacent pair of capitalised words* matches **100% of
+sessions in all nine verticals**, because the family's ambient narrative filler is built from
+invented names (*"Between Quenn Lorrinwraith and Kesse Ruskxby the story was consistent"*). The
+denominator is then every session and the resulting share means nothing — Forgetting reads 80%
+against 4–25% elsewhere, on a measurement too coarse for either number to be quoted. The check has
+to key on **each generator's own value-stating bank**, the way `_VALUE_ANYWHERE` is derived from
+`CHOICES`, and that is eight small pieces of work rather than one clever regex.
+
+### 15e. A sidecar field that reads backwards
+
+`coverage.echo_by_shape["never-known"]` publishes **0.0**, and that is the *search* result, not the
+realised echo: coverage is the share of a question's gold sessions BM25 surfaces, these questions
+have none, and `calibrate_per_shape` correctly declines to search a shape it cannot score. The
+generator then derives the shape's actual echo as the **mean of its calibrated siblings**
+(`absent_knob`), because leaving it at zero would make this the only shape in the vertical whose
+filler does not compete lexically — which makes V11 easier for a reason that has nothing to do with
+the shape. Deterministic from the recorded map, so a pinned rebuild still reproduces byte for byte.
+**Read that 0.0 as "not searched", never as "no echo applied".**
+
+## 16. Amendment, 2026-09-02 — the silent `{}`, swept rather than tripped over
+
+Three of this release's findings are the same defect in three instruments, and after the third it
+stopped being worth waiting to trip over the fourth. **The class:**
+
+> An instrument returns an empty result when it declines to measure, and an empty result is
+> indistinguishable from *"there was nothing here to measure."* Every gate downstream then skips
+> the case in silence.
+
+It is the **element-missing** entry in this project's gate self-examination list, one level up: the
+artifact does not supply its own pass, it supplies its own *applicability*.
+
+| instrument | returned `{}` when | what that hid |
+|---|---|---|
+| `_discrimination` | V1 or V9 undefined | `forgetting/never-known` — 15 questions, 30% of a vertical, certified by nothing |
+| `_abstention` (as first written) | no draw could be graded | the same hole, restored, on any run whose judge misbehaves — caught by `--dry-run` |
+| `_pair_discrimination` | no complete pair in the group | Forgetting's 30 paired questions: it groups per shape, and Forgetting's arms **are** its shapes |
+
+So the remaining `return {}` sites were read rather than waited for, and **two more were live**:
+
+- **`_pair_discrimination`, second exit.** Complete pairs exist but no pair has both arms measured
+  on V1 and V9 — the block vanished. It now publishes `pairs` with an `unmeasured` row.
+- **A broken pairing reads as no pairing.** A group carrying pair ids whose arms never came
+  together returned exactly what eight verticals with no pairs at all return. It now publishes
+  `pairs_incomplete` with the ids.
+
+### 16a. What the new gate found before it ever ran in CI
+
+`VerticalsWithPairedArms_PublishAPairFigure` is wired **from the corpus**, not from the sidecar: the
+corpus says which questions carry a `pair_id`, and the sidecar must then report a pair figure over
+them. Asking only whether the published block looks reasonable lets the runner decide what it is
+willing to measure, which is the whole defect restated.
+
+It immediately found a **third** vertical: **`prospective` ships 38 paired questions and published
+no pair figure.** Measured once published:
+
+| vertical | paired questions | pair headroom | scaled floor | separation | discriminates |
+|---|---|---|---|---|---|
+| `bitemporal` | 60 | 0.5556 | 0.254 | — | ✔ (already published, per shape) |
+| `forgetting` | 30 | **0.4667** | 0.240 | **3.68 sd** | ✔ — never published |
+| `prospective` | 38 | **0.6316** | 0.213 | **5.878 sd** | ✔ — never published |
+
+Two of the three paired verticals were carrying their strongest acceptance argument unpublished, and
+in Forgetting's case it is the argument that rescues a shape the per-shape floor now fails (§14d).
+
+### 16b. The rule this leaves behind
+
+**An instrument that declines to measure must say which of the two reasons applies**, and the
+reasons are not interchangeable:
+
+- *not applicable* — there is nothing of this kind here. Publish nothing.
+- *not measured* — there is something of this kind here and it could not be scored. **Publish a row
+  saying so.**
+
+Keyed on the **input**, never on the result: `_abstention` decides applicability from whether the
+group contains no-gold questions, not from whether any draw was gradeable. Deciding from the result
+is how the first implementation reproduced the exact hole it was written to close.
+
+## 17. Amendment, 2026-09-02 — WorkingMemory's ladder measured volume and called it distance
+
+**The reference retriever cannot see the variable the vertical is named for.** BM25 scores documents
+independently of their position in the list; only ties break by order. So a ladder whose independent
+variable is *how far back the gold sits* has a baseline that is, by construction, blind to it.
+
+It nevertheless published a gradient — V9 **12/12, 12/12, 12/12, 8/12, 9/12** across rungs 8, 15,
+25, 40, 60 — and three of those rungs were declared `SaturatedByDesign`, with the note *"the
+gradient across rungs is the measurement."*
+
+### 17a. The confound, measured rather than reasoned
+
+The generator built `distance + 1` sessions with gold pinned to session 0. So:
+
+| rung | H (sessions) | gold-to-query distance |
+|---|---|---|
+| distance-8 | 9 | 8 |
+| distance-15 | 16 | 15 |
+| distance-25 | 26 | 25 |
+| distance-40 | 41 | 40 |
+| distance-60 | 61 | 60 |
+
+**H = distance + 1, exactly.** Two variables moving as one, and the baseline can only see the second.
+
+Confirmed directly on the shipped corpus, no rebuild needed: taking one `distance-60` question and
+moving its gold session to **eleven sampled indices of its own haystack**, BM25 top-5 membership was
+**identical at every one of them**. The published gradient was a **context-volume** effect wearing a
+distance label, and the vertical could not distinguish a system that degrades with recency from one
+that degrades with size — two different failure modes a consumer would want told apart.
+
+The three saturated rungs were not "trivially retrievable by design" either. At distance-8 the
+haystack is 9 sessions and `K_ref` is 5, so **a random retriever draws 5 of 9 — a floor of 0.56.**
+Their saturation was `K/H` arithmetic, not a property of distance.
+
+### 17b. The fix, and why a flat baseline is the point
+
+**H is held at 60 non-gold sessions on every rung; gold position is the only thing that moves.**
+
+The reference retriever went flat: V9 **9 / 7 / 7 / 6 / 8** of 12, non-monotone, with Wilson bands
+overlapping heavily at n=12. **That is the correct null.** A control that cannot see the independent
+variable is what makes a gradient in a consumer's system attributable to that variable — our
+baseline stops being the measurement and becomes the null it should always have been.
+
+| | before | after |
+|---|---|---|
+| rungs that discriminate | **2 of 5** | **5 of 5** |
+| per-rung headroom | 0.00 · 0.00 · 0.00 · 0.33 · 0.25 | 0.25 · 0.42 · 0.42 · 0.50 · 0.33 |
+| BM25 coverage spread across rungs | 0.333 (monotone) | 0.167 (non-monotone, ≈ noise at n=12) |
+| V1 / V8 / V2 / V3 | — | 60/60 · 60/60 · 60/60 · 60/60 |
+
+**36 of 60 questions could not rank anything and now can.**
+
+### 17c. Two declared carve-outs deleted, not carried
+
+Both existed to defend the pinning, and both went with it:
+
+- **`separability_exempt={"position_in_haystack"}`.** Gold sat at index 0 on every question, making
+  position a perfect gold predictor corpus-wide. Gold now sits at a different index on each rung and
+  the feature is measured like every other one — **it passes**. The generator comment written when
+  the exemption was removed said *"if the screen fires, that is a finding"*; it did not fire.
+- **`Corpus_DoesNotPinGoldToTheFirstSessionExceptWhereDeclared`** asserted `share == 1.0` for this
+  vertical, with a note calling the confound *"the construct"*. Now `share == 0.0` — the opposite of
+  every other vertical's bar, so it keeps its own branch rather than falling into the general case.
+
+**An exemption that stops being necessary should be deleted, not kept as a courtesy.** Two of the
+three defences this vertical carried were defending the defect.
+
+### 17d. What is still not measured, stated rather than implied
+
+Holding H constant isolates distance and **gives up measuring volume sensitivity**. The honest
+decomposition would be two ladders — distance at constant H, and volume at constant distance — and
+only the first exists. A consumer whose system degrades with context length will see that as a flat
+line here, not as a finding. **That dimension is unmeasured, not clean.**
+
+## 18. Amendment, 2026-09-02 — the calibration echo was the difficulty AND the leak
+
+`episodic/participant-attribution` published headroom **0.20**. All of it came from an answer leak,
+and removing the leak removed the headroom. That is the finding; the rest is how it surfaced.
+
+### 18a. Found by adding a third arm
+
+The shape asked *"Was that me or you?"* — **k=2**, so a reader with no evidence lands gold half the
+time. Measured: gold sat in BM25's top-5 on **10 of 15** questions and V9 scored **12 of 15**.
+Retrieve ten, guess half the remaining five: 12.5. The published headroom was the gap between a
+perfect selector and *a lexical one plus a coin*, and no amount of retrieval work closes the coin's
+half.
+
+The floor is 1/k, so the only lever is a third candidate. **`both`** is the right one: it keeps
+G > 0 — a `neither` arm would recreate the no-gold hole §13 just closed in Forgetting — and it tests
+a real attribution failure, a system that finds one mention and stops. Marginal 5/5/5, so
+majority-class guessing is worth exactly the 1/3 floor.
+
+The arm was phrased *"me or you or both of us"* rather than *"me, you, or both of us"* deliberately:
+`closed_choice_k` counts `" or "` occurrences and does not parse comma-separated alternatives, so
+the comma form reads as k=2. **That detector feeds V2's and V3's chance-aware thresholds**, so
+changing it needs its own measured arc — and no shipped question trips the comma case, making the
+bug latent rather than live. Recorded here so the next author does not discover it by shipping it.
+
+### 18b. What the `both` arm exposed
+
+V3 failed it immediately — 3 draws of 3, with **both** gold sessions ablated — and the model said
+why:
+
+> *"the 'corner / pharmacy / shuts / hour / lunch' pieces show up in both your messages and mine …
+> it appears only as fragments in the 'Also on my mind' lists from both you and me."*
+
+`weave_echo` splices the echo source's content words into filler turns, **alternating the role** it
+attaches to — deliberately, because parking it on the user turn would tilt every answer toward "you
+said it". But the question quotes the statement verbatim, so echoing the whole question scattered
+the statement's own vocabulary across **both roles'** filler. For a shape whose answer *is* which
+role said it, that is the answer.
+
+**It had been there for every arm.** The single-speaker arms hid it because naming the right one of
+*two* speakers from scattered fragments is a coin flip, and a coin flip does not reach V3's
+threshold. Three candidates and a `both` answer made the same leak reach 3-of-3.
+
+### 18c. The trade, stated plainly
+
+Echoing the topic instead of the whole question closes the leak — V3 goes to 15/15 — and
+**coverage went straight to 1.000**. Two further attempts did not move it:
+
+| distractor | competes on | coverage |
+|---|---|---|
+| other claims about the **same topic** | topic words | 1.000 |
+| the **same claim** about other topics | statement words | 1.000 |
+| both kinds together | most of the query | 1.000 |
+
+The question names a topic **and** quotes a statement, so gold is the only session carrying the whole
+query and nothing can outrank it. **The shape's entire retrieval difficulty had been manufactured by
+the mechanism that was also giving away the answer**, and no distractor engineering restores it
+without restoring the leak.
+
+Measured after: V1 14/15, V8 15/15, **V9 15/15**, headroom −0.0667.
+
+### 18d. So it is scored on the reader, and the bar is on the reader
+
+`render()` emits every turn as `"{role}: {content}"`. **Provenance is free for any reader of the
+transcript**, so our reference stack cannot fail this shape for the reason it exists to test. What
+it discriminates is a consumer's memory layer that *flattens* conversations into facts and drops the
+speaker — a real and common design — and it cannot discriminate ours.
+
+That is the same situation as §17's WorkingMemory ladder read from the other end: there the
+reference retriever was **blind** to the independent variable, here it has **perfect** access to it.
+Both mean the baseline is a control, not a measurement.
+
+Declared as `ScoredOnTheReader`, exempt from the retrieval-headroom floor, and taking a bar it could
+fail: **V8 − chance ≥ 0.30**. Failing that would mean the reference model mis-attributes with the
+labelled answer in front of it, which is a corpus defect — ambiguous gold — not a retrieval result.
+It currently reads **+0.667**.
+
+### 18e. Two stale exemptions deleted on the way past
+
+`UncalibratableShapes` still carried WorkingMemory's three short rungs, reading *"an eight-session-old
+fact is easy to retrieve"*. They were easy because the haystack was **small** (§17), not because the
+fact was recent, and BM25 cannot see recency at all. Every rung is now in band and needs no
+exemption. They had been passing silently — an exemption never fails, so a stale one is invisible
+until someone reads it.
+
+## 19. Amendment, 2026-09-02 — V6's scope was a two-vertical list; three more verticals made the same claim
+
+V6 applied where `vertical in ("arithmetic", "forgetting")`. **Three more generators state the same
+claim in their own comments and nothing tested it:**
+
+| generator | the written claim |
+|---|---|
+| `temporal` | *"every link is NECESSARY rather than redundant"* — each shape scoped to a window it can close on its own |
+| `semantic` | co-reference: *"the chain is the evidence, not just its endpoint"* |
+| `conjunction` | *"Both halves must be load-bearing"* |
+
+That is the **applied-once** shape: a right rule with too small a reach. It also *hid the opposite
+case* — `semantic/current-value` must **not** be in scope, because dropping a middle replacement
+still leaves the latest one and the component genuinely is redundant. A per-vertical list cannot
+express that. **The scope is now a per-question declaration**, `gold_components_load_bearing`, the
+mirror of the `gold_components_redundant` flag §14b added, with a C# gate asserting the corpus's
+declarations and the arm's accounting agree in both directions.
+
+Scope: **85 → 200 questions.**
+
+### 19a. What it found, including in my own declaration
+
+**`conjunction` 22/65 — and the over-declaration was mine.** The survivors are always the same
+thing: the **head of a replacement chain**. Gold carries *"my usual courier is Pellham Freight"* and
+later *"Oakhurst Transit has taken over from Pellham Freight"*; the second names both values, so
+dropping the first leaves the current value fully derivable. That is `semantic/current-value`'s
+structure, and `check_conjunction`'s "both halves must be load-bearing" is about the two TYPE halves
+each contributing gold — not about every session being necessary. Flag removed from the three chain
+shapes; `conditional-branch` keeps it and passes **15/15**.
+
+Expressing the real claim needs a **per-component** declaration, since those shapes mix load-bearing
+sessions (each count event; the switch that sets the current value) with redundant ones (the chain
+head). V6 is per question and cannot say that. **Recorded as owed rather than declared wrongly.**
+
+**`temporal` 28/30** — the claim holds. The other 20 are undecidable for the ablation arms and are
+now published as `excluded_not_decidable`; without that list, 20 declared claims went unscored with
+nothing naming them.
+
+**`semantic/co-reference` 4/15 — a real defect, and a familiar one.** The haystack held exactly ONE
+lease fact, ONE boiler fact, ONE roof fact. So *"How long does the lease run at the workshop?"* is
+answerable by finding the only lease statement in the corpus, whatever place it is filed under, and
+the co-reference hop the shape exists to measure is never required. With the link ablated:
+
+> *tme-sem-022 → "The lease runs to the end of next year."* — correct, no hop taken.
+
+This is `conjunction/alias-then-count`'s decoy defect in another vertical: **resolving the alias
+wrong, or not at all, still gives the right answer.** Fixed with rival same-kind facts under other
+designations carrying different answers.
+
+### 19b. V6 never got the chance floor V3 got
+
+Adding the rivals made V6 *worse*-looking, and the reason was in V6, not the corpus. V3 was
+corrected on 2026-08-30 to require the smallest `h` with `P(X≥h | 1/k) < 0.05`, because against a
+guesser a single hit in three arrives with probability `1−(1−1/k)³` — **0.875 at k=2, 0.704 at k=3**.
+**V6 is the dual arm and kept the old one-hit rule.** Applied-once, again, and this time the same
+correction had already been written thirty lines away.
+
+It went unnoticed while no V6 question had candidates. The rivals created a three-way choice and V6
+began condemning components that were doing their job:
+
+> `tme-sem-021`, link ablated — sample 0: *"the conversations do not say when the boiler was replaced
+> at the new flat"* (abstained). Sample 1: guessed, landed. **Component recorded redundant on the
+> strength of the guess.**
+
+V6 now takes `k` from the same place the published chance floor does — the generator's declaration
+where the candidates live in the haystack, `closed_choice_k` where the question names them — and
+counts hits instead of breaking on the first. `semantic/co-reference`: **4/15 → 9/15.**
+
+### 19c. The residual, declared
+
+Six of fifteen co-reference questions still carry a component droppable at a **3-of-3** bar against a
+declared 1/3 floor. Ratcheted, not tolerated: it may improve and may not regress. One contributing
+cause was found and fixed — the `roof` entry's rivals changed the *subject* (flooring, guttering)
+rather than the answer, so picking the only roof fact was right regardless of place — and it did not
+move the number, so the remaining cause is not that. **Stated as unexplained rather than attributed.**
+
+## 20. Amendment, 2026-09-02 — the §18 echo class is BOUNDED, and episodic was the only instance
+
+§18 found that `episodic/participant-attribution`'s entire retrieval difficulty was manufactured by
+the calibration echo leaking the answer. **Audited across all nine generators** (five parallel
+agents, findings adversarially verified; one claim refuted on reproduction).
+
+**The mechanism bounds it.** `echo_terms` returns `rng.sample(sorted(set(tokenize(source))), take)`
+and `weave_echo` emits them as an unordered bag — *"(Also on my mind: a, b, c.)"* — with no syntax.
+Every generator passes the **question text** as the source. So the echo can only carry answer content
+**when the question already contains the answer**, and it can never add a token the reader was not
+handed anyway.
+
+Measured: questions with any non-gold echo term outside the question's own vocabulary — **semantic
+0/50, temporal 0/50**; every answer token found in a non-gold echo clause is also a question token,
+across all 100 audited questions. `temporal/occurrence-order` and `recency` are the interesting near
+misses: both name their candidates in the question, so the echo *does* scatter the answer's tokens —
+but the discriminating content is the ORDER, and a comma bag carries no relation. Correlation of the
+echoed name with the answer: z = 0.00 and z = 1.12, indistinguishable from chance.
+
+**`episodic/participant-attribution` was the only shape whose question quoted its own gold**, which
+is exactly the condition the mechanism requires. The class is closed, with the reason rather than by
+enumeration.
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best

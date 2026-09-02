@@ -65,13 +65,20 @@ import typedmemeval_common as tmc
 SHAPE_VALUE_COUNT = "value-then-count"
 SHAPE_ALIAS_COUNT = "alias-then-count"
 SHAPE_ORDER_VALUE = "order-then-value"
+SHAPE_CONDITIONAL = "conditional-branch"
 TYPE_VALUE_COUNT = "conjunction-value-then-count"
 TYPE_ALIAS_COUNT = "conjunction-alias-then-count"
 TYPE_ORDER_VALUE = "conjunction-order-then-value"
+TYPE_CONDITIONAL = "conjunction-conditional-branch"
 
 VALUE_COUNT_QUESTIONS = 20
 ALIAS_COUNT_QUESTIONS = 15
 ORDER_VALUE_QUESTIONS = 15
+#: ADR-029's one declared cost. Conjunction shipped 50 across three shapes (20/15/15); a fourth at
+#: parity would put every shape near 12, under the ~15 line at which this family's own guidance says
+#: a shape supports diagnosis rather than a claim. So the vertical GROWS rather than redistributing,
+#: and the consuming project is told before it does.
+CONDITIONAL_QUESTIONS = 15
 
 H_MIN, H_MAX = 14, 24
 _BASE = datetime(2026, 4, 6, 10, 0)
@@ -188,7 +195,8 @@ def _reply(rng: random.Random) -> str:  # DevSkim: ignore DS148264 - determinist
     return rng.choice(REPLIES)
 
 
-def _filler(rng: random.Random, echoed: list[str], avoid: str = "") -> tmc.Session:  # DevSkim: ignore DS148264 - deterministic corpus generation
+def _filler(rng: random.Random, echoed: list[str], avoid: str = "",  # DevSkim: ignore DS148264 - deterministic corpus generation
+            avoid_condition: str = "") -> tmc.Session:
     """Non-gold.
 
     Carries the same frames AND the same vocabulary gold uses, minus whatever this question asks
@@ -227,7 +235,29 @@ def _filler(rng: random.Random, echoed: list[str], avoid: str = "") -> tmc.Sessi
             attribute, values = rng.choice(
                 [a for a in ATTRIBUTES if a[0] != avoid] + list(UNASKED_ATTRIBUTES))
             text = f"{_lead(pair[0])} happened while {rng.choice(values)} was the {attribute}."
-    elif draw < 0.72:
+    elif draw < 0.62:
+        # RULES AND STATES IN FILLER, at the rate gold uses them, for the reason written three
+        # times above this function and learned the hard way each time: a construction only gold
+        # ever receives is a frame, not content. "Standing rule for the" appearing in 15 gold
+        # sessions and zero distractors would separate this shape perfectly, and the separability
+        # probe would be right to say so.
+        #
+        # Both halves are excluded from the asked question: a rule for the asked ATTRIBUTE would
+        # assert a competing branch table, and a state for the asked CONDITION would put a second
+        # answer in the haystack. `avoid_condition` is why this signature grew.
+        pool = [a for a in ATTRIBUTES if a[0] != avoid] + list(UNASKED_ATTRIBUTES)
+        other_attribute, other_values = rng.choice(pool)
+        conditions = [c for c in CONDITIONS if c[0] != avoid_condition] or list(CONDITIONS)
+        other_condition, other_states = rng.choice(conditions)
+        if rng.random() < 0.5 and len(other_values) >= 3:
+            picks = rng.sample(list(other_values), 3)
+            text = rng.choice(RULE_FRAMES).format(
+                attribute=other_attribute, condition=other_condition,
+                s0=other_states[0], v0=picks[0], s1=other_states[1], v1=picks[1], v2=picks[2])
+        else:
+            text = rng.choice(STATE_FRAMES).format(
+                condition=other_condition, state=rng.choice(other_states))
+    elif draw < 0.80:
         pool = [a for a in ATTRIBUTES if a[0] != avoid] + list(UNASKED_ATTRIBUTES)
         attribute, values = rng.choice(pool)
         pair = rng.sample(list(values), 2)
@@ -247,6 +277,51 @@ def _filler(rng: random.Random, echoed: list[str], avoid: str = "") -> tmc.Sessi
     return tmc.Session(
         turns=[tmc.Turn("user", tmc.weave_echo(text, echoed)), tmc.Turn("assistant", _reply(rng))],
         timestamp=_BASE, is_gold=False, tag="filler-frame")
+
+
+#: Conditions a standing rule can turn on, and the states each can be in.
+#:
+#: Invented and non-referential, for the reason MILESTONES records: four of that bank's six names
+#: were real places, and a shape asking which came first can be answered by a model that knows the
+#: referents. Same exposure here -- if a reader knows what "Marrow Lane" is, the rule stops being
+#: arbitrary. Verified by tools/audit_name_collisions.py alongside the rest of the family.
+#:
+#: THREE states, not two, and the arithmetic is the reason. A reader that retrieves the rule and
+#: misses the state can still pick a branch: at two branches that is a coin flip, so V9 floors at
+#: 0.50 and caps this shape's headroom at 0.50 before it measures anything. Three puts the floor at
+#: 0.33. It is the ADR-028 SS7.4 chance-floor discipline applied at DESIGN time rather than
+#: discovered in the probe records afterwards.
+CONDITIONS = (
+    ("the Kelvaryn access", ("open", "closed for resurfacing", "restricted to one lane")),
+    ("the Peskadd permit", ("granted", "still pending", "refused")),
+    ("the Zannifer slot", ("confirmed", "provisional", "released back")),
+    ("the Muldreth gauge", ("in the green", "in the amber", "in the red")),
+    ("the Ferrasque window", ("open", "narrowed", "shut for the season")),
+    ("the Tovrekk clearance", ("signed off", "queried", "withdrawn")),
+)
+
+#: The rule, which is the whole shape. It names the attribute AND the condition, because it is the
+#: bridge between them; that is what makes it reachable from the question and what makes the state
+#: session reachable only THROUGH it.
+RULE_FRAMES = (
+    "Standing rule for the {attribute}: if {condition} is {s0} it is {v0}, if {s1} it is {v1}, "
+    "and otherwise it is {v2}.",
+    "We settled the {attribute} by rule: {v0} when {condition} is {s0}, {v1} when {s1}, {v2} "
+    "in any other case.",
+    "How the {attribute} gets picked: {condition} {s0} means {v0}, {s1} means {v1}, anything "
+    "else means {v2}.",
+)
+
+#: The state, which names ONLY the condition. Never the attribute, never a value -- if it named the
+#: attribute the question would retrieve it directly and there would be no second hop; if it named a
+#: value it would answer the question by itself, which is the defect order-then-value shipped with
+#: for its whole life (V9 15/15 against coverage 0.667).
+STATE_FRAMES = (
+    "{condition} came back {state} this morning.",
+    "Heard today: {condition} is {state}.",
+    "Logging it -- {condition} is {state} as of now.",
+    "They confirmed {condition} is {state}.",
+)
 
 
 def _lead(phrase: str) -> str:
@@ -290,6 +365,28 @@ def _lay_out(sessions: list[tmc.Session], ordinal: int, chain: list[str] | None 
 
 def _types_of(question: tmc.Question) -> list[str]:
     return [getattr(s, "kind", "unknown") for s in question.sessions if s.is_gold]
+
+
+def _load_bearing(sessions: list[tmc.Session], golds: list[tmc.Session],
+                  tags: set[str], last_of: str | None = None) -> list[int]:
+    """Session indices of the gold components this shape CLAIMS are individually necessary.
+
+    Per component, not per question, because these shapes mix the two kinds. Every count event is
+    load-bearing -- drop one and the count changes -- while the HEAD of a replacement chain is not:
+    the replacement session names both the old and the new value, so the head adds nothing the
+    reader cannot already get. Declaring the whole question load-bearing was refuted immediately
+    (V6 22/65, every survivor a chain head).
+
+    `last_of` names a tag whose LAST occurrence is load-bearing and whose earlier ones are not --
+    the replacement that sets the value actually asked about, as against the ones it superseded.
+    """
+    position = {id(session): i for i, session in enumerate(sessions)}
+    chosen = [g for g in golds if g.tag in tags]
+    if last_of:
+        matching = [g for g in golds if g.tag == last_of]
+        if matching:
+            chosen.append(matching[-1])
+    return sorted(position[id(g)] for g in chosen)
 
 
 def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Question:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -346,6 +443,31 @@ def _value_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=index * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_VALUE_COUNT, "replacement_depth": k, "event_count": hits,
+                   # Every event (drop one, the count changes) and the LAST replacement (drop it,
+                   # the count is taken against a superseded entity). The chain head and the middle
+                   # replacements are NOT claimed: each is named by the replacement that follows it.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"event"}, last_of="replacement"),
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
                    "current_value": current, "superseded_value": superseded,
                    "join": ["semantic", "arithmetic"]})
 
@@ -363,11 +485,24 @@ def _alias_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
     for _ in range(hits):
         golds.append(_gold(f"Took a delivery at {stated}.", rng, "event", "arithmetic"))
 
+    # THE DECOY'S COUNT MUST DIFFER FROM GOLD'S, and it did not.
+    #
+    # It was hardcoded at 2 while gold is `2 + (index % 3)`, so on every third question the decoy
+    # designation carried EXACTLY gold's count -- five of fifteen. On those five, a system that
+    # resolves the alias to the wrong place still produces the right number, which is precisely the
+    # failure this shape exists to detect. The join was not load-bearing on a third of the shape.
+    #
+    # It surfaced as a V3 leak on tme-cnj-024: with gold ablated the model answered "two deliveries
+    # were taken at the Peverel building" -- a different designation, the same count, and
+    # `require_distinctive` cannot separate them because the distinctive token is the digit both
+    # share. V3 read 50/50 before this, on a corpus where five questions could leak; the pass was
+    # luck, not evidence, which is the third time that sentence has been written in this family.
+    decoy_hits = hits + 1 if hits < 4 else 2
+    decoy_as = DESIGNATIONS[(index + 1) % len(DESIGNATIONS)][0]
     decoys = [tmc.Session(
-        turns=[tmc.Turn("user", f"{rng.choice(OPENERS)} Took a delivery at "
-                                f"{DESIGNATIONS[(index + 1) % len(DESIGNATIONS)][0]}."),
+        turns=[tmc.Turn("user", f"{rng.choice(OPENERS)} Took a delivery at {decoy_as}."),
                tmc.Turn("assistant", _reply(rng))],
-        timestamp=_BASE, is_gold=False, tag="decoy") for _ in range(2)]
+        timestamp=_BASE, is_gold=False, tag="decoy") for _ in range(decoy_hits)]
 
     filler = max(H_MIN - len(decoys), rng.randint(H_MIN, H_MAX) - len(decoys))
     sessions = golds + decoys + [_filler(rng, echoed, avoid=asked) for _ in range(filler)]
@@ -380,7 +515,47 @@ def _alias_then_count(index: int, echo: float, rng: random.Random) -> tmc.Questi
         question_date=_BASE + timedelta(days=(VALUE_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ALIAS_COUNT, "event_count": hits, "stated_as": stated,
-                   "asked_as": asked, "join": ["semantic", "arithmetic"]})
+                   # Every event, and the link: without it the asked designation cannot be tied to
+                   # the sessions that record the deliveries. Both halves of the join, per session.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"event", "link"}),
+                   # A HAYSTACK-BORNE CLOSED CHOICE, which the question cannot show.
+                   #
+                   # Ablate the link and exactly two designations in the haystack carry delivery
+                   # events -- the one gold states under and the decoy -- with different counts
+                   # since those were separated. The reference model says so itself: "the unit
+                   # behind the depot: 3 times / the place on Ferrow Row: 2 times ... none are
+                   # identified as the new flat". So a reader that cannot resolve the alias is
+                   # choosing between two, and a single lucky draw in three is not evidence that
+                   # the link was redundant. `closed_choice_k` cannot see this: it parses the
+                   # question, and the question names no candidates.
+                   "chance_floor": 0.5,
+                   "chance_floor_reason": (
+                       "with the co-reference link removed, exactly two designations in the "
+                       "haystack carry delivery events and they carry different counts"),
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
+                   "asked_as": asked, "decoy_as": decoy_as,
+                   "decoy_event_count": decoy_hits,
+                   "join": ["semantic", "arithmetic"]})
 
 
 def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Question:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -435,7 +610,151 @@ def _order_then_value(index: int, echo: float, rng: random.Random) -> tmc.Questi
             days=(VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + index) * 41 + 70),
         sessions=sessions,
         extension={"shape": SHAPE_ORDER_VALUE, "anchor_event": anchor,
+                   # THE ANCHOR ONLY, and the switches are the correction.
+                   #
+                   # The claim above read "all three are needed" and V6 refuted it 0/15. Every
+                   # REPLACEMENT_FRAME names BOTH values -- "Corvin Dispatch has taken over from
+                   # Pellham Freight", "I have switched from Corvin Dispatch to Marlow Carriage" --
+                   # so either switch alone identifies the middle value and neither is INDIVIDUALLY
+                   # necessary. The pair is jointly necessary, which is a real claim and one a
+                   # single-drop probe cannot express: V6 removes one component at a time.
+                   #
+                   # So the shape claims what it can support. The anchor is individually
+                   # load-bearing -- without it the asked event cannot be placed between the
+                   # switches at all -- and V6 confirms it (the anchor was never among the
+                   # survivors). Joint necessity is recorded as unclaimed rather than asserted
+                   # where the instrument would have to take it on trust.
+                   "gold_components_load_bearing_indices":
+                       _load_bearing(sessions, golds, {"anchor"}),
+                   # NOT gold_components_load_bearing, and the measurement is why.
+                   #
+                   # It was declared here and V6 refuted it at once: value-then-count 0/20,
+                   # order-then-value 0/15, alias-then-count 7/15. Reading the survivors, the
+                   # redundant component is always the SAME thing -- the HEAD of the replacement
+                   # chain. Gold carries "my usual courier is Pellham Freight" and, later,
+                   # "Oakhurst Transit has taken over from Pellham Freight". The second names both
+                   # values, so dropping the first leaves the current value fully derivable.
+                   #
+                   # That is not a corpus defect; it is the same structure `semantic/current-value`
+                   # has, and the reason that shape was deliberately left undeclared. The claim
+                   # these shapes actually make -- check_conjunction's "both halves must be
+                   # load-bearing" -- is about the two TYPE halves each contributing gold, not
+                   # about every individual session being necessary. Declaring the stronger claim
+                   # was mine, and V6 caught it.
+                   #
+                   # Expressing it properly needs a PER-COMPONENT declaration, since these shapes
+                   # mix load-bearing sessions (each count event; the switch that sets the current
+                   # value) with redundant ones (the chain head). V6 is per question and cannot
+                   # say that. Recorded as owed rather than declared wrongly.
                    "value_at_anchor": middle, "join": ["semantic", "temporal"]})
+
+
+def _conditional_branch(index: int, echo: float, rng: random.Random) -> tmc.Question:  # DevSkim: ignore DS148264 - deterministic corpus generation
+    """A stated rule joined to a stated state: which branch is in force right now.
+
+    THE GAP THIS FILLS, measured rather than asserted: across all 470 questions shipped at
+    v0.32.0-beta, not one required resolving a conditional. Five contain "if" or "unless" and in
+    every case the conditional is quoted PAYLOAD, never the thing being asked (ADR-029 SS7b).
+
+    A conjunction rather than a tenth vertical, because the join is the same structural move as its
+    neighbours: find the rule -> find the condition's state -> select the branch. ADR-027 SS11.1's
+    standard -- "a vertical whose shapes each have a plausible existing home is a weak vertical" --
+    is satisfied by NOT making it one.
+
+    The two hops live in different sessions and only one of them is lexically reachable from the
+    question. The question names the attribute; the rule names the attribute and the condition; the
+    state names the condition alone. So a retriever working from the question can find the rule and
+    cannot find the state without first reading it -- which is the definition of a second hop, and
+    the thing order-then-value had to be rebuilt to obtain.
+    """
+    # MEASURED ON THE SHIPPED CORPUS, and it is why this shape's coverage sits at exactly 0.50:
+    #
+    #     rule in BM25 top-5 ....... 15/15
+    #     state in BM25 top-5 ......  0/15
+    #     both .....................  0/15   <- the only questions V9 could answer
+    #
+    # So coverage is 1-of-2 on every question by CONSTRUCTION, not by calibration -- the echo knob
+    # has nothing to move here, and 0.50 is a structural floor that happens to coincide with the
+    # band's lower edge. READ A BAND FAILURE ON THIS SHAPE AS THE RULE HAVING BECOME UNRETRIEVABLE,
+    # never as a reason to widen the band.
+    #
+    # V9 comes in at 0/15 against a declared chance floor of 1/3, which is below chance and is not
+    # a fault: the reference model retrieves the rule, sees three named branches, and DECLINES --
+    # "the conversations don't say whether the Peskadd permit is granted, still pending, or
+    # something else". It is not guessing, so it does not collect the guesser's third.
+    attribute, values = ATTRIBUTES[index % len(ATTRIBUTES)]
+    condition, states = CONDITIONS[index % len(CONDITIONS)]
+    outcomes = rng.sample(list(values), 3)
+    # Which branch the haystack puts in force. Rotated rather than drawn, so all three branches --
+    # including the `otherwise` fallthrough -- are exercised across the shape instead of appearing
+    # at whatever rate the rng happens to give.
+    branch = index % 3
+    state = states[branch]
+    answer = outcomes[branch]
+
+    qid = f"tme-cnj-{VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + ORDER_VALUE_QUESTIONS + index + 1:03d}"
+    ask = f"Going by the standing rule, which {attribute} is in force?"
+    echoed = tmc.echo_terms(ask, echo, random.Random(f"{qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
+
+    golds = [
+        _gold(rng.choice(RULE_FRAMES).format(
+            attribute=attribute, condition=condition,
+            s0=states[0], v0=outcomes[0], s1=states[1], v1=outcomes[1], v2=outcomes[2]),
+            rng, "rule", "semantic"),
+        _gold(rng.choice(STATE_FRAMES).format(condition=condition, state=state),
+              rng, "state", "episodic"),
+    ]
+
+    filler = rng.randint(H_MIN, H_MAX)
+    sessions = golds + [_filler(rng, echoed, avoid=attribute, avoid_condition=condition)
+                        for _ in range(filler)]
+    rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation
+    _lay_out(sessions, VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + ORDER_VALUE_QUESTIONS + index)
+
+    return tmc.Question(
+        question_id=qid, question_type=TYPE_CONDITIONAL, question=ask, answer=f"{answer}.",
+        question_date=_BASE + timedelta(
+            days=(VALUE_COUNT_QUESTIONS + ALIAS_COUNT_QUESTIONS + ORDER_VALUE_QUESTIONS + index)
+            * 41 + 70),
+        sessions=sessions,
+        extension={
+            "shape": SHAPE_CONDITIONAL,
+            # Two sessions, both required: the rule names the condition, the state selects a branch.
+            "gold_components_load_bearing": True,
+            # The rule is a standing policy the speaker states once and does not restate; the state
+            # is a specific thing heard on a specific day. Semantic joined to Episodic, and the
+            # declared join is checked against the per-item kinds below.
+            "join": ["semantic", "episodic"],
+            "condition": condition,
+            "branch_taken": branch,
+            # PUBLISHED, because it is a chance floor and this family has been caught by unpublished
+            # ones twice (ADR-028 SS7.4, and V2's 69 unearned passes). The rule session names all
+            # three outcomes, and BM25 retrieves the rule for 15 of 15 questions while retrieving
+            # the state for 4 of 15 -- measured on the shipped corpus. So a reader holding only the
+            # rule is choosing among three named candidates, and V9 on this shape has a floor of
+            # 1/3 that no amount of retrieval skill is being credited for.
+            #
+            # `closed_choice_k` cannot see this: it parses the QUESTION, and the question names no
+            # candidates. The candidates are in the haystack, which is a different thing and needed
+            # saying out loud.
+            "branches": 3,
+            # GENERIC KEY, deliberately. `chance_floor_given_rule` was the first spelling and it
+            # would have made the instrument that reads it conditional-branch-only -- which is the
+            # applied-once defect this project has logged three times in one day before now. Any
+            # future shape whose haystack hands the reader a closed set of candidates publishes the
+            # same two fields and gets the same column.
+            "chance_floor": round(1 / 3, 4),
+            "chance_floor_reason": (
+                "the rule session names all three branch outcomes, so a reader that retrieves the "
+                "rule and misses the state is choosing among three named candidates"),
+            # The branch table, recorded so the boundary rule below is checked against what the
+            # generator MEANT rather than against a re-parse of the prose it emitted.
+            "branch_outcomes": list(outcomes),
+            "branch_states": list(states),
+            "difficulty": branch + 1,
+            "difficulty_dial": "branch", "difficulty_validated": False,
+        },
+    )
 
 
 def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -448,9 +767,24 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS
                   for i in range(ALIAS_COUNT_QUESTIONS)]
     questions += [_order_then_value(i, knob(SHAPE_ORDER_VALUE), rng)
                   for i in range(ORDER_VALUE_QUESTIONS)]
+    questions += [_conditional_branch(i, knob(SHAPE_CONDITIONAL), rng)
+                  for i in range(CONDITIONAL_QUESTIONS)]
     for question in questions:
         question.extension["gold_item_types"] = _types_of(question)
     return questions
+
+
+def _attribute_of(question: tmc.Question) -> str:
+    """The attribute a conditional-branch question asks about, read off the question text.
+
+    Off the QUESTION, not off a recorded field, because the question is what a retriever sees and
+    the check is about what is lexically reachable from it. A recorded copy could drift from the
+    prose and the check would still pass.
+    """
+    for attribute, _ in ATTRIBUTES:
+        if attribute in question.question:
+            return attribute
+    return ""
 
 
 def check_conjunction(questions: list[tmc.Question]) -> list[str]:
@@ -461,6 +795,100 @@ def check_conjunction(questions: list[tmc.Question]) -> list[str]:
         shape = q.extension["shape"]
         types = q.extension["gold_item_types"]
         gold_text = " ".join(s.text().lower() for s in q.sessions if s.is_gold)
+
+        if shape == SHAPE_ALIAS_COUNT:
+            # Counted from the SESSIONS, not from the two recorded numbers. Comparing
+            # `event_count` against `decoy_event_count` would be the generator agreeing with
+            # itself; what matters is how many delivery sessions each designation actually got.
+            stated_as, asked_as = q.extension["stated_as"], q.extension["asked_as"]
+            other = q.extension["decoy_as"]
+            # THE EVENT SENTENCE, not a mention. Filler states designation links of its own
+            # ("The annexe is the Peverel building."), so counting every non-gold session that
+            # NAMES the decoy counts sessions that record no delivery -- which is what the first
+            # version of this guard did, and it reported tme-cnj-026 at 4 against a real 2.
+            # An over-counting guard is not the safe direction here: it would have been "fixed" by
+            # loosening it, and the loosening would have taken the real check with it.
+            gold_events = sum(1 for s in q.sessions
+                              if s.is_gold and s.tag == "event"
+                              and f"Took a delivery at {stated_as}" in s.text())
+            decoy_events = sum(1 for s in q.sessions if not s.is_gold
+                               and f"Took a delivery at {other}" in s.text())
+            if gold_events == decoy_events:
+                problems.append(
+                    f"{q.question_id}: the decoy designation has the same event count as gold "
+                    f"({gold_events}), so resolving the alias WRONG still gives the right answer "
+                    f"and the join is not load-bearing")
+            if not gold_events:
+                problems.append(f"{q.question_id}: no gold event sessions name {stated_as!r}")
+            del asked_as
+
+        if shape == SHAPE_CONDITIONAL:
+            # ADR-029's boundary rule, and the reason this shape could be built inside Conjunction
+            # at all: it is mechanically checkable, and no existing vertical can express it.
+            #
+            #   "The answer must CHANGE depending on a condition stated in the haystack. A question
+            #    whose answer is the same under both branches is not a conditional question and is
+            #    refused at generation."
+            #
+            # Checked against the recorded branch table rather than re-parsed out of the prose the
+            # generator emitted -- a check that re-reads the artifact's own output is agreeing with
+            # itself, which is the co-moving-operands shape.
+            outcomes = q.extension["branch_outcomes"]
+            states = q.extension["branch_states"]
+            taken = q.extension["branch_taken"]
+            condition = q.extension["condition"]
+            attribute_values = [v for _, values in ATTRIBUTES for v in values]
+
+            if len(set(outcomes)) != len(outcomes):
+                problems.append(
+                    f"{q.question_id}: branch outcomes {outcomes} are not all distinct, so the "
+                    f"answer does not change with the condition and this is not a conditional")
+            if len(set(states)) != len(states):
+                problems.append(f"{q.question_id}: branch states {states} are not all distinct")
+            if q.answer.rstrip(".") != outcomes[taken]:
+                problems.append(
+                    f"{q.question_id}: gold {q.answer!r} is not the branch the stated state "
+                    f"selects ({outcomes[taken]!r})")
+
+            rule = [s for s in q.sessions if s.is_gold and s.tag == "rule"]
+            state = [s for s in q.sessions if s.is_gold and s.tag == "state"]
+            if len(rule) != 1 or len(state) != 1:
+                problems.append(
+                    f"{q.question_id}: expected exactly one rule and one state gold session, "
+                    f"got {len(rule)} and {len(state)}")
+                continue
+            rule_text, state_text = rule[0].text(), state[0].text()
+
+            # THE SECOND HOP, ENFORCED. The question names the attribute, so anything naming the
+            # attribute is lexically reachable from it. If the STATE session named the attribute
+            # too, a retriever would fetch both halves off one query and the join would be
+            # decorative -- which is exactly how order-then-value shipped saturated at V9 15/15.
+            if _attribute_of(q) in state_text.lower():
+                problems.append(
+                    f"{q.question_id}: the state session names the attribute, so both hops are "
+                    f"reachable from the question and no join is required")
+            if any(v.lower() in state_text.lower() for v in attribute_values):
+                problems.append(
+                    f"{q.question_id}: the state session names a candidate value, so it answers "
+                    f"the question by itself")
+            if condition.lower() not in rule_text.lower():
+                problems.append(f"{q.question_id}: the rule does not name its own condition")
+            if _attribute_of(q) not in rule_text.lower():
+                problems.append(f"{q.question_id}: the rule does not name its own attribute")
+
+            # NO SECOND ANSWER. A distractor stating another state for the asked condition, or
+            # another rule for the asked attribute, puts a competing branch in the haystack.
+            for j, session in enumerate(q.sessions):
+                if session.is_gold:
+                    continue
+                text = session.text().lower()
+                if condition.lower() in text:
+                    problems.append(
+                        f"{q.question_id} s{j}: a distractor names the asked condition "
+                        f"{condition!r}, which can state a second state for it")
+                if _attribute_of(q) in text and "rule" in text:
+                    problems.append(
+                        f"{q.question_id} s{j}: a distractor states a rule for the asked attribute")
 
         # THE DEFINING PROPERTY. A question whose gold is all one type is not a conjunction, it is
         # that type wearing this vertical's name.
@@ -521,7 +949,16 @@ if __name__ == "__main__":
             h_max=H_MAX,
             # value-then-count: 2..4 semantic + 2..4 arithmetic; alias-then-count: 1 + 2..4;
             # order-then-value: 3 semantic + 2 temporal.
-            g_values={3, 4, 5, 6, 7, 8},
+            # 2 added with `conditional-branch`, and it is the honest minimum for that join rather
+            # than a relaxation: a rule and the state it turns on are two sessions, and padding to
+            # three would mean inventing a component the shape does not need. The declared set moves
+            # to follow the design; the alternative is a design bent to fit a declaration.
+            #
+            # DISCLOSED: this changes the vertical's G distribution, which is a retrieval control.
+            # G=2 has a structural ceiling of 1.0 at K_REF=5, so nothing is capped by it -- the
+            # shape's difficulty is that one of the two golds is not lexically reachable from the
+            # question, not that there are many of them.
+            g_values={2, 3, 4, 5, 6, 7, 8},
             no_absolute_dates=True,
         ),
         generator_tool="gen_typedmemeval_conjunction.py",

@@ -33,6 +33,12 @@ ENTITY_BANKS = {
     ("gen_typedmemeval_bitemporal.py", "PLACES"),
     ("gen_typedmemeval_bitemporal.py", "FILLER_PLACES"),
     ("gen_typedmemeval_conjunction.py", "MILESTONES"),
+    # Added with `conditional-branch` (ADR-029). These are the entities the RULE turns on, so a
+    # model that knows the referent could infer which branch is plausible without reading the state
+    # -- the same exposure MILESTONES had, where four of six names were real and the shape asks
+    # which came first. A bank enters this list when its entries are entity names, not when someone
+    # remembers to add it.
+    ("gen_typedmemeval_conjunction.py", "CONDITIONS"),
     ("gen_typedmemeval_episodic.py", "_DECOY_ITEMS"),
     ("gen_typedmemeval_forgetting.py", "PARITY_STEMS"),
     ("gen_typedmemeval_forgetting.py", "STEMS"),
@@ -74,7 +80,23 @@ def collect() -> dict[str, list[str]]:
             except Exception:
                 continue
             for entry in values:
+                # A bank entry may be the name itself or a tuple whose FIRST element is the name --
+                # ATTRIBUTES, DESIGNATIONS and CONDITIONS all take the second form. `str(entry)` on
+                # a tuple produces "('the Kelvaryn access', ('open', ...))", which then goes to the
+                # model as a name; the model says REAL: no, quite correctly, and the real name
+                # inside the string is silently exonerated. No shipped bank was nested when this was
+                # written -- CONDITIONS is the first -- so this is a trap closed before it fired
+                # rather than a defect found after.
+                if isinstance(entry, (tuple, list)):
+                    entry = entry[0]
                 name = head(str(entry))
+                # LOUD, not lenient. If a future bank nests one level deeper, the name will still
+                # carry punctuation, and auditing it would return a confident clean verdict about a
+                # string no corpus contains.
+                if any(ch in name for ch in "()[]{}'"):
+                    raise SystemExit(
+                        f"{base}:{key[1]} produced {name!r}, which is not a name. The bank nests "
+                        f"deeper than collect() unpacks; fix the unpacking rather than the bank.")
                 if len(name) > 2:
                     found.setdefault(name, set()).add(f"{base.replace('gen_typedmemeval_','').replace('.py','')}:{key[1]}")
     return {k: sorted(v) for k, v in sorted(found.items())}

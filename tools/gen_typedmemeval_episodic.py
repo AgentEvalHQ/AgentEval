@@ -424,15 +424,35 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
     """15 questions whose answer is a speaker."""
     out: list[tmc.Question] = []
     chosen = rng.sample(STATEMENTS, 15)
-    # Near-even marginal, then shuffled: which question gets which speaker stays arbitrary
-    # (V2), but the majority class is worth 8/15 rather than whatever an unconstrained
-    # coin flip happened to produce on this seed.
-    speakers = ["user"] * 8 + ["assistant"] * 7
+    # THREE ARMS, NOT TWO, AND THE THIRD IS WHY.
+    #
+    # "Was that me or you?" is a two-candidate question, so a reader with no evidence still lands
+    # gold half the time. Measured on the shipped corpus that was not a theoretical worry: gold sat
+    # in BM25's top-5 on 10 of 15 questions and V9 scored 12 of 15 -- retrieve ten, guess half the
+    # remaining five, which is 12.5. The published headroom of 0.20 was the difference between a
+    # perfect selector and a lexical one PLUS A COIN, and no amount of retrieval work closes the
+    # coin's half.
+    #
+    # A third arm is the only lever, because the floor is 1/k and k was fixed by the question. BOTH
+    # is the right third: it keeps G>0 (so V1, V3 and the accuracy arms all stay defined, unlike a
+    # "neither" arm, which would recreate the no-gold hole this release just closed in Forgetting),
+    # and it tests a real attribution failure -- a system that finds one mention and stops.
+    #
+    # Marginal held at 5/5/5, so majority-class guessing is worth exactly the 1/3 chance floor and
+    # nothing more.
+    speakers = ["user"] * 5 + ["assistant"] * 5 + ["both"] * 5
     rng.shuffle(speakers)  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this shuffles filler text, not secrets.
 
     for offset, ((topic, statement), speaker) in enumerate(zip(chosen, speakers)):
-        question_text = (f"Earlier one of us said, about {topic}, that {statement}. "
-                         f"Was that me or you?")
+        # PHRASED SO THE EXISTING DETECTOR READS IT CORRECTLY, which is deliberate rather than
+        # incidental. `closed_choice_k` counts " or " occurrences in a trailing clause and does NOT
+        # parse comma-separated alternatives, so "me, you, or both of us" would be read as k=2 and
+        # publish a floor of 0.50 for a three-way question. That detector feeds V2's and V3's
+        # chance-aware thresholds, so changing it needs its own measured arc -- and no shipped
+        # question currently trips the comma case, making the bug latent rather than live. Writing
+        # the alternatives with repeated "or" gets k=3 out of the detector as it stands.
+        question_text = (f"Earlier, about {topic}, someone said that {statement}. "
+                         f"Was that me or you or both of us?")
 
         # The statement clause is byte-identical across the two variants; only the role
         # carrying it moves. Anything else that differed would be a cue.
@@ -444,23 +464,121 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
         # keeps the only thing that differs between the arms the ROLE that carries it.
         frame, prompt = ATTRIBUTION_FRAMES[offset % len(ATTRIBUTION_FRAMES)]
         said = frame.format(topic=topic, statement=statement)
+
+        def user_said() -> tmc.Session:
+            return tmc.Session([tmc.Turn("user", said, has_answer=True),
+                                tmc.Turn("assistant", "")], BASE, is_gold=True, tag="attribution")
+
+        def assistant_said() -> tmc.Session:
+            return tmc.Session([tmc.Turn("user", prompt.format(topic=topic)),
+                                tmc.Turn("assistant", said, has_answer=True)],
+                               BASE, is_gold=True, tag="attribution")
+
         if speaker == "user":
-            turns = [tmc.Turn("user", said, has_answer=True),
-                     tmc.Turn("assistant", "")]
+            golds = [user_said()]
+        elif speaker == "assistant":
+            golds = [assistant_said()]
         else:
-            turns = [tmc.Turn("user", prompt.format(topic=topic)),
-                     tmc.Turn("assistant", said, has_answer=True)]
-        gold = tmc.Session(turns, BASE, is_gold=True, tag="attribution")
+            # Both arms carry the SAME statement text, exactly as the single-speaker arms do --
+            # the only thing that differs anywhere in this shape is which role utters it. Two
+            # sessions rather than one turn-pair, so finding either is not finding both.
+            golds = [user_said(), assistant_said()]
 
-        filler = [_filler_session(rng, question_text, echo, i)
-                  for i in range(rng.randint(15, 25))]
-        sessions = _place(rng, [gold], filler)
+        # THE ECHO DRAWS FROM THE TOPIC, NOT THE WHOLE QUESTION, and this is a real leak rather
+        # than a tidy-up.
+        #
+        # `weave_echo` splices the echo source's content words into filler turns, alternating the
+        # ROLE it attaches to -- deliberately, because parking it on the user turn would tilt every
+        # attribution answer toward "you said it". But the question quotes the statement verbatim,
+        # so echoing the whole question scattered the statement's own vocabulary across both roles'
+        # filler. For a shape whose answer IS which role said it, that is the answer.
+        #
+        # The reference model spelled it out when the `both` arm made it visible. With both gold
+        # sessions ablated it still answered "both of us", 3 draws out of 3, and explained: "the
+        # 'corner / pharmacy / shuts / hour / lunch' pieces show up in both your messages and mine
+        # ... it appears only as fragments in the 'Also on my mind' lists from both you and me."
+        # V3 was right to call it a leak. It had been there for every arm of this shape; the
+        # single-speaker arms hid it because naming the RIGHT one of two speakers from scattered
+        # fragments is a coin flip, and a coin flip does not reach V3's threshold.
+        #
+        # The topic is the retrieval axis anyway: it is what makes gold findable and it asserts
+        # nothing about who spoke.
+        # NEAR-MISS SESSIONS ON THE ASKED TOPIC, roles balanced.
+        #
+        # Dropping the statement from the echo closed the leak and immediately traded it for
+        # saturation: the question still quotes the statement verbatim, nothing else in the
+        # haystack carried that vocabulary, and BM25 coverage went to 1.000 with the knob at its
+        # ceiling. A shape whose retriever never fails cannot rank two retrievers.
+        #
+        # So the competition comes back as CONTENT rather than as echo: other claims about the
+        # SAME topic, in the same frames, uttered by roles in a balanced pair. They are lexically
+        # close enough to compete for a top-K slot, and they cannot answer the question, because
+        # the question names the claim it is asking about and these are different claims.
+        #
+        # Balanced across roles ON PURPOSE. One near-miss on a single role would tilt the answer
+        # toward that role exactly as the old echo did, which is the defect one level down.
+        # THE SAME CLAIM ABOUT OTHER TOPICS, roles balanced.
+        #
+        # First cut put OTHER claims about the SAME topic here, which shares only the topic words
+        # with the question and left coverage at 1.000: the question quotes the statement verbatim
+        # and nothing else in the haystack carried that vocabulary. Competition has to come from
+        # the words the question actually leans on, so the near-miss carries the STATEMENT and
+        # changes the TOPIC instead.
+        #
+        # It cannot answer the question, and the reason is worth stating precisely: the question
+        # asks who said this about THIS topic, and these sessions say it about a different one.
+        # That is a content boundary a careful reader can hold, unlike the previous echo leak,
+        # where the statement's words arrived as topic-free fragments in "Also on my mind" lists
+        # and reading them as "both of us touched on it" was the correct inference.
+        #
+        # Roles balanced, always as a pair. One near-miss on a single role would tilt the answer
+        # toward that role -- the same defect as the echo, one level down.
+        # TWO KINDS OF NEAR-MISS, and it takes both. The question names a topic AND quotes a
+        # statement, so gold is the only session carrying the whole query -- which is why either
+        # kind alone left coverage at 1.000:
+        #
+        #   same TOPIC, other claim      competes on the topic words
+        #   same CLAIM, other topic      competes on the statement words
+        #
+        # Together several sessions carry most of the query and only gold carries all of it, which
+        # is what a top-K budget has to choose between. Neither kind can answer: one is a different
+        # claim, the other is about a different thing.
+        other_topics = [tp for tp, _ in STATEMENTS if tp != topic]
+        other_claims = [st for tp, st in STATEMENTS if tp != topic]
+        near_topics = rng.sample(other_topics, 2)
+        near_claims = rng.sample(other_claims, 2)
+        near_frame, near_prompt = ATTRIBUTION_FRAMES[(offset + 1) % len(ATTRIBUTION_FRAMES)]
 
-        # Derived from the emitted turn, so the answer cannot disagree with the transcript.
-        role = next(t.role for t in gold.turns if t.has_answer)
-        answer = ("You did — it was in one of your own messages, not one of mine."
-                  if role == "user" else
-                  "I did — it was in one of my replies, not one of your messages.")
+        def as_user(tp: str, st: str) -> tmc.Session:
+            return tmc.Session([tmc.Turn("user", near_frame.format(topic=tp, statement=st)),
+                                tmc.Turn("assistant", "")], BASE, is_gold=False, tag="near-miss")
+
+        def as_assistant(tp: str, st: str) -> tmc.Session:
+            return tmc.Session([tmc.Turn("user", near_prompt.format(topic=tp)),
+                                tmc.Turn("assistant", near_frame.format(topic=tp, statement=st))],
+                               BASE, is_gold=False, tag="near-miss")
+
+        # Roles balanced WITHIN each kind, so neither kind tilts the answer toward a speaker --
+        # the same defect as the echo leak, one level down.
+        near_miss = [
+            as_user(topic, near_claims[0]), as_assistant(topic, near_claims[1]),
+            as_user(near_topics[0], statement), as_assistant(near_topics[1], statement),
+        ]
+
+        # INSIDE the haystack budget, not on top of it. Adding them pushed H to 26-27 against a
+        # declared [15, 25], and a haystack that quietly grows is a retrieval control drifting.
+        filler = near_miss + [_filler_session(rng, topic, echo, i)
+                              for i in range(rng.randint(15, 25) - len(near_miss))]
+        sessions = _place(rng, golds, filler)
+
+        # Derived from the emitted turns, so the answer cannot disagree with the transcript.
+        roles = sorted({t.role for g in golds for t in g.turns if t.has_answer})
+        role = "both" if len(roles) > 1 else roles[0]
+        answer = {
+            "user": "You did — it was in one of your own messages, not one of mine.",
+            "assistant": "I did — it was in one of my replies, not one of your messages.",
+            "both": "Both of us did — it is in one of your messages and in one of my replies.",
+        }[role]
 
         out.append(tmc.Question(
             f"tme-epi-{start + offset:03d}", TYPE_ATTRIB, question_text, answer,
@@ -556,11 +674,20 @@ def check_episodic(questions: list[tmc.Question]) -> list[str]:
                                 f"answer's order {items}")
 
         elif shape == SHAPE_ATTRIB:
-            role = next((t.role for i in q.gold_indices for t in q.sessions[i].turns
-                         if t.has_answer), None)
+            # THE SET, not the first one. With a `both` arm there are two answer-bearing turns
+            # and `next(...)` silently reported whichever came first -- so every `both` question
+            # read as "user" and the check condemned a correct corpus. Still an independent read:
+            # the roles come from the emitted transcript, the label from the declaration, and the
+            # two must agree.
+            roles = sorted({t.role for i in q.gold_indices for t in q.sessions[i].turns
+                            if t.has_answer})
+            role = "both" if len(roles) > 1 else (roles[0] if roles else None)
             if role != q.extension["attributed_speaker"]:
                 failures.append(f"{q.question_id}: answer key says {q.extension['attributed_speaker']} "
-                                f"but the has_answer turn is a {role} turn")
+                                f"but the answer-bearing turns are {roles}")
+            if q.extension["attributed_speaker"] == "both" and len(q.gold_indices) != 2:
+                failures.append(f"{q.question_id}: a `both` question has {len(q.gold_indices)} gold "
+                                f"sessions; finding one must not be finding the other")
 
     # (c) The shape mix is the vertical's design, and the report surface reads per shape:
     # a corpus that silently drifted to 25/10/15 would still pass every other check here
@@ -575,8 +702,11 @@ def check_episodic(questions: list[tmc.Question]) -> list[str]:
     attributed = [q.extension["attributed_speaker"] for q in questions
                   if q.extension["shape"] == SHAPE_ATTRIB]
     if attributed:
-        majority = max(attributed.count("user"), attributed.count("assistant"))
-        if majority / len(attributed) > 0.6:
+        # Three classes now, so the bar tightens with them: at 5/5/5 the majority class is 1/3,
+        # and anything above 0.45 would put majority-guessing meaningfully above the chance floor
+        # the shape publishes.
+        majority = max(attributed.count(c) for c in ("user", "assistant", "both"))
+        if majority / len(attributed) > 0.45:
             failures.append(f"attribution speaker marginal is {majority}/{len(attributed)} -- "
                             f"majority-class guessing beats the shape")
     return failures
@@ -587,7 +717,9 @@ if __name__ == "__main__":
         vertical="episodic",
         build=build,
         structure=tmc.StructureSpec(
-            h_min=15, h_max=25, g_values={1, 4, 5, 6, 7}, gold_position_shuffled=True,
+            # 2 added with the `both` arm of participant-attribution: that arm has one gold
+            # session per speaker, so finding either is not finding both.
+            h_min=15, h_max=25, g_values={1, 2, 4, 5, 6, 7}, gold_position_shuffled=True,
             no_absolute_dates=False,
         ),
         generator_tool="tools/gen_typedmemeval_episodic.py",

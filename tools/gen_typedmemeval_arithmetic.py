@@ -866,6 +866,9 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
             plan.qid, plan.qtype, plan.question, plan.answer,
             sessions[-1].timestamp + timedelta(days=2), sessions,
             deepcopy({"shape": plan.shape, "derivation": plan.derivation,
+                  # Every input is an operand: drop one and the arithmetic changes. This was V6's
+                  # original scope and is now stated on the question instead of in the runner.
+                  "gold_components_load_bearing": True,
                       # Dispersion is this vertical's dial: how many distinct gold sessions the
                       # answer must be assembled from. See _difficulty_band for why that is counted
                       # in SESSIONS rather than in `inputs` -- the two are the same number for

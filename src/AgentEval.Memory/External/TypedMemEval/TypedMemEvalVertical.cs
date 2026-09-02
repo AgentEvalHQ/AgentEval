@@ -227,7 +227,12 @@ public static class TypedMemEvalVerticals
             Slug = "conjunction",
             Abbreviation = "cnj",
             DisplayName = "TypedMemEval-Conjunction",
-            QuestionCount = 50,
+            // 50 -> 65 at 0.33.0-beta, and the vertical GREW rather than redistributing. ADR-029
+            // adds a fourth shape, `conditional-branch`; splitting 50 four ways would put every
+            // shape near 12, under the ~15 line at which this family's guidance says a shape
+            // supports diagnosis rather than a claim. A declared size move, disclosed before it
+            // lands, is the cheaper of the two costs.
+            QuestionCount = 65,
             // No timestamps. Both halves resolve by stated relation - a replacement chain, an alias,
             // an anchor pinned between two switches - never by session date. Supplying dates would
             // let a metadata sort answer the semantic half without reading it.

@@ -1,14 +1,15 @@
 {
   "corpus_id": "agenteval-typedmemeval-conjunction-v5",
   "vertical": "conjunction",
-  "revision": "v5",
+  "revision": "v5+a949006ce182",
+  "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
     "shipped_in": "0.24.0-beta",
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
-  "question_count": 50,
-  "corpus_sha256": "9f6a0f37a506747318e1048706b25d1039c3247525515506d409f0ed308449cd",
+  "question_count": 65,
+  "corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858",
   "generator": {
     "tool": "gen_typedmemeval_conjunction.py",
     "version": "1.0.0",
@@ -19,76 +20,94 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.581,
-    "echo": 0.25,
-    "iterations": 21,
+    "mean_realised": 0.6035,
+    "echo": 0.0938,
+    "iterations": 174,
     "search_trace": [],
     "per_question": {
       "tme-cnj-001": 1.0,
       "tme-cnj-002": 0.5,
-      "tme-cnj-003": 0.5,
+      "tme-cnj-003": 0.625,
       "tme-cnj-004": 1.0,
-      "tme-cnj-005": 0.5,
-      "tme-cnj-006": 0.5,
+      "tme-cnj-005": 0.8333,
+      "tme-cnj-006": 0.625,
       "tme-cnj-007": 1.0,
-      "tme-cnj-008": 0.6667,
+      "tme-cnj-008": 0.8333,
       "tme-cnj-009": 0.625,
       "tme-cnj-010": 0.5,
-      "tme-cnj-011": 0.8333,
-      "tme-cnj-012": 0.5,
+      "tme-cnj-011": 0.5,
+      "tme-cnj-012": 0.625,
       "tme-cnj-013": 1.0,
       "tme-cnj-014": 0.6667,
       "tme-cnj-015": 0.5,
       "tme-cnj-016": 1.0,
       "tme-cnj-017": 0.5,
       "tme-cnj-018": 0.625,
-      "tme-cnj-019": 0.5,
+      "tme-cnj-019": 0.75,
       "tme-cnj-020": 0.5,
       "tme-cnj-021": 0.3333,
       "tme-cnj-022": 0.25,
-      "tme-cnj-023": 0.2,
+      "tme-cnj-023": 0.6,
       "tme-cnj-024": 0.3333,
-      "tme-cnj-025": 0.0,
+      "tme-cnj-025": 0.25,
       "tme-cnj-026": 0.2,
       "tme-cnj-027": 0.3333,
-      "tme-cnj-028": 0.75,
+      "tme-cnj-028": 1.0,
       "tme-cnj-029": 0.4,
-      "tme-cnj-030": 0.3333,
-      "tme-cnj-031": 0.25,
+      "tme-cnj-030": 0.6667,
+      "tme-cnj-031": 0.5,
       "tme-cnj-032": 0.2,
       "tme-cnj-033": 1.0,
       "tme-cnj-034": 0.25,
       "tme-cnj-035": 0.2,
-      "tme-cnj-036": 0.6,
+      "tme-cnj-036": 0.8,
       "tme-cnj-037": 1.0,
       "tme-cnj-038": 1.0,
       "tme-cnj-039": 0.8,
-      "tme-cnj-040": 0.6,
+      "tme-cnj-040": 0.4,
       "tme-cnj-041": 0.8,
-      "tme-cnj-042": 0.6,
-      "tme-cnj-043": 0.4,
+      "tme-cnj-042": 0.4,
+      "tme-cnj-043": 0.6,
       "tme-cnj-044": 0.8,
       "tme-cnj-045": 1.0,
       "tme-cnj-046": 0.6,
-      "tme-cnj-047": 0.4,
-      "tme-cnj-048": 0.8,
-      "tme-cnj-049": 0.4,
-      "tme-cnj-050": 0.8
+      "tme-cnj-047": 0.6,
+      "tme-cnj-048": 0.6,
+      "tme-cnj-049": 0.8,
+      "tme-cnj-050": 0.8,
+      "tme-cnj-051": 0.5,
+      "tme-cnj-052": 0.5,
+      "tme-cnj-053": 0.5,
+      "tme-cnj-054": 0.5,
+      "tme-cnj-055": 0.5,
+      "tme-cnj-056": 0.5,
+      "tme-cnj-057": 0.5,
+      "tme-cnj-058": 0.5,
+      "tme-cnj-059": 0.5,
+      "tme-cnj-060": 0.5,
+      "tme-cnj-061": 0.5,
+      "tme-cnj-062": 0.5,
+      "tme-cnj-063": 0.5,
+      "tme-cnj-064": 0.5,
+      "tme-cnj-065": 0.5
     },
     "echo_by_shape": {
-      "alias-then-count": 0.25,
+      "alias-then-count": 0.0,
+      "conditional-branch": 0.0,
       "order-then-value": 0.25,
-      "value-then-count": 0.25
+      "value-then-count": 0.125
     },
     "per_shape_realised": {
-      "alias-then-count": 0.3356,
-      "order-then-value": 0.7067,
-      "value-then-count": 0.6708
+      "alias-then-count": 0.4344,
+      "conditional-branch": 0.5,
+      "order-then-value": 0.7333,
+      "value-then-count": 0.7104
     }
   },
   "ceiling": {
     "k_ref": 5,
     "by_g": {
+      "2": 1.0,
       "3": 1.0,
       "4": 1.0,
       "5": 1.0,
@@ -100,28 +119,23 @@
   },
   "structure": {
     "g_distribution": {
+      "2": 15,
       "3": 5,
       "4": 12,
       "5": 20,
       "6": 7,
       "8": 6
     },
-    "h_min": 15,
+    "h_min": 14,
     "h_max": 24,
     "gold_position_shuffled": true,
     "h_is_independent_variable": false,
     "no_absolute_dates": true,
     "empty_turns": {
-      "count": 249,
-      "of_turns": 6200,
+      "count": 324,
+      "of_turns": 7555,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
-    },
-    "scaffolding_dependence": {
-      "bm25_coverage_as_shipped": 0.585,
-      "bm25_coverage_without_distractor_echo": 0.701,
-      "dependence": 0.116,
-      "reading": "How much of this corpus's retrieval difficulty is carried by the bracketed calibration echo clause on its distractors. A retriever that discounts formulaic scaffolding sees the second number, so V9's BM25 baseline is depressed by roughly this much and the V1 - V9 headroom is an upper bound rather than an estimate."
     }
   },
   "gold_item_types": {
@@ -132,156 +146,156 @@
       "semantic"
     ],
     "tme-cnj-002": [
+      "arithmetic",
       "semantic",
+      "arithmetic",
+      "arithmetic",
       "semantic",
-      "arithmetic",
-      "arithmetic",
-      "arithmetic",
       "semantic"
     ],
     "tme-cnj-003": [
       "semantic",
+      "arithmetic",
+      "semantic",
       "semantic",
       "semantic",
       "arithmetic",
-      "arithmetic",
-      "semantic",
       "arithmetic",
       "arithmetic"
     ],
     "tme-cnj-004": [
       "semantic",
+      "semantic",
       "arithmetic",
-      "arithmetic",
-      "semantic"
+      "arithmetic"
     ],
     "tme-cnj-005": [
       "semantic",
       "semantic",
       "arithmetic",
       "arithmetic",
-      "arithmetic",
-      "semantic"
+      "semantic",
+      "arithmetic"
     ],
     "tme-cnj-006": [
-      "semantic",
+      "arithmetic",
       "arithmetic",
       "semantic",
       "arithmetic",
       "semantic",
-      "arithmetic",
+      "semantic",
       "arithmetic",
       "semantic"
     ],
     "tme-cnj-007": [
-      "arithmetic",
-      "arithmetic",
       "semantic",
-      "semantic"
+      "semantic",
+      "arithmetic",
+      "arithmetic"
     ],
     "tme-cnj-008": [
       "arithmetic",
-      "semantic",
-      "semantic",
       "arithmetic",
+      "semantic",
+      "semantic",
       "arithmetic",
       "semantic"
     ],
     "tme-cnj-009": [
       "semantic",
+      "semantic",
+      "arithmetic",
       "arithmetic",
       "semantic",
       "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
+    "tme-cnj-010": [
       "semantic",
       "arithmetic",
       "semantic",
       "arithmetic"
     ],
-    "tme-cnj-010": [
-      "arithmetic",
-      "semantic",
-      "arithmetic",
-      "semantic"
-    ],
     "tme-cnj-011": [
-      "arithmetic",
-      "arithmetic",
-      "arithmetic",
       "semantic",
       "semantic",
-      "semantic"
+      "semantic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic"
     ],
     "tme-cnj-012": [
+      "arithmetic",
+      "arithmetic",
       "semantic",
       "arithmetic",
       "semantic",
       "arithmetic",
       "semantic",
-      "arithmetic",
-      "arithmetic",
       "semantic"
     ],
     "tme-cnj-013": [
-      "arithmetic",
       "semantic",
+      "arithmetic",
       "semantic",
       "arithmetic"
     ],
     "tme-cnj-014": [
-      "semantic",
-      "arithmetic",
       "arithmetic",
       "semantic",
+      "semantic",
+      "arithmetic",
       "semantic",
       "arithmetic"
     ],
     "tme-cnj-015": [
-      "semantic",
-      "arithmetic",
       "arithmetic",
       "semantic",
       "arithmetic",
+      "arithmetic",
       "semantic",
+      "semantic",
+      "semantic",
+      "arithmetic"
+    ],
+    "tme-cnj-016": [
+      "arithmetic",
+      "arithmetic",
+      "semantic",
+      "semantic"
+    ],
+    "tme-cnj-017": [
+      "arithmetic",
+      "semantic",
+      "semantic",
+      "arithmetic",
       "arithmetic",
       "semantic"
     ],
-    "tme-cnj-016": [
-      "semantic",
-      "arithmetic",
-      "semantic",
-      "arithmetic"
-    ],
-    "tme-cnj-017": [
-      "semantic",
-      "arithmetic",
-      "semantic",
-      "arithmetic",
-      "semantic",
-      "arithmetic"
-    ],
     "tme-cnj-018": [
+      "semantic",
+      "arithmetic",
       "arithmetic",
       "arithmetic",
       "arithmetic",
       "semantic",
       "semantic",
-      "semantic",
-      "arithmetic",
       "semantic"
     ],
     "tme-cnj-019": [
-      "arithmetic",
       "semantic",
       "arithmetic",
-      "semantic"
+      "semantic",
+      "arithmetic"
     ],
     "tme-cnj-020": [
-      "semantic",
-      "semantic",
+      "arithmetic",
       "semantic",
       "arithmetic",
       "arithmetic",
-      "arithmetic"
+      "semantic",
+      "semantic"
     ],
     "tme-cnj-021": [
       "arithmetic",
@@ -289,35 +303,35 @@
       "semantic"
     ],
     "tme-cnj-022": [
+      "arithmetic",
+      "arithmetic",
       "semantic",
-      "arithmetic",
-      "arithmetic",
       "arithmetic"
     ],
     "tme-cnj-023": [
       "arithmetic",
       "arithmetic",
-      "arithmetic",
       "semantic",
+      "arithmetic",
       "arithmetic"
     ],
     "tme-cnj-024": [
       "arithmetic",
-      "semantic",
-      "arithmetic"
+      "arithmetic",
+      "semantic"
     ],
     "tme-cnj-025": [
-      "arithmetic",
       "semantic",
+      "arithmetic",
       "arithmetic",
       "arithmetic"
     ],
     "tme-cnj-026": [
+      "semantic",
       "arithmetic",
       "arithmetic",
       "arithmetic",
-      "arithmetic",
-      "semantic"
+      "arithmetic"
     ],
     "tme-cnj-027": [
       "semantic",
@@ -332,10 +346,10 @@
     ],
     "tme-cnj-029": [
       "arithmetic",
-      "semantic",
       "arithmetic",
       "arithmetic",
-      "arithmetic"
+      "arithmetic",
+      "semantic"
     ],
     "tme-cnj-030": [
       "arithmetic",
@@ -343,15 +357,15 @@
       "semantic"
     ],
     "tme-cnj-031": [
+      "arithmetic",
+      "arithmetic",
       "semantic",
-      "arithmetic",
-      "arithmetic",
       "arithmetic"
     ],
     "tme-cnj-032": [
-      "arithmetic",
-      "arithmetic",
       "semantic",
+      "arithmetic",
+      "arithmetic",
       "arithmetic",
       "arithmetic"
     ],
@@ -361,24 +375,24 @@
       "arithmetic"
     ],
     "tme-cnj-034": [
-      "arithmetic",
-      "arithmetic",
-      "arithmetic",
-      "semantic"
-    ],
-    "tme-cnj-035": [
-      "arithmetic",
       "semantic",
       "arithmetic",
       "arithmetic",
       "arithmetic"
     ],
+    "tme-cnj-035": [
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "arithmetic",
+      "semantic"
+    ],
     "tme-cnj-036": [
-      "semantic",
-      "semantic",
-      "semantic",
       "temporal",
-      "temporal"
+      "temporal",
+      "semantic",
+      "semantic",
+      "semantic"
     ],
     "tme-cnj-037": [
       "semantic",
@@ -389,24 +403,24 @@
     ],
     "tme-cnj-038": [
       "semantic",
-      "semantic",
       "temporal",
+      "semantic",
       "temporal",
       "semantic"
     ],
     "tme-cnj-039": [
+      "temporal",
       "semantic",
       "semantic",
-      "temporal",
-      "temporal",
-      "semantic"
+      "semantic",
+      "temporal"
     ],
     "tme-cnj-040": [
       "semantic",
       "temporal",
       "semantic",
-      "semantic",
-      "temporal"
+      "temporal",
+      "semantic"
     ],
     "tme-cnj-041": [
       "temporal",
@@ -416,67 +430,127 @@
       "temporal"
     ],
     "tme-cnj-042": [
-      "semantic",
-      "semantic",
       "temporal",
       "temporal",
+      "semantic",
+      "semantic",
       "semantic"
     ],
     "tme-cnj-043": [
       "temporal",
+      "semantic",
+      "semantic",
       "temporal",
-      "semantic",
-      "semantic",
       "semantic"
     ],
     "tme-cnj-044": [
       "semantic",
+      "semantic",
+      "semantic",
       "temporal",
+      "temporal"
+    ],
+    "tme-cnj-045": [
+      "temporal",
+      "semantic",
       "temporal",
       "semantic",
       "semantic"
     ],
-    "tme-cnj-045": [
-      "semantic",
-      "temporal",
-      "semantic",
-      "semantic",
-      "temporal"
-    ],
     "tme-cnj-046": [
-      "semantic",
-      "semantic",
+      "temporal",
       "semantic",
       "temporal",
-      "temporal"
+      "semantic",
+      "semantic"
     ],
     "tme-cnj-047": [
       "semantic",
       "semantic",
       "temporal",
-      "temporal",
-      "semantic"
+      "semantic",
+      "temporal"
     ],
     "tme-cnj-048": [
-      "temporal",
+      "semantic",
       "temporal",
       "semantic",
-      "semantic",
+      "temporal",
       "semantic"
     ],
     "tme-cnj-049": [
-      "semantic",
-      "semantic",
+      "temporal",
       "temporal",
       "semantic",
-      "temporal"
+      "semantic",
+      "semantic"
     ],
     "tme-cnj-050": [
       "semantic",
       "semantic",
-      "semantic",
       "temporal",
+      "semantic",
       "temporal"
+    ],
+    "tme-cnj-051": [
+      "episodic",
+      "semantic"
+    ],
+    "tme-cnj-052": [
+      "episodic",
+      "semantic"
+    ],
+    "tme-cnj-053": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-054": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-055": [
+      "episodic",
+      "semantic"
+    ],
+    "tme-cnj-056": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-057": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-058": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-059": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-060": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-061": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-062": [
+      "episodic",
+      "semantic"
+    ],
+    "tme-cnj-063": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-064": [
+      "semantic",
+      "episodic"
+    ],
+    "tme-cnj-065": [
+      "semantic",
+      "episodic"
     ]
   },
   "probes": {
@@ -537,40 +611,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5458,
+        "session_length_chars": 0.5405,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5252,
+        "position_in_haystack": 0.5001,
         "digit_density": 0.5,
-        "uppercase_density": 0.5008,
-        "sentence_count": 0.536,
-        "punctuation_density": 0.5512,
+        "uppercase_density": 0.5102,
+        "sentence_count": 0.5295,
+        "punctuation_density": 0.5002,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5458,
-        "type_token_ratio": 0.5434,
-        "first_user_length_chars": 0.6176,
-        "first_user_uppercase_density": 0.5291,
-        "first_user_sentence_count": 0.5881,
-        "first_assistant_length_chars": 0.5397,
-        "first_assistant_uppercase_density": 0.5401,
-        "first_assistant_sentence_count": 0.5192,
-        "user_slot1_length_chars": 0.5094,
+        "mean_turn_chars": 0.5405,
+        "type_token_ratio": 0.5602,
+        "first_user_length_chars": 0.5659,
+        "first_user_uppercase_density": 0.5422,
+        "first_user_sentence_count": 0.6425,
+        "first_assistant_length_chars": 0.5056,
+        "first_assistant_uppercase_density": 0.5281,
+        "first_assistant_sentence_count": 0.524,
+        "user_slot1_length_chars": 0.5066,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5371,
-        "assistant_slot2_length_chars": 0.5139,
+        "assistant_slot1_length_chars": 0.521,
+        "assistant_slot2_length_chars": 0.5278,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5668,
-        "user_uppercase_density": 0.5408,
-        "user_sentence_count": 0.5703,
-        "user_punctuation_density": 0.5326,
-        "user_type_token_ratio": 0.5806,
-        "user_mean_turn_chars": 0.5668,
-        "assistant_length_chars": 0.5058,
-        "assistant_uppercase_density": 0.516,
-        "assistant_sentence_count": 0.5088,
-        "assistant_punctuation_density": 0.5423,
-        "assistant_type_token_ratio": 0.5037,
-        "assistant_mean_turn_chars": 0.5058,
+        "user_length_chars": 0.5416,
+        "user_uppercase_density": 0.5279,
+        "user_sentence_count": 0.6152,
+        "user_punctuation_density": 0.5092,
+        "user_type_token_ratio": 0.5937,
+        "user_mean_turn_chars": 0.5416,
+        "assistant_length_chars": 0.5244,
+        "assistant_uppercase_density": 0.5149,
+        "assistant_sentence_count": 0.5311,
+        "assistant_punctuation_density": 0.515,
+        "assistant_type_token_ratio": 0.5113,
+        "assistant_mean_turn_chars": 0.5244,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -580,335 +654,335 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6038,
-        "boilerplate_ngram": 0.6289
+        "gold_marker_ngram": 0.5946,
+        "boilerplate_ngram": 0.6318
       },
-      "worst_refused_feature": "boilerplate_ngram",
-      "worst_refused_auc": 0.6289,
+      "worst_refused_feature": "first_user_sentence_count",
+      "worst_refused_auc": 0.6425,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "this",
-      "gold_marker_ngram_auc": 0.6038,
+      "worst_gold_marker_ngram": "quick",
+      "gold_marker_ngram_auc": 0.5946,
       "worst_boilerplate_ngram": "is the",
-      "boilerplate_ngram_auc": 0.6289,
+      "boilerplate_ngram_auc": 0.6318,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_in_haystack": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "digit_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "uppercase_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "sentence_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "punctuation_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "em_dash_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_user_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_user_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_assistant_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_assistant_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_slot1_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_slot1_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_length_chars": {
-          "share": 0.0,
-          "chance": 0.0002,
-          "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "share": 0.0308,
+          "chance": 0.0024,
+          "observed": 2,
+          "expected": 0.16,
+          "z": 4.68
         },
         "user_uppercase_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "user_type_token_ratio": {
-          "share": 0.0,
-          "chance": 0.0002,
-          "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "share": 0.0154,
+          "chance": 0.0024,
+          "observed": 1,
+          "expected": 0.16,
+          "z": 2.14
         },
         "user_mean_turn_chars": {
-          "share": 0.0,
-          "chance": 0.0002,
-          "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "share": 0.0308,
+          "chance": 0.0024,
+          "observed": 2,
+          "expected": 0.16,
+          "z": 4.68
         },
         "assistant_length_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0002,
-          "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "share": 0.0154,
+          "chance": 0.0024,
+          "observed": 1,
+          "expected": 0.16,
+          "z": 2.14
         },
         "assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_punctuation_density": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_type_token_ratio": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "assistant_mean_turn_chars": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         },
         "gold_marker_ngram": {
           "share": 0.0,
-          "chance": 0.0002,
+          "chance": 0.0024,
           "observed": 0,
-          "expected": 0.01,
-          "z": -0.1
+          "expected": 0.16,
+          "z": -0.4
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "9f6a0f37a506747318e1048706b25d1039c3247525515506d409f0ed308449cd"
+      "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-08-31T13:29:36Z",
-    "questions_probed": 50,
+    "run_at": "2026-09-02T13:42:47Z",
+    "questions_probed": 65,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
-      "applicable": 50,
-      "passed": 50,
+      "applicable": 65,
+      "passed": 65,
       "failed": []
     },
     "v1_pair_flip": {
@@ -921,8 +995,8 @@
       "samples_per_question": 10,
       "reject_at_hits": 2,
       "temperature": "provider default",
-      "applicable": 50,
-      "passed": 50,
+      "applicable": 65,
+      "passed": 65,
       "failed": [],
       "closed_choice": {
         "questions": 0,
@@ -933,21 +1007,39 @@
       }
     },
     "v3_gold_ablated": {
-      "applicable": 50,
-      "passed": 49,
-      "failed": [
-        "tme-cnj-024"
-      ],
+      "applicable": 65,
+      "passed": 65,
+      "failed": [],
       "not_decidable": [],
       "not_decidable_chance_floor": "A closed-choice question hands the model its candidates, so with the evidence removed it still reaches gold at 1/k. V3 therefore needs the smallest hit count whose tail P(X>=h | 1/k) is under 0.05; where no count within 3 samples reaches that -- k=2, where even 3-of-3 leaves p=0.125 -- the question is not decidable by this arm and is recorded as such rather than passed or failed.",
       "not_decidable_reason": "gold carries no content the prompt did not already supply, so a no-evidence answer and a correct one are indistinguishable to this probe"
     },
     "v6_leave_one_out": {
-      "applicable": 0,
-      "passed": 0,
+      "applicable": 50,
+      "passed": 50,
       "failed": [],
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
-      "not_applicable_reason": "V6 is not defined for conjunction"
+      "excluded_declared_redundant": [],
+      "excluded_no_load_bearing_claim": [],
+      "excluded_not_decidable": [],
+      "excluded_chance_undecidable": [
+        "tme-cnj-021",
+        "tme-cnj-022",
+        "tme-cnj-023",
+        "tme-cnj-024",
+        "tme-cnj-025",
+        "tme-cnj-026",
+        "tme-cnj-027",
+        "tme-cnj-028",
+        "tme-cnj-029",
+        "tme-cnj-030",
+        "tme-cnj-031",
+        "tme-cnj-032",
+        "tme-cnj-033",
+        "tme-cnj-034",
+        "tme-cnj-035"
+      ],
+      "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
+      "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one"
     },
     "empty_completions": {
       "count": 0
@@ -955,77 +1047,96 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 11770,
+        "calls": 15440,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 4419,
+        "judge_calls": 5506,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 3181,
+        "calls": 4213,
         "empty": 9,
-        "rate": 0.0028,
-        "judge_calls": 1062,
+        "rate": 0.0021,
+        "judge_calls": 1392,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 2329,
+        "calls": 3855,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 872,
+        "judge_calls": 2078,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 1544,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1177,
+        "calls": 1544,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1177,
+        "judge_calls": 1528,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v10": {
+        "population": "probe_answers",
+        "calls": 93,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
+        "judge_empty": 0,
+        "judge_rate": 0.0
+      },
+      "v11": {
+        "population": "probe_answers",
+        "calls": 93,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 93,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
     },
     "v8_full_haystack": {
-      "applicable": 50,
-      "v1_passed": 50,
-      "v8_passed": 49,
-      "interference_cost": 0.02,
+      "applicable": 65,
+      "v1_passed": 65,
+      "v8_passed": 63,
+      "interference_cost": 0.0308,
       "regressed_under_interference": [
-        "tme-cnj-048"
+        "tme-cnj-046",
+        "tme-cnj-049"
       ],
       "failures_with_no_captured_answer": [],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
     },
     "v9_reference_retrieval": {
-      "applicable": 50,
-      "v1_gold_only": 50,
-      "v8_full_haystack": 49,
-      "v9_bm25_top_k": 14,
-      "headroom_over_lexical_retrieval": 0.72,
-      "headroom_unlimited_context_over_lexical": 0.7,
+      "applicable": 65,
+      "v1_gold_only": 65,
+      "v8_full_haystack": 63,
+      "v9_bm25_top_k": 16,
+      "headroom_over_lexical_retrieval": 0.7538,
+      "headroom_unlimited_context_over_lexical": 0.7231,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "by_shape": {
@@ -1034,15 +1145,80 @@
         "v1_applicable": 15,
         "v1_passed": 15,
         "v3_applicable": 15,
-        "v3_passed": 14,
+        "v3_passed": 15,
         "v8_applicable": 15,
         "v8_passed": 15,
         "v9_applicable": 15,
-        "v9_passed": 1,
+        "v9_passed": 2,
+        "ci95": {
+          "v1": [
+            0.7961,
+            1.0
+          ],
+          "v3": [
+            0.7961,
+            1.0
+          ],
+          "v8": [
+            0.7961,
+            1.0
+          ],
+          "v9": [
+            0.0374,
+            0.3788
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
-        "headroom_perfect_selector": 0.9333,
+        "chance_floor": 0.5,
+        "chance_floor_reason": "with the co-reference link removed, exactly two designations in the haystack carry delivery events and they carry different counts",
+        "v9_above_chance": -0.3667,
+        "v8_above_chance": 0.5,
+        "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
+        "headroom_perfect_selector": 0.8667,
         "discriminates": true,
-        "headroom_reachable": 0.9333,
+        "headroom_reachable": 0.8667,
+        "limited_by": "retrieval",
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+      },
+      "conditional-branch": {
+        "questions": 15,
+        "v1_applicable": 15,
+        "v1_passed": 15,
+        "v3_applicable": 15,
+        "v3_passed": 15,
+        "v8_applicable": 15,
+        "v8_passed": 15,
+        "v9_applicable": 15,
+        "v9_passed": 0,
+        "ci95": {
+          "v1": [
+            0.7961,
+            1.0
+          ],
+          "v3": [
+            0.7961,
+            1.0
+          ],
+          "v8": [
+            0.7961,
+            1.0
+          ],
+          "v9": [
+            0.0,
+            0.2039
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
+        "required_sessions_median": 2,
+        "chance_floor": 0.3333,
+        "chance_floor_reason": "the rule session names all three branch outcomes, so a reader that retrieves the rule and misses the state is choosing among three named candidates",
+        "v9_above_chance": -0.3333,
+        "v8_above_chance": 0.6667,
+        "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
+        "headroom_perfect_selector": 1.0,
+        "discriminates": true,
+        "headroom_reachable": 1.0,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
@@ -1053,13 +1229,32 @@
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
-        "v8_passed": 14,
+        "v8_passed": 13,
         "v9_applicable": 15,
-        "v9_passed": 7,
+        "v9_passed": 9,
+        "ci95": {
+          "v1": [
+            0.7961,
+            1.0
+          ],
+          "v3": [
+            0.7961,
+            1.0
+          ],
+          "v8": [
+            0.6212,
+            0.9626
+          ],
+          "v9": [
+            0.3575,
+            0.8018
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 5,
-        "headroom_perfect_selector": 0.5333,
+        "headroom_perfect_selector": 0.4,
         "discriminates": true,
-        "headroom_reachable": 0.4667,
+        "headroom_reachable": 0.2667,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
@@ -1072,11 +1267,30 @@
         "v8_applicable": 20,
         "v8_passed": 20,
         "v9_applicable": 20,
-        "v9_passed": 6,
+        "v9_passed": 5,
+        "ci95": {
+          "v1": [
+            0.8389,
+            1.0
+          ],
+          "v3": [
+            0.8389,
+            1.0
+          ],
+          "v8": [
+            0.8389,
+            1.0
+          ],
+          "v9": [
+            0.1119,
+            0.4687
+          ]
+        },
+        "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 6,
-        "headroom_perfect_selector": 0.7,
+        "headroom_perfect_selector": 0.75,
         "discriminates": true,
-        "headroom_reachable": 0.7,
+        "headroom_reachable": 0.75,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       }
@@ -1085,9 +1299,9 @@
       "tme-cnj-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You put an order in with your current usual courier **twice**.\n\nYour current usual courier is **Oakhurst Transit** — you moved from Pellham Freight to Oakhurst Transit on **2026/05/01**. The two orders logged were on **2026/04/07** and **2026/04/19**.",
+        "v8_answer": "You put an order in with your current usual courier **twice**.\n\nYour current usual courier is **Oakhurst Transit**.",
         "v9": true,
-        "v9_answer": "You put in an order with your current usual courier **2 times**.\n\nYour current usual courier is **Oakhurst Transit**.",
+        "v9_answer": "You put an order in with your current usual courier **2 times**.\n\nYour current usual courier is **Oakhurst Transit**.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1095,14 +1309,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-002": {
         "v1": true,
         "v8": true,
         "v8_answer": "You sent paperwork over to your current regular printer **3 times**.\n\nYour current regular printer is **Denhurst Bindery**.",
         "v9": false,
-        "v9_answer": "You sent paperwork over **0 times** to your current regular printer.\n\nYour current regular printer is **Denhurst Bindery**.",
+        "v9_answer": "The conversations say your current regular printer is **Denhurst Bindery**.\n\nThey do **not** say how many times you sent paperwork over to it.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1110,104 +1329,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You current main contractor is **Lowther Site**.\n\nYou recorded booking a collection with Lowther Site **4 times**. Two of those were before it became your main contractor, and two were after.",
+        "v8_answer": "You booked a collection with your current main contractor **4 times**.\n\nYour current main contractor is **Garrowby Build**.",
         "v9": false,
-        "v9_answer": "The conversations say your current main contractor is **Lowther Site**.\n\nThey do **not** say how many times you booked a collection with Lowther Site, or even that you did so.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-004": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You raised a job with your current usual courier **twice**.\n\nYour current usual courier is **Oakhurst Transit**.",
-        "v9": true,
-        "v9_answer": "You raised a job with your current usual courier **2 times**.\n\nYour current usual courier is **Oakhurst Transit**.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-005": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You put an order in with your current regular printer **3 times**.\n\nYour current regular printer is **Fairbourne Plate**.",
-        "v9": false,
-        "v9_answer": "The conversations say your current regular printer is **Fairbourne Plate**.\n\nThey do **not** say how many times you put an order in with Fairbourne Plate.",
-        "v9_gold_in_context": 3,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-006": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You sent paperwork over to your current main contractor **4 times**.\n\nYour current main contractor is **Garrowby Build**.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say how many times you sent paperwork over.\n\nYour current main contractor is **Garrowby Build**.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-007": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You booked a collection with your current usual courier **2 times**.\n\nYour current usual courier is **Nettleford Runners**.",
-        "v9": true,
-        "v9_answer": "You booked a collection with your current usual courier **2 times**.\n\nYour current usual courier is **Nettleford Runners**.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-008": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You raised a job with your current regular printer **3 times**.\n\nYour current regular printer is **Brentwood Litho**.",
-        "v9": false,
-        "v9_answer": "Once. Your current regular printer is Brentwood Litho.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-009": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You put an order in with **Kelsall Group** **4 times** in the record.\n\nYour current main contractor is **Kelsall Group**.",
-        "v9": false,
-        "v9_answer": "You put an order in with your current main contractor **once**.\n\nYour current main contractor is **Kelsall Group**.",
+        "v9_answer": "Once — with Garrowby Build, which is your current main contractor.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1215,14 +1349,139 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-004": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You raised a job with your current usual courier **twice**.\n\nThe current usual courier is **Marlow Carriage**.",
+        "v9": true,
+        "v9_answer": "You raised a job with your current usual courier **2 times**.\n\nYour current usual courier is **Marlow Carriage**.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-005": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with your current regular printer **3 times**.\n\nYour current regular printer is **Brentwood Litho**.",
+        "v9": false,
+        "v9_answer": "Your current regular printer, from the records, is **Fairbourne Plate**.\n\nYou recorded putting in orders with **Brentwood Litho** three times, but there is **no record** of you putting an order in with **Fairbourne Plate**.\n\nSo: **0 times with Fairbourne Plate**.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-006": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You sent paperwork over to your current main contractor **4 times**.\n\nYour current main contractor is **Garrowby Build**.",
+        "v9": false,
+        "v9_answer": "Once — to Garrowby Build, which is your current main contractor.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-007": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You booked a collection with your current usual courier **twice**.\n\nYour current usual courier is **Oakhurst Transit**.",
+        "v9": true,
+        "v9_answer": "You booked a collection with your current usual courier **2 times**.\n\nYour current usual courier is **Oakhurst Transit**.",
+        "v9_gold_in_context": 4,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-008": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You raised a job with your current regular printer **3 times**.\n\nYour current regular printer is **Fairbourne Plate**.",
+        "v9": false,
+        "v9_answer": "Twice. Your current regular printer is **Fairbourne Plate**.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-009": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You put an order in with your current main contractor **4 times**.\n\nThe current main contractor is **Kelsall Group**.",
+        "v9": false,
+        "v9_answer": "Once — your current main contractor is Kelsall Group.",
+        "v9_gold_in_context": 5,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-010": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Twice. Your current usual courier is Bardsey Logistics.",
+        "v8_answer": "You sent paperwork over to your current usual courier **twice**.\n\nYour current usual courier is **Corvin Dispatch**. You recorded sending paperwork there on:\n\n- **2027/04/15**\n- **2027/05/01**",
         "v9": false,
-        "v9_answer": "The conversations say your current usual courier is **Bardsey Logistics**.\n\nThey do **not** say how many times you sent paperwork over to them. They only mention “paperwork” being on your mind, not any actual sends.",
+        "v9_answer": "The current usual courier is **Corvin Dispatch**.\n\nThe conversations do **not** say that you sent paperwork over to them, or how many times. They only mention “paperwork” as something on your mind.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1230,14 +1489,39 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-011": {
         "v1": true,
         "v8": true,
         "v8_answer": "You booked a collection with your current regular printer **3 times**.\n\nYour current regular printer is **Brentwood Litho**.",
         "v9": false,
-        "v9_answer": "You booked a collection with your current regular printer **2 times**.\n\nYour current regular printer is **Brentwood Litho**.",
+        "v9_answer": "The conversations say your current regular printer is **Brentwood Litho**.\n\nThey do **not** say how many times you booked a collection with Brentwood Litho.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-012": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You raised a job with your current main contractor **4 times**.\n\nYour current main contractor is **Jarrow Contracting**.",
+        "v9": false,
+        "v9_answer": "Once — with Jarrow Contracting, which is your current main contractor.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1245,29 +1529,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-012": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You raised a job with your current main contractor **4 times**.\n\nYour current main contractor is **Ilminster Trades**.  \nThat became current on **2027/07/29**, when you moved the main contractor from Garrowby Build to Ilminster Trades.\n\nThe four “raised a job with Ilminster Trades” entries were on:\n",
-        "v9": false,
-        "v9_answer": "You raised your current main contractor once.\n\nYour current main contractor is Ilminster Trades.",
-        "v9_gold_in_context": 4,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You put an order in with your current usual courier **twice**.\n\nYour current usual courier is **Corvin Dispatch**.",
+        "v8_answer": "You put an order in with your current usual courier **2 times**.\n\nYour current usual courier is **Marlow Carriage**.",
         "v9": true,
-        "v9_answer": "You put an order in with your current usual courier **2 times**.\n\nYour current usual courier is **Corvin Dispatch**.",
+        "v9_answer": "You put an order in with your current usual courier **2 times**.\n\nYour current usual courier is **Marlow Carriage**.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1275,14 +1549,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You sent paperwork over to your current regular printer **3 times**.\n\nYour current regular printer is **Elmsworth Type**.",
+        "v8_answer": "You sent paperwork over to your current regular printer **3 times**.\n\nYour current regular printer is **Denhurst Bindery**.",
         "v9": false,
-        "v9_answer": "Once. Your current regular printer is Elmsworth Type.",
+        "v9_answer": "Once. Your current regular printer is Denhurst Bindery.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1290,14 +1569,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You booked a collection with **Ilminster Trades** **4 times**.\n\nYour current main contractor is **Ilminster Trades**.",
+        "v8_answer": "Your current main contractor is **Lowther Site**.\n\nYou recorded booking a collection with **Lowther Site** **4 times** in the conversations.  \nIf counting only after Lowther Site became the main contractor, then it was **1 time**.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many times you booked a collection.\n\nYour current main contractor is **Ilminster Trades**.",
+        "v9_answer": "The conversations do not say that you booked any collection with your current main contractor.\n\nYour current main contractor is **Lowther Site**.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1305,12 +1589,17 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your current usual courier is **Corvin Dispatch**.\n\nYou mentioned raising a job with **Corvin Dispatch** **twice**:\n- 2027/12/15\n- 2027/12/28",
+        "v8_answer": "You raised a job with your current usual courier **2 times**.\n\nYour current usual courier is **Corvin Dispatch**.",
         "v9": true,
         "v9_answer": "You raised a job with your current usual courier **2 times**.\n\nYour current usual courier is **Corvin Dispatch**.",
         "v9_gold_in_context": 4,
@@ -1320,14 +1609,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You put an order in with your current regular printer **3 times**.\n\nYour current regular printer is **Culverton Print**.",
-        "v9": true,
-        "v9_answer": "You put in an order with your current regular printer **3 times**.\n\nThe printer was **Culverton Print**.",
+        "v8_answer": "You put an order in with your current regular printer **3 times**.\n\nYour current regular printer is **Denhurst Bindery**.",
+        "v9": false,
+        "v9_answer": "The conversations say your current regular printer is **Denhurst Bindery**.\n\nThey **do not say how many times** you put an order in with Denhurst Bindery.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1335,14 +1629,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You sent paperwork over to your current main contractor **4 times**.\n\nYour current main contractor is **Lowther Site**.",
+        "v8_answer": "You sent paperwork over to your current main contractor **4 times**.\n\nYour current main contractor is **Halstead Works**.",
         "v9": false,
-        "v9_answer": "You sent paperwork over to your current main contractor **once**.\n\nYour current main contractor is **Lowther Site**.",
+        "v9_answer": "Once — to Halstead Works, which is your current main contractor.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1350,29 +1649,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 5,
+        "v6_components_total": 8,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You booked a collection with your current usual courier **twice**.\n\nYour current usual courier is **Corvin Dispatch**.",
+        "v8_answer": "You booked a collection with your current usual courier **twice**.\n\nYour current usual courier is **Nettleford Runners**.",
         "v9": false,
-        "v9_answer": "The conversations say your current usual courier is **Corvin Dispatch**.\n\nThey do **not** say how many times you booked a collection with Corvin Dispatch.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-020": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You raised a job with your current regular printer **3 times**.\n\nYour current regular printer is **Ashcombe Press**.",
-        "v9": false,
-        "v9_answer": "The conversations say your current regular printer is **Ashcombe Press**.\n\nThey do **not** say how many times you raised a job with Ashcombe Press, so I can’t determine that from the record.",
+        "v9_answer": "You booked a collection with your current usual courier **once**.\n\nYour current usual courier is **Nettleford Runners**.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1380,14 +1669,39 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 3,
+        "v6_components_total": 4,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-020": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You raised a job with your current regular printer **3 times**.\n\nYour current regular printer is **Elmsworth Type**.",
+        "v9": false,
+        "v9_answer": "The conversations say your current regular printer is **Elmsworth Type**.\n\nThey do **not** say how many times you raised a job with it.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 4,
+        "v6_components_total": 6,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Two deliveries were taken at the new flat.",
+        "v8_answer": "2 deliveries were taken at the new flat.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at the new flat.",
+        "v9_answer": "The conversations do not say that any deliveries were taken at the new flat.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1395,14 +1709,26 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 3,
+        "v6_components_total": 3,
+        "v6": null,
+        "v6_undecidable_drops": [
+          11,
+          13,
+          18
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Three deliveries were taken at the workshop.",
+        "v8_answer": "3 deliveries were taken at the workshop.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at the workshop.",
+        "v9_answer": "No deliveries at the workshop are recorded in the conversations.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1410,52 +1736,104 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 4,
+        "v6_components_total": 4,
+        "v6": null,
+        "v6_undecidable_drops": [
+          6,
+          7,
+          9,
+          12
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-023": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Four deliveries were taken at head office.",
+        "v8_answer": "4 deliveries were taken at head office.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at head office. They only mention deliveries at the cottage at Wray Head.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "2 deliveries were taken at head office.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 5,
+        "v6_components_total": 5,
+        "v6": null,
+        "v6_undecidable_drops": [
+          0,
+          2,
+          9,
+          13,
+          19
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-024": {
         "v1": true,
         "v8": true,
-        "v8_answer": "2 deliveries were taken at the weekend place.",
+        "v8_answer": "Two deliveries were taken at the weekend place, since the weekend place is the cottage at Wray Head.",
         "v9": false,
         "v9_answer": "The conversations do not say how many deliveries were taken at the weekend place.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
-        "v3_hits": 2,
+        "v3_hits": 0,
         "v3_required_hits": 1,
-        "v3": false,
+        "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 3,
+        "v6_components_total": 3,
+        "v6": null,
+        "v6_undecidable_drops": [
+          2,
+          6,
+          14
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Three deliveries were taken at the annexe — the annexe is the Peverel building.",
+        "v8_answer": "3 deliveries were taken at the annexe.",
         "v9": false,
         "v9_answer": "The conversations do not say how many deliveries were taken at the annexe.",
-        "v9_gold_in_context": 0,
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 4,
+        "v6_components_total": 4,
+        "v6": null,
+        "v6_undecidable_drops": [
+          3,
+          10,
+          18,
+          19
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-026": {
         "v1": true,
@@ -1470,7 +1848,21 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 5,
+        "v6_components_total": 5,
+        "v6": null,
+        "v6_undecidable_drops": [
+          4,
+          11,
+          14,
+          15,
+          16
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-027": {
         "v1": true,
@@ -1485,29 +1877,54 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 3,
+        "v6_components_total": 3,
+        "v6": null,
+        "v6_undecidable_drops": [
+          2,
+          6,
+          9
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "3 deliveries were taken at head office.",
-        "v9": false,
-        "v9_answer": "2 deliveries.",
-        "v9_gold_in_context": 3,
+        "v8_answer": "3 deliveries were taken at head office, since head office is the Calderwick office.",
+        "v9": true,
+        "v9_answer": "3 deliveries.",
+        "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 4,
+        "v6_components_total": 4,
+        "v6": null,
+        "v6_undecidable_drops": [
+          6,
+          10,
+          13,
+          16
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "4 deliveries were taken at the weekend place.",
+        "v8_answer": "Four deliveries were taken at the weekend place, the cottage at Wray Head.",
         "v9": false,
-        "v9_answer": "One delivery.",
+        "v9_answer": "One delivery was taken at the weekend place.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1515,44 +1932,83 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 5,
+        "v6_components_total": 5,
+        "v6": null,
+        "v6_undecidable_drops": [
+          2,
+          6,
+          8,
+          13,
+          16
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-030": {
         "v1": true,
         "v8": true,
         "v8_answer": "2 deliveries were taken at the annexe.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at the annexe.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "One delivery was taken at the annexe.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 3,
+        "v6_components_total": 3,
+        "v6": null,
+        "v6_undecidable_drops": [
+          1,
+          4,
+          9
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "3 deliveries were taken at the new flat.",
+        "v8_answer": "3 deliveries were taken at the new flat, since the new flat is the place on Ferrow Row.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at the new flat.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "One.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 4,
+        "v6_components_total": 4,
+        "v6": null,
+        "v6_undecidable_drops": [
+          2,
+          12,
+          18,
+          23
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-032": {
         "v1": true,
         "v8": true,
         "v8_answer": "Four deliveries were taken at the workshop.",
         "v9": false,
-        "v9_answer": "The conversations do not say how many deliveries were taken at the workshop.",
+        "v9_answer": "The conversations do not say. No deliveries at the workshop are recorded.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1560,12 +2016,26 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 5,
+        "v6_components_total": 5,
+        "v6": null,
+        "v6_undecidable_drops": [
+          0,
+          5,
+          9,
+          13,
+          15
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Two deliveries were taken at head office.",
+        "v8_answer": "2 deliveries were taken at head office.",
         "v9": true,
         "v9_answer": "2 deliveries were taken at head office.",
         "v9_gold_in_context": 3,
@@ -1575,12 +2045,24 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 3,
+        "v6_components_total": 3,
+        "v6": null,
+        "v6_undecidable_drops": [
+          9,
+          12,
+          14
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Three deliveries were taken at the weekend place, i.e. the cottage at Wray Head.",
+        "v8_answer": "3 deliveries were taken at the weekend place, the cottage at Wray Head.",
         "v9": false,
         "v9_answer": "The conversations do not say how many deliveries were taken at the weekend place.",
         "v9_gold_in_context": 1,
@@ -1590,12 +2072,25 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 4,
+        "v6_components_total": 4,
+        "v6": null,
+        "v6_undecidable_drops": [
+          2,
+          11,
+          13,
+          17
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Four deliveries were taken at the annexe.",
+        "v8_answer": "4 deliveries were taken at the annexe.\n\nThe annexe is the Peverel building, and deliveries at the Peverel building were logged in Sessions 4, 5, 12, and 18.",
         "v9": false,
         "v9_answer": "The conversations do not say how many deliveries were taken at the annexe.",
         "v9_gold_in_context": 1,
@@ -1605,29 +2100,48 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_candidates": 2,
+        "v6_required_hits": null,
+        "v6_components_tested": 5,
+        "v6_components_total": 5,
+        "v6": null,
+        "v6_undecidable_drops": [
+          3,
+          4,
+          11,
+          17,
+          18
+        ],
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Pellham Freight.\n\nThe notes say Bardsey Logistics was replaced by Pellham Freight in the week of the Zethisk handover, and Pellham Freight was later replaced by Corvin Dispatch in the week of the Traymoor fit-out. The later record places the Quorlory rewiring after the Zethisk handover and before th",
-        "v9": false,
-        "v9_answer": "The conversations don’t give a settled answer.\n\n- If the Quorlory rewiring was **before the Zethisk handover**, the usual courier would have been **Bardsey Logistics**.\n- If it was **after the Zethisk handover and before the Traymoor fit-out**, the usual courier would have been **Pellham Freight**.\n",
-        "v9_gold_in_context": 3,
+        "v8_answer": "Corvin Dispatch.\n\nThe record says the Draimune inspection happened after the Quorlory rewiring and before the Ondrey audit. Corvin Dispatch took over from Pellham Freight in the week of the Quorlory rewiring, and Marlow Carriage replaced Corvin in the week of the Ondrey audit.",
+        "v9": true,
+        "v9_answer": "Corvin Dispatch. The conversations say the courier was switched from Corvin Dispatch to Marlow Carriage in the week of the Ondrey audit, and the Draimune inspection happened before the Ondrey audit.",
+        "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ashcombe Press. The Traymoor fit-out was after the Vreskade survey, when you had switched from Fairbourne Plate to Ashcombe Press, and before the Zethisk handover, when Elmsworth Type took over.",
+        "v8_answer": "Ashcombe Press.",
         "v9": true,
-        "v9_answer": "Ashcombe Press.",
+        "v9_answer": "Ashcombe Press. The conversations say it had taken over from Culverton Print in the week of the Zethisk handover, and the Ondrey audit happened after that but before the Quorlory rewiring.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1635,14 +2149,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Halstead Works.  \n\nThe record says Garrowby Build was replaced by Halstead Works in the week of the Vreskade survey, and Halstead Works was later replaced by Ilminster Trades in the week of the Quorlory rewiring. Since the Traymoor fit-out happened after the Vreskade survey and before the Quorlory r",
+        "v8_answer": "Ilminster Trades.",
         "v9": true,
-        "v9_answer": "Halstead Works.",
+        "v9_answer": "Ilminster Trades.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1650,14 +2169,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Bardsey Logistics. \n\nThe conversations say the switch from Pellham Freight to Bardsey Logistics happened in the week of the Ondrey audit, and the later switch to Nettleford Runners happened in the week of the Zethisk handover. They also state the Traymoor fit-out was after the Ondrey audit and befor",
+        "v8_answer": "Marlow Carriage.\n\nThe record says the Vreskade survey happened after the Traymoor fit-out and before the Quorlory rewiring. The usual courier moved from Corvin Dispatch to Marlow Carriage in the week of the Traymoor fit-out, and then from Marlow Carriage to Pellham Freight in the week of the Quorlor",
         "v9": true,
-        "v9_answer": "Bardsey Logistics.",
+        "v9_answer": "Marlow Carriage. The courier was moved from Corvin Dispatch to Marlow Carriage during the week of the Traymoor fit-out, and the Vreskade survey happened after that.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1665,29 +2189,39 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Brentwood Litho.  \n\nThe notes say Brentwood Litho took over from Fairbourne Plate in the week of the Vreskade survey, and the Zethisk handover happened after the Vreskade survey but before the Draimune inspection—before the later move to Ashcombe Press.",
+        "v8_answer": "Fairbourne Plate.",
         "v9": false,
-        "v9_answer": "The conversations only state that your regular printer is **Fairbourne Plate**. They do not separately specify a different printer for the Zethisk handover.",
-        "v9_gold_in_context": 3,
+        "v9_answer": "The second-floor printer.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Garrowby Build.\n\nThe notes say the Traymoor fit-out was after the Zethisk handover and before the Draimune inspection; you switched to Garrowby Build in the week of the Zethisk handover, and Halstead Works took over in the week of the Draimune inspection.",
+        "v8_answer": "Jarrow Contracting. \n\nThe conversations say you switched from Garrowby Build to Jarrow Contracting in the week of the Traymoor fit-out, and later from Jarrow Contracting to Ilminster Trades in the week of the Zethisk handover. They also say the Ondrey audit was after Traymoor and before Zethisk.",
         "v9": false,
-        "v9_answer": "Jarrow Contracting.",
+        "v9_answer": "Garrowby Build — the later records say you moved off Garrowby Build to Jarrow Contracting only afterward.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1695,29 +2229,39 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Pellham Freight.\n\nThe records say you switched from Marlow Carriage to Pellham Freight in the week of the Vreskade survey, and the Traymoor fit-out happened after the Vreskade survey but before the Draimune inspection. The later switch to Bardsey Logistics was in the week of the Draimune inspection.",
+        "v8_answer": "Bardsey Logistics. The Quorlory rewiring was after the Vreskade survey, when Bardsey had taken over, and before the Draimune inspection, when Marlow Carriage took over.",
         "v9": false,
-        "v9_answer": "The only usual courier named in the conversations is **Marlow Carriage**. The notes don’t explicitly say it was used during the Traymoor fit-out, but they do say your usual courier was Marlow Carriage.",
-        "v9_gold_in_context": 3,
+        "v9_answer": "The conversations do not say which usual courier you were using when the Quorlory rewiring happened. They only note that the Quorlory rewiring happened after the Vreskade survey and before the Draimune inspection.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Denhurst Bindery.\n\nThe records say the Zethisk handover happened after the Quorlory rewiring and before the Vreskade survey. You switched from Brentwood Litho to Denhurst Bindery in the week of the Quorlory rewiring, and later from Denhurst Bindery to Ashcombe Press in the week of the Vreskade surve",
+        "v8_answer": "Culverton Print.\n\nThe conversations say you switched from Denhurst Bindery to Culverton Print in the week of the Ondrey audit, and Ashcombe Press only took over in the week of the Traymoor fit-out. Since the Vreskade survey happened after the Ondrey audit and before the Traymoor fit-out, the regular",
         "v9": true,
-        "v9_answer": "Denhurst Bindery.",
+        "v9_answer": "Culverton Print. You had switched your regular printer from Denhurst Bindery to Culverton Print in the week of the Ondrey audit, and the Vreskade survey happened after the Ondrey audit.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1725,14 +2269,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ilminster Trades.  \n\nThe conversations say Ilminster Trades took over from Kelsall Group the week of the Draimune inspection, and Lowther Site replaced Ilminster the week of the Traymoor fit-out. Since the Zethisk handover happened after the Draimune inspection and before the Traymoor fit-out, the m",
-        "v9": false,
-        "v9_answer": "The conversations don’t say plainly.\n\nThey say Ilminster Trades took over from Kelsall Group during the week of the Draimune inspection, and that the Zethisk handover happened after the Draimune inspection. But they don’t specify whether the takeover happened before or after the Zethisk handover.",
+        "v8_answer": "Jarrow Contracting.",
+        "v9": true,
+        "v9_answer": "Jarrow Contracting.\n\nYou moved from Kelsall Group to Jarrow Contracting during the week of the Traymoor fit-out, and the Draimune inspection happened after Traymoor but before the Ondrey audit, when you later switched to Lowther Site.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1740,14 +2289,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-045": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Bardsey Logistics.",
+        "v8_answer": "Oakhurst Transit. The records say the Ondrey audit was after the Draimune inspection and before the Zethisk handover; the usual courier changed from Nettleford Runners to Oakhurst Transit in the week of the Draimune inspection, and from Oakhurst Transit to Corvin Dispatch in the week of the Zethisk ",
         "v9": true,
-        "v9_answer": "Bardsey Logistics.",
+        "v9_answer": "Oakhurst Transit. The Ondrey audit was after the Draimune inspection and before the Zethisk handover, and during that interval your usual courier had changed from Nettleford Runners to Oakhurst Transit.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1755,14 +2309,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-046": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "Ashcombe Press. The conversations say you switched from Elmsworth Type to Ashcombe Press in the week of the Vreskade survey, and the Draimune inspection happened after the Vreskade survey but before the Zethisk handover, when you later switched to Denhurst Bindery.",
+        "v8": false,
+        "v8_answer": "Denhurst Bindery.\n\nThe relevant chain is: the regular printer changed from Denhurst Bindery to Fairbourne Plate in the week of the Vreskade survey, and the later timeline puts the Traymoor fit-out before the Vreskade survey.",
         "v9": true,
-        "v9_answer": "Ashcombe Press.",
+        "v9_answer": "Fairbourne Plate. The switch to Brentwood Litho happened in the week of the Ondrey audit, and the Traymoor fit-out was before the Ondrey audit.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1770,29 +2329,59 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Jarrow Contracting.\n\nThe later note says the Draimune inspection was after the Vreskade survey and before the Traymoor fit-out; Jarrow Contracting took over during the week of the Vreskade survey, and Lowther Site did not take over until the week of the Traymoor fit-out.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which main contractor you were using when the Draimune inspection happened.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "Garrowby Build. The notes say Garrowby Build took over from Jarrow Contracting during the week of the Quorlory rewiring, and the Ondrey audit happened after the Quorlory rewiring but before the Zethisk handover, when Halstead Works took over.",
+        "v9": true,
+        "v9_answer": "Garrowby Build.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-048": {
         "v1": true,
-        "v8": false,
-        "v8_answer": "The record is inconsistent, so it does not give one certain answer.\n\n- If the Quorlory rewiring was **after the Draimune inspection and before the Zethisk handover**, then the courier would have been **Oakhurst Transit**.\n- But another note says the Quorlory rewiring happened **after the Zethisk han",
+        "v8": true,
+        "v8_answer": "Pellham Freight.",
         "v9": false,
-        "v9_answer": "I can’t determine it uniquely from the conversations.\n\n- If the Quorlory rewiring happened **after the Draimune inspection and before the Zethisk handover**, then the courier would have been **Oakhurst Transit**.\n- But another note says it happened **once the Zethisk handover was out of the way**, w",
+        "v9_answer": "Oakhurst Transit.",
+        "v9_gold_in_context": 3,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-049": {
+        "v1": true,
+        "v8": false,
+        "v8_answer": "The record is inconsistent, so I can’t say plainly which one.\n\n- If the Draimune inspection was **after Traymoor and before Quorlory** (Session 3), the regular printer would have been **Elmsworth Type**.\n- If Quorlory was **before Draimune** (Session 18), then the regular printer would have been **C",
+        "v9": false,
+        "v9_answer": "I can’t determine it plainly from the conversations, because the timing is contradictory.\n\n- One note says the Draimune inspection was **after the Traymoor fit-out and before the Quorlory rewiring** — that would make the printer **Elmsworth Type**.\n- A later note says the Quorlory rewiring was **aft",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1800,29 +2389,19 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
-      },
-      "tme-cnj-049": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Fairbourne Plate.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say which regular printer you were using when the Vreskade survey happened. They only mention “regular, printer” as being on your mind, without naming the printer.",
-        "v9_gold_in_context": 2,
-        "v2_hits": 0,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 1,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       },
       "tme-cnj-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ilminster Trades. The notes say you changed from Lowther Site to Ilminster Trades in the week of the Quorlory rewiring, and later from Ilminster Trades to Kelsall Group in the week of the Vreskade survey. Since the Zethisk handover happened after the Quorlory rewiring and before the Vreskade survey,",
-        "v9": true,
-        "v9_answer": "Ilminster Trades.",
+        "v8_answer": "Lowther Site. It had taken over from Halstead Works in the week of the Vreskade survey, and Ilminster Trades did not replace Lowther Site until the week of the Draimune inspection. The Traymoor fit-out was between those two events.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say plainly.\n\nThey say the Traymoor fit-out happened before the Draimune inspection, and that the main contractor changed from Lowther Site to Ilminster Trades during the week of the Draimune inspection. That suggests Lowther Site may have still been in place before then, but",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1830,10 +2409,315 @@
         "v3_required_hits": 1,
         "v3": true,
         "ablation_samples": 3,
-        "v6": null
+        "v6_components_tested": 1,
+        "v6_components_total": 5,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-051": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nettleford Runners.\n\nThe standing rule says to use Nettleford Runners when the Kelvaryn access is open, and the record says the Kelvaryn access was open as of 2031/11/29 with no later change noted.",
+        "v9": false,
+        "v9_answer": "The conversations do not say whether Kelvaryn access is currently open, closed for resurfacing, or otherwise unavailable, so they do not determine which usual courier is in force.\n\nThe standing rule recorded was:\n\n- Kelvaryn access open → Nettleford Runners  \n- Closed for resurfacing → Oakhurst Tran",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-052": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ashcombe Press.\n\nThe standing rule says: if the Peskadd permit is still pending, the regular printer is Ashcombe Press. The conversations only record it as still pending, with no later update.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say whether the Peskadd permit is granted, still pending, or something else, so they don’t contain enough information to determine which regular printer is in force.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-053": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Garrowby Build. The rule was: Halstead Works if the Zannifer slot is confirmed, Ilminster Trades if provisional, otherwise Garrowby Build; later the Zannifer slot was released back.",
+        "v9": false,
+        "v9_answer": "The conversations give the standing rule:\n\n- Zannifer slot confirmed → Halstead Works\n- Zannifer slot provisional → Ilminster Trades\n- Any other case → Garrowby Build\n\nBut they do not say what the current Zannifer slot status is, so the contractor in force cannot be determined from the conversations",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-054": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "The last recorded status says the Muldreth gauge was in the green. By the standing rule, that means the usual courier is Pellham Freight.\n\nNo later conversation changes that.",
+        "v9": false,
+        "v9_answer": "The conversations give the rule: Pellham Freight if the Muldreth gauge is green, Oakhurst Transit if amber, and Marlow Carriage otherwise.\n\nThey do not say what the Muldreth gauge currently shows, so the usual courier in force cannot be determined from the record.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-055": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ashcombe Press. The Ferrasque window was last recorded as narrowed, and the standing rule says a narrowed Ferrasque window means Ashcombe Press is the regular printer.",
+        "v9": false,
+        "v9_answer": "The conversations give the standing rule, but they do not say whether the Ferrasque window is currently open, narrowed, or otherwise. So the regular printer in force cannot be determined from the record.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-056": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Contracting. The standing rule says anything other than “signed off” or “queried” uses Jarrow Contracting, and the latest update says the Tovrekk clearance was withdrawn.",
+        "v9": false,
+        "v9_answer": "The conversations give the rule:\n\n- Tovrekk clearance **signed off** → **Halstead Works**\n- **queried** → **Lowther Site**\n- anything else → **Jarrow Contracting**\n\nBut they do **not** say what the current Tovrekk clearance status is. So the main contractor in force cannot be determined from these c",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-057": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Nettleford Runners. The standing rule says that when the Kelvaryn access is open, the usual courier is Nettleford Runners, and the later record says the Kelvaryn access came back open.",
+        "v9": false,
+        "v9_answer": "I don’t know from these conversations. They give the rule, but not whether the Kelvaryn access is open, closed for resurfacing, or something else.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-058": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Denhurst Bindery. The standing rule says a still-pending Peskadd permit means Denhurst Bindery, and the later note says the Peskadd permit is still pending.",
+        "v9": false,
+        "v9_answer": "The conversations give the standing rule, but they do not say whether the Peskadd permit is granted, pending, or otherwise. So the regular printer in force cannot be determined from the record.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-059": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Lowther Site.\n\nThe standing rule says: confirmed Zannifer slot → Garrowby Build; provisional → Jarrow Contracting; otherwise → Lowther Site. Later, the Zannifer slot was confirmed as “released back,” so the “otherwise” case applies.",
+        "v9": false,
+        "v9_answer": "The conversations do not say whether the Zannifer slot is confirmed, provisional, or otherwise, so they do not contain enough information to identify which main contractor is in force.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-060": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Oakhurst Transit. The standing rule says the usual courier is Oakhurst Transit when the Muldreth gauge is in the green, and the later note says the Muldreth gauge is in the green.",
+        "v9": false,
+        "v9_answer": "I don’t have enough information to say which usual courier is currently in force.\n\nThe standing rule is:\n\n- Muldreth gauge in the green → Oakhurst Transit\n- in the amber → Corvin Dispatch\n- anything else → Nettleford Runners\n\nBut the conversations do not say what the Muldreth gauge currently reads.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-061": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ashcombe Press. The standing rule says to use Ashcombe Press when the Ferrasque window is narrowed, and it was reported narrowed on 2033/01/14.",
+        "v9": false,
+        "v9_answer": "The conversations give the rule, but not the current state of the Ferrasque window.\n\nRule recorded:\n- Ferrasque window open → Denhurst Bindery\n- narrowed → Ashcombe Press\n- any other case → Fairbourne Plate\n\nSo I can’t determine which regular printer is in force from the record alone.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-062": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Jarrow Contracting. The standing rule says anything other than “signed off” or “queried” uses Jarrow Contracting, and the Tovrekk clearance was recorded as withdrawn.",
+        "v9": false,
+        "v9_answer": "I can’t determine that from the conversations.\n\nThe rule given was: Tovrekk clearance **signed off → Lowther Site**, **queried → Ilminster Trades**, **anything else → Jarrow Contracting**. But the conversations do not state the current Tovrekk clearance status.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-063": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Corvin Dispatch.",
+        "v9": false,
+        "v9_answer": "The conversations give the standing rule:\n\n- Kelvaryn access open → Corvin Dispatch\n- Closed for resurfacing → Marlow Carriage\n- Anything else → Oakhurst Transit\n\nBut they do **not** say what the Kelvaryn access status is now, so the usual courier in force cannot be determined from the record.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-064": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Elmsworth Type — the standing rule says to use Elmsworth Type while the Peskadd permit is still pending, and the latest logged status says it was still pending.",
+        "v9": false,
+        "v9_answer": "The conversations give the rule, but not the current status of the Peskadd permit.\n\nSo I can’t determine which regular printer is in force. If the permit is granted it would be Ashcombe Press; if still pending, Elmsworth Type; otherwise, Brentwood Litho.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
+      },
+      "tme-cnj-065": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Ilminster Trades is in force. The standing rule says Halstead Works only if the Zannifer slot is confirmed, Kelsall Group if provisional, and Ilminster Trades otherwise; later you recorded that the Zannifer slot was released back.",
+        "v9": false,
+        "v9_answer": "The conversations give the rule:\n\n- **Halstead Works** if the **Zannifer slot is confirmed**\n- **Kelsall Group** if it is **provisional**\n- **Ilminster Trades** otherwise\n\nBut they do **not** say what the current Zannifer slot status is, so the main contractor currently in force cannot be determined",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 1,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6_candidates": 3,
+        "v6_required_hits": 3,
+        "v6": true,
+        "v6_redundant_components": [],
+        "v10": null,
+        "v11": null
       }
     },
-    "probed_corpus_sha256": "9f6a0f37a506747318e1048706b25d1039c3247525515506d409f0ed308449cd",
+    "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858",
     "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
   }
 }

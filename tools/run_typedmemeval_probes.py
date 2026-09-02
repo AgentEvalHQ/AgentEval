@@ -176,7 +176,7 @@ _ARM_TOKEN = re.compile("^v[0-9]+[a-z]*$")
 #:
 #: Mirrored by ExpectedProbeArms in TypedMemEvalCorpusTests. `v9strip` is deliberately NOT here: it
 #: belongs to measure_retrieval_ceiling.py, which merely shares this cache.
-PROBE_ARMS = ("v1", "v2", "v3", "v6", "v8", "v9")
+PROBE_ARMS = ("v1", "v2", "v3", "v6", "v8", "v9", "v10", "v11")
 
 
 def _arm_and_kind(cache_key: str) -> tuple[str, str]:
@@ -488,6 +488,142 @@ def judged_equivalent(question: str, gold: str, response: str, cache_key: str) -
     return verdict.strip().lower().startswith("yes")
 
 
+#: Draws per never-known probe per context. Abstention is a behaviour, not a fact: the same model
+#: on the same prompt abstains on one draw and guesses on the next, so a single draw reports a coin
+#: flip as a property of the corpus. Three matches ABLATION_SAMPLES so the two sampled instruments
+#: cost the same per question and can be read on the same scale.
+ABSTENTION_SAMPLES = 3
+
+
+#: The abstention grade, kept out of the function so its exact wording is greppable, diffable,
+#: and pinned by a self-test rather than buried in a call.
+_ABSTENTION_PROMPT = """You are checking whether a response COMMITS to an answer or DECLINES to answer.
+Reply with exactly one word, lowercase, nothing else.
+
+  commit   the response names a specific answer to the question. This includes a hedged,
+           tentative, partial or explicitly-guessed answer, and it includes a response that
+           first says it has no record and THEN offers a candidate anyway.
+  abstain  the response states it has no record, no information, or cannot tell, and offers
+           no candidate answer of its own.
+
+Asking a clarifying question, with no candidate offered, is abstain.
+
+QUESTION
+{question}
+
+RESPONSE
+{response}
+
+One word:"""
+
+def abstention_verdict(question: str, response: str, cache_key: str) -> bool | None:
+    """Whether a response DECLINED to answer, rather than committing to one. None if it was silent.
+
+    NOT `produced_gold` against the abstention text, though that would have been the cheap reuse.
+    The equivalence judge asks whether a response conveys the reference answer, and the reference
+    answer here is "no record at all" -- so a response reading "you never mentioned a kiteboard,
+    though from your other gear it was probably a Slingshot" conveys it and would be graded a pass.
+    That response is the single most dangerous thing a memory system can do with a question it has
+    no evidence for, and the arm that exists to catch it must not score it as the good case.
+
+    So the verdict is about COMMITMENT, not equivalence, and abstain-then-guess is a commit. That
+    also makes the grade independent of the gold wording, which matters because the gold here is
+    generator boilerplate: fifteen questions share one sentence with the noun swapped, and a judge
+    keyed on it would be scoring the template.
+    """
+    verdict = complete(
+        _ABSTENTION_PROMPT.format(question=question, response=response),
+        cache_key=cache_key,
+        max_tokens=1500,
+    )
+    word = verdict.strip().lower()
+    if word.startswith("abstain"):
+        return True
+    if word.startswith("commit"):
+        return False
+    # Neither word. An unparseable grade is a missing grade, and defaulting it either way is the
+    # failure this family keeps finding: defaulting to abstain certifies silence as good behaviour,
+    # defaulting to commit invents a defect. Undefined, and counted as such.
+    return None
+
+
+def drawn_from_haystack(response: str, haystack: str, already_known: str = "") -> bool:
+    """Whether a committed answer reuses distinctive content the haystack actually contains.
+
+    A TRIAGE SIGNAL, NOT A VERDICT, and the distinction is the whole point. The corpus claim that a
+    never-known question has no evidence is certified by `check_forgetting`, which refuses at
+    generation if the asked noun appears anywhere in the haystack -- model-free, exhaustive, fatal.
+    This is the weaker behavioural companion: when the model commits, did it invent the answer or
+    lift it off the page?
+
+    Lifting it is not proof of a corpus defect. The haystack is full of parity filler stating the
+    same KIND of fact about other nouns, so a model that mis-attributes "Marloe Standard" from a
+    broadband sentence to a kiteboard question scores as drawn-from-haystack while the corpus is
+    exactly as intended. That over-flags, which is the direction a validity signal should err in:
+    a false alarm costs one human read, a miss ships a question whose premise is false.
+    """
+    tokens = distinctive(response, already_known)
+    if not tokens:
+        return False
+    lowered = haystack.lower()
+    return any(re.search(rf"(?<![\w]){re.escape(token.lower())}(?![\w])", lowered)
+               for token in tokens)
+
+
+#: The resolution grade, kept out of the function for the same reason the abstention one is.
+_RESOLUTION_PROMPT = """You are checking whether a response ties its answer to a NAMED thing.
+Reply with exactly one word, lowercase, nothing else.
+
+  resolved   the response states its answer AS BEING ABOUT the named thing.
+  declined   the response does not connect its answer to the named thing: it says it cannot
+             identify it, says the record does not mention it, offers the answer about some
+             OTHER thing, or answers only conditionally ("if you mean X").
+
+A response that gives the right fact about a DIFFERENT thing is declined, not resolved.
+A response that names the thing only to say it cannot find it is declined.
+
+THE NAMED THING
+{entity}
+
+QUESTION
+{question}
+
+RESPONSE
+{response}
+
+One word:"""
+
+
+def resolved_to_entity(question: str, entity: str, response: str, cache_key: str) -> bool | None:
+    """Whether a response ties its answer to the entity the question asked about.
+
+    FOR ABLATION ARMS ONLY, and the reason is specific. V3 and V6 ask whether removing a component
+    removed the answer. When the removed component is the LINK between the asked designation and
+    the session stating the fact, a response that reports the fact under the OTHER designation --
+    or says outright it cannot identify the asked one -- has demonstrably not made the link. It
+    says so. Scoring it as a reproduction records the component as redundant on the strength of a
+    response that proves the opposite.
+
+    `judged_equivalent` cannot see this: it asks whether the response conveys the reference answer,
+    and "the conversations do not mention a workshop; at the unit behind the depot the alarm code
+    was changed after the break-in" does convey it. Sixteen of eighteen scored V6 hits on
+    semantic/co-reference were of exactly that shape.
+
+    A JUDGE RATHER THAN A PATTERN, deliberately. A lexical disclaimer regex only ever REFUSES
+    hits, and on an ablation arm refusing a hit makes the corpus look better -- the flattering
+    direction, which this project has been caught by often enough to distrust a heuristic that
+    points that way. A one-word grade can also say `declined` for a reason nobody enumerated.
+    """
+    verdict = complete(
+        _RESOLUTION_PROMPT.format(entity=entity, question=question, response=response),
+        cache_key=cache_key, max_tokens=1500)
+    word = verdict.strip().lower()
+    if word.startswith("resolved"):
+        return True
+    if word.startswith("declined"):
+        return False
+    return None
+
 def produced_gold(
     question: str,
     gold: str,
@@ -497,6 +633,7 @@ def produced_gold(
     screen: bool = False,
     require_distinctive: bool = False,
     already_known: str = "",
+    must_name: str = "",
 ) -> bool:
     """Whether a response reached the gold fact.
 
@@ -526,7 +663,14 @@ def produced_gold(
         _stats["distinctive_absent"] += 1
         return False
     _stats["escalated"] += 1
-    return judged_equivalent(question, gold, response, cache_key)
+    if not judged_equivalent(question, gold, response, cache_key):
+        return False
+    if must_name:
+        # See resolved_to_entity. An UNREADABLE grade is not a reproduction: on an ablation arm the
+        # conservative direction is to refuse, because calling a component redundant is the claim
+        # that needs evidence.
+        return resolved_to_entity(question, must_name, response, f"{cache_key}:resolved") is True
+    return True
 
 
 # --------------------------------------------------------------------------------------
@@ -536,6 +680,28 @@ def produced_gold(
 _NEGATIVE_GOLD = re.compile(
     r"^\s*(no|not|none)\b|no longer|already happened|not yet|no record|never (told|mentioned|recorded)",
     re.IGNORECASE)
+
+
+def negative_gold_requires_value(gold: str, already_known: str = "") -> bool:
+    """Whether the accuracy arms must see the gold's own value before calling a response a match.
+
+    ON A NEGATIVE GOLD, "there is no record of it" and "it was X, and that is no longer true" are
+    two different answers, and only the value tells them apart. The equivalence judge cannot: asked
+    whether "The conversations do not say who cleans the flat" conveys "No longer valid. Your
+    cleaner was Orrindale Solace, but that is out of date...", it says yes, because the response
+    does convey the operative part. Eleven grades across V1, V8 and V9 passed that way on
+    Forgetting, one of them a total retrieval failure scored as a success on the vertical whose
+    entire subject is retaining what is no longer true.
+
+    So the same defence V3 and V6 have always had is extended to the accuracy arms -- but ONLY here,
+    and the scoping is the point. Turning `require_distinctive` on across the board would reject
+    correct paraphrases elsewhere ("one thousand two hundred and forty" for "1,240"), which is the
+    opposite error and a worse one on V1, where a false negative rejects a valid question. Measured
+    over the shipped cache before it was written: this predicate fires on Forgetting's 20
+    invalidated questions and Prospective's 11, flips 11 grades on Forgetting and ZERO on
+    Prospective, and touches no other vertical.
+    """
+    return bool(_NEGATIVE_GOLD.search(gold)) and bool(distinctive(gold, already_known))
 
 
 def v3_required_hits(k: int | None, samples: int = None) -> int | None:
@@ -709,13 +875,27 @@ def probe_question(entry: dict, vertical: str) -> dict:
     everything = list(range(len(entry["haystack_sessions"])))
     non_gold = [i for i in everything if i not in golds]
     record: dict = {"question_id": qid}
+    known = f"{question} {date}"
+    # See negative_gold_requires_value. Computed once so all three accuracy arms grade to the same
+    # standard -- grading them differently is how the defect it exists for was found.
+    needs_value = negative_gold_requires_value(gold, known)
+    if needs_value:
+        record["gold_value_required"] = True
+    # The entity an answer must be ABOUT, for the ablation arms. Declared by the generator, because
+    # only it knows which phrase in the question is the thing being resolved. Applied to V3 and V6
+    # alone -- V1/V8/V9 correctly accept "Roof work, due before winter" without repeating the
+    # place, since nothing was removed and the tie is not in question there.
+    must_name = ((entry.get("typedmemeval") or {}).get("answer_must_name") or "")
+    if must_name:
+        record["answer_must_name"] = must_name
 
     # V1 -- the ceiling. A question the reference model cannot answer with perfect retrieval is
     # measuring the model, not the memory system, and does not belong in the corpus.
     if golds:
         answer = complete(ask(question, date, subset(entry, golds)), cache_key=f"{key}:v1")
         if answer:
-            record["v1"] = produced_gold(question, gold, answer, f"{key}:v1:judge")
+            record["v1"] = produced_gold(question, gold, answer, f"{key}:v1:judge",
+                                       require_distinctive=needs_value, already_known=known)
         else:
             record["v1"] = None
             _mark_silent(record, "v1")
@@ -745,7 +925,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
     if golds:
         answer = complete(ask(question, date, subset(entry, everything)), cache_key=f"{key}:v8")
         if answer:
-            record["v8"] = produced_gold(question, gold, answer, f"{key}:v8:judge")
+            record["v8"] = produced_gold(question, gold, answer, f"{key}:v8:judge",
+                                       require_distinctive=needs_value, already_known=known)
         else:
             record["v8"] = None
             _mark_silent(record, "v8")
@@ -778,7 +959,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
         answer = complete(ask(question, date, subset(entry, sorted(ranked))),
                           cache_key=f"{key}:v9")
         if answer:
-            record["v9"] = produced_gold(question, gold, answer, f"{key}:v9:judge")
+            record["v9"] = produced_gold(question, gold, answer, f"{key}:v9:judge",
+                                       require_distinctive=needs_value, already_known=known)
         else:
             record["v9"] = None
             _mark_silent(record, "v9")
@@ -852,7 +1034,8 @@ def probe_question(entry: dict, vertical: str) -> dict:
                 silent += 1
                 continue
             if produced_gold(question, gold, answer, f"{key}:v3:{k}:judge",
-                             require_distinctive=True, already_known=f"{question} {date}"):
+                             require_distinctive=True, already_known=f"{question} {date}",
+                             must_name=must_name):
                 v3_hits += 1
         leaked = v3_hits >= v3_needs
         # A leak found is a leak, whatever the other samples did. But "no leak" is only a finding
@@ -884,10 +1067,80 @@ def probe_question(entry: dict, vertical: str) -> dict:
     # coverage echo depends on every component being load-bearing. Elsewhere a question can have
     # two gold sessions without the design claiming both are individually necessary, and applying
     # the rule there would report a corpus defect the corpus never promised not to have.
-    if len(golds) > 1 and vertical in ("arithmetic", "forgetting") and decidable:
+    #
+    # AND NOT WHERE THE CORPUS DECLARES THE COMPONENTS REDUNDANT. Forgetting's `still-valid`
+    # control carries a statement AND a re-affirmation of the same value, and the generator says so
+    # in the corpus -- `gold_components_redundant: true` -- because the control exists to catch
+    # OVER-forgetting and a system that finds either mention has what it needs. Ablating either
+    # leaves the other, so V6 fails all fifteen by design.
+    #
+    # It did. V6 published 20/35 for the life of this vertical, and 20/35 reads as fifteen corpus
+    # defects. Every one of them is question tme-for-021 through -035: the fifteen controls,
+    # exactly, which is what a structural cause looks like next to a real one. The instrument was
+    # scoped per VERTICAL and the redundancy is declared per SHAPE, so the flag the corpus
+    # publishes for this purpose was never read. The arm is 20/20 where it is defined.
+    #
+    # SCOPE IS DECLARED PER QUESTION, NOT HARDCODED PER VERTICAL.
+    #
+    # It used to read `vertical in ("arithmetic", "forgetting")`, which is a right rule with too
+    # small a reach -- the applied-once shape. Three more generators state the same claim in their
+    # own comments and nothing tested it:
+    #
+    #   temporal      "every link is NECESSARY rather than redundant" -- all three shapes, each
+    #                 scoped to a window it can close on its own
+    #   semantic      co-reference: "the chain is the evidence, not just its endpoint"
+    #   conjunction   every gold session changes the answer if dropped: a count loses an event, a
+    #                 switch chain loses a hop, the conditional loses its rule or its state
+    #
+    # And the same list was hiding the opposite case: `semantic/current-value` must NOT be in scope.
+    # Dropping a MIDDLE replacement still leaves the latest one, so the answer survives and the
+    # component genuinely is redundant. A per-vertical list cannot express that; a per-question
+    # declaration can, which is the argument for the change rather than the coverage it buys.
+    extension = entry.get("typedmemeval") or {}
+    redundant = bool(extension.get("gold_components_redundant"))
+    load_bearing = bool(extension.get("gold_components_load_bearing"))
+
+    # PER-COMPONENT SCOPE, for the shapes whose gold MIXES the two kinds.
+    #
+    # The whole-question flag could not describe Conjunction's chain shapes: every count event is
+    # load-bearing, and the head of the replacement chain is not, because the replacement session
+    # names both the old and the new value. Declaring the whole question load-bearing was refuted
+    # at once (22/65); removing the flag left 50 questions with NO V6 coverage, which is worse than
+    # the over-claim. So a question may instead name the SUBSET it claims, and V6 ablates only
+    # those. The components it does not name are not asserted either way and are never dropped.
+    declared_indices = extension.get("gold_components_load_bearing_indices")
+    if declared_indices is not None:
+        ablate = [i for i in golds if i in set(declared_indices)]
+        applies = bool(ablate) and len(golds) > 1
+    else:
+        ablate = golds
+        applies = len(golds) > 1 and load_bearing
+    if applies and decidable and not redundant:
+        # V6 NEEDS THE SAME CHANCE FLOOR V3 GOT, and it never received it.
+        #
+        # V3 draws 3 ablation samples and used to condemn on ONE hit; that was corrected on
+        # 2026-08-30 to the smallest h with P(X>=h | 1/k) < 0.05, because against a guesser
+        # choosing among k candidates a single hit in three arrives with probability
+        # 1-(1-1/k)^3 -- 0.875 at k=2, 0.704 at k=3. V6 is the dual arm and kept the old rule.
+        # Applied-once, the same shape as the curated exemption list that correction retired.
+        #
+        # It went unnoticed while no V6 question had candidates. Adding rival same-kind facts to
+        # semantic/co-reference created a three-way choice and V6 started condemning components
+        # that were doing their job: on tme-sem-021 the reader ABSTAINED on sample 0 -- "the
+        # conversations do not say when the boiler was replaced at the new flat" -- and guessed
+        # right on sample 1, and the component was recorded redundant on the strength of the guess.
+        #
+        # k comes from the same place the published chance floor does: the generator's declaration
+        # where the candidates live in the HAYSTACK, `closed_choice_k` where they are named in the
+        # question. Where neither applies, k is None and one hit still condemns, which is the
+        # correct rule for an open question.
+        v6_k = (round(1 / extension["chance_floor"]) if extension.get("chance_floor")
+                else closed_choice_k(question))
+        v6_needs = v3_required_hits(v6_k)
         survived = []
         silent_drops = []
-        for dropped in golds:
+        undecidable_drops = []
+        for dropped in ablate:
             keep = [i for i in everything if i != dropped]
             saw_silence = False
             # Sampled, for the same reason as V3: one draw can miss a component that is in fact
@@ -895,6 +1148,10 @@ def probe_question(entry: dict, vertical: str) -> dict:
             # `already_known` matters here too — without it the screen counts the year and the
             # numbers the prompt itself supplied as evidence the model reached the gold, which is
             # precisely the false positive the subtraction exists to remove.
+            # NO EARLY BREAK. With a bar above one hit the COUNT is the evidence, and a loop that
+            # stopped at the first hit could never be compared against a 3-of-3 threshold. Same
+            # correction, same reason, as V3's.
+            hits = 0
             for k in range(ABLATION_SAMPLES):
                 answer = complete(ask(question, date, subset(entry, keep)),
                                   cache_key=f"{key}:v6:{dropped}:{k}",
@@ -904,17 +1161,33 @@ def probe_question(entry: dict, vertical: str) -> dict:
                     continue
                 if produced_gold(
                         question, gold, answer, f"{key}:v6:{dropped}:{k}:judge",
-                        require_distinctive=True, already_known=f"{question} {date}"):
-                    survived.append(dropped)
-                    break
-            else:
-                # No sample reproduced the answer without this component. That is only evidence
-                # the component is load-bearing if the model actually answered; silence here is
-                # the same false PASS as in V3, one level down.
-                if saw_silence:
-                    silent_drops.append(dropped)
+                        require_distinctive=True, already_known=f"{question} {date}",
+                        must_name=must_name):
+                    hits += 1
+            if v6_needs is None:
+                # No hit count within the sample budget separates a reproduction from a guess --
+                # k=2 leaves p=0.125 even at 3 of 3. Undecidable, and recorded as such rather than
+                # resolved in whichever direction is convenient.
+                undecidable_drops.append(dropped)
+            elif hits >= v6_needs:
+                survived.append(dropped)
+            elif saw_silence and hits + ABLATION_SAMPLES - hits >= v6_needs:
+                # Silence disqualifies only where it could CHANGE the verdict, the rule V2 and V3
+                # already use.
+                silent_drops.append(dropped)
+        if v6_k is not None:
+            record["v6_candidates"] = v6_k
+            record["v6_required_hits"] = v6_needs
+        if declared_indices is not None:
+            # Which components were tested, so a reader can see the arm's reach on this question
+            # rather than assuming it covered every gold session.
+            record["v6_components_tested"] = len(ablate)
+            record["v6_components_total"] = len(golds)
         if survived:
             record["v6"] = False
+        elif undecidable_drops:
+            record["v6"] = None
+            record["v6_undecidable_drops"] = undecidable_drops
         elif silent_drops:
             record["v6"] = None
             record["v6_silent_drops"] = silent_drops
@@ -924,6 +1197,94 @@ def probe_question(entry: dict, vertical: str) -> dict:
         record["v6_redundant_components"] = survived
     else:
         record["v6"] = None
+        if len(golds) > 1 and declared_indices is None:
+            # WHICH of the reasons, because they are different facts. `redundant` is a design that
+            # says the components are interchangeable; `undeclared` is a design that makes no claim
+            # either way, and the arm has nothing to test. Collapsing them is how the 15 Forgetting
+            # controls read as failures for the life of that vertical.
+            record["v6_not_applicable"] = (
+                "gold_components_redundant" if redundant
+                else "not_decidable" if not decidable
+                else "no_load_bearing_claim")
+
+    # V10 / V11 -- ABSTENTION. The only arms a never-known probe can carry, and until now it
+    # carried none.
+    #
+    # Fifteen of Forgetting's fifty questions have no gold session, because the thing asked about
+    # was never mentioned. Every arm above is defined in terms of reaching a gold fact, so every
+    # one of them records not-applicable -- correctly, and the comments above say so -- and the
+    # result was that 30% of the vertical shipped certified by nothing at all. Both discrimination
+    # assertions skipped it silently too, which is the pass-by-absence shape this family gates
+    # against everywhere else.
+    #
+    # What IS checkable on a question with no gold, and the two halves must not be confused:
+    #
+    #   the CORPUS claim   the haystack contains no evidence for the asked thing.
+    #                      Certified by `check_forgetting`, model-free and fatal at generation:
+    #                      the asked noun may not appear as a substring anywhere in the haystack.
+    #                      Nothing here adds to that, and nothing here may be read as replacing it.
+    #
+    #   the SYSTEM claim   asked a question the evidence cannot answer, the reader abstains
+    #                      instead of inventing an answer. That is a behaviour, it is the one
+    #                      consumers ask about most, and it is what these two arms measure.
+    #
+    # Two contexts, mirroring V8 and V9 exactly so the pair is a like-for-like difference:
+    #
+    #   V10  the entire haystack          -- abstention when nothing was withheld
+    #   V11  BM25 top-K_ref, same ranker  -- abstention when a real selector picked the context
+    #
+    # V10 - V11 is then the cost of retrieval to a system's calibration, and it is not obvious in
+    # advance which way it runs: a narrow context has fewer sessions to mis-attribute from, but the
+    # ones it does have are the topically NEAREST, which is when a confident wrong answer is most
+    # available. Measured rather than predicted.
+    if not golds:
+        haystack = subset(entry, everything)
+        texts = [render([session], [date])
+                 for session, date in zip(entry["haystack_sessions"], entry["haystack_dates"])]
+        ranked = sorted(tmc.bm25_rank(question, texts)[:tmc.K_REF])
+        for arm, context in (("v10", haystack), ("v11", subset(entry, ranked))):
+            abstained = committed = drawn = unmeasured = 0
+            for k in range(ABSTENTION_SAMPLES):
+                answer = complete(ask(question, date, context), cache_key=f"{key}:{arm}:{k}")
+                if not answer:
+                    unmeasured += 1
+                    continue
+                verdict = abstention_verdict(question, answer, f"{key}:{arm}:{k}:judge")
+                if verdict is None:
+                    # An unparseable grade, not a commit. Counted with silence for the same
+                    # reason: it is a draw this arm could not read.
+                    unmeasured += 1
+                    continue
+                if verdict:
+                    abstained += 1
+                else:
+                    committed += 1
+                    # Scored against the FULL haystack in both arms. The question is whether the
+                    # answer exists in the corpus at all, not whether this arm's context happened
+                    # to include it -- a V11 commit lifted from a session BM25 did not return is
+                    # still the model reading the page it was given.
+                    if drawn_from_haystack(answer, haystack, known):
+                        drawn += 1
+                        record.setdefault(f"{arm}_drawn_answers", []).append(answer[:200])
+            record[f"{arm}_abstained"] = abstained
+            record[f"{arm}_committed"] = committed
+            record[f"{arm}_samples"] = ABSTENTION_SAMPLES
+            if drawn:
+                record[f"{arm}_drawn_from_haystack"] = drawn
+            if unmeasured:
+                record[f"{arm}_unmeasured_samples"] = unmeasured
+            if not (abstained + committed):
+                record[arm] = None
+                _mark_silent(record, arm)
+            else:
+                # Passes only on a CLEAN SWEEP. One commit in three draws is a reader that will
+                # invent an answer for this question, and a rate that averages it away hides the
+                # single event a consumer needs to see. Same asymmetry as V3: a leak found is a
+                # leak, whatever the other samples did.
+                record[arm] = committed == 0
+    else:
+        record["v10"] = None
+        record["v11"] = None
 
     return record
 
@@ -1013,6 +1374,49 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # entire argument for having one.
     arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
                                  (e.get("typedmemeval") or {}).get("arm")) for e in entries}
+    # WHAT A GUESSER SCORES, from either of the two places a closed choice can live.
+    #
+    # These were two mechanisms for one concept, which is the two-spellings-of-one-rule defect this
+    # project keeps finding: `closed_choice_k` reads the QUESTION and fed only V2 and V3, while
+    # `chance_floor` is declared by the generator for a choice the HAYSTACK hands the reader and fed
+    # only the new column. Six shapes and 71 questions enumerate their own alternatives and none of
+    # them published a floor beside their ACCURACY arms.
+    #
+    # The question-derived floor is preferred where both exist: it is derived from the text a
+    # retriever actually sees, and a generator declaration that disagreed with it would be the
+    # artifact stating its own bar.
+    def _floor_of(entry: dict) -> tuple[float | None, str]:
+        extension = entry.get("typedmemeval") or {}
+        declared = extension.get("chance_floor")
+        k = closed_choice_k(entry["question"])
+        if k:
+            derived = round(1.0 / k, 4)
+            if declared is not None and abs(declared - derived) > 1e-9:
+                # THEY DISAGREE. The derived value still wins -- a generator that could override
+                # its own floor would be the artifact supplying an input to its own pass/fail --
+                # but the disagreement is PUBLISHED rather than resolved silently, because the
+                # likeliest cause is a detector limit rather than a lying generator.
+                #
+                # `closed_choice_k` is a literal-pattern heuristic with two known limits, both
+                # currently latent and both pinned by self-tests:
+                #   (a) it counts " or " occurrences and does not parse comma-separated
+                #       alternatives, so "me, you, or both of us" reads as k=2;
+                #   (b) `_YESNO_Q` matches first, so a question opening with a yes/no verb short-
+                #       circuits to 2 however many candidates it then lists.
+                # Neither can be fixed by counting commas: 34 shipped questions read "...come due
+                # yet, and on what date is or was it due?", where the "or" is a verb-phrase
+                # disjunction inside a yes/no question, and every comma rule tried so far promotes
+                # them to k=3 in the WRONG direction.
+                return derived, (
+                    f"DISPUTED: the question parses to {k} candidates (floor {derived}) while the "
+                    f"generator declares {declared}. The derived value is used. Check whether the "
+                    f"question's phrasing defeats closed_choice_k before trusting either.")
+            return derived, (
+                f"the question names its own {k} candidates, so a reader with no evidence still "
+                f"reaches gold at 1/{k}")
+        return declared, extension.get("chance_floor_reason") or ""
+
+    floors = {e["question_id"]: _floor_of(e) for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -1036,6 +1440,9 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
             "answers_differ": flipped,
             "passed": bool(ra.get("v1")) and bool(rb.get("v1")) and flipped,
         })
+
+    # Computed once: _pair_discrimination is not free and the block below needs it twice.
+    _cross_shape_pairs = _pair_discrimination(records, arm_of)
 
     def tally(key):
         applicable = [r for r in records if r.get(key) is not None]
@@ -1111,12 +1518,48 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # failed" when the probe never ran. Says which of the two reasons applies.
         "v6_leave_one_out": {
             **tally("v6"),
+            **({"excluded_declared_redundant": sorted(
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "gold_components_redundant"),
+                "excluded_no_load_bearing_claim": sorted(
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "no_load_bearing_claim"),
+                # THE THIRD REASON, and it has to be published for the accounting to close. A
+                # question whose gold carries no content the prompt did not already supply is
+                # undecidable for the ablation arms -- V3 says so in its own block, and V6 shares
+                # the predicate. Temporal declares all 50 load-bearing and 20 land here; without
+                # this list, 20 declared claims would go unscored with nothing naming them.
+                "excluded_not_decidable": sorted(
+                    r["question_id"] for r in records
+                    if r.get("v6_not_applicable") == "not_decidable"),
+                # THE FOURTH REASON. A question whose components CAN be ablated but whose
+                # candidate count leaves no hit threshold inside the sample budget -- k=2, where
+                # even 3 of 3 leaves p=0.125 -- is undecidable for a different reason than an
+                # undecidable GOLD. alias-then-count lands all 15 here once its haystack-borne
+                # two-way choice is declared. Without this list they vanish from the accounting.
+                "excluded_chance_undecidable": sorted(
+                    r["question_id"] for r in records if r.get("v6_undecidable_drops")),
+                "excluded_reading": (
+                    "These questions publish `gold_components_redundant: true`: the design states "
+                    "either component suffices, so ablating one leaves the other and V6 fails them "
+                    "by construction. They are OUT of both numerator and denominator, not scored "
+                    "as failures. Scoring them is what made this arm read 20/35 -- fifteen "
+                    "declared-by-design cases pooled with twenty real passes, which reads as a 57% "
+                    "validity rate on an arm that is clean where it is defined.")}
+               # Gated on EITHER reason. It used to fire only on `v6_not_applicable`, which the
+               # chance-undecidable path never sets -- so conjunction, where all 15
+               # alias-then-count questions land there, published no exclusion lists at all and
+               # the accounting could not close. An exclusion block that goes missing is the
+               # silent-{} shape one more time.
+               if any(r.get("v6_not_applicable") or r.get("v6_undecidable_drops")
+                      for r in records) else {}),
             "applies_to": (
-                "Arithmetic and Forgetting, on questions with more than one gold session. Those are "
-                "the verticals whose design claims every gold component is load-bearing; elsewhere "
-                "a question may have several gold sessions without the design promising each one is "
-                "individually necessary, and ablating them would report a defect never promised "
-                "against"
+                "questions that DECLARE `gold_components_load_bearing` and have more than one gold "
+                "session. The scope used to be a hardcoded list of two verticals; it is now a "
+                "per-question declaration, because three more generators state the same claim in "
+                "their own comments and nothing tested it, while `semantic/current-value` states "
+                "the opposite within a vertical the list would have swept in wholesale -- dropping "
+                "a middle replacement still leaves the latest one"
             ),
             **({"not_applicable_reason": (
                 f"V6 is not defined for {vertical}" if vertical not in ("arithmetic", "forgetting")
@@ -1145,6 +1588,33 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # the statistic discriminates cleanly between an arm that is fine and one that is not --
         # but only once judge grades are kept out of the denominator, which is the correction here.
         "empty_rate_by_arm": {arm: _arm_row(arm) for arm in PROBE_ARMS},
+        # The two arms a no-gold question can carry. Emitted only where such questions exist, so
+        # a vertical without them does not publish an empty block that reads as a zero.
+        **({"abstention": {
+            "samples_per_question": ABSTENTION_SAMPLES,
+            "pass_rule": "clean sweep -- the reader abstained on every draw",
+            "measures": (
+                "whether a reader asked a question its evidence cannot answer declines instead of "
+                "inventing an answer. A failure describes the REFERENCE MODEL, not the corpus: the "
+                "corpus claim is certified model-free at generation by check_forgetting"),
+            "v10_full_haystack": tally("v10"),
+            "v11_reference_retrieval": tally("v11"),
+        }} if any(r.get("v10") is not None or r.get("v11") is not None for r in records) else {}),
+        # PAIRS ACROSS SHAPES, which the per-shape block cannot see.
+        #
+        # `_pair_discrimination` is called per shape, and that is right for Bitemporal, whose two
+        # arms are two questions inside ONE shape. Forgetting's arms ARE its shapes --
+        # `invalidated` and `still-valid` -- so every per-shape group holds one arm of each pair,
+        # `len(arms) != 2` on all fifteen, and the instrument returned {} for the whole vertical.
+        # Thirty paired questions, no pair figure, and nothing said so: the same silent-{} shape as
+        # the abstention hole this release closes.
+        #
+        # It matters here more than anywhere. The control arm's job is catching OVER-forgetting --
+        # a system reporting a still-valid fact as superseded -- and that is a property of the
+        # PAIR, not of either arm's retrieval headroom. Measured: pair headroom 0.4667 against a
+        # scaled floor of 0.24 and 3.68 sd of separation, so the capability the vertical is about
+        # is comfortably measurable while `still-valid` alone reads 0.0667.
+        **({"paired_arms": _cross_shape_pairs} if _cross_shape_pairs else {}),
         "v8_full_haystack": _interference(records),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
@@ -1166,8 +1636,23 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                 "v8_passed": sum(1 for r in group if r.get("v8") is True),
                 "v9_applicable": sum(1 for r in group if r.get("v9") is not None),
                 "v9_passed": sum(1 for r in group if r.get("v9") is True),
+                # Bands beside every point estimate, so a rate over six questions cannot be read
+                # as though it were a rate over sixty. See wilson_interval.
+                "ci95": {
+                    arm: wilson_interval(
+                        sum(1 for r in group if r.get(arm) is True),
+                        sum(1 for r in group if r.get(arm) is not None))
+                    for arm in ("v1", "v3", "v8", "v9")
+                    if any(r.get(arm) is not None for r in group)
+                },
+                "ci95_reading": (
+                    "95% Wilson intervals on the pass rates above, from the recorded counts. Every "
+                    "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
+                    "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
+                **_chance_floor(group, floors),
                 **_discrimination(group),
+                **_abstention(group),
                 **_pair_discrimination(group, arm_of),
             }
             for shape, group in sorted(
@@ -1241,6 +1726,221 @@ def _discrimination(group: list[dict]) -> dict:
     return row
 
 
+def _abstention(group: list[dict]) -> dict:
+    """The abstention counterpart to `_discrimination`, for shapes whose questions have no gold.
+
+    `_discrimination` returns an EMPTY dict when V1 is undefined, which is honest arithmetic and a
+    reporting hole: the shape then publishes no `discriminates` key at all, and both C# assertions
+    that read it skip the shape without saying so. A shape that cannot be scored on retrieval
+    headroom should say WHY in the sidecar, and publish the axis it can be scored on instead.
+
+    `discriminates` is deliberately null rather than true or false. The retrieval floor is a
+    statement about a BASELINE being beatable -- V9 saturated at 1.0 means no retriever can be told
+    apart, whatever it does. These two arms have no baseline system between them: they are one
+    model under two contexts, so 1.0 in both means the reference model is well calibrated here, NOT
+    that the shape cannot separate a system that confabulates from one that does not. Reporting
+    that as `discriminates: true` would claim a separation this run never observed, and as `false`
+    would condemn the shape on evidence that does not bear on it. Null, with the reason attached.
+    """
+    def counts(arm: str) -> tuple[int, int]:
+        applicable = [r for r in group if r.get(arm) is not None]
+        return sum(1 for r in applicable if r[arm]), len(applicable)
+
+    full_hits, full_n = counts("v10")
+    topk_hits, topk_n = counts("v11")
+
+    # APPLICABILITY IS KEYED ON THE QUESTIONS, NOT ON THE RESULTS, and the difference is the whole
+    # reason this arm exists. Returning {} whenever no draw could be graded looks like the same
+    # arithmetic -- nothing measured, nothing to say -- but it reproduces the hole exactly: a run
+    # whose judge returns garbage publishes no exemption row, and both C# assertions skip the shape
+    # in silence again. Found by --dry-run, whose stub grade is unparseable by construction and so
+    # drives precisely this path. A question that HAS no gold always publishes; whether it was
+    # measured is a separate field.
+    applicable = [r for r in group if r.get("v10_samples") or r.get("v11_samples")]
+    if not applicable:
+        return {}
+
+    row = {
+        "discriminates": None,
+        "discrimination_basis": "abstention",
+        "discrimination_exempt_reason": (
+            "Every question in this shape has zero gold sessions, so V1, V8 and V9 are undefined "
+            "and V1-V9 cannot be formed. The shape is scored on abstention instead (V10/V11). "
+            "This is a declared exemption from DISCRIMINATION_FLOOR, not a missing measurement."),
+        "abstention_full_haystack": {"clean_sweeps": full_hits, "questions": full_n},
+        "abstention_reference_retrieval": {"clean_sweeps": topk_hits, "questions": topk_n},
+        "abstention_ci95": {
+            arm: wilson_interval(hits, n)
+            for arm, hits, n in (("v10", full_hits, full_n), ("v11", topk_hits, topk_n)) if n
+        },
+    }
+    if not full_n and not topk_n:
+        row["unmeasured"] = {
+            "questions": len(applicable),
+            "reading": (
+                "Every draw on every question in this shape was silent or returned an unreadable "
+                "grade, so both abstention arms are undefined. This row exists to say so. Read it "
+                "as NOT MEASURED, never as measured-and-clean, and re-run before citing the "
+                "shape."),
+        }
+    if full_n and topk_n:
+        row["retrieval_cost_to_calibration"] = round(full_hits / full_n - topk_hits / topk_n, 4)
+        row["reading"] = (
+            "A question counts as a clean sweep only if the reader abstained on EVERY draw; one "
+            "commit in three is a reader that will invent an answer here. "
+            "retrieval_cost_to_calibration is V10-V11: how much of the reference model's "
+            "abstention survives being handed a BM25-selected context instead of everything. "
+            "Positive means a real selector makes it confabulate more. "
+            "A failure in either arm is a statement about the REFERENCE MODEL, not about the "
+            "corpus: the corpus claim -- that no evidence for the asked thing exists -- is "
+            "certified model-free by check_forgetting, which refuses at generation if the asked "
+            "noun appears anywhere in the haystack. The corpus-relevant subset is "
+            "`answers_drawn_from_haystack`.")
+
+    drawn = sorted(r["question_id"] for r in group
+                   if r.get("v10_drawn_from_haystack") or r.get("v11_drawn_from_haystack"))
+    if drawn:
+        row["answers_drawn_from_haystack"] = drawn
+        row["answers_drawn_reading"] = (
+            "The reader committed to an answer whose distinctive tokens appear in the haystack. A "
+            "TRIAGE SIGNAL, not a verdict: the haystack states the same KIND of fact about other "
+            "nouns by design, so mis-attributing one of those scores here while the corpus is "
+            "exactly as intended. Over-flagging is the intended direction -- a false alarm costs "
+            "one read, a miss ships a question whose premise is false.")
+    return row
+
+
+def _chance_floor(group: list[dict], floors: dict) -> dict:
+    """What a reader scores on this shape by guessing, where the HAYSTACK names the candidates.
+
+    `closed_choice_k` reads the QUESTION, which is right for "Which came first, X or Y?" and blind
+    to a shape whose candidates live in the evidence. `conjunction/conditional-branch` is the first:
+    the rule session names all three branch outcomes, BM25 retrieves that rule for 15 of 15
+    questions and the state that selects a branch for 4 of 15, so a lexical reader is very often
+    holding the menu and not the order.
+
+    Published rather than gated, and the distinction matters. A V9 at chance does NOT mean the shape
+    cannot rank two systems -- a better retriever finds the state and scores above it, which is the
+    whole point. It means the BOTTOM of the scale is 1/3 rather than 0, and a reader comparing a
+    0.27 against a 0.33 is comparing two ways of knowing nothing. ADR-028 SS7.4's rule, applied
+    where the family had no instrument for it: derive the floor per arm, publish it beside the
+    number it bounds, and let the reader subtract.
+    """
+    rows = [floors.get(r["question_id"], (None, None)) for r in group]
+    values = {f for f, _ in rows if f is not None}
+    if not values:
+        return {}
+    if len(values) > 1:
+        # A shape whose questions disagree about their own floor cannot be summarised by one
+        # number, and averaging them would hide the disagreement.
+        return {"chance_floor_mixed": sorted(values)}
+
+    floor = values.pop()
+    covered = sum(1 for f, _ in rows if f is not None)
+    if covered != len(group):
+        # PARTIAL, AND SAID SO. `prospective/seed-carry-over` has 7 of 12 questions naming their
+        # own candidates and 5 that do not. Publishing 0.5 as the shape's floor would apply a
+        # guesser's advantage to five questions that never offered one -- a diluted denominator,
+        # in the flattering direction for whichever arm sits above it.
+        # AND PUBLISH THE DECOMPOSITION, not just the warning.
+        #
+        # The first version of this block said "decompose before comparing two systems on it" and
+        # then handed the reader nothing to decompose with. Doing it here costs nothing -- the
+        # per-question records are already in hand -- and it turns a caveat into data.
+        #
+        # It matters. `prospective/seed-carry-over` publishes headroom 0.3333 over 12 questions
+        # whose two halves behave nothing alike: its 5 open questions run V9 2/5 for a headroom of
+        # 0.60, its 7 yes/no questions run V9 6/7 for 0.143 -- BELOW the discrimination floor, and
+        # against a 0.50 chance floor at that. One number over two populations with opposite
+        # properties is the diluted-denominator shape at the level of a shape rather than a rate.
+        #
+        # The questions are CARRIED from the timegrounded corpus, so the mixture is a property of
+        # the source and not something to rewrite away. Reporting it is the whole remedy available.
+        with_floor = {r["question_id"] for r, (f, _) in zip(group, rows) if f is not None}
+
+        def half(ids: set) -> dict:
+            members = [r for r in group if r["question_id"] in ids]
+            row = {"questions": len(members)}
+            for arm in ("v1", "v8", "v9"):
+                usable = [r for r in members if r.get(arm) is not None]
+                if usable:
+                    row[f"{arm}_passed"] = sum(1 for r in usable if r[arm])
+                    row[f"{arm}_applicable"] = len(usable)
+            v1n, v9n = row.get("v1_applicable"), row.get("v9_applicable")
+            if v1n and v9n:
+                row["headroom_perfect_selector"] = round(
+                    row["v1_passed"] / v1n - row["v9_passed"] / v9n, 4)
+            return row
+
+        return {
+            "chance_floor_partial": {
+                "floor": floor,
+                "questions_with_a_floor": covered,
+                "questions": len(group),
+                "reading": (
+                    "Only some questions in this shape name their own candidates, so no single "
+                    "floor describes it, and the shape's headline arms average two populations "
+                    "with different properties. The split is published below: compare two systems "
+                    "on the halves, never on the shape's mean."),
+                "guessable": {**half(with_floor), "chance_floor": floor},
+                "open": {**half({r["question_id"] for r in group} - with_floor),
+                         "chance_floor": None},
+            }
+        }
+    reason = next(r for f, r in rows if f is not None)
+    def above(arm: str) -> float | None:
+        rows_for = [r for r in group if r.get(arm) is not None]
+        if not rows_for:
+            return None
+        return round(sum(1 for r in rows_for if r[arm]) / len(rows_for) - floor, 4)
+
+    v9_above = above("v9")
+    if v9_above is None:
+        return {"chance_floor": floor, "chance_floor_reason": reason}
+    return {
+        "chance_floor": floor,
+        "chance_floor_reason": reason,
+        "v9_above_chance": v9_above,
+        # V8 TOO, because a shape can be scored on the reader rather than the retriever. Where the
+        # reference stack cannot fail a shape's retrieval -- episodic/participant-attribution, whose
+        # answer is a role and whose transcript labels every turn with its role -- V9 says nothing
+        # and V8-above-chance is the quantity that carries a bar.
+        **({"v8_above_chance": above("v8")} if above("v8") is not None else {}),
+        "chance_floor_reading": (
+            "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this "
+            "shape. At or below zero the lexical baseline is not beating chance, so read the "
+            "published headroom as measured against a floor rather than against retrieval skill. "
+            "The shape can still rank two systems: a retriever that finds the selecting evidence "
+            "scores above the floor, which is what the headroom is room for."),
+    }
+
+
+def wilson_interval(hits: int, total: int, z: float = 1.96) -> list[float] | None:
+    """A 95% Wilson score interval for a pass rate. Arithmetic on recorded counts; no model calls.
+
+    EVERY ARM FIGURE IN THIS FAMILY IS n=1 OVER 6 TO 18 QUESTIONS. One question moves a shape by 5
+    to 17 points, so a point estimate reads with a precision the sample cannot support -- and the
+    "diagnosis-only" note added for shapes under 15 questions covers the smallest cells and not the
+    middle ones. The consuming project asked for bands as a standing column, which is the oldest
+    rule in the shared ledger pointed back at our own numbers.
+
+    Wilson rather than the normal approximation, for the same reason the paired-arm separation is
+    smoothed: the normal interval degenerates at rates 0 and 1, which are common here -- V1 is
+    routinely n/n -- and would report a zero-width band on exactly the cells whose sample is
+    smallest. Wilson stays finite and asymmetric at the boundaries, which is the honest shape.
+
+    Returns None when there is nothing to measure, rather than a band around no data.
+    """
+    if not total:
+        return None
+    proportion = hits / total
+    denominator = 1.0 + (z * z) / total
+    centre = (proportion + (z * z) / (2 * total)) / denominator
+    margin = (z / denominator) * math.sqrt(
+        (proportion * (1.0 - proportion) / total) + (z * z) / (4 * total * total))
+    return [round(max(0.0, centre - margin), 4), round(min(1.0, centre + margin), 4)]
+
+
 def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     """For a shape built as PAIRED ARMS, score the pair rather than the arm. ADR-028 SS7.4.
 
@@ -1282,6 +1982,20 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
             pairs.setdefault(pair_id, {})[arm] = record
     complete = [a for a in pairs.values() if len(a) == 2]
     if not complete:
+        # NOTHING TO REPORT AND SOMETHING TO REPORT ARE DIFFERENT. A group with no pair ids at all
+        # is eight of the nine verticals and publishes nothing, correctly. A group that HAS pair ids
+        # whose arms never came together is a broken pairing, and returning {} for it says exactly
+        # what "this vertical has no pairs" says.
+        if any(pid for _, (pid, _) in paired):
+            return {
+                "pairs": 0,
+                "pairs_incomplete": sorted(pairs),
+                "pairs_incomplete_reading": (
+                    "These pair ids appear on questions in this group but never with both arms, so "
+                    "no pair could be scored. Read as BROKEN PAIRING, not as 'this shape has no "
+                    "pairs' -- the two look identical in an empty block, which is why this row "
+                    "exists."),
+            }
         return {}
 
     def both(key: str) -> tuple[int, int]:
@@ -1291,7 +2005,21 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     v1_hits, v1_n = both("v1")
     v9_hits, v9_n = both("v9")
     if not v1_n or not v9_n:
-        return {}
+        # Complete pairs exist and neither arm could be measured on both sides. Same rule as above
+        # and as `_abstention`: the pairs are real, so the block publishes and says it is undefined.
+        # Silently returning {} here would read as "this shape has no paired design" on a shape
+        # whose entire acceptance argument is its paired design.
+        return {
+            "pairs": len(complete),
+            "unmeasured": {
+                "v1_pairs_both_arms": v1_n,
+                "v9_pairs_both_arms": v9_n,
+                "reading": (
+                    "Complete pairs exist, but no pair has BOTH arms measured on V1 and V9 "
+                    "together, so pair headroom is undefined. Read as NOT MEASURED, never as "
+                    "measured-and-clean. Re-probe before citing this shape."),
+            },
+        }
 
     def arm_rate(key: str) -> float:
         usable = [r for r in group if r.get(key) is not None]
@@ -1337,8 +2065,10 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     if v8_n:
         row["pair_v8_both_arms"] = f"{v8_hits}/{v8_n}"
     row["pair_reading"] = (
-        "Both arms of one pair scored together, because a system that answers only the valid-time "
-        "arm has not shown it can represent two clocks. Compare pair_headroom against "
+        "Both arms of one pair scored together, because a system that answers only one arm has "
+        "not shown it can tell the two apart: two clocks in Bitemporal, a superseded fact from a "
+        "still-valid one in Forgetting, before from after in Prospective. Compare pair_headroom "
+        "against "
         "pair_floor_scaled, NOT against the unpaired floor: conjoining two measurements widens "
         "headroom mechanically, and the scaled floor removes that gain rather than banking it. "
         "pair_discriminates requires BOTH that floor and pair_separation_sd, because the floor's "
@@ -1460,7 +2190,10 @@ def self_test() -> None:
                            "2026/02/25 (Wed) 09:00"],
         "haystack_session_ids": ["s0", "s1", "s2"],
         "answer_session_ids": ["s0", "s1"],
-        "typedmemeval": {"shape": "duration"},
+        # DECLARES THE FLAG, because V6's scope is now a per-question declaration rather than a
+        # hardcoded vertical list. Without it this fixture stops exercising V6 at all and the
+        # silence case below quietly covers one arm fewer -- which is what the assertion caught.
+        "typedmemeval": {"shape": "duration", "gold_components_load_bearing": True},
     }
     real_complete = globals()["complete"]
     globals()["complete"] = lambda *a, **k: ""      # a model that returns nothing, every time
@@ -1473,6 +2206,23 @@ def self_test() -> None:
         check(f"silence leaves {arm} undefined rather than scored", rec.get(arm), None)
     check("silence is named on every arm it blocked",
           sorted(set(rec.get("silent_arms") or [])), ["v1", "v2", "v3", "v6", "v8", "v9"])
+
+    # ---- Wilson intervals ----------------------------------------------------------------
+    #
+    # The boundary cases are the ones that matter: this family's V1 is routinely n/n, and a normal
+    # approximation reports a ZERO-WIDTH band there -- infinite confidence from the smallest
+    # samples in the corpus, which is the opposite of the truth.
+    check("a perfect 6/6 does NOT read as certainty",
+          wilson_interval(6, 6), [0.6097, 1.0])
+    check("a zero 0/12 does not read as certainty either",
+          wilson_interval(0, 12), [0.0, 0.2425])
+    check("nothing measured yields no band, rather than a band around no data",
+          wilson_interval(0, 0), None)
+    # The interval must NARROW with n: same rate, ten times the sample.
+    narrow = wilson_interval(50, 100)
+    wide = wilson_interval(5, 10)
+    check("more evidence gives a tighter band",
+          (narrow[1] - narrow[0]) < (wide[1] - wide[0]), True)
 
     # ---- the paired-arm instrument -------------------------------------------------------
     #
@@ -1554,17 +2304,227 @@ def self_test() -> None:
     unpaired = [{"question_id": "solo", **hit}]
     check("unpaired shapes publish no pair block",
           _pair_discrimination(unpaired, {"solo": (None, None)}), {})
-    # A half-collected pair is not a pair: one arm missing means the conjunction is undefined.
+    # A half-collected pair is not a pair -- but it is also not "no pairs here", and the two used
+    # to be the same empty dict. A broken pairing now says so.
     half, half_arms = paired([({**hit}, {**hit})])
     half, half_arms = half[:1], {half[0]["question_id"]: half_arms[half[0]["question_id"]]}
-    check("a pair missing an arm is skipped", _pair_discrimination(half, half_arms), {})
+    broken = _pair_discrimination(half, half_arms)
+    check("a pair missing an arm scores nothing", broken["pairs"], 0)
+    check("and names the pair it could not complete", broken["pairs_incomplete"], ["p0"])
+    check("and is distinguishable from having no pairs at all",
+          "pairs_incomplete" in broken and "pairs_incomplete" not in
+          _pair_discrimination(unpaired, {"solo": (None, None)}), True)
+
+    # Complete pairs whose arms were never measured: the block publishes and says UNDEFINED, for
+    # the same reason the abstention block does. This is the third instance of the class in one
+    # release, so it is now a self-test rather than a comment.
+    blank = {"v1": None, "v9": None, "v8": None}
+    dead, dead_arms = paired([({**blank}, {**blank})])
+    row = _pair_discrimination(dead, dead_arms)
+    check("complete-but-unmeasured pairs still publish", row["pairs"], 1)
+    check("and say they were NOT MEASURED", "NOT MEASURED" in row["unmeasured"]["reading"], True)
+    check("and publish no headroom they could not compute", "pair_headroom" in row, False)
+
+    # ---- abstention (V10/V11) -----------------------------------------------------------
+    #
+    # The grade is a one-word parse, and every way it can go wrong has a home in this family's
+    # defect log: defaulting an unreadable verdict to the good case is the silence-scores-as-a-pass
+    # shape, and defaulting it to the bad case invents a corpus defect out of a judge failure.
+    for text, expected, label in (
+            ("abstain", True, "bare abstain"),
+            ("Abstain.", True, "capitalised, punctuated"),
+            ("abstaining", True, "prefix match"),
+            ("commit", False, "bare commit"),
+            ("COMMIT - it names a board", False, "commit with a trailing clause"),
+            ("", None, "an empty grade is undefined, not an abstention"),
+            ("unclear", None, "an unparseable grade is undefined, not a commit"),
+            ("The response declines to answer.", None,
+             "a prose grade is undefined -- it is not the word the prompt asked for")):
+        original = globals()["complete"]
+        globals()["complete"] = lambda *a, _t=text, **k: _t
+        try:
+            check(f"abstention grade: {label}", abstention_verdict("q?", "r", "k"), expected)
+        finally:
+            globals()["complete"] = original
+
+    check("the abstention prompt names both verdicts",
+          "commit" in _ABSTENTION_PROMPT and "abstain" in _ABSTENTION_PROMPT, True)
+    check("and rules on abstain-then-guess, the case it exists for",
+          "THEN offers a candidate" in _ABSTENTION_PROMPT, True)
+
+    # drawn_from_haystack. Over-sensitive by design, but not blind to what the prompt supplied.
+    check("an answer lifted from the haystack is flagged",
+          drawn_from_haystack("You went with the Marloe Standard.",
+                              "s1: my broadband is the Marloe Standard tariff"), True)
+    check("an invented answer is not",
+          drawn_from_haystack("You went with the Slingshot Rally.",
+                              "s1: my broadband is the Marloe Standard tariff"), False)
+    check("a value-free answer is not",
+          drawn_from_haystack("I have no record of that.",
+                              "s1: my broadband is the Marloe Standard tariff"), False)
+    check("and content the QUESTION supplied does not count as lifted",
+          drawn_from_haystack("Your Marloe kiteboard.", "s1: nothing relevant here",
+                              already_known="Which Marloe did I end up with?"), False)
+    check("substring matches do not count -- 'Marlo' is not 'Marloe'",
+          drawn_from_haystack("You went with Marloe.", "s1: I bought a Marlowe hat"), False)
+
+    # The aggregate. A shape with no gold publishes an EXEMPTION, never an empty dict: the empty
+    # dict is what let 15 questions ship certified by nothing while both C# assertions skipped
+    # them without a word.
+    def abst(v10, v11, drawn=False):
+        row = {"question_id": f"q{v10}{v11}{drawn}", "v10": v10, "v11": v11,
+               "v10_samples": ABSTENTION_SAMPLES, "v11_samples": ABSTENTION_SAMPLES}
+        if drawn:
+            row["v11_drawn_from_haystack"] = 1
+        return row
+
+    swept = [abst(True, True) for _ in range(4)] + [abst(True, False)]
+    row = _abstention(swept)
+    check("a no-gold shape publishes a declared exemption", row["discriminates"], None)
+    check("and names the axis it IS scored on", row["discrimination_basis"], "abstention")
+    check("full-haystack clean sweeps", row["abstention_full_haystack"]["clean_sweeps"], 5)
+    check("top-K clean sweeps", row["abstention_reference_retrieval"]["clean_sweeps"], 4)
+    check("retrieval cost to calibration", row["retrieval_cost_to_calibration"], 0.2)
+    check("no drawn answers means no triage list", "answers_drawn_from_haystack" in row, False)
+    check("intervals accompany both arms", sorted(row["abstention_ci95"]), ["v10", "v11"])
+
+    row = _abstention(swept + [abst(True, False, drawn=True)])
+    check("a lifted answer reaches the triage list",
+          row["answers_drawn_from_haystack"], ["qTrueFalseTrue"])
+    check("and is labelled a signal, not a verdict",
+          "not a verdict" in row["answers_drawn_reading"], True)
+
+    check("a shape with gold publishes no abstention block",
+          _abstention([{"question_id": "g", "v10": None, "v11": None}]), {})
+    check("an all-silent arm is excluded from its denominator, not scored",
+          _abstention([abst(None, True)])["abstention_full_haystack"]["questions"], 0)
+    # A shape whose every draw was silent must still publish. Returning {} here is arithmetically
+    # the same as having no such questions and semantically the opposite, and it is how 15
+    # questions shipped certified by nothing in the first place.
+    silent_row = _abstention([{"question_id": "s", "v10": None, "v11": None,
+                               "v10_samples": 3, "v11_samples": 3}])
+    check("a shape silent on both arms still publishes an exemption",
+          silent_row["discriminates"], None)
+    check("and says it was NOT MEASURED rather than staying quiet",
+          "NOT MEASURED" in silent_row["unmeasured"]["reading"], True)
+    check("and publishes no calibration cost it could not compute",
+          "retrieval_cost_to_calibration" in silent_row, False)
+
+    # ---- resolution grade (ablation arms) ------------------------------------------------
+    for text, expected, label in (
+            ("resolved", True, "bare resolved"),
+            ("Resolved.", True, "capitalised"),
+            ("declined", False, "bare declined"),
+            ("declined - it names the other place", False, "declined with a clause"),
+            ("", None, "an empty grade is undefined"),
+            ("unclear", None, "an unparseable grade is undefined, not a pass")):
+        original = globals()["complete"]
+        globals()["complete"] = lambda *a, _t=text, **k: _t
+        try:
+            check(f"resolution grade: {label}",
+                  resolved_to_entity("q?", "the workshop", "r", "k"), expected)
+        finally:
+            globals()["complete"] = original
+    check("the resolution prompt names both verdicts",
+          "resolved" in _RESOLUTION_PROMPT and "declined" in _RESOLUTION_PROMPT, True)
+    check("and rules on the case it exists for -- the right fact about another thing",
+          "DIFFERENT thing is declined" in _RESOLUTION_PROMPT, True)
+
+    # ---- negative-gold value requirement ------------------------------------------------
+    neg = ("No longer valid. Your cleaner was Orrindale Solace, but that is out of date: you "
+           "stopped the visits. There is no current cleaner on record.")
+    check("a negative gold naming a value requires it",
+          negative_gold_requires_value(neg, "Who cleans the flat? 2026/03/06"), True)
+    check("a negative gold naming NOTHING cannot require anything",
+          negative_gold_requires_value("No, that has already happened.", "Has it? 2026/03/06"),
+          False)
+    check("a positive gold is untouched by this rule",
+          negative_gold_requires_value("Pellow Ardent.", "Which agent? 2026/03/06"), False)
+    check("and a value the QUESTION supplied does not count as naming it",
+          negative_gold_requires_value("No record of Orrindale.", "Where is Orrindale? 2026/03/06"),
+          False)
+    # The grade it produces: a response that names no value must not match a gold that names one.
+    check("a bare no-record response fails the screen the rule turns on",
+          lexically_possible("The conversations do not say who cleans the flat.", neg,
+                             "Who cleans the flat? 2026/03/06"), False)
+    check("and a response naming the value passes it",
+          lexically_possible("It was Orrindale Solace, and it no longer is.", neg,
+                             "Who cleans the flat? 2026/03/06"), True)
+
+    # ---- haystack-borne chance floor -----------------------------------------------------
+    def cf(v9, floor):
+        return {"question_id": f"q{v9}{floor}", "v9": v9}
+
+    g = [cf(True, 0.3333)] + [cf(False, 0.3333) for _ in range(2)]
+    fl = {r["question_id"]: (0.3333, "the rule names all three outcomes") for r in g}
+    row = _chance_floor(g, fl)
+    check("the floor is published", row["chance_floor"], 0.3333)
+    check("with the reason that earned it",
+          "names all three outcomes" in row["chance_floor_reason"], True)
+    check("and V9 stated relative to it", row["v9_above_chance"], 0.0)
+    check("a rate under the floor reads negative",
+          _chance_floor([cf(False, 0.3333)] * 4,
+                        {f"qFalse0.3333": (0.3333, "r")})["v9_above_chance"], -0.3333)
+
+    # A shape whose questions disagree about their own floor is a generator bug, and averaging the
+    # two would hide it -- the diluted-denominator move, one level up.
+    mixed = [cf(True, 0.5), {"question_id": "other", "v9": True}]
+    row = _chance_floor(mixed, {"qTrue0.5": (0.5, "a"), "other": (0.25, "b")})
+    check("mixed floors are reported, not averaged", row, {"chance_floor_mixed": [0.25, 0.5]})
+    # PARTIAL COVERAGE is not a shape-level floor. prospective/seed-carry-over has 7 of 12
+    # questions naming their own candidates; publishing 0.5 for the shape would hand a guesser's
+    # advantage to the five that never offered one -- diluted denominator, flattering direction.
+    part = [cf(True, 0.5), cf(False, 0.5), {"question_id": "plain", "v9": True}]
+    row = _chance_floor(part, {"qTrue0.5": (0.5, "a"), "qFalse0.5": (0.5, "a"),
+                               "plain": (None, None)})
+    check("a partly-guessable shape publishes no single floor", "chance_floor" in row, False)
+    check("and says how many questions have one",
+          row["chance_floor_partial"]["questions_with_a_floor"], 2)
+    check("out of how many", row["chance_floor_partial"]["questions"], 3)
+
+    # The partial block must carry the SPLIT, not just a warning to go and find one.
+    split = _chance_floor(part, {"qTrue0.5": (0.5, "a"), "qFalse0.5": (0.5, "a"),
+                                 "plain": (None, None)})["chance_floor_partial"]
+    check("the guessable half is counted", split["guessable"]["questions"], 2)
+    check("the open half is counted", split["open"]["questions"], 1)
+    check("the guessable half carries the floor", split["guessable"]["chance_floor"], 0.5)
+    check("the open half carries none", split["open"]["chance_floor"], None)
+    check("and the halves partition the shape",
+          split["guessable"]["questions"] + split["open"]["questions"], split["questions"])
+
+    # closed_choice_k IS A HEURISTIC AND THESE PIN IT. Anyone changing it has to confront these
+    # cases first -- the live ones especially, because the obvious fix breaks them.
+    check("a two-candidate tail", closed_choice_k("Was that me or you?"), 2)
+    check("repeated 'or' counts the alternatives",
+          closed_choice_k("Earlier, about X, someone said Y. Was that me or you or both of us?"), 3)
+    check("KNOWN LIMIT (a): a comma enumeration is NOT parsed",
+          closed_choice_k("Earlier someone said Y. Was that me, you, or both of us?"), 2)
+    check("KNOWN LIMIT (b): a yes/no opener short-circuits before the tail is read",
+          closed_choice_k("Was that me or you or both of us?"), 2)
+    # And the reason (a) cannot be fixed by counting commas: 34 shipped Prospective questions have
+    # a comma AND an ' or ' in their final clause where the 'or' is a verb-phrase disjunction.
+    check("a yes/no question with a disjunctive verb phrase stays k=2",
+          closed_choice_k("Has the reminder about the bike chain come due yet, and on what date "
+                          "is or was it due?"), 2)
+    check("and so does the validity form",
+          closed_choice_k("Is the ferry ticket still valid, and when does or did it run out?"), 2)
+
+    # The question-derived floor, which is the half that had never reached the accuracy arms.
+    check("a two-candidate question yields k=2", closed_choice_k("Was that me or you?"), 2)
+    check("and an open question yields none", closed_choice_k("Which courier is it?"), None)
+
+    check("a shape declaring no floor publishes none",
+          _chance_floor([{"question_id": "n", "v9": True}], {"n": (None, None)}), {})
+
+    check("both abstention arms are in the published arm set",
+          ("v10" in PROBE_ARMS and "v11" in PROBE_ARMS), True)
 
     if failures:
         for f in failures:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "14 paired-arm cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 8 resolution cases, 22 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:

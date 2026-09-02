@@ -122,17 +122,44 @@ MIDDLE_DESIGNATIONS = (
 )
 
 #: (fact, question template, gold answer). Asked under the FAR designation.
+#: (fact, question template, answer, RIVAL FACTS about other places).
+#:
+#: The fourth element exists because V6 refuted this shape's central claim. The generator said "the
+#: chain is the evidence, not just its endpoint"; leave-one-out passed only 4 of 15. Reading the
+#: survivors gives the mechanism at once: the haystack contained exactly ONE lease fact, ONE boiler
+#: fact, ONE roof fact. So "How long does the lease run at the workshop?" is answerable by finding
+#: the only lease statement in the corpus, whatever place it is filed under, and the co-reference
+#: hop the shape exists to measure is never required. Dropping the link changed nothing:
+#:
+#:   tme-sem-022, link ablated -> "The lease runs to the end of next year." (correct, no hop taken)
+#:
+#: This is `conjunction/alias-then-count`'s decoy defect in another vertical: resolving the alias
+#: WRONG, or not at all, still gives the right answer. Rivals are same-KIND facts under other
+#: designations with DIFFERENT answers, so a reader that does not resolve the designation is left
+#: with several candidates and no way to choose.
 COREF_FACTS = (
     ("the boiler was replaced in the spring", "When was the boiler replaced at {asked}?",
-     "In the spring."),
+     "In the spring.",
+     ("the boiler was replaced two winters ago", "the boiler was replaced right after the sale")),
     ("the lease runs to the end of next year", "How long does the lease run at {asked}?",
-     "To the end of next year."),
+     "To the end of next year.",
+     ("the lease runs to the end of the month", "the lease runs for another three years")),
     ("the alarm code was changed after the break-in", "What happened to the alarm code at {asked}?",
-     "It was changed after the break-in."),
+     "It was changed after the break-in.",
+     ("the alarm code was changed when the keys went missing",
+      "the alarm code was changed at the start of the year")),
+    # SAME PREDICATE, DIFFERENT VALUE -- as every other entry here does, and as this one did not.
+    # Its rivals were "the flooring needs doing" and "the guttering needs doing", a different
+    # SUBJECT rather than a different answer. So a reader that never resolved the designation could
+    # still pick the only ROOF fact and be right, and V6 caught it 3 of 3: "The roof needs doing
+    # before winter -- logged for the blue estate car", naming the wrong place and matching gold
+    # anyway, because the gold answer does not name a place either.
     ("the roof needs doing before winter", "What work is outstanding at {asked}?",
-     "Roof work, due before winter."),
+     "Roof work, due before winter.",
+     ("the roof needs doing before the spring", "the roof needs doing once the scaffold is free")),
     ("parking there is on the north side", "Where is the parking at {asked}?",
-     "On the north side."),
+     "On the north side.",
+     ("parking there is behind the loading bay", "parking there is on the street only")),
 )
 
 #: (topic, belief). The topic is how a source gets NAMED in an answer, so it has to be distinctive
@@ -333,7 +360,7 @@ def _co_reference(index: int, echo: float, rng: random.Random) -> tmc.Question: 
     """A fact stated under one designation, asked under another. Gold is the stating session PLUS
     every link needed to get there -- the chain is the evidence, not just its endpoint."""
     stated, asked, link = DESIGNATIONS[index % len(DESIGNATIONS)]
-    fact, template, answer = COREF_FACTS[index % len(COREF_FACTS)]
+    fact, template, answer, rivals = COREF_FACTS[index % len(COREF_FACTS)]
     hops = 1 if index % 3 else 2
     qid = f"tme-sem-{CURRENT_QUESTIONS + index + 1:03d}"
     ask = template.format(asked=asked)
@@ -347,7 +374,24 @@ def _co_reference(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         golds.append(_gold(f"{middle.capitalize()} is {stated}.", _reply(rng), rng, "link"))
         golds.append(_gold(f"{asked.capitalize()} is {middle}.", _reply(rng), rng, "link"))
 
-    sessions = golds + [_filler(rng, echoed) for _ in range(rng.randint(H_MIN, H_MAX))]
+    # RIVAL FACTS OF THE SAME KIND, filed under places the question does not ask about. Without
+    # them the shape's only fact of its kind is gold, and the designation never has to be resolved
+    # -- see COREF_FACTS. Their designations exclude everything this question's chain uses, so a
+    # rival can never be read as the asked place.
+    used = {stated, asked}
+    if hops != 1:
+        used.add(MIDDLE_DESIGNATIONS[index % len(MIDDLE_DESIGNATIONS)])
+    rival_places = [d for d, _, _ in DESIGNATIONS if d not in used][:len(rivals)]
+    rival_sessions = [
+        tmc.Session(
+            turns=[tmc.Turn("user", tmc.weave_echo(f"At {place}, {rival}.", echoed)),
+                   tmc.Turn("assistant", _reply(rng))],
+            timestamp=_BASE, is_gold=False, tag="rival-fact")
+        for place, rival in zip(rival_places, rivals)]
+
+    # INSIDE the haystack budget, so H does not drift with the fix.
+    filler_count = max(0, rng.randint(H_MIN, H_MAX) - len(rival_sessions))
+    sessions = golds + rival_sessions + [_filler(rng, echoed) for _ in range(filler_count)]
     rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation under a fixed seed; a CSPRNG cannot be replayed, and this orders sessions, not secrets.
     _lay_out(sessions, CURRENT_QUESTIONS + index)
 
@@ -356,6 +400,32 @@ def _co_reference(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         question_date=_BASE + timedelta(days=(CURRENT_QUESTIONS + index) * 37 + 60),
         sessions=sessions,
         extension={"shape": SHAPE_COREF, "designation_distance": hops,
+                   # THE ANSWER MUST BE ABOUT THE ASKED DESIGNATION, on the ablation arms.
+                   #
+                   # The component V6 removes here IS the link from `asked` to the session stating
+                   # the fact. A response that reports the fact under the OTHER designation, or
+                   # says it cannot identify the asked one, has not made the link -- and 16 of the
+                   # 18 scored V6 hits on this shape were exactly that: "The conversations do not
+                   # mention a workshop by that name. They do say that at the unit behind the
+                   # depot, the alarm code was changed after the break-in."
+                   "answer_must_name": asked,
+                   # THE RIVALS CREATE A CLOSED CHOICE, so the shape declares its own floor.
+                   # After the co-reference link is removed the haystack still holds the gold fact
+                   # and its rivals -- same kind, other places, different answers -- so a reader
+                   # that cannot resolve the designation is choosing among 1 + len(rivals). V6 and
+                   # the published v9_above_chance both read this; without it V6 condemns a
+                   # component on a single lucky guess in three samples.
+                   "chance_floor": round(1.0 / (1 + len(rivals)), 4),
+                   "chance_floor_reason": (
+                       f"after the link is ablated the haystack holds {1 + len(rivals)} facts of "
+                       f"the asked kind, filed under different designations"),
+                   # "the chain is the evidence, not just its endpoint" -- drop a link and the
+                   # asked designation can no longer be resolved to the stating session.
+                   #
+                   # NOT declared on SHAPE_CURRENT, deliberately: dropping a MIDDLE replacement
+                   # still leaves the latest one, so the answer survives and that component really
+                   # is redundant. A per-vertical scope could not have expressed the difference.
+                   "gold_components_load_bearing": True,
                    "stated_as": stated, "asked_as": asked})
 
 
