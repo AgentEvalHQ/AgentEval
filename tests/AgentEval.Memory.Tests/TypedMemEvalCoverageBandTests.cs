@@ -52,7 +52,10 @@ public class TypedMemEvalCoverageBandTests
     private static readonly Dictionary<(TypedMemEvalVertical, string), double> OutOfBand =
         new()
         {
-            [(TypedMemEvalVertical.Conjunction, "alias-then-count")] = 0.3356,
+            // 0.3356 -> 0.4344 at 0.33.0-beta, moving toward the band. The ratchet records the
+            // BETTER value so it cannot drift back: the decoy designation's event count now
+            // differs from gold's, which changed how many sessions the shape carries.
+            [(TypedMemEvalVertical.Conjunction, "alias-then-count")] = 0.4344,
             [(TypedMemEvalVertical.Prospective, "due-window")] = 0.4352,
             [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
         };

@@ -1905,14 +1905,14 @@
       "reading": "A failure with no captured answer is not a wrong answer. These questions are counted as failures in the published pass counts, so the arm's figure is a LOWER BOUND on what the answer model achieves and the shortfall is partly silence rather than error. Whether an empty response is a refusal, a provider filter or a capture fault is not decidable from this record; it is disclosed rather than corrected because excluding it would substitute one unexamined assumption for another."
     },
     "empty_completion_disclosure": {
-      "measured_over": "the 35367 cached reference-model calls present in this tree, attributed by cache-key arm and split into probe answers and judge grades; not necessarily the full historical run",
+      "measured_over": "the 37854 cached reference-model calls present in this tree, attributed by cache-key arm and split into probe answers and judge grades; not necessarily the full historical run",
       "empty_completion_rate": {
-        "v1": "0/1321",
-        "v2": "0/13210",
-        "v3": "9/3544 (0.2%)",
+        "v1": "0/1431",
+        "v2": "0/14310",
+        "v3": "9/3874 (0.2%)",
         "v6": "0/2623",
-        "v8": "0/1321",
-        "v9": "0/1321",
+        "v8": "0/1431",
+        "v9": "0/1431",
         "v10": "0/93",
         "v11": "0/93"
       },
@@ -1926,28 +1926,28 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1321,
+        "judge_calls": 1431,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 13210,
+        "calls": 14310,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 4539,
+        "judge_calls": 4839,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 3544,
+        "calls": 3874,
         "empty": 9,
-        "rate": 0.0025,
-        "judge_calls": 1079,
+        "rate": 0.0023,
+        "judge_calls": 1170,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -1962,19 +1962,19 @@
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1321,
+        "judge_calls": 1431,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1305,
+        "judge_calls": 1415,
         "judge_empty": 0,
         "judge_rate": 0.0
       },

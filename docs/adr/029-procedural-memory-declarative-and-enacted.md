@@ -1,6 +1,6 @@
 # ADR-029: Build the conditional, not procedural memory
 
-- **Status:** **Accepted**, scoped to ONE shape — `conjunction/conditional-branch`. Procedural memory
+- **Status:** **Accepted and BUILT** (2026-09-02, §9), scoped to ONE shape — `conjunction/conditional-branch`. Procedural memory
   as a memory type stays out and ADR-026 §8 is untouched.
 - **How it got here, which is the useful part:** an earlier draft proposed narrowing ADR-027's
   exclusion and was put to an adversarial review that refuted three of its four decisions (§8). The
@@ -213,3 +213,92 @@ The lesson worth keeping: **an amendment that moves scope should first establish
 The first draft spent its length on whether the split was intellectually sound and never checked the
 one line that said who owns the decision — a line already present in this repository, and read
 earlier the same day.
+
+## 9. BUILT, 2026-09-02 — `conjunction/conditional-branch`
+
+Fifteen questions, `tme-cnj-051` through `-065`. Conjunction 50 → 65, the one cost §7b declared.
+
+### 9a. The construction
+
+Two gold sessions, and which one is lexically reachable from the question is the whole design:
+
+| | names | reachable from the question? |
+|---|---|---|
+| **rule** (semantic) | the attribute **and** the condition | yes — the question names the attribute |
+| **state** (episodic) | the condition **only** | **no** — you must read the rule to learn what to look for |
+
+> *"How the usual courier gets picked: the Kelvaryn access open means Nettleford Runners, closed for
+> resurfacing means Marlow Carriage, anything else means Bardsey Logistics."*
+> *"Logging it — the Kelvaryn access is open as of now."*
+> **"Going by the standing rule, which usual courier is in force?"**
+
+That is a real second hop, and it is the property `order-then-value` had to be rebuilt to obtain —
+that shape shipped saturated at V9 15/15 because one gold session named both the anchor and the
+answer.
+
+### 9b. Measured
+
+| | |
+|---|---|
+| V1 / V8 / V9 | **15/15 · 15/15 · 0/15** |
+| headroom (reachable) | **1.00 (1.00)** — the widest in the family |
+| V2 / V3 | 15/15 · 15/15 |
+| coverage | 0.50 |
+
+**The structural prediction and the measurement agree exactly.** Before probing, on the shipped
+corpus: the rule is in BM25's top-5 for **15/15** questions, the state for **0/15**, both for
+**0/15** — and 0/15 is precisely what V9 returned. Coverage of 0.50 is 1-of-2 on every question by
+construction, so the echo knob has nothing to move here and 0.50 is a structural floor that happens
+to sit on the band's lower edge. **A band failure on this shape means the rule stopped being
+retrievable; it is never a reason to widen the band.**
+
+### 9c. Two things checked because the numbers flatter us
+
+**V9 = 0/15 is an extreme value, and extreme values are wiring faults until proven otherwise.** Read
+back, the reference model retrieves the rule, sees three named branches and *declines*: *"the
+conversations don't say whether the Peskadd permit is granted, still pending, or something else."*
+Calibrated abstention, not a broken arm.
+
+**The rule session names all three outcomes**, so a reader holding the rule and missing the state is
+choosing among three named candidates — a chance floor of **1/3** that `closed_choice_k` cannot see,
+because it parses the *question* and the candidates live in the *haystack*. This family has been
+caught by unpublished chance floors twice (ADR-028 §7.4; V2's 69 unearned passes), so it is now a
+published column: `chance_floor`, `chance_floor_reason`, `v9_above_chance`. This shape reads
+**−0.3333** — the baseline is below chance because it does not guess.
+
+The field is named `chance_floor`, not `chance_floor_given_rule`. A generic instrument keyed on a
+shape-specific name is the applied-once defect; any future shape whose haystack hands the reader a
+closed set publishes the same two fields and gets the same column.
+
+### 9d. What building it found in a neighbour
+
+`alias-then-count`'s decoy count was hardcoded at **2** while gold is `2 + (index % 3)`, so on every
+third question the decoy designation carried **exactly gold's count** — five of fifteen. On those
+five, **a system that resolves the alias to the wrong place still produces the right answer**, which
+is the precise failure the shape exists to detect. The join was not load-bearing on a third of it.
+
+It surfaced as a V3 leak: with gold ablated the model answered *"two deliveries were taken at the
+Peverel building"* — a different designation, the same count, and `require_distinctive` cannot
+separate them because the distinctive token is the digit they share. **V3 read 50/50 before this on
+a corpus where five questions could leak.** The pass was luck, not evidence.
+
+Fixed, and guarded: the decoy's count now differs from gold's, and `check_conjunction` counts
+delivery sentences per designation and refuses equality. V3 is **65/65**; `alias-then-count`
+coverage moved 0.3356 → 0.4344, toward the band.
+
+The guard's own first version over-counted — it matched any non-gold session *naming* the decoy,
+including filler that states a designation link and records no delivery. It reported 4 against a
+real 2. Worth recording because an over-counting guard invites being loosened, and the loosening
+would have taken the real check with it.
+
+### 9e. The name bank, and a trap closed before it fired
+
+`CONDITIONS` is registered in `tools/audit_name_collisions.py` — the same exposure MILESTONES had,
+where four of six names were real and the shape asks which came first. All six audited live: **zero
+real, zero unparsed, six invented.** Confirmed positively rather than read off an absence.
+
+Registering it also exposed the extractor: `collect()` did `head(str(entry))`, which on a nested
+bank produces `"('the Kelvaryn access', ('open', ...))"` and sends *that* to the model as a name.
+The model says REAL: no — correctly — and the real name inside the string is silently exonerated.
+**No shipped bank was nested when this was written; `CONDITIONS` is the first.** The unpacking is
+fixed and a punctuation check now raises rather than auditing a string no corpus contains.

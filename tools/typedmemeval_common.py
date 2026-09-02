@@ -141,7 +141,7 @@ VERTICALS = {
     "semantic":     ("sem",  50),
     # ADR-027 SS10. Cross-type: questions no single memory type can answer, composed from the
     # constructs the other verticals certify. Gold is genuinely mixed-type here.
-    "conjunction":  ("cnj",  50),
+    "conjunction":  ("cnj",  65),   # 50 -> 65: ADR-029's conditional-branch, see TypedMemEvalVertical.cs
 }
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "src" / "AgentEval.Memory" / "Data" / "typedmemeval"

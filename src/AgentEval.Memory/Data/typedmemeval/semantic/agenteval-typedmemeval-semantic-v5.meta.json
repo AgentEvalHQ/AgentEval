@@ -824,28 +824,28 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1321,
+        "judge_calls": 1431,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 13210,
+        "calls": 14310,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 4539,
+        "judge_calls": 4839,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 3544,
+        "calls": 3874,
         "empty": 9,
-        "rate": 0.0025,
-        "judge_calls": 1079,
+        "rate": 0.0023,
+        "judge_calls": 1170,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -860,19 +860,19 @@
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1321,
+        "judge_calls": 1431,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1321,
+        "calls": 1431,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1305,
+        "judge_calls": 1415,
         "judge_empty": 0,
         "judge_rate": 0.0
       },

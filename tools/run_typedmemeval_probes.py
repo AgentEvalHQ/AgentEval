@@ -1220,6 +1220,11 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # entire argument for having one.
     arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
                                  (e.get("typedmemeval") or {}).get("arm")) for e in entries}
+    # A closed choice the HAYSTACK hands the reader, which `closed_choice_k` cannot see because it
+    # parses the question. Declared by the generator per question; see _chance_floor.
+    floors = {e["question_id"]: ((e.get("typedmemeval") or {}).get("chance_floor"),
+                                 (e.get("typedmemeval") or {}).get("chance_floor_reason"))
+              for e in entries}
 
     # Pair flip (V1p). Both arms must be answerable AND their answers must differ, which is what
     # makes the before/after design capable of showing anything at all.
@@ -1427,6 +1432,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
                     "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
+                **_chance_floor(group, floors),
                 **_discrimination(group),
                 **_abstention(group),
                 **_pair_discrimination(group, arm_of),
@@ -1584,6 +1590,49 @@ def _abstention(group: list[dict]) -> dict:
             "exactly as intended. Over-flagging is the intended direction -- a false alarm costs "
             "one read, a miss ships a question whose premise is false.")
     return row
+
+
+def _chance_floor(group: list[dict], floors: dict) -> dict:
+    """What a reader scores on this shape by guessing, where the HAYSTACK names the candidates.
+
+    `closed_choice_k` reads the QUESTION, which is right for "Which came first, X or Y?" and blind
+    to a shape whose candidates live in the evidence. `conjunction/conditional-branch` is the first:
+    the rule session names all three branch outcomes, BM25 retrieves that rule for 15 of 15
+    questions and the state that selects a branch for 4 of 15, so a lexical reader is very often
+    holding the menu and not the order.
+
+    Published rather than gated, and the distinction matters. A V9 at chance does NOT mean the shape
+    cannot rank two systems -- a better retriever finds the state and scores above it, which is the
+    whole point. It means the BOTTOM of the scale is 1/3 rather than 0, and a reader comparing a
+    0.27 against a 0.33 is comparing two ways of knowing nothing. ADR-028 SS7.4's rule, applied
+    where the family had no instrument for it: derive the floor per arm, publish it beside the
+    number it bounds, and let the reader subtract.
+    """
+    declared = {floors.get(r["question_id"], (None, None))[0] for r in group}
+    declared.discard(None)
+    if len(declared) != 1:
+        # Mixed or absent. A shape whose questions disagree about their own chance floor has a
+        # generator bug, and averaging the two would hide it.
+        return {"chance_floor_mixed": sorted(declared)} if len(declared) > 1 else {}
+
+    floor = declared.pop()
+    reason = next((floors[r["question_id"]][1] for r in group
+                   if floors.get(r["question_id"], (None, None))[0] is not None), "")
+    applicable = [r for r in group if r.get("v9") is not None]
+    if not applicable:
+        return {"chance_floor": floor, "chance_floor_reason": reason}
+    v9 = sum(1 for r in applicable if r["v9"]) / len(applicable)
+    return {
+        "chance_floor": floor,
+        "chance_floor_reason": reason,
+        "v9_above_chance": round(v9 - floor, 4),
+        "chance_floor_reading": (
+            "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this "
+            "shape. At or below zero the lexical baseline is not beating chance, so read the "
+            "published headroom as measured against a floor rather than against retrieval skill. "
+            "The shape can still rank two systems: a retriever that finds the selecting evidence "
+            "scores above the floor, which is what the headroom is room for."),
+    }
 
 
 def wilson_interval(hits: int, total: int, z: float = 1.96) -> list[float] | None:
@@ -2099,6 +2148,29 @@ def self_test() -> None:
           lexically_possible("It was Orrindale Solace, and it no longer is.", neg,
                              "Who cleans the flat? 2026/03/06"), True)
 
+    # ---- haystack-borne chance floor -----------------------------------------------------
+    def cf(v9, floor):
+        return {"question_id": f"q{v9}{floor}", "v9": v9}
+
+    g = [cf(True, 0.3333)] + [cf(False, 0.3333) for _ in range(2)]
+    fl = {r["question_id"]: (0.3333, "the rule names all three outcomes") for r in g}
+    row = _chance_floor(g, fl)
+    check("the floor is published", row["chance_floor"], 0.3333)
+    check("with the reason that earned it",
+          "names all three outcomes" in row["chance_floor_reason"], True)
+    check("and V9 stated relative to it", row["v9_above_chance"], 0.0)
+    check("a rate under the floor reads negative",
+          _chance_floor([cf(False, 0.3333)] * 4,
+                        {f"qFalse0.3333": (0.3333, "r")})["v9_above_chance"], -0.3333)
+
+    # A shape whose questions disagree about their own floor is a generator bug, and averaging the
+    # two would hide it -- the diluted-denominator move, one level up.
+    mixed = [cf(True, 0.5), {"question_id": "other", "v9": True}]
+    row = _chance_floor(mixed, {"qTrue0.5": (0.5, "a"), "other": (0.25, "b")})
+    check("mixed floors are reported, not averaged", row, {"chance_floor_mixed": [0.25, 0.5]})
+    check("a shape declaring no floor publishes none",
+          _chance_floor([{"question_id": "n", "v9": True}], {"n": (None, None)}), {})
+
     check("both abstention arms are in the published arm set",
           ("v10" in PROBE_ARMS and "v11" in PROBE_ARMS), True)
 
@@ -2107,7 +2179,7 @@ def self_test() -> None:
             print(f"self-test FAIL  {f}")
         raise SystemExit(1)
     print("self-test OK  (10 evidence-screen cases, 6 arm-attribution cases, 7 silence cases, "
-          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases)")
+          "20 paired-arm cases, 4 interval cases, 24 abstention cases, 6 negative-gold cases, 6 chance-floor cases)")
 
 
 def restamp_empty_rates_from_cache(verticals: list[str]) -> None:
