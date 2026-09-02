@@ -294,10 +294,15 @@ public sealed class TypedMemEvalCorpusTests
 
         if (vertical == TypedMemEvalVertical.WorkingMemory)
         {
-            // Declared carve-out (ADR §5.4): the fact is stated in session 0 by design, which means
-            // distance is deliberately confounded with absolute position and recency. That
-            // composite IS the construct, and the ADR names it rather than hiding it.
-            Assert.Equal(1.0, share);
+            // WAS a declared carve-out: the fact was stated in session 0 on every question, and the
+            // note here called the resulting confound of distance with position and recency "the
+            // construct". It was not — it made the haystack grow with the rung label, and BM25
+            // scores documents independently of position, so the whole published gradient was a
+            // context-volume effect. Gold now sits `distance` sessions before the query with H held
+            // constant, so NO question pins gold to session 0 and this vertical takes the ordinary
+            // bar. Kept as its own branch because the expectation is the opposite of every other
+            // vertical's: zero, not "at most half".
+            Assert.Equal(0.0, share);
         }
         else
         {
@@ -566,9 +571,15 @@ public sealed class TypedMemEvalCorpusTests
         // refused_features array trimmed to two entries, or a threshold_auc of 0.99, would sail
         // through. The record supplies only the corpus hash, which is the one thing it can be
         // trusted to state about itself.
-        var exempt = vertical == TypedMemEvalVertical.WorkingMemory
-            ? new HashSet<string>(StringComparer.Ordinal) { "position_in_haystack" }
-            : [];
+        // NO VERTICAL IS EXEMPT ANY MORE. WorkingMemory held the only entry —
+        // `position_in_haystack` — because it pinned its fact to session 0 on every question,
+        // which made position a perfect gold predictor across the whole corpus. That pinning was
+        // also what confounded distance with haystack size (see SaturatedByDesign in
+        // TypedMemEvalDiscriminationTests), and removing it removed the need for the exemption:
+        // gold now sits at a different index on each rung and the feature is measured like any
+        // other. It passes. An exemption that stops being necessary should be deleted, not kept
+        // as a courtesy.
+        var exempt = new HashSet<string>(StringComparer.Ordinal);
 
         // Re-measured from the corpus text, not read back from `features`. A stamped number that
         // nothing recomputes is a claim; this is the check. It is also deliberately a SECOND

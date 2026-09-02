@@ -679,6 +679,80 @@ Keyed on the **input**, never on the result: `_abstention` decides applicability
 group contains no-gold questions, not from whether any draw was gradeable. Deciding from the result
 is how the first implementation reproduced the exact hole it was written to close.
 
+## 17. Amendment, 2026-09-02 — WorkingMemory's ladder measured volume and called it distance
+
+**The reference retriever cannot see the variable the vertical is named for.** BM25 scores documents
+independently of their position in the list; only ties break by order. So a ladder whose independent
+variable is *how far back the gold sits* has a baseline that is, by construction, blind to it.
+
+It nevertheless published a gradient — V9 **12/12, 12/12, 12/12, 8/12, 9/12** across rungs 8, 15,
+25, 40, 60 — and three of those rungs were declared `SaturatedByDesign`, with the note *"the
+gradient across rungs is the measurement."*
+
+### 17a. The confound, measured rather than reasoned
+
+The generator built `distance + 1` sessions with gold pinned to session 0. So:
+
+| rung | H (sessions) | gold-to-query distance |
+|---|---|---|
+| distance-8 | 9 | 8 |
+| distance-15 | 16 | 15 |
+| distance-25 | 26 | 25 |
+| distance-40 | 41 | 40 |
+| distance-60 | 61 | 60 |
+
+**H = distance + 1, exactly.** Two variables moving as one, and the baseline can only see the second.
+
+Confirmed directly on the shipped corpus, no rebuild needed: taking one `distance-60` question and
+moving its gold session to **eleven sampled indices of its own haystack**, BM25 top-5 membership was
+**identical at every one of them**. The published gradient was a **context-volume** effect wearing a
+distance label, and the vertical could not distinguish a system that degrades with recency from one
+that degrades with size — two different failure modes a consumer would want told apart.
+
+The three saturated rungs were not "trivially retrievable by design" either. At distance-8 the
+haystack is 9 sessions and `K_ref` is 5, so **a random retriever draws 5 of 9 — a floor of 0.56.**
+Their saturation was `K/H` arithmetic, not a property of distance.
+
+### 17b. The fix, and why a flat baseline is the point
+
+**H is held at 60 non-gold sessions on every rung; gold position is the only thing that moves.**
+
+The reference retriever went flat: V9 **9 / 7 / 7 / 6 / 8** of 12, non-monotone, with Wilson bands
+overlapping heavily at n=12. **That is the correct null.** A control that cannot see the independent
+variable is what makes a gradient in a consumer's system attributable to that variable — our
+baseline stops being the measurement and becomes the null it should always have been.
+
+| | before | after |
+|---|---|---|
+| rungs that discriminate | **2 of 5** | **5 of 5** |
+| per-rung headroom | 0.00 · 0.00 · 0.00 · 0.33 · 0.25 | 0.25 · 0.42 · 0.42 · 0.50 · 0.33 |
+| BM25 coverage spread across rungs | 0.333 (monotone) | 0.167 (non-monotone, ≈ noise at n=12) |
+| V1 / V8 / V2 / V3 | — | 60/60 · 60/60 · 60/60 · 60/60 |
+
+**36 of 60 questions could not rank anything and now can.**
+
+### 17c. Two declared carve-outs deleted, not carried
+
+Both existed to defend the pinning, and both went with it:
+
+- **`separability_exempt={"position_in_haystack"}`.** Gold sat at index 0 on every question, making
+  position a perfect gold predictor corpus-wide. Gold now sits at a different index on each rung and
+  the feature is measured like every other one — **it passes**. The generator comment written when
+  the exemption was removed said *"if the screen fires, that is a finding"*; it did not fire.
+- **`Corpus_DoesNotPinGoldToTheFirstSessionExceptWhereDeclared`** asserted `share == 1.0` for this
+  vertical, with a note calling the confound *"the construct"*. Now `share == 0.0` — the opposite of
+  every other vertical's bar, so it keeps its own branch rather than falling into the general case.
+
+**An exemption that stops being necessary should be deleted, not kept as a courtesy.** Two of the
+three defences this vertical carried were defending the defect.
+
+### 17d. What is still not measured, stated rather than implied
+
+Holding H constant isolates distance and **gives up measuring volume sensitivity**. The honest
+decomposition would be two ladders — distance at constant H, and volume at constant distance — and
+only the first exists. A consumer whose system degrades with context length will see that as a flat
+line here, not as a finding. **That dimension is unmeasured, not clean.**
+
 ## 9. Provenance
 
 The finding came out of a question about whether the `value-then-count` repair was the best

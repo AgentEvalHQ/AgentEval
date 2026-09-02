@@ -43,12 +43,23 @@ public class TypedMemEvalDiscriminationTests
     private static readonly Dictionary<(TypedMemEvalVertical, string), string> SaturatedByDesign =
         new()
         {
-            [(TypedMemEvalVertical.WorkingMemory, "distance-8")] =
-                "declared ladder: the short rungs are meant to be trivially retrievable",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-15")] =
-                "declared ladder: the gradient across rungs is the measurement",
-            [(TypedMemEvalVertical.WorkingMemory, "distance-25")] =
-                "declared ladder: still inside the easy half by construction",
+            // EMPTY as of 0.33.0-beta, and the three entries it held are worth recording rather
+            // than deleting silently.
+            //
+            // WorkingMemory's three short rungs were declared "trivially retrievable by design",
+            // with the gradient across rungs given as the measurement. Both halves were wrong.
+            // The generator built `distance + 1` sessions with gold pinned to session 0, so the
+            // haystack GREW with the label and the two variables moved as one — and BM25 scores
+            // documents independently of their position, so the reference retriever could only
+            // ever see the second of them. Measured on the shipped corpus: moving one gold to
+            // every index of its own haystack left top-5 membership identical at all of them.
+            // The published gradient was a context-VOLUME effect wearing a distance label.
+            //
+            // H is now held at 60 non-gold sessions on every rung and gold position is the only
+            // variable. The reference retriever went flat — V9 9/7/7/6/8 of 12, non-monotone,
+            // well inside the sampling noise at n=12 — which is what a control that cannot see
+            // the independent variable should do. All five rungs discriminate; three of them
+            // could not rank anything at all before.
         };
 
     /// <summary>

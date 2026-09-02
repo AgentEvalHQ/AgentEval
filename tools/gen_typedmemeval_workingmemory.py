@@ -65,6 +65,30 @@ QTYPE = "workingmemory-recall"
 # grading actually begins.
 DISTANCES = (8, 15, 25, 40, 60)
 
+#: EVERY CELL GETS THE SAME NUMBER OF SESSIONS, and this is the correction that makes the ladder
+#: measure what it is named for.
+#:
+#: It used to build `distance + 1` sessions with gold pinned to session 0, so the gold sat `distance`
+#: sessions before the query AND the haystack was `distance + 1` long. Those are two variables moving
+#: as one, and the reference retriever can only see the second of them: BM25 scores documents
+#: INDEPENDENTLY OF THEIR POSITION in the list. Measured on the shipped corpus by moving one gold
+#: session to all eleven sampled indices of its own haystack -- top-5 membership was identical at
+#: every one. So the published gradient (V9 12/12, 12/12, 12/12, 8/12, 9/12) is entirely a CONTEXT
+#: VOLUME effect wearing a distance label, and the vertical could not distinguish a system that
+#: degrades with recency from one that degrades with size.
+#:
+#: With H held at the top of the ladder, gold position is the only thing that moves. The reference
+#: retriever then shows a FLAT line across the rungs, and that is the point rather than a weakness:
+#: a control that cannot see the independent variable is what makes a gradient in a consumer's
+#: system attributable to the variable. Our baseline stops being the measurement and becomes the
+#: null.
+#:
+#: Two things fall out. The `position_in_haystack` separability exemption was needed because gold
+#: was always index 0; now it varies by rung. And the three saturated rungs stop being "trivially
+#: retrievable by design" -- their saturation was K/H arithmetic (5/9 = 0.56 of the whole haystack
+#: at the shortest rung), not a property of distance.
+H_FIXED = max(DISTANCES) + 1
+
 #: One fixed epoch for every cell. Combined with `tmc.spread`'s default interval this makes
 #: session-distance and time-distance a single variable across the whole grid.
 EPOCH = datetime(2026, 2, 2, 9, 0)
@@ -349,17 +373,23 @@ def build(echo: float, rng: random.Random) -> list[tmc.Question]:
         for distance, stem in zip(DISTANCES, stems):
             value = family.value(stem)
 
-            # d + 1 sessions and then the query, all on one fixed interval: the cells of the
-            # grid differ in how many sessions intervene and in nothing else.
-            stamps = tmc.spread(EPOCH, distance + 2)
+            # H_FIXED sessions and then the query, all on one fixed interval. The cells differ
+            # in WHERE the gold sits and in nothing else -- see H_FIXED for why that is the
+            # correction rather than a refinement.
+            stamps = tmc.spread(EPOCH, H_FIXED + 1)
+            gold_index = H_FIXED - distance
+            sessions = [
+                _interference_session(family, family.question, echo, rng, stamp)
+                for stamp in stamps[:H_FIXED - 1]
+            ]
+            # Built at the gold's own stamp, so session order and time order still agree.
             gold = tmc.make_session(
-                stamps[0],
+                stamps[gold_index],
                 (family.statement.format(value=value), family.acknowledgement),
                 gold_turn=0, tag="gold")
-            sessions = [gold] + [
-                _interference_session(family, family.question, echo, rng, stamp)
-                for stamp in stamps[1:-1]
-            ]
+            sessions.insert(gold_index, gold)
+            for position, stamp in enumerate(stamps[:H_FIXED]):
+                sessions[position].timestamp = stamp
 
             questions.append(tmc.Question(
                 question_id=f"tme-wm-{index:03d}",
@@ -412,24 +442,31 @@ def check_grid(questions: list[tmc.Question]) -> list[str]:
         distance = q.extension["distance_sessions"]
         family_key = q.extension["fact_family"]
 
-        # (a) H is the independent variable; if it drifts from the label, every number
-        # reported against that rung describes a different experiment from the one named.
-        if q.h != distance:
-            failures.append(f"{q.question_id}: H={q.h} but distance_sessions={distance}")
+        # (a) H IS HELD CONSTANT and gold position is the independent variable. The old rule
+        # here was `q.h == distance`, which enforced the confound rather than catching it: it
+        # required the haystack to grow with the label, so the two variables could never come
+        # apart. Both halves are now asserted, because either drifting alone re-creates it.
+        if q.h != H_FIXED - 1:
+            failures.append(
+                f"{q.question_id}: H={q.h}, must be {H_FIXED - 1} on every rung -- a haystack that "
+                f"grows with the label confounds distance with volume. (H counts NON-GOLD "
+                f"sessions per ADR SS4, so the constant is H_FIXED - 1, not H_FIXED.)")
+        if q.gold_indices != [H_FIXED - distance]:
+            failures.append(
+                f"{q.question_id}: gold at {q.gold_indices}, must sit {distance} sessions before "
+                f"the query (index {H_FIXED - distance})")
         if q.extension["shape"] != f"distance-{distance}":
             failures.append(f"{q.question_id}: shape {q.extension['shape']!r} contradicts its distance")
 
-        # Gold position is pinned by design (§5.4); a cell whose gold drifted off session 0
-        # would have a different distance from the one it claims to have.
-        if q.gold_indices != [0]:
-            failures.append(f"{q.question_id}: gold at {q.gold_indices}, must be pinned to session 0")
+
 
         # (b) Stated exactly once. A restatement anywhere else in the haystack turns an aging
         # measurement into a rehearsal measurement without changing anything visible.
         holders = [i for i, s in enumerate(q.sessions) if q.answer.lower() in s.text().lower()]
-        if holders != [0]:
+        if holders != [H_FIXED - distance]:
             failures.append(
-                f"{q.question_id}: value {q.answer!r} appears in sessions {holders}, expected exactly [0]")
+                f"{q.question_id}: value {q.answer!r} appears in sessions {holders}, expected "
+                f"exactly [{H_FIXED - distance}]")
 
         # (d) No interference session may carry any value this family could have stated.
         # Checked against the whole gold-stem pool rather than the one drawn value, because
@@ -467,16 +504,18 @@ if __name__ == "__main__":
         vertical="workingmemory",
         build=build,
         structure=tmc.StructureSpec(
-            # H is the independent variable here, so this pair records the ends of the ladder
-            # rather than asserting a haystack budget; the flag is what scopes the floor
-            # assertion out instead of silently waiving it.
-            h_min=1, h_max=40, g_values={1},
+            # H IS NO LONGER THE INDEPENDENT VARIABLE -- it is held at H_FIXED on every rung so
+            # that gold POSITION can be. The flag flips with it: a real haystack budget is now
+            # assertable, and the floor assertion applies rather than being scoped out.
+            h_min=H_FIXED - 1, h_max=H_FIXED - 1, g_values={1},
             gold_position_shuffled=False,
             no_absolute_dates=False,
-            h_is_independent_variable=True,
-            # ADR §5.4 pins the fact to session 0, so position separates gold perfectly and is
-            # meant to: the construct is how far back the memory sits.
-            separability_exempt=frozenset({"position_in_haystack"}),
+            h_is_independent_variable=False,
+            # NO SEPARABILITY EXEMPTION. It was needed while gold was pinned to session 0 on every
+            # question, which made `position_in_haystack` a perfect gold predictor across the whole
+            # corpus. Gold now sits at a different index on every rung, so the feature is measured
+            # like any other and the exemption would be hiding rather than declaring. If the screen
+            # fires, that is a finding.
         ),
         generator_tool="tools/gen_typedmemeval_workingmemory.py",
         extra_checks=check_grid,
