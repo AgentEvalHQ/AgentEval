@@ -1,6 +1,6 @@
 # ADR-029: Build the conditional, not procedural memory
 
-- **Status:** **Accepted and BUILT** (2026-09-02, §9) — and **REOPENED 2026-09-03 (§10)**: the Procedural vertical this ADR declined is now being built. §9 stands; §6a does not, and
+- **Status:** **Accepted and BUILT** (2026-09-02, §9) — **REOPENED 2026-09-03 (§10)** and **BUILT the same day (§11)**: the Procedural vertical this ADR declined ships as 80 questions at headroom +0.81, committed to a branch and deliberately unreleased while the counterparty's co-design reply is outstanding. §9 stands; §6a does not, and
   neither does the title — it is kept because retitling an ADR hides the reversal.
 - **How it got here, which is the useful part:** an earlier draft proposed narrowing ADR-027's
   exclusion and was put to an adversarial review that refuted three of its four decisions (§8). The
@@ -374,3 +374,71 @@ rather than for waiting.
 
 **Nothing in §9 changes.** `conjunction/conditional-branch` stays where it is; the conditional is a
 join and belongs in Conjunction, not in a procedure recital.
+
+## 11. OUTCOME, 2026-09-03 — built and measured. Four deltas from §10d's plan.
+
+Status: **Accepted and implemented.** Corpus `e86a271e323f`, 80 questions, four shapes at 20 each,
+exactly as §10d planned. What follows is what §10d could not know.
+
+### 11a. What it measured
+
+| shape | V1 | V8 | V9 | headroom | discriminates |
+|---|---|---|---|---|---|
+| `step-order` | 20/20 | 20/20 | 1/20 | **+0.95** | yes |
+| `amended-step` | 20/20 | 20/20 | 3/20 | **+0.85** | yes |
+| `precondition` | 20/20 | 20/20 | 4/20 | **+0.80** | yes |
+| `retired-step` | 20/20 | 20/20 | 7/20 | **+0.65** | yes |
+
+Vertical: V1 80/80, V2 80/80, V3 80/80, V6 77/80, V8 80/80, V9 15/80, headroom **+0.8125** — the
+largest in the family, and fully reachable since V8 equals V1. Coverage 0.594; per shape 0.525 /
+0.575 / 0.600 / 0.675, all in band, **calibrated per shape from the first build**.
+
+**§10d's two techniques both held.** Invented causality: V2 **80/80**, so no leak agreed with gold.
+The second-hop construction: V9 **15/80** against V8 80/80, which is the gap the asymmetry was built
+to produce.
+
+### 11b. Delta 1 — `precondition` asked for one hop and graded two
+
+§10d describes the shape as *"reached through a second hop"*, and the first question text was
+*"What has to be true before X can start?"*. Gold named both the gate and its prerequisite, so a
+reader that correctly named the gate alone was graded wrong: **V1 15/20**.
+
+The corpus was not the defect; the question was. It now asks *"…and what does that depend on in
+turn?"* — **V1 20/20**. This is the shape-level form of a rule this family has now hit repeatedly:
+**gold may not require what the question did not ask for.**
+
+### 11c. Delta 2 — V6 counted a decline as a success
+
+`amended-step` came back **V6 11/20 failing**, and the failures were readers *explicitly declining*
+the amendment link when a component was dropped — which is the correct behaviour, scored as though
+they had reached gold. The instrument for this already existed (`answer_must_name`, built for
+`semantic/co-reference` the day before) and simply had not been declared here. Declared: **77/80**.
+
+The three residual failures (`tme-prc-008`, `017`, `018`) are understood and unfixed.
+
+### 11d. Delta 3 — the separability gate refused the corpus four times
+
+84 leaking phrases → 61 → 1 → **0**. Every failure was filler drawn from a bank or frame the gold
+owned: a hardcoded membership sentence, then a shared step bank, then `'of the sequence'` leaking
+from the edit frames. **Each fix gave filler the same bank; none weakened the check.** Disjoint
+filler banks are now asserted at import.
+
+This is the same defect class as the 72 distractors that shipped in v0.32.0-beta. It was caught
+before generation completed rather than after release, which is the gate working.
+
+### 11e. Delta 4 — §10e was overtaken. The counterparty asked to co-design.
+
+§10e said the counterparty *"is not being asked to approve in advance"* and would be told in the
+next disclosure. They were told, and their reply **raised no objection to the vertical** but asked
+for something §10e did not anticipate: **co-design the corpus intent against their AIP/skills track
+before the corpus is fixed**, so that two procedural corpora which cannot share questions are not
+built in parallel.
+
+That is a reasonable ask and it is honoured. A one-page shape list is written. **The corpus is
+committed to a branch and is deliberately not released**, so nothing they consume depends on it
+while their single reply is outstanding. The bilateral exclusion in ADR-026 §8 is not narrowed by
+this ADR alone; it is narrowed when they answer.
+
+**One open risk, stated rather than assumed:** our step names are semantics-free invented artefacts.
+If their track needs steps that map to callable operations, that is a bank change — cheap now,
+expensive once the corpus is cited.
