@@ -1497,6 +1497,13 @@ public sealed class TypedMemEvalCorpusTests
         // judge scored them as reaching a gold that names no place. The ablation arms now require
         // the answer to be tied to the asked entity.
         [TypedMemEvalVertical.Semantic] = 1.0,
+        // The tenth vertical, and the first built with V6 in mind rather than retro-fitted to it.
+        // 60/80 on its first probe: the membership session was being dropped and the reader said so
+        // ("the conversations do not mention a Verrin changeover by name") before reporting a rival
+        // edit, which an equivalence judge scored as reaching a gold that names no procedure. The
+        // grader `semantic/co-reference` needed already existed; this vertical only had to declare
+        // `answer_must_name`. 77/80 after.
+        [TypedMemEvalVertical.Procedural] = 77.0 / 80.0,
     };
 
     private static JsonElement Metadata(TypedMemEvalVertical vertical)

@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Procedural, the tenth vertical (80 questions)
+
+`TypedMemEvalVertical.Procedural`, corpus `e86a271e323f`, 80 questions across four shapes at 20
+each. It asks whether a system **remembers a procedure it was told across sessions**: the steps,
+the order they must run in, what has to be true before it starts, and which steps were later
+amended or retired.
+
+| shape | n | V1 | V8 | V9 | headroom | discriminates |
+|---|---|---|---|---|---|---|
+| `step-order` | 20 | 20/20 | 20/20 | 1/20 | **+0.95** | yes |
+| `amended-step` | 20 | 20/20 | 20/20 | 3/20 | **+0.85** | yes |
+| `precondition` | 20 | 20/20 | 20/20 | 4/20 | **+0.80** | yes |
+| `retired-step` | 20 | 20/20 | 20/20 | 7/20 | **+0.65** | yes |
+
+Vertical: V1 80/80, V2 80/80, V3 80/80, V6 77/80, V8 80/80, V9 15/80, **headroom +0.8125** — the
+largest in the family, and fully reachable (V8 = V1, so no part of it is closed to a perfect
+retriever). Mean realised coverage 0.594; all four shapes in the 0.50–0.90 band on their own
+(0.525 / 0.575 / 0.600 / 0.675), calibrated per shape from the start rather than retro-fitted.
+
+**Why it discriminates.** Every question needs two hops by construction. Exactly one gold session
+names the procedure — the membership list, stated in an order that is never the answer — and the
+dependencies, sub-precondition, amendment and retirement name step or condition *pairs* and never
+the procedure. A retriever working from the question's wording reaches the first and not the
+second. That asymmetry is asserted at generation and is fatal to the build if it breaks.
+
+**Two constructs the family did not previously carry.** `step-order` is its only **order that must
+hold** — violating it is an error, not merely a wrong answer. `precondition` is its only constraint
+that is **neither a step nor a value**. `retired-step` is deliberately distinct from
+`forgetting/invalidated`: there a value is superseded by another value; here a position leaves the
+sequence and nothing replaces it, so a store holding procedures as opaque blobs keeps the dead step
+alive.
+
+**Scope of the claim.** This measures whether a procedure was *remembered*, not whether it can be
+*executed* or whether the system *improves* at it. Those need observed outcomes over repeated
+trials and are a different claim (ADR-029 §2). The enacted half is explicitly not built.
+
+### Added — a smoke selector for the live judge calibration arm
+
+`AGENTEVAL_CALIBRATION_ONLY` restricts `LiveJudge_LabelsTheCalibrationSetAsTheHumansDid` to named
+case ids or a named vertical, so the wiring can be proved on one case before spending the full set.
+A limited run **asserts nothing about agreement** and returns before the floors, because a green
+one-case run that read as a passed calibration would be the diluted-denominator defect this family
+has already shipped twice. Applicability is decided by the input, never by the result.
+
+### Changed — judge calibration re-measured over the grown set
+
+257 cases (was 230). Family agreement **0.988**, Procedural **1.000 (27/27)**, no vertical below
+0.885. The judge prompt was **not** touched and its fingerprint is unchanged; only the case set
+grew, which is precisely the drift the recorded `cases` count exists to catch.
+
+Three of the 27 Procedural cases were authored with the wrong label and the live arm caught it: an
+answer saying *"nothing in the record says what order they run in"* is a confident denial, which
+ADR-026 §6 grades `Missed`, not `Abstained`. The cases were reworded to sit on the side of the
+boundary they were written to test, not relabelled to agree with the judge.
+
+### Unchanged — all nine existing corpora
+
+Every existing corpus is **byte-identical** (`corpus_sha256` verified against `HEAD` for all nine).
+Their metadata sidecars moved only because `empty_rate_by_arm` records a **family-wide** call
+population, and a tenth vertical's probes enlarge it. No question, answer, or haystack changed.
+
 ## [0.33.0-beta] - 2026-09-03
 
 **Cut for AgentMemory's C-D full-family run.** It carries the two fixes they named as blocking: `forgetting` at `be14b81ae4e2` (not `7fe6e166dbf1`), and the `prospective` due-window answer-key fix at `39f205b72294`.

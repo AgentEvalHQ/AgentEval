@@ -1,7 +1,7 @@
 # ADR-029: Build the conditional, not procedural memory
 
-- **Status:** **Accepted and BUILT** (2026-09-02, §9), scoped to ONE shape — `conjunction/conditional-branch`. Procedural memory
-  as a memory type stays out and ADR-026 §8 is untouched.
+- **Status:** **Accepted and BUILT** (2026-09-02, §9) — and **REOPENED 2026-09-03 (§10)**: the Procedural vertical this ADR declined is now being built. §9 stands; §6a does not, and
+  neither does the title — it is kept because retitling an ADR hides the reversal.
 - **How it got here, which is the useful part:** an earlier draft proposed narrowing ADR-027's
   exclusion and was put to an adversarial review that refuted three of its four decisions (§8). The
   maintainer then set aside the one political objection, leaving the two technical ones — and
@@ -302,3 +302,75 @@ bank produces `"('the Kelvaryn access', ('open', ...))"` and sends *that* to the
 The model says REAL: no — correctly — and the real name inside the string is silently exonerated.
 **No shipped bank was nested when this was written; `CONDITIONS` is the first.** The unpacking is
 fixed and a punctuation check now raises rather than auditing a string no corpus contains.
+
+---
+
+## 10. REOPENED, 2026-09-03 — build Procedural. The technical objection was withdrawn in §7b.
+
+**§6a said this project does not narrow ADR-026 §8's exclusion. That is reversed here**, on the
+maintainer's authority, and the reasoning that got here is short because most of it is already above.
+
+### 10a. The blocker I kept quoting was solved in this same document
+
+§6d called the §4 contradiction "open and blocking": a procedure is distinct because its order is
+*causally required*, and ADR-026 §5.2 forbids orderings a model can infer from narrative logic.
+
+**§7b resolves it.** *"The Vreskade check must run before the Quorlory sync, because Quorlory
+consumes Vreskade's output"* is causally required **inside the fiction** and unguessable **outside**
+it, because no model holds a prior about Vreskade. §5.2 bans orderings a model can INFER, not
+causality as such. §7b then set the resolution aside with the words *"it is simply no longer the
+argument being made"* — because the scope had already narrowed to the conditional, **not because it
+fails**.
+
+I quoted §6d as a live blocker after §7b had dissolved it. That was the error, and it survived into
+the quality board and a reply to the maintainer.
+
+### 10b. Execution was never required, and this ADR already said so
+
+§2: *"Observed outcomes are needed to test whether a system IMPROVED; they are not needed to test
+whether it REMEMBERED."* Asking for a procedure and grading the answer tests memory. Execution tests
+learning. Only the first is this family's subject, so the N4 (enacted) half stays out and **N3
+(declarative) is the whole build**.
+
+### 10c. The gap is measured, not argued
+
+Across all **485** shipped questions — question text, gold answer and full haystack:
+
+| property | occurrences |
+|---|---|
+| precondition language (`must … before`, `cannot … until`, `only after`, `prerequisite`) | **0** |
+| causal-necessity language (`because`, `so that`, `consumes`, `depends on`) | **0** |
+
+§3's table listed **preconditions** as unhomed and only the conditional was built. It is still
+unhomed. `episodic/list-order` recalls an ordered list, but an **arbitrary** one — nothing in the
+family tests an order that must hold, or a constraint that is neither a step nor a value.
+
+### 10d. What is being built
+
+**Four shapes, 20 each, 80 questions.** `conditional-branch` is NOT among them — it already shipped
+inside Conjunction and duplicating it would be the weak-vertical failure ADR-027 §11.1 names.
+
+| shape | what only it tests |
+|---|---|
+| `step-order` | an order that must hold; violating it is an error, not a wrong answer |
+| `precondition` | a constraint that is neither a step nor a value, reached through a second hop |
+| `amended-step` | one element of a sequence replaced, the rest intact |
+| `retired-step` | a position removed from a sequence — not a fact invalidated |
+
+**The two known risks each have a technique demonstrated this week.** §5's V2 blindness on ordering
+questions is answered by invented causality (no prior can apply, and V2 tests exactly that). §5's
+structural cap — *"the question names the entity it asks about"* — is answered the way
+`conditional-branch` answered it: put a required hop in a session that names **only** the
+subordinate entity, so the question cannot reach it. Measured there: rule retrievable 15/15, state
+0/15.
+
+### 10e. What is NOT decided, and is disclosed rather than assumed
+
+**ADR-026 §8's exclusion is bilateral.** The maintainer holds this side of it and has exercised that
+call; the counterparty has not been asked and is not being asked to approve in advance. They are
+told what we are doing in the next disclosure, before it lands in a release they consume. If they
+object, this is one vertical and it can be withdrawn — which is the argument for telling them
+rather than for waiting.
+
+**Nothing in §9 changes.** `conjunction/conditional-branch` stays where it is; the conditional is a
+join and belongs in Conjunction, not in a procedure recital.

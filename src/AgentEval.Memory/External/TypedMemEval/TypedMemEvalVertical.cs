@@ -71,7 +71,34 @@ public enum TypedMemEvalVertical
     /// The merged corpus does NOT inherit its parts' certifications: SS10 requires its own V7 run,
     /// and it got one.
     /// </remarks>
-    Conjunction = 8
+    Conjunction = 8,
+
+    /// <summary>
+    /// An ordered, causally-constrained procedure learned across sessions: its steps, its
+    /// preconditions, and which steps were amended or retired.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-029 SS10, which REVERSES that ADR's own SS6a. RECALL ONLY. Asking for a process and
+    /// grading the answer tests whether a system <b>remembers</b> it; executing the process would
+    /// test whether it got <b>better</b> at it, and only the first is this family's subject —
+    /// ADR-029 SS2 said so before the vertical was declined on other grounds.
+    /// </para>
+    /// <para>
+    /// The gap it closes was measured, not argued: across the 485 questions shipped before it,
+    /// their gold and their full haystacks, ZERO carried precondition language and ZERO carried
+    /// causal-necessity language. <c>episodic/list-order</c> recalls an ordered list, but an
+    /// ARBITRARY one — nothing tested an order that must hold, or a constraint that is neither a
+    /// step nor a value.
+    /// </para>
+    /// <para>
+    /// Its ordering survives V2 by <b>invented causality</b>: "the Quorlory sync consumes the
+    /// Vreskade check's output" is causally required inside the fiction and unguessable outside it,
+    /// because no model holds a prior about Quorlory. ADR-026 SS5.2 bans orderings a model can
+    /// INFER, not causality as such.
+    /// </para>
+    /// </remarks>
+    Procedural = 9
 
 }
 
@@ -236,6 +263,24 @@ public static class TypedMemEvalVerticals
             // No timestamps. Both halves resolve by stated relation - a replacement chain, an alias,
             // an anchor pinned between two switches - never by session date. Supplying dates would
             // let a metadata sort answer the semantic half without reading it.
+            RequiredGrounding = TemporalGroundingMode.None,
+            RequiresTimestamps = false
+        },
+        [TypedMemEvalVertical.Procedural] = new()
+        {
+            Vertical = TypedMemEvalVertical.Procedural,
+            Slug = "procedural",
+            Abbreviation = "prc",
+            DisplayName = "TypedMemEval-Procedural",
+            // Four shapes at 20. `conditional-branch` is deliberately NOT among them: it already
+            // shipped inside Conjunction, and a vertical whose shapes each have a plausible existing
+            // home is the weak vertical ADR-027 SS11.1 refuses.
+            QuestionCount = 80,
+            // No timestamps, and this is load-bearing rather than incidental. The order of a
+            // procedure is fixed by STATED CAUSAL DEPENDENCY between its steps, never by when the
+            // sessions happened to be written. Supplying dates would let a metadata sort produce a
+            // plausible sequence without reading a single dependency — which is precisely the
+            // failure Temporal exists to catch, one vertical over.
             RequiredGrounding = TemporalGroundingMode.None,
             RequiresTimestamps = false
         },

@@ -78,7 +78,7 @@ as sensitive data: restrict access, retention, and publication.
 
 ### Typed outcomes, never one percentage
 
-> **Thirteen of the 32 shapes carry fewer than 15 questions, and their figures support diagnosis
+> **Thirteen of the 36 shapes carry fewer than 15 questions, and their figures support diagnosis
 > rather than claims.** ADR-026 says this about the family's cell sizes and the published tables never
 > repeated it, so a six-question rate has been reading like a measurement. The threshold is a
 > judgement — 15 is where a single question stops moving a rate by more than ~7 points — but the
@@ -129,7 +129,7 @@ Exactly one causal reading is safe — `Wrong` with `EvidenceAbsent` *is* a retr
 The mirror reading (`Missed` with `EvidencePresent` means a synthesis failure) is an inference, not
 a fact, because a compression loss inside the store looks identical from here.
 
-## The nine verticals
+## The ten verticals
 
 ### Prospective (50 questions)
 
@@ -304,6 +304,28 @@ other scores like a stack weak on both** — which is exactly what a per-type sc
 headroom 0.00) and cannot discriminate retrievers at all; the vertical's headroom is carried
 entirely by the other two. That is declared here rather than left inside an average.
 
+### Procedural (80 questions)
+
+Twenty each of `step-order`, `precondition`, `amended-step`, `retired-step`. The vertical asks
+whether a system **remembers a procedure it was told across sessions** — the steps, the order they
+must run in, what has to be true before it starts, and which steps were later amended or retired. It
+does not ask whether the system can *execute* the procedure or whether it *improves* at it; that
+needs observed outcomes over repeated trials and is a different claim, argued in ADR-029 §2.
+
+Two properties are unique to this vertical. `step-order` is the family's only **order that must
+hold** — violating it is an error rather than a wrong answer — and `precondition` is its only
+constraint that is **neither a step nor a value**. `retired-step` is deliberately distinct from
+`forgetting/invalidated`: there a value is superseded by another value, here a position leaves the
+sequence and nothing takes its place, so a store that keeps procedures as opaque blobs keeps the
+dead step alive.
+
+Every question needs **two hops by construction**. Exactly one gold session names the procedure — the
+membership list, and it states the steps in an order that is never the answer. The dependencies, the
+sub-precondition, the amendment and the retirement name step or condition *pairs* and never the
+procedure, so a retriever working from the question's wording reaches the first and not the second.
+That asymmetry is enforced at generation and is why the vertical carries the family's largest
+headroom (**+0.81**) with all four shapes discriminating.
+
 ## Coverage: what the corpora guarantee, and what they don't
 
 A saturated corpus cannot see retrieval mechanisms. Two mechanisms produce non-saturation, and the
@@ -340,6 +362,7 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Temporal | 50 | 0.704 | 2 (×15), 3 (×11), 4 (×12), 5 (×12) |
 | Semantic | 50 | 0.667 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
 | Conjunction | 65 | 0.604 | 2 (×15), 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
+| Procedural | 80 | 0.594 | 2 (×60), 4 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -423,6 +446,7 @@ gold is itself an abstention.
 | Temporal | 50/50 | — | 50/50 | 30/30 | 30/30 | 50/50 | 19/50 | +0.62 |
 | Semantic | 49/50 | — | 48/50 | 50/50 | 15/15 | 49/50 | 30/50 | +0.38 |
 | Conjunction | 65/65 | — | 65/65 | 65/65 | 50/50 | 63/65 | 16/65 | +0.75 |
+| Procedural | 80/80 | — | 80/80 | 80/80 | 77/80 | 80/80 | 15/80 | +0.81 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**

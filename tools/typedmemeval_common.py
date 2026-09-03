@@ -142,6 +142,11 @@ VERTICALS = {
     # ADR-027 SS10. Cross-type: questions no single memory type can answer, composed from the
     # constructs the other verticals certify. Gold is genuinely mixed-type here.
     "conjunction":  ("cnj",  65),   # 50 -> 65: ADR-029's conditional-branch, see TypedMemEvalVertical.cs
+    # ADR-029 SS10. The tenth vertical and the last gap in the taxonomy: an ordered,
+    # causally-constrained procedure learned across sessions. RECALL ONLY -- asking for the process
+    # tests whether a system remembers it; executing the process would test whether it got BETTER at
+    # it, which is a different claim and not this family's subject.
+    "procedural":   ("prc",  80),
 }
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "src" / "AgentEval.Memory" / "Data" / "typedmemeval"
