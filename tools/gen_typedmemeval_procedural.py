@@ -46,6 +46,22 @@ TYPE_RETIRED = "procedural-retired-step"
 ORDER_QUESTIONS = PRECOND_QUESTIONS = AMENDED_QUESTIONS = RETIRED_QUESTIONS = 20
 
 H_MIN, H_MAX = 15, 25
+#: `step-order` REALISES COVERAGE BELOW THE 0.50 BAND FLOOR (0.463), and that is declared rather than
+#: engineered away. It is the only shape carrying four MANDATORY strong competitors -- the three
+#: rival-chain sessions and the applicability session -- against G=4 gold at K_ref=5, and the rival
+#: chain competes with gold on the same frames and the same step vocabulary by design, because that
+#: is what makes the membership session load-bearing.
+#:
+#: The echo knob cannot lift it: echo makes DISTRACTORS more question-like, so it only ever LOWERS
+#: coverage, and at echo 0.000 the shape is already at its ceiling. Narrowing the distractor budget
+#: to [12,18] was tried and bought 0.012 -- 0.463 to 0.475 -- for a per-shape special case, so it was
+#: reverted.
+#:
+#: ADR-028 is the resolution: accept a shape on measured DISCRIMINATION, not on the coverage proxy.
+#: step-order discriminates at the top of the family (V9 far below V8, headroom fully reachable). The
+#: failure to avoid is not being out of band; it is being out of band SILENTLY -- so this shape is
+#: DECLARED in TypedMemEvalCoverageBandTests.OutOfBand with the value measured here, alongside the
+#: four already there, and a drift check fails if it moves.
 _BASE = datetime(2026, 5, 11, 9, 30)
 
 #: Procedures. Invented, and audited by tools/audit_name_collisions.py like every other entity bank
@@ -111,6 +127,55 @@ RETIRE_FRAMES = (
     "We no longer run {step} as part of {proc}.",
     "{step} is out of {proc} — the sequence is shorter by one now.",
 )
+
+#: WHEN a procedure applies, and when it must NOT run. Requested by the consuming project, whose
+#: AIP skills carry `trigger_when` / `do_not_use_when` as first-class fields.
+#:
+#: NO SHAPE ASKS THIS, deliberately. It is carried in the SUBSTRATE so that a fifth shape here, or a
+#: skill-emission question over the same haystacks on their side, is possible WITHOUT regenerating.
+#: Cheap now and expensive after citation -- which is the argument we made to them about step names,
+#: returned to us about this. It does not thin the 20-per-shape parity because it asks nothing.
+#:
+#: An applicability session NAMES THE PROCEDURE and carries no step and no order, so it does not
+#: collapse the second hop -- check (a) is scoped to sessions naming a STEP for exactly this reason.
+#: It does compete for the retrieval budget, which makes V9 harder rather than easier.
+SITUATIONS = (
+    "the upstream feed changes supplier", "a quarter closes on a weekend",
+    "the second site comes online", "a reconciliation is carried over",
+    "the ledger is reopened after sign-off", "an interim balance is requested",
+)
+EXCLUSIONS = (
+    "the period is already locked", "a freeze is in force",
+    "the parallel run has not finished", "an audit is open on the same accounts",
+    "the prior cycle was rolled back", "only a partial extract is available",
+)
+APPLICABILITY_FRAMES = (
+    "{proc} is the one to run when {trigger}. Do not use it when {exclude}.",
+    "Use {proc} for {trigger} — but not when {exclude}.",
+    "{proc} applies when {trigger}; when {exclude}, it is the wrong procedure.",
+)
+
+#: Invented, stable operation identity per step, for the consuming project's skill-emission test:
+#: scoring an EMITTED CALL SEQUENCE needs something to match against. SEMANTICS-FREE on purpose --
+#: tool SHAPE without real-world semantics -- so the V2-clean property the invented-causality choice
+#: buys is untouched. Derived, not tabulated, so a new step cannot arrive without one.
+_ARG_BANK = ("source_ref", "period_key", "batch_id", "target_ref", "cutoff", "scope")
+
+
+def _operation(step: str) -> str:
+    return step.removeprefix("the ").replace(" ", "_").lower()
+
+
+def _arg_slots(step: str) -> list[str]:
+    """0-2 named slots, deterministic in the step name so the id is stable across regenerations."""
+    n = len(step) % 3
+    i = sum(map(ord, step)) % len(_ARG_BANK)
+    return [_ARG_BANK[(i + k) % len(_ARG_BANK)] for k in range(n)]
+
+
+def _operations(steps) -> list[dict]:
+    return [{"step": x, "operation": _operation(x), "args": _arg_slots(x)} for x in steps]
+
 
 OPENERS = ("Noting this down.", "For the file.", "Worth recording.", "Quick update.",
            "One more thing.", "Setting this down.")
@@ -206,18 +271,77 @@ def _filler(rng: random.Random, echoed: list[str],  # DevSkim: ignore DS148264 -
         text = (rng.choice(AMEND_FRAMES).format(old=picks[0], new=picks[1], proc="the sequence")
                 if rng.random() < 0.5
                 else rng.choice(RETIRE_FRAMES).format(step=picks[0], proc="the sequence"))
-    elif draw < 0.52:
+    elif draw < 0.48:
         # A dependency between two steps of a procedure nobody asks about: the ordering frame
         # appears outside gold at the rate gold uses it.
         a, b = rng.sample(steps, 2)
         text = rng.choice(DEPENDENCY_FRAMES).format(a=a, b=b)
-    elif draw < 0.50:
-        # Likewise the precondition frame.
+    elif draw < 0.54:
+        # Applicability, about a procedure nobody asks about. Without this branch the frame appears
+        # only where the asked procedure does, and a frame only one side ever receives is a marker
+        # rather than content -- the defect this build was refused for four times running.
+        text = rng.choice(APPLICABILITY_FRAMES).format(
+            proc=rng.choice(procs), trigger=rng.choice(SITUATIONS), exclude=rng.choice(EXCLUSIONS))
+        text = f"{text[0].upper()}{text[1:]}"
+    elif draw < 0.66:
+        # Likewise the precondition frame. THIS BRANCH WAS DEAD: its bound was 0.50 behind a 0.52
+        # above it, so PRECOND_FRAMES never appeared outside gold and the frame marked gold on
+        # every `precondition` question. The separability gate did not catch it because the frames
+        # vary enough phrase-to-phrase to stay under its threshold -- a reminder that a green gate
+        # bounds the tell it measures, not the one nobody wrote a branch for.
         text = rng.choice(PRECOND_FRAMES).format(
             proc=rng.choice(procs), cond=rng.choice(conds))
     else:
         text = rng.choice(FILLER)
     return _session(rng, text, echoed, gold=False, tag="filler")
+
+
+def _applicability(rng: random.Random, proc: str,  # DevSkim: ignore DS148264 - deterministic corpus generation
+                   echoed: list[str]) -> tuple[tmc.Session, str, str]:
+    """States when the asked procedure applies and when it must not run. NON-GOLD: nothing asks it."""
+    trigger = rng.choice(SITUATIONS)  # DevSkim: ignore DS148264 - deterministic corpus generation
+    exclude = rng.choice(EXCLUSIONS)  # DevSkim: ignore DS148264 - deterministic corpus generation
+    text = rng.choice(APPLICABILITY_FRAMES).format(  # DevSkim: ignore DS148264 - deterministic corpus generation
+        proc=proc, trigger=trigger, exclude=exclude)
+    return (_session(rng, f"{text[0].upper()}{text[1:]}", echoed, gold=False, tag="applicability"),
+            trigger, exclude)
+
+
+def _rival_chain(rng: random.Random, echoed: list[str],  # DevSkim: ignore DS148264 - deterministic corpus generation
+                 avoid: frozenset[str]) -> list[tmc.Session]:
+    """A COMPLETE chain over steps this question does not own.
+
+    Without it the gold chain is the only total order in the haystack, because `_filler` states
+    only ISOLATED pairs. A reader holding the three dependency links could therefore emit the gold
+    order WITHOUT ever learning which procedure they belong to -- which made the membership
+    session, this shape's entire second hop, redundant, and `gold_components_load_bearing: True` an
+    over-claim on all twenty questions.
+
+    V6 measured exactly that: 14 of 60 membership-drop samples reproduced the four gold step names
+    verbatim in gold order, and only 3 were condemned -- the other 11 were rescued by the
+    resolution grader saying `declined`, which is the arm reporting a corpus defect as a pass.
+
+    With a rival chain present, dropping membership leaves two complete orders and nothing that
+    says which is the asked procedure's, so the hop is load-bearing by construction rather than by
+    declaration. Same repair `_rival_edits` already makes for amended-step and retired-step.
+    """
+    # TWO rival chains, not one, and the second is there for a MEASUREMENT reason rather than a
+    # difficulty one. With a single rival the reader that has lost the membership session chooses
+    # between two complete orders, so `chance_floor` is 1/2, `v3_required_hits(2)` is None, and V6
+    # cannot resolve the shape at three samples at all -- it returned UNDECIDABLE on all twenty
+    # questions, which is not a pass, it is silence. The same 2-way dead end that leaves
+    # `conjunction/alias-then-count` unresolvable.
+    #
+    # Three candidate chains put k at 3, where the threshold is 3-of-3 and the arm can decide. It
+    # also makes the membership session harder to skip, which is the construct.
+    pool = [x for x in list(STEPS) + list(FILLER_STEPS) if x not in avoid]
+    picks = rng.sample(pool, 8)  # DevSkim: ignore DS148264 - deterministic corpus generation
+    out = []
+    for chain in (picks[:4], picks[4:]):
+        out += [_session(rng, rng.choice(DEPENDENCY_FRAMES).format(a=a, b=b),
+                         echoed, gold=False, tag="rival-dependency")
+                for a, b in zip(chain, chain[1:])]
+    return out
 
 
 def _lay_out(sessions: list[tmc.Session], ordinal: int) -> datetime:
@@ -268,7 +392,14 @@ def _step_order(index: int, echo: float, rng: random.Random) -> tmc.Question:  #
         golds.append(_session(rng, rng.choice(DEPENDENCY_FRAMES).format(a=a, b=b),
                               echoed, gold=True, tag="dependency"))
 
-    sessions = golds + [_filler(rng, echoed, owned) for _ in range(rng.randint(H_MIN, H_MAX))]
+    applic, trigger, exclude = _applicability(rng, proc, echoed)
+    rival = _rival_chain(rng, echoed, owned)
+    # DRAWN FROM THE FILLER BUDGET, not added to it. The rival chain is filler in every respect
+    # except that its edges are guaranteed to compose, so counting it separately pushed H to 28
+    # against a declared [15, 25] on five questions -- a corpus that fails its own structure spec.
+    sessions = (golds + rival + [applic]
+                + [_filler(rng, echoed, owned)
+                   for _ in range(rng.randint(H_MIN, H_MAX) - len(rival) - 1)])
     rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation
     date = _lay_out(sessions, index)
     return tmc.Question(
@@ -276,6 +407,30 @@ def _step_order(index: int, echo: float, rng: random.Random) -> tmc.Question:  #
         f"{', then '.join(steps[:-1])}, then {steps[-1]}.",
         date, sessions,
         {"shape": SHAPE_ORDER, "procedure": proc, "steps": list(steps),
+         # SUBSTRATE FOR THE CONSUMING PROJECT'S SKILLS TRACK. Nothing here is asked by any shape
+         # and nothing here is graded; it is carried so their skill-emission questions can run on
+         # these haystacks without a regeneration. `dataflow` is the produces/consumes relation the
+         # prose already states -- their typed-port graph, which our invented causality turned out
+         # to be an instance of.
+         "operations": _operations(steps),
+         "dataflow": [{"produces": _operation(a), "consumes": _operation(b)}
+                      for a, b in zip(steps, steps[1:])],
+         # V6'S CHANCE FLOOR, derived from the construction rather than declared by hand.
+         #
+         # Without it `v6_k` is None, `v6_needs` collapses to 1, and ONE hit in three samples
+         # condemns a component. Against a guesser choosing among k candidates that fires with
+         # probability 1-(1-1/k)^3 -- 0.70 at k=3 -- so V6 was condemning components that ARE
+         # load-bearing, on luck. Exactly the hole `semantic/co-reference` had, where fixing it took
+         # the shape from 4/15 to 9/15 with no corpus change at all.
+         #
+         # This is the UNDERSTATING direction, which is why it survived a probe: it makes the corpus
+         # look worse than it is. It is still wrong, and a number that is wrong in the safe
+         # direction is still a number nobody can cite.
+         # Three complete chains exist by construction -- gold's and `_rival_chain`'s two -- so a
+         # reader that has lost the membership session is choosing among three total orders. k=3 is
+         # where `v3_required_hits` returns 3-of-3 and the arm can actually decide.
+         "chance_floor": 1 / 3,
+         "applicability": {"trigger_when": trigger, "do_not_use_when": exclude},
          "gold_components_load_bearing": True,
          # THE ANSWER MUST BE ABOUT THIS PROCEDURE, on the ablation arms only.
          #
@@ -316,7 +471,10 @@ def _precondition(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         _session(rng, rng.choice(SUBCOND_FRAMES).format(cond=cond, sub=sub),
                  echoed, gold=True, tag="subgate"),
     ]
-    sessions = golds + [_filler(rng, echoed, owned) for _ in range(rng.randint(H_MIN, H_MAX))]
+    applic, trigger, exclude = _applicability(rng, proc, echoed)
+    sessions = (golds + [applic]
+                + [_filler(rng, echoed, owned)
+                   for _ in range(rng.randint(H_MIN, H_MAX) - 1)])
     rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation
     date = _lay_out(sessions, ORDER_QUESTIONS + index)
     return tmc.Question(
@@ -324,6 +482,17 @@ def _precondition(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         f"{cond[0].upper()}{cond[1:]} has to be in place, and that in turn needs {sub}.",
         date, sessions,
         {"shape": SHAPE_PRECOND, "procedure": proc, "condition": cond, "subcondition": sub,
+         "applicability": {"trigger_when": trigger, "do_not_use_when": exclude},
+         # V6'S CHANCE FLOOR. Unlike the other three shapes this one has no constant candidate
+         # count -- there is no guaranteed rival bank, so the competitors are however many distinct
+         # conditions the filler draw happened to place in this haystack. COUNTED, therefore, not
+         # assumed: a reader that loses the gate session knows the condition and its prerequisite
+         # from the subgate but not WHICH procedure the condition gates, so it is choosing among the
+         # conditions actually present. Assuming a constant here would hand some questions a floor
+         # their haystack does not earn.
+         "chance_floor": 1 / max(2, sum(
+             1 for c in list(CONDITIONS) + list(FILLER_CONDITIONS)
+             if any(c.lower() in x.text().lower() for x in sessions))),
          "gold_components_load_bearing": True})
 
 
@@ -373,9 +542,11 @@ def _amended_step(index: int, echo: float, rng: random.Random) -> tmc.Question: 
                  echoed, gold=True, tag="amendment"),
     ]
     rivals = _rival_edits(rng, "amendment", owned, echoed)
+    applic, trigger, exclude = _applicability(rng, proc, echoed)
     # Inside the haystack budget, so H does not drift with the fix.
-    sessions = golds + rivals + [_filler(rng, echoed, owned)
-                                 for _ in range(rng.randint(H_MIN, H_MAX) - len(rivals))]
+    sessions = golds + rivals + [applic] + [
+        _filler(rng, echoed, owned)
+        for _ in range(rng.randint(H_MIN, H_MAX) - len(rivals) - 1)]
     rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation
     date = _lay_out(sessions, ORDER_QUESTIONS + PRECOND_QUESTIONS + index)
     return tmc.Question(
@@ -383,7 +554,23 @@ def _amended_step(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         f"{old[0].upper()}{old[1:]} was swapped out; {new} runs in its place.",
         date, sessions,
         {"shape": SHAPE_AMENDED, "procedure": proc, "steps": list(steps),
+         "operations": _operations(steps + [new]),
+         "applicability": {"trigger_when": trigger, "do_not_use_when": exclude},
          "retired_step": old, "replacement_step": new,
+         # V6'S CHANCE FLOOR, derived from the construction rather than declared by hand.
+         #
+         # Without it `v6_k` is None, `v6_needs` collapses to 1, and ONE hit in three samples
+         # condemns a component. Against a guesser choosing among k candidates that fires with
+         # probability 1-(1-1/k)^3 -- 0.70 at k=3 -- so V6 was condemning components that ARE
+         # load-bearing, on luck. Exactly the hole `semantic/co-reference` had, where fixing it took
+         # the shape from 4/15 to 9/15 with no corpus change at all.
+         #
+         # This is the UNDERSTATING direction, which is why it survived a probe: it makes the corpus
+         # look worse than it is. It is still wrong, and a number that is wrong in the safe
+         # direction is still a number nobody can cite.
+         # `_rival_edits(n=2)` guarantees two rival amendments beside gold's, so a reader without
+         # the membership session picks one of three.
+         "chance_floor": 1 / 3,
          "gold_components_load_bearing": True,
          # THE ANSWER MUST BE ABOUT THIS PROCEDURE, on the ablation arms only.
          #
@@ -418,9 +605,11 @@ def _retired_step(index: int, echo: float, rng: random.Random) -> tmc.Question: 
                  echoed, gold=True, tag="retirement"),
     ]
     rivals = _rival_edits(rng, "retirement", owned, echoed)
+    applic, trigger, exclude = _applicability(rng, proc, echoed)
     # Inside the haystack budget, so H does not drift with the fix.
-    sessions = golds + rivals + [_filler(rng, echoed, owned)
-                                 for _ in range(rng.randint(H_MIN, H_MAX) - len(rivals))]
+    sessions = golds + rivals + [applic] + [
+        _filler(rng, echoed, owned)
+        for _ in range(rng.randint(H_MIN, H_MAX) - len(rivals) - 1)]
     rng.shuffle(sessions)  # DevSkim: ignore DS148264 - deterministic corpus generation
     date = _lay_out(sessions, ORDER_QUESTIONS + PRECOND_QUESTIONS + AMENDED_QUESTIONS + index)
     return tmc.Question(
@@ -429,6 +618,21 @@ def _retired_step(index: int, echo: float, rng: random.Random) -> tmc.Question: 
         f"replaced it.",
         date, sessions,
         {"shape": SHAPE_RETIRED, "procedure": proc, "steps": list(steps), "retired_step": dropped,
+         # V6'S CHANCE FLOOR, derived from the construction rather than declared by hand.
+         #
+         # Without it `v6_k` is None, `v6_needs` collapses to 1, and ONE hit in three samples
+         # condemns a component. Against a guesser choosing among k candidates that fires with
+         # probability 1-(1-1/k)^3 -- 0.70 at k=3 -- so V6 was condemning components that ARE
+         # load-bearing, on luck. Exactly the hole `semantic/co-reference` had, where fixing it took
+         # the shape from 4/15 to 9/15 with no corpus change at all.
+         #
+         # This is the UNDERSTATING direction, which is why it survived a probe: it makes the corpus
+         # look worse than it is. It is still wrong, and a number that is wrong in the safe
+         # direction is still a number nobody can cite.
+         # Same construction as amended-step: two guaranteed rival retirements beside gold's.
+         "chance_floor": 1 / 3,
+         "operations": _operations(steps),
+         "applicability": {"trigger_when": trigger, "do_not_use_when": exclude},
          "gold_components_load_bearing": True,
          # THE ANSWER MUST BE ABOUT THIS PROCEDURE, on the ablation arms only.
          #
@@ -507,9 +711,29 @@ def check_procedural(questions: list[tmc.Question]) -> list[str]:
             if j in gold_idx:
                 continue
             text = session.text()
-            hit = next((o for o in owned if o.lower() in text.lower()), None)
+            # THE APPLICABILITY SESSION IS THE ONE EXEMPTION, AND ONLY FOR THE PROCEDURE NAME.
+            # It exists to say WHEN the procedure applies, which cannot be said without naming it.
+            # It stays forbidden from naming a STEP, a condition or an edit -- so it carries no
+            # order, no gate and no revision, and cannot collapse the second hop. What it does do is
+            # compete for the retrieval budget on the question's own words, which makes V9 harder.
+            forbidden = (owned - {proc}) if session.tag == "applicability" else owned
+            hit = next((o for o in forbidden if o.lower() in text.lower()), None)
             if hit:
                 failures.append(f"{q.question_id} s{j}: filler names {hit!r}, which this question owns")
+
+        # (b2) EXACTLY ONE APPLICABILITY SESSION, and it must be non-gold. Two would make the
+        #      procedure name cheap to retrieve; zero would silently drop the substrate the
+        #      consuming project asked for, and nothing else in this file would notice, because no
+        #      shape asks an applicability question. A field carried for someone else needs a guard
+        #      of its own or it rots the first time a generator is refactored.
+        applic = [j for j, s_ in enumerate(q.sessions) if s_.tag == "applicability"]
+        if len(applic) != 1:
+            failures.append(
+                f"{q.question_id}: {len(applic)} applicability sessions, expected exactly 1")
+        if any(j in gold_idx for j in applic):
+            failures.append(f"{q.question_id}: the applicability session is marked gold; nothing asks it")
+        if not (q.extension.get("applicability") or {}).get("trigger_when"):
+            failures.append(f"{q.question_id}: no applicability.trigger_when in the extension")
 
         if shape == SHAPE_ORDER:
             steps = q.extension["steps"]
@@ -536,6 +760,41 @@ def check_procedural(questions: list[tmc.Question]) -> list[str]:
                     failures.append(
                         f"{q.question_id}: the membership session lists the steps in ANSWER order, "
                         f"so the ordering can be read off without following a single dependency")
+
+            # (d2) A COMPLETE RIVAL CHAIN MUST EXIST OUTSIDE GOLD. Without one the gold chain is
+            #      the only total order in the haystack, so the three dependency links alone yield
+            #      the answer and the membership session -- this shape's whole second hop -- is
+            #      redundant. Not a hypothesis: V6 measured 14 of 60 membership-drop samples
+            #      reproducing the four gold steps verbatim in gold order, and only 3 were
+            #      condemned. The other 11 were rescued by the resolution grader saying `declined`,
+            #      which is the arm reporting a corpus defect as a pass. Fatal, because a shape
+            #      whose declared load-bearing component is not load-bearing publishes a flattering
+            #      V6 -- and it fails in the FLATTERING direction, the kind this family ships most.
+            #
+            #      SCOPED TO THE TAGGED SESSIONS, not re-derived from the whole haystack. The first
+            #      version walked a longest path over every non-gold session and reported 3-of-4 on
+            #      five questions that in fact had a complete rival chain: `weave_echo` can inject a
+            #      THIRD step name into a session, and an edge extractor keying on "exactly two step
+            #      names" drops that edge silently. Reading the sessions the generator emitted for
+            #      this purpose measures the structure instead of the echo.
+            rival = [i for i in range(len(q.sessions))
+                     if q.sessions[i].tag == "rival-dependency"]
+            if len(rival) != 2 * (len(steps) - 1):
+                failures.append(
+                    f"{q.question_id}: {len(rival)} rival-dependency sessions; TWO complete rival "
+                    f"chains need {2 * (len(steps) - 1)}. One rival leaves a 2-way choice, which V6 "
+                    f"cannot resolve at three samples -- it returns undecidable, not a pass")
+            else:
+                mentioned = {x for i in rival for x in list(STEPS) + list(FILLER_STEPS)
+                             if x in q.sessions[i].text()}
+                if len(mentioned) < 2 * len(steps):
+                    failures.append(
+                        f"{q.question_id}: the rival chains span {len(mentioned)} distinct steps and "
+                        f"two full rivals need {2 * len(steps)}; overlapping rivals are one rival")
+                if mentioned & set(steps):
+                    failures.append(
+                        f"{q.question_id}: the rival chain reuses {sorted(mentioned & set(steps))!r} "
+                        f"from the asked procedure, so it is not a rival but a second account of it")
 
         if shape == SHAPE_PRECOND:
             # (e) THE SUBGATE MUST NOT NAME THE PROCEDURE -- it is the unreachable half.

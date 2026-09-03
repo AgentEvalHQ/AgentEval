@@ -1,6 +1,6 @@
 # ADR-029: Build the conditional, not procedural memory
 
-- **Status:** **Accepted and BUILT** (2026-09-02, §9) — **REOPENED 2026-09-03 (§10)** and **BUILT the same day (§11)**: the Procedural vertical this ADR declined ships as 80 questions at headroom +0.81, committed to a branch and deliberately unreleased while the counterparty's co-design reply is outstanding. §9 stands; §6a does not, and
+- **Status:** **Accepted and BUILT** (2026-09-02, §9) — **REOPENED 2026-09-03 (§10)**, **BUILT the same day (§11)**, and **released STANDALONE (§12)**: the Procedural vertical this ADR declined ships as 80 questions at headroom +0.81. The co-design hold in §11e is lifted; the counterparty is notified once the work is usable, not asked in advance. §9 and §10e stand; §6a and §11e's closing do not, and
   neither does the title — it is kept because retitling an ADR hides the reversal.
 - **How it got here, which is the useful part:** an earlier draft proposed narrowing ADR-027's
   exclusion and was put to an adversarial review that refuted three of its four decisions (§8). The
@@ -382,6 +382,9 @@ exactly as §10d planned. What follows is what §10d could not know.
 
 ### 11a. What it measured
 
+> **SUPERSEDED BY §14.** The `V6 77/80` below was flattering and is corrected there, along with the
+> corpus fix that replaced it. The V1/V2/V3/V8 figures stand; V9 is now 16/80 and headroom +0.80.
+
 | shape | V1 | V8 | V9 | headroom | discriminates |
 |---|---|---|---|---|---|
 | `step-order` | 20/20 | 20/20 | 1/20 | **+0.95** | yes |
@@ -442,3 +445,147 @@ this ADR alone; it is narrowed when they answer.
 **One open risk, stated rather than assumed:** our step names are semantics-free invented artefacts.
 If their track needs steps that map to callable operations, that is a bank change — cheap now,
 expensive once the corpus is cited.
+
+## 12. STANDALONE, 2026-09-03 (later) — the co-design hold is lifted, on the maintainer's decision.
+
+**§11e is superseded on one point and stands on every other.** Its record of what the counterparty
+asked for is accurate and stays. What is withdrawn is the consequence it drew: that the corpus would
+be held unreleased until they replied.
+
+**The decision, stated without dressing it up.** The maintainer has decided this project goes
+standalone: build, release, and **notify the counterparty once the work is done and usable**, rather
+than solicit their input first. This is not a claim that ADR-026 §8's exclusion has been
+renegotiated — it has not, and §1 is still right that this project cannot narrow a bilateral
+agreement by itself. It is a decision to **act and disclose** rather than to wait, accepting that
+this departs from the agreement's spirit, and it is recorded here so the departure is legible rather
+than discovered.
+
+**This reinstates §10e, which §11e had set aside.** §10e's policy was already exactly the standalone
+one — *"the counterparty … is not being asked to approve in advance … told what we are doing in the
+next disclosure … If they object, this is one vertical and it can be withdrawn, which is the
+argument for telling them rather than for waiting."* §11e overtook that on their request to
+co-design; §12 puts it back. The withdrawability in §10e is the part that makes this defensible and
+it is unchanged: **one vertical, removable, with no other corpus depending on it.**
+
+It is also consistent with what the maintainer said when §7b was written — *"we can decide this
+alone; the other party is simply not ready to use it, but if it works, it will."*
+
+### 12a. What changes in practice
+
+| | before | after |
+|---|---|---|
+| corpus | committed, **held unreleased** pending their reply | released on the normal cadence |
+| the shape list | a **request** for input, with three gating questions | a **notification**, sent once the vertical is usable |
+| their reply | a precondition | welcome, and not waited on |
+| withdrawability | — | **unchanged: still one vertical, still removable** |
+
+### 12b. What does NOT change
+
+- **The exclusion in ADR-026 §8 is not narrowed by this document.** It is departed from, knowingly.
+- **§11a–§11d stand entirely** — the measurement, and the four deltas from plan.
+- **The enacted half stays out** (§10b). Nothing here reopens it.
+- **The corpus remains withdrawable.** If the counterparty objects on seeing it, removing the
+  vertical costs one generator, one corpus, one enum member and one row in each published table.
+
+## 13. THE REPLY ARRIVED, 2026-09-03 — no conflict, and three substrate changes taken.
+
+**Sequence matters here, so it is stated first.** §12's standalone decision was made *without* the
+counterparty's answer and did not depend on it. Their reply then arrived on its own. It is recorded
+here as what it is — a confirmation that cost us nothing to have waited for and that we did not wait
+for — not as retroactive permission.
+
+### 13a. What they said
+
+**No conflict, merge.** The four shapes map onto their AIP plan rather than competing with it:
+`step-order` and `precondition` are `depends_on` and typed preconditions, `amended-step` is
+`SUPERSEDES`, `retired-step` is retirement. They confirmed **invented over recognisable** — not as a
+concession but as *required* by their side too, since recognisable procedures are the Yarrow class
+waiting to happen and invented content also avoids training-data contamination of skill content. And
+they accepted the enacted-half caveat verbatim: it is a harness, not a vertical.
+
+They also observed something we had not: **our invented causality is their typed-port dataflow
+stated in prose.** *"Vreskade consumes what Quorlory produces"* is a produces/consumes edge.
+
+### 13b. The three substrate changes, all taken
+
+Each is carried in the substrate and **asked by no shape**, so none of them changes what this
+vertical measures, what it grades, or its 20-per-shape parity.
+
+| | change | cost |
+|---|---|---|
+| a | **applicability** — the teaching sessions now state when the procedure applies and when it must *not* run (`trigger_when` / `do_not_use_when`) | a haystack change, batched into a regeneration already required |
+| b | **per-step `operation` ids** with 0–2 named argument slots, in the extension | extension-only, **free** |
+| c | **the produces/consumes edge** exposed in the extension as `dataflow` | extension-only, **free** |
+
+(b) and (c) cost nothing because `question_key` is derived from the question, answer, date and
+haystack and **excludes the extension** — so extension-only changes do not invalidate a single probe
+call. (a) does change haystack bytes, and was free in practice only because §11's V6 defect had
+already forced a regeneration.
+
+**Operation ids are derived, not tabulated** (`the Quorlory sync` → `quorlory_sync`, slots from a
+deterministic hash of the step name), so a step cannot be added without one. They are
+**semantics-free on purpose**: tool *shape* without real-world semantics, which is what keeps the
+invented-causality property that gives V2 80/80.
+
+### 13c. The one design consequence worth naming
+
+An applicability session **names the procedure**, which is the thing check (a) exists to ration.
+It is permitted, and the reasoning is that check (a) guards a specific failure — a retriever reaching
+the *answer* in one hop — not the procedure name as such. An applicability session carries no step,
+no order, no gate and no revision, so it cannot collapse the second hop. Check (a) is scoped to gold
+and was already unaffected; check (b) gained a narrow exemption for the procedure name **only**, and
+still forbids these sessions from naming any step.
+
+What it does do is **compete for the retrieval budget on the question's own words**, which makes V9
+harder rather than easier. A new check `(b2)` pins exactly one applicability session per question,
+non-gold, with its fields present — because no shape asks an applicability question, so nothing else
+in the file would notice if the substrate silently rotted.
+
+## 14. V6 REPORTED FOUR NUMBERS BEFORE IT REPORTED A TRUE ONE, 2026-09-04.
+
+§11a published `V6 77/80` and §11c explained one defect behind it. Both were premature. The arm was
+wrong in **both** directions before it was right, and each step moved the number for a different
+reason — only the last moved the corpus.
+
+| | V6 | what was actually happening |
+|---|---|---|
+| 1 | 60/80 | readers *declining* the link scored as reaching gold. Fixed by declaring `answer_must_name` (§11c) |
+| 2 | **77/80** | **flattering, and published.** The dependency sessions state the adjacent pairs of a 4-chain, so their transitive closure *is* the gold order, and filler stated only isolated pairs. The gold chain was the only complete order in the haystack, so the membership session — this shape's entire second hop — was redundant. **14 of 60** membership-drop samples reproduced the gold order verbatim; only 3 were condemned, the rest rescued by the resolution grader saying `declined` |
+| 3 | 68/80 | truer, after a guaranteed rival chain — and now condemning on **luck**. No `chance_floor` was declared, so `v6_needs` collapsed to 1: one hit in three samples condemns, against a guesser firing at 1−(2/3)³ = **0.70** at k=3 |
+| 4 | 51/52 | honest where it could decide, **silent where it could not**. k=2 leaves no hit threshold at three samples, so all twenty `step-order` questions returned undecidable |
+| 5 | **70/72** | a second rival chain puts k at 3, where the threshold is 3-of-3. V6 scores **72 of 80** questions instead of 52, and `step-order` is measured rather than blind |
+
+### 14a. Three rules this cost enough to be worth stating
+
+**A chance floor absent is not a floor of zero.** It collapses the required-hit threshold to 1 and
+condemns components that *are* load-bearing. That is the **understating** direction, which is
+exactly why it survived a probe and a review: a corpus that looks worse than it is raises no alarm.
+A number wrong in the safe direction is still a number nobody can cite.
+
+**An undecidable result is not a pass, and a smaller denominator is not a better score.** `51/52`
+reads better than `68/80` and says nothing whatever about a quarter of the corpus. Any V6 figure
+must be read with its scope: this vertical's is now 72 of 80.
+
+**A structural claim needs competition, not declaration.** `gold_components_load_bearing: true` was
+true of the amendment shapes and false of `step-order`, in the same corpus, under the same flag.
+What separates them is that the amendment shapes had `_rival_edits` and `step-order` had nothing to
+compete with its chain. The generator now refuses a corpus whose rival chains are missing, short, or
+overlapping — check `(d2)`.
+
+### 14b. What it cost, stated because the trade should be visible
+
+`step-order` realises **0.400** coverage against a 0.50 floor, down from 0.4625 with one rival chain
+and 0.525 with none. It is the furthest out-of-band shape in the family, and it moved **away** from
+the band on purpose — the one direction the ratchet in `TypedMemEvalCoverageBandTests` exists to
+refuse, so the reason is recorded there rather than the number quietly raised.
+
+That is a **proxy traded for a measurement**, which is the trade ADR-028 licenses: accept a shape on
+measured discrimination, calibrate on the proxy. Removing the rivals would restore the coverage
+number and delete the construct.
+
+### 14c. Still open
+
+Eight `precondition` questions remain undecidable — their haystacks happened to carry only two
+distinct conditions, and the floor is counted per question rather than assumed. Guaranteeing a third
+rival condition would close it, at the cost of a regeneration and a re-probe. Recorded rather than
+fixed, because 72 of 80 is a scope worth citing and the fix is not urgent.

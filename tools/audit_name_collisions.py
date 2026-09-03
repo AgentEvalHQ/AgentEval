@@ -40,6 +40,20 @@ ENTITY_BANKS = {
     # remembers to add it.
     ("gen_typedmemeval_conjunction.py", "CONDITIONS"),
     ("gen_typedmemeval_episodic.py", "_DECOY_ITEMS"),
+    # Added with the Procedural vertical. `step-order` is an ORDERING shape, which is exactly where
+    # this audit's harm model says exposure concentrates -- so its banks belong here on the same
+    # rule the conjunction:CONDITIONS comment states: a bank enters this list when its entries are
+    # entity names, not when someone remembers to add it. Note the ordered entities here are STEPS
+    # and their order is fixed by INVENTED causal dependencies rather than by dates, so a real
+    # referent would have to carry a canonical position in a real procedure to leak -- a narrower
+    # exposure than temporal:MILESTONES, and still worth measuring rather than assuming.
+    ("gen_typedmemeval_procedural.py", "PROCEDURES"),
+    ("gen_typedmemeval_procedural.py", "STEPS"),
+    ("gen_typedmemeval_procedural.py", "CONDITIONS"),
+    ("gen_typedmemeval_procedural.py", "SUBCONDITIONS"),
+    ("gen_typedmemeval_procedural.py", "FILLER_PROCEDURES"),
+    ("gen_typedmemeval_procedural.py", "FILLER_STEPS"),
+    ("gen_typedmemeval_procedural.py", "FILLER_CONDITIONS"),
     ("gen_typedmemeval_forgetting.py", "PARITY_STEMS"),
     ("gen_typedmemeval_forgetting.py", "STEMS"),
     ("gen_typedmemeval_forgetting.py", "PEOPLE"),
@@ -56,7 +70,14 @@ _LEAD = re.compile(r"^the\s+", re.I)
 _ACTIVITY = re.compile(
     r"\s+(move|survey|rewiring|handover|audit|fit-out|inspection|sign-off|relining|changeover|"
     r"retrofit|commissioning|clear-out|repaint|resurfacing|re-roofing|rewire|screed|attic|yard|"
-    r"lane|court|rewire|glazing|plumbing|route|hide|cafe)\b.*$", re.I)
+    r"lane|court|rewire|glazing|plumbing|route|hide|cafe|"
+    # Procedural's activity nouns. Same rule as the rest: the NAME is the head and the
+    # activity is ours, so testing "Quorlory sync" would test our noun, not their entity.
+    r"rollover|handback|cutover|swap|migration|transfer|switchover|reissue|refit|"
+    r"sync|check|reconciliation|posting|sweep|tally|reading|batch|close|draw|lift|"
+    r"clearance|permit|waiver|approval|licence|assay|review|count|test|"
+    r"routine|wind-down|restart|log|pass|trim|note|consent|endorsement|assent|"
+    r"dispensation)\b.*$", re.I)
 
 
 def head(entry: str) -> str:

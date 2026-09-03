@@ -2381,6 +2381,20 @@ def finalise(
             # behind a vertical mean of exactly 0.700.
             **({"echo_by_shape": calibration.echo_by_shape} if calibration.echo_by_shape else {}),
             **({"per_shape_realised": calibration.per_shape} if calibration.per_shape else {}),
+            # NAMED, not left to be derived. THIS GENERATOR'S OWN GATE tests only `mean_realised`
+            # (the BAND_LOW/BAND_HIGH check above), so at authoring time a shape outside the band
+            # passes whenever the vertical mean carries it. What actually catches it is downstream,
+            # in TypedMemEvalCoverageBandTests, which checks every shape against the band and holds
+            # a pinned list of declared exceptions -- so the four shapes currently out of band are
+            # DECLARED there, not silent.
+            #
+            # This field closes the gap between the two: the generator now states the same fact at
+            # the moment it writes the corpus, instead of leaving the first report of it to a test
+            # run that may be days later. It is a record, not a second gate.
+            **({"per_shape_out_of_band": sorted(
+                shape for shape, value in calibration.per_shape.items()
+                if not (BAND_LOW <= value <= BAND_HIGH))}
+               if calibration.per_shape else {}),
         },
         "ceiling": {
             "k_ref": K_REF,

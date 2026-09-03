@@ -324,7 +324,22 @@ membership list, and it states the steps in an order that is never the answer. T
 sub-precondition, the amendment and the retirement name step or condition *pairs* and never the
 procedure, so a retriever working from the question's wording reaches the first and not the second.
 That asymmetry is enforced at generation and is why the vertical carries the family's largest
-headroom (**+0.81**) with all four shapes discriminating.
+headroom (**+0.80**) with all four shapes discriminating.
+
+**The second hop is enforced by competition, not by declaration.** Stating the dependencies as
+adjacent pairs of a chain is not enough on its own: their transitive closure *is* the gold order, so
+a reader holding them can emit the answer without ever learning which procedure they belong to. Each
+`step-order` haystack therefore carries **two complete rival chains** over steps the question does
+not own, and each `amended-step` and `retired-step` haystack carries two rival edits, so losing the
+membership session leaves a reader choosing among three candidates rather than reading off the only
+one. The generator refuses a corpus without them. This is what `gold_components_load_bearing: true`
+means here — a measured property, not a claim, and V6 reports it at **70/72**.
+
+The cost is paid in the retrieval proxy: `step-order` realises **0.40** coverage against a 0.50 band
+floor, because seven mandatory competitors sit against G=4 gold at `K_ref` = 5. It is declared
+out-of-band rather than tuned back in, on ADR-028's rule that a shape is accepted on measured
+discrimination and calibrated on the proxy — removing the rivals would trade the construct for the
+number.
 
 ## Coverage: what the corpora guarantee, and what they don't
 
@@ -362,7 +377,7 @@ Shipped calibration (BM25 @ K_ref = 5):
 | Temporal | 50 | 0.704 | 2 (×15), 3 (×11), 4 (×12), 5 (×12) |
 | Semantic | 50 | 0.667 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
 | Conjunction | 65 | 0.604 | 2 (×15), 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
-| Procedural | 80 | 0.594 | 2 (×60), 4 (×20) |
+| Procedural | 80 | 0.575 | 2 (×60), 4 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
 fifty questions are never-known probes with no gold at all, and a question with nothing to retrieve
@@ -446,7 +461,7 @@ gold is itself an abstention.
 | Temporal | 50/50 | — | 50/50 | 30/30 | 30/30 | 50/50 | 19/50 | +0.62 |
 | Semantic | 49/50 | — | 48/50 | 50/50 | 15/15 | 49/50 | 30/50 | +0.38 |
 | Conjunction | 65/65 | — | 65/65 | 65/65 | 50/50 | 63/65 | 16/65 | +0.75 |
-| Procedural | 80/80 | — | 80/80 | 80/80 | 77/80 | 80/80 | 15/80 | +0.81 |
+| Procedural | 80/80 | — | 80/80 | 80/80 | 70/72 | 80/80 | 16/80 | +0.80 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this
 > note drew the wrong conclusion and it is corrected here.**
