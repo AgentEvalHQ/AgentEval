@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0-beta] - 2026-09-04
+
+**The tenth vertical, and the taxonomy closes.** Procedural ships at 80 questions and headroom
++0.80 — the largest in the family — bringing TypedMemEval to **565 questions across 36 shapes in 10
+verticals**. Every memory type the consuming engine ships is now covered.
+
+**Purely additive.** All nine existing corpora are byte-identical; `corpus_sha256` verified against
+`v0.33.0-beta` for each. Nothing a current consumer runs changes.
+
 ### Added — Procedural, the tenth vertical (80 questions)
 
 `TypedMemEvalVertical.Procedural`, corpus `d431a7fc9ac5`, 80 questions across four shapes at 20
