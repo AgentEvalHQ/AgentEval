@@ -33,7 +33,32 @@ public class ToolCallRecord
     /// of a paired result does. Set by the extractor when it matches a FunctionResultContent by CallId.
     /// </summary>
     public bool WasExecuted { get; set; }
-    
+
+    /// <summary><see cref="ApprovalState"/> value: the framework asked a human to approve this call and no decision has been observed.</summary>
+    public const string ApprovalRequested = "Requested";
+
+    /// <summary><see cref="ApprovalState"/> value: the call was approved. It executed only if a paired result was also observed (<see cref="WasExecuted"/>).</summary>
+    public const string ApprovalApproved = "Approved";
+
+    /// <summary><see cref="ApprovalState"/> value: the call was rejected. It never executed; a "failed" result generated for the rejection does not count as one.</summary>
+    public const string ApprovalRejected = "Rejected";
+
+    /// <summary>
+    /// Where this call stands in a human-approval flow, or <see langword="null"/> when the call was not
+    /// approval-gated (the ordinary <c>FunctionCallContent</c> path). One of
+    /// <see cref="ApprovalRequested"/>, <see cref="ApprovalApproved"/>, <see cref="ApprovalRejected"/>.
+    /// </summary>
+    /// <remarks>
+    /// Populated only by an approval-aware extraction (ADR-030 Slice 0.5, opt-in:
+    /// <c>ToolUsageExtractor.Extract(rawMessages, includeApprovalGatedCalls: true)</c>). MAF answers an
+    /// approval-required call with a <c>ToolApprovalRequestContent</c> that <i>wraps</i> the
+    /// <c>FunctionCallContent</c>; the default extractor cannot see it and reports the drop instead
+    /// (<see cref="ToolUsageReport.DroppedApprovalRequestCount"/>). An approval <i>request</i> is not an
+    /// execution — a gated-and-rejected call records as <see cref="WasExecuted"/> <c>false</c> and is still
+    /// a call for the purposes of <c>NeverCallTool</c>, because "the agent tried" is what that assertion asks.
+    /// </remarks>
+    public string? ApprovalState { get; set; }
+
     /// <summary>Order in which this tool was called (1-based).</summary>
     public int Order { get; init; }
     

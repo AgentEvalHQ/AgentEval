@@ -29,6 +29,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveTotalDurationUnder(TimeSpan max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.TotalDuration > max)
         {
             var overage = _metrics.TotalDuration - max;
@@ -46,7 +47,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert total duration is at least a minimum.</summary>
@@ -55,6 +56,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveTotalDurationAtLeast(TimeSpan min, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.TotalDuration < min)
         {
             AgentEvalScope.FailWith(
@@ -65,7 +67,7 @@ public class PerformanceAssertions
                     measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TotalDuration.TotalMilliseconds:F0}ms"),
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert time to first token is under a maximum (streaming only).</summary>
@@ -78,13 +80,17 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveTimeToFirstTokenUnder(TimeSpan max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (!_metrics.TimeToFirstToken.HasValue)
         {
             // Skip gracefully - TTFT requires streaming mode
             System.Diagnostics.Debug.WriteLine(
                 "[AgentEval] Skipping TTFT assertion - Time to First Token not available. " +
                 "Enable streaming mode to capture TTFT.");
-            return this;
+            probe.MarkInconclusive(
+                "Time to First Token was not captured, so the TTFT budget could not be checked. " +
+                "Enable streaming mode to capture TTFT.");
+            return probe.Complete(this);
         }
         
         if (_metrics.TimeToFirstToken!.Value > max)
@@ -103,7 +109,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert total token count is under a maximum.</summary>
@@ -112,6 +118,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveTokenCountUnder(int max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.TotalTokens > max)
         {
             var breakdown = $"Prompt: {_metrics.PromptTokens}, Completion: {_metrics.CompletionTokens}";
@@ -130,7 +137,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert prompt tokens under a maximum.</summary>
@@ -139,6 +146,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HavePromptTokensUnder(int max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.PromptTokens > max)
         {
             AgentEvalScope.FailWith(
@@ -155,7 +163,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert completion tokens under a maximum.</summary>
@@ -164,6 +172,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveCompletionTokensUnder(int max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.CompletionTokens > max)
         {
             AgentEvalScope.FailWith(
@@ -179,7 +188,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert estimated cost is under a maximum (USD).</summary>
@@ -192,13 +201,17 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveEstimatedCostUnder(decimal maxUsd, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (!_metrics.EstimatedCost.HasValue)
         {
             // Skip gracefully - cost requires model pricing and token counting
             System.Diagnostics.Debug.WriteLine(
                 "[AgentEval] Skipping cost assertion - estimated cost not available. " +
                 "Ensure model pricing is configured and token counting is enabled.");
-            return this;
+            probe.MarkInconclusive(
+                "No estimated cost was captured, so the cost budget could not be checked. " +
+                "Ensure model pricing is configured and token counting is enabled.");
+            return probe.Complete(this);
         }
         
         if (_metrics.EstimatedCost!.Value > maxUsd)
@@ -220,7 +233,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert average tool time is under a maximum.</summary>
@@ -233,13 +246,19 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveAverageToolTimeUnder(TimeSpan max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.ToolCallCount == 0 || _metrics.TotalToolTime == TimeSpan.Zero)
         {
             // Skip gracefully - tool timing requires streaming mode or no tools called
             System.Diagnostics.Debug.WriteLine(
                 "[AgentEval] Skipping average tool time assertion - tool timing not available. " +
                 "Enable streaming mode to capture tool timing.");
-            return this;
+            probe.MarkInconclusive(
+                _metrics.ToolCallCount == 0
+                    ? "No tools were called, so there is no average tool time to check."
+                    : "No tool timing was captured, so the average-tool-time budget could not be " +
+                      "checked. Enable streaming mode to capture tool timing.");
+            return probe.Complete(this);
         }
         
         if (_metrics.AverageToolTime > max)
@@ -259,7 +278,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert total tool time is under a maximum.</summary>
@@ -272,13 +291,19 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveTotalToolTimeUnder(TimeSpan max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.ToolCallCount == 0 || _metrics.TotalToolTime == TimeSpan.Zero)
         {
             // Skip gracefully - tool timing requires streaming mode or no tools called
             System.Diagnostics.Debug.WriteLine(
                 "[AgentEval] Skipping total tool time assertion - tool timing not available. " +
                 "Enable streaming mode to capture tool timing.");
-            return this;
+            probe.MarkInconclusive(
+                _metrics.ToolCallCount == 0
+                    ? "No tools were called, so there is no total tool time to check."
+                    : "No tool timing was captured, so the total-tool-time budget could not be " +
+                      "checked. Enable streaming mode to capture tool timing.");
+            return probe.Complete(this);
         }
         
         if (_metrics.TotalToolTime > max)
@@ -299,7 +324,7 @@ public class PerformanceAssertions
                     },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert tool call count is exactly N.</summary>
@@ -308,6 +333,7 @@ public class PerformanceAssertions
     [StackTraceHidden]
     public PerformanceAssertions HaveToolCallCount(int expected, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_metrics.ToolCallCount != expected)
         {
             AgentEvalScope.FailWith(
@@ -318,7 +344,7 @@ public class PerformanceAssertions
                     measuredValue: $"{_metrics.ToolCallCount}",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Get the underlying metrics for custom assertions.</summary>

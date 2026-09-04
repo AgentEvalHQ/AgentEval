@@ -30,6 +30,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolCallAssertion HaveCalledTool(string toolName, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(toolName);
         if (!_report.WasToolCalled(toolName))
         {
             var calledTools = _report.UniqueToolNames.ToList();
@@ -68,7 +69,7 @@ public class ToolUsageAssertions
         // not called this would otherwise throw InvalidOperationException on an empty sequence and
         // crash the whole scope evaluation instead of collecting the soft failure (BUG-15).
         var call = _report.GetCallsByName(toolName).FirstOrDefault();
-        return new ToolCallAssertion(this, _report, call, toolName);
+        return probe.Complete(new ToolCallAssertion(this, _report, call, toolName));
     }
     
     /// <summary>Assert that a specific tool was NOT called.</summary>
@@ -77,6 +78,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions NotHaveCalledTool(string toolName, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(toolName);
         if (_report.WasToolCalled(toolName))
         {
             var callCount = _report.GetCallsByName(toolName).Count();
@@ -89,7 +91,7 @@ public class ToolUsageAssertions
                     actual: $"Tool '{toolName}' called {callCount} time(s)",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert exact number of tool calls.</summary>
@@ -98,6 +100,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCallCount(int expectedCount, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_report.Count != expectedCount)
         {
             var timeline = BuildTimeline();
@@ -110,7 +113,7 @@ public class ToolUsageAssertions
                     context: timeline,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert at least N tool calls.</summary>
@@ -119,6 +122,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCallCountAtLeast(int minCount, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_report.Count < minCount)
         {
             var timeline = BuildTimeline();
@@ -131,7 +135,7 @@ public class ToolUsageAssertions
                     context: timeline,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert no tool calls resulted in errors.</summary>
@@ -139,6 +143,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveNoErrors(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var errors = _report.Calls.Where(c => c.HasError).ToList();
         if (errors.Count > 0)
         {
@@ -161,7 +166,7 @@ public class ToolUsageAssertions
                     suggestions: suggestions,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert that tools were called in a specific order.</summary>
@@ -169,6 +174,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCallOrder(params string[] expectedOrder)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         // Subsequence match with a consumed-position cursor. Each expected tool must appear in
         // the actual call sequence (ordered by Order) strictly AFTER the previously matched call.
         // The previous implementation resolved every occurrence to GetToolOrder()'s FIRST call,
@@ -209,12 +215,12 @@ public class ToolUsageAssertions
                         expected: $"Tool order (subsequence): [{string.Join(" → ", expectedOrder)}]",
                         actual: $"Could not match '{expectedTool}' at/after call #{cursor + 1} in the sequence",
                         context: timeline));
-                return this; // first failure reported; stop (FailWith may accumulate rather than throw)
+                return probe.Complete(this); // first failure reported; stop (FailWith may accumulate rather than throw)
             }
 
             cursor = matchIndex + 1; // the next expected tool must come strictly after this match
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert that at least one tool was called.</summary>
@@ -222,6 +228,7 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCalledAnyTool(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_report.Count == 0)
         {
             var suggestions = new List<string>
@@ -240,7 +247,7 @@ public class ToolUsageAssertions
                     suggestions: suggestions,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Get the underlying report for custom assertions.</summary>
@@ -271,26 +278,45 @@ public class ToolUsageAssertions
         ArgumentNullException.ThrowIfNull(toolName);
         ArgumentNullException.ThrowIfNull(because);
         
+        using var probe = AgentEvalScope.BeginAssertion(toolName);
         var calls = _report.GetCallsByName(toolName).ToList();
-        if (calls.Count > 0)
+        if (calls.Count == 0)
         {
-            var callDetails = string.Join(", ", calls.Select(c => $"#{c.Order}"));
-            AgentEvalScope.FailWith(
-                BehavioralPolicyViolationException.Create(
-                    message: $"Policy Violation: Tool '{toolName}' was called but is prohibited.",
-                    policyName: $"NeverCallTool({toolName})",
-                    violationType: "ForbiddenTool",
-                    violatingAction: $"Called {toolName} {calls.Count} time(s) at positions: {callDetails}",
-                    forbiddenToolName: toolName,
-                    because: because,
-                    suggestions: new[]
-                    {
-                        $"Remove '{toolName}' from the agent's available tools if it should never be used",
-                        "Update the agent's system prompt to explicitly forbid this action",
-                        "Implement a confirmation workflow if the action is sometimes permitted"
-                    }));
+            // Chance floor. A prohibition the agent had no way to violate cannot fail, so it is
+            // not evidence that the agent would refrain — it is an untested policy. Report it as
+            // undecidable unless the harness declared that the tool really was on offer (AE-01;
+            // the full floor model is AE-06).
+            var available = _report.WasToolAvailable(toolName);
+            if (available is not true)
+            {
+                probe.MarkInconclusive(available is false
+                    ? $"'{toolName}' was not among the agent's declared tools, so this policy could " +
+                      "not fail. It carries no evidence that the agent would refrain from calling it."
+                    : $"'{toolName}' was never called and the agent's tool inventory was not declared, " +
+                      "so a pass cannot be told apart from the tool never having been available. Call " +
+                      $"{nameof(ToolUsageReport)}.{nameof(ToolUsageReport.DeclareAvailableTools)}(...) " +
+                      "to make this policy decidable.");
+            }
+
+            return probe.Complete(this);
         }
-        return this;
+
+        var callDetails = string.Join(", ", calls.Select(c => $"#{c.Order}"));
+        AgentEvalScope.FailWith(
+            BehavioralPolicyViolationException.Create(
+                message: $"Policy Violation: Tool '{toolName}' was called but is prohibited.",
+                policyName: $"NeverCallTool({toolName})",
+                violationType: "ForbiddenTool",
+                violatingAction: $"Called {toolName} {calls.Count} time(s) at positions: {callDetails}",
+                forbiddenToolName: toolName,
+                because: because,
+                suggestions: new[]
+                {
+                    $"Remove '{toolName}' from the agent's available tools if it should never be used",
+                    "Update the agent's system prompt to explicitly forbid this action",
+                    "Implement a confirmation workflow if the action is sometimes permitted"
+                }));
+        return probe.Complete(this);
     }
     
     /// <summary>
@@ -320,6 +346,7 @@ public class ToolUsageAssertions
         ArgumentNullException.ThrowIfNull(pattern);
         ArgumentNullException.ThrowIfNull(because);
         
+        using var probe = AgentEvalScope.BeginAssertion(pattern);
         // Bound regex evaluation: a catastrophic-backtracking pattern over attacker-influenced
         // argument values could otherwise hang the evaluation thread (ReDoS). Matches the
         // project convention (RegexMatchEvaluator etc.). (SEC-07)
@@ -380,7 +407,7 @@ public class ToolUsageAssertions
                 }
             }
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>
@@ -432,11 +459,16 @@ public class ToolUsageAssertions
         ArgumentNullException.ThrowIfNull(toolName);
         ArgumentNullException.ThrowIfNull(because);
 
+        using var probe = AgentEvalScope.BeginAssertion(toolName);
         var targetCalls = _report.GetCallsByName(toolName).ToList();
         if (targetCalls.Count == 0)
         {
-            // Tool wasn't called, policy not applicable
-            return this;
+            // Tool wasn't called, policy not applicable — and "not applicable" is not "held".
+            // The gate never ran, so it is undecidable rather than a pass (AE-01).
+            probe.MarkInconclusive(
+                $"'{toolName}' was never called, so the confirmation gate in front of it was never " +
+                "exercised. This is not evidence that a confirmation would have been required.");
+            return probe.Complete(this);
         }
 
         // Default confirmation tool names to look for. Heuristic English-language allowlist —
@@ -494,7 +526,7 @@ public class ToolUsageAssertions
                         }));
             }
         }
-        return this;
+        return probe.Complete(this);
     }
 
     private string BuildTimeline()
@@ -550,7 +582,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion BeforeTool(string otherToolName, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -575,7 +614,7 @@ public class ToolCallAssertion
                     context: BuildTimeline(),
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert this tool was called after another tool.</summary>
@@ -584,7 +623,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion AfterTool(string otherToolName, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -609,7 +655,7 @@ public class ToolCallAssertion
                     context: BuildTimeline(),
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert a specific argument value (equality).</summary>
@@ -619,7 +665,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgument(string paramName, object expectedValue, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(paramName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -637,7 +690,7 @@ public class ToolCallAssertion
                     actual: $"Available arguments: [{available}]",
                     suggestions: new[] { $"Check the argument name spelling", $"Available: {available}" },
                     because: because));
-            return this; // Return if in scope mode
+            return probe.Complete(this); // Return if in scope mode
         }
         
         // Type-aware comparison (BUG-21): numbers compare numerically, booleans by value,
@@ -652,7 +705,7 @@ public class ToolCallAssertion
                     actual: $"'{paramName}' = \"{ToolArgumentComparison.Canonical(actualValue)}\"",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert an argument contains a substring (case-insensitive).</summary>
@@ -662,7 +715,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgumentContaining(string paramName, string substring, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(paramName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -675,7 +735,7 @@ public class ToolCallAssertion
                     expected: $"Argument '{paramName}' containing \"{substring}\"",
                     actual: "Argument not found",
                     because: because));
-            return this; // Return if in scope mode
+            return probe.Complete(this); // Return if in scope mode
         }
         
         var actualStr = actualValue is JsonElement je ? je.GetString() : actualValue?.ToString();
@@ -690,7 +750,7 @@ public class ToolCallAssertion
                     actual: $"'{paramName}' = \"{Truncate(actualStr ?? "(null)", 100)}\"",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert the tool result contains a substring (case-insensitive).</summary>
@@ -699,7 +759,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithResultContaining(string substring, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         var resultStr = _call.Result?.ToString();
         
         if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
@@ -712,7 +779,7 @@ public class ToolCallAssertion
                     actual: $"Result: \"{Truncate(resultStr ?? "(null)", 100)}\"",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert the tool completed without error.</summary>
@@ -720,7 +787,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithoutError(string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         if (_call.HasError)
         {
             AgentEvalScope.FailWith(
@@ -733,7 +807,7 @@ public class ToolCallAssertion
                     suggestions: new[] { "Check tool implementation", "Verify input arguments" },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert tool duration is under a maximum.</summary>
@@ -746,7 +820,14 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithDurationUnder(TimeSpan max, string? because = null)
     {
-        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
+        if (_call is null)
+        {
+            // Not called → the soft failure is already recorded by HaveCalledTool (BUG-15). There
+            // is nothing left for THIS check to decide, so it reports undecidable, not a pass.
+            probe.MarkInconclusive($"'{_toolName}' was never called, so this check had nothing to evaluate.");
+            return probe.Complete(this);
+        }
         if (!_call.HasTiming)
         {
             // Skip gracefully - timing requires streaming mode
@@ -754,7 +835,10 @@ public class ToolCallAssertion
             System.Diagnostics.Debug.WriteLine(
                 $"[AgentEval] Skipping duration assertion for '{_toolName}' - timing not available. " +
                 "Enable streaming mode to capture tool timing.");
-            return this;
+            probe.MarkInconclusive(
+                $"No timing was captured for '{_toolName}', so the duration budget could not be " +
+                "checked. Enable streaming mode to capture tool timing.");
+            return probe.Complete(this);
         }
         
         if (_call.Duration > max)
@@ -768,7 +852,7 @@ public class ToolCallAssertion
                     suggestions: new[] { "Consider optimizing the tool implementation", "Check for slow I/O operations" },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert this tool was called exactly N times total.</summary>
@@ -777,6 +861,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion Times(int expectedCount, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(_toolName);
         var actualCount = _report.GetCallsByName(_toolName).Count();
         if (actualCount != expectedCount)
         {
@@ -789,7 +874,7 @@ public class ToolCallAssertion
                     context: BuildTimeline(),
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Return to parent assertions for chaining.</summary>

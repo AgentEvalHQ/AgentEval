@@ -23,7 +23,21 @@ public static class EvalResultPersistence
     };
 
     /// <summary>Builds a ScenarioResult that stores <paramref name="result"/> as JSON in Output.</summary>
-    public static ScenarioResult ToScenarioResult(EvalResult result, string scenarioId, string scenarioName)
+    /// <param name="result">The eval-result tree to persist.</param>
+    /// <param name="scenarioId">Scenario identifier.</param>
+    /// <param name="scenarioName">Human-readable scenario name.</param>
+    /// <param name="assertions">
+    /// Assertion outcomes to persist alongside the scenario. When <see langword="null"/> the
+    /// outcomes collected by the ambient <see cref="AgentEvalScope"/> are used, so an eval that
+    /// runs its assertions inside <c>AgentEvalScope.Collecting()</c> gets them into the artifact
+    /// with no extra wiring. Pass an empty list to persist none. (AE-01: before this, the field was
+    /// hard-coded empty and assertion outcomes reached no artifact AgentEval writes.)
+    /// </param>
+    public static ScenarioResult ToScenarioResult(
+        EvalResult result,
+        string scenarioId,
+        string scenarioName,
+        IReadOnlyList<AssertionResult>? assertions = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioId);
@@ -67,7 +81,9 @@ public static class EvalResultPersistence
             Passed: result.Score.Passed,
             Score: result.Score.Value,
             Metrics: metrics,
-            Assertions: Array.Empty<AssertionResult>(),
+            Assertions: assertions
+                ?? AgentEval.Assertions.AgentEvalScope.Current?.Results
+                ?? Array.Empty<AssertionResult>(),
             Duration: TimeSpan.Zero,
             EstimatedCost: result.Provenance.EstimatedCost);
     }

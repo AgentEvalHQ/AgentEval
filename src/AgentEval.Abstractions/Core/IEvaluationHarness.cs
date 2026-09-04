@@ -73,7 +73,22 @@ public class EvaluationOptions
 {
     /// <summary>Whether to track tool/function calls.</summary>
     public bool TrackTools { get; init; } = true;
-    
+
+    /// <summary>
+    /// Whether the tool-usage report records <b>approval-gated</b> tool calls (MAF's
+    /// <c>ToolApprovalRequestContent</c>, which wraps the call the agent emitted). Default
+    /// <see langword="false"/>: such calls are dropped, counted in
+    /// <c>ToolUsageReport.DroppedApprovalRequestCount</c>, and the harness logs a warning naming them.
+    /// </summary>
+    /// <remarks>
+    /// Opt-in on purpose (ADR-030 Slice 0.5). Turning it on is the one change that can move a verdict —
+    /// <c>NeverCallTool</c> on a gated tool can now fail, <c>MustCallTool</c> can now pass — so it must not
+    /// happen silently under anyone's existing numbers. A gated call is recorded with
+    /// <c>WasExecuted == false</c> and <c>ApprovalState == "Requested"</c>; an approval request is not an
+    /// execution.
+    /// </remarks>
+    public bool IncludeApprovalGatedToolCalls { get; init; }
+
     /// <summary>Whether to track performance metrics.</summary>
     public bool TrackPerformance { get; init; } = true;
     

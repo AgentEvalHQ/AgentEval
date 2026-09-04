@@ -69,6 +69,57 @@ public class DirectoryExporterStoreTests
     }
 
     [Fact]
+    public async Task ExportThroughStore_CarriesAssertionOutcomesIntoTheScenarioArtifact()
+    {
+        // AE-01: ScenarioResult.Assertions used to be hard-coded Array.Empty<AssertionResult>(),
+        // so assertion outcomes reached no artifact AgentEval wrote. They do now — including the
+        // undecidable ones, which must not arrive looking like passes.
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var context = new RunContext("TestProject", ".", "TestHarness", null, null, "eval");
+        var manifest = await store.StartRunAsync(subject, context);
+
+        var report = new EvaluationReport
+        {
+            RunId = manifest.Run.RunId,
+            StartTime = DateTimeOffset.UtcNow.AddSeconds(-1),
+            EndTime = DateTimeOffset.UtcNow,
+            TotalTests = 1,
+            PassedTests = 1,
+            TestResults =
+            [
+                new TestResultSummary
+                {
+                    Name = "scenario-with-assertions",
+                    Passed = true,
+                    Score = 100,
+                    DurationMs = 10,
+                    Assertions =
+                    [
+                        AssertionResult.Pass("HaveCalledTool(Search)"),
+                        AssertionResult.Fail("HaveCallCount", "Expected 2, saw 3."),
+                        AssertionResult.Undecidable("NeverCallTool(PlaceOrder)", "never available")
+                    ]
+                }
+            ]
+        };
+
+        var exporter = new DirectoryExporter();
+        await exporter.ExportThroughStoreAsync(store, subject, manifest, report);
+
+        var scenarios = new List<ScenarioResult>();
+        await foreach (var sr in store.GetScenarioResultsAsync(manifest.Run.RunId))
+            scenarios.Add(sr);
+
+        var scenario = Assert.Single(scenarios);
+        Assert.Equal(3, scenario.Assertions.Count);
+        Assert.Equal(AssertionOutcome.Passed, scenario.Assertions[0].Outcome);
+        Assert.Equal(AssertionOutcome.Failed, scenario.Assertions[1].Outcome);
+        Assert.Equal(AssertionOutcome.Inconclusive, scenario.Assertions[2].Outcome);
+        Assert.False(scenario.Assertions[2].Passed);
+    }
+
+    [Fact]
     public async Task ExportThroughStore_AllPassed_ReturnsPassVerdict()
     {
         var store = new InMemoryOutputStore();

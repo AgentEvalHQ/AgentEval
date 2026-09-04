@@ -86,6 +86,16 @@ public class TestResultSummary
     
     /// <summary>Metric scores for this test.</summary>
     public Dictionary<string, double> MetricScores { get; set; } = new();
+
+    /// <summary>
+    /// Assertion outcomes for this test — passes, failures, and checks that could not decide.
+    /// </summary>
+    /// <remarks>
+    /// This is the exporters' input for <c>ScenarioResult.Assertions</c>, which was hard-coded
+    /// empty before AE-01. Fill it from an eval-mode assertion scope:
+    /// <c>summary.Assertions.AddRange(scope.Results)</c>.
+    /// </remarks>
+    public List<Output.AssertionResult> Assertions { get; set; } = new();
 }
 
 /// <summary>

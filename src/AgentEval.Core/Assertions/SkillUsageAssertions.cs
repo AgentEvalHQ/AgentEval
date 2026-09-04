@@ -45,8 +45,9 @@ public static class SkillUsageAssertions
     public static ToolCallAssertion HaveLoadedSkill(this ToolUsageAssertions a, string? skillName = null, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion(skillName);
         var filters = BuildFilters((SkillToolNames.SkillNameArg, skillName));
-        return AssertSkillToolCall(a, SkillToolNames.LoadSkill, filters, because);
+        return probe.Complete(AssertSkillToolCall(a, SkillToolNames.LoadSkill, filters, because));
     }
 
     /// <summary>
@@ -62,10 +63,11 @@ public static class SkillUsageAssertions
     public static ToolCallAssertion HaveReadSkillResource(this ToolUsageAssertions a, string? skillName = null, string? resourceName = null, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion(skillName);
         var filters = BuildFilters(
             (SkillToolNames.SkillNameArg, skillName),
             (SkillToolNames.ResourceNameArg, resourceName));
-        return AssertSkillToolCall(a, SkillToolNames.ReadSkillResource, filters, because);
+        return probe.Complete(AssertSkillToolCall(a, SkillToolNames.ReadSkillResource, filters, because));
     }
 
     /// <summary>
@@ -81,10 +83,11 @@ public static class SkillUsageAssertions
     public static ToolCallAssertion HaveRunSkillScript(this ToolUsageAssertions a, string? skillName = null, string? scriptName = null, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion(skillName);
         var filters = BuildFilters(
             (SkillToolNames.SkillNameArg, skillName),
             (SkillToolNames.ScriptNameArg, scriptName));
-        return AssertSkillToolCall(a, SkillToolNames.RunSkillScript, filters, because);
+        return probe.Complete(AssertSkillToolCall(a, SkillToolNames.RunSkillScript, filters, because));
     }
 
     /// <summary>
@@ -99,7 +102,8 @@ public static class SkillUsageAssertions
     {
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(because);
-        return a.NeverCallTool(SkillToolNames.RunSkillScript, because);
+        using var probe = AgentEvalScope.BeginAssertion();
+        return probe.Complete(a.NeverCallTool(SkillToolNames.RunSkillScript, because));
     }
 
     /// <summary>
@@ -116,6 +120,7 @@ public static class SkillUsageAssertions
     public static ToolUsageAssertions HaveDisclosedProgressively(this ToolUsageAssertions a, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion();
         var report = a.Report;
         var analysis = SkillDisclosureAnalyzer.Analyze(report);
 
@@ -138,7 +143,7 @@ public static class SkillUsageAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -156,10 +161,11 @@ public static class SkillUsageAssertions
     {
         ArgumentNullException.ThrowIfNull(assertion);
         ArgumentNullException.ThrowIfNull(argKey);
+        using var probe = AgentEvalScope.BeginAssertion(argKey);
         var call = assertion.Call;
         if (call is null)
         {
-            return assertion;   // not called → soft-fail already recorded upstream (BUG-15 convention)
+            return probe.Complete(assertion);   // not called → soft-fail already recorded upstream (BUG-15 convention)
         }
 
         object? nestedRaw = null;
@@ -181,7 +187,7 @@ public static class SkillUsageAssertions
                     because: because));
         }
 
-        return assertion;
+        return probe.Complete(assertion);
     }
 
     /// <summary>
@@ -227,6 +233,7 @@ public static class SkillUsageAssertions
     public static ToolUsageAssertions HaveDisclosedEfficiently(this ToolUsageAssertions a, double minScore, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion();
         var report = a.Report;
         var metric = new Metrics.Agentic.SkillDisclosureEfficiencyMetric();
         var context = new EvaluationContext { Input = "n/a", Output = "n/a", ToolUsage = report };
@@ -245,7 +252,7 @@ public static class SkillUsageAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -262,6 +269,7 @@ public static class SkillUsageAssertions
     {
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(skillName);
+        using var probe = AgentEvalScope.BeginAssertion(skillName);
         var report = a.Report;
 
         var loaded = report.GetCallsByName(SkillToolNames.LoadSkill)
@@ -279,7 +287,7 @@ public static class SkillUsageAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     // ------------------------------------------------------------------------------------------

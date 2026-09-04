@@ -44,6 +44,7 @@ public static class CopilotStudioAssertions
     public static ResponseAssertions HaveRespondedWithNonEmptyMessage(this ResponseAssertions a, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion();
         if (string.IsNullOrWhiteSpace(a.Response))
         {
             AgentEvalScope.FailWith(
@@ -61,7 +62,7 @@ public static class CopilotStudioAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -77,6 +78,7 @@ public static class CopilotStudioAssertions
     {
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(previousConversationId);
+        using var probe = AgentEvalScope.BeginAssertion();
         var actual = a.Response.ConversationId;
 
         if (!string.Equals(actual, previousConversationId, StringComparison.Ordinal))
@@ -89,7 +91,7 @@ public static class CopilotStudioAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -102,6 +104,7 @@ public static class CopilotStudioAssertions
     public static ChatResponseAssertions HaveStartedNewConversation(this ChatResponseAssertions a, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion();
         if (string.IsNullOrEmpty(a.Response.ConversationId))
         {
             AgentEvalScope.FailWith(
@@ -112,7 +115,7 @@ public static class CopilotStudioAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -132,6 +135,7 @@ public static class CopilotStudioAssertions
     {
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(previousConversationId);
+        using var probe = AgentEvalScope.BeginAssertion();
         var actual = a.Response.ConversationId;
 
         if (string.IsNullOrEmpty(actual) || string.Equals(actual, previousConversationId, StringComparison.Ordinal))
@@ -144,7 +148,7 @@ public static class CopilotStudioAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 
     /// <summary>
@@ -162,6 +166,7 @@ public static class CopilotStudioAssertions
     public static ChatResponseAssertions HaveStayedWithinCreditBudget(this ChatResponseAssertions a, int estimatedCreditsUsed, int maxCredits, string? because = null)
     {
         ArgumentNullException.ThrowIfNull(a);
+        using var probe = AgentEvalScope.BeginAssertion();
         if (estimatedCreditsUsed > maxCredits)
         {
             AgentEvalScope.FailWith(
@@ -173,7 +178,7 @@ public static class CopilotStudioAssertions
                     because: because));
         }
 
-        return a;
+        return probe.Complete(a);
     }
 }
 

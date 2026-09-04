@@ -46,6 +46,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HavePassed(string? because = null, double maxInconclusiveFraction = DefaultMaxInconclusiveFraction)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.Verdict != Verdict.Pass)
         {
             var failedAttacks = _result.AttackResults
@@ -67,7 +68,7 @@ public sealed class RedTeamAssertions
                     "Implement input validation and prompt hardening"
                 ],
                 because: because));
-            return this;
+            return probe.Complete(this);
         }
 
         if (_result.InconclusiveRate > maxInconclusiveFraction)
@@ -84,7 +85,7 @@ public sealed class RedTeamAssertions
                 because: because));
         }
 
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -95,6 +96,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveMinimumScore(double minimumScore, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.OverallScore < minimumScore)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
@@ -109,7 +111,7 @@ public sealed class RedTeamAssertions
                 ],
                 because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -121,6 +123,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveASRBelow(double threshold, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var asr = _result.ConclusiveAttackSuccessRate;
         if (asr > threshold)
         {
@@ -143,7 +146,7 @@ public sealed class RedTeamAssertions
                 suggestions: suggestions,
                 because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -154,6 +157,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveResistedAttack(string attackName, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(attackName);
         var attack = _result.AttackResults.FirstOrDefault(a =>
             a.AttackName.Equals(attackName, StringComparison.OrdinalIgnoreCase));
 
@@ -170,7 +174,7 @@ public sealed class RedTeamAssertions
                     "Ensure the attack was included in the scan"
                 ],
                 because: because));
-            return this;
+            return probe.Complete(this);
         }
 
         if (attack.SucceededCount > 0)
@@ -194,7 +198,7 @@ public sealed class RedTeamAssertions
                 because: because));
         }
 
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -205,6 +209,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveNoHighSeverityCompromises(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var highSeverityCompromises = _result.AttackResults
             .Where(a => a.Severity is Severity.Critical or Severity.High && a.SucceededCount > 0)
             .ToList();
@@ -229,7 +234,7 @@ public sealed class RedTeamAssertions
                 because: because));
         }
 
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -240,6 +245,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveNoCompromisesFor(string owaspId, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(owaspId);
         var attacks = _result.AttackResults
             .Where(a => a.OwaspId?.Equals(owaspId, StringComparison.OrdinalIgnoreCase) == true)
             .ToList();
@@ -256,7 +262,7 @@ public sealed class RedTeamAssertions
                     "Include attacks targeting this OWASP category in the scan"
                 ],
                 because: because));
-            return this;
+            return probe.Complete(this);
         }
 
         var compromised = attacks.Sum(a => a.SucceededCount);
@@ -282,7 +288,7 @@ public sealed class RedTeamAssertions
                 because: because));
         }
 
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -294,6 +300,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveAttackASRBelow(string attackName, double threshold, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(attackName);
         var attack = _result.AttackResults.FirstOrDefault(a =>
             a.AttackName.Equals(attackName, StringComparison.OrdinalIgnoreCase));
 
@@ -304,7 +311,7 @@ public sealed class RedTeamAssertions
                 expected: $"Attack '{attackName}' present",
                 actual: "Attack not found",
                 because: because));
-            return this;
+            return probe.Complete(this);
         }
 
         var asr = attack.ConclusiveAttackSuccessRate;
@@ -318,7 +325,7 @@ public sealed class RedTeamAssertions
                 because: because));
         }
 
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>Asserts the scan was conclusive: a real verdict, not dominated by inconclusive probes (RC-6).</summary>
@@ -327,6 +334,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions BeConclusive(double maxInconclusiveFraction = DefaultMaxInconclusiveFraction, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var inconclusiveRate = _result.InconclusiveRate;
         if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
         {
@@ -342,7 +350,7 @@ public sealed class RedTeamAssertions
                 ],
                 because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>Asserts no probe failed to execute (transport/timeout/unexpected faults) (RC-6).</summary>
@@ -350,6 +358,7 @@ public sealed class RedTeamAssertions
     [StackTraceHidden]
     public RedTeamAssertions HaveNoExecutionErrors(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.HasExecutionErrors)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
@@ -364,7 +373,7 @@ public sealed class RedTeamAssertions
                 ],
                 because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>

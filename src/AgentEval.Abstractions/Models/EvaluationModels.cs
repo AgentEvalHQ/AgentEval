@@ -27,8 +27,19 @@ public class TestCase
     public int PassingScore { get; init; } = EvaluationDefaults.DefaultPassingScore;
     
     /// <summary>Expected tools to be called.</summary>
+    /// <remarks>
+    /// <b>Not enforced by <c>MAFEvaluationHarness</c>.</b> Every dataset loader populates this field, but the
+    /// agent harness that runs a <see cref="TestCase"/> does not read it — a case declaring expected tools
+    /// passes or fails on its text checks alone (ADR-030 defect D-d, tracker AE-02). The harness logs a
+    /// warning naming the case and the tools whenever the field is present, so the silence is not mistaken
+    /// for enforcement. Enforcement lands with the <c>IEval</c> bridge (AE-04). The two harnesses that
+    /// <i>do</i> enforce their own expected-tools fields are <c>ConversationRunner</c>
+    /// (<c>ConversationalTestCase.ExpectedTools</c>) and <c>WorkflowEvaluationHarness</c>
+    /// (<c>WorkflowTestCase.ExpectedTools</c>); use them, or assert on <see cref="TestResult.ToolUsage"/>
+    /// with the fluent tool-usage assertions.
+    /// </remarks>
     public IReadOnlyList<string>? ExpectedTools { get; init; }
-    
+
     /// <summary>Ground truth response (for accuracy metrics).</summary>
     public string? GroundTruth { get; init; }
     
@@ -72,7 +83,19 @@ public class TestResult
     
     /// <summary>Individual criteria results.</summary>
     public IReadOnlyList<CriterionResult>? CriteriaResults { get; set; }
-    
+
+    /// <summary>
+    /// Outcomes of the fluent assertions run against this test — passes, failures and checks that
+    /// could not decide.
+    /// </summary>
+    /// <remarks>
+    /// Populate this from an eval-mode assertion scope
+    /// (<c>AgentEvalScope.Collecting()</c> → <c>scope.Results</c>) to get assertion outcomes into
+    /// the exported artifacts. Before AE-01 there was nowhere to put them and the exported
+    /// <c>ScenarioResult.Assertions</c> was always empty.
+    /// </remarks>
+    public IReadOnlyList<Output.AssertionResult>? AssertionResults { get; set; }
+
     /// <summary>Exception if the test errored.</summary>
     public Exception? Error { get; set; }
     

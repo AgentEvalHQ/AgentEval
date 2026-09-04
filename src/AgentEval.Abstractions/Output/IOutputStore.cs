@@ -116,8 +116,8 @@ public sealed record ScenarioResult(
     TimeSpan Duration,
     double EstimatedCost);
 
-/// <summary>Result of a single assertion within a scenario.</summary>
-public sealed record AssertionResult(string Assertion, bool Passed, string? Message);
+// AssertionResult moved to AssertionResult.cs (same namespace and assembly, so this is not an
+// API change) when it grew a three-valued Outcome and factory methods — see AE-01.
 
 /// <summary>Full agent execution trace for a run.</summary>
 public sealed record AgentTrace(string RunId, string ScenarioId, IReadOnlyList<TraceEvent> Events);

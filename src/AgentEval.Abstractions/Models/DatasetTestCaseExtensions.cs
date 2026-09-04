@@ -76,7 +76,13 @@ public static class DatasetTestCaseExtensions
     /// When only a structured <see cref="GroundTruthToolCall"/> is present and no <see cref="DatasetTestCase.ExpectedOutput"/>,
     /// <see cref="EvaluationContext.GroundTruth"/> will be <c>null</c>. This is by design:
     /// <see cref="EvaluationContext.GroundTruth"/> is consumed by the LLM judge as text.
-    /// For tool-call accuracy evaluation, use the ToolUsage metrics which compare against ExpectedTools.
+    /// </para>
+    /// <para>
+    /// <b>Tool expectations are not carried here.</b> This method does not populate
+    /// <see cref="EvaluationContext.ExpectedTools"/> or <see cref="EvaluationContext.ToolUsage"/>, so the
+    /// tool-usage metrics have nothing to compare; set both yourself if you want them to run. Note also
+    /// that <see cref="TestCase.ExpectedTools"/> (populated by <see cref="ToTestCase"/>) is <b>not enforced
+    /// by the MAF evaluation harness</b> — see the remarks on that property (ADR-030 defect D-d, tracker AE-02).
     /// </para>
     /// </remarks>
     /// <param name="d">The dataset test case.</param>

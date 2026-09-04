@@ -46,6 +46,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveOverallScoreAtLeast(double minimumScore, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.OverallScore < minimumScore)
         {
             var suggestions = new List<string>();
@@ -77,7 +78,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -86,6 +87,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveAllQueriesPassed(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var failedQueries = _result.QueryResults.Where(r => !r.Passed).ToArray();
         
         if (failedQueries.Length > 0)
@@ -110,7 +112,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -119,6 +121,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveAtLeastQueriesPassed(int minimumPassed, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.PassedQueries < minimumPassed)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -130,7 +133,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -139,6 +142,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveRememberedFacts(IEnumerable<MemoryFact> expectedFacts, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var expected = expectedFacts.ToArray();
         var missing = expected.Except(_result.FoundFacts).ToArray();
         
@@ -164,7 +168,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -173,6 +177,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions NotHaveRecalledForbiddenFacts(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.ForbiddenFound.Count > 0)
         {
             var suggestions = new List<string>
@@ -195,7 +200,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -204,6 +209,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]  
     public MemoryEvaluationAssertions HaveCompletedWithin(TimeSpan maxDuration, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.Duration > maxDuration)
         {
             var suggestions = new List<string>
@@ -222,7 +228,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -231,6 +237,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveUsedFewerTokens(int maxTokens, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.TokensUsed > maxTokens)
         {
             var suggestions = new List<string>
@@ -249,7 +256,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -258,6 +265,7 @@ public class MemoryEvaluationAssertions
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveCostLessThan(decimal maxCost, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.EstimatedCost > maxCost)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -273,7 +281,7 @@ public class MemoryEvaluationAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 }
 
@@ -295,6 +303,7 @@ public class MemoryQueryAssertions
     [StackTraceHidden]
     public MemoryQueryAssertions HavePassed(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (!_result.Passed)
         {
             var suggestions = new List<string>
@@ -317,7 +326,7 @@ public class MemoryQueryAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -326,6 +335,7 @@ public class MemoryQueryAssertions
     [StackTraceHidden]
     public MemoryQueryAssertions HaveScoreAtLeast(double minimumScore, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_result.Score < minimumScore)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -337,7 +347,7 @@ public class MemoryQueryAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -346,6 +356,7 @@ public class MemoryQueryAssertions
     [StackTraceHidden]
     public MemoryQueryAssertions HaveFoundAllExpectedFacts(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var missing = _result.MissingFacts;
         
         if (missing.Count > 0)
@@ -363,7 +374,7 @@ public class MemoryQueryAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 
     /// <summary>
@@ -372,6 +383,7 @@ public class MemoryQueryAssertions
     [StackTraceHidden]
     public MemoryQueryAssertions HaveResponseContaining(string expectedText, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(expectedText);
         if (!_result.Response.Contains(expectedText, StringComparison.OrdinalIgnoreCase))
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -387,6 +399,6 @@ public class MemoryQueryAssertions
             ));
         }
         
-        return this;
+        return probe.Complete(this);
     }
 }

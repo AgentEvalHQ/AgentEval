@@ -145,22 +145,47 @@ public sealed class CompositeEval : IEval
             .Zip(subs, (c, s) => (Component: c, Sub: s))
             .Any(pair => pair.Component.Required && pair.Sub.Score.Label == "error");
 
+        // ADR-030 Slice 0.1 (defect D-a): a composite none of whose leaves produced a measurement has
+        // nothing to render a verdict on. Every aggregation strategy already excludes "skipped" and
+        // "error" leaves from the score and returns (0, "none") when nothing is left — and that
+        // (0, "none") then fell straight through BOTH verdict paths below: Threshold==null read the
+        // empty severity rollup as "pass", and a Threshold read the placeholder 0.0 as a real "fail"
+        // (or "pass" at threshold 0). A green verdict from an instrument that measured nothing is the
+        // silent-{} shape; the honest label is "skipped" (every leaf skipped) or "error" (nothing
+        // measured and at least one leaf errored — an optional judge that could not speak is still
+        // the only thing that ran).
+        var measuredCount = subs.Count(s => s.Score.Label is not ("skipped" or "error"));
+        var nothingMeasured = measuredCount == 0;
+        var allSkipped = nothingMeasured && subs.All(s => s.Score.Label == "skipped");
+
         // Verdict matrix:
         //   Required sub errored -> error (regardless of score/threshold — nothing was actually evaluated)
+        //   No leaf measured     -> skipped (all leaves skipped) or error (some leaf errored), never pass/fail
         //   Threshold set        -> score >= threshold ? pass : fail
         //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
         var label = hasRequiredError
             ? "error"
-            : Threshold is { } t
-                ? (score >= t ? "pass" : "fail")
-                : verdictSeverity switch
-                {
-                    "critical" or "high" => "fail",
-                    "medium" => "warn",
-                    _ => "pass"
-                };
+            : nothingMeasured
+                ? (allSkipped ? "skipped" : "error")
+                : Threshold is { } t
+                    ? (score >= t ? "pass" : "fail")
+                    : verdictSeverity switch
+                    {
+                        "critical" or "high" => "fail",
+                        "medium" => "warn",
+                        _ => "pass"
+                    };
         var passed = label == "pass";
+
+        // Say why in the result itself (mirrors EvalResult.Skipped, which writes its reason to
+        // Recommendations) so a reader of the artifact sees "nothing ran", not a bare 0.0.
+        string? nothingMeasuredNote = nothingMeasured && !hasRequiredError
+            ? (allSkipped
+                ? $"All {subs.Length} component(s) were skipped; nothing was measured, so no verdict is reported."
+                : $"No component produced a measurement ({subs.Count(s => s.Score.Label == "error")} errored, " +
+                  $"{subs.Count(s => s.Score.Label == "skipped")} skipped); no verdict is reported.")
+            : null;
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
@@ -168,9 +193,12 @@ public sealed class CompositeEval : IEval
             Details: new(
                 Dimensions: null,
                 Evidence: null,
-                Recommendations: null,
+                Recommendations: nothingMeasuredNote is null ? null : new[] { nothingMeasuredNote },
                 SubResults: subs,
-                AggregationStrategy: Aggregation.Name),
+                AggregationStrategy: Aggregation.Name)
+            {
+                Summary = nothingMeasuredNote,
+            },
             Provenance: new(
                 Type: "composite",
                 JudgeModel: null,

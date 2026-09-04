@@ -51,6 +51,8 @@ Each ADR follows this structure:
 | [028](028-typedmemeval-acceptance-on-discrimination.md) | TypedMemEval — accept a shape on measured discrimination, not a coverage proxy | Proposed | 2026-08-31 |
 | [029](029-procedural-memory-declarative-and-enacted.md) | Procedural memory — a finding, and a request to reopen a bilateral agreement | Accepted, then REVERSED by its own §10–§12: the Procedural vertical is built (80q, headroom +0.81) and released standalone | 2026-09-03 |
 
+| [030](030-meta-evaluation-is-the-lane.md) | Meta-evaluation is the lane; contract unification is not — chance floors, exact tests, applicability as first-class; `IEval` kept by adaptation; deterministic assertion catalogue rejected by name | Proposed | 2026-09-04 |
+| [031](031-eval-packs-ship-reduced.md) | Eval Packs — adversarial verdict DON'T BUILD as scoped; SHIP REDUCED to five items on the existing `subjects/` tree, no new format | Proposed (reduced) | 2026-09-04 |
 ---
 
 *Template based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)*
