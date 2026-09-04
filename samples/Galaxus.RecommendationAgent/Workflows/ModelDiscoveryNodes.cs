@@ -679,7 +679,7 @@ public sealed class ModelRanker(Catalogue catalogue, DiscoveryModelCall model, I
             "Ranker",
             "GalaxusRanker",
             DiscoveryRankerPrompt.Instructions,
-            BuildRankerContext(state),
+            BuildRankerContext(state, _catalogue),
             state,
             cancellationToken).ConfigureAwait(false);
 
@@ -738,7 +738,34 @@ public sealed class ModelRanker(Catalogue catalogue, DiscoveryModelCall model, I
     /// rather than a leak — and the scan that catches one is therefore honest.
     /// </summary>
     /// <param name="state">The run state.</param>
-    public static string BuildRankerContext(DiscoveryState state)
+    /// <summary>
+    /// The attribute tokens a candidate carries that <see cref="Product.TryGetAttributeValue"/> will
+    /// actually resolve — spec keys and whole tags. Falls back to the raw fused set when no catalogue
+    /// is supplied, so the method stays usable in isolation; callers on the live path pass one.
+    /// </summary>
+    /// <param name="candidate">The candidate whose tokens are being offered to the model.</param>
+    /// <param name="catalogue">The catalogue, used to resolve the candidate to its product.</param>
+    /// <returns>Up to 14 resolvable tokens, ordinal-ordered.</returns>
+    internal static IEnumerable<string> ResolvableAttributeKeys(ProductCandidate candidate, Catalogue? catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        if (catalogue is null || !catalogue.TryGet(candidate.ProductId, out var product) || product is null)
+            return candidate.Attributes.Order(StringComparer.Ordinal).Take(14);
+
+        var resolvable = candidate.Attributes
+            .Where(token => product.TryGetAttributeValue(token, out _))
+            .Order(StringComparer.Ordinal)
+            .Take(14)
+            .ToList();
+
+        // A product with no resolvable token would leave the model nothing to ground on; showing the
+        // raw set is worse than showing none, because a citation from it is dropped. Show none, and
+        // let the ranker return a null grounding key rather than a doomed one.
+        return resolvable;
+    }
+
+    public static string BuildRankerContext(DiscoveryState state, Catalogue? catalogue = null)
     {
         ArgumentNullException.ThrowIfNull(state);
 
@@ -773,8 +800,18 @@ public sealed class ModelRanker(Catalogue catalogue, DiscoveryModelCall model, I
                 $"  {candidate.ProductId}  {candidate.Title}  ·  {candidate.CategoryPathText}  " +
                 $"(for {candidate.MatchedInterestId}, score {candidate.SearchScore:0.0000}, " +
                 $"{candidate.RatingCount} rating(s))");
+            // ⚠ Only tokens the RESOLVER accepts are offered. `ProductCandidate.Attributes` is the
+            //   FUSED set — tags, tag suffixes, spec keys, spec VALUES and `key=value` pairs — but
+            //   `Product.TryGetAttributeValue` resolves only a spec key or a whole tag. Rule 6 of the
+            //   ranker prompt tells the model to copy `grounding_attribute_key` from this list, so
+            //   listing a value like `230-g` or a suffix like `beginner` invites a citation that is
+            //   then dropped `attribute_not_found` — the model obeying the instruction literally and
+            //   being punished for it. Observed on the live run of 2026-09-04 ("230-g",
+            //   "1-kg-of-whole-beans", "beginner", "2-batteries" all dropped). Filtering here rather
+            //   than relaxing the resolver keeps the grounding check strict, and it self-maintains:
+            //   whatever the resolver accepts is exactly what the model is shown.
             builder.AppendLine(CultureInfo.InvariantCulture,
-                $"      attribute keys: {string.Join(", ", candidate.Attributes.Order(StringComparer.Ordinal).Take(14))}");
+                $"      attribute keys: {string.Join(", ", ResolvableAttributeKeys(candidate, catalogue))}");
             if (candidate.ReviewIds.Count > 0)
                 builder.AppendLine($"      review ids: {string.Join(", ", candidate.ReviewIds)}");
         }
