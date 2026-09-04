@@ -329,6 +329,31 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
             return;
         }
 
+        // A smoke selector, for proving the wiring on one case before spending the whole set. The
+        // full arm is 257 judge calls in one burst, and the failures worth catching first — a bad
+        // deployment name, a protocol the deployment will not honour, a template that throws — are
+        // all visible on the first case.
+        //
+        // A limited run measures a SUBSET, so it deliberately asserts NOTHING about agreement and
+        // returns before the floors. Letting a one-case run reach a green agreement assertion is the
+        // diluted-denominator defect this family has already shipped twice: a gate whose
+        // applicability is read off its own result rather than its input. Here the input decides.
+        var only = Environment.GetEnvironmentVariable("AGENTEVAL_CALIBRATION_ONLY");
+        var selected = string.IsNullOrWhiteSpace(only)
+            ? [.. Cases]
+            : Cases
+                .Where(c => only
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Any(token =>
+                        string.Equals(c.Id, token, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(c.Vertical, token, StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+
+        Assert.True(
+            selected.Length > 0,
+            $"AGENTEVAL_CALIBRATION_ONLY='{only}' selected no cases. A run that measures nothing is " +
+            $"not a smoke run, it is a typo.");
+
         var options = new ExternalBenchmarkOptions
         {
             JudgeVerdictProtocol = JudgeVerdictProtocol.StructuredJson,
@@ -345,7 +370,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         // that throttles would turn a calibration measurement into a retry-accounting measurement.
         using var gate = new SemaphoreSlim(4);
 
-        await Task.WhenAll(Cases.Select(async calibrationCase =>
+        await Task.WhenAll(selected.Select(async calibrationCase =>
         {
             await gate.WaitAsync().ConfigureAwait(false);
             try
@@ -382,12 +407,12 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
 
         var results = observed.ToArray();
         var agreed = results.Count(r => r.Actual == Enum.Parse<TypedMemEvalOutcome>(r.Case.Expected));
-        var agreement = (double)agreed / Cases.Count;
+        var agreement = (double)agreed / selected.Length;
 
         // Printed, not just asserted: this output is what the recorded-result file is filled in from,
         // and a run that only says pass or fail leaves the maintainer nothing to record.
         _output.WriteLine($"deployment: {deployment}");
-        _output.WriteLine($"agreement: {agreement:0.###} ({agreed}/{Cases.Count})");
+        _output.WriteLine($"agreement: {agreement:0.###} ({agreed}/{selected.Length})");
         foreach (var vertical in Enum.GetValues<TypedMemEvalVertical>())
         {
             var subset = results
@@ -411,6 +436,19 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
 
         foreach (var line in disagreements)
             _output.WriteLine(line);
+
+        if (selected.Length != Cases.Count)
+        {
+            // Everything above is printed; nothing below is asserted. The wiring is what a smoke run
+            // can establish — that the deployment answers, the protocol holds, the template renders
+            // and the verdict parses. Agreement over a hand-picked subset is not the calibration and
+            // must not be able to go green as if it were.
+            _output.WriteLine(
+                $"SMOKE RUN: {selected.Length} of {Cases.Count} cases, selected by " +
+                $"AGENTEVAL_CALIBRATION_ONLY. Wiring exercised; agreement NOT asserted and this run " +
+                $"is not a measurement. Clear the variable to run the calibration.");
+            return;
+        }
 
         var lowVerticals = Enum.GetValues<TypedMemEvalVertical>()
             .Select(vertical => (Vertical: vertical, Subset: results

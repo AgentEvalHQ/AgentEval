@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0-beta] - 2026-09-04
+
+**The tenth vertical, and the taxonomy closes.** Procedural ships at 80 questions and headroom
++0.80 — the largest in the family — bringing TypedMemEval to **565 questions across 36 shapes in 10
+verticals**. Every memory type the consuming engine ships is now covered.
+
+**Purely additive.** All nine existing corpora are byte-identical; `corpus_sha256` verified against
+`v0.33.0-beta` for each. Nothing a current consumer runs changes.
+
+### Added — Procedural, the tenth vertical (80 questions)
+
+`TypedMemEvalVertical.Procedural`, corpus `d431a7fc9ac5`, 80 questions across four shapes at 20
+each. It asks whether a system **remembers a procedure it was told across sessions**: the steps,
+the order they must run in, what has to be true before it starts, and which steps were later
+amended or retired.
+
+Vertical: V1 80/80, V2 80/80, V3 80/80, **V6 70/72**, V8 80/80, V9 16/80, **headroom +0.80** — the
+largest in the family, and fully reachable (V8 = V1, so no part of it is closed to a perfect
+retriever). Mean realised coverage 0.575, calibrated per shape from the first build rather than
+retro-fitted. Three shapes sit in the 0.50–0.90 band (0.600 / 0.625 / 0.675); `step-order` is
+**declared out of band at 0.400**, see below.
+
+**Why it discriminates.** Every question needs two hops by construction. Exactly one gold session
+names the procedure — the membership list, stated in an order that is never the answer — and the
+dependencies, sub-precondition, amendment and retirement name step or condition *pairs* and never
+the procedure. A retriever working from the question's wording reaches the first and not the
+second. That asymmetry is asserted at generation and is fatal to the build if it breaks.
+
+**The hop is held open by competition, not by declaration — and the first build got this wrong.**
+Stating the dependencies as the adjacent pairs of a four-chain is not sufficient on its own: their
+transitive closure *is* the gold order, and filler stated only isolated pairs, so the gold chain was
+the only complete order in the haystack and the membership session was redundant. Every
+`step-order` haystack now carries **two complete rival chains** over steps the question does not
+own, and the generator refuses a corpus without them.
+
+**`step-order` is declared out of band at 0.400 coverage** (floor 0.50). Seven mandatory competitors
+sit against G=4 gold at `K_ref` = 5, and that competition is the construct. ADR-028's rule applies —
+accept a shape on measured discrimination, calibrate on the proxy — and the alternative is trading
+the construct for the number. Recorded in `TypedMemEvalCoverageBandTests.OutOfBand` with a drift
+check, alongside the four shapes already there.
+
+**Two constructs the family did not previously carry.** `step-order` is its only **order that must
+hold** — violating it is an error, not merely a wrong answer. `precondition` is its only constraint
+that is **neither a step nor a value**. `retired-step` is deliberately distinct from
+`forgetting/invalidated`: there a value is superseded by another value; here a position leaves the
+sequence and nothing replaces it, so a store holding procedures as opaque blobs keeps the dead step
+alive.
+
+**Scope of the claim.** This measures whether a procedure was *remembered*, not whether it can be
+*executed* or whether the system *improves* at it. Those need observed outcomes over repeated
+trials and are a different claim (ADR-029 §2). The enacted half is explicitly not built.
+
+### Added — a smoke selector for the live judge calibration arm
+
+`AGENTEVAL_CALIBRATION_ONLY` restricts `LiveJudge_LabelsTheCalibrationSetAsTheHumansDid` to named
+case ids or a named vertical, so the wiring can be proved on one case before spending the full set.
+A limited run **asserts nothing about agreement** and returns before the floors, because a green
+one-case run that read as a passed calibration would be the diluted-denominator defect this family
+has already shipped twice. Applicability is decided by the input, never by the result.
+
+### Fixed — V6 reported a number four times before it reported a true one
+
+The leave-one-out arm is what makes `gold_components_load_bearing` a measurement rather than a
+claim, and on this vertical it was wrong in both directions before it was right. Recorded in full
+because each step moved the number for a different reason and only the last moved the corpus:
+
+| | V6 | what was actually happening |
+|---|---|---|
+| 1 | 60/80 | readers *declining* the link were scored as reaching gold. Fixed by declaring `answer_must_name`, an instrument that already existed |
+| 2 | 77/80 | **flattering.** The dependency chain's transitive closure is the gold order, so the membership session was redundant — 14 of 60 membership-drop samples reproduced the gold order verbatim, and only 3 were condemned |
+| 3 | 68/80 | truer, after a guaranteed rival chain — but now condemning on **luck**: no `chance_floor` was declared, so one hit in three samples condemned, against a guesser firing at 1−(2/3)³ = **0.70** |
+| 4 | 51/52 | honest where it could decide and **silent where it could not** — k=2 leaves no threshold at three samples, so all twenty `step-order` questions came back undecidable |
+| 5 | **70/72** | a second rival chain puts k at 3, where the threshold is 3-of-3. V6 now scores **72 of 80** questions instead of 52 |
+
+Two lessons worth keeping. **A chance floor absent is not a floor of zero** — it collapses
+`v6_needs` to 1 and condemns working components, which is the understating direction and therefore
+the one that survives review. And **an undecidable result is not a pass**: 51/52 read better than
+68/80 while saying nothing at all about a quarter of the corpus.
+
+### Changed — judge calibration re-measured over the grown set
+
+257 cases (was 230). Family agreement **0.988**, Procedural **1.000 (27/27)**, no vertical below
+0.885. The judge prompt was **not** touched and its fingerprint is unchanged; only the case set
+grew, which is precisely the drift the recorded `cases` count exists to catch.
+
+Three of the 27 Procedural cases were authored with the wrong label and the live arm caught it: an
+answer saying *"nothing in the record says what order they run in"* is a confident denial, which
+ADR-026 §6 grades `Missed`, not `Abstained`. The cases were reworded to sit on the side of the
+boundary they were written to test, not relabelled to agree with the judge.
+
+### Unchanged — all nine existing corpora
+
+Every existing corpus is **byte-identical** (`corpus_sha256` verified against `HEAD` for all nine).
+Their metadata sidecars moved only because `empty_rate_by_arm` records a **family-wide** call
+population, and a tenth vertical's probes enlarge it. No question, answer, or haystack changed.
+
 ## [0.33.0-beta] - 2026-09-03
 
 **Cut for AgentMemory's C-D full-family run.** It carries the two fixes they named as blocking: `forgetting` at `be14b81ae4e2` (not `7fe6e166dbf1`), and the `prospective` due-window answer-key fix at `39f205b72294`.

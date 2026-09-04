@@ -123,6 +123,7 @@ public sealed class TypedMemEvalCorpusTests
             coverage.GetProperty("per_question").EnumerateObject().Count());
     }
 
+
     [Theory]
     [MemberData(nameof(AllVerticals))]
     public void Metadata_RecordsProbesAgainstTheCorpusItShipsWith(TypedMemEvalVertical vertical)
@@ -714,6 +715,27 @@ public sealed class TypedMemEvalCorpusTests
     private static readonly Dictionary<(TypedMemEvalVertical Vertical, string Shape), string>
         UncalibratableShapes = new()
         {
+            // Below the floor BY CONSTRUCTION, and the construction is the shape's whole difficulty.
+            // step-order is the only shape carrying four MANDATORY strong competitors -- a
+            // three-session rival chain plus an applicability session -- against G=4 gold at
+            // K_ref=5. The rival chain competes with gold on the same frames and the same step
+            // vocabulary DELIBERATELY, because that is what makes the membership session
+            // load-bearing: without it, V6 measured the second hop as redundant, with 14 of 60
+            // membership-drop samples reproducing the gold order verbatim (ADR-029 §11b).
+            //
+            // No knob raises it. The echo knob makes DISTRACTORS more question-like, so it only ever
+            // lowers coverage, and at echo 0.000 the shape is already at its ceiling. Narrowing the
+            // distractor budget to [12,18] was measured and bought 0.012 -- 0.4625 to 0.4750 -- for
+            // a per-shape special case, so it was reverted. The only remaining lever is deleting the
+            // rival chain, which would trade a real construct for a proxy.
+            //
+            // ADR-028 is the licence: a shape is accepted on measured DISCRIMINATION, not on
+            // coverage. This one discriminates at the top of the family.
+            [(TypedMemEvalVertical.Procedural, "step-order")] =
+                "four mandatory strong competitors against G=4 at K_ref=5, which is what makes the "
+                + "membership session load-bearing; no knob raises it and removing them removes the "
+                + "construct (ADR-028, ADR-029 §11b)",
+
             // The events are recorded under one designation and counted under another, so a lexical
             // retriever searching the ASKED designation cannot reach them at all — it can only
             // reach the link session. Realised coverage is 0.336 at echo 0.0, which is the floor
@@ -1497,6 +1519,36 @@ public sealed class TypedMemEvalCorpusTests
         // judge scored them as reaching a gold that names no place. The ablation arms now require
         // the answer to be tied to the asked entity.
         [TypedMemEvalVertical.Semantic] = 1.0,
+        // The tenth vertical, and the one whose V6 number took four measurements to become true.
+        // The arc is worth keeping, because every step of it moved the number for a different
+        // reason and only the last one moved the CORPUS:
+        //
+        //   60/80  first probe. The membership session was dropped, the reader said so ("the
+        //          conversations do not mention a Verrin changeover by name") and then reported a
+        //          rival edit, which an equivalence judge scored as reaching a gold that names no
+        //          procedure. Fixed by declaring `answer_must_name`, an instrument that already
+        //          existed for `semantic/co-reference`.
+        //   77/80  and FLATTERING. `step-order`'s three dependency sessions state the adjacent
+        //          pairs of a 4-chain, so their transitive closure IS the gold order, and filler
+        //          stated only isolated pairs -- the gold chain was the sole complete order in the
+        //          haystack and the membership session was redundant. 14 of 60 membership-drop
+        //          samples reproduced the gold order verbatim; only 3 were condemned, the rest
+        //          rescued by the resolution grader saying `declined`.
+        //   68/80  after a guaranteed rival chain. Lower, and truer -- but now condemning on LUCK:
+        //          no `chance_floor` was declared, so `v6_needs` collapsed to 1 and one hit in three
+        //          samples condemned, against a guesser firing at 1-(2/3)^3 = 0.70 at k=3.
+        //   51/52  after declaring floors derived from the construction. Honest where it could
+        //          decide, and SILENT where it could not: k=2 on `step-order` leaves no threshold
+        //          at three samples, so all twenty came back undecidable -- V6 said nothing about a
+        //          quarter of the corpus.
+        //   70/72  after a SECOND rival chain put k at 3, where the threshold is 3-of-3. V6 now
+        //          scores 72 of 80 questions instead of 52, and `step-order` is measured rather
+        //          than blind. The eight still undecidable are `precondition` questions whose
+        //          haystack happened to carry only two distinct conditions.
+        //
+        // Recorded as the measured fraction, not the old 77/80: that denominator no longer exists,
+        // and a ratchet holding a number from a superseded scope is one nothing can trip.
+        [TypedMemEvalVertical.Procedural] = 70.0 / 72.0,
     };
 
     private static JsonElement Metadata(TypedMemEvalVertical vertical)

@@ -373,6 +373,10 @@ curve is the strongest candidate) is a costed open question for the joint review
 not something these tables quietly promise. Procedural memory stays consumer-side (it is
 agentic and needs tools); it is out of scope for AgentEval and this family.
 
+> **SUPERSEDED 2026-09-03 by [ADR-029](029-procedural-memory-declarative-and-enacted.md) §10–§12.**
+> "Agentic and needs tools" is true of *enacting* a procedure and false of *remembering* one.
+> The declarative half is a static corpus and is built; the enacted half stays out.
+
 Common validity rules, written before any generation (per-vertical rules add to these):
 
 - **V1 — Oracle answerability.** Every question, run gold-only through the oracle arm
@@ -790,6 +794,11 @@ provider-rejection = question-failure rule, echoed into the same `AnswerSampling
 - **Does not touch LongMemEval.** No shipped LongMemEval surface changes. The tg corpus
   stays where it is, frozen.
 - **No Procedural vertical** — consumer-side by agreement (needs tools; agentic).
+  > **SUPERSEDED 2026-09-03 by [ADR-029](029-procedural-memory-declarative-and-enacted.md) §10–§12.**
+  > The premise was wrong: a *remembered* procedure needs no tools, only a recall test. The
+  > vertical ships as 80 questions at headroom +0.81. §8's exclusion is bilateral and is **not
+  > renegotiated** — ADR-029 §12 records a deliberate, disclosed departure from it, and the
+  > vertical remains withdrawable.
 - **No cross-family composite score.** There is deliberately no "TypedMemEval overall
   number": the verticals measure different mechanisms and a blend would rebuild the one
   percentage the family exists to replace.

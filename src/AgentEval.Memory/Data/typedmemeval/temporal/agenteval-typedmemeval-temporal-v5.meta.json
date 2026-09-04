@@ -939,16 +939,16 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 1646,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 1646,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 15440,
+        "calls": 16460,
         "empty": 0,
         "rate": 0.0,
         "judge_calls": 5506,
@@ -957,37 +957,37 @@
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4213,
+        "calls": 4519,
         "empty": 9,
-        "rate": 0.0021,
+        "rate": 0.002,
         "judge_calls": 1392,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 3855,
+        "calls": 4621,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 2078,
+        "judge_calls": 2553,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 1646,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1544,
+        "judge_calls": 1646,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1544,
+        "calls": 1646,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1528,
+        "judge_calls": 1630,
         "judge_empty": 0,
         "judge_rate": 0.0
       },

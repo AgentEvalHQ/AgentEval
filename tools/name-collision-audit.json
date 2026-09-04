@@ -1,10 +1,10 @@
 {
-  "measured_at": "2026-08-30",
+  "measured_at": "2026-09-03",
   "instrument": "tools/audit_name_collisions.py",
   "reference_deployment": "gpt-5.5",
-  "names_tested": 163,
-  "real_world_referents": 75,
-  "invented": 88,
+  "names_tested": 206,
+  "real_world_referents": 78,
+  "invented": 128,
   "unparsed": 0,
   "finding": "V2 caught the reference model answering 'Which came first, the Fenn commissioning or the Yarrow move?' with real knowledge about Yarrow Shipbuilders' 1900s move to Scotstoun. A sweep of every entity bank found 75 of 163 names are real-world referents.",
   "harm_model": "A real referent is only exploitable where its real-world facts answer the question asked. 'Meridian Tools' being a real brand does not tell a model which vendor the USER chose; 'Yarrow' being a shipbuilder that moved in 1906 does tell it which milestone came first. Harm therefore concentrates in ORDERING questions, where the referent carries a date.",
@@ -31,16 +31,20 @@
     "Yarrow"
   ],
   "declared_not_remediated": {
-    "count": 61,
-    "reason": "Measured and assessed low-harm: these names are vendors, places someone lived, products chosen, or people's first names in padding. None answers its question. Rewriting them would move all nine corpus shas and reset every control the consuming project holds, for no measured leak. Declared rather than silently rewritten.",
+    "count": 76,
+    "reason": "Measured and assessed low-harm: these names are vendors, places someone lived, products chosen, or people's first names in padding. None answers its question. Rewriting them would move all nine corpus shas and reset every control the consuming project holds, for no measured leak. Declared rather than silently rewritten. RE-RUN 2026-09-03 over the Procedural vertical's seven entity banks, which the instrument did not cover when it was written: 206 names now tested, up from 171, and 15 of the 35 new ones are real referents. THE LOAD-BEARING RESULT IS WHICH BANK THEY ARE NOT IN. procedural:STEPS -- the bank holding the entities `step-order` asks a system to SEQUENCE -- returned ZERO collisions, because its heads come from the same pre-audited invented pool as temporal:MILESTONES (Quorlory, Vreskade, Zethisk, Draimune, Ondrey, Traymoor, Wexilune, Peskadd and Tovrekk were already tested and already invented). The 15 sit in PROCEDURES (the label of the procedure, never ordered against anything), CONDITIONS and SUBCONDITIONS (gates, carrying no date), and the three FILLER banks (never gold). Under this record's own harm model -- harm concentrates in ordering questions where the referent carries a date -- none is exploitable: knowing Thessaly is a region of Greece or Bracknell a town in Berkshire does not tell a model whether the Quorlory sync runs before the Vreskade check, because that order is fixed by an INVENTED causal dependency between two invented artefacts. Corroborated by V2 at 80/80 -- but see v2_undercounts_this: V2 scores only a leak that AGREES with gold, so it corroborates and cannot certify.",
     "names": [
       "Ashcombe",
+      "Ashgate",
       "Bexley",
+      "Bicknell",
       "Brackenhoe",
+      "Bracknell",
       "Bram",
       "Bruno",
       "Cambourne",
       "Cranmere",
+      "Denbury",
       "Denn",
       "Dev",
       "Dunmoor",
@@ -48,26 +52,34 @@
       "Elverton",
       "Estrey",
       "Farrow",
+      "Garrow",
       "Garrowby",
+      "Halbrook",
       "Halbury",
       "Halden",
       "Herrold",
+      "Hollin",
       "Ibbetson",
       "Ilminster",
       "Kesse",
       "Kit",
       "Larkmead",
+      "Larkstone",
       "Larkwood",
       "Lowick",
       "Marchmont",
       "Marloe",
+      "Marrick",
       "Marrow",
       "Marta",
       "Marth",
       "Nadia",
       "Nettlebed Barn studio",
+      "Nettleford",
       "Ninnis",
       "Norra",
+      "Oakmere",
+      "Padgate",
       "Pell",
       "Pellow",
       "Pomfret",
@@ -80,9 +92,12 @@
       "Ryhope",
       "Sable",
       "Saltcoats",
+      "Selby",
       "Selwick",
+      "Sorrell",
       "Tarraby",
       "Theo",
+      "Thessaly",
       "Thornbury",
       "Thorne",
       "Torvald",
@@ -96,5 +111,48 @@
       "Yarrowfield",
       "Zennor Hill"
     ]
+  },
+  "procedural_bank_scope": {
+    "added_2026_09_03": [
+      "procedural:PROCEDURES",
+      "procedural:STEPS",
+      "procedural:CONDITIONS",
+      "procedural:SUBCONDITIONS",
+      "procedural:FILLER_PROCEDURES",
+      "procedural:FILLER_STEPS",
+      "procedural:FILLER_CONDITIONS"
+    ],
+    "ordering_bank": "procedural:STEPS",
+    "ordering_bank_collisions": 0,
+    "collisions_by_bank": {
+      "procedural:CONDITIONS": [
+        "Ashgate",
+        "Denbury",
+        "Halbrook",
+        "Nettleford"
+      ],
+      "procedural:FILLER_CONDITIONS": [
+        "Bicknell",
+        "Larkstone",
+        "Oakmere"
+      ],
+      "procedural:PROCEDURES": [
+        "Bracknell",
+        "Marrick",
+        "Thessaly"
+      ],
+      "procedural:FILLER_PROCEDURES": [
+        "Hollin",
+        "Selby"
+      ],
+      "procedural:SUBCONDITIONS": [
+        "Padgate",
+        "Sorrell"
+      ],
+      "procedural:FILLER_STEPS": [
+        "Garrow"
+      ]
+    },
+    "note": "ENTITY_BANKS was a hardcoded set and the Procedural vertical shipped seven entity banks into it without registering any -- the exact omission the conjunction:CONDITIONS comment warns against: 'a bank enters this list when its entries are entity names, not when someone remembers to add it.' Registering them also normalised two conjunction:CONDITIONS entries ('Peskadd permit', 'Tovrekk clearance') to their heads, which is the tool's own doctrine and loses no coverage, both heads being already tested."
   }
 }

@@ -18,6 +18,12 @@ The consuming engine ships eight memory types; TypedMemEval covers five. This AD
 the missing four — **Semantic**, **Temporal**, **Bitemporal**. Procedural stays out permanently: it
 needs tools, a live agent loop and observed outcomes, so it cannot be a static corpus.
 
+> **SUPERSEDED 2026-09-03 by [ADR-029](029-procedural-memory-declarative-and-enacted.md) §10–§12.**
+> "Permanently" was not this ADR's to say, and the reasoning conflated two claims. Tools, a live
+> loop and observed outcomes are what testing whether a system **improved** at a procedure needs;
+> testing whether it **remembered** one needs a corpus. Procedural ships as a static corpus of 80
+> questions. The *enacted* half is still out, and for exactly the reason given here.
+
 **The reframing signal.** On Arithmetic v5 the consuming stack measures realised coverage **1.000**
 against the corpus's calibrated BM25 floor of **0.636** — it retrieves every gold session and still
 answers wrong. Three things follow, and they shape every decision below:

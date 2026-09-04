@@ -62,6 +62,27 @@ public class TypedMemEvalCoverageBandTests
             [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 1.0000,
             [(TypedMemEvalVertical.Prospective, "due-window")] = 0.4352,
             [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
+            // BELOW THE FLOOR BY CONSTRUCTION, and the construction is the point. step-order is the
+            // only shape carrying SEVEN mandatory strong competitors -- two three-session rival
+            // chains plus an applicability session -- against G=4 gold at K_ref=5, and those
+            // competitors are what make its membership session load-bearing. Without them V6
+            // measured the second hop as redundant: 14 of 60 membership-drop samples reproduced the
+            // gold order verbatim.
+            //
+            // MOVED AWAY FROM THE BAND ON PURPOSE, 0.4625 -> 0.4000, which is the one direction this
+            // ratchet exists to refuse -- so the reason is recorded rather than the number quietly
+            // raised. With ONE rival chain the reader that loses membership chooses between two
+            // complete orders; k=2, `v3_required_hits(2)` is None, and V6 returned UNDECIDABLE on
+            // all twenty questions. Not a pass -- silence, on a quarter of the corpus. A second
+            // rival chain puts k at 3, where the threshold is 3-of-3 and the arm can decide: V6
+            // coverage went from 52 of 80 questions to 72, and step-order became measurable for the
+            // first time.
+            //
+            // So this is a deliberate trade of a PROXY for a MEASUREMENT, which is the trade
+            // ADR-028 exists to license: a shape is accepted on measured discrimination, not on
+            // coverage. If a future change moves this further out again, it needs its own reason
+            // here -- drift without one is the defect, not the distance.
+            [(TypedMemEvalVertical.Procedural, "step-order")] = 0.4000,
         };
 
     /// <summary>

@@ -1,29 +1,32 @@
 {
   "judge_prompt_fingerprint": "b1d3f7216032ba27232fe4f0824f84226ffc39db6b226a66fa286b756b44e123",
-  "measured_at": "2026-08-29",
+  "measured_at": "2026-09-03",
   "model": "gpt-5.5",
-  "agreement": 0.987,
+  "agreement": 0.988,
   "status": "measured",
-  "cases": 230,
+  "cases": 257,
   "runs": 3,
   "per_vertical": {
     "Prospective": 1.0,
     "Episodic": 1.0,
     "Arithmetic": 1.0,
     "WorkingMemory": 1.0,
-    "Forgetting": 0.923,
+    "Forgetting": 0.885,
     "Bitemporal": 1.0,
     "Temporal": 1.0,
     "Semantic": 1.0,
-    "Conjunction": 0.958
+    "Conjunction": 1.0,
+    "Procedural": 1.0
   },
   "disagreements": {
     "every_run": [
       "cal-for-006"
     ],
     "run_varying": [
-      "cal-cnj-011",
-      "cal-for-012"
+      "cal-epi-023",
+      "cal-for-005",
+      "cal-for-012",
+      "cal-for-028"
     ]
   },
   "superseded": {
@@ -44,5 +47,6 @@
       "Conjunction": 1.0
     }
   },
-  "note": "Three runs: 0.991 / 0.987 / 0.996. Lowest recorded, per-vertical from that run. Run 3's 0.996 is the highest this set has measured, with cal-for-006 its only disagreement. SEMANTIC GAINED A JUDGE BODY, commissioned by the consuming project after it shipped without one. That was the right call at the time - it measured 0.958 on the shared preamble alone and nothing failed consistently - but it left Semantic as the ONLY vertical with no body to settle the preamble's abstained/missed line, which the preamble states as uncertainty-versus-denial and then illustrates with a denial. cal-sem-007 and cal-sem-013 alternated between Missed and Abstained across runs as a result. Semantic is now 26/26 in ALL THREE RUNS. THE SHARED PREAMBLE WAS NOT TOUCHED, and that is deliberate: editing it was tried, measured, and reverted - it converted the family's canonical genuine-refusal cases to Missed across four verticals and dropped agreement 0.983 to 0.966. Per-vertical is the remedy, and the family rule it confirms is that A VERTICAL BODY SUPERSEDES THE SHARED PREAMBLE. BUILT UNDER REACH ENUMERATION, a requirement the consuming project adopted from our own failure on that preamble edit: controls-first is necessary and not sufficient, because the guard there was built against the failure imagined rather than the surfaces the change could touch. So all 26 Semantic cases were enumerated first and 19 carry a DECLARED ROUTE, not just the four the body targets. The two that matter are cal-sem-005 (lists every value the record has held) and cal-sem-020 (restates a related fact): both LOOK like refusals and both COMMIT, so a body that swept them into abstained would repeat the preamble regression at vertical scale. Both held at 'value'. The route is asserted INDEPENDENTLY of the outcome via question_asks - value | absence | uncertainty - so a template reaching the right label by the wrong reasoning fails rather than passing quietly. No case reached its outcome by the wrong route in any run. cal-for-006 remains the family's only every-run disagreement: an answer replaces a cancelled gym membership with an invented move to a different gym, the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry."
+  "note": "Three runs: 0.988 / 0.992 / 0.992. Lowest recorded, per-vertical from that run. RE-MEASURED BECAUSE THE SET GREW, NOT BECAUSE THE PROMPT CHANGED. The judge prompt fingerprint is unchanged from the 230-case measurement of 2026-08-29 that recorded 0.987; what moved is the case count, 230 -> 257, on PROCEDURAL joining the family as its tenth vertical. That is exactly the drift the recorded `cases` count exists to catch: the fingerprint pins the prompt TEXT and cannot see a case list grow underneath it, which is how a measurement over 120 of 168 cases once went on being read as a family-wide number. PROCEDURAL IS 27/27 IN ALL THREE RUNS. It routes to the shared preamble with no vertical body, and the four shapes -- step-order, precondition, amended-step, retired-step -- needed none: the preamble's uncertainty-versus-denial line settles every case the shapes produce. THREE OF ITS 27 CASES WERE AUTHORED WITH THE WRONG LABEL AND THE LIVE ARM CAUGHT IT. cal-prc-005 and cal-prc-013 answered 'nothing in the record says...' and were labelled Abstained; cal-prc-008 answered 'the record does not treat any of them as coming before another' and was labelled Wrong. All three are CONFIDENT DENIALS, which ADR-026 SS6 grades Missed, and the judge said so on all three. The rule had been stated correctly in cal-prc-006's own note and then violated three cases later. THE CASES WERE REWORDED TO SIT ON THE SIDE OF THE BOUNDARY THEY WERE WRITTEN TO TEST, NOT RELABELLED TO AGREE WITH THE JUDGE -- 005 and 013 now express inability to determine (paired against 006 and 014, which deny and are Missed), and 008 now asserts a positive, specific and wrong structure, which is what Wrong is for. Relabelling would have measured agreement while deleting the boundary. cal-for-006 remains the family's only every-run disagreement, unchanged in both content and behaviour from the previous record: an answer replaces a cancelled gym membership with an invented move to a different gym, the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry. Forgetting is again the lowest vertical and again above its floor; its three run-varying cases (005, 012, 028) all sit on the abstained/missed/wrong boundary the shared preamble draws. A SMOKE SELECTOR WAS ADDED FOR THIS ARM: AGENTEVAL_CALIBRATION_ONLY restricts the run to named case ids or a named vertical so the wiring can be proved on one case before spending 257 judge calls. A limited run ASSERTS NOTHING about agreement and returns before the floors, because a green one-case run reading as a passed calibration is the diluted-denominator defect this family has already shipped twice. Applicability is decided by the INPUT -- the variable -- never by the result.",
+  "note_previous_measurement": "The 230-case measurement of 2026-08-29, under this same judge prompt fingerprint. Retained because it is the record of why Semantic gained a vertical body and why the shared preamble must not be edited. Three runs: 0.991 / 0.987 / 0.996. Lowest recorded, per-vertical from that run. Run 3's 0.996 is the highest this set has measured, with cal-for-006 its only disagreement. SEMANTIC GAINED A JUDGE BODY, commissioned by the consuming project after it shipped without one. That was the right call at the time - it measured 0.958 on the shared preamble alone and nothing failed consistently - but it left Semantic as the ONLY vertical with no body to settle the preamble's abstained/missed line, which the preamble states as uncertainty-versus-denial and then illustrates with a denial. cal-sem-007 and cal-sem-013 alternated between Missed and Abstained across runs as a result. Semantic is now 26/26 in ALL THREE RUNS. THE SHARED PREAMBLE WAS NOT TOUCHED, and that is deliberate: editing it was tried, measured, and reverted - it converted the family's canonical genuine-refusal cases to Missed across four verticals and dropped agreement 0.983 to 0.966. Per-vertical is the remedy, and the family rule it confirms is that A VERTICAL BODY SUPERSEDES THE SHARED PREAMBLE. BUILT UNDER REACH ENUMERATION, a requirement the consuming project adopted from our own failure on that preamble edit: controls-first is necessary and not sufficient, because the guard there was built against the failure imagined rather than the surfaces the change could touch. So all 26 Semantic cases were enumerated first and 19 carry a DECLARED ROUTE, not just the four the body targets. The two that matter are cal-sem-005 (lists every value the record has held) and cal-sem-020 (restates a related fact): both LOOK like refusals and both COMMIT, so a body that swept them into abstained would repeat the preamble regression at vertical scale. Both held at 'value'. The route is asserted INDEPENDENTLY of the outcome via question_asks - value | absence | uncertainty - so a template reaching the right label by the wrong reasoning fails rather than passing quietly. No case reached its outcome by the wrong route in any run. cal-for-006 remains the family's only every-run disagreement: an answer replaces a cancelled gym membership with an invented move to a different gym, the judge reads the no-longer as satisfied, the label treats the fabricated replacement as a committed value gold does not carry."
 }

@@ -61,7 +61,24 @@ public class TypedMemEvalNameCollisionTests
     /// exemption's silence without ever being assessed.
     /// </para>
     /// </remarks>
-    private const int DeclaredUnremediated = 61;
+    /// <para>
+    /// RAISED 61 -> 76 on 2026-09-03, which is the path this guard's own message prescribes:
+    /// re-run the instrument and judge the additions. The Procedural vertical shipped seven entity
+    /// banks that <c>ENTITY_BANKS</c> did not cover, so 35 names had never been tested at all. They
+    /// were tested (206 names now, up from 171) and 15 are real referents.
+    /// </para>
+    /// <para>
+    /// The assessment that justifies raising it is WHICH BANK THEY ARE NOT IN.
+    /// <c>procedural:STEPS</c> — the bank whose entries <c>step-order</c> asks a system to SEQUENCE,
+    /// and therefore the only one this record's harm model puts at risk — returned ZERO collisions,
+    /// because its heads come from the same pre-audited invented pool as <c>temporal:MILESTONES</c>.
+    /// The 15 sit in procedure labels, gates and filler: none is ordered against anything and none
+    /// carries a date, so knowing Thessaly is a region of Greece does not tell a model whether the
+    /// Quorlory sync precedes the Vreskade check. That order is an invented dependency between two
+    /// invented artefacts, and V2 at 80/80 corroborates it — though only corroborates, since V2
+    /// scores just the leaks that AGREE with gold.
+    /// </para>
+    private const int DeclaredUnremediated = 76;
 
     [Fact]
     public void TheDeclaredExemption_DoesNotGrow()
