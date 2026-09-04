@@ -201,8 +201,15 @@ static bool TryResolveSelector(ParsedArgs parsed, out (int Demo, string UserId, 
         "0" => (3, Galaxus.RecommendationAgent.Workflows.DiscoveryTerminationProbe.ProbeUserId, false, true),
 
         // ── The two headline selectors, in the order the demo script types them. ──────
+        // Demo 02 defaults to MARCO, not Nadia, because after the corpus extension the reviewer
+        // approves Nadia's coverage in round 1 — the loop-back edge never fires, so the demo's
+        // visual payload is invisible. Marco's coverage leaves gaps and the loop runs 3 rounds.
+        // ⚠ This picks the persona on which the MECHANISM is exercised. It is NOT evidence that
+        //   the loop produces better recommendations — at equal k it does not, and Eval 02 says
+        //   so. For the same-customer comparison against Demo 01, run `-- 2 --user USR-NB-01`;
+        //   Nadia's run is the loop correctly declining to spend a second round.
         "1" => (1, GalaxusDemoPrompts.NadiaUserId, false, false),
-        "2" => (2, GalaxusDemoPrompts.NadiaUserId, false, false),
+        "2" => (2, GalaxusDemoPrompts.MarcoUserId, false, false),
 
         // ── Demo 01, the other personas and toggles. ─────────────────────────────────
         "3" => (1, GalaxusDemoPrompts.MarcoUserId, false, false),
@@ -402,7 +409,12 @@ bounded discovery loop), plus the loop's termination proof.
 
 The two headline selectors, in the order the demo script types them:
   1   Demo 01 — Nadia Brunner (USR-NB-01) through the SINGLE AGENT
-  2   Demo 02 — Nadia Brunner (USR-NB-01) through the DISCOVERY LOOP
+  2   Demo 02 — Marco Iten (USR-MI-02) through the DISCOVERY LOOP
+      Marco's coverage leaves gaps, so the loop-back edge fires and the loop runs 3
+      rounds — the mechanism this demo exists to show. It is NOT a claim that the loop
+      recommends better: at equal k it does not, and Eval 02 reports that. For the
+      same-customer comparison against Demo 01, run: -- 2 --user USR-NB-01 (Nadia's
+      coverage is sufficient in round 1, so the loop declines to spend a second one).
       Add --offline to either one for the deterministic, zero-cost arm.
 
 Selectors 3-7 are Demo 01's other personas and toggles:
