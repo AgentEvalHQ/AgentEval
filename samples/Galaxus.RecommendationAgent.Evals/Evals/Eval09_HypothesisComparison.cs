@@ -3022,7 +3022,7 @@ public sealed partial class Eval09WorkflowStubClient : IChatClient
     private static partial System.Text.RegularExpressions.Regex ReviewerCandidateLine();
 
     // "  GLX-1234  Title  ·  path  (for I-1, score …, n rating(s))\n      attribute keys: a, b, c" — ranker context
-    [System.Text.RegularExpressions.GeneratedRegex(@"^\s{2}(?<id>GLX-\d{4})\s+.+?\(for\s+(?<for>I-\d+),[^\r\n]*\r?\n\s+attribute keys:\s*(?<keys>[^\r\n]*)$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s{2}(?<id>GLX-\d{4})\s+.+?\(for\s+(?<for>I-\d+),[^\r\n]*\r?\n\s+attribute keys:\s*(?<keys>[^\r\n]*)", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
     private static partial System.Text.RegularExpressions.Regex RankerCandidateLine();
 }
 
