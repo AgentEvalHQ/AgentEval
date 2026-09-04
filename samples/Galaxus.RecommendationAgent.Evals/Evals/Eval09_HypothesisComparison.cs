@@ -282,8 +282,12 @@ public static class Eval09_HypothesisComparison
         //   InterestMapper call — both attempts — on exactly one persona, so the VOID rule and the
         //   cancelled-call accounting are each proved on one cell while eleven others stay whole.
         //   Its prose still differs from the agent stub's, so the scripted judge, which decides by
-        //   hashing the answer, still produces non-tied pairs and the delta arithmetic's win and
-        //   loss branches still run.
+        //   hashing the answer, produces non-tied pairs and the delta arithmetic's win and loss
+        //   branches run — PROVIDED its cells exist on the judged panel. Different prose is not
+        //   enough on its own: a cell that presents nothing is excluded as vacuous and enters no
+        //   pair, which is why the stub's ranker cites a grounding key that resolves (see
+        //   Eval09WorkflowStubClient.GroundingKey). The 2026-09-04 dry run had the prose right and
+        //   the key wrong, and the plumbing check counted zero pairs.
         IChatClient workflowClient = new MeteredChatClient(
             dryRun
                 ? new Eval09SyntheticUsageClient(new Eval09WorkflowStubClient(cancelForPersonaId: Eval09DryRun.CancelledPersonaId))
@@ -480,7 +484,8 @@ public static class Eval09_HypothesisComparison
                         judgedCell = false;
                     }
 
-                    PrintCellLine(label, repLabel, score, judgedCell, cell.Result.Score, judged.LastMetSummary);
+                    PrintCellLine(label, repLabel, score, judgedCell, cell.Result.Score, judged.LastMetSummary,
+                        excludedAsVacuous: !judgeable);
 
                     if (score.PresentedCount == 0)
                     {
@@ -817,14 +822,26 @@ public static class Eval09_HypothesisComparison
     private readonly record struct Eval09ArmCell(CoverageScore? Score, TestResult Result, IReadOnlyList<PresentedCall> Presented);
 
     /// <summary>The per-cell console line, printed by the caller once the cell's fate is decided.</summary>
+    /// <remarks>
+    /// A cell with no judged number has one of two fates and the line names which: the judge was
+    /// asked and returned no usable verdict (undecidable), or the judge was never consulted because
+    /// the arm presented nothing (vacuous). Printing both as "undecidable" read as a judge fault
+    /// when it was a silent arm — MEASURED on the 2026-09-04 dry run, where all twelve workflow
+    /// cells were vacuous and the panel said the judge could not decide them.
+    /// </remarks>
     private static void PrintCellLine(
-        string armLabel, string repLabel, CoverageScore score, bool judgedOk, int judgeScore, string metSummary)
+        string armLabel, string repLabel, CoverageScore score, bool judgedOk, int judgeScore, string metSummary,
+        bool excludedAsVacuous = false)
     {
+        string judgeColumn = judgedOk
+            ? $"{judgeScore,3}/100 {metSummary}"
+            : excludedAsVacuous ? "— vacuous (presented nothing)" : "— undecidable";
+
         Console.ForegroundColor = score.IsScorable && score.Latent > 0 ? ConsoleColor.Green : ConsoleColor.DarkGray;
         Console.WriteLine($"      {armLabel,-34} {repLabel,-16} latent {Format(score.Latent)} "
                         + $"({score.LatentServed}/{score.LatentTotal}) vs floor {Format(score.LatentFloor)} at k="
                         + $"{score.PresentedCount}  forced-choice {Format(score.ForcedChoice)}  "
-                        + $"judge {(judgedOk ? $"{judgeScore,3}/100 {metSummary}" : "— undecidable")}"
+                        + $"judge {judgeColumn}"
                         + (score.PhantomCount > 0 ? $"  ⚠ phantom {score.PhantomCount}" : ""));
         Console.ResetColor();
     }
@@ -855,7 +872,10 @@ public static class Eval09_HypothesisComparison
     ///   has a win, a loss and a tie branch; a run where everything ties exercises one of them and
     ///   prints a full panel of zeroes that is indistinguishable from a broken comparison. MEASURED:
     ///   with both arms on the same stub their answers were byte-identical and every one of the
-    ///   seventy-two judged pairs tied.</description></item>
+    ///   seventy-two judged pairs tied. MEASURED AGAIN (2026-09-05): with the workflow stub citing a
+    ///   grounding key that never resolved, every workflow cell presented k = 0, was excluded from
+    ///   the judged panel as vacuous, and there were ZERO pairs — a second way to the same zeroes,
+    ///   which the check now names separately.</description></item>
     ///   <item><description><b>The primary sign test computed a defined attainable p.</b></description></item>
     ///   <item><description><b>No arm threw.</b></description></item>
     /// </list>
@@ -928,11 +948,18 @@ public static class Eval09_HypothesisComparison
         // zeroes that looks like a working comparison. This asserts at least one NON-TIED pair
         // somewhere in the judged panel, which is the only evidence that the other two branches
         // run at all.
+        //
+        // The tie count is kept for the MESSAGE, not the predicate: zero non-tied pairs has two
+        // causes that need different fixes — every pair tied (the arms' answers are identical), or
+        // no pair exists (one arm was excluded from the judged panel on every persona). MEASURED
+        // 2026-09-05: the second, printed as the first, sent a whole session after the wrong cause.
         int nonTiedJudgedPairs = 0;
+        int tiedJudgedPairs = 0;
         for (int i = 0; i < judged.CriterionCount; i++)
         {
-            (int wins, int losses, _) = judged.PairedCounts(ArmSingleAgent, ArmWorkflow, i);
+            (int wins, int losses, int ties) = judged.PairedCounts(ArmSingleAgent, ArmWorkflow, i);
             nonTiedJudgedPairs += wins + losses;
+            tiedJudgedPairs += ties;
         }
         bool judgedDeltasExercised = nonTiedJudgedPairs > 0;
 
@@ -962,10 +989,14 @@ public static class Eval09_HypothesisComparison
               + "floor beside it."
             : "the FLOOR arm produced NO defined rate — every judged number would print without its floor.");
         Line(judgedDeltasExercised, judgedDeltasExercised
-            ? $"the per-criterion delta arithmetic saw {nonTiedJudgedPairs} NON-TIED pair(s), so its win and loss "
-              + "branches actually ran rather than a panel of zeroes standing in for them."
-            : "EVERY judged pair tied, so only the tie branch of the delta arithmetic ran. A panel of zeroes is "
-              + "indistinguishable from a broken comparison — make the two arms' answers differ.");
+            ? $"the per-criterion delta arithmetic saw {nonTiedJudgedPairs} NON-TIED pair(s) and {tiedJudgedPairs} tied, so "
+              + "its win and loss branches actually ran rather than a panel of zeroes standing in for them."
+            : tiedJudgedPairs > 0
+                ? $"EVERY judged pair tied ({tiedJudgedPairs} of them), so only the tie branch of the delta arithmetic ran. "
+                  + "A panel of zeroes is indistinguishable from a broken comparison — make the two arms' answers differ."
+                : "NO judged pair exists: on no persona were BOTH live arms decidable, so the delta arithmetic ran on "
+                  + "nothing. A missing pair is not a tie — an arm that presented nothing on every cell was excluded "
+                  + "from the judged panel as vacuous, and the two arms' answers never met. Make that arm present.");
         Line(pComputable, "the primary sign test computed a defined attainable p from the non-tied pair count.");
         Line(noneThrew, noneThrew ? "no arm threw." : $"{armsThatThrew} arm run(s) threw.");
 
@@ -2790,8 +2821,18 @@ public sealed class Eval09SyntheticUsageClient(IChatClient inner) : IChatClient
 /// approves, it writes one gap per interest in a catalogue leaf name (round 2 then repeats the
 /// query, the projection refuses the repeat, and the loop exits GapsUnresolvable — so the stub
 /// loops exactly once, and P(rounds = 1) = 0 for it); the ranker takes candidates round-robin
-/// across interests with the first attribute key the candidate lists; the presenter writes one
-/// sentence that names the stub. No stage reads gold, no stage invents a product id.
+/// across interests and cites, for each, a grounding key that RESOLVES by its shape alone (the
+/// key half of a <c>key=value</c> token, else a whole <c>prefix:suffix</c> tag — see
+/// <c>GroundingKey</c>), so the evidence check lets the item through and the cell PRESENTS; the
+/// presenter writes one sentence that names the stub. No stage reads gold, no stage invents a
+/// product id, no stage cites a key the context did not list.
+/// </para>
+/// <para>
+/// <b>Why the ranker's key has to resolve.</b> A workflow cell that presents nothing is excluded
+/// from the judged panel as vacuous, so it has no judged cell and enters no pair. The scripted
+/// judge can only make two arms differ on cells that exist: with the first listed token cited
+/// (a spec VALUE, usually numeric) every selection was dropped <c>attribute_not_found</c>, every
+/// workflow cell was k = 0, and the delta arithmetic saw zero pairs — not sixty tied ones.
 /// </para>
 /// <para>
 /// <b>The cancellation.</b> On the mapper message carrying <c>CUSTOMER {cancelForPersonaId}</c> the
@@ -2960,7 +3001,7 @@ public sealed partial class Eval09WorkflowStubClient : IChatClient
         return $$"""{"covered_interest_ids":[],"gaps":[{{string.Join(",", gaps)}}],"new_interest":null,"stop_reason":"GAPS_REMAIN","assessment":"DRY RUN — scripted verdict, one gap per interest, no judgement."}""";
     }
 
-    // ── Stage 4: the ranker. Candidates round-robin across interests, first attribute key. ──
+    // ── Stage 4: the ranker. Candidates round-robin across interests, a key that resolves. ──
 
     private static string RankerEnvelope(string context)
     {
@@ -2971,7 +3012,7 @@ public sealed partial class Eval09WorkflowStubClient : IChatClient
         {
             string id = m.Groups["id"].Value;
             string forId = m.Groups["for"].Value;
-            string key = m.Groups["keys"].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty;
+            string key = GroundingKey(m.Groups["keys"].Value);
             if (key.Length == 0) continue;
 
             if (!byInterest.TryGetValue(forId, out var queue))
@@ -2997,6 +3038,47 @@ public sealed partial class Eval09WorkflowStubClient : IChatClient
         }
 
         return $$"""{"selections":[{{string.Join(",", selections)}}]}""";
+    }
+
+    /// <summary>
+    /// A grounding key that RESOLVES on the product, chosen from the tokens the ranker context
+    /// listed for it — by token SHAPE, because the list carries no other signal.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The context's <c>attribute keys:</c> line is <c>Product.Attributes</c> — every tag, every tag
+    /// suffix, every spec key, every spec VALUE and every <c>key=value</c> pair — sorted ordinal and
+    /// cut at fourteen, so its first entry is usually a numeric spec value such as <c>230-g</c>.
+    /// <c>Product.TryGetAttributeValue</c> resolves a spec key, a whole tag or a tag prefix and
+    /// nothing else. MEASURED (2026-09-05): citing the first token put every one of the sixty
+    /// dry-run selections through <c>attribute_not_found</c>, every workflow cell presented k = 0,
+    /// every workflow judged cell was excluded as vacuous, and the plumbing check had no pair to
+    /// count — which it printed as "every pair tied".
+    /// </para>
+    /// <para>
+    /// Two shapes resolve by construction: the key half of a <c>key=value</c> token is a spec key,
+    /// and a <c>prefix:suffix</c> token is a whole tag. Anything else is cited as-is, so a product
+    /// whose first fourteen tokens carry neither still fails the evidence check the way it should —
+    /// the stub is not allowed to invent a key the context did not show it.
+    /// </para>
+    /// </remarks>
+    /// <param name="listedTokens">The comma-separated token list from the candidate's <c>attribute keys:</c> line.</param>
+    private static string GroundingKey(string listedTokens)
+    {
+        string[] tokens = listedTokens.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (string token in tokens)
+        {
+            int equals = token.IndexOf('=');
+            if (equals > 0) return token[..equals];
+        }
+
+        foreach (string token in tokens)
+        {
+            if (token.IndexOf(':') > 0) return token;
+        }
+
+        return tokens.FirstOrDefault() ?? string.Empty;
     }
 
     private static string Json(string text) => System.Text.Json.JsonSerializer.Serialize(text);
@@ -3111,6 +3193,13 @@ public sealed class Eval09ProseStubClient(string text) : IChatClient
 /// <b>Deliberately arbitrary, and it says so.</b> Each criterion's verdict is decided by a hash of
 /// the answer text, so the two arms genuinely differ and the delta arithmetic is exercised — and so
 /// that no dry-run judged number can be mistaken for an opinion about anything.
+/// </para>
+/// <para>
+/// <b>What it cannot do.</b> It can only separate two arms on a cell that reaches the judged panel.
+/// The eval excludes a cell that presented nothing as vacuous BEFORE the verdict is recorded, so an
+/// arm whose stub never gets an item through the guardrails has no judged cell, whatever this
+/// class returns for it. Two verdicts that are never paired are not a tie, and a plumbing line that
+/// says "every pair tied" over an arm with no cells is reading the wrong cause.
 /// </para>
 /// </remarks>
 public sealed class Eval09ScriptedJudgeClient : IChatClient

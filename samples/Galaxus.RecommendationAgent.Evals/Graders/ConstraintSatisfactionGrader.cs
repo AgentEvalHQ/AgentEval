@@ -118,6 +118,23 @@ public static class ConstraintSatisfactionGrader
         return p * (1.0 - p) * (n - k) / ((n - 1.0) * k);
     }
 
+    /// <summary>
+    /// The standard deviation of the MEAN executed floor over <paramref name="cases"/>, each case
+    /// averaged over <paramref name="draws"/> independent uniform draws of size <paramref name="k"/>:
+    /// <c>sqrt(Σ Var_c(k) / draws) / |cases|</c>. The one band both Eval 02b's wiring panel and
+    /// Eval 03's Broken06 row are built from, so the two panels cannot disagree about it.
+    /// </summary>
+    /// <param name="cases">The applicable cases.</param>
+    /// <param name="k">Draw size.</param>
+    /// <param name="draws">Draws per case.</param>
+    /// <returns>NaN when there is nothing to average over.</returns>
+    public static double UniformDrawSigmaOfMean(IReadOnlyList<StatedNeedCase> cases, int k, int draws)
+    {
+        ArgumentNullException.ThrowIfNull(cases);
+        if (cases.Count == 0 || draws <= 0) return double.NaN;
+        return Math.Sqrt(cases.Sum(c => UniformDrawVariance(c, k) / draws)) / cases.Count;
+    }
+
     /// <summary>Grades what an arm presented against the case.</summary>
     /// <param name="testCase">The case.</param>
     /// <param name="presented">The <c>PresentRecommendation</c> calls, from the tool trace.</param>

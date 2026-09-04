@@ -86,6 +86,7 @@ public static class NegativeControls
         rows.Add(await CheckSingleShotAsync(retriever, harness, options, ct).ConfigureAwait(false));
         rows.Add(await CheckPopularityAsync(harness, options, ct).ConfigureAwait(false));
         rows.Add(await CheckRubberStampLoopAsync(retriever, harness, options, ct).ConfigureAwait(false));
+        rows.Add(await CheckConstraintBlindFloorAsync(harness, options, ct).ConfigureAwait(false));
         rows.Add(await CheckConstantPolicyCeilingAsync(harness, options, ct).ConfigureAwait(false));
         rows.Add(CheckGraderSanity());
 
@@ -319,6 +320,138 @@ public static class NegativeControls
           + $"P(rounds = 1) {Format(pRoundsOne)} over {observedRuns} run(s) · approved {approvedRuns}/{observedRuns} · "
           + string.Join(", ", lines),
             validComparator && provablyDegenerate);
+    }
+
+    // ══ Control 6 — the EXECUTED chance floor of Eval 02b, checked from BOTH sides. ══════
+
+    /// <summary>
+    /// Runs <see cref="Broken06_ConstraintBlindRecommender"/> — a uniform draw that reads neither
+    /// the need nor the customer — <see cref="Eval02b_StatedNeedSatisfaction.FloorDraws"/> times on
+    /// every APPLICABLE stated-need case, through Eval 02b's own scoring path, and checks the
+    /// executed mean precision against the closed form <c>|S| / N</c> from both sides.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ABOVE the band is the flattering direction, and it is the one this row exists for.</b> A
+    /// draw that ignores every constraint and still scores above chance is being credited for
+    /// constraints it did not satisfy — and then Eval 02b's precision column measures nothing and
+    /// every "above its floor" verdict in it is decoration. BELOW the band the executed floor is
+    /// broken: the grader rejects true satisfiers, or the draw is not the uniform draw it claims to
+    /// be. Either is a wiring fault; only one of them fails toward looking green.
+    /// </para>
+    /// <para>
+    /// <b>Same path as Eval 02b, on purpose.</b> Every draw goes through
+    /// <see cref="Eval02b_StatedNeedSatisfaction.ScoreAsync"/> — the harness turn, the trace
+    /// extraction and <see cref="ConstraintSatisfactionGrader.Grade"/> — so what this row verifies is
+    /// the path the live agent is scored by, not a re-implementation of it. Eval 02b runs the same
+    /// comparison inside its own wiring panel; this row is the same fact in the panel that gates with
+    /// no credentials and no model, so it cannot be skipped by skipping Eval 02b.
+    /// </para>
+    /// <para>
+    /// <b>The layer this row does NOT inspect.</b> The analytic floor and the grader both derive from
+    /// <c>StatedNeedCase.IsSatisfiedBy</c>. A hollow constraint there moves both operands together and
+    /// the band cannot see it. The row therefore also requires every applicable need to EXCLUDE at
+    /// least one catalogue product — a need nothing fails is not a constraint — which catches a checker
+    /// that accepts everything, and not one that is blind to a single clause. That remains Eval 02b's
+    /// per-case satisfying-set print-out's to show, and a reader's to read.
+    /// </para>
+    /// </remarks>
+    private static async Task<ControlRowSnapshot> CheckConstraintBlindFloorAsync(
+        MAFEvaluationHarness harness, EvaluationOptions options, CancellationToken ct)
+    {
+        const int draws = Eval02b_StatedNeedSatisfaction.FloorDraws;
+        const double sigmas = Eval02b_StatedNeedSatisfaction.FloorBandSigmas;
+        const int k = Broken06_ConstraintBlindRecommender.DrawSize;
+        int catalogueSize = Catalogue.Default.All.Count;
+
+        // Applicability comes from the CORPUS (the derived satisfying set), never from what the arm
+        // did — the silent-{} shape: a row that derived its denominator from its own result could
+        // shrink it to whatever passed.
+        var applicable = StatedNeedCases.All.Where(ConstraintSatisfactionGrader.IsApplicable).ToList();
+
+        var executedByCase = new Dictionary<string, double>(StringComparer.Ordinal);
+        var perCase = new List<string>();
+        var hollow = new List<string>();
+        int threw = 0, phantom = 0, silentDraws = 0, presentedTotal = 0, observedDraws = 0;
+
+        foreach (var testCase in applicable)
+        {
+            int satisfying = ConstraintSatisfactionGrader.SatisfyingSet(testCase).Count;
+            if (satisfying >= catalogueSize) hollow.Add(testCase.Id);
+
+            var precisions = new List<double>(draws);
+            for (int rep = 1; rep <= draws; rep++)
+            {
+                ConstraintScore? score = await Eval02b_StatedNeedSatisfaction.ScoreAsync(
+                    testCase, new Broken06_ConstraintBlindRecommender(rep), harness, options,
+                    Eval02b_StatedNeedSatisfaction.ArmFloor, rep, draws, print: false, ct).ConfigureAwait(false);
+
+                if (score is not { } s) { threw++; continue; }
+
+                observedDraws++;
+                precisions.Add(s.Precision);
+                presentedTotal += s.Presented;
+                phantom += s.Phantom;
+                if (s.Silent) silentDraws++;
+            }
+
+            if (precisions.Count == 0)
+            {
+                perCase.Add($"{testCase.Id} NO observation");
+                continue;
+            }
+
+            double executed = precisions.Average();
+            executedByCase[testCase.Id] = executed;
+            perCase.Add($"{testCase.Id} {Format(executed)}/{Format(ConstraintSatisfactionGrader.UniformDrawFloor(testCase))} " +
+                        $"(|S| {satisfying})");
+        }
+
+        // The band is computed for exactly `draws` draws per case; fewer observed draws is a
+        // narrower measurement wearing the wider band's label, so a thrown turn is a fail here.
+        bool complete = applicable.Count > 0
+                     && threw == 0
+                     && observedDraws == applicable.Count * draws
+                     && applicable.All(c => executedByCase.ContainsKey(c.Id));
+
+        double analyticMean = applicable.Count == 0 ? double.NaN : applicable.Average(ConstraintSatisfactionGrader.UniformDrawFloor);
+        double executedMean = complete ? applicable.Average(c => executedByCase[c.Id]) : double.NaN;
+        double sigma = ConstraintSatisfactionGrader.UniformDrawSigmaOfMean(applicable, k, draws);
+        double band = sigmas * sigma;
+        double z = (executedMean - analyticMean) / sigma;
+        double meanK = observedDraws == 0 ? double.NaN : presentedTotal / (double)observedDraws;
+
+        bool aboveBand = !double.IsNaN(executedMean) && !double.IsNaN(band) && executedMean > analyticMean + band;
+        bool belowBand = !double.IsNaN(executedMean) && !double.IsNaN(band) && executedMean < analyticMean - band;
+        bool withinBand = complete && !double.IsNaN(band) && !double.IsNaN(z) && Math.Abs(executedMean - analyticMean) <= band;
+
+        bool tripped = withinBand && phantom == 0 && silentDraws == 0 && hollow.Count == 0;
+
+        string direction = aboveBand
+            ? "ABOVE the band — the grader is crediting what it should not (the FLATTERING direction)"
+            : belowBand
+                ? "BELOW the band — the executed floor is broken"
+                : double.IsNaN(z) ? "undecidable (no complete measurement — not a pass)" : $"within the band, z = {z:+0.00;-0.00}σ";
+
+        return new ControlRowSnapshot(
+            nameof(Broken06_ConstraintBlindRecommender),
+            $"score AT the chance floor, from BOTH sides: over every applicable stated-need case × {draws} seeded uniform "
+          + $"draws of {k} from the whole catalogue, scored through Eval 02b's own harness-and-grader path, the executed mean "
+          + $"precision must land within ±{sigmas:0}σ of the closed form |S|/N. ABOVE the band is the flattering direction "
+          + "and the reason this row exists — a draw that reads neither the need nor the customer is being credited for "
+          + "constraints it did not satisfy, and Eval 02b is decoration. BELOW the band the executed floor is broken (the "
+          + "grader rejects true satisfiers, or the draw is not uniform). Every draw must present something real (no "
+          + "phantom, no silence — a silent draw would sit 'below band' for the wrong reason), every one of the "
+          + $"{draws} draws must be observed (the band is computed for exactly that many), and every applicable need must "
+          + "EXCLUDE at least one catalogue product — the analytic floor and the grader share IsSatisfiedBy, so a hollow "
+          + "checker moves both operands together and only a need nothing fails gives it away.",
+            $"executed {F4(executedMean)} vs analytic {F4(analyticMean)} · {direction} · band ±{F4(band)} (σ of the mean "
+          + $"{F4(sigma)}) · {applicable.Count} of {StatedNeedCases.All.Count} case(s) applicable × {draws} draws = "
+          + $"{observedDraws} observed · threw {threw} · phantom {phantom} · silent {silentDraws} · mean k {Format(meanK)} "
+          + $"(declared {k})"
+          + (hollow.Count > 0 ? $" · ⚠ NEED EXCLUDES NOTHING (|S| = N): {string.Join(", ", hollow)}" : "")
+          + " · per case executed/analytic: " + string.Join(", ", perCase),
+            tripped);
     }
 
     // ══ Instrument finding 2 — can the metric tell one CUSTOMER from another? ═════════════
@@ -842,6 +975,10 @@ public static class NegativeControls
 
     private static string Format(double value) =>
         double.IsNaN(value) ? "n/a" : value.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Four decimals where three would round a ±0.01 band to a digit that cannot show which side of it a number fell.
+    private static string F4(double value) =>
+        double.IsNaN(value) ? "n/a" : value.ToString("F4", System.Globalization.CultureInfo.InvariantCulture);
 
     private static void PrintHeader()
     {

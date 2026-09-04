@@ -324,7 +324,13 @@ public static class Eval02b_StatedNeedSatisfaction
 
     // ══ One graded turn ═══════════════════════════════════════════════════════════════════
 
-    private static async Task<ConstraintScore?> ScoreAsync(
+    /// <summary>
+    /// One arm, one case, one harness turn, one grade. Internal — not private — because Eval 03's
+    /// Broken06 row scores its draws through THIS method, so that what it verifies is the path the
+    /// live agent is scored by and not a re-implementation of it.
+    /// </summary>
+    /// <returns>The score, or null when the turn threw (an absent measurement, never a 0.000).</returns>
+    internal static async Task<ConstraintScore?> ScoreAsync(
         StatedNeedCase testCase,
         IEvaluableAgent agent,
         MAFEvaluationHarness harness,
@@ -417,10 +423,8 @@ public static class Eval02b_StatedNeedSatisfaction
         double executedMean = applicable.Count == 0 || applicable.Any(c => !executedFloor.ContainsKey(c.Id))
             ? double.NaN
             : applicable.Average(c => executedFloor[c.Id]);
-        double sdOfMean = applicable.Count == 0
-            ? double.NaN
-            : Math.Sqrt(applicable.Sum(c => ConstraintSatisfactionGrader.UniformDrawVariance(c, Broken06_ConstraintBlindRecommender.DrawSize) / FloorDraws))
-              / applicable.Count;
+        double sdOfMean = ConstraintSatisfactionGrader.UniformDrawSigmaOfMean(
+            applicable, Broken06_ConstraintBlindRecommender.DrawSize, FloorDraws);
         double band = FloorBandSigmas * sdOfMean;
         bool atFloor = !double.IsNaN(executedMean) && !double.IsNaN(analyticMean) && Math.Abs(executedMean - analyticMean) <= band;
         rows.Add(new WiringRow("FloorControlAtFloor",
