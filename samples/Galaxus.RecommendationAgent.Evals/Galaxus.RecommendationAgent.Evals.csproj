@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+
+    <!-- Eval harness for the Galaxus recommendation agent. References the AgentEval libraries
+         directly via ProjectReference (not the published NuGet package, which lags behind on an
+         older MAF baseline) so it tracks this repo's current MAF build in lockstep with
+         Galaxus.RecommendationAgent. Package versions resolve from Directory.Packages.props
+         (Central Package Management): NO Version= attributes here (NU1008), and a package absent
+         from that file fails restore with NU1010. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference the demo project — catalogue, agents, tools and guardrails live there.
+         The agent project is an Exe; a ProjectReference to an Exe is legal and does not
+         change this project's own entry point. -->
+    <ProjectReference Include="../Galaxus.RecommendationAgent/Galaxus.RecommendationAgent.csproj" />
+    <!-- AgentEval libraries referenced directly (harness, assertions, comparison, models) instead
+         of the published AgentEval NuGet package. The umbrella src/AgentEval embeds these
+         sub-projects as PrivateAssets="all", so a reference to the umbrella would not surface
+         their types — reference the sub-projects directly. -->
+    <ProjectReference Include="../../src/AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../../src/AgentEval.Core/AgentEval.Core.csproj" />
+    <ProjectReference Include="../../src/AgentEval.MAF/AgentEval.MAF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MAF + Azure packages — versions resolve from Directory.Packages.props (Central Package Management) -->
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="System.Memory.Data" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+</Project>

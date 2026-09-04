@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+
+    <!-- Pure MAF + Azure OpenAI demo (no AgentEval dependency).
+         Versions resolve from Directory.Packages.props (Central Package Management):
+         NO Version= attributes here (NU1008), and a package absent from that file
+         fails restore with NU1010. Every reference below was checked against it. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <!-- MANDATORY, not transitive (MAF 1.17.0). Executor.ConfigureProtocol(ProtocolBuilder) is
+         abstract and this source generator emits it; without the reference every custom
+         Executor in Workflows/ fails with CS0534. Verified by removing it. -->
+    <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="System.Memory.Data" />
+    <!-- Brute-force cosine over the product index. Already pinned centrally (10.0.9). -->
+    <PackageReference Include="System.Numerics.Tensors" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+  <!-- NOTE: the design's §G csproj also lists
+
+           <EmbeddedResource Include="Data\catalogue.embeddings.json" />
+           <EmbeddedResource Include="Data\queries.embeddings.json" />
+
+       Those two assets do NOT exist yet — real text-embedding-3-small vectors cannot be
+       generated in an offline build — and an EmbeddedResource pointing at a missing file
+       is a hard build error (MSB3030). The offline default is ConceptEmbeddingSource
+       (authored concept vectors, deterministic, no key); PrecomputedEmbeddingSource and
+       the rebuild-embeddings CLI switch are written for real so the assets can be
+       generated later.
+       Restore the two EmbeddedResource lines in the SAME commit that adds the files. -->
+
+</Project>
