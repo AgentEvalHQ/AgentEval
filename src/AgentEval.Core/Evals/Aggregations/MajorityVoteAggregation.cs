@@ -34,7 +34,7 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         // 17: exclude "error" leaves too (transient provider failure, severity "none" by construction), not
         // just "skipped" — an "error" leaf never counts as a pass/warn/fail vote (its label matches none of
         // them), but WITHOUT this exclusion its placeholder score still polluted the returned meanScore below.
-        var voting = results.Where(r => r.Score.Label is not ("skipped" or "error")).ToList();
+        var voting = results.Where(r => r.Score.CountsTowardAggregate()).ToList();
         if (voting.Count == 0) return (0, "none");
 
         var passCount = voting.Count(r => r.Score.Label == "pass");

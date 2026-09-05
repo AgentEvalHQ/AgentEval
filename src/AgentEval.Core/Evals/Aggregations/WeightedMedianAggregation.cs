@@ -32,7 +32,7 @@ public sealed class WeightedMedianAggregation : IAggregationStrategy
         // way WeightedSumAggregation does — neither "skipped" nor "error" is a real quality signal, and
         // including an "error" leaf's placeholder score would incorrectly drag the median down.
         var pairs = Enumerable.Range(0, results.Count)
-            .Where(i => results[i].Score.Label is not ("skipped" or "error") && components[i].Weight > 0)
+            .Where(i => results[i].Score.CountsTowardAggregate() && components[i].Weight > 0)
             .Select(i => (Score: results[i].Score.Value, Weight: components[i].Weight))
             .OrderBy(p => p.Score)
             .ToList();
@@ -54,7 +54,7 @@ public sealed class WeightedMedianAggregation : IAggregationStrategy
         }
 
         var severity = SeverityRollup.Max(
-            results.Where(r => r.Score.Label is not ("skipped" or "error")).Select(r => r.Score.Severity));
+            results.Where(r => r.Score.CountsTowardAggregate()).Select(r => r.Score.Severity));
 
         return (median, severity);
     }

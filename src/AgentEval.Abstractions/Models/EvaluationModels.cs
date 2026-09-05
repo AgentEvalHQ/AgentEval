@@ -11,6 +11,24 @@ namespace AgentEval.Models;
 /// </summary>
 public class TestCase
 {
+    /// <summary>
+    /// Stable identity for this case. Optional and additive.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-030 §4.7, Slice 1.6 (defect D11). <see cref="Name"/> is a display string — harnesses
+    /// format it (<c>$"{id} — {group}"</c> is the recorded example) and reports render it — so
+    /// joining runs on it re-points the join the moment anyone edits a label. Anything that pairs
+    /// results across arms or runs needs a key that is allowed to be ugly and forbidden to change.
+    /// </para>
+    /// <para>
+    /// Declared <c>init</c> rather than the <c>set</c> ADR-030 §4.7 sketches, to match every other
+    /// member of this type: an identity that can be reassigned after construction is an identity
+    /// that can be reassigned between the run and the report.
+    /// </para>
+    /// </remarks>
+    public string? Id { get; init; }
+
     /// <summary>Name of the test case.</summary>
     public required string Name { get; init; }
     

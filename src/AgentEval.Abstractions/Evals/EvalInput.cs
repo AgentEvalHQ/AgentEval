@@ -49,4 +49,25 @@ public sealed record EvalInput(
     /// (both in <c>AgentEval.Core</c>, namespace <c>AgentEval.Evals</c>).
     /// </summary>
     public const string TraceMetadataKey = "__agentTrace__";
+
+    /// <summary>
+    /// Stable identity for the case this input represents. Optional, non-positional and init-only,
+    /// so every existing construction site and every deconstruction is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-030 §4.7, Slice 1.6 (defect D11). The unit of analysis for a floor, a paired comparison
+    /// or a shuffled-gold control is the CASE, and none of them is implementable without a stable
+    /// per-case key. There was none: <see cref="EvalInput"/> had no identity at all, and the
+    /// flagship sample joined on <c>$"{c.Id} — {c.Group}"</c> — a formatted <i>display string</i>
+    /// used as a join key, which silently re-points the moment anyone edits the label.
+    /// </para>
+    /// <para>
+    /// Deliberately a plain nullable string with no generated default. An id that the library
+    /// invents is an id that changes between runs, and a join key that changes between runs is
+    /// worse than an absent one because it fails silently. <see langword="null"/> means "this
+    /// producer has not declared case identity" and the meta layer must say so rather than guess.
+    /// </para>
+    /// </remarks>
+    public string? CaseId { get; init; }
 }

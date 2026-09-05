@@ -31,7 +31,7 @@ public sealed class WeightedSumAggregation : IAggregationStrategy
             //   "error"   — transient provider failure (network, quota, upstream bug)
             // Neither represents a real quality signal; including them at 0.0 would incorrectly
             // drag the composite below threshold (e.g. sample 13 uses threshold=0.75).
-            if (results[i].Score.Label is "skipped" or "error") continue;
+            if (!results[i].Score.CountsTowardAggregate()) continue;
             if (components[i].Weight <= 0) continue;
             weightSum        += components[i].Weight;
             weightedScoreSum += results[i].Score.Value * components[i].Weight;
@@ -39,7 +39,7 @@ public sealed class WeightedSumAggregation : IAggregationStrategy
 
         var score = weightSum > 0 ? weightedScoreSum / weightSum : 0;
         var severity = SeverityRollup.Max(results
-            .Where(r => r.Score.Label is not "skipped" and not "error")
+            .Where(r => r.Score.CountsTowardAggregate())
             .Select(r => r.Score.Severity));
         return (score, severity);
     }

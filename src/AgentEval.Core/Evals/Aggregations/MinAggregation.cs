@@ -30,7 +30,7 @@ public sealed class MinAggregation : IAggregationStrategy
         // 17: exclude "error" leaves too (transient provider failure, severity "none" by construction), not
         // just "skipped" — a "min" strategy is maximally exposed to this: one error leaf's placeholder score
         // would otherwise floor the ENTIRE composite regardless of every other sub-result's real quality.
-        var nonSkipped = results.Where(r => r.Score.Label is not ("skipped" or "error")).ToList();
+        var nonSkipped = results.Where(r => r.Score.CountsTowardAggregate()).ToList();
         if (nonSkipped.Count == 0) return (0, "none");
 
         var min = nonSkipped.Min(r => r.Score.Value);

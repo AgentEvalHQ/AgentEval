@@ -2,6 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+using AgentEval.Evals.Meta;
+
 namespace AgentEval.Evals;
 
 /// <summary>Normalised score produced by an eval, including pass/fail disposition and severity.</summary>
@@ -18,6 +21,12 @@ namespace AgentEval.Evals;
 /// The same guard applies to a <c>with</c> copy: <c>score with { Value = double.NaN }</c>
 /// throws exactly as the constructor would. <see cref="Threshold"/> and
 /// <see cref="Confidence"/> carry the same guard on both paths when non-null.
+/// </para>
+/// <para>
+/// <b>ADR-030 Slice 1.1.</b> <see cref="Measurement"/> and <see cref="Passed"/> are bound by one
+/// invariant — <i>a score that is not a measurement can never be <see cref="Passed"/></i> — and it
+/// is guarded on the PAIR, so neither side can reach the bad state from its own direction. Use
+/// <see cref="NotApplicable"/> to build an inapplicable score.
 /// </para>
 /// </remarks>
 public sealed record EvalScore(
@@ -39,6 +48,21 @@ public sealed record EvalScore(
     private readonly double _value = EnsureFinite(Value, nameof(Value));
     private readonly double? _threshold = EnsureFiniteOrNull(Threshold, nameof(Threshold));
     private readonly double? _confidence = EnsureFiniteOrNull(Confidence, nameof(Confidence));
+
+    // ADR-030 Slice 1.1. Declared BEFORE _passed so the constructor path reads a settled Measurement.
+    // MeasurementState.Measured is default(MeasurementState) = 0, so on the constructor path the pair
+    // is always (Measured, Passed) and there is nothing to validate; Measurement can only become
+    // non-Measured through an object initializer or a `with`, both of which run AFTER the field
+    // initialisers. That is why the constructor path assigns directly and only the copy path validates.
+    //
+    // The guard was placed wrongly twice before landing here, and both wrong placements are on record
+    // in ADR-030 §4.2: a throwing property INITIALIZER on Measurement (does not compile — CS0236 — and
+    // could never fire, because the initializer observes `default` before any object-initializer runs),
+    // and a guard on EvalResult's primary constructor (bypassed by `result with { Score = ... }`, and on
+    // the wrong type — both operands live here, and all five aggregation strategies read EvalScore
+    // directly). This is the AE-01 / AE-08 pattern the repository has now shipped three times.
+    private readonly MeasurementState _measurement = MeasurementState.Measured;
+    private readonly bool _passed = Passed;
 
     /// <inheritdoc cref="EvalScore"/>
     /// <exception cref="ArgumentOutOfRangeException">
@@ -72,6 +96,88 @@ public sealed record EvalScore(
     {
         get => _confidence;
         init => _confidence = EnsureFiniteOrNull(value, nameof(Confidence));
+    }
+
+    /// <summary>
+    /// Whether the eval decided and the thing held. Positional, so every existing call site, every
+    /// deconstruction and every persisted artifact is unchanged.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to <see langword="true"/> on a copy whose <see cref="Measurement"/> is not
+    /// <see cref="MeasurementState.Measured"/>. The primary constructor cannot reach that state —
+    /// <see cref="Measurement"/> is still <c>Measured</c> while the field initialisers run — so the
+    /// constructor path assigns directly and only the copy path validates.
+    /// </exception>
+    public bool Passed
+    {
+        get => _passed;
+        init
+        {
+            EnsureDecidable(_measurement, value, nameof(Passed));
+            _passed = value;
+        }
+    }
+
+    /// <summary>
+    /// Whether this score is a real measurement (ADR-030 §4.2). Non-positional and init-only, so
+    /// positional construction and deconstruction are unaffected and the default is
+    /// <see cref="MeasurementState.Measured"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Not written to JSON while it is <see cref="MeasurementState.Measured"/></b>
+    /// (<see cref="JsonIgnoreCondition.WhenWritingDefault"/>). Schema v1 declares
+    /// <c>additionalProperties: false</c> on <c>score</c>, so emitting this field unconditionally
+    /// would invalidate every document the library writes and change every historical
+    /// <c>ScenarioResult</c> content hash. Persisting it is ADR-030 Slice 1.4 — a schema v1.1 bump
+    /// that ADR-030 §9 Q4 still gates. The READ path is deliberately live even so: an artifact that
+    /// claims <c>passed:true</c> alongside a non-measured state is refused rather than loaded, which
+    /// is the ADR-025 direction.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to a non-measured state on a score whose <see cref="Passed"/> is
+    /// <see langword="true"/> — on an object initializer, a <c>with</c> copy, and deserialisation
+    /// alike, since all three route through this accessor.
+    /// </exception>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public MeasurementState Measurement
+    {
+        get => _measurement;
+        init
+        {
+            EnsureDecidable(value, _passed, nameof(Measurement));
+            _measurement = value;
+        }
+    }
+
+    /// <summary>
+    /// The only sanctioned way to build a not-applicable score: the CASE could not test the thing.
+    /// </summary>
+    /// <param name="severity">Severity to carry; <c>none</c> by default.</param>
+    /// <remarks>
+    /// The REASON does not live here — it goes to <c>EvalDetails.Summary</c> (and
+    /// <c>Recommendations</c>). A bare <c>n/a</c> with no reason is the blank cell ADR-030 §4.2's
+    /// rendering rule exists to forbid.
+    /// </remarks>
+    public static EvalScore NotApplicable(string severity = "none") =>
+        new(0.0, null, "inapplicable", false, null, severity, null)
+        { Measurement = MeasurementState.NotApplicable };
+
+    // One predicate, both accessors. The guard is on the PAIR, so it cannot be satisfied by arriving
+    // at the bad state from the other side: the record's clone copies every field first and then runs
+    // the `with` block's init accessors in source order, so each accessor sees the other operand's
+    // already-copied value and BOTH orderings throw.
+    private static void EnsureDecidable(MeasurementState measurement, bool passed, string member)
+    {
+        if (measurement is not MeasurementState.Measured && passed)
+        {
+            throw new ArgumentException(
+                $"A score whose Measurement is '{measurement}' cannot be Passed. The case had " +
+                "nothing to fire against, or the instrument did not run; undecidable is not a pass. " +
+                $"Use {nameof(EvalScore)}.{nameof(NotApplicable)}(...) or EvalResult.Skipped(...).",
+                member);   // the member the caller actually assigned, so the ParamName is testable
+        }
     }
 
     private static double EnsureFinite(double value, string member)
