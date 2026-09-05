@@ -1880,3 +1880,114 @@ dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --offline --user U
 
 Nothing above spends money. The LOUD-fallback direction is re-derived by changing
 `EmbeddingDocument.TemplateVersion` and re-running the second line.
+
+---
+
+## §18 — Independent verification of B-7 + ADR-030 Slice 1, and the README numbers it found stale (2026-09-05)
+
+Both lanes on `joslat/digitec-galaxus` re-run from a clean tree at `878e5da4`, nothing trusted as
+reported. Everything in §17 reproduced. Three things §17 could not have said are recorded here.
+
+### 18.1 Reproduced exactly
+
+| Claim | Reproduced |
+|---|---|
+| Library tests net8 / net9 / net10 | **9,413 / 9,413 / 9,632**, 0 failed (1, 1, 2 skipped) |
+| `AgentEval.Memory.Tests` | **1,185 / 1,185** on all three TFMs |
+| Solution build | **0 errors**; Evals sample **17 warnings**, agent sample 1 |
+| New tests, no existing test edited | **59 new**, all 7 files `A` (added) in `git diff --name-status` |
+| `-- 3`, all three configurations | **16 rows · 12 gating, every one caught · 4 advisory · 2 tripping** |
+| Arms A/B/C/D, concept | 18/56 (10 latent gold) · 0/56 (170 vectors, 0 live calls) · 18/56 · **8/50** |
+| Arms A/B/C/D, `--real-vectors` | **0/56** · 0/56 · 18/56 · **38/50** |
+| Exit codes, 13 commands | all 0 on the default path; `-- 4` and `--ci --dry-run` exit **1** under `--real-vectors` |
+| Every Eval 02 mean in §17.4's table | reproduced to three decimals, both spaces |
+| Demo 01 panel · `-- 0` | 12/12 · 6 of 6, in every configuration including `--real-vectors` |
+| Both flags together | exits **2** in both CLIs |
+
+### 18.2 What neither lane could verify alone — the cross-lane direction
+
+The two lanes are disjoint in FILES, and both said so. They are **not** disjoint in DEPENDENCIES,
+and neither lane checked the direction that matters:
+
+* `tests/AgentEval.Tests` has no reference to Galaxus — so WIRE cannot affect Slice 1. §17.5 item 5
+  is correct.
+* But `Galaxus.RecommendationAgent.Evals` **ProjectReferences `AgentEval.Abstractions` and
+  `AgentEval.Core`** — exactly the two projects Slice 1 changed. Slice 1's "samples/ untouched (0
+  files changed)" is true about files and silent about linkage; §17's byte-identical comparison was
+  made at `250154e0`, before Slice 1 existed.
+
+**Verified clean, with the reason.** All 13 sample commands still exit 0 and every control count is
+unchanged. The reason it is clean is structural, not luck: the samples never construct an
+`EvalScore`, never call `EvalResult.Skipped`, and never use `CompositeEval` or `CapByWorst`. They
+only read `.Passed` on scores that are always `Measured`, so Slice 1's `EnsureDecidable` guard has
+no reachable path from sample code.
+
+### 18.3 Defect found and fixed: the meta-lane grep gate had no positive control
+
+`MetaLaneArchitectureTests.NoRivalConstructors_AndNoFlatteringEscapeHatch` scans `src/` and asserts
+`Assert.Empty(offenders)`. It guarded `repoRoot` for null but asserted nothing about its own INPUT —
+an empty offender list was indistinguishable from "scanned nothing" or "the matcher no longer
+matches". That is the **silent-`{}`** shape from the gate self-examination rule: applicability read
+out of the RESULT rather than the INPUT, and it fails in the flattering direction.
+
+**Shown able to fail.** Rewriting the sanctioned line in `EvalScore.NotApplicable()` as
+`Measurement = (MeasurementState)1` — *behaviourally identical*, since `NotApplicable = 1` — made the
+grep match nothing. The old test passed this mutation silently. Two assertions were added on the
+input (`filesScanned > 100`, and the sanctioned constructor seen **exactly once**), and the mutated
+tree now fails 1 of 5. Mutation reverted; `git diff src/` is empty.
+
+This strengthens a control and weakens nothing. It is the only code change made by this pass.
+
+### 18.4 README numbers found stale — all PRE-EXISTING, none moved by B-7 or Slice 1
+
+§17 declared one of these (`Evals -- 3`) as already-published-and-wrong and out of scope. Verifying
+it surfaced five more of the same family. All are corrected in
+`samples/Galaxus.RecommendationAgent/README.md`; all were wrong **before** `f8005cec`.
+
+| Where | Published | Measured | Note |
+|---|---|---|---|
+| `README:555` table | `Evals -- 3` = "7/7 gating caught; 3 advisory, 1 tripped" | **12/12 gating, 4 advisory, 2 tripping** | the row §17 declared |
+| `README:135` tour row 8 | "Ten rows … seven ✅ caught, three advisory, one ⚠️ FINDING" | **16 rows, 12 caught, 4 advisory, 2 FINDING** | same defect, second location |
+| `README:553` table | "`Agent -- 2 --offline` (Nadia) … 19 discovered, 10 recommended, `SKU containment 10/10`" | that command runs **Marco**; Nadia is `--user USR-NB-01` and reads **22 discovered, 11 recommended, 11/11** | command AND counts |
+| `README:132` tour row 5 | "`Agent -- 2 --offline` … `SKU containment 10/10`" | same mislabel; **11/11** under `--user USR-NB-01` | Demo 02's default persona is Marco, per the agent's own `--help` |
+| `README:558` prose | "Eval 03's **three** advisory findings, in full" | there are **four** | `SuppressionDetectorExercised` was absent entirely; bullet added |
+| `README:685` neighbourhood | dry-run arm means "identical in the dry run and the live run because these arms make no model call" | **false** — Eval 02 is paired and cuts every arm to the live arm's own `k`, which is a stub in a dry run | see below |
+
+**On the last row, a correction to this pass's own first attempt.** The claimed-identical figures
+(rubber stamp **0.458**, Demo 2 arm **0.583**) are the **live-run** table's, from a real 36-turn run
+at USD 18.5647 — they are *not* wrong, and were briefly replaced with dry-run values before that was
+caught and reverted. What is wrong is the **equivalence claim**. The dry-run means are rubber stamp
+**0.375** and Demo 2 arm **0.403** recall / **0.514** latent-own-`k`; the live table stands
+untouched. The dry-run block is now labelled as such and states why the two differ.
+
+The one figure in that block that could not be verified without a paid run — real loop
+`P(rounds = 1) = 0.417` — was **removed rather than restated**, because it sat inside the false
+equivalence claim and no dry run can establish it. The rubber stamp's `P(rounds = 1) = 1.000` is
+measured and kept.
+
+### 18.5 Not fixed, declared
+
+1. **A seventh copy of the aggregate predicate** at `src/AgentEval.Evals.Performance/PerformanceBenchmark.cs:717`
+   carries the same `Label != "skipped"` asymmetry. Slice 1 disclosed it and left it; **verified
+   genuinely unreachable** — the only labels that file produces are `pass`, `fail` and `skipped`
+   (line 711), and the skipped path returns at line 479, before the aggregate at line 517. No test
+   can distinguish the fix, so it correctly stays out.
+2. **Arm C is still 18 of 56** and **arm D 8 of 50 on the default path** (§17.5 items 1–2).
+3. **`--real-vectors` must not enter CI** — it exits 1 on Eval 04, correctly.
+4. **The live-run figures in the README were not re-derived.** Re-running them costs ~USD 18.6.
+   Only the dry-run and offline paths were re-measured here.
+
+### 18.6 How to re-derive §18
+
+```
+git diff --name-status f8005cec HEAD -- tests/          # every test file is 'A'
+dotnet build AgentEval.sln -v q                          # 0 errors
+dotnet test tests/AgentEval.Tests/AgentEval.Tests.csproj -v q
+dotnet test tests/AgentEval.Memory.Tests/AgentEval.Memory.Tests.csproj -v q
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors
+dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --offline                   # Marco
+dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --offline --user USR-NB-01  # Nadia
+```
+
+Nothing above spends money.

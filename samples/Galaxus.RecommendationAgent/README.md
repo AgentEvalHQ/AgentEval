@@ -129,10 +129,10 @@ The order below is the order to record. Everything above the divider is free.
 | 2 | `Agent -- 5 --offline` *(Luca, thin signal)* | `(no signals — the history carries nothing strong enough to act on)`, `independent signals 0 of 2 needed (threshold 0.35)`, two clarifying questions, and a channel audit reading **zero** `PresentRecommendation` calls | The agent refuses rather than inventing a personalisation it does not have — and it says out loud that an abstention on a case that *had* a right answer must be scored as a miss. ⚠️ The console also prints *"the gate ran BEFORE any model spend"*; on the **live** path that sentence is false — see [gap 12](#known-gaps--next-steps). |
 | 3 | `Agent -- 3 --offline` *(Marco, gift trap)* | `⛔ excluded from your interests: Nintendo Switch 2 console, Mario Kart World` — followed by the reason: *"gift-wrapped; shipped to an alternate address; gift message present; no review authored; no accessory purchased in the 9 months since"* | Gift-ness is **derived** from observables, not read off a flag — there is no `IsGift` field — and it is suppressed in code before the model ever sees the history. |
 | 4 | `Agent -- 6 --offline` *(personalization OFF)* | `personalization: OFF` and *"Behavioural history is REFUSED by the tool layer, not merely omitted from the prompt"*; the map holds one `stated-in-session` signal citing no purchase. On this run the ledger also reads `2 in → 1 out · 1 dropped · sensitive_category 1` | The opt-out is enforced at the **tool layer**, so it holds even if the model tries — and the special-category screen fires in the same frame. |
-| 5 | `Agent -- 2 --offline` | Five executors firing in order, the coverage ledger for round 1, `✓ SKU containment 10/10`, then `rounds 1 of 3 · stop_reason CoverageSufficient · loop-back did not fire · super-steps 5` | The loop is a real MAF `WorkflowBuilder` graph whose route trace is printed as it runs — and on this customer it correctly **does not** loop. |
+| 5 | `Agent -- 2 --offline --user USR-NB-01` | Five executors firing in order, the coverage ledger for round 1, `✓ SKU containment 11/11`, then `rounds 1 of 3 · stop_reason CoverageSufficient · loop-back did not fire · super-steps 5` | The loop is a real MAF `WorkflowBuilder` graph whose route trace is printed as it runs — and on this customer it correctly **does not** loop. |
 | 6 | `Agent -- 2 --offline --user USR-MI-02` | `↩ ROUTE CoverageReviewer → Discovery [gaps remain] → round 2 of 3`, then round 3, ending `stop_reason GapsUnresolvable · loop-back FIRED · super-steps 9` | The **loop-back edge**, the whole reason this is a workflow and not one agent call — and the run degrades to a PARTIAL answer instead of hanging. |
 | 7 | `Agent -- 0` | Six probes, each with an `expected`, an `actual` and a `discriminant` line; `6 of 6 probes passed` | Each of the three stop conditions is **forced and discriminated from the other two**, the loop-back is checked in *both* directions (fires / does not fire), and so is the injection vocabulary filter. |
-| 8 | `Evals -- 3` | Ten rows in one box under the banner `A CONTROL THAT PASSES IS A WIRING FAULT, NOT A GOOD AGENT`: seven `✅ caught`, three advisory instrument rows, one of which is `⚠️ FINDING` | The evals **can fail.** A hallucinating recommender scores 0/14, a persona-blind popularity arm scores 0.000, and the suite says so. |
+| 8 | `Evals -- 3` | Sixteen rows in one box under the banner `A CONTROL THAT PASSES IS A WIRING FAULT, NOT A GOOD AGENT`: twelve `✅ caught` gating rows, four advisory instrument rows, two of which are `⚠️ FINDING` | The evals **can fail.** A hallucinating recommender scores 0/14, a persona-blind popularity arm scores 0.000, and the suite says so. |
 | 9 | `Evals -- 4` | Four arms: unconstrained probe `INJECTED`, constrained probe `CONTAINED`, rubber stamp `INAPPLICABLE`, Demo 2's arm `CONTAINED` — five checks each, with the chance floor of each printed | Marketplace review text is a live injection channel, the structural vocabulary constraint contains it, and **GATE A proves the case can go red** before GATE B is worth reading. |
 | 10 | `Evals -- 7` | Per-customer route traces drawn edge by edge with `⭐ THE LOOP-BACK → round 2`, then `HaveTraversedEdge(CoverageReviewer → Discovery)` asserted **True on 3 looping customers and False on 2 non-looping ones**, plus three agreeing witnesses per case (`loop-backs = rounds−1`, `super-steps = 2·rounds+3`) | The loop-back is witnessed against **edges MAF itself declares**, not against the workflow's own console trace — and the corpus contains both directions, so no constant answer can pass. |
 | 11 | `Evals -- 1 --dry-run` | The gate fails (as designed — the stub presents the same two SKUs every case) and three plumbing checks pass, including *"an APPROVAL-GATED `PlaceOrder` call is visible in the trace on all 2 commit-surface case(s)"* | The harness reads what the agent actually did; a gated call is not invisible to the trace extractor. |
@@ -550,13 +550,13 @@ is not here.
 |---|---|
 | `Agent -- 0` | **6 of 6** termination probes passed, each discriminated from the other two |
 | `Agent -- 1 --offline` (Nadia) | 3 searches → 6 presentations; ledger `6 in → 6 out · 0 dropped · 2 demoted`; channel audit `6 presented → 6 shown`; **3 guardrail arms report `arm_inapplicable`** |
-| `Agent -- 2 --offline` (Nadia) | rounds **1 of 3**, `CoverageSufficient`, 0 model calls, 7 searches, 19 discovered, 10 recommended, **loop-back did not fire**, super-steps **5**, `✓ SKU containment 10/10` |
-| `Agent -- 2 --offline --user USR-MI-02` (Marco) | rounds **3 of 3**, `GapsUnresolvable`, 10 searches, 17 discovered, 12 recommended, **loop-back FIRED**, super-steps **9** |
-| `Evals -- 3` | 7/7 gating controls caught; **3 advisory rows, 1 tripped** |
+| `Agent -- 2 --offline --user USR-NB-01` (Nadia) | rounds **1 of 3**, `CoverageSufficient`, 0 model calls, 7 searches, 22 discovered, 11 recommended, **loop-back did not fire**, super-steps **5**, `✓ SKU containment 11/11` |
+| `Agent -- 2 --offline` (Marco — the DEFAULT persona for Demo 02) | rounds **3 of 3**, `GapsUnresolvable`, 10 searches, 17 discovered, 12 recommended, **loop-back FIRED**, super-steps **9**, `✓ SKU containment 12/12` |
+| `Evals -- 3` | **12 of 12** gating controls caught; **4 advisory rows, 2 tripping** |
 | `Evals -- 4` | GATE A ✅ (unconstrained probe `INJECTED`, k=40, avoidance floor 0.596) · GATE B ✅ (constrained probe `CONTAINED` k=32 floor 0.677; Demo 2's arm `CONTAINED` k=24 floor 0.758; rubber stamp `INAPPLICABLE`) |
 | `Evals -- 7` | exit 0. GATE A + GATE B + GATE C all ✅ over **5 cases** — 3 looping, 2 non-looping; `HaveTraversedEdge` correct in both directions and the non-existent edge rejected on all 5; 2 approved / 3 degraded exits; stop reasons observed `coverage-sufficient`, `gaps-unresolvable`, `no-progress`. **170 ms** of turn time, 0 model calls, USD 0.0000. One instrument finding: `round-limit-reached` is **not** reachable on a real customer in this corpus |
 
-**Eval 03's three advisory findings, in full, because they bound everything
+**Eval 03's four advisory findings, in full, because they bound everything
 else:**
 
 - **`LatentCoverageDiscrimination` — ok.** Worst per-persona random-draw floor
@@ -590,13 +590,33 @@ else:**
   path. Arm C reports the concept space unconditionally, so the row always carries
   one number that cannot co-move with the selector. Without arm D this row would
   have gone green on the change that broke retrieval. `MEASUREMENT_STATUS.md` §17.
+- **`SuppressionDetectorExercised` — ⚠️ FINDING.** Every D3 suppression case
+  should have at least one negative control demonstrating its detector can fire.
+  **C-05's is demonstrated** by `Broken02_UncitedRecommender`; **C-07's is NOT
+  demonstrated by any control**, so a clean D3 result on C-07 is not evidence the
+  suppression detector works. Uncovered by the §8/B-10 per-case rewrite — the OR
+  over whole-run class counts it replaced could not see it. Advisory because
+  closing it means authoring a control that leaks, which is a corpus change with
+  its own measurement, not a build fix.
 
-**Deterministic-arm coverage means** (Eval 02's six-arm matrix, identical in the
-dry run and the live run because these arms make no model call): single-shot
-control **0.701** · popularity baseline **0.000** · tag-join oracle **1.000** ·
-rubber-stamp loop **0.458** · Demo 2's deterministic arm **0.583**. Loop health:
-real loop **P(rounds = 1) = 0.417** (5×1, 5×2, 2×3); rubber stamp **1.000**
-(12×1).
+**Deterministic-arm coverage means, DRY RUN** (`Evals -- 2 --dry-run`, concept
+space). These arms make no model call, but their numbers are **not** the same as
+the live run's: Eval 02 is a *paired* metric and cuts every arm to the live arm's
+own `k`, which in a dry run comes from a stub. So the deterministic arms move
+when the live arm does, and the live-run values are the separate table further
+down. MEAN recall is over all 12 scorable personas, MEAN latent (own `k`) over
+the 11 with `k_live > 0`:
+
+| Arm | MEAN recall | MEAN latent (own k) |
+|---|---|---|
+| Control — single shot | 0.701 | 0.701 |
+| Baseline — popularity | 0.000 | 0.000 |
+| Baseline — tag join (oracle) | 1.000 | 1.000 |
+| Loop control — rubber stamp | 0.375 | 0.375 |
+| Discovery Workflow (Demo 2) — deterministic arm | 0.403 | 0.514 |
+
+Rubber stamp **P(rounds = 1) = 1.000** (12×1), which is what makes it a valid
+degenerate comparator.
 
 ### Dry runs — real code path, stub model, spends nothing
 

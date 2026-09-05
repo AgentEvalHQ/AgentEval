@@ -137,12 +137,15 @@ public class MetaLaneArchitectureTests
         Assert.NotNull(repoRoot);
 
         var offenders = new List<string>();
+        var filesScanned = 0;
+        var sanctionedConstructorSeen = 0;
         foreach (var file in Directory.EnumerateFiles(Path.Combine(repoRoot!, "src"), "*.cs", SearchOption.AllDirectories))
         {
             if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
                 file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
                 continue;
 
+            filesScanned++;
             var isEvalScore = Path.GetFileName(file) == "EvalScore.cs";
             var lines = File.ReadAllLines(file);
             for (var i = 0; i < lines.Length; i++)
@@ -155,8 +158,23 @@ public class MetaLaneArchitectureTests
                 var assignsMeasured = line.Contains("Measurement = MeasurementState.Measured", StringComparison.Ordinal);
                 if (assignsMeasured || !isEvalScore)
                     offenders.Add($"{Path.GetRelativePath(repoRoot!, file)}:{i + 1}: {line.Trim()}");
+                else
+                    sanctionedConstructorSeen++;
             }
         }
+
+        // NON-VACUITY, both halves — added by the B-7/Slice-1 verification pass. `Assert.Empty` on a
+        // scan reads applicability out of its own RESULT: an empty offender list is indistinguishable
+        // from "src/ moved, nothing was read, the grep matched nothing". That is the silent-{} shape,
+        // and it fails in the flattering direction. So assert the INPUT instead: files were actually
+        // read, and the one line this rule sanctions was actually FOUND — which is the positive
+        // control proving the matcher can still match at all.
+        Assert.True(filesScanned > 100, $"scanned only {filesScanned} file(s) under src/ — the grep is vacuous");
+        Assert.True(
+            sanctionedConstructorSeen == 1,
+            $"expected EXACTLY ONE sanctioned `Measurement = MeasurementState.NotApplicable` in "
+            + $"EvalScore.NotApplicable(); saw {sanctionedConstructorSeen}. Zero means this grep no "
+            + "longer matches anything and would pass over any violation.");
 
         Assert.Empty(offenders);
     }
