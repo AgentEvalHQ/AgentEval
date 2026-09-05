@@ -892,6 +892,13 @@ document is the committed record.
 > intent, and making the tree match an asserted intent is a decision for the owner, not a side effect of a run.
 > Filed as plan item **8.24**.
 
+⚠️ **"33 commands" is the systematic ledger, not the total number of executions.** Six further runs were
+made and are listed under REPEATS AND EXTRAS in `EXITCODES.txt`: the four per-persona `-- 2 --offline` runs
+that measure 22.8, and a closing `-- 3` / `--ci --dry-run` re-verification. `-- 3`, `-- 4` and `-- 7` were
+each executed more than once **on purpose** — the real-vector runs left the store's pointer holding a
+`--real-vectors` record and the default space is the reproducible one, so each was re-run in the concept
+space last. **Every repeat returned the same exit code as its first execution (0 / 0 / 1).**
+
 ### 22.1 The four defects — verified fixed, each by re-introducing it
 
 Every row below was proven the way the standing rule requires: the defect was put back, the control was
