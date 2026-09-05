@@ -44,6 +44,8 @@ public sealed class AzureEmbeddingSource : IEmbeddingSource, IDisposable
     private readonly bool _ownsGenerator;
     private int _dimensions;
     private int _callCount;
+    private long _promptTokens;
+    private int _callsWithoutUsage;
 
     /// <summary>
     /// Wraps an existing MEAI embedding generator — the seam the eval project uses to inject a
@@ -86,6 +88,23 @@ public sealed class AzureEmbeddingSource : IEmbeddingSource, IDisposable
 
     /// <summary>How many embedding calls this source has issued. Printed by <c>--rebuild-embeddings</c>; it is spend.</summary>
     public int CallCount => Volatile.Read(ref _callCount);
+
+    /// <summary>
+    /// Prompt tokens billed so far, summed from each response's own usage block. This is the
+    /// number an invoice is computed from, so it is READ FROM THE RESPONSE rather than estimated
+    /// from character counts — a four-characters-per-token rule of thumb forecast 13 278 tokens for
+    /// the B-6 rebuild against a billed 13 383 (0.8 % low over 170 calls, 7 % low on the single
+    /// document it was checked against), and an estimate presented as a cost is a fabricated
+    /// measurement.
+    /// </summary>
+    public long PromptTokens => Interlocked.Read(ref _promptTokens);
+
+    /// <summary>
+    /// Calls whose response carried NO usage block. Non-zero means <see cref="PromptTokens"/> is a
+    /// LOWER BOUND, not a total — which the caller must be able to say out loud rather than quietly
+    /// under-report the spend.
+    /// </summary>
+    public int CallsWithoutUsage => Volatile.Read(ref _callsWithoutUsage);
 
     /// <summary>True once a response has been seen and <see cref="Dimensions"/> is a fact rather than a declaration.</summary>
     public bool DimensionsConfirmed { get; private set; }
@@ -164,11 +183,30 @@ public sealed class AzureEmbeddingSource : IEmbeddingSource, IDisposable
 
         Interlocked.Increment(ref _callCount);
 
-        var embedding = await _generator
-            .GenerateAsync(text, cancellationToken: cancellationToken)
+        // The batch overload deliberately, over the one-string extension that wraps it: the
+        // extension returns only the embedding and DROPS the response's usage block, and this class
+        // documents its call count as spend. A spend you can count but not price is half a fact.
+        var generated = await _generator
+            .GenerateAsync([text], cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        var vector = embedding.Vector;
+        if (generated.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Embedding deployment '{ModelId}' returned no embedding for a non-empty input. " +
+                "An empty result from a LIVE source is a fault, not a degraded mode.");
+        }
+
+        if (generated.Usage?.InputTokenCount is { } inputTokens)
+        {
+            Interlocked.Add(ref _promptTokens, inputTokens);
+        }
+        else
+        {
+            Interlocked.Increment(ref _callsWithoutUsage);
+        }
+
+        var vector = generated[0].Vector;
         if (vector.Length == 0)
         {
             throw new InvalidOperationException(

@@ -31,17 +31,26 @@
     <PackageReference Include="OpenTelemetry.Api" />
   </ItemGroup>
 
-  <!-- NOTE: the design's §G csproj also lists
+  <!-- The two committed vector assets (design §D.4 / §G). Generated 2026-09-05 by running
+       this project with the "rebuild-embeddings" switch and the embedding-model override
+       pointed at text-embedding-3-small (the exact command line is in MEASUREMENT_STATUS §16;
+       XML comments cannot carry a double hyphen, so it is not repeated here).
+       170 live calls, 13 383 prompt tokens, ≈ USD 0.00027. Real text-embedding-3-small
+       vectors: 99 product documents + 71 query texts, 1536 dims, template stamp v2.
 
-           <EmbeddedResource Include="Data\catalogue.embeddings.json" />
-           <EmbeddedResource Include="Data\queries.embeddings.json" />
+       These two lines and the two files land in the SAME commit on purpose — an
+       EmbeddedResource pointing at a missing file is a hard build error (MSB3030), which
+       is why they were absent until the assets existed.
 
-       Those two assets do NOT exist yet — real text-embedding-3-small vectors cannot be
-       generated in an offline build — and an EmbeddedResource pointing at a missing file
-       is a hard build error (MSB3030). The offline default is ConceptEmbeddingSource
-       (authored concept vectors, deterministic, no key); PrecomputedEmbeddingSource and
-       the rebuild-embeddings CLI switch are written for real so the assets can be
-       generated later.
-       Restore the two EmbeddedResource lines in the SAME commit that adds the files. -->
+       ⚠ Adding them does NOT change how the demo retrieves. The default embedding source
+       on every demo and eval path is still ConceptEmbeddingSource (authored concept
+       vectors, deterministic, no key, no network) — see MEASUREMENT_STATUS §16. The
+       committed assets are the real-vector path that PrecomputedEmbeddingSource loads and
+       that the AuthoredQueryPhraseRetrievability control measures; nothing else reads them
+       today, and that is stated rather than implied. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\catalogue.embeddings.json" />
+    <EmbeddedResource Include="Data\queries.embeddings.json" />
+  </ItemGroup>
 
 </Project>

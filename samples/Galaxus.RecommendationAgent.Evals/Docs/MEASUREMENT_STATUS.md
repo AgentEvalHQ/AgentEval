@@ -1491,3 +1491,165 @@ test supplied the number that described it.
 are caught; **2 advisory instrument findings** are reported and do not gate.
 
 No behaviour changed. This entry corrects a published claim only.
+
+---
+
+## §16 — B-6: the committed embedding assets exist, and what that did and did not move (2026-09-05)
+
+**This section spent money.** 170 live calls against `text-embedding-3-small`, **13 383 prompt
+tokens**, ≈ **USD 0.00027** at $0.02 / 1M input tokens. The token count is read from the responses'
+own usage blocks, not estimated: a four-characters-per-token forecast said 13 278 and was 0.8 % low,
+and an estimate printed as a cost is a fabricated measurement. Three further probe calls (≈ 474
+tokens, one of them against `text-embedding-ada-002`) were spent in stage 2 below, adding ≈ USD
+0.00002.
+
+### 16.1 The three-stage protocol, and what each stage actually established
+
+| Stage | What ran | Spend | Result |
+|---|---|---|---|
+| 1 — dry run | offline probe over the shipped `EmbeddingCacheBuilder` / `PrecomputedEmbeddingSource` | **none** | 7 of 7 checks passed |
+| 2 — one item | one live embedding of `GLX-1001`'s document | 2 calls (+1 re-verify) | usable vector confirmed |
+| 3 — full run | the shipped rebuild-embeddings switch, embedding model overridden to `text-embedding-3-small` | 170 calls | both assets written |
+
+**Stage 1 checked seven things and spent nothing:** the builder refuses an OFFLINE source and
+creates no output directory; the writer path produces a report and two files; the loader accepts
+what the builder wrote; every product document is a cache hit through the loader; the
+template-version guard makes `Load` THROW and `TryLoad` warn-and-empty; the *same file* with the
+current stamp still loads (so the guard is not vacuous in the always-fails direction); and the
+model-mismatch guard clears the cache rather than mixing two embedding spaces. Separately, the
+rebuild switch with the credentials unset refuses cleanly and exits 0.
+
+**Stage 2 measured one real vector before authorising 170.** `text-embedding-3-small`: 1536
+dimensions (declared 1536, confirmed from the response), L2 norm **0.999999933**, mean |component|
+1.99e-2, range [−0.089677, 0.091325], **0 exact-zero components of 1536**, not all-zero, 158 prompt
+tokens. `text-embedding-ada-002` — what `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` was actually set to —
+also answers at 1536 dims and would have passed every dimension assertion silently. **It was not
+used**: every document in this repo names `text-embedding-3-small`, and stamping an asset
+`text-embedding-ada-002` while the prose said otherwise is the exact failure the `model` stamp
+exists to prevent. The deployment was overridden explicitly for the run.
+
+**Stage 3 wrote both assets:** `catalogue.embeddings.json` 99/99 vectors, `queries.embeddings.json`
+71/71, model `text-embedding-3-small`, 1536 dims, template stamp `v2`, 1447.2 KB combined, 34.8 s.
+Verified afterwards through the *embedded-resource* path (not the file path), with no key present:
+170 vectors load with **0 warnings**, all 99 product documents hit, **0 live fallback calls**.
+
+### 16.2 The acceptance, and the part of it that was not reachable as written
+
+§8.1's B-6 test reads: *`AuthoredQueryPhraseRetrievability` reports 0 of 56 zero-vector phrases on
+the real-vector path.* **As written it was not merely unmet, it was unmeasurable**, for two reasons
+found in stage 1:
+
+1. **The control had no real-vector path to read.** It called `ConceptEmbeddingSource.Instance`
+   unconditionally. Generating the assets would have changed its output by exactly nothing.
+2. **The assets would not have carried the phrases.** `EmbeddingCacheBuilder.CanonicalQueries` is
+   the 17 demo prompts. Measured before the fix: a query asset built from it carries **0 of 54**
+   distinct context phrases. Every one of the 56 would have come back `Unavailable`.
+
+Both were closed. `EmbeddingCacheBuilder.AuthoredInterestPhrases` (54 distinct values of
+`InterestMapBuilder.ContextPhrases`, ordinal key order) joins `CanonicalQueries` in the new
+`DefaultQuerySet`, and the control gained a second arm.
+
+### 16.3 The control now has two arms, and it is still RED on purpose
+
+| Arm | Path | Before | After |
+|---|---|---|---|
+| **A** | offline concept retriever — *the path every demo and every eval actually runs on* | 18 of 56 zero, 10 latent gold | **18 of 56 zero, 10 latent gold — UNCHANGED** |
+| **B** | the committed `text-embedding-3-small` assets, no key, no live fallback | *did not exist* (56 of 56 dead had it existed) | **0 of 56 dead** |
+
+The row's verdict is A **AND** B, so `AuthoredQueryPhraseRetrievability` **remains a FINDING**.
+Reporting it green because a path nothing runs on is clean would be the flattering pass this suite
+exists to refuse. **B-6's stated acceptance is met on arm B and is NOT met on the path the numbers
+come from, and that distinction is the honest result rather than a caveat on it.**
+
+⚠️ **Arm B's zero test is near-vacuous, and this is stated in the row's own printed text.** A real
+embedding model returns a dense vector for any non-empty input, so "is it non-zero?" cannot fail on
+that path and would be satisfied by a garbage vector. What arm B actually verifies is **asset
+presence and stamp validity**: a phrase absent from the committed asset, or an asset whose model /
+dimensions / template version fail to validate, answers `Unavailable`, which the dense leg cannot
+tell from zero and which arm B counts as dead.
+
+**Arm B was demonstrated failing.** Bumping `EmbeddingDocument.TemplateVersion` from `v2` to
+`v3-ABLATION` (one constant, nothing else) turns arm B from `0 of 56 dead` to
+**`56 of 56 dead — NO committed vectors loaded — … was generated from document template 'v2' but
+this build renders 'v3-ABLATION' … REFUSING to load them`**. Arm A read 18 of 56 in both directions,
+so the ablation moved one variable. The constant was restored and the reading returned to 0 of 56.
+
+### 16.4 Every number that moved — the full before/after
+
+| Figure | Before | After | Why |
+|---|---|---|---|
+| `AuthoredQueryPhraseRetrievability`, arm A | 18 of 56 zero (10 gold) | **18 of 56 zero (10 gold)** | untouched on purpose — the concept lexicon was not edited |
+| `AuthoredQueryPhraseRetrievability`, arm B | *(no such arm)* | **0 of 56 dead** | the assets now exist and carry all 54 distinct phrases |
+| Row verdict | ⚠️ FINDING | ⚠️ **FINDING** | A ∧ B; arm A still red |
+| `Evals -- 3` control rows | 16 (12 gating + 4 advisory) | **16 (12 gating + 4 advisory)** | no row added or removed |
+| Gating rows caught | 12 of 12 | **12 of 12** | unchanged |
+| Advisory rows tripping | 2 | **2** | unchanged |
+| Query asset entries | *(no asset)* | **71** (17 canonical + 54 phrases) | `DefaultQuerySet` |
+| Catalogue asset entries | *(no asset)* | **99** | one per SKU |
+| Repo weight | — | **+1 447 KB** across two files | base64 float32 × 1536 dims × 170 vectors |
+| `AzureEmbeddingSource` | call count only | call count **+ prompt tokens + calls-without-usage** | the class documented its calls as spend but could not price them |
+| Asset encoding | — | UTF-8 **without** BOM | `Encoding.UTF8` emits one; two invisible leading bytes in a committed file are a trap, and the writer now matches the committed bytes |
+
+### 16.5 Every number that did NOT move — measured, not assumed
+
+Captured before and after, and diffed:
+
+| Command | Differing lines | What they were |
+|---|---|---|
+| `-- 1 --dry-run` | **0** | byte-identical |
+| `-- 2 --dry-run` | **0** | byte-identical |
+| `-- 2b --dry-run` | **0** | byte-identical |
+| `-- 2c --dry-run` | **0** | byte-identical |
+| `-- 4` | **0** | byte-identical |
+| `-- 0` (termination probe) | **0** | byte-identical |
+| `-- 9 --dry-run` | 2 | one wall-clock figure (0.4 s → 0.3 s) |
+| `-- 3` | 47 | **the one control row's text, lines 48–66 → 48–75, and nothing else** |
+| `--ci --dry-run` | 173 | the same control row, plus per-run latency jitter |
+| `Agent -- 1 --offline` | 12 | stock `verified HH:MM:SS UTC` timestamps only |
+| `Agent -- 2 --offline` | 26 | the same timestamps, plus one node duration |
+
+**No coverage cell, chance floor, gate verdict, control verdict, arm mean, token count or exit code
+moved anywhere in the suite. Every command still exits 0.** The solution builds.
+
+⚠️ **The demo narrative did not shift, and the reason is not reassuring.** The question asked was
+whether real vectors change which products come back for a persona. They cannot, because **nothing
+retrieves against them.** Every demo and every eval still builds its `HybridRetriever` with
+`ConceptEmbeddingSource.Instance`; `PrecomputedEmbeddingSource` is constructed by the new control
+arm and by nothing else. B-6 as scoped adds the real-vector path and makes it measurable; it does
+**not** move the system onto it. Doing that would replace a hermetic, key-free, deterministic
+retriever with one that must fall through to a paid call on every model-composed query, and it would
+move every number in §2 — so it is a separate, declared change, not a side effect of this one.
+
+### 16.6 Regressions and residual defects
+
+**No regression was found.** No control stopped catching, no gate weakened, no threshold was moved,
+and the corpus was not touched. The four items below are limits of what was done, declared:
+
+1. **Arm A is still red at 18 of 56, 10 of them latent gold.** B-6 did not repair it and was not
+   supposed to: repairing it means choosing a concept dimension per phrase, which is a direct lever
+   on every coverage cell. Nothing in §2 may be read as if it had been fixed.
+2. **The composed LABEL is still not cached.** `ComposeConjunctionLabel` joins up to three phrases,
+   and the joined string hashes differently from its parts. Arm B proves each authored interest is
+   individually askable on the committed path; it does **not** make the demo's actual queries cache
+   hits.
+3. **`UncalibratedDenseScoreFloor` is still uncalibrated, and now there are two spaces it is wrong
+   for.** Both `ConceptEmbeddingSource` and `AzureEmbeddingSource` declare 0.28. A floor is a
+   property of an embedding space; the committed assets make the second space real, and the number
+   is still a placeholder in both. It gates nothing today because nothing retrieves against the
+   assets.
+4. **`AZURE_OPENAI_EMBEDDING_DEPLOYMENT` in this environment is `text-embedding-ada-002`.** A future
+   rebuild that does not override it will stamp the assets `text-embedding-ada-002` and pass every
+   dimension assertion (ada-002 is also 1536). The stamp would be honest and the
+   `PrecomputedEmbeddingSource` model guard would catch a *mixture* — but nothing warns that the
+   deployment differs from the one every document names.
+
+### 16.7 How to re-derive §16
+
+```
+dotnet run --project samples/Galaxus.RecommendationAgent -- --rebuild-embeddings --embedding-model text-embedding-3-small
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3     # the two-arm row
+```
+
+The first line **spends money** and rewrites both assets (only `generatedUtc` differs on a re-run
+against the same model and template). The second spends nothing. Arm B's failing direction is
+re-derived by changing `EmbeddingDocument.TemplateVersion` and running `-- 3` again.

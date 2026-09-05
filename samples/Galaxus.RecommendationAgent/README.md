@@ -163,8 +163,12 @@ point: `RrfK = 60`, 24 candidates pulled per leg, `topK` 8 by default (max 12).
 - **Dense leg** — `ConceptEmbeddingSource.cs`: an authored **24 named-concept**
   space. Deterministic, key-free, and the reason every offline number here is
   reproducible. `AzureEmbeddingSource` / `PrecomputedEmbeddingSource` /
-  `EmbeddingCacheBuilder` implement the real-vector path; the two committed
-  vector assets do not exist yet (see [Known gaps](#known-gaps--next-steps)).
+  `EmbeddingCacheBuilder` implement the real-vector path, and since B-6
+  (2026-09-05) the two committed vector assets exist — 99 product + 71 query
+  `text-embedding-3-small` vectors at 1536 dims, embedded as resources. ⚠ They
+  are **not** what the demo retrieves with: the dense leg is still
+  `ConceptEmbeddingSource` on every demo and eval path, and only Eval 03's
+  `AuthoredQueryPhraseRetrievability` arm B reads the assets.
 - **Lexical leg** — `LexicalIndex.cs`: IDF-weighted token overlap with an exact
   boost for model numbers and GTINs, because Galaxus customers type `α7 IV`,
   `A7IV` and `ILCE-7M4` for one product and a 1536-dimensional vector treats the
@@ -402,7 +406,7 @@ pass.
 |---|---|---|
 | `LatentCoverageDiscrimination` | advisory | every persona's random-draw floor must stay below 0.50, or the metric is a decoration |
 | `LatentCoveragePersonaDiscrimination` | advisory | the tag-join oracle must identify its own customer above the 0.083 chance rate, or latent coverage carries **zero** information about personalisation |
-| `AuthoredQueryPhraseRetrievability` | advisory | every authored query phrase must embed to a non-zero vector — a phrase the lexicon does not know returns nothing, and the arm's low score is then a property of the corpus |
+| `AuthoredQueryPhraseRetrievability` | advisory | every authored query phrase must be ASKABLE on **both** embedding paths. **Arm A** (offline concept retriever — the path everything actually runs on): a phrase the 24-dimension lexicon does not know embeds to zero and the dense leg returns nothing, so the arm's low score is a property of the corpus. **Arm B** (the committed `text-embedding-3-small` assets, no key): a phrase absent from the asset, or an asset whose model / dimensions / template stamp fail to validate, answers `Unavailable` — the same nothing. Verdict is A ∧ B |
 | `Broken01_HallucinatingRecommender` | **gates** | score 0/14 and trip D1, D4/D6 and D5 |
 | `Broken02_UncitedRecommender` | **gates** | pass D1 and D2 while failing D5 everywhere — proves the suite distinguishes *which* invariant broke |
 | `Broken03_SingleShotWorkflow` | **gates** | be a **valid comparator**: present something, no phantom SKU, every citation resolves. A control that presents nothing would pass "the loop wins" for the wrong reason |
@@ -550,14 +554,22 @@ else:**
   cross-persona forced choice is **1.000 (12 of 12) against chance 0.083**. This
   is the check that decides whether the metric carries *any* information about
   personalisation, and it does.
-- **`AuthoredQueryPhraseRetrievability` — ⚠️ FINDING.** **18 of 56** authored
-  query phrases embed to the **zero vector** under the offline concept
-  retriever, and **10 of those are latent-gold tokens for a scored persona**:
-  `all-day-riding`, `card-to-edit`, `couch-co-op`, `late-night-session`,
-  `off-grid-power`, `self-supported`, `steep-ascents`, `two-channel-room`,
-  `weigh-every-shot`, `winter-base-miles`. On those interests the dense leg
-  contributes nothing, so a low coverage cell there is **not** evidence the arm
-  failed to reason. Read every Eval 02 number with this in front of it.
+- **`AuthoredQueryPhraseRetrievability` — ⚠️ FINDING.** **Arm A (the path
+  everything runs on): 18 of 56** authored query phrases embed to the **zero
+  vector** under the offline concept retriever, and **10 of those are latent-gold
+  tokens for a scored persona**: `all-day-riding`, `card-to-edit`, `couch-co-op`,
+  `late-night-session`, `off-grid-power`, `self-supported`, `steep-ascents`,
+  `two-channel-room`, `weigh-every-shot`, `winter-base-miles`. On those interests
+  the dense leg contributes nothing, so a low coverage cell there is **not**
+  evidence the arm failed to reason. Read every Eval 02 number with this in front
+  of it. **Arm B (the committed real vectors, added by B-6): 0 of 56 dead** — 170
+  `text-embedding-3-small` vectors at 1536 dims load from the embedded assets with
+  no key and no live call. The row stays a FINDING because its verdict is A ∧ B:
+  arm B is clean and **nothing retrieves against it**, so a green row here would
+  claim a fix the suite has not had. Arm B's zero test is also near-vacuous on its
+  own — a real model cannot return a zero vector — so what it verifies is asset
+  presence and stamp validity, demonstrated by bumping the template version and
+  watching it read 56 of 56 dead. See `MEASUREMENT_STATUS.md` §16.
 
 **Deterministic-arm coverage means** (Eval 02's six-arm matrix, identical in the
 dry run and the live run because these arms make no model call): single-shot
@@ -819,14 +831,14 @@ silently repaired.
 
 | # | Gap | Why it was not fixed |
 |---|---|---|
-| 1 | **10 dead query phrases.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero (`AuthoredQueryPhraseRetrievability`) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell |
+| 1 | **10 dead query phrases, STILL OPEN after B-6.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero on the offline concept path (`AuthoredQueryPhraseRetrievability`, arm A) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 committed real `text-embedding-3-small` vectors and closed the row's *arm B*; it deliberately did **not** touch arm A, and nothing retrieves against the committed assets |
 | 2 | **`"wahl"` in the political-opinion term set** | Changing a screening term changes what the eval measures. Same precedent as #1 |
 | 3 | **Demo 2's 60 s model timeout** vs `gpt-5.5`'s latency on the three JSON-envelope stages | A threshold decision, not a verification one. `--model-timeout` exists precisely to change it, and the 60 s value is documented as measured (without it a stalled deployment queues ~40 min) |
 | 4 | **`DetectOptOutBackstop` is unverified and uncovered** — the only reader of the tool-result channel | Localising it (extractor vs. detector) needs one instrumented live turn |
 | 5 | **The pre-registered A/B has never been run.** Eval 09 was built to run it — both arms live, spend metered under each, a CONFOUNDED verdict if the budgets diverge — and it is the single most valuable thing left to do here | It costs a second live architecture across twelve personas × 2 reps plus a judge call per cell: roughly 20–45 minutes and a bill the cost panel reports exactly. Nobody has spent it |
 | 6 | **Two-sided evidence is one-and-a-half-sided** — no `userEvidence` argument on `PresentRecommendation` | The fix is purely additive (a fifth argument, never a rename — `Domain/Recommendation.cs` is the cross-lane contract), but it changes the frozen tool signature both projects grade against |
 | 7 | **Demo 1 has no candidate-set containment** | The candidate set must first be widened to *every* retrieval route — today only the three semantic tools record provenance, so `BrowseCategory` results legitimately arrive with none. Enforcing before widening would drop legitimate results |
-| 8 | **The two committed embedding assets do not exist.** `PrecomputedEmbeddingSource`, `EmbeddingCacheBuilder`, `--rebuild-embeddings` and the staleness guard are all built; only `Data/*.embeddings.json` and the two `<EmbeddedResource>` lines are absent | Generating them needs credentials at authoring time, and landing them means re-running Eval 03 and **re-measuring every Eval 02 cell**, declaring the movement. An `EmbeddedResource` pointing at a missing file is a hard build error (MSB3030), so the lines must land in the same commit as the files |
+| 8 | ~~**The two committed embedding assets do not exist.**~~ **CLOSED 2026-09-05 (B-6).** `Data/catalogue.embeddings.json` (99 vectors) and `Data/queries.embeddings.json` (71) now hold real `text-embedding-3-small` output at 1536 dims, template stamp `v2`, and the two `<EmbeddedResource>` lines landed in the same commit | 170 live calls, 13 383 prompt tokens, ≈ USD 0.00027. Every Eval 02 cell was re-measured and **none moved**, because nothing retrieves against the assets: every demo and eval still builds its retriever with `ConceptEmbeddingSource`. `MEASUREMENT_STATUS.md` §16 has the full before/after and the four residual limits |
 | 9 | **The D-3 vocabulary control is monolingual.** The fix is to give the *catalogue's own* category and attribute vocabulary de/fr/it forms — **not** to widen with review text, which is the laundering channel | A corpus authoring task with its own re-measurement cost |
 | 10 | **Evals 05, 06, 08 and 09 have no measured results in this file.** All four need credentials and all four landed after the measured live run; the binaries that produced the Eval 01/02 numbers contained Evals 01–04 only. (Eval 07 needs no model, was run on 2026-09-04 against the current tree and **is** reported.) | Reporting a number for any of them here would be reporting a number nobody ran |
 | 11 | **The tree is moving faster than any document about it.** Evals 05–09, `--skip-slow` and `CredentialGuard` all landed on 2026-09-04 between the measured live run and this file being written; the earlier record of a warning-free build predates them, and a build today also emits `CS0162: Unreachable code detected` at `Eval04_ReviewInjectionContainment.cs:72` | Nothing to fix in this README beyond re-reading the tree before quoting it. Re-run `Evals -- 3`, `-- 4`, `-- 7` and `--ci --dry-run` — all four are free — before trusting any figure above |

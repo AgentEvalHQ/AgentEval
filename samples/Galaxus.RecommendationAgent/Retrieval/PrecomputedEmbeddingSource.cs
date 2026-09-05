@@ -174,8 +174,9 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     /// <summary>
     /// Finds an asset by file name: embedded resource first, then <c>Data/</c> beside the binary,
     /// then <c>Data/</c> in each parent directory up to the repository root, then the working
-    /// directory. Returns null when the asset does not exist anywhere — which is the expected
-    /// state in this build, since real vectors cannot be generated offline.
+    /// directory. Returns null when the asset does not exist anywhere — which since B-6
+    /// (2026-09-05) means the assets were deleted or the resource was not embedded, not that they
+    /// were never generated.
     /// </summary>
     /// <param name="fileName">e.g. <c>"catalogue.embeddings.json"</c>.</param>
     public static string? ResolveAssetPath(string fileName)

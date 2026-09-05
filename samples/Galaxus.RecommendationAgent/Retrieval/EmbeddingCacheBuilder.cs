@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Galaxus.RecommendationAgent.Domain;
+using Galaxus.RecommendationAgent.Signals;
 
 namespace Galaxus.RecommendationAgent.Retrieval;
 
@@ -15,9 +16,11 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This spends money.</b> One embedding call per product plus one per canonical query — around
-/// ninety calls for the shipped catalogue. It is a deliberate, explicit, occasional action behind
-/// a CLI switch, never something the demo does on startup.
+/// <b>This spends money.</b> One embedding call per product plus one per entry of
+/// <see cref="DefaultQuerySet"/> — <b>170 calls and 13 383 prompt tokens</b> on the shipped
+/// catalogue (99 products + 17 canonical queries + 54 authored interest phrases), MEASURED
+/// 2026-09-05 against <c>text-embedding-3-small</c>. It is a deliberate, explicit, occasional
+/// action behind a CLI switch, never something the demo does on startup.
 /// </para>
 /// <para>
 /// <b>It refuses to write a file that would misrepresent itself.</b> The <c>model</c> stamp is
@@ -28,9 +31,18 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// what was written and by what.
 /// </para>
 /// <para>
-/// <b>The two <c>EmbeddedResource</c> entries are currently absent from the csproj</b>, because an
-/// <c>EmbeddedResource</c> pointing at a file that does not exist is a hard build error (MSB3030).
-/// This builder prints the reminder to restore them in the same commit that adds the assets.
+/// <b>The two <c>EmbeddedResource</c> entries are now IN the csproj</b>, restored in the same
+/// commit that added the assets (B-6, 2026-09-05) — an <c>EmbeddedResource</c> pointing at a file
+/// that does not exist is a hard build error (MSB3030), which is why they were absent until then.
+/// The reminder below still prints, because it is right for the next person who regenerates into
+/// an empty <c>Data/</c> folder.
+/// </para>
+/// <para>
+/// <b>What generating the assets did NOT do.</b> Every demo and eval path still builds its
+/// <c>HybridRetriever</c> with <see cref="ConceptEmbeddingSource"/>. Committing real vectors does
+/// not silently move the demo onto them, and this class must not be read as if it had: the assets
+/// are the real-vector path, and moving the default onto them is a separate, declared change that
+/// would move every measured number in the suite.
 /// </para>
 /// </remarks>
 public static class EmbeddingCacheBuilder
@@ -43,6 +55,9 @@ public static class EmbeddingCacheBuilder
 
     /// <summary>The folder the assets live in, relative to the project root.</summary>
     public const string DataFolderName = "Data";
+
+    /// <summary>UTF-8 with no byte-order mark — the encoding both committed assets are written in.</summary>
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
     /// The canonical demo and eval queries, from <see cref="GalaxusDemoPrompts"/> — the only query
@@ -77,12 +92,52 @@ public static class EmbeddingCacheBuilder
     ];
 
     /// <summary>
+    /// The authored interest phrases — every distinct value of
+    /// <see cref="InterestMapBuilder.ContextPhrases"/>, in ordinal key order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>These are queries, not decoration.</b> <c>InterestMapBuilder.ComposeConjunctionLabel</c>
+    /// turns a context-tag suffix into one of these strings and that string IS what a searching arm
+    /// asks the retriever for. They belong in the query asset for exactly the reason
+    /// <see cref="CanonicalQueries"/> does: they are known ahead of any run, so their vectors can be
+    /// computed once instead of on every run.
+    /// </para>
+    /// <para>
+    /// <b>Why this list was added at B-6.</b> Without it the committed query asset carried
+    /// <b>0 of 54</b> of them, so there was no real-vector path for any authored interest at all,
+    /// and B-6's acceptance — <c>AuthoredQueryPhraseRetrievability</c> reporting zero dead phrases
+    /// on the real-vector path — was not merely unmet but unmeasurable. Measured before the change.
+    /// </para>
+    /// <para>
+    /// <b>What it does NOT cover, said plainly.</b> A label is a JOIN of up to
+    /// <c>InterestMapBuilder.MaximumLabelPhrases</c> = 3 of these phrases, and the joined string is
+    /// a different text with a different hash. Caching the parts does not cache the whole. This list
+    /// makes each authored interest INDIVIDUALLY askable on the committed-asset path; it does not
+    /// make the demo's composed queries cache hits.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<string> AuthoredInterestPhrases { get; } =
+        InterestMapBuilder.ContextPhrases
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => pair.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    /// <summary>
+    /// What <c>--rebuild-embeddings</c> embeds into the query asset when no explicit set is given:
+    /// <see cref="CanonicalQueries"/> followed by <see cref="AuthoredInterestPhrases"/>, de-duplicated.
+    /// </summary>
+    public static IReadOnlyList<string> DefaultQuerySet { get; } =
+        CanonicalQueries.Concat(AuthoredInterestPhrases).Distinct(StringComparer.Ordinal).ToArray();
+
+    /// <summary>
     /// Regenerates both assets and writes them, printing a TravelDemo-style progress panel.
     /// </summary>
     /// <param name="products">The catalogue to embed.</param>
     /// <param name="source">The embedding source. Normally <see cref="AzureEmbeddingSource"/>.</param>
     /// <param name="outputDirectory">Where to write. Null resolves the project's <c>Data/</c> folder.</param>
-    /// <param name="queries">Query texts to embed. Null uses <see cref="CanonicalQueries"/>.</param>
+    /// <param name="queries">Query texts to embed. Null uses <see cref="DefaultQuerySet"/>.</param>
     /// <param name="allowOfflineSource">Permits generating assets from an offline source. Off by default, on purpose.</param>
     /// <param name="cancellationToken">Cancellation.</param>
     /// <returns>What was written, or null when the run refused to write.</returns>
@@ -118,7 +173,7 @@ public static class EmbeddingCacheBuilder
         var directory = outputDirectory ?? ResolveOutputDirectory();
         Directory.CreateDirectory(directory);
 
-        var queryTexts = (queries ?? CanonicalQueries).Where(q => !string.IsNullOrWhiteSpace(q)).ToArray();
+        var queryTexts = (queries ?? DefaultQuerySet).Where(q => !string.IsNullOrWhiteSpace(q)).ToArray();
         var stopwatch  = Stopwatch.StartNew();
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -137,10 +192,20 @@ public static class EmbeddingCacheBuilder
         var cataloguePath = Path.Combine(directory, CatalogueAssetFileName);
         var queriesPath   = Path.Combine(directory, QueriesAssetFileName);
 
-        await File.WriteAllTextAsync(cataloguePath, Serialize(catalogueFile), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(queriesPath, Serialize(queriesFile), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+        // UTF-8 with NO byte-order mark. `Encoding.UTF8` emits one, and while System.Text.Json's
+        // stream reader tolerates it, these files are committed and diffed: two invisible leading
+        // bytes are exactly the kind of thing that later reads as "binary file" in a grep and gets
+        // chased for an hour. Both consumers read the same bytes either way.
+        await File.WriteAllTextAsync(cataloguePath, Serialize(catalogueFile), Utf8NoBom, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(queriesPath, Serialize(queriesFile), Utf8NoBom, cancellationToken).ConfigureAwait(false);
 
         stopwatch.Stop();
+
+        // Spend is read from the source that issued the calls, never estimated here. A source that
+        // cannot report it yields (0, 0), which prints as "not reported" rather than as free.
+        var (calls, promptTokens, callsWithoutUsage) = source is AzureEmbeddingSource azure
+            ? (azure.CallCount, azure.PromptTokens, azure.CallsWithoutUsage)
+            : (0, 0L, 0);
 
         var report = new EmbeddingCacheBuildReport(
             cataloguePath,
@@ -151,7 +216,10 @@ public static class EmbeddingCacheBuilder
             catalogueFile.Dimensions,
             EmbeddingDocument.TemplateVersion,
             new FileInfo(cataloguePath).Length + new FileInfo(queriesPath).Length,
-            stopwatch.Elapsed);
+            stopwatch.Elapsed,
+            calls,
+            promptTokens,
+            callsWithoutUsage);
 
         PrintReport(report, products.Count, queryTexts.Length);
         return report;
@@ -352,6 +420,12 @@ public static class EmbeddingCacheBuilder
         Console.WriteLine($"     queries   : {report.QueryVectors}/{queryCount} vectors → {report.QueriesPath}");
         Console.WriteLine($"     model     : {report.Model} · {report.Dimensions} dims · template {report.DocumentTemplateVersion}");
         Console.WriteLine($"     size      : {report.TotalBytes / 1024.0:F1} KB · took {report.Elapsed.TotalSeconds:F1} s");
+        Console.WriteLine(report.EmbeddingCalls == 0
+            ? "     spend     : not reported by this source (0 calls counted) — NOT the same as free"
+            : $"     spend     : {report.EmbeddingCalls} calls · {report.PromptTokens} prompt tokens"
+              + (report.CallsWithoutUsage == 0
+                    ? " (every response carried usage)"
+                    : $" — LOWER BOUND: {report.CallsWithoutUsage} response(s) carried no usage block"));
 
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine();
@@ -381,6 +455,15 @@ public static class EmbeddingCacheBuilder
 /// <param name="DocumentTemplateVersion">The <see cref="EmbeddingDocument.TemplateVersion"/> in force.</param>
 /// <param name="TotalBytes">Combined size on disk.</param>
 /// <param name="Elapsed">Wall-clock duration, including every embedding call.</param>
+/// <param name="EmbeddingCalls">Embedding calls issued. Zero when the source does not report it.</param>
+/// <param name="PromptTokens">
+/// Prompt tokens billed, summed from the responses' own usage blocks — never estimated. Zero when
+/// the source does not report it, which is NOT the same as free.
+/// </param>
+/// <param name="CallsWithoutUsage">
+/// Calls whose response carried no usage block. Non-zero makes <paramref name="PromptTokens"/> a
+/// lower bound rather than a total.
+/// </param>
 public sealed record EmbeddingCacheBuildReport(
     string CataloguePath,
     int CatalogueVectors,
@@ -390,4 +473,7 @@ public sealed record EmbeddingCacheBuildReport(
     int Dimensions,
     string DocumentTemplateVersion,
     long TotalBytes,
-    TimeSpan Elapsed);
+    TimeSpan Elapsed,
+    int EmbeddingCalls = 0,
+    long PromptTokens = 0,
+    int CallsWithoutUsage = 0);

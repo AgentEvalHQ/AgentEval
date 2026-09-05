@@ -975,6 +975,26 @@ public static class NegativeControls
     /// leave the lexicon edit to be made deliberately, declared, and re-measured. Gating on it
     /// would create exactly the incentive this suite exists to refuse.
     /// </para>
+    /// <para>
+    /// <b>B-6 (2026-09-05) added a SECOND arm, and the row is deliberately still red.</b> Arm A is
+    /// the offline concept path above — the path every demo and every eval actually runs on — and
+    /// it is unchanged at 18 of 56. Arm B is the committed real-vector path
+    /// (<see cref="PrecomputedEmbeddingSource"/> over the two <c>text-embedding-3-small</c> assets,
+    /// no live fallback, no key). B-6's acceptance is arm B reading 0 of 56, and it does. The row's
+    /// verdict is A AND B, so it stays a FINDING: reporting green because a path nothing runs on is
+    /// clean would be the flattering pass this suite exists to refuse.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>What arm B does and does not verify, because the difference is the whole point.</b> A
+    /// real embedding model returns a dense vector for ANY non-empty text, so "is it non-zero?" is
+    /// very nearly a tautology on that path and would be satisfied by a garbage vector. The
+    /// non-vacuous half is what precedes it: the phrase must be PRESENT in the committed asset and
+    /// the asset's model / dimensions / template stamp must all validate, or the source answers
+    /// <c>Unavailable</c> — which is operationally identical to a zero vector, and is counted here
+    /// as dead. Measured before the fix: the asset carried <b>0 of 54</b> distinct phrases, so arm B
+    /// read 56 of 56 dead. That is the state this arm can return to, and it is why the arm is worth
+    /// having at all.
+    /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckAuthoredQueryPhrasesRetrieve()
     {
@@ -1003,27 +1023,88 @@ public static class NegativeControls
         }
 
         int total = InterestMapBuilder.ContextPhrases.Count;
-        bool allRetrievable = dead.Count == 0;
+        bool conceptArmClean = dead.Count == 0;
+
+        // ── Arm B — the committed real-vector path (B-6). No live fallback is passed, so a phrase
+        //    absent from the asset comes back Unavailable rather than quietly costing a live call:
+        //    the arm must measure the ASSET, not the credentials of whoever ran it.
+        var (realDead, realNote) = MeasureRealVectorArm();
+        bool realArmClean = realDead == 0;
+        bool allRetrievable = conceptArmClean && realArmClean;
 
         return new ControlRowSnapshot(
             "AuthoredQueryPhraseRetrievability",
-            "every phrase in InterestMapBuilder.ContextPhrases should embed to a NON-ZERO vector under the "
-          + "offline concept retriever. That phrase is not decoration: it is the query the searching arms "
-          + "issue for the interest. A phrase the lexicon does not know embeds to zero, the dense leg returns "
-          + "nothing, and the arm's low score is then a property of the corpus rather than of the arm — "
-          + "invisible in a coverage number, which is why it is checked here.",
-            $"{dead.Count} of {total} authored phrase(s) embed to the ZERO vector"
+            "every phrase in InterestMapBuilder.ContextPhrases should be ASKABLE on BOTH embedding paths. "
+          + "That phrase is not decoration: it is the query the searching arms issue for the interest. "
+          + "ARM A (offline concept retriever, the path every demo and eval actually runs on): a phrase the "
+          + "24-dimension lexicon does not know embeds to ZERO, the dense leg returns nothing, and the arm's "
+          + "low score is then a property of the corpus rather than of the arm. ARM B (the committed "
+          + "text-embedding-3-small assets, no key, no live fallback): a phrase absent from the asset, or an "
+          + "asset whose model / dimensions / template stamp fail to validate, comes back UNAVAILABLE — "
+          + "operationally the same nothing. A real model cannot return a zero vector, so arm B's zero test "
+          + "alone is near-vacuous; what it actually verifies is asset PRESENCE and stamp validity.",
+            $"ARM A (concept, the live path): {dead.Count} of {total} authored phrase(s) embed to the ZERO vector"
           + (dead.Count == 0 ? "." : $": {string.Join(", ", dead)}.")
           + $" Of those, {deadGold.Count} are latent-GOLD tokens for a scored persona"
           + (deadGold.Count == 0 ? "." : $": {string.Join(", ", deadGold)}.")
+          + $" · ARM B (committed real vectors): {realDead} of {total} dead — {realNote}"
           + (allRetrievable
-                ? " Every arm can at least ASK for every interest the gold rewards."
+                ? " Every arm can at least ASK for every interest the gold rewards, on both paths."
                 : " READ EVERY EVAL 02 ARM NUMBER WITH THIS IN FRONT OF IT: on the interests listed above the "
                 + "dense retrieval leg contributes nothing, so a low coverage cell there is not evidence that "
-                + "the arm failed to reason. ADVISORY — fixing it means choosing a concept mapping per phrase, "
-                + "which moves every coverage cell, so it is reported rather than silently repaired."),
+                + "the arm failed to reason. ADVISORY — fixing ARM A means choosing a concept mapping per phrase, "
+                + "which moves every coverage cell, so it is reported rather than silently repaired. B-6 closed "
+                + "ARM B and deliberately did NOT close ARM A: the committed assets are not what the suite runs "
+                + "on, and a green row here would say they were."),
             allRetrievable,
             Gating: false);
+    }
+
+    /// <summary>
+    /// Arm B of <see cref="CheckAuthoredQueryPhrasesRetrieve"/>: how many authored phrases the
+    /// COMMITTED vector assets cannot answer. Counts an <c>Unavailable</c> (absent from the asset,
+    /// or the whole asset rejected on its stamp) exactly like a zero vector, because the dense leg
+    /// gets the same nothing from both.
+    /// </summary>
+    private static (int Dead, string Note) MeasureRealVectorArm()
+    {
+        PrecomputedEmbeddingSource source;
+        try
+        {
+            // TryLoad, not Load: a stale or missing asset must be REPORTED by this row, not thrown
+            // out of Eval 03 as a crash. liveFallback stays null on purpose — see the call site.
+            source = PrecomputedEmbeddingSource.TryLoad(Catalogue.Default.All, liveFallback: null);
+        }
+        catch (Exception ex)
+        {
+            return (InterestMapBuilder.ContextPhrases.Count, $"the assets could not be read at all ({ex.GetType().Name}).");
+        }
+
+        if (source.IsEmpty)
+        {
+            return (InterestMapBuilder.ContextPhrases.Count,
+                    "NO committed vectors loaded — " +
+                    (source.LoadWarnings.Count > 0 ? source.LoadWarnings[0] : "the assets are absent."));
+        }
+
+        int dead = 0;
+        foreach (var phrase in InterestMapBuilder.ContextPhrases.Values)
+        {
+            var vector = source.EmbedAsync(phrase).AsTask().GetAwaiter().GetResult();
+            if (vector.IsUnavailable()) { dead++; continue; }
+
+            bool zero = true;
+            foreach (float component in vector.Span)
+            {
+                if (Math.Abs(component) > 1e-6f) { zero = false; break; }
+            }
+            if (zero) dead++;
+        }
+
+        return (dead,
+                $"{source.CachedVectorCount} committed '{source.ModelId}' vectors at {source.Dimensions} dims, "
+              + $"{source.FallbackCalls} live call(s) made"
+              + (source.LoadWarnings.Count == 0 ? "." : $"; {source.LoadWarnings.Count} load warning(s)."));
     }
 
     // ══ Control 6 — the METRIC itself. Does latent coverage have room to discriminate? ════
