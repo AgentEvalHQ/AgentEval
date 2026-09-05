@@ -3403,6 +3403,13 @@ visible, not so it can be read.**
 
 ### 23.10 Defects found in Eval 09, declared and NOT repaired
 
+> ✅ **SUPERSEDED 2026-09-06 — four of the five are REPAIRED at `fc90f791`; see §24.3 for the per-row status.**
+> The paragraph below argued for deferring them, and it was right about the risk and wrong about the ordering:
+> what closes the *"repairing a gate and then not exercising it"* objection is not a paid run, it is a
+> **negative control that fails when the repair is removed**. `Eval09RuleAndRemedy` and `GraderSanity` are
+> those controls, and both were watched going red with the defect re-introduced in place. #5 (judged
+> criterion 4) is still open, because it is a rubric-calibration question and a control cannot settle it.
+
 Not repaired because each changes a headline eval's grading and none can be validated without the paid
 re-run §23.2 declined. Repairing a gate and then not exercising it is how a green tick stops meaning
 anything.
@@ -3450,3 +3457,213 @@ sed -n '2746,3135p' "$L"                               # every panel quoted abov
 Nothing in §23 was measured by a new paid run. Every figure is either read from the 2026-09-05 log and
 its own printed panels, re-derived from that log's per-rep lines and checked against the panels it
 must reproduce, or computed in closed form from the token ledger.
+
+---
+
+## §24 — Wave 1: the four defects fixed, and the full suite re-run in both spaces (2026-09-06)
+
+**Commit `41cd09a2`, branch `joslat/digitec-galaxus`, tree clean.** This section records what a
+**free wiring-and-regression run** measured after the four defects §§2, 20.2, 23.10 named were repaired.
+
+**Read the scope before the numbers.** Every eval that needs a chat model ran `--dry-run`. **No agent turn
+was bought, so nothing in §§21–23 is superseded** — a dry run measures the plumbing, never the agent. The only
+live calls anywhere in this run are `text-embedding-3-small` **query** embeddings on the `--real-vectors`
+commands.
+
+### 24.1 The command ledger — 33 commands at HEAD, both spaces
+
+| space | commands | exit 0 | exit 1 |
+|---|---|---|---|
+| concept (the default) | 13 | 12 | **1** — `-- 7`, GATE B, the pre-existing Renzo pin |
+| `--real-vectors` | 13 | 12 | **1** — `-- 7`, GATE B **and GATE C** (24.5) |
+| demos (`-- 1`, `-- 2`, `-- 0`, per-persona `-- 2`) | 7 | 7 | — |
+| **total** | **33** | **31** | **2** |
+
+`--ci --dry-run` exits **0 in both spaces**, all eleven evals. `-- 0`'s termination probe exits 0. Both demos
+exit 0 offline in both spaces. Two further commands were run at `a78d05e5` as a deliberate ablation (24.5) and
+are labelled as such in `EXITCODES.txt`.
+
+Logs: `Docs/runs/2026-09-06_wave1-verify-41cd09a2/`.
+
+**Spend.** Demo 01 on `--real-vectors` is the only command in the suite that meters itself: **4 live query
+calls + 1 space-identity probe, 178 prompt tokens**. Everything else on the real path is **UNMETERED** —
+which is plan item **8.12**, re-confirmed rather than newly found. By §20's measurement of the same sweep
+shape the whole run is well under USD 0.01. **No completion model was called at all.**
+
+### 24.2 The four defects — repaired, and each proven by re-introduction
+
+| # | defect | fix | gating control | shipped tree |
+|---|---|---|---|---|
+| 1 | Eval 02 crashed on the paid path; `--dry-run` took the other branch | `cef95b6c` | `OwnKRereadAtVaryingK` | ✅ green, both spaces |
+| 2 | Eval 09 pairs k-blind and reads an unmade comparison as agreement | `fc90f791` | `Eval09RuleAndRemedy`, `GraderSanity` | ✅ green, both spaces |
+| 3 | Eval 05's judge "returned criteria nobody declared" | `a78d05e5` | `JudgeEchoJoinsToDeclaredRubric` | ✅ green, both spaces |
+| 4 | an interest that names nothing was COVERED by whatever came back | `aae2024d` | `ContentlessRequestIsNotCovered` | ⚠️ gate green; **the tray is not** (24.5) |
+
+Three of the four repairs turned out to be about something other than what the defect report said, and the
+corrections are the load-bearing part:
+
+- **Defect 1 had TWO independent blindnesses.** Besides `Eval02:392`'s `if (!dryRun)` branch,
+  `int reps = dryRun ? 1 : …` meant one repetition, and **one repetition can never produce two budgets** —
+  fixing the branch alone would have left the dry run unable to reach the condition. Both are closed
+  (`DryRunReps = 2`, a stub that alternates 2/3 products, `FromThisRun` on both paths).
+- **Defect 1 also carried a gate-self-examination shape nobody had named.** `OwnKReread` wrote
+  `with { KUniformAcrossReps = true }` onto both cells — and that flag is exactly what `SignTestAtEqualK`
+  reads to decide a pair is comparable. The artifact under test was supplying an input to its own pass/fail.
+  Removed; `CoverageScore.Mean` now computes it.
+- **Defect 3's diagnosis was INVERTED.** The judge did not invent a rubric. All 24 "undeclared" criteria are
+  this eval's own five, verbatim, with the ordinal `src/AgentEval.Core/Core/ChatClientEvaluator.cs:46` prints
+  itself (`$"{i + 1}. {c}"`). A **three-character offset** defeated exact, whitespace-normalised and
+  48-character-prefix matching alike. The judge graded correctly — holistic 82 agent against 0 control on the
+  same cells — and **we discarded its verdicts**. Undeclared criteria were *already* detected and printed; the
+  detector was firing on a false positive and could not say so.
+- **Defect 4's fix changed the SIGNAL, not the threshold**, and the control asserts both thresholds every run:
+  `MinCandidateScore` still `0.012`, pre-calibration dense floor still `0.280`. A second
+  gate-self-examination shape fell out of it: the attribution vocabulary was picking up **our own**
+  `"stated this session: "` label prefix, so a product whose text contained the word *session* would have
+  covered the request. The prefix is stripped before the vocabulary is taken.
+
+### 24.3 §23.10's five Eval 09 defects — four repaired, one open
+
+| # | §23.10 said | now |
+|---|---|---|
+| 1 | pairs through k-blind `SignTest` | ✅ **REPAIRED.** All pairings go through `SignTestAtEqualK`. **`PairedCoverageReport.SignTest` is deleted** — no definition, no caller, repo-wide. `GraderSanity`'s assertion is replaced by a **stronger** one: by reflection, the type must expose **no** pairing method lacking a `CoverageMetric` |
+| 2 | grades with `GradeWithControls`, so `DeclaredK = 0` and `PrecisionAtK` is `NaN` | ✅ **REPAIRED.** Two reports over the same turns, as Eval 02 keeps them: own-`k` for floors / forced choice / cost / telemetry / snapshot, and a declared-`k` cut that is the **only** report any pairing reads. `precision@k` is added as a reported-only row — the pre-registered rule still names recall and was not rewritten after the fact. ⚠️ `GradeWithControls` is **not** deletable and was correctly kept: it is the own-`k` grader with two legitimate callers (`Eval02:799`, Eval 09's own-`k` report) |
+| 3 | the remedy prescribes a timeout for a run with 0 cancelled calls | ✅ **REPAIRED.** The remedy is now derived from the run's own ledger **and prints the counts it derived it from**: at 120 / 120 / 0 it names unparseable envelopes and refuses to prescribe the timeout; at 7 / 1 / 6 it still offers it. Clause 5's own text names both causes and sends the reader to the ledger |
+| 4 | the snapshot's `Label` reads "Eval 02 — Latent-Interest Coverage" | ✅ **REPAIRED.** `ToSnapshot`'s `label` is now a **required** parameter with no default, so the class of defect cannot recur silently; Eval 09 also saves its declared-`k` cells beside its own-`k` ones |
+| 5 | judged criterion 4 — both live arms 0.000 where an empty answer scores 1.000 | ⬜ **STILL OPEN.** It is a rubric-calibration question, not a wiring one, and it needs a judged run to settle |
+
+**And one §23.10 did not have.** A new verdict `NotComparableAtEqualK` is decided **before any p-value is
+read**. An exact sign test over zero pairs returns p = 1.0000 *by arithmetic*; the old rule read that as
+`NoDifferenceDetected` — the arms agreeing — which is the flattering misreading of a comparison that was never
+made. The verdict panel a reader meets first said the same thing one box higher (`paired result W/L/T 0/0/0`,
+`exact two-sided p 1.0000`, *"in neither direction, 0.076 against 0.235"*, over **11 refused pairs**); one
+rendering path now serves every branch and refuses to render a refusal as a tie. **GATE 3 also failed closed**
+— `Losses <= Wins` is trivially true at 0/0, so it used to pass on a comparison that was never made; it was
+safe only while the pairing was k-blind, because a k-blind pairing always produces pairs.
+
+### 24.4 Numbers that moved — every one of them, worse included
+
+| what | before | after | direction |
+|---|---|---|---|
+| `-- 3` control panel: rows | 16 | **20** | more |
+| `-- 3` control panel: **gating** rows, all caught | 12 | **16** | more |
+| `-- 3` control panel: advisory rows | 4 (2 ok, 2 findings) | 4 (2 ok, 2 findings) | unchanged |
+| Eval 09 primary pairing, next paid run | n = 12, W/L/T 4/6/2, p = 0.7539 | **n ≤ 8**, and 0 comparable pairs on the persisted cells | **WORSE reach** — and unearned before |
+| Eval 09 contentless-floor comparison | `W/L/T 12/0/0, p = 0.0005` | **the p-value is withdrawn**; the count and its floor remain | **WORSE reach**, and the finding survives |
+| Eval 07 `USR-LF-04` on `--real-vectors`: items presented | 5 (1,674-char answer) | **2** | better, not fixed (24.5) |
+| Eval 07 `USR-LF-04` on `--real-vectors`: stop reason | `coverage-sufficient`, approved | **`gaps-unresolvable`, degraded** | correct |
+| Demo 02 `USR-LF-04 --real-vectors` | `5 → 5 · 2 rounds · CoverageSufficient · 6 discovered` | **`2 → 2 · 1 round · GapsUnresolvable · 2 discovered`** | better, not fixed |
+| `-- 2 --dry-run` per-cell coverage numbers | stub always presented 2 | stub alternates **2 / 3** | changed **by design** — the varying-`k` condition has to exist for the new control to mean anything. No published number is affected; every one of them was a stub |
+| compiler warning **instances** (two sample projects + `src/` deps, non-incremental) | 34 at `29775483` | **36** | **WORSE by 2** — `NegativeControls.cs` CS0162 1 → 2 instances. Warning **sites** are an identical set of 12 |
+| `tests/AgentEval.Tests` net10 | 9,630 / 0 / 2 of 9,632 | **identical** | unchanged, and *derived*: the wave touched no file under `src/` or `tests/` |
+
+**Numbers that did NOT move, proven rather than assumed:**
+
+- **The concept-space `eval07_topology.json` is byte-identical (ignoring `RunAt`) between `a78d05e5` — the
+  tree with defect 4 still in it — and `41cd09a2`.** That is an ablation, not a comparison of two post-fix
+  runs.
+- Demo 02 for Luca in the concept space: `0 in → 0 out · 1 round · GapsUnresolvable`, unchanged.
+- Every gate verdict in Evals 01, 02b, 02c, 04, 06, 08, in both spaces.
+- `-- 3`'s verdict list is **byte-identical between the two spaces** (diffed), which is what a control panel
+  should be: a measurement of the instrument, not of the embedding.
+
+### 24.5 🔴 Eval 07 GATE C fails on `--real-vectors`, before AND after — the ablation
+
+Defect 4's control was declared **space-independent**: it proves the mechanism and explicitly does **not**
+prove that a `--real-vectors` run abstains end to end. That verification is this section, and the answer is
+**the gate is fixed and the tray is not.**
+
+Method: `git checkout a78d05e5 -- samples/`, build, run, `git checkout HEAD -- samples/`, rebuild.
+
+| `USR-LF-04`, `--real-vectors` | `a78d05e5` (pre-fix) | `41cd09a2` (post-fix) |
+|---|---|---|
+| Eval 07 termination row | `coverage-sufficient · approved = True · partial = False · 5 item(s)` | `gaps-unresolvable · approved = False · partial = True · **2 item(s)**` |
+| `answer channel is correctly EMPTY` | ❌ — 1,674 char(s), 5 items | ❌ — 2 items |
+| GATE A / GATE B / GATE C | ✅ / ❌ / **❌** | ✅ / ❌ / **❌** |
+
+**GATE C was already failing on the real path.** The wave did not cause it and did not close it. What the
+fix reached is the *loop*: the coverage gate refuses the contentless interest, no second query is written, the
+stop reason is right, and the customer ledger now says out loud *"2 candidate(s) credited, 0 of them carrying
+anything this interest names"*. What it does not reach is the **presentation path**: the two candidates
+retrieved in round 1 before the gate ran still flow through the Ranker to the Presenter, and
+`PresentsAnswerText` is authored from the customer as `false`, so 2 ≠ 0.
+
+⚠️ **The suite had never printed a real-space Eval 07 verdict before 2026-09-06.** `SUITE_SUMMARY` §13's
+"GATE C ✅" is a concept-space statement and remains true there.
+
+### 24.6 The wider attribution finding, measured on the shipped default
+
+Defect 4's fix makes the question askable of every interest, and printing the answer exposes a bigger version
+of the same defect than the "real space only" scoping suggested. Concept space, `-- 2 --offline`, final
+coverage ledger:
+
+| persona | interests | COVERED | of those, **0 attributable** |
+|---|---|---|---|
+| `USR-NB-01` | 5 | 5 | **2** — `I-3 Headlamps` 0 of 6 credited, `I-4 Mirrorless full-frame` 0 of 6 |
+| `USR-MI-02` | 6 | 5 | **1** — `I-1 "stated this session: Anything new I might like"` 0 of 4 |
+| `USR-SK-03` | 6 | 6 | 0 |
+| `USR-LF-04` | 1 | 0 — refused, vocabulary empty ✅ | — |
+| **total** | **18** | **16** | **3 of 16** |
+
+Nadia owns the only headlamp in the catalogue, so it is excluded from retrieval; the six candidates credited
+to `Headlamps` are hiking shoes, trekking poles, a watch, a chest pack, a rear light and a running vest.
+**The interest is reported COVERED.**
+
+⚠️ **Not gated, and the reason is a measurement.** Gating on the attributable count was built and run: it
+**flips four of Eval 07's five personas and removes the corpus's only APPROVED exit, so GATE C fails.** That
+changes what the shipped demo *answers*, not just what a gate says, and it is a design decision. Filed as plan
+item **8.21**.
+
+### 24.7 Three findings this run produced that were not on any list
+
+1. 🔴 **`--ci --dry-run` writes two snapshots and prints "no snapshot was written".** Evals 03 and 04 take no
+   `dryRun` parameter — the CI chain calls `NegativeControls.RunAsync()` and
+   `Eval04_ReviewInjectionContainment.RunAsync()` with no argument — so they run for real inside a dry run and
+   persist. Measured: `eval03_controls.20260905T232614Z.json` and `eval04_injection.20260905T232614Z.json`
+   were archived at 01:26:14, inside `00-ci-dryrun-concept` (01:26:12–01:26:19). Same shape on the real-space
+   chain. **The defect is the claim, not the write** — those two evals are real measurements and should
+   persist. It also falsifies `RUN_PROTOCOL.md`'s *"A dry run must NOT write a snapshot"* as written. Plan
+   item **8.19**.
+2. ⚠️ **Evals 05 and 06 persist nothing and say nothing about it.** Eval 08 also persists nothing, but states
+   its reason in code (`Eval08:316-319`). Plan item **8.20**.
+3. ⚠️ **The new control added one compile-time-unreachable branch** — `if (DiscoveryState.MinCandidateScore
+   != 0.012)` against a `const` (CS0162, `NegativeControls.cs:2445`). It is not dead in the way that matters
+   (change the const and it becomes reachable and fires), but it is the one warning instance the wave added.
+
+### 24.8 Persistence — verified, with the ablation's residue named
+
+Current pointers are all **HEAD, concept-space** records: `eval03_controls.json` (01:39:51, 22,992 B),
+`eval04_injection.json` (01:39:52, 4,664 B), `eval07_topology.json` (01:39:25, 12,908 B). The live suite's
+records — `eval01_integrity`, `eval02_coverage_ab`, `eval02b_stated_need`, `eval02c_held_out`,
+`eval09_hypothesis_ab` and the three probe keys — are **untouched**, because every eval that owns them ran
+`--dry-run`.
+
+⚠️ **Two archives in the store are PRE-FIX and are not HEAD records**, both produced by 24.5's ablation:
+`eval07_topology.20260905T233418Z.json` (12,965 B — `a78d05e5`, `--real-vectors`, Luca at 5 items) and
+`eval07_topology.20260905T233503Z.json` (12,907 B — `a78d05e5`, concept). They are kept because they are the
+evidence. `eval07_topology.20260905T233156Z.json` (12,921 B) is the **post-fix** real-vector record.
+
+**Persists:** 01, 02, 02b, 02c, 03, 04, 07, 09. **Does not:** 05, 06, 08.
+
+### 24.9 How to re-derive §24
+
+```
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet build AgentEval.sln                                  # 0 errors
+dotnet test tests/AgentEval.Tests -f net10.0                # 9630/0/2 of 9632
+dotnet run --project $E -- 3                                # 20 rows: 16 gating caught, 4 advisory. exit 0
+dotnet run --project $E -- --ci --dry-run                   # exit 0, 11 evals
+dotnet run --project $E -- --ci --dry-run --real-vectors    # exit 0, 11 evals
+dotnet run --project $E -- 2 --dry-run | grep 'CONDITION IT DIED OF'
+dotnet run --project $E -- 9 --dry-run | grep 'NOT COMPARABLE'
+dotnet run --project $E -- 5 --dry-run | grep 'BOTH surface forms'
+dotnet run --project $E -- 7 ; dotnet run --project $E -- 7 --real-vectors   # exit 1 / exit 1
+dotnet run --project $A -- 2 --user USR-LF-04 --offline --real-vectors        # 2 -> 2, GapsUnresolvable
+# the ablation (24.5) — reverts the tree, so run it deliberately:
+git checkout a78d05e5 -- samples/ && dotnet build $E && dotnet run --project $E -- 7 --real-vectors
+git checkout HEAD -- samples/ && dotnet build AgentEval.sln
+```
+
+**Nothing in §24 was measured by a paid agent run.** Every figure is an exit code, a printed control row, a
+file on disk, a build output, or an ablation of this repository against its own earlier commit.

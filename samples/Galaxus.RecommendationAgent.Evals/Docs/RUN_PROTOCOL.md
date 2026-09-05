@@ -30,11 +30,19 @@ Every one of these passed a dry run and was still broken:
 | Eval 01, all plumbing green | `wahl` — German for both *election* and *choice* — tripped a zero-tolerance GDPR detector on de-language personas. 3 of 6 failures. **Structurally invisible offline**: the deterministic arm composes its reasons in English. |
 | Demo 2, exit 0 | 6 of 7 model calls timed out at 60 s. The printed verdict "the loop bought nothing" came from **timeouts, not the reviewer**. |
 | The ranker, offline | Rule 6 tells the model to cite `grounding_attribute_key` from a list whose tokens the resolver **rejects** — the agent punished for obeying its instructions. Visible only in a live trace. |
-| Eval 02, `--dry-run` exit 0 | **Crashes on the paid path.** The dry run cannot see the branch that crashes, so two gates and the cost panel never printed. |
-| Eval 05, judged cells | The judge returned **criteria nobody declared**, on 3 of 10 cells. |
+| Eval 02, `--dry-run` exit 0 | **Crashes on the paid path.** The dry run cannot see the branch that crashes, so two gates and the cost panel never printed. ✅ *Fixed `cef95b6c` — the dry run now runs that branch AND varies the stub's `k`, and says which.* |
+| Eval 05, judged cells | The judge returned **criteria nobody declared**, on 3 of 10 cells. 🔴 *Corrected `a78d05e5`: it did not. It echoed OUR rubric with the ordinal `ChatClientEvaluator.cs:46` prints itself, and our matcher failed to recognise our own text. Same lesson, opposite subject — the live model behaved more faithfully than the stub, which stripped the ordinal.* |
 
 The pattern: a dry run exercises the code the stub reaches. The defects live in the code only a real model
 reaches — different text, different language, different failure modes, different timing.
+
+**And one refinement the 2026-09-06 wave added, which is the harder half.** Two of those rows were reachable
+from stage 1 all along; what stopped them was that the **stub behaved better than any real model would**. The
+Eval 05 stub echoed each criterion with the ordinal *stripped*; the Eval 02 stub presented a constant `k` and
+ran one repetition. A stub that is more convenient than reality is not a conservative test, it is a blind one.
+Both stubs now exercise the awkward form — Eval 05 alternates ordinal / bare and asserts both were seen, Eval
+02 alternates 2 / 3 products across two reps — and where a dry run genuinely **cannot** see its subject it now
+prints a check that says so rather than a green tick beside it.
 
 ## Persistence
 
@@ -42,6 +50,17 @@ Every eval run that produces a verdict must persist a snapshot to
 `.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/` via `EvalResultStore`.
 **Verify the file landed** — list it with its timestamp. A run whose result was not written did not happen,
 as far as the next person is concerned. A dry run must NOT write a snapshot (it has no result to record).
+
+> ⚠️ **That last sentence is FALSE for `--ci --dry-run`, measured 2026-09-06** (`MEASUREMENT_STATUS` §24.7).
+> Evals 03 and 04 take no `dryRun` parameter — the CI chain calls them with no argument — so they run for
+> real inside a dry run and **do** persist, while the chain's closing banner prints *"no model was called and
+> no snapshot was written"*. The **writes are correct** (both are real, model-free measurements); the
+> **banner and the sentence above are wrong**. Plan item **8.19**. Until it is fixed: after a
+> `--ci --dry-run`, expect `eval03_controls.json` and `eval04_injection.json` to have moved, and nothing else.
+>
+> **Which evals persist at all**, verified 2026-09-06: 01, 02, 02b, 02c, 03, 04, 07, 09 do. **05, 06 and 08
+> do not.** Eval 08's silence is deliberate and stated in code (`Eval08:316-319`); 05's and 06's is neither
+> stated nor intended (plan item **8.20**).
 
 ## Cost discipline
 
