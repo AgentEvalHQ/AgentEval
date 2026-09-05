@@ -163,21 +163,21 @@ public static class Config
 
     /// <summary>
     /// Prints an "Azure target" header block to the console showing the
-    /// endpoint, chat deployment, embedding deployment, and a redacted key
-    /// fingerprint. Useful at the top of demos and evals so the operator sees
+    /// chat deployment and embedding deployment. Useful at the top of demos and evals so the operator sees
     /// at a glance which model (and which Foundry / OpenAI resource) is about
     /// to be charged.
     /// </summary>
     /// <remarks>
-    /// The key is never printed in full — only its length and a
-    /// first-4-…-last-4 fingerprint. That's enough to confirm "yes, this
-    /// is the key I expected" without leaking the secret to a screen
-    /// recording, a posted screenshot, or a shoulder-surfer.
+    /// ⚠ The API key is NOT printed at all — not in full, not as a fingerprint, not as a hash. An
+    /// earlier version printed <c>first4…last4</c>, which is eight real characters of the secret, and
+    /// this banner runs at the top of every demo and eval, so those characters reached every
+    /// <c>--log</c> file, terminal scrollback and screenshot of a sample in a public repository. The
+    /// endpoint is reported as set/unset rather than by URL, because the URL names the Azure resource.
+    /// Neither is needed to interpret a result; the deployment name is, and that is what remains.
     /// </remarks>
     public static void PrintAzureTarget()
     {
         var endpoint  = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var key       = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var envDep    = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
         var envEmbDep = Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_DEPLOYMENT");
         var resolved  = Model;
@@ -196,33 +196,12 @@ public static class Config
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─── Azure target ────────────────────────────────────────────────────");
         Console.ResetColor();
-        Console.WriteLine($"  Endpoint   : {endpoint ?? "(unset)"}");
+        Console.WriteLine($"  Endpoint   : {(string.IsNullOrEmpty(endpoint) ? "(unset)" : "(set)")}");
         Console.WriteLine($"  Model      : {resolved}  [source: {source}]");
         Console.WriteLine($"  Embeddings : {resolvedE}  [source: {embSource}]");
-        Console.WriteLine($"  API key    : {FingerprintKey(key)}");
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────");
         Console.ResetColor();
     }
 
-    /// <summary>
-    /// A fingerprint that identifies the key WITHOUT reproducing any of it: the first eight hex
-    /// characters of its SHA-256.
-    /// </summary>
-    /// <remarks>
-    /// ⚠ This deliberately does NOT print characters of the key itself. The previous version showed
-    /// <c>first4…last4</c>, which is eight real characters of the secret, and
-    /// <see cref="PrintAzureTarget"/> is called at the top of every demo and eval — so those eight
-    /// characters landed in every <c>--log</c> file, every terminal scrollback and every screenshot,
-    /// in a public repository's sample. A hash prefix answers the only question the banner exists to
-    /// answer — "is this the key I expected?" — and answers it just as well, because two different
-    /// keys give two different prefixes. It simply cannot be run backwards.
-    /// </remarks>
-    private static string FingerprintKey(string? key)
-    {
-        if (string.IsNullOrEmpty(key)) return "(unset)";
-
-        var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key));
-        return $"sha256:{Convert.ToHexString(digest)[..8].ToLowerInvariant()} ({key.Length} chars)";
-    }
 }
