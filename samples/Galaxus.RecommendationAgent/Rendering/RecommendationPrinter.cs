@@ -57,16 +57,23 @@ public static class RecommendationPrinter
     /// <param name="outcome">The guardrail pipeline's result: cleaned answer, ledger, verified figures.</param>
     /// <param name="toolCallsUsed">Tool calls spent this turn, or <see cref="OmitToolCalls"/>.</param>
     /// <param name="toolCallCap">The tool-call cap, or <see cref="OmitToolCalls"/>.</param>
+    /// <param name="gateRanBeforeSpend">
+    /// True only when the caller ran <c>GuardrailPipeline.ShouldAbstain</c> BEFORE constructing the
+    /// agent (§8.1 B-1). The abstention panel prints the "no tokens were spent" sentence only under
+    /// this flag; see <see cref="PrintAbstention"/>.
+    /// </param>
     public static void PrintAnswer(
         User user,
         InterestMap map,
         IReadOnlyList<ClassifiedPurchase> classified,
         GuardrailOutcome outcome,
         int toolCallsUsed = OmitToolCalls,
-        int toolCallCap = OmitToolCalls)
+        int toolCallCap = OmitToolCalls,
+        bool gateRanBeforeSpend = false)
     {
         ArgumentNullException.ThrowIfNull(outcome);
-        PrintAnswer(user, map, classified, outcome.Cleaned, outcome.VerifiedPrices, outcome.Ledger, toolCallsUsed, toolCallCap);
+        PrintAnswer(user, map, classified, outcome.Cleaned, outcome.VerifiedPrices, outcome.Ledger,
+                    toolCallsUsed, toolCallCap, gateRanBeforeSpend);
     }
 
     /// <summary>
@@ -81,6 +88,10 @@ public static class RecommendationPrinter
     /// <param name="ledger">The guardrail ledger accumulated by the pipeline.</param>
     /// <param name="toolCallsUsed">Tool calls spent this turn, or <see cref="OmitToolCalls"/>.</param>
     /// <param name="toolCallCap">The tool-call cap, or <see cref="OmitToolCalls"/>.</param>
+    /// <param name="gateRanBeforeSpend">
+    /// True only when the caller ran <c>GuardrailPipeline.ShouldAbstain</c> BEFORE constructing the
+    /// agent (§8.1 B-1). Gates the abstention panel's "no tokens were spent" sentence.
+    /// </param>
     public static void PrintAnswer(
         User user,
         InterestMap map,
@@ -89,7 +100,8 @@ public static class RecommendationPrinter
         IReadOnlyDictionary<string, PriceStockSnapshot> verified,
         GuardrailLedger ledger,
         int toolCallsUsed = OmitToolCalls,
-        int toolCallCap = OmitToolCalls)
+        int toolCallCap = OmitToolCalls,
+        bool gateRanBeforeSpend = false)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(map);
@@ -101,7 +113,7 @@ public static class RecommendationPrinter
         PrintCustomerHeader(user);
         PrintInterestMap(map, classified);
 
-        if (set.Abstained) PrintAbstention(set);
+        if (set.Abstained) PrintAbstention(set, gateRanBeforeSpend);
         else PrintRecommendations(set, verified);
 
         PrintReplenishment(set);
@@ -297,7 +309,19 @@ public static class RecommendationPrinter
     /// questions asked instead of a guess.
     /// </summary>
     /// <param name="set">The abstaining set.</param>
-    public static void PrintAbstention(RecommendationSet set)
+    /// <param name="gateRanBeforeSpend">
+    /// True only when the caller decided to abstain BEFORE constructing the agent.
+    /// </param>
+    /// <remarks>
+    /// ⚠ <b>The claim on the last line is gated on a flag, and it has to be (§8.1 B-1).</b> This
+    /// panel printed "The gate is structural and ran BEFORE any model spend" unconditionally, on
+    /// every abstention, while the only caller in the codebase ran the gate AFTER the model had
+    /// answered. The sentence was false on every live thin-signal run and the customer read it
+    /// anyway. The flag is now supplied by the caller that actually did the short-circuiting, so
+    /// the interface is structurally unable to make the claim on a turn where it is not true — the
+    /// same discipline as the price line, which prints a figure only from a snapshot.
+    /// </remarks>
+    public static void PrintAbstention(RecommendationSet set, bool gateRanBeforeSpend = false)
     {
         ArgumentNullException.ThrowIfNull(set);
 
@@ -311,10 +335,18 @@ public static class RecommendationPrinter
             Console.WriteLine($"{Indent}?  {Wrap(question)}");
         Console.ResetColor();
 
+        Console.ForegroundColor = gateRanBeforeSpend ? ConsoleColor.DarkGray : ConsoleColor.Red;
+        Console.WriteLine(gateRanBeforeSpend
+            ? $"{Indent}   The gate is structural and ran BEFORE any model spend: no search was made and no prompt"
+            : $"{Indent}   ⚠ This gate ran AFTER the answer was assembled, so the model HAD already run and the spend");
+        Console.WriteLine(gateRanBeforeSpend
+            ? $"{Indent}   token was sent on this turn."
+            : $"{Indent}   is already gone. Do not read this panel as evidence that the pre-spend gate works.");
+        Console.ResetColor();
+
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"{Indent}   The gate is structural and ran BEFORE any model spend. An abstention is not automatically");
-        Console.WriteLine($"{Indent}   a pass: on a case that HAD a right answer it must be scored as a miss, or saying nothing");
-        Console.WriteLine($"{Indent}   becomes a way to score well.");
+        Console.WriteLine($"{Indent}   An abstention is not automatically a pass: on a case that HAD a right answer it must be");
+        Console.WriteLine($"{Indent}   scored as a miss, or saying nothing becomes a way to score well.");
         Console.ResetColor();
         Console.WriteLine();
     }

@@ -445,52 +445,6 @@ public sealed class Catalogue
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
-    //  Concepts — the offline retrieval lane's product-side vectors
-    // ══════════════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// The fixed, ORDERED concept space. Index in this list is the vector index, so the
-    /// order is part of the contract. The retrieval lane's query-side lexicon must be
-    /// authored against these names.
-    /// </summary>
-    public IReadOnlyList<string> ConceptDimensions => CatalogueSeed.ConceptDimensions;
-
-    /// <summary>
-    /// The concept weights for one SKU, or an empty map for an unknown id. Absent
-    /// dimensions are zero.
-    /// </summary>
-    /// <param name="sku">A product id.</param>
-    public IReadOnlyDictionary<string, double> ConceptsFor(string? sku) =>
-        sku is not null && CatalogueSeed.ConceptWeights.TryGetValue(sku, out var weights) ? weights : EmptyConcepts;
-
-    /// <summary>
-    /// The concept weights for one SKU as a dense vector over <see cref="ConceptDimensions"/>,
-    /// L2-normalised so a dot product is a cosine. Returns a zero vector for an unknown id.
-    /// </summary>
-    /// <param name="sku">A product id.</param>
-    public float[] ConceptVectorFor(string? sku)
-    {
-        var dims    = ConceptDimensions;
-        var weights = ConceptsFor(sku);
-        var vector  = new float[dims.Count];
-
-        double sumSquares = 0.0;
-        for (int i = 0; i < dims.Count; i++)
-        {
-            double w = weights.TryGetValue(dims[i], out var value) ? value : 0.0;
-            vector[i] = (float)w;
-            sumSquares += w * w;
-        }
-
-        if (sumSquares > 0.0)
-        {
-            float norm = (float)Math.Sqrt(sumSquares);
-            for (int i = 0; i < vector.Length; i++) vector[i] /= norm;
-        }
-        return vector;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════════════
     //  Integrity
     // ══════════════════════════════════════════════════════════════════════════════════
 
@@ -622,26 +576,6 @@ public sealed class Catalogue
                 throw Broken($"'{product.Id}' declares a replenishment cadence but is not a consumable.");
         }
 
-        // 11 — concept rows: one per product, every name a real dimension, weights in [0,1].
-        var dimensions = new HashSet<string>(ConceptDimensions, StringComparer.Ordinal);
-        foreach (var product in All)
-        {
-            var weights = ConceptsFor(product.Id);
-            if (weights.Count == 0)
-                throw Broken($"'{product.Id}' has no concept weights; the offline retrieval path cannot embed it.");
-
-            foreach (var (concept, weight) in weights)
-            {
-                if (!dimensions.Contains(concept))
-                    throw Broken($"'{product.Id}' names concept '{concept}', which is not in ConceptDimensions.");
-                if (weight is < 0.0 or > 1.0)
-                    throw Broken($"'{product.Id}' gives concept '{concept}' weight {weight}; weights are in [0, 1].");
-            }
-        }
-        foreach (var sku in CatalogueSeed.ConceptWeights.Keys)
-            if (!_bySku.ContainsKey(sku))
-                throw Broken($"concept weights exist for unknown SKU '{sku}'.");
-
         // 12 — reviews resolve to products.
         foreach (var review in AllReviews)
             if (!_bySku.ContainsKey(review.ProductId))
@@ -700,7 +634,6 @@ public sealed class Catalogue
     // ── Helpers ──────────────────────────────────────────────────────────────────────
 
     private static readonly IReadOnlySet<string> EmptyTokens = new HashSet<string>(StringComparer.Ordinal);
-    private static readonly IReadOnlyDictionary<string, double> EmptyConcepts = new Dictionary<string, double>(StringComparer.Ordinal);
 
     private static ReviewDigest ReviewDigest(string sku) => new(sku, [], [], 0, 0.0);
 

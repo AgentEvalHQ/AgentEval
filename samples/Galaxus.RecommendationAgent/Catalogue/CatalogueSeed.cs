@@ -23,12 +23,25 @@ namespace Galaxus.RecommendationAgent.Catalog;
 /// </para>
 /// <para>
 /// <b>The cross-category bridge is engineered, not emergent (§B.2).</b> Every product
-/// carries <c>context:</c> / <c>trip:</c> / <c>weight:</c> / <c>skill:</c> tags that compose
-/// into the embedding document's <c>Use:</c> line, and a <see cref="ConceptWeights"/> row
-/// over the fixed <see cref="ConceptDimensions"/> list. A 38 L trekking pack and a 1.13 kg
-/// carbon travel tripod are near neighbours because both say <i>multi-day, on foot, carried
-/// weight is the binding constraint</i> — and neither says the other's category noun. Say
-/// that out loud in the room; hand-waving it is the failure mode.
+/// carries <c>context:</c> / <c>trip:</c> / <c>weight:</c> / <c>skill:</c> / <c>mode:</c> tags
+/// that compose into the embedding document's <c>Use:</c> line, and that line is the ONLY
+/// product-side input to the offline vector — <c>ConceptEmbeddingSource</c> projects the whole
+/// document through its authored 24-concept lexicon. A 38 L trekking pack and a 1.13 kg carbon
+/// travel tripod are near neighbours because both say <i>multi-day, on foot, carried weight is
+/// the binding constraint</i> — and neither says the other's category noun. Say that out loud
+/// in the room; hand-waving it is the failure mode.
+/// </para>
+/// <para>
+/// <b>B-14(b) — there used to be a second concept space here and it never ran.</b> This file
+/// carried a hand-authored 26-dimension <c>ConceptDimensions</c> list and 99 <c>ConceptWeights</c>
+/// rows, validated at load and read by nothing outside <c>Catalogue.cs</c>, while the retriever
+/// ran on <c>ConceptEmbeddingSource</c>'s DIFFERENT 24-dimension lexicon. Only one of the two
+/// could ever answer a query: a retrieval space needs a query-side projector as well as a
+/// product-side one, and the 26-dimension table had no lexicon mapping words onto its
+/// dimensions — it could embed products and nothing else. It has been deleted, and the
+/// <c>mode:</c> tag now carries the on-foot / on-bike distinction its
+/// <c>on-foot-navigation</c> and <c>cycling-endurance</c> dimensions were authored for, in the
+/// space that runs.
 /// </para>
 /// <para>
 /// <b>Compile-time contracts this file must keep.</b> Every one of them is asserted at
@@ -71,14 +84,6 @@ public static class CatalogueSeed
     {
         var map = new Dictionary<string, string>(pairs.Length, StringComparer.Ordinal);
         foreach (var (k, v) in pairs) map[k] = v;
-        return map;
-    }
-
-    /// <summary>Builds a concept row. Every key is validated against <see cref="ConceptDimensions"/> at load.</summary>
-    private static IReadOnlyDictionary<string, double> C(params (string Concept, double Weight)[] weights)
-    {
-        var map = new Dictionary<string, double>(weights.Length, StringComparer.Ordinal);
-        foreach (var (c, w) in weights) map[c] = w;
         return map;
     }
 
@@ -220,15 +225,29 @@ public static class CatalogueSeed
             Id = "GLX-1010", Gtin = "7610100010101",
             Name = "Rollei Astroklar variable ND and CPL, 82 mm", Brand = "Rollei",
             CategoryPath = ["Photography", "Filters", "Variable ND"],
-            PriceChf = 219.00m,
+            PriceChf = 175.00m,
             Specs = S(("Filter thread", "82 mm"), ("Density", "ND2 to ND32 (1 to 5 stops), continuously variable"),
                       ("Coating", "16-layer multi-coating"), ("Material", "Gorilla glass, brass frame")),
             Description = "Continuously variable density with a polariser stacked in one frame. Convenient for video, but " +
                           "the maximum five stops is short of what daylight long exposures on water need.",
             Tags = ["context:long-exposure", "context:golden-hour", "trip:day", "weight:packable", "skill:enthusiast", "context:street-walkaround", "context:long-exposure-water", "context:blue-hour"],
             RatingAverage = 0.0, RatingCount = 0, HelpfulVoteTotal = 0,
-            StockUnits = 5, AvailableMarkets = Dach, Sustainability = Plain, ReleaseYear = 2026,
+            StockUnits = 5, AvailableMarkets = Dach, Sustainability = Repairable, ReleaseYear = 2026,
             MarketplaceSeller = "Optikhaus Luzern",
+            // B-20 — the ONE second-hand listing. Product.IsSecondHand was documented
+            // ("refurbished / second-hand listings"), surfaced by GetProductDetails, and true of
+            // nothing: a field with no carrier is a mechanism with no behaviour, the same defect
+            // class as B-14. It is planted here rather than as a hundredth SKU on purpose. The
+            // 99 is load-bearing arithmetic — Eval 01's chance floors are hand-derived as
+            // C(98,5)/C(99,5) and friends across eight cases in a file this lane does not own —
+            // so adding a product would have silently falsified every one of them; and on this
+            // model a used item can only BE a product row, because there is no offer-versus-
+            // product distinction (design §B.1, Q7). Reachability is MEASURED, not asserted:
+            // GLX-1010 is returned by the offline retriever for Nadia's "Mirrorless full-frame"
+            // signal and presented in her secondary tray, so the flag is on a SKU a demo run
+            // actually reaches. Price drops 219 -> 175 for a refurbished unit; nothing else
+            // moves, because price is in neither the embedding document nor the lexical index.
+            IsSecondHand = true,
         },
         new()
         {
@@ -276,7 +295,7 @@ public static class CatalogueSeed
                       ("Rain cover", "Integrated in the base pocket"), ("Weight", "1.66 kg")),
             Description = "Thirty-eight litres is the size that carries two to three nights of kit on foot. Load transfers " +
                           "onto the hips, which is what makes a heavy day sustainable; every gram added is carried all day.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:carried", "skill:enthusiast", "compat:hydration-bladder", "compat:backpack-strap", "context:hut-to-hut"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:carried", "skill:enthusiast", "compat:hydration-bladder", "compat:backpack-strap", "context:hut-to-hut", "mode:on-foot"],
             RatingAverage = 4.6, RatingCount = 274, HelpfulVoteTotal = 588,
             StockUnits = 11, AvailableMarkets = Eu, Sustainability = Bluesign, ReleaseYear = 2022,
         },
@@ -290,7 +309,7 @@ public static class CatalogueSeed
                       ("Burn time", "7 h at 100 lumens"), ("Weight", "75 g")),
             Description = "Rechargeable headlamp with a AAA fallback, which is the combination that matters when a walk-in " +
                           "starts two hours before sunrise and there is no socket for three days.",
-            Tags = ["context:dawn-start", "context:golden-hour", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd", "context:first-light", "context:off-grid-power", "context:dark-commute", "context:steep-ascents"],
+            Tags = ["context:dawn-start", "context:golden-hour", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd", "context:first-light", "context:off-grid-power", "context:dark-commute", "context:steep-ascents", "mode:on-foot"],
             RatingAverage = 4.7, RatingCount = 389, HelpfulVoteTotal = 812,
             StockUnits = 26, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2021,
         },
@@ -304,7 +323,7 @@ public static class CatalogueSeed
                       ("Fit", "Slim"), ("Weight", "218 g")),
             Description = "Two-hundred-weight merino long sleeve. Holds warmth when damp and resists odour over consecutive " +
                           "days, which is why it is worn rather than carried on a multi-day walk in shoulder season.",
-            Tags = ["context:dawn-start", "context:cold-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut"],
+            Tags = ["context:dawn-start", "context:cold-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "mode:on-foot"],
             RatingAverage = 4.5, RatingCount = 198, HelpfulVoteTotal = 402,
             StockUnits = 0, AvailableMarkets = Eu, Sustainability = Bluesign, ReleaseYear = 2020,
         },
@@ -318,7 +337,7 @@ public static class CatalogueSeed
                       ("Adjustment", "Fixed length, three-section Z-fold"), ("Weight", "290 g per pair")),
             Description = "Fixed-length folding poles that collapse to 37 cm and stow inside a pack rather than on it. " +
                           "Fixed length saves the weight of a locking mechanism; the size has to be chosen correctly.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:steep-ascents", "context:effort-tracking"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:steep-ascents", "context:effort-tracking", "mode:on-foot"],
             RatingAverage = 4.5, RatingCount = 121, HelpfulVoteTotal = 264,
             StockUnits = 16, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2021,
         },
@@ -332,7 +351,7 @@ public static class CatalogueSeed
                       ("Flow rate", "2 litres per minute"), ("Weight", "63 g")),
             Description = "Collapsible soft flask with an integrated hollow-fibre filter. Sixty-three grams removes the need " +
                           "to carry a day's water uphill, which is the single largest weight saving available on a walk-in.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:steep-ascents", "context:self-supported"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:steep-ascents", "context:self-supported", "mode:on-foot"],
             RatingAverage = 4.4, RatingCount = 167, HelpfulVoteTotal = 311,
             StockUnits = 22, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2019,
         },
@@ -346,7 +365,7 @@ public static class CatalogueSeed
                       ("Hood", "Fixed, helmet-compatible"), ("Weight", "142 g")),
             Description = "A 142 g wind shell with a durable water-repellent finish. It sheds spray and short showers and " +
                           "breathes under effort. It is not a hardshell and it is not rated for sustained rain.",
-            Tags = ["context:dawn-start", "trip:day", "weight:packable", "skill:enthusiast", "weather:water-resistant", "context:dark-commute", "context:wet-road", "context:mountain-running"],
+            Tags = ["context:dawn-start", "trip:day", "weight:packable", "skill:enthusiast", "weather:water-resistant", "context:dark-commute", "context:wet-road", "context:mountain-running", "mode:on-foot"],
             RatingAverage = 4.2, RatingCount = 88, HelpfulVoteTotal = 173,
             StockUnits = 13, AvailableMarkets = Eu, Sustainability = Bluesign, ReleaseYear = 2023,
         },
@@ -360,7 +379,7 @@ public static class CatalogueSeed
                       ("Thickness", "7.6 cm"), ("Weight", "354 g")),
             Description = "Insulated air mat with an R-value of 4.5, which covers shoulder-season ground temperatures. " +
                           "Packs to roughly the size of a one-litre bottle.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:bikepacking", "context:self-supported"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:hut-to-hut", "context:bikepacking", "context:self-supported", "mode:on-foot", "mode:on-bike"],
             RatingAverage = 4.5, RatingCount = 143, HelpfulVoteTotal = 289,
             StockUnits = 10, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2023,
         },
@@ -374,7 +393,7 @@ public static class CatalogueSeed
                       ("Sole", "Contagrip MA"), ("Weight", "380 g per shoe")),
             Description = "Low-cut hiking shoe with a lined membrane and a chassis that resists twisting under a loaded pack. " +
                           "Sized to allow for foot swell on long descents.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:carried", "skill:beginner", "context:mountain-running", "context:steep-ascents"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:carried", "skill:beginner", "context:mountain-running", "context:steep-ascents", "mode:on-foot"],
             RatingAverage = 4.3, RatingCount = 312, HelpfulVoteTotal = 501,
             StockUnits = 19, AvailableMarkets = Eu, Sustainability = Recycled, ReleaseYear = 2021,
         },
@@ -388,7 +407,7 @@ public static class CatalogueSeed
                       ("Water resistance", "IPX7"), ("Weight", "100 g")),
             Description = "Two-way messaging and SOS off the mobile network, plus breadcrumb tracking. Requires an active " +
                           "subscription. Charges over USB-C, so it shares a cable and a power bank with everything else.",
-            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd", "context:off-grid-power", "context:self-supported"],
+            Tags = ["context:dawn-start", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd", "context:off-grid-power", "context:self-supported", "mode:on-foot"],
             RatingAverage = 4.6, RatingCount = 154, HelpfulVoteTotal = 366,
             StockUnits = 8, AvailableMarkets = Eu, Sustainability = Plain, ReleaseYear = 2022,
         },
@@ -402,7 +421,7 @@ public static class CatalogueSeed
                       ("Weather protection", "DCF laminate, taped seams"), ("Weight", "165 g")),
             Description = "Chest-mounted pod that clips across two shoulder straps and holds a mirrorless body with a wide " +
                           "zoom attached. Keeps a camera reachable on the move without hanging weight off the neck.",
-            Tags = ["context:dawn-start", "context:golden-hour", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:backpack-strap", "compat:camera-body", "context:mountain-running"],
+            Tags = ["context:dawn-start", "context:golden-hour", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:backpack-strap", "compat:camera-body", "context:mountain-running", "mode:on-foot"],
             RatingAverage = 0.0, RatingCount = 0, HelpfulVoteTotal = 0,
             StockUnits = 4, AvailableMarkets = Dach, Sustainability = Recycled, ReleaseYear = 2026,
             MarketplaceSeller = "Trailhead Outfitters GmbH",
@@ -853,7 +872,7 @@ public static class CatalogueSeed
                       ("Weather protection", "Welded seams, roll closure"), ("Weight", "1.1 kg")),
             Description = "Welded handlebar pack with a removable padded divider that takes a mirrorless body with a wide " +
                           "zoom attached. Detaches from the bar in one movement and carries by the shoulder strap on foot.",
-            Tags = ["context:golden-hour", "context:dawn-start", "trip:multi-day", "weight:carried", "skill:enthusiast", "compat:camera-body", "context:wet-road", "context:bikepacking"],
+            Tags = ["context:golden-hour", "context:dawn-start", "trip:multi-day", "weight:carried", "skill:enthusiast", "compat:camera-body", "context:wet-road", "context:bikepacking", "mode:on-bike"],
             RatingAverage = 4.5, RatingCount = 128, HelpfulVoteTotal = 271,
             StockUnits = 11, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2021,
         },
@@ -867,7 +886,7 @@ public static class CatalogueSeed
                       ("Battery life", "500 h on a CR2032"), ("Water resistance", "IPX7")),
             Description = "Chest strap that reads the heart's electrical signal directly, which tracks changes faster than " +
                           "a wrist optical sensor. Stores sessions on the strap when no phone or head unit is paired.",
-            Tags = ["context:training", "skill:enthusiast", "context:winter-base-miles", "context:effort-tracking"],
+            Tags = ["context:training", "skill:enthusiast", "context:winter-base-miles", "context:effort-tracking", "mode:on-bike"],
             RatingAverage = 4.3, RatingCount = 377, HelpfulVoteTotal = 588,
             StockUnits = 20, AvailableMarkets = Eu, Sustainability = Plain, ReleaseYear = 2020,
         },
@@ -881,7 +900,7 @@ public static class CatalogueSeed
                       ("Navigation", "Turn-by-turn with routable maps"), ("Connectivity", "Bluetooth, ANT+ and Wi-Fi")),
             Description = "Multi-band GNSS head unit with routable European maps and structured workout support. " +
                           "Charges over USB-C.",
-            Tags = ["context:training", "trip:day", "skill:enthusiast", "compat:usb-c-pd", "context:winter-base-miles", "context:effort-tracking"],
+            Tags = ["context:training", "trip:day", "skill:enthusiast", "compat:usb-c-pd", "context:winter-base-miles", "context:effort-tracking", "mode:on-bike"],
             RatingAverage = 4.4, RatingCount = 241, HelpfulVoteTotal = 462,
             StockUnits = 12, AvailableMarkets = Eu, Sustainability = Plain, ReleaseYear = 2023,
         },
@@ -895,7 +914,7 @@ public static class CatalogueSeed
                       ("Burn time", "2 h at 1400 lumens, 23 h at 150"), ("Mount", "31.8 mm handlebar strap")),
             Description = "Shaped-beam front light with a cut-off that keeps glare out of oncoming eyes. Doubles as a " +
                           "power bank for a phone in an emergency.",
-            Tags = ["context:dawn-start", "context:training", "trip:day", "skill:enthusiast", "compat:usb-c-pd", "context:dark-commute"],
+            Tags = ["context:dawn-start", "context:training", "trip:day", "skill:enthusiast", "compat:usb-c-pd", "context:dark-commute", "mode:on-bike"],
             RatingAverage = 4.4, RatingCount = 168, HelpfulVoteTotal = 271,
             StockUnits = 23, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2022,
         },
@@ -909,7 +928,7 @@ public static class CatalogueSeed
                       ("Type", "Tubeless-ready clincher"), ("Weight", "255 g")),
             Description = "Tubeless-ready road tyre. Twenty-eight millimetres run at lower pressure than a 25, which " +
                           "reduces rolling resistance on real Swiss road surfaces rather than on a drum test.",
-            Tags = ["context:training", "skill:enthusiast", "context:wet-road", "context:winter-base-miles", "context:all-day-riding"],
+            Tags = ["context:training", "skill:enthusiast", "context:wet-road", "context:winter-base-miles", "context:all-day-riding", "mode:on-bike"],
             RatingAverage = 4.6, RatingCount = 512, HelpfulVoteTotal = 876,
             StockUnits = 41, AvailableMarkets = Eu, Sustainability = Plain, ReleaseYear = 2021,
         },
@@ -923,7 +942,7 @@ public static class CatalogueSeed
                       ("Retention", "Zoom Ace dial"), ("Weight", "230 g")),
             Description = "Ventilated road helmet at 230 g in size medium. Thirty-eight vents keep airflow at climbing " +
                           "speeds where a heavier aero shell traps heat.",
-            Tags = ["context:training", "weight:packable", "skill:enthusiast"],
+            Tags = ["context:training", "weight:packable", "skill:enthusiast", "mode:on-bike"],
             RatingAverage = 4.5, RatingCount = 197, HelpfulVoteTotal = 321,
             StockUnits = 14, AvailableMarkets = Eu, Sustainability = Plain, ReleaseYear = 2020,
         },
@@ -937,7 +956,7 @@ public static class CatalogueSeed
                       ("Bit set", "Hex 2 to 8 mm, Torx T10 and T25, chain tool"), ("Weight", "170 g")),
             Description = "Twenty-function tool with a chain breaker, which is the one roadside repair that cannot be " +
                           "improvised. Fits a jersey pocket or a top-tube bag.",
-            Tags = ["context:training", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:winter-base-miles", "context:bikepacking", "context:all-day-riding"],
+            Tags = ["context:training", "trip:multi-day", "weight:packable", "skill:enthusiast", "context:winter-base-miles", "context:bikepacking", "context:all-day-riding", "mode:on-bike"],
             RatingAverage = 4.6, RatingCount = 289, HelpfulVoteTotal = 431,
             StockUnits = 38, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2018,
         },
@@ -951,7 +970,7 @@ public static class CatalogueSeed
                       ("Weather protection", "Coated ripstop with a storm flap"), ("Weight", "88 g")),
             Description = "Narrow top-tube bag sized for a phone, a multi-tool and food. Bolts to frame mounts where they " +
                           "exist and straps on where they do not.",
-            Tags = ["context:training", "trip:day", "weight:packable", "skill:enthusiast", "context:bikepacking", "context:all-day-riding"],
+            Tags = ["context:training", "trip:day", "weight:packable", "skill:enthusiast", "context:bikepacking", "context:all-day-riding", "mode:on-bike"],
             RatingAverage = 0.0, RatingCount = 0, HelpfulVoteTotal = 0,
             StockUnits = 9, AvailableMarkets = Dach, Sustainability = Recycled, ReleaseYear = 2026,
             MarketplaceSeller = "Velo Supply Basel",
@@ -1298,7 +1317,7 @@ public static class CatalogueSeed
                       ("Flask compatibility", "Two 500 ml soft flasks included"), ("Weight", "285 g")),
             Description = "A vest rather than a pack: the load sits on the chest and shoulders and does not swing on a " +
                           "descent. Twelve litres carries a shell, poles and a day of food for a long day on foot.",
-            Tags = ["context:mountain-running", "context:steep-ascents", "trip:day", "weight:packable", "skill:enthusiast", "compat:soft-flask"],
+            Tags = ["context:mountain-running", "context:steep-ascents", "trip:day", "weight:packable", "skill:enthusiast", "compat:soft-flask", "mode:on-foot"],
             RatingAverage = 4.5, RatingCount = 136, HelpfulVoteTotal = 261,
             StockUnits = 14, AvailableMarkets = Eu, Sustainability = Bluesign, ReleaseYear = 2023,
         },
@@ -1312,7 +1331,7 @@ public static class CatalogueSeed
                       ("Navigation", "Offline topographic maps and breadcrumb back-tracking"), ("Weight", "53 g")),
             Description = "Dual-frequency satellite reception with offline maps on the wrist, so a route is followed without " +
                           "a phone. Forty-five hours of full tracking covers a long weekend between charges.",
-            Tags = ["context:effort-tracking", "context:mountain-running", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd"],
+            Tags = ["context:effort-tracking", "context:mountain-running", "trip:multi-day", "weight:packable", "skill:enthusiast", "compat:usb-c-pd", "mode:on-foot"],
             RatingAverage = 0.0, RatingCount = 0, HelpfulVoteTotal = 0,
             StockUnits = 4, AvailableMarkets = Dach, Sustainability = Repairable, ReleaseYear = 2026,
             MarketplaceSeller = "Bergsport Chur",
@@ -1477,7 +1496,7 @@ public static class CatalogueSeed
                       ("Burn time", "5 h at 100 lumens"), ("Mount", "Seatpost or seatstay strap, 22 to 35 mm")),
             Description = "A front light is what you see with; a rear light is what you are seen with, and the second one " +
                           "is the one that matters at a Swiss winter dusk. Daytime flash mode runs for eighteen hours.",
-            Tags = ["context:dark-commute", "context:training", "trip:day", "skill:beginner", "compat:usb-c-pd"],
+            Tags = ["context:dark-commute", "context:training", "trip:day", "skill:beginner", "compat:usb-c-pd", "mode:on-bike"],
             RatingAverage = 4.5, RatingCount = 203, HelpfulVoteTotal = 312,
             StockUnits = 24, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2022,
         },
@@ -1491,7 +1510,7 @@ public static class CatalogueSeed
                       ("Sizes", "S to XXL"), ("Weight", "148 g per pair")),
             Description = "Cold feet end a winter commute earlier than cold hands do, because the shoe is ventilated by " +
                           "design and sits in the airflow. Neoprene over the shoe is the cheapest fix for the whole season.",
-            Tags = ["context:dark-commute", "context:training", "weight:packable", "skill:beginner"],
+            Tags = ["context:dark-commute", "context:training", "weight:packable", "skill:beginner", "mode:on-bike"],
             RatingAverage = 4.3, RatingCount = 117, HelpfulVoteTotal = 168,
             StockUnits = 19, AvailableMarkets = Eu, Sustainability = Recycled, ReleaseYear = 2021,
         },
@@ -1505,7 +1524,7 @@ public static class CatalogueSeed
                       ("Mounting", "Eyelet stays, front and rear"), ("Weight", "620 g per set")),
             Description = "Full-length guards with a front mudflap, which is the part that keeps the spray off the feet and " +
                           "the drivetrain. A clip-on guard covers the saddle and nothing else.",
-            Tags = ["context:wet-road", "context:training", "skill:beginner"],
+            Tags = ["context:wet-road", "context:training", "skill:beginner", "mode:on-bike"],
             RatingAverage = 4.4, RatingCount = 261, HelpfulVoteTotal = 377,
             StockUnits = 21, AvailableMarkets = Eu, Sustainability = Repairable, ReleaseYear = 2019,
         },
@@ -1519,7 +1538,7 @@ public static class CatalogueSeed
                       ("Connectivity", "ANT+ FE-C and Bluetooth"), ("Accuracy", "Plus or minus 2 percent")),
             Description = "Takes the rear wheel off and drives the cassette directly, so power is measured rather than " +
                           "estimated from a roller. What it buys is structured training on the evenings that are dark at five.",
-            Tags = ["context:winter-base-miles", "context:effort-tracking", "context:all-day-riding", "context:training", "skill:enthusiast"],
+            Tags = ["context:winter-base-miles", "context:effort-tracking", "context:all-day-riding", "context:training", "skill:enthusiast", "mode:on-bike"],
             RatingAverage = 0.0, RatingCount = 0, HelpfulVoteTotal = 0,
             StockUnits = 3, AvailableMarkets = Dach, Sustainability = Repairable, ReleaseYear = 2026,
             MarketplaceSeller = "Radsport Emmental",
@@ -1642,187 +1661,6 @@ public static class CatalogueSeed
     /// 23 measurability-extension SKUs — 99.
     /// </summary>
     public static IReadOnlyList<Product> All { get; } = [.. CoreProducts, .. HealthProducts, .. ExtensionProducts];
-
-    /// <summary>
-    /// The fixed, ORDERED concept space the offline <c>ConceptEmbeddingSource</c> projects
-    /// into. Twenty-six named dimensions; index in this list IS the vector index, so the
-    /// order is part of the contract and must not be re-sorted.
-    /// </summary>
-    /// <remarks>
-    /// These are use-context concepts, never category synonyms — the same discipline as the
-    /// <c>Use:</c> line in §D.1. That is what lets a query about photographing waterfalls on
-    /// a multi-day walk retrieve a neutral-density filter that shares no keyword with it.
-    /// The retrieval lane owns the query-side keyword-to-concept lexicon; the catalogue lane
-    /// owns this list and <see cref="ConceptWeights"/>, so both sides are authored against
-    /// one vocabulary.
-    /// </remarks>
-    public static IReadOnlyList<string> ConceptDimensions { get; } =
-    [
-        "landscape-photography",   // 0
-        "long-exposure",           // 1
-        "optical-imaging",         // 2
-        "low-light-and-dawn",      // 3
-        "weather-sealing",         // 4
-        "carried-weight",          // 5
-        "travel-portability",      // 6
-        "multi-day-trekking",      // 7
-        "on-foot-navigation",      // 8
-        "cold-weather-layering",   // 9
-        "water-treatment",         // 10
-        "power-autonomy",          // 11
-        "cable-and-connectivity",  // 12
-        "espresso-extraction",     // 13
-        "coffee-grinding",         // 14
-        "milk-texturing",          // 15
-        "machine-maintenance",     // 16
-        "bean-freshness",          // 17
-        "food-preparation",        // 18
-        "water-filtration",        // 19
-        "cycling-endurance",       // 20
-        "load-carrying",           // 21
-        "audio-fidelity",          // 22
-        "noise-isolation",         // 23
-        "gaming-play",             // 24
-        "health-monitoring",       // 25
-    ];
-
-    /// <summary>
-    /// Per-product concept weights over <see cref="ConceptDimensions"/>, in [0, 1]. Absent
-    /// dimensions are zero. Authored by hand: this is the demo's stand-in for a real
-    /// embedding model, chosen so the sample is deterministic and runs with no API key.
-    /// </summary>
-    /// <remarks>
-    /// Read the rows for GLX-2001 (a 38 L trekking pack) and GLX-1004 (a carbon travel
-    /// tripod) together: they overlap on <c>carried-weight</c>, <c>travel-portability</c>
-    /// and <c>multi-day-trekking</c> and share not one category noun. That overlap is the
-    /// cross-category mechanism, written down where it can be inspected rather than
-    /// asserted as emergent behaviour.
-    /// </remarks>
-    public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> ConceptWeights { get; } =
-        new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.OrdinalIgnoreCase)
-        {
-            // ── Photography ─────────────────────────────────────────────────────────────
-            ["GLX-1001"] = C(("optical-imaging", 0.95), ("landscape-photography", 0.80), ("low-light-and-dawn", 0.70), ("weather-sealing", 0.50), ("travel-portability", 0.30)),
-            ["GLX-1002"] = C(("landscape-photography", 0.95), ("optical-imaging", 0.90), ("weather-sealing", 0.85), ("travel-portability", 0.70), ("carried-weight", 0.60), ("low-light-and-dawn", 0.50)),
-            ["GLX-1003"] = C(("long-exposure", 1.00), ("landscape-photography", 0.90), ("low-light-and-dawn", 0.50), ("travel-portability", 0.45), ("optical-imaging", 0.40), ("multi-day-trekking", 0.35)),
-            ["GLX-1004"] = C(("travel-portability", 0.95), ("carried-weight", 0.90), ("landscape-photography", 0.80), ("long-exposure", 0.75), ("multi-day-trekking", 0.50)),
-            ["GLX-1005"] = C(("carried-weight", 0.80), ("multi-day-trekking", 0.70), ("travel-portability", 0.70), ("load-carrying", 0.60), ("landscape-photography", 0.50)),
-            ["GLX-1006"] = C(("power-autonomy", 0.85), ("low-light-and-dawn", 0.50), ("multi-day-trekking", 0.50), ("optical-imaging", 0.40), ("travel-portability", 0.40)),
-            ["GLX-1007"] = C(("load-carrying", 0.80), ("travel-portability", 0.50), ("optical-imaging", 0.30), ("carried-weight", 0.30)),
-            ["GLX-1008"] = C(("optical-imaging", 0.50), ("travel-portability", 0.30)),
-            ["GLX-1009"] = C(("optical-imaging", 0.90), ("weather-sealing", 0.60), ("landscape-photography", 0.45), ("travel-portability", 0.30)),
-            ["GLX-1010"] = C(("long-exposure", 0.60), ("landscape-photography", 0.55), ("optical-imaging", 0.60), ("travel-portability", 0.40)),
-            ["GLX-1011"] = C(("landscape-photography", 0.60), ("long-exposure", 0.50), ("travel-portability", 0.40), ("carried-weight", 0.25)),
-            ["GLX-1012"] = C(("optical-imaging", 0.30), ("travel-portability", 0.35), ("load-carrying", 0.30)),
-
-            // ── Outdoor & Hiking ────────────────────────────────────────────────────────
-            ["GLX-2001"] = C(("multi-day-trekking", 1.00), ("load-carrying", 0.95), ("carried-weight", 0.85), ("on-foot-navigation", 0.50), ("travel-portability", 0.50)),
-            ["GLX-2002"] = C(("low-light-and-dawn", 0.95), ("multi-day-trekking", 0.80), ("on-foot-navigation", 0.70), ("power-autonomy", 0.50), ("carried-weight", 0.50)),
-            ["GLX-2003"] = C(("cold-weather-layering", 1.00), ("multi-day-trekking", 0.80), ("carried-weight", 0.50), ("low-light-and-dawn", 0.40)),
-            ["GLX-2004"] = C(("multi-day-trekking", 0.90), ("carried-weight", 0.80), ("travel-portability", 0.60), ("on-foot-navigation", 0.50)),
-            ["GLX-2005"] = C(("water-treatment", 1.00), ("multi-day-trekking", 0.80), ("carried-weight", 0.60), ("travel-portability", 0.50)),
-            ["GLX-2006"] = C(("cold-weather-layering", 0.70), ("carried-weight", 0.60), ("multi-day-trekking", 0.50), ("travel-portability", 0.50), ("weather-sealing", 0.35)),
-            ["GLX-2007"] = C(("multi-day-trekking", 0.90), ("carried-weight", 0.80), ("cold-weather-layering", 0.50), ("travel-portability", 0.50)),
-            ["GLX-2008"] = C(("multi-day-trekking", 0.85), ("on-foot-navigation", 0.60), ("carried-weight", 0.30)),
-            ["GLX-2009"] = C(("on-foot-navigation", 1.00), ("multi-day-trekking", 0.85), ("power-autonomy", 0.60), ("carried-weight", 0.60), ("travel-portability", 0.50)),
-            ["GLX-2010"] = C(("carried-weight", 0.90), ("multi-day-trekking", 0.85), ("landscape-photography", 0.70), ("load-carrying", 0.70), ("travel-portability", 0.70), ("weather-sealing", 0.50)),
-
-            // ── Home Espresso ───────────────────────────────────────────────────────────
-            ["GLX-3001"] = C(("espresso-extraction", 1.00), ("coffee-grinding", 0.60), ("milk-texturing", 0.60), ("machine-maintenance", 0.50)),
-            ["GLX-3002"] = C(("coffee-grinding", 1.00), ("espresso-extraction", 0.70), ("bean-freshness", 0.60)),
-            ["GLX-3003"] = C(("espresso-extraction", 0.95), ("machine-maintenance", 0.30)),
-            ["GLX-3004"] = C(("espresso-extraction", 0.90), ("coffee-grinding", 0.40)),
-            ["GLX-3005"] = C(("espresso-extraction", 0.90)),
-            ["GLX-3006"] = C(("espresso-extraction", 0.90)),
-            ["GLX-3007"] = C(("coffee-grinding", 1.00), ("bean-freshness", 0.70), ("espresso-extraction", 0.60), ("travel-portability", 0.40)),
-            ["GLX-3008"] = C(("bean-freshness", 1.00), ("espresso-extraction", 0.60), ("coffee-grinding", 0.50)),
-            ["GLX-3009"] = C(("bean-freshness", 0.90), ("espresso-extraction", 0.50), ("coffee-grinding", 0.40)),
-            ["GLX-3010"] = C(("machine-maintenance", 1.00), ("espresso-extraction", 0.35)),
-            ["GLX-3011"] = C(("machine-maintenance", 1.00), ("water-filtration", 0.30)),
-
-            // ── Gaming ──────────────────────────────────────────────────────────────────
-            ["GLX-4001"] = C(("gaming-play", 1.00)),
-            ["GLX-4002"] = C(("gaming-play", 1.00)),
-            ["GLX-4003"] = C(("gaming-play", 1.00)),
-            ["GLX-4004"] = C(("gaming-play", 0.90), ("audio-fidelity", 0.50), ("noise-isolation", 0.40)),
-            ["GLX-4005"] = C(("gaming-play", 1.00)),
-            ["GLX-4006"] = C(("gaming-play", 0.80)),
-            ["GLX-4007"] = C(("gaming-play", 0.95)),
-            ["GLX-4008"] = C(("gaming-play", 0.80), ("travel-portability", 0.70), ("cable-and-connectivity", 0.60), ("power-autonomy", 0.40)),
-
-            // ── Kitchen & Small Appliances ──────────────────────────────────────────────
-            ["GLX-5001"] = C(("food-preparation", 1.00)),
-            ["GLX-5002"] = C(("water-filtration", 1.00), ("food-preparation", 0.30)),
-            ["GLX-5003"] = C(("bean-freshness", 1.00), ("food-preparation", 0.30)),
-            ["GLX-5004"] = C(("espresso-extraction", 0.80), ("coffee-grinding", 0.50), ("bean-freshness", 0.40), ("food-preparation", 0.30)),
-            ["GLX-5005"] = C(("food-preparation", 0.90)),
-            ["GLX-5006"] = C(("food-preparation", 0.70), ("travel-portability", 0.30)),
-            ["GLX-5007"] = C(("food-preparation", 1.00)),
-            ["GLX-5008"] = C(("food-preparation", 1.00)),
-            ["GLX-5009"] = C(("milk-texturing", 1.00), ("espresso-extraction", 0.40)),
-
-            // ── Cycling ─────────────────────────────────────────────────────────────────
-            ["GLX-6001"] = C(("load-carrying", 0.90), ("carried-weight", 0.70), ("travel-portability", 0.70), ("weather-sealing", 0.60), ("optical-imaging", 0.50), ("cycling-endurance", 0.40)),
-            ["GLX-6002"] = C(("cycling-endurance", 0.90), ("health-monitoring", 0.55)),
-            ["GLX-6003"] = C(("cycling-endurance", 0.90), ("on-foot-navigation", 0.40), ("power-autonomy", 0.30)),
-            ["GLX-6004"] = C(("low-light-and-dawn", 0.80), ("cycling-endurance", 0.70), ("power-autonomy", 0.40)),
-            ["GLX-6005"] = C(("cycling-endurance", 0.90)),
-            ["GLX-6006"] = C(("cycling-endurance", 0.80), ("carried-weight", 0.30)),
-            ["GLX-6007"] = C(("cycling-endurance", 0.60), ("travel-portability", 0.50), ("carried-weight", 0.40)),
-            ["GLX-6008"] = C(("cycling-endurance", 0.70), ("load-carrying", 0.50), ("carried-weight", 0.50)),
-
-            // ── Home Audio ──────────────────────────────────────────────────────────────
-            ["GLX-7001"] = C(("noise-isolation", 1.00), ("audio-fidelity", 0.85), ("travel-portability", 0.50)),
-            ["GLX-7002"] = C(("audio-fidelity", 1.00)),
-            ["GLX-7003"] = C(("audio-fidelity", 1.00)),
-            ["GLX-7004"] = C(("audio-fidelity", 0.95)),
-            ["GLX-7005"] = C(("audio-fidelity", 0.70)),
-            ["GLX-7006"] = C(("audio-fidelity", 0.85), ("noise-isolation", 0.60), ("travel-portability", 0.50)),
-            ["GLX-7007"] = C(("audio-fidelity", 1.00), ("cable-and-connectivity", 0.30)),
-
-            // ── Power & Travel Tech ─────────────────────────────────────────────────────
-            ["GLX-8001"] = C(("power-autonomy", 1.00), ("multi-day-trekking", 0.60), ("travel-portability", 0.60), ("cable-and-connectivity", 0.50), ("carried-weight", 0.30)),
-            ["GLX-8002"] = C(("cable-and-connectivity", 1.00), ("power-autonomy", 0.30)),
-            ["GLX-8003"] = C(("weather-sealing", 1.00), ("multi-day-trekking", 0.70), ("travel-portability", 0.60), ("carried-weight", 0.50), ("load-carrying", 0.50)),
-            ["GLX-8004"] = C(("power-autonomy", 0.80), ("cable-and-connectivity", 0.60), ("travel-portability", 0.50)),
-            ["GLX-8005"] = C(("carried-weight", 0.90), ("power-autonomy", 0.90), ("multi-day-trekking", 0.80), ("travel-portability", 0.80)),
-            ["GLX-8006"] = C(("travel-portability", 0.80), ("power-autonomy", 0.50), ("cable-and-connectivity", 0.50)),
-            ["GLX-8007"] = C(("power-autonomy", 0.95), ("cable-and-connectivity", 0.50), ("travel-portability", 0.50)),
-
-            // ── Health & Personal Care (sensitive) ──────────────────────────────────────
-            ["GLX-9001"] = C(("health-monitoring", 1.00)),
-            ["GLX-9002"] = C(("health-monitoring", 1.00)),
-            ["GLX-9003"] = C(("health-monitoring", 0.90)),
-            ["GLX-9004"] = C(("health-monitoring", 1.00)),
-
-            // ── Extension (the Eval 02 measurability SKUs) ──────────────────────────────
-            // No new DIMENSION is introduced: the concept space is an ordered contract and a
-            // 27th name would silently re-index every cached vector. Every row below projects
-            // onto the existing twenty-six.
-            ["GLX-1013"] = C(("cable-and-connectivity", 0.70), ("optical-imaging", 0.50), ("travel-portability", 0.40)),
-            ["GLX-2011"] = C(("carried-weight", 0.85), ("load-carrying", 0.70), ("on-foot-navigation", 0.45), ("travel-portability", 0.50), ("multi-day-trekking", 0.30)),
-            ["GLX-2012"] = C(("on-foot-navigation", 0.95), ("multi-day-trekking", 0.55), ("health-monitoring", 0.45), ("cycling-endurance", 0.40), ("power-autonomy", 0.30)),
-            ["GLX-3012"] = C(("machine-maintenance", 1.00), ("espresso-extraction", 0.30)),
-            ["GLX-3013"] = C(("coffee-grinding", 1.00), ("espresso-extraction", 0.75), ("bean-freshness", 0.60)),
-            ["GLX-4009"] = C(("gaming-play", 1.00)),
-            ["GLX-4010"] = C(("gaming-play", 0.70), ("travel-portability", 0.80)),
-            ["GLX-5010"] = C(("milk-texturing", 1.00), ("espresso-extraction", 0.30)),
-            ["GLX-5011"] = C(("milk-texturing", 1.00), ("espresso-extraction", 0.35)),
-            ["GLX-5012"] = C(("espresso-extraction", 0.45), ("milk-texturing", 0.40)),
-            ["GLX-5013"] = C(("water-filtration", 1.00), ("espresso-extraction", 0.35), ("food-preparation", 0.25)),
-            ["GLX-5014"] = C(("water-filtration", 0.80), ("espresso-extraction", 0.60), ("bean-freshness", 0.30)),
-            ["GLX-5015"] = C(("food-preparation", 0.90)),
-            ["GLX-6009"] = C(("cycling-endurance", 0.60), ("low-light-and-dawn", 0.75), ("power-autonomy", 0.30)),
-            ["GLX-6010"] = C(("cold-weather-layering", 0.80), ("cycling-endurance", 0.50)),
-            ["GLX-6011"] = C(("cycling-endurance", 0.50), ("weather-sealing", 0.60)),
-            ["GLX-6012"] = C(("cycling-endurance", 1.00), ("health-monitoring", 0.35)),
-            ["GLX-7008"] = C(("audio-fidelity", 0.70), ("cable-and-connectivity", 0.40), ("power-autonomy", 0.30)),
-            ["GLX-7009"] = C(("audio-fidelity", 0.85), ("travel-portability", 0.80), ("cable-and-connectivity", 0.40)),
-            ["GLX-7010"] = C(("audio-fidelity", 0.70)),
-            ["GLX-7011"] = C(("audio-fidelity", 0.90), ("noise-isolation", 0.70)),
-            ["GLX-7012"] = C(("audio-fidelity", 0.50), ("cable-and-connectivity", 0.80)),
-            ["GLX-8008"] = C(("power-autonomy", 1.00), ("multi-day-trekking", 0.50), ("carried-weight", 0.40)),
-        };
 
     /// <summary>
     /// The product name that MUST NOT appear in this seed — the phantom-SKU probe

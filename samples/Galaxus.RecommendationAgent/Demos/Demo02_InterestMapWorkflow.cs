@@ -119,11 +119,58 @@ public static class Demo02_InterestMapWorkflow
             PrintScreenedAnswer(result.State);
             PrintRoutes(result);
             PrintDegradations(result.State);
+            PrintExecutorFailures(result);
         }
         catch (Exception ex)
         {
             PrintFailure(ex);
         }
+    }
+
+    /// <summary>
+    /// Prints the node failures and makes the PROCESS say so. A run with a thrown node is not a
+    /// result, and until this existed it was indistinguishable from a healthy one at the exit code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the gate, not the panel. The panel above it already printed
+    /// <c>⚠ [CoverageReviewer] executor FAILED</c> — and the process still exited <b>0</b>, so every
+    /// automated reader saw green while the tray below the warning was produced by a workflow whose
+    /// reviewer never ran. Printing louder does not fix that; changing the exit code does.
+    /// </para>
+    /// <para>
+    /// ⚠ It is deliberately NOT a rethrow. The stream is fully drained and every panel is printed
+    /// first, because the failure text and the partial state are the evidence a reader needs. The
+    /// run is reported in full and then marked unusable.
+    /// </para>
+    /// <para>
+    /// <b>The check can fail, and was demonstrated failing in both directions.</b> Removing one
+    /// entry from <c>QueryVocabulary</c>'s B-9 localisation table makes <c>CoverageReviewer</c>
+    /// throw: before this, <c>Agent -- 2 --offline</c> exited 0; after it, 1. On the shipped tree,
+    /// with the table intact, it exits 0. A gate that only ever fires, or never fires, proves
+    /// nothing either way.
+    /// </para>
+    /// </remarks>
+    /// <param name="result">The finished run.</param>
+    private static void PrintExecutorFailures(DiscoveryRunResult result)
+    {
+        if (!result.Failed) return;
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("  ─── NODE FAILURES — this run is NOT a result ────────────────────────────");
+        foreach (var failure in result.ExecutorFailures)
+            Console.WriteLine($"    ❌ {failure}");
+
+        Console.WriteLine(
+            "    Nothing above this line may be quoted. A node threw, so the panels were built from"
+            + Environment.NewLine
+            + "    a state that node never contributed to. Exit code set to 1 — the earlier ⚠ note is"
+            + Environment.NewLine
+            + "    on the WARNING channel, which is for degradation a run survived, and this is not that.");
+        Console.ResetColor();
+
+        Environment.ExitCode = 1;
     }
 
     // ── Panels ────────────────────────────────────────────────────────────────

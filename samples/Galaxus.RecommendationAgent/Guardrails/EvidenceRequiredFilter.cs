@@ -34,6 +34,16 @@ namespace Galaxus.RecommendationAgent.Guardrails;
 /// belonging to someone else: both are wrong, but "you bought a games console" as evidence for
 /// Marco's own interests is a specific, nameable failure and deserves its own reason token.
 /// </para>
+/// <para>
+/// <b>Three grades of wrong id, three reason tokens (§8.1 B-5).</b> A cited purchase can fail for
+/// three different reasons and they are NOT the same failure: it can belong to somebody else
+/// (<see cref="GuardrailReasons.ForeignPurchaseId"/>), it can be the customer's own but a gift
+/// (<see cref="GuardrailReasons.GiftPurchaseCited"/>), or it can be the customer's own, not a
+/// gift, and simply not evidence for the interest being cited
+/// (<see cref="GuardrailReasons.PurchaseDoesNotEvidenceSignal"/>). The third was invisible until
+/// the tool gained a user-side argument, because the derived user side could only ever cite the
+/// signal's own ids back at it.
+/// </para>
 /// </remarks>
 public static class EvidenceRequiredFilter
 {
@@ -107,6 +117,27 @@ public static class EvidenceRequiredFilter
                 {
                     reason = GuardrailReasons.ForeignPurchaseId;
                     detail = $"cites {purchaseId}, which does not belong to {context.User.Id}";
+                    return false;
+                }
+
+                // ── §8.1 B-5: the id must evidence THE CITED SIGNAL, not merely exist ────────
+                //
+                // The customer's own id is not a blank cheque. "Photography" evidenced by the
+                // headlamp purchase is the customer's id, is not a gift, and is still a
+                // fabricated link — and it is precisely what a model does when it has to write a
+                // user side it cannot support. The map's own EvidencePurchaseIds are the bar, so
+                // the artifact under test does not supply it.
+                //
+                // ⚠ On the DERIVED path this clause is a tautology (both sides come out of the
+                // same signal). That is why Demo 1 writes an arm_inapplicable note whenever it
+                // falls back to derivation: the clause exists, but it did not run.
+                if (!signal.EvidencePurchaseIds.Contains(purchaseId, StringComparer.Ordinal))
+                {
+                    reason = GuardrailReasons.PurchaseDoesNotEvidenceSignal;
+                    detail = $"cites {purchaseId} as evidence for \"{signal.Label}\", but the code-derived map says that " +
+                             $"interest rests on {string.Join(", ", signal.EvidencePurchaseIds)}. The id is this customer's, " +
+                             "which is exactly why the weaker check passes it — belonging to the customer is not the same as " +
+                             "supporting the claim";
                     return false;
                 }
             }

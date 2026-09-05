@@ -74,6 +74,12 @@ public static class CatalogueGroundingFilter
                 "the customer owns nothing in this context, so the already-owned and durable-churn arms had nothing " +
                 "to fire against (chance floor 1.0 — not a pass). The existence arm below DID run.");
         }
+        else if (context.ReplenishmentProductIds.Count == 0)
+        {
+            ledger.Note(GuardrailStage.CatalogueGrounding, GuardrailReasons.ArmInapplicable, "replenishment lane",
+                "this customer has no purchase on a replenishment cadence, so the replenishment_not_discovery arm " +
+                "had nothing to fire against (chance floor 1.0 — not a pass). The already-owned arm beside it DID run.");
+        }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
@@ -117,6 +123,22 @@ public static class CatalogueGroundingFilter
             {
                 ledger.Drop(GuardrailStage.CatalogueGrounding, GuardrailReasons.DuplicatePresentation, item.ProductId,
                     "presented more than once in the same turn");
+                continue;
+            }
+
+            // ── §8.1 B-16: the replenishment lane, checked BEFORE ownership ─────────────
+            //
+            // Sofia's cartridges used to leave the ledger as `already_owned`. That was true and
+            // useless: it named the wrong mechanism, and the lane that actually handles them —
+            // the repeat-buy tray with its cadence and due date — was never seen working on any
+            // run. A consumable on a cadence is not "something she owns"; it is something she is
+            // about to buy again, and the ledger now says which of the two happened.
+            if (context.ReplenishmentProductIds.Contains(item.ProductId))
+            {
+                ledger.Drop(GuardrailStage.CatalogueGrounding, GuardrailReasons.ReplenishmentNotDiscovery, item.ProductId,
+                    $"{product.Name} is on this customer's replenishment cadence and is already in the repeat-buy tray " +
+                    "with its due date. Surfacing it as a discovery is the \"you might like the cartridges you have " +
+                    "bought five times\" failure — a different lane, not a different ranking");
                 continue;
             }
 

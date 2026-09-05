@@ -134,6 +134,13 @@ public static class Eval02_LatentInterestCoverage
         PrintHeader();
         PrintPreRegistration();
 
+        // ⚠ B-12. Before the numbers, not after them: the legend says which arm is an ORACLE that
+        // reads the gold, which is the CONTROL that can take the win away, and which arm carries a
+        // "do NOT read this as the headline" caveat. Those notes were written on every arm and read
+        // by nothing, so the caveat existed only in source — and a caveat that does not print is not
+        // a caveat.
+        EvalPrinter.PrintArmLegend(CoverageArms.All);
+
         IReadOnlyList<CoveragePersona> personas = onlyPersona is null
             ? CoveragePersonas.All
             : [.. CoveragePersonas.All.Where(p => string.Equals(p.Id, onlyPersona, StringComparison.OrdinalIgnoreCase))];
@@ -424,8 +431,26 @@ public static class Eval02_LatentInterestCoverage
             .Select(pair => atK.SignTestAtEqualK(pair.Reference, pair.Challenger, CoverageMetric.PrecisionAtK))
             .ToList();
 
+        // ⚠ The colour map is the REGISTRY's, not the panel's. Before this the sign-test rows were
+        // painted green whenever the CHALLENGER led — and the primary control is a challenger, so
+        // "one retrieval pass matched the shipped agent" rendered in the colour of good news (B-12).
+        var kindByArm = CoverageArms.All.ToDictionary(a => a.Label, a => a.Kind, StringComparer.Ordinal);
+
         EvalPrinter.PrintSignTest([.. atKRecall, .. atKPrecision],
-            $"Paired sign test AT THE DECLARED k = {declaredK} — equal-k pairs only, reported, never gated");
+            $"Paired sign test AT THE DECLARED k = {declaredK} — equal-k pairs only, reported, never gated",
+            kindByArm);
+
+        // ── The design's pre-registered rule, EVALUATED. ─────────────────────────────────
+        //
+        // ⚠ B-2. This block used to be a sentence in the pre-registration banner with nothing
+        // behind it — no WinsRequired, no comparison, no verdict — printed above a panel that had
+        // once shown a green 12/0/0 for a DIFFERENT pair. The rule names the discovery WORKFLOW
+        // against the single agent, and since the k = 5 re-cut a pair at unequal k is not
+        // comparable at all, so the verdict has to be able to say NOT EVALUATED out loud rather
+        // than vanishing. It is rendered for that pair specifically, whatever the panel shows.
+        var preRegistered = PreRegisteredRule.Evaluate(
+            ArmLive, CoverageArms.DiscoveryWorkflow, atKRecall, $"the declared-k panel (k = {declaredK}, recall)");
+        EvalPrinter.PrintPreRegisteredRule(preRegistered);
 
         var rereadRecall = new List<SignTestOutcome>();
         var rereadPrecision = new List<SignTestOutcome>();
@@ -439,7 +464,8 @@ public static class Eval02_LatentInterestCoverage
                 .ToList();
 
             EvalPrinter.PrintSignTest([.. rereadRecall, .. rereadPrecision],
-                "Paired sign test AT THE LIVE ARM'S OWN k — controls cut to match, reported, never gated");
+                "Paired sign test AT THE LIVE ARM'S OWN k — controls cut to match, reported, never gated",
+                kindByArm);
         }
 
         EvalPrinter.PrintCostComparison(ownK);
@@ -476,6 +502,15 @@ public static class Eval02_LatentInterestCoverage
         bool gate2Decidable = gate2Reads.Any(r => !r.Outcome.Undecidable);
         bool controlLeadsAnywhere = gate2Reads.Any(r => !r.Outcome.Undecidable && r.Outcome.ChallengerLeads);
         bool controlSane = primaryControl is not null && gate2Decidable && !controlLeadsAnywhere;
+
+        // ⚠ B-11. The gate's RESULT is a bool; what the printer needs is the observed STATE, because
+        // "the control did not lead", "there was nothing to lead on" and "no control was run" are
+        // three different sentences and the printer used to render the first one for all three.
+        EvalPrinter.CoverageGate2State gate2State =
+            primaryControl is null ? EvalPrinter.CoverageGate2State.NoControlRun
+            : !gate2Decidable ? EvalPrinter.CoverageGate2State.NoComparablePair
+            : controlLeadsAnywhere ? EvalPrinter.CoverageGate2State.ControlLed
+            : EvalPrinter.CoverageGate2State.ControlDidNotLead;
 
         string gate2Detail = primaryControl is null
             ? "no primary control arm was run."
@@ -611,7 +646,12 @@ public static class Eval02_LatentInterestCoverage
                 + ". An arm at chance here has produced answers that fit any of these customers equally well, "
                 + "whatever its coverage says.");
 
-        EvalPrinter.PrintCoverageGate(aboveFloor, controlSane, notes, gate2Detail);
+        // The DENOMINATOR is the personas GATE 1 actually read — the scorable ones for the live arm
+        // — not every persona in the table. A gate that reports "12 of 12" while it only read three
+        // is the diluted-denominator shape, and it fails in the flattering direction.
+        int gate1Read = ownK.Personas.Count(p => ownK.ScoreOf(p, ArmLive) is { IsScorable: true });
+
+        EvalPrinter.PrintCoverageGate(aboveFloor, below, gate1Read, gate2State, notes, gate2Detail);
 
         if (dryRun)
         {
@@ -628,7 +668,7 @@ public static class Eval02_LatentInterestCoverage
             // repository's three-stage run protocol — could not fail. A stage that cannot fail is
             // not a stage. It now asserts the same class of property Eval 01's dry run does.
             bool plumbingHeld = DryRunPlumbingHeld(ownK, atK, goldByPersona, floors, precisionFloors, armsThatThrew,
-                                                   declaredK, atKRecall, persisted, rereadRows);
+                                                   declaredK, atKRecall, persisted, rereadRows, preRegistered);
             bool secondTurnWired = SecondTurnPlumbingHeld(secondTurns);
             return plumbingHeld && secondTurnWired ? 0 : 1;
         }
@@ -802,6 +842,13 @@ public static class Eval02_LatentInterestCoverage
     ///   wired.</description></item>
     ///   <item><description><b>The persisted re-read produced rows</b> when a snapshot exists —
     ///   otherwise the zero-cost reading of the paid run is silently absent.</description></item>
+    ///   <item><description><b>Every registered arm carries a NOTE</b> (§8, B-12). The legend
+    ///   prints one row per arm and the note is the row's payload; an arm registered without one
+    ///   would print a blank caveat, which is how "do NOT read this as the headline" came to live
+    ///   in source and nowhere else.</description></item>
+    ///   <item><description><b>The pre-registered rule rendered a VERDICT</b> (§8, B-2). Not a
+    ///   particular verdict — any of the three, with a reason attached. A rule text with no
+    ///   evaluator behind it is what this check exists to make impossible to ship again.</description></item>
     /// </list>
     /// </remarks>
     private static bool DryRunPlumbingHeld(
@@ -814,7 +861,8 @@ public static class Eval02_LatentInterestCoverage
         int declaredK,
         IReadOnlyList<SignTestOutcome> atKRecall,
         CoverageSnapshot? persisted,
-        IReadOnlyList<OwnKRereadRow> rereadRows)
+        IReadOnlyList<OwnKRereadRow> rereadRows,
+        PreRegisteredRuleOutcome preRegistered)
     {
         var scored = goldByPersona.Where(kv => !kv.Value.LatentIsEmpty).Select(kv => kv.Key)
             .Where(id => ownK.Personas.Contains(id, StringComparer.Ordinal)).ToList();
@@ -848,6 +896,21 @@ public static class Eval02_LatentInterestCoverage
 
         bool rereadRan = persisted is null || rereadRows.Count > 0;
 
+        // ⚠ B-12. The legend's payload is the NOTE. An arm with an empty one prints a row that says
+        // nothing, and the "do NOT read this arm's number as the headline" caveat is exactly the
+        // note most likely to be left off a new arm.
+        var notelessArms = CoverageArms.All.Where(a => a.Note.Length == 0).Select(a => a.Label).ToList();
+        bool everyArmHasANote = notelessArms.Count == 0;
+
+        // ⚠ B-2. Any of the three verdicts counts; a MISSING one does not. The rule must also carry
+        // a reason — "NOT EVALUATED" with no sentence after it is the dormant text again in a
+        // different font.
+        bool ruleRendered = preRegistered.Reason.Length > 0
+            && Enum.IsDefined(preRegistered.Verdict)
+            && string.Equals(preRegistered.Challenger, CoverageArms.DiscoveryWorkflow, StringComparison.Ordinal)
+            && string.Equals(preRegistered.Reference, ArmLive, StringComparison.Ordinal)
+            && preRegistered.WinsRequired == PreRegisteredRule.WinsRequired;
+
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("  ─── DRY-RUN PLUMBING CHECKS (a stub cannot prove anything else) ──────");
@@ -876,9 +939,19 @@ public static class Eval02_LatentInterestCoverage
             : rereadRows.Count > 0
                 ? $"the persisted live run ({persisted.RunAt:u}) was re-read at its own k: {rereadRows.Count} row(s)."
                 : "a persisted live run exists but the re-read produced NO rows.");
+        Line(everyArmHasANote, everyArmHasANote
+            ? $"every one of the {CoverageArms.All.Count} registered arms carries a NOTE, so the legend printed a "
+            + "caveat for each rather than a blank row."
+            : $"arm(s) registered with NO note: {string.Join(", ", notelessArms)}. The legend row prints empty and the "
+            + "arm's caveat exists only in source.");
+        Line(ruleRendered, ruleRendered
+            ? $"the pre-registered ≥ {PreRegisteredRule.WinsRequired}-of-{PreRegisteredRule.PreRegisteredPairs} rule was "
+            + $"EVALUATED for the loop-vs-agent pair and rendered {preRegistered.Label}, with a reason."
+            : "the pre-registered rule rendered NO verdict for the loop-vs-agent pair, or rendered one with no reason. "
+            + "That is the B-2 defect: rule text with no evaluator behind it.");
 
         return goldDerived && floorsDefined && precisionFloorsDefined && liveMeasured && silentArms.Count == 0
-            && noneThrew && cutBounded && cutFired && refusalFired && rereadRan;
+            && noneThrew && cutBounded && cutFired && refusalFired && rereadRan && everyArmHasANote && ruleRendered;
 
         static void Line(bool ok, string text)
         {
@@ -923,8 +996,18 @@ public static class Eval02_LatentInterestCoverage
         Console.WriteLine("  PRE-REGISTERED, AND WHAT SURVIVED CONTACT WITH THE CORPUS:");
         Console.ResetColor();
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("    · Decision rule was: the workflow wins iff it beats the single agent on ≥ 10 of 12");
-        Console.WriteLine("      paired personas (exact two-sided sign test, p = 0.0386).");
+        // ⚠ B-2. This line used to end here, with no evaluator anywhere in the repository behind
+        // it: no WinsRequired constant, no threshold comparison, no verdict — a quotable rule in
+        // the shape of a met one, printed above a sign-test panel for a different comparison. The
+        // constant is now named FROM the evaluator, and the verdict is rendered further down in
+        // all three states, including NOT EVALUATED. Nothing on this banner is a rule the run does
+        // not evaluate.
+        Console.WriteLine($"    · Decision rule: {PreRegisteredRule.Statement}.");
+        Console.WriteLine($"      WinsRequired = {PreRegisteredRule.WinsRequired} of {PreRegisteredRule.PreRegisteredPairs}. "
+                        + "EVALUATED below, on the PRE-REGISTERED DECISION RULE panel, for the");
+        Console.WriteLine($"      '{EvalPrinter.ShortArm(CoverageArms.DiscoveryWorkflow)}' vs "
+                        + $"'{EvalPrinter.ShortArm(ArmLive)}' pair specifically — MET, NOT MET or");
+        Console.WriteLine("      NOT EVALUATED with the reason attached. It is never simply absent.");
         Console.WriteLine($"    · DECLARED BUDGET: k = {CoverageArms.DeclaredK}, from the canonical utterance (\"…your "
                         + $"{GalaxusDemoPrompts.CoverageCohortDeclaredKInWords} best…\"). Every arm is cut to");
         Console.WriteLine("      its top k in its own order before pairing; pairs at unequal k are NOT COMPARABLE.");

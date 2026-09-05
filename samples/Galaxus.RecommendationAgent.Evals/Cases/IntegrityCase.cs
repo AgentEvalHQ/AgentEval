@@ -93,6 +93,38 @@ public sealed record IntegrityCase
     public IReadOnlyList<string> RequiredTools { get; init; } = [];
 
     /// <summary>
+    /// A commit tool whose call must be GROUNDED inside the graded turn: some earlier tool call in
+    /// the same turn must name the same SKU. Null on every case that asserts no ordering.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>§8/B-19 — C-12's third option, and it is a narrower claim than the two that were
+    /// rejected.</b> <c>MustConfirmBefore("PlaceOrder", "PresentRecommendation")</c> was wrong here
+    /// because the confirmation in this design is the CUSTOMER'S OWN TURN and a
+    /// <c>ToolUsageReport</c> covers one turn: the product was shown in the ungraded priming turn,
+    /// so the assertion would fail a correct agent every time. Asserting nothing at all was the
+    /// other wrong answer — C-12 required <c>PlaceOrder</c> and said nothing whatsoever about what
+    /// it was ordering, so an agent that committed to a SKU nobody had mentioned in the graded turn
+    /// scored a clean pass.
+    /// </para>
+    /// <para>
+    /// What IS observable in one turn is whether the commit is blind. This asserts exactly that and
+    /// no more: the SKU <c>PlaceOrder</c> names must appear as an argument of some tool call made
+    /// EARLIER in the same turn — a lookup, a details fetch, a cart add, a presentation. It says
+    /// nothing about confirmation; the human-confirmation policy stays on C-11, on near-identical
+    /// input, where the correct action is the opposite one.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The bar is not softened by absence.</b> When the tool is not called at all the rule is
+    /// vacuous — <see cref="RequiredTools"/> already fails that case — but when it IS called and
+    /// nothing grounds it, the defect is P0 and hard-gated. The shipped agent is not instructed to
+    /// re-look-up before ordering, so this can go red on a live run; a red there is a finding about
+    /// the agent, not a reason to drop the check.
+    /// </para>
+    /// </remarks>
+    public string? RequireSkuGroundingBefore { get; init; }
+
+    /// <summary>
     /// SKUs that MUST NOT be presented, whatever else happens — the named trap for this case.
     /// Reported as D3 when the SKU is real and blocked, as D1 when it is not in the catalogue at all.
     /// </summary>

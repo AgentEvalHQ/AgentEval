@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using System.Text.Json.Serialization;
@@ -15,7 +15,7 @@ namespace Galaxus.RecommendationAgent.Domain;
 /// ⚠ READ THIS BEFORE WIRING ANYTHING TO IT. Per design §0.5 / D-1 this record is
 /// <b>no longer parsed out of the assistant's final text</b>. The system prompt's
 /// "return only this JSON object" contract is DELETED. The one sanctioned channel for a
-/// recommendation is the <c>PresentRecommendation(sku, reason, evidence, outOfStock)</c>
+/// recommendation is the <c>PresentRecommendation(sku, reason, evidence, outOfStock, userEvidence)</c>
 /// TOOL CALL — see <see cref="PresentedRecommendation"/> — and this set is ASSEMBLED by
 /// the tool layer from those calls, from the code-derived <see cref="InterestMap"/>, and
 /// from the replenishment lane.
@@ -225,6 +225,19 @@ public static class PresentRecommendationArguments
 
     /// <summary>Argument name for the out-of-stock acknowledgement.</summary>
     public const string OutOfStock = "outOfStock";
+
+    /// <summary>
+    /// Argument name for the OPTIONAL user-side evidence — the customer signal the item is for,
+    /// and the purchase ids that evidence it (§8.1 / B-5).
+    /// </summary>
+    /// <remarks>
+    /// The fifth argument, and the only optional one. It was added to the tool without a constant
+    /// here, which is precisely the drift this class exists to prevent: the tool defined
+    /// <c>userEvidence</c>, the eval had no name to read it by, and the two lanes were one rename
+    /// away from the §0.5 / D-1 failure with nothing to catch it. Control C-12 asserts the schema
+    /// handed to the model names all five of these constants.
+    /// </remarks>
+    public const string UserEvidence = "userEvidence";
 }
 
 /// <summary>Which kind of catalogue fact an <see cref="EvidenceRef"/> points at.</summary>

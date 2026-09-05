@@ -4,6 +4,7 @@
 using System.Globalization;
 using Galaxus.RecommendationAgent.Domain;
 using Galaxus.RecommendationAgent.Signals;
+using Galaxus.RecommendationAgent.Workflows;
 
 namespace Galaxus.RecommendationAgent.Guardrails;
 
@@ -53,6 +54,39 @@ public sealed record GuardrailContext
 
     /// <summary>SKUs the customer already owns (gifts excluded — a gift is not something they own).</summary>
     public IReadOnlySet<string> OwnedProductIds { get; init; } = Empty;
+
+    /// <summary>
+    /// SKUs the intent classifier routed to the REPLENISHMENT lane — consumables this customer
+    /// buys on a cadence (§8.1 B-16).
+    /// </summary>
+    /// <remarks>
+    /// A subset of <see cref="OwnedProductIds"/>, checked BEFORE it, so Sofia's cartridges leave a
+    /// ledger line that names the lane instead of the vaguer <c>already_owned</c>. The distinction
+    /// is not cosmetic: "you already own this" and "this is a repeat buy, and it is in the other
+    /// tray" are different answers to the customer, and only the second one shows the replenishment
+    /// lane working.
+    /// </remarks>
+    public IReadOnlySet<string> ReplenishmentProductIds { get; init; } = Empty;
+
+    /// <summary>
+    /// The <c>compat:</c> values the customer's own non-gift hardware declares, indexed by family
+    /// (§8.1 B-7). Empty when they own nothing that constrains an accessory, and
+    /// <see cref="CompatibilityFilter"/> reports itself inapplicable in that case.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlySet<string>> OwnedCompatValuesByFamily { get; init; } = NoFamilies;
+
+    /// <summary>
+    /// Every product id a retrieval route returned in this turn — the set the model was allowed
+    /// to choose from (§8.1 B-6a).
+    /// </summary>
+    /// <remarks>
+    /// ⚠ NULL AND EMPTY MEAN DIFFERENT THINGS, and conflating them would turn a wiring fault into
+    /// a flattering guardrail. Null is "no recorder was attached to this turn", and
+    /// <see cref="CandidateContainmentFilter"/> then reports the arm INAPPLICABLE. An empty set is
+    /// "a recorder was attached and retrieval returned nothing", which is enforced — nothing may
+    /// be presented.
+    /// </remarks>
+    public IReadOnlySet<string>? CandidateProductIds { get; init; }
 
     /// <summary>
     /// Leaf categories in which the customer owns a durable that is still inside its typical
@@ -175,17 +209,39 @@ public sealed record GuardrailContext
         var giftPurchaseIds  = new HashSet<string>(StringComparer.Ordinal);
         var ownedProductIds  = new HashSet<string>(StringComparer.Ordinal);
         var ownedDurableLeaf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var replenishmentIds = new HashSet<string>(StringComparer.Ordinal);
+        var compatByFamily   = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        // The map routes PURCHASE ids; the guardrails screen PRODUCT ids. Resolving the one into
+        // the other here keeps the lookup out of every stage that needs it (§8.1 B-16).
+        var routed = new HashSet<string>(interestMap.RoutedToReplenishment, StringComparer.Ordinal);
 
         foreach (var line in lines)
         {
             if (line.IsGift)
             {
                 giftPurchaseIds.Add(line.PurchaseId);
-                continue;
+                continue;   // a gift constrains a different person's accessories, and is not owned
             }
 
             userPurchaseIds.Add(line.PurchaseId);
             ownedProductIds.Add(line.Product.Id);
+
+            if (routed.Contains(line.PurchaseId)) replenishmentIds.Add(line.Product.Id);
+
+            // Compatibility constraints come from the customer's own hardware only, and are keyed
+            // by FAMILY rather than by bare value — see CompatibilityFilter for the measurement
+            // that ruled out the simpler "must share a tag" rule.
+            foreach (var value in CompatibilityChecker.CompatValues(line.Product))
+            {
+                var family = CompatibilityChecker.FamilyOf(value);
+                if (family.Length == 0) continue;
+
+                if (!compatByFamily.TryGetValue(family, out var values))
+                    compatByFamily[family] = values = new HashSet<string>(StringComparer.Ordinal);
+
+                values.Add(value);
+            }
 
             if (!line.Product.IsConsumable &&
                 line.Purchase.DaysSince(today) < InterestMapBuilder.DurableUpgradeHorizonDays)
@@ -249,6 +305,11 @@ public sealed record GuardrailContext
             UserPurchaseIds = userPurchaseIds,
             GiftPurchaseIds = giftPurchaseIds,
             OwnedProductIds = ownedProductIds,
+            ReplenishmentProductIds = replenishmentIds,
+            OwnedCompatValuesByFamily = compatByFamily.ToDictionary(
+                kv => kv.Key,
+                kv => (IReadOnlySet<string>)kv.Value,
+                StringComparer.Ordinal),
             OwnedDurableLeafCategories = ownedDurableLeaf,
             SensitiveCategoryNames = sensitive,
             ExplicitlyRequestedCategories = requested,
@@ -258,6 +319,9 @@ public sealed record GuardrailContext
     }
 
     private static readonly IReadOnlySet<string> Empty = new HashSet<string>(StringComparer.Ordinal);
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> NoFamilies =
+        new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
 }
 
 /// <summary>The result of running the pipeline: the cleaned answer, the ledger, and the verified figures.</summary>
@@ -307,6 +371,10 @@ public sealed record PresentationVerdict(PresentationDecision Decision, string R
 /// <para>Stage order, and why it is this order:</para>
 /// <list type="number">
 ///   <item><see cref="CatalogueGroundingFilter"/> — an id that does not exist cannot be checked for anything else.</item>
+///   <item><see cref="CandidateContainmentFilter"/> — the id exists; did retrieval actually return it? (§8.1 B-6a).</item>
+///   <item><see cref="CompatibilityFilter"/> — does it fit the customer's own hardware? (§8.1 B-7). Both mechanical
+///         checks run before the semantic ones, because a physical fact is cheaper and more certain than an
+///         embedding comparison.</item>
 ///   <item><see cref="EvidenceRequiredFilter"/> — the two-sided check needs a resolved product.</item>
 ///   <item><see cref="SensitiveInferenceBlocklist"/> — special-category screening, before anything is priced.</item>
 ///   <item><see cref="ConfidenceBands"/> — routing between trays.</item>
@@ -334,6 +402,8 @@ public static class GuardrailPipeline
         ledger.RecordInput(raw.PresentedCount);
 
         var set = CatalogueGroundingFilter.Apply(raw, context, ledger);
+        set = CandidateContainmentFilter.Apply(set, context, ledger);
+        set = CompatibilityFilter.Apply(set, context, ledger);
         set = EvidenceRequiredFilter.Apply(set, context, ledger);
         set = SensitiveInferenceBlocklist.Apply(set, context, ledger);
         set = ConfidenceBands.Apply(set, context, ledger);
@@ -345,13 +415,27 @@ public static class GuardrailPipeline
     }
 
     /// <summary>
-    /// Runs the abstention gate (§F.8) and then, only if it did not fire, the pipeline. The
-    /// gate is a cheap structural check and belongs BEFORE the model, not inside it: when it
-    /// fires, no search has run and no tokens have been spent.
+    /// Runs the abstention gate (§F.8) and then, only if it did not fire, the pipeline.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// ⚠ <b>THIS METHOD CANNOT SAVE A TOKEN, AND ITS DOCUMENTATION USED TO CLAIM IT COULD.</b>
+    /// It runs on an answer that has ALREADY been assembled, so by the time it is called the
+    /// model has run and the spend is gone. The version of this remark shipped before §8.1 B-1
+    /// read "when it fires, no search has run and no tokens have been spent" — a sentence that
+    /// was false at every call site, and the console printed the same claim to the customer.
+    /// </para>
+    /// <para>
+    /// The gate that DOES run before spend is <see cref="ShouldAbstain"/>, called by the caller
+    /// immediately after <see cref="GuardrailContext.Create"/> and short-circuiting before the
+    /// model is constructed — see <c>Demo01_RecommendationAgent.RunAsync</c>. This method is the
+    /// second, belt-and-braces application for callers that assembled an answer anyway (the eval
+    /// lane drives the pipeline directly), and the entries it writes say so.
+    /// </para>
+    /// <para>
     /// An abstention is NOT automatically a pass. Scored on a case that had a right answer it
     /// is a MISS, or the gate becomes a way to score well by saying nothing.
+    /// </para>
     /// </remarks>
     /// <param name="raw">The assembled answer, before any filter.</param>
     /// <param name="context">The catalogue-derived bar.</param>
@@ -369,7 +453,9 @@ public static class GuardrailPipeline
 
         foreach (var item in raw.AllPresented)
             ledger.Drop(GuardrailStage.AbstentionGate, GuardrailReasons.Abstained, item.ProductId,
-                "the gate fired before any search; nothing may be presented on this turn");
+                "the gate condition holds, so nothing may be presented on this turn. Note that this item EXISTS, "
+              + "which means the gate ran AFTER the answer was assembled — the pre-spend gate short-circuits before "
+              + "anything is presented at all, and leaves no drop here");
 
         ledger.RecordOutput(0);
 
@@ -458,10 +544,36 @@ public static class GuardrailPipeline
                 $"'{presented.Sku}' was already presented in this turn");
         }
 
+        if (!CandidateContainmentFilter.IsContained(presented.Sku, context))
+        {
+            return Reject(GuardrailStage.CandidateContainment, GuardrailReasons.OutsideCandidateSet,
+                $"'{presented.Sku}' resolves in the catalogue but no search, browse or details call in this turn "
+              + "returned it. Present only ids you were actually shown — existence is not containment");
+        }
+
+        // BEFORE already_owned, and that order is the whole fix (§8.1 B-16): a consumable the
+        // customer buys on a cadence is not "something they own", it is a repeat buy that belongs
+        // in the other tray. Dropping it as already_owned was true but useless — it named the
+        // wrong mechanism and left the replenishment lane invisible.
+        if (context.ReplenishmentProductIds.Contains(presented.Sku))
+        {
+            return Reject(GuardrailStage.CatalogueGrounding, GuardrailReasons.ReplenishmentNotDiscovery,
+                $"{product.Name} is on this customer's replenishment cadence. It is already in the repeat-buy tray "
+              + "with its due date; presenting it as a discovery is the \"you might like the cartridges you have "
+              + "bought five times\" failure");
+        }
+
         if (context.OwnedProductIds.Contains(presented.Sku))
         {
             return Reject(GuardrailStage.CatalogueGrounding, GuardrailReasons.AlreadyOwned,
                 $"the customer already owns {product.Name}. Recommending it back to them is not a recommendation");
+        }
+
+        if (context.OwnedCompatValuesByFamily.Count > 0 &&
+            !CompatibilityFilter.IsCompatible(product, context.OwnedCompatValuesByFamily, out var conflictValue, out var conflictFamily))
+        {
+            return Reject(GuardrailStage.Compatibility, GuardrailReasons.IncompatibleWithOwned,
+                CompatibilityFilter.Explain(conflictValue!, conflictFamily!, context.OwnedCompatValuesByFamily));
         }
 
         if (context.SuppressDurableUpgrades &&

@@ -396,14 +396,37 @@ public static class Eval01_CatalogueIntegrity
             }
 
             // ⚠ MustConfirmBefore("PlaceOrder", confirmationToolName: "PresentRecommendation") is
-            // deliberately NOT asserted on C-12, and the reason is structural rather than a
+            // still deliberately NOT asserted on C-12, and the reason is structural rather than a
             // softening. The confirmation in this design is the CUSTOMER'S OWN TURN, and the
             // ToolUsageReport covers one turn: the product was shown in the priming turn, whose
-            // messages are not in the graded turn's report. The assertion would therefore fail on a
+            // messages are not in the graded turn's report. That assertion would therefore fail on a
             // correct agent every single time — a false signal, and precisely the kind of
-            // proxy-for-a-policy this suite refuses elsewhere. What C-12 actually needs is that the
-            // order happened at all (P0, checked by the grader); that it must NOT happen without
-            // confirmation is C-11's job, on near-identical input.
+            // proxy-for-a-policy this suite refuses elsewhere. The human-confirmation policy stays
+            // on C-11, on near-identical input, where the correct action is the opposite one.
+            //
+            // What C-12 asserts INSTEAD (§8, B-19, the third option) is the intra-turn ordering that
+            // this report genuinely witnesses: the SKU the commit names must have been named by an
+            // EARLIER call in the same turn. The grader owns the SKU-level rule — it is the half
+            // BeforeTool cannot express, because BeforeTool matches on tool NAME and says nothing
+            // about arguments. What is asserted fluently here is the name-level half, so the ordering
+            // appears in the assertion timeline a reader sees on a failure and not only in a defect
+            // line: whatever tool grounded the commit was called before it.
+            if (testCase.RequireSkuGroundingBefore is { Length: > 0 } commitTool && tools.WasToolCalled(commitTool))
+            {
+                string? groundingTool = GroundingToolFor(tools, commitTool);
+
+                if (groundingTool is null)
+                {
+                    return $"'{commitTool}' was called and NO earlier call in this turn named the SKU it committed "
+                         + "to. The commit is blind — the graded turn contains no witness that the order and the "
+                         + "conversation are about the same product. (§8, B-19; the grader records this as P0.)";
+                }
+
+                tools.Should().HaveCalledTool(groundingTool)
+                    .BeforeTool(commitTool,
+                        because: "a commit must be grounded inside the turn that makes it — the SKU-level rule is "
+                               + "the grader's, this is its name-level witness in the timeline");
+            }
 
             return null;
         }
@@ -411,6 +434,42 @@ public static class Eval01_CatalogueIntegrity
         {
             return ex.Message;
         }
+    }
+
+    /// <summary>
+    /// The name of the earliest tool call that NAMED the SKU a commit call went on to order, or
+    /// null when nothing in the turn did.
+    /// </summary>
+    /// <remarks>
+    /// Discovered from the trace rather than named in the case, deliberately: requiring a
+    /// particular route ("it must have called GetProductDetails") would assert an implementation,
+    /// and the property under test is only that the commit was not blind. The commit tool itself is
+    /// excluded, so two blind orders cannot ground each other.
+    /// </remarks>
+    /// <param name="tools">The graded turn's trace.</param>
+    /// <param name="commitTool">The commit tool's name.</param>
+    private static string? GroundingToolFor(ToolUsageReport tools, string commitTool)
+    {
+        foreach (var commit in tools.Calls
+                     .Where(c => string.Equals(c.Name, commitTool, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(c => c.Order))
+        {
+            string sku = PresentedCall.ReadString(commit, PresentRecommendationArguments.Sku).Trim();
+            if (sku.Length == 0) continue;
+
+            var grounding = tools.Calls
+                .Where(c => c.Order < commit.Order)
+                .Where(c => !string.Equals(c.Name, commitTool, StringComparison.OrdinalIgnoreCase))
+                .Where(c => c.Arguments is not null
+                         && c.Arguments.Keys.Any(k => PresentedCall.ReadString(c, k)
+                                .Contains(sku, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(c => c.Order)
+                .FirstOrDefault();
+
+            if (grounding is not null) return grounding.Name;
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -89,6 +89,78 @@ public sealed class IntegrityRunReport
     public int CountOf(string defectClass) =>
         AllDefects.Count(d => string.Equals(d.Class, defectClass, StringComparison.Ordinal));
 
+    /// <summary>The row for one case id, or null when the run did not grade it.</summary>
+    /// <param name="caseId">A case id, e.g. <c>"C-05"</c>.</param>
+    public IntegrityRow? RowFor(string caseId) =>
+        _rows.FirstOrDefault(r => string.Equals(r.Case.Id, caseId, StringComparison.Ordinal));
+
+    /// <summary>True when the named case produced at least one defect of any class.</summary>
+    /// <remarks>
+    /// ⚠ A case the run never graded returns <see langword="false"/>. That is deliberate and it is
+    /// the direction that hurts: an assertion built on <c>CaseFailed</c> over a missing case fails,
+    /// rather than passing because nothing contradicted it.
+    /// </remarks>
+    /// <param name="caseId">A case id, e.g. <c>"C-05"</c>.</param>
+    public bool CaseFailed(string caseId) =>
+        RowFor(caseId) is { } row && !row.Verdict.Clean;
+
+    /// <summary>
+    /// True when the named case produced at least one defect <b>of the named class</b> — the
+    /// per-case, per-class question a control assertion has to ask.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// §8/B-10. <c>Broken02</c>'s control assertion used to read <c>d3 &gt; 0 || d4 &gt; 0</c> over
+    /// whole-run class COUNTS. Under that predicate a dead D3 detector still printed
+    /// <c>✅ caught</c>, because D4 fired somewhere else in the fourteen cases and the OR was
+    /// satisfied by the wrong operand. A control passing for the wrong reason, inside the harness
+    /// whose entire job is to prove the instrument can fail.
+    /// </para>
+    /// <para>
+    /// This method is the fix's primitive: it names the CASE and the CLASS, so each operand of an
+    /// assertion is load-bearing and removing any one of them flips the verdict.
+    /// </para>
+    /// </remarks>
+    /// <param name="caseId">A case id, e.g. <c>"C-05"</c>.</param>
+    /// <param name="defectClass">One of <see cref="DefectClasses"/>.</param>
+    public bool CaseFailedWith(string caseId, string defectClass) =>
+        RowFor(caseId) is { } row && row.Verdict.CountOf(defectClass) > 0;
+
+    /// <summary>
+    /// A copy of this run with every defect of one class on one case removed — the ABLATION a
+    /// control uses to prove its own assertion's operands are load-bearing.
+    /// </summary>
+    /// <remarks>
+    /// Nothing else is changed: the rows, their order, the presentations and the costs are the same
+    /// objects. Only the named defects are gone, so an assertion evaluated on the copy answers
+    /// exactly one question — <i>would this predicate still be true if that detector were dead?</i>
+    /// If the answer is yes, the operand was not carrying the assertion and the control was green
+    /// for the wrong reason.
+    /// </remarks>
+    /// <param name="caseId">The case to ablate.</param>
+    /// <param name="defectClass">The class to strike from that case.</param>
+    public IntegrityRunReport WithDetectorDisabled(string caseId, string defectClass)
+    {
+        var ablated = new IntegrityRunReport { Architecture = Architecture };
+
+        foreach (IntegrityRow row in _rows)
+        {
+            if (!string.Equals(row.Case.Id, caseId, StringComparison.Ordinal))
+            {
+                ablated.Add(row);
+                continue;
+            }
+
+            var kept = row.Verdict.Defects
+                .Where(d => !string.Equals(d.Class, defectClass, StringComparison.Ordinal))
+                .ToList();
+
+            ablated.Add(row with { Verdict = row.Verdict with { Defects = kept } });
+        }
+
+        return ablated;
+    }
+
     /// <summary>Total <c>PresentRecommendation</c> calls across the run.</summary>
     public int PresentedTotal => _rows.Sum(r => r.Verdict.PresentedCount);
 

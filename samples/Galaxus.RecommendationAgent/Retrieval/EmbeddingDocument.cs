@@ -49,7 +49,7 @@ public static class EmbeddingDocument
     /// <see cref="ForProduct"/> changes: a stale asset then FAILS LOUDLY instead of silently
     /// retrieving against vectors computed for text that no longer exists.
     /// </summary>
-    public const string TemplateVersion = "v1";
+    public const string TemplateVersion = "v2";
 
     /// <summary>Maximum description characters carried into the document (§D.1).</summary>
     public const int DescriptionCharacterBudget = 320;
@@ -63,12 +63,30 @@ public static class EmbeddingDocument
     /// <summary>
     /// Tag prefixes that compose the <c>Use:</c> line. <c>compat:</c> is absent by design.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>mode:</c> is the B-8 fix and this list is why it needed a code change.</b> The
+    /// design's §8.1 row expected <c>mode:on-foot</c> / <c>mode:on-bike</c> to be a seed edit
+    /// alone; it is not, because this list is CLOSED — a tag whose prefix is absent here never
+    /// reaches the <c>Use:</c> line and therefore never reaches the vector, so the token would
+    /// have been authored into the seed and read by nothing. The measured failure it closes:
+    /// <c>trip:multi-day</c> is mode-agnostic, so a bike multi-tool and a trekking pack were
+    /// neighbours on the one line that is supposed to carry use context.
+    /// </para>
+    /// <para>
+    /// <c>mode:</c> is deliberately NOT added to
+    /// <c>InterestMapBuilder.ContextTagPrefixes</c>: a mode of travel is a retrieval
+    /// DISCRIMINATOR, not an interest, and admitting it there would rewrite every persona's
+    /// derived label and with it Eval 02's latent-gold derivation, for no gain.
+    /// </para>
+    /// </remarks>
     public static IReadOnlyList<string> UseTagPrefixes { get; } =
     [
         "context:",
         "trip:",
         "weight:",
         "skill:",
+        "mode:",
     ];
 
     /// <summary>Index of the <c>Use:</c> line inside <see cref="LinesFor"/>. The load-bearing line.</summary>

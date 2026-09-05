@@ -390,11 +390,24 @@ public sealed record RetrievalResult(IReadOnlyList<RetrievalHit> Hits, Retrieval
     /// <summary>True when nothing survived. A legitimate answer, and one the abstention gate reads.</summary>
     public bool IsEmpty => Hits.Count == 0;
 
-    /// <summary>
-    /// The best fused score, or 0 when empty. §F.8's post-hoc abstention arm reads this:
-    /// "the gate also fires if the best fused retrieval score is below the floor".
-    /// </summary>
-    public double TopFusedScore => Hits.Count == 0 ? 0.0 : Hits[0].Score;
+    // B-14(a) — TopFusedScore was here, and §F.8's post-hoc abstention arm ("the gate also fires
+    // if the best fused retrieval score is below the floor") is struck with it. It was never
+    // read: its declaration was its only reference, which is the third state §8.1 refuses to
+    // leave standing. It is deleted rather than wired because the quantity it exposed cannot
+    // carry a floor. The fused score is Reciprocal Rank Fusion — see HybridRetriever.RrfK — so
+    // Hits[0].Score is a sum of 1/(60 + rank) over the legs that returned the item, and nothing
+    // else. It reports HOW MANY LEGS AGREED, not how good the top hit is.
+    //
+    // MEASURED over all 40 derived interest labels of the 14 personas (every query Demo 1's
+    // offline arm actually issues): the statistic is BIMODAL. Twelve labels score exactly
+    // 1/61 = 0.016393 — the dense leg alone — and the other twenty-eight land in
+    // 0.028787 .. 0.032787, a 14% spread whose top is exactly 2/61. Quality does not track it:
+    // Elena's "Heart-rate monitors", which returns only two candidates, scores the same
+    // 0.016393 as Nadia's headline conjunction, which returns six good ones; and Sofia's
+    // "Whole beans" and Renzo's "Hiking shoes" both sit at the 2/61 ceiling. A floor anywhere in
+    // that range separates one-leg queries from two-leg queries and nothing else — it would have
+    // printed as an abstention reason while measuring leg agreement. The real, calibratable
+    // floor is the dense one, RetrievalDiagnostics.DenseScoreFloor.
 
     /// <summary>
     /// The retrieved product ids, in rank order. Recomputed on each access (deliberately — a

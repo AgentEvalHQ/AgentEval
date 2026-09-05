@@ -111,16 +111,37 @@ public static class GalaxusTools
     /// <summary>True once <see cref="Bind"/> has been called.</summary>
     public static bool IsBound => Retriever is not null;
 
-    /// <summary>Binds the retriever the three semantic tools search through.</summary>
+    /// <summary>
+    /// The market every semantic query is gated on (§8.1 B-17). Set by <see cref="Bind"/>;
+    /// <see cref="RetrievalQuery.DefaultMarket"/> until it is.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ It lives beside the retriever rather than on each tool because the frozen tool signatures
+    /// have no market argument, and adding one would let the MODEL choose the market it is served
+    /// in — which is not the model's decision to make. The customer's market is a fact from the
+    /// profile, so the composition root binds it once, at the same seam as the index.
+    /// </remarks>
+    public static string Market { get; private set; } = RetrievalQuery.DefaultMarket;
+
+    /// <summary>Binds the retriever the three semantic tools search through, and the market they are gated on.</summary>
     /// <param name="retriever">The hybrid retriever built at startup, or any other implementation of the seam.</param>
-    public static void Bind(IProductRetriever retriever)
+    /// <param name="market">
+    /// The customer's market code. Null or blank keeps <see cref="RetrievalQuery.DefaultMarket"/>,
+    /// which is what every caller got before §8.1 B-17 — including Sofia, who is in DE.
+    /// </param>
+    public static void Bind(IProductRetriever retriever, string? market = null)
     {
         ArgumentNullException.ThrowIfNull(retriever);
         Retriever = retriever;
+        Market = string.IsNullOrWhiteSpace(market) ? RetrievalQuery.DefaultMarket : market.Trim().ToUpperInvariant();
     }
 
-    /// <summary>Releases the bound retriever. Used by tests; the demo binds once and keeps it.</summary>
-    public static void Unbind() => Retriever = null;
+    /// <summary>Releases the bound retriever and resets the market. Used by tests; the demo binds once and keeps it.</summary>
+    public static void Unbind()
+    {
+        Retriever = null;
+        Market = RetrievalQuery.DefaultMarket;
+    }
 
     /// <summary>
     /// Fails fast when the composition root forgot to bind a retriever. Call it at startup: a
@@ -154,13 +175,24 @@ public static class GalaxusTools
     /// SEARCH NEED surfaced a SKU gives the assembler a third option that is neither: the user
     /// side becomes the signal whose query actually returned the product.
     /// </para>
-    /// <para>Outside a scope both collections stay empty and nothing is recorded.</para>
+    /// <para>
+    /// Since §8.1 B-5 the tool carries a fifth argument for the user side, so provenance is now
+    /// the FALLBACK rather than the only option. Both are recorded, and
+    /// <c>Demo01_RecommendationAgent</c> says in the ledger which one produced the numbers.
+    /// </para>
+    /// <para>Outside a scope every collection stays empty and nothing is recorded.</para>
     /// </remarks>
+    /// <param name="advisoryContext">
+    /// Optional catalogue-derived bar. When supplied, <see cref="PresentRecommendation"/> runs
+    /// <see cref="GuardrailPipeline.Screen"/> against it in ADVISORY mode and returns the verdict
+    /// as a warning (§8.1 B-13) — nothing is rewritten and nothing is refused; the call is still
+    /// recorded exactly as the model made it.
+    /// </param>
     /// <returns>A scope; dispose it to restore the enclosing capture (or none).</returns>
-    public static IDisposable BeginRunCapture()
+    public static IDisposable BeginRunCapture(GuardrailContext? advisoryContext = null)
     {
         var previous = Capture.Value;
-        Capture.Value = new RunCapture();
+        Capture.Value = new RunCapture(advisoryContext);
         return new CaptureScope(previous);
     }
 
@@ -182,6 +214,30 @@ public static class GalaxusTools
     /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> RetrievalProvenanceInCurrentRun =>
         Capture.Value?.SnapshotProvenance() ?? EmptyProvenance;
+
+    /// <summary>
+    /// The <c>userEvidence</c> argument of every presentation in this run, verbatim, INDEX-ALIGNED
+    /// with <see cref="PresentedInCurrentRun"/> (§8.1 B-5). A null entry means the model omitted it.
+    /// </summary>
+    /// <remarks>
+    /// Aligned by position rather than keyed by SKU because a duplicate presentation is a defect
+    /// that must stay visible: keying on the SKU would silently merge the two calls and hide it.
+    /// </remarks>
+    public static IReadOnlyList<string?> UserEvidenceInCurrentRun =>
+        Capture.Value?.SnapshotUserEvidence() ?? [];
+
+    /// <summary>
+    /// Every product id a retrieval route returned in this run — the set the model was allowed to
+    /// choose from (§8.1 B-6a). NULL outside a capture scope, which is not the same as empty.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ The null/empty distinction is load-bearing and is honoured all the way down into
+    /// <see cref="CandidateContainmentFilter"/>: null means "nothing was recording", and the
+    /// containment arm then declares itself inapplicable rather than dropping every item and
+    /// looking like a guardrail that worked.
+    /// </remarks>
+    public static IReadOnlySet<string>? CandidateSetInCurrentRun =>
+        Capture.Value?.SnapshotCandidates();
 
     // ── Shared authorities ────────────────────────────────────────────────────
 
@@ -255,7 +311,10 @@ public static class GalaxusTools
             CategoryPathPrefix = string.IsNullOrWhiteSpace(categoryPathPrefix) ? null : categoryPathPrefix.Trim(),
             MaxPriceChf = maxPriceChf,
             InStockOnly = inStockOnly,
-            TopK = topK
+            TopK = topK,
+            // §8.1 B-17. RetrievalQuery.For leaves Market at the CH default, so every semantic
+            // search ran in Galaxus's home market whoever the customer was — Sofia is in DE.
+            Market = Market
         };
 
         var result = await retriever.SearchAsync(query).ConfigureAwait(false);
@@ -295,7 +354,7 @@ public static class GalaxusTools
         // The anchor's own stored vector drives the dense leg, and RetrievalQuery.IsSameModelVariant
         // suppresses other trims of the same model — "alternatives, not padding". Both live in the
         // retrieval seam so the tool cannot disagree with the index about what a variant is.
-        var query = RetrievalQuery.SimilarTo(anchor, Math.Clamp(topK, 1, 8));
+        var query = RetrievalQuery.SimilarTo(anchor, Math.Clamp(topK, 1, 8), Market);
 
         var result = await retriever.SearchAsync(query).ConfigureAwait(false);
         RecordProvenance(query.Need, result);
@@ -357,7 +416,7 @@ public static class GalaxusTools
             return candidateCompat.Overlaps(anchorCompat);
         }
 
-        var query = RetrievalQuery.ComplementsOf(anchor, need, IsCompatible, Math.Clamp(topK, 1, 8));
+        var query = RetrievalQuery.ComplementsOf(anchor, need, IsCompatible, Math.Clamp(topK, 1, 8), Market);
 
         var result = await retriever.SearchAsync(query).ConfigureAwait(false);
         RecordProvenance(query.Need, result);
@@ -552,6 +611,7 @@ public static class GalaxusTools
 
         await Task.Delay(StructuredLatencyMs).ConfigureAwait(false);
         ToolCallBudget.Remember(nameof(GetProductDetails), key, [product.Id]);
+        RecordCandidates([product.Id]);   // §8.1 B-6a — a details call is a retrieval route too
 
         var digest = Cat.DigestFor(product.Id);
         // Catalogue.AttributesOf is the MEMOISED token set. Product.Attributes recomputes on
@@ -705,6 +765,7 @@ public static class GalaxusTools
             .ToArray();
 
         ToolCallBudget.Remember(nameof(BrowseCategory), key, [.. listed.Select(p => p.productId)]);
+        RecordCandidates(listed.Select(p => p.productId));   // §8.1 B-6a
 
         return ToolJson.Ok(new
         {
@@ -796,11 +857,26 @@ public static class GalaxusTools
     /// The budget COUNTS this call but never refuses it (§F.9, deviation documented on
     /// <see cref="ToolCallBudget"/>): a spent budget must bound the spend, not silence the answer.
     /// </para>
+    /// <para>
+    /// <b>FIVE arguments since §8.1 B-5, and the first four keep their names.</b> The signature is
+    /// a contract the eval lane reads by name (<c>PresentRecommendationArguments</c>), so
+    /// <paramref name="userEvidence"/> is an ADDITION — nothing was renamed and nothing moved.
+    /// Before it, the tool carried only the product half of §F.3's two-sided evidence and the
+    /// customer half had to be derived, which made the user-side arm unable to fail on any turn.
+    /// </para>
     /// </remarks>
     /// <param name="sku">The product id being recommended.</param>
     /// <param name="reason">Two sentences addressed to the customer, naming the trade-off. No prices.</param>
     /// <param name="evidence">A citation of the form <c>attr:&lt;token&gt;</c> or <c>review:&lt;id&gt;</c>.</param>
     /// <param name="outOfStock">True when the SKU has no stock and is being offered as an alternative anyway.</param>
+    /// <param name="userEvidence">
+    /// The USER side of §F.3's two-sided evidence (§8.1 B-5): the interest label this
+    /// recommendation serves and the purchase ids that evidence it, as
+    /// <c>label | PUR-AA-01,PUR-AA-02</c>. OPTIONAL — omitting it makes Demo 1 fall back to
+    /// deriving the user side from retrieval provenance and record in the ledger that the
+    /// user-side arm could not fire. Requiring it would drop every recommendation on a turn where
+    /// the model forgot, which is a wiring fault wearing a guardrail's clothes.
+    /// </param>
     [Description("Present ONE recommendation to the customer. This is the ONLY way to recommend anything: a "
                + "product named only in your prose is not shown and does not count. Call it once per product, in "
                + "the order you want them shown. The 'evidence' argument must be a citation returned by "
@@ -811,9 +887,15 @@ public static class GalaxusTools
         [Description("Product id to recommend, exactly as returned by a search, browse or details call, e.g. 'GLX-1042'.")] string sku,
         [Description("Two sentences addressed to the customer, naming the trade-off and the purchases that made you think of it. No prices, no stock numbers.")] string reason,
         [Description("The catalogue citation backing the claim: 'attr:<token>' or 'review:<id>', copied verbatim from GetProductDetails.")] string evidence,
-        [Description("Set true when this product has no stock and you are offering it as an alternative anyway. Never leave it false for an out-of-stock product.")] bool outOfStock = false)
+        [Description("Set true when this product has no stock and you are offering it as an alternative anyway. Never leave it false for an out-of-stock product.")] bool outOfStock = false,
+        [Description("The CUSTOMER side of the evidence, as '<interest label> | <purchase id>,<purchase id>'. Copy "
+                   + "the label verbatim from GetInterestMap and list only the purchase ids GetInterestMap gives for "
+                   + "THAT label — an id of this customer's that belongs to a different interest is checked and drops "
+                   + "the recommendation. For a need the customer stated in this conversation, give the label alone "
+                   + "with no purchase ids.")] string? userEvidence = null)
     {
-        Console.WriteLine($"   ⭐ PresentRecommendation(\"{sku}\", evidence=\"{evidence}\"{(outOfStock ? ", outOfStock=true" : "")})");
+        Console.WriteLine($"   ⭐ PresentRecommendation(\"{sku}\", evidence=\"{evidence}\"{(outOfStock ? ", outOfStock=true" : "")}"
+                        + $"{(string.IsNullOrWhiteSpace(userEvidence) ? "" : $", userEvidence=\"{Clip(userEvidence, 40)}\"")})");
 
         // Counted on the ANSWER channel, never refused, never charged to a cap, and never
         // memoised — a duplicate presentation is a defect that must stay visible. See the remarks.
@@ -825,8 +907,9 @@ public static class GalaxusTools
             evidence ?? string.Empty,
             outOfStock);
 
-        var position = Capture.Value?.RecordPresentation(presented) ?? 0;
-        var duplicate = Capture.Value?.CountForSku(presented.Sku) is > 1;
+        var capture = Capture.Value;
+        var position = capture?.RecordPresentation(presented, userEvidence) ?? 0;
+        var duplicate = capture?.CountForSku(presented.Sku) is > 1;
 
         await Task.Delay(StructuredLatencyMs).ConfigureAwait(false);
 
@@ -858,6 +941,34 @@ public static class GalaxusTools
 
         if (duplicate)
             warnings.Add($"'{presented.Sku}' has already been presented in this turn. Present each product once.");
+
+        if (string.IsNullOrWhiteSpace(userEvidence))
+            warnings.Add("No 'userEvidence' was given, so the customer side of the evidence has to be DERIVED from "
+                       + $"whichever search surfaced this product. Supply it as \"{UserEvidenceRef.Format}\": a "
+                       + "derived user side cannot be checked, and the ledger records that it was not.");
+
+        // ── §8.1 B-13: every remaining warning comes from GuardrailPipeline.Screen ──────────
+        //
+        // Screen was ninety lines with no call site, while this method hand-rolled a partly
+        // overlapping list beside it. Now there is ONE rule set: a rule added to Screen reaches the
+        // model with no second edit here. ADVISORY means advisory — the verdict becomes a sentence,
+        // the ledger it writes into is a throwaway, and the call stays recorded exactly as the
+        // model made it. Running Screen in its REJECTING mode would break D-1's record-verbatim
+        // rule and make defect classes that must stay visible unable to fire.
+        if (capture?.AdvisoryContext is { } advisoryContext)
+        {
+            var verdict = GuardrailPipeline.Screen(
+                presented, advisoryContext, new GuardrailLedger(), capture.SkusPresentedBefore(position));
+
+            if (verdict.Decision != PresentationDecision.Accept &&
+                !warnings.Any(w => w.Contains(verdict.Detail, StringComparison.Ordinal)))
+            {
+                var consequence = verdict.Decision == PresentationDecision.Reject
+                    ? "will be REMOVED before the customer sees it"
+                    : "will be DEMOTED to 'also consider'";
+                warnings.Add($"Guardrail screen ({verdict.Reason}): {verdict.Detail}. This recommendation {consequence}.");
+            }
+        }
 
         if (warnings.Count == 0)
         {
@@ -1074,7 +1185,37 @@ public static class GalaxusTools
     private static void RecordProvenance(string need, RetrievalResult result)
     {
         if (Capture.Value is not { } capture) return;
-        foreach (var hit in result.Hits) capture.RecordProvenance(hit.ProductId, need);
+        foreach (var hit in result.Hits)
+        {
+            capture.RecordProvenance(hit.ProductId, need);
+            capture.RecordCandidate(hit.ProductId);
+        }
+    }
+
+    /// <summary>
+    /// Adds product ids to the turn's CANDIDATE SET — everything a retrieval route actually put in
+    /// front of the model (§8.1 B-6a).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Distinct from <see cref="RecordProvenance"/> on purpose. Provenance answers "which search
+    /// NEED surfaced this?", which only the three semantic tools can answer; containment answers
+    /// "was this ever shown to you at all?", which every route can. Recording only the semantic
+    /// routes and then enforcing containment would have dropped a correctly-reasoned
+    /// <c>BrowseCategory</c> find for the route it arrived by — a guardrail firing on its own
+    /// wiring, in the flattering direction (it would have looked like a working filter).
+    /// </para>
+    /// <para>
+    /// <see cref="CheckStockAndPrice"/> deliberately does NOT record: it is a lookup on an id the
+    /// model already holds, so treating it as a retrieval route would let the model launder any id
+    /// it invented into the candidate set by pricing it first.
+    /// </para>
+    /// </remarks>
+    /// <param name="productIds">The ids this route returned.</param>
+    private static void RecordCandidates(IEnumerable<string> productIds)
+    {
+        if (Capture.Value is not { } capture) return;
+        foreach (var id in productIds) capture.RecordCandidate(id);
     }
 
     private static string Clip(string? text, int max)
@@ -1085,17 +1226,34 @@ public static class GalaxusTools
     }
 
     /// <summary>The mutable per-run collection behind <see cref="BeginRunCapture"/>.</summary>
-    private sealed class RunCapture
+    /// <param name="advisoryContext">
+    /// The catalogue-derived bar the tool screens each presentation against, in ADVISORY mode
+    /// (§8.1 B-13). Null disables the advisory screen; the demo passes the very context the
+    /// pipeline will use afterwards, so the two can never disagree about the bar.
+    /// </param>
+    private sealed class RunCapture(GuardrailContext? advisoryContext)
     {
         private readonly List<PresentedRecommendation> _presented = [];
+        private readonly List<string?> _userEvidence = [];
         private readonly Dictionary<string, List<string>> _provenance = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _candidates = new(StringComparer.Ordinal);
         private readonly Lock _gate = new();
 
-        public int RecordPresentation(PresentedRecommendation presentation)
+        /// <summary>The bar the advisory screen measures against, or null when there is none.</summary>
+        public GuardrailContext? AdvisoryContext { get; } = advisoryContext;
+
+        /// <summary>
+        /// Records one presentation and the user side that came with it, keeping the two lists
+        /// index-aligned. Alignment is the contract the assembler reads them back on.
+        /// </summary>
+        /// <param name="presentation">The four frozen arguments.</param>
+        /// <param name="userEvidence">The fifth argument, verbatim, or null when it was omitted.</param>
+        public int RecordPresentation(PresentedRecommendation presentation, string? userEvidence)
         {
             lock (_gate)
             {
                 _presented.Add(presentation);
+                _userEvidence.Add(userEvidence);
                 return _presented.Count;
             }
         }
@@ -1104,6 +1262,15 @@ public static class GalaxusTools
         {
             lock (_gate)
                 return _presented.Count(p => string.Equals(p.Sku.Trim(), sku.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>The SKUs presented BEFORE the one at <paramref name="position"/> (1-based).</summary>
+        public IReadOnlySet<string> SkusPresentedBefore(int position)
+        {
+            lock (_gate)
+                return _presented.Take(Math.Max(0, position - 1))
+                                 .Select(p => p.Sku.Trim())
+                                 .ToHashSet(StringComparer.Ordinal);
         }
 
         public void RecordProvenance(string productId, string need)
@@ -1116,9 +1283,25 @@ public static class GalaxusTools
             }
         }
 
+        public void RecordCandidate(string productId)
+        {
+            if (string.IsNullOrWhiteSpace(productId)) return;
+            lock (_gate) _candidates.Add(productId.Trim());
+        }
+
         public IReadOnlyList<PresentedRecommendation> SnapshotPresented()
         {
             lock (_gate) return _presented.ToArray();
+        }
+
+        public IReadOnlyList<string?> SnapshotUserEvidence()
+        {
+            lock (_gate) return _userEvidence.ToArray();
+        }
+
+        public IReadOnlySet<string> SnapshotCandidates()
+        {
+            lock (_gate) return new HashSet<string>(_candidates, StringComparer.Ordinal);
         }
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> SnapshotProvenance()

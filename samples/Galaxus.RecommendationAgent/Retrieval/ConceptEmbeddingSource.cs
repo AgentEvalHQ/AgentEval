@@ -135,7 +135,13 @@ public sealed class ConceptEmbeddingSource : IEmbeddingSource
     /// part of it on purpose: a cached vector from <c>galaxus-concept-v1</c> must never be loaded
     /// into an index built by a later, differently-authored lexicon.
     /// </summary>
-    public const string ModelIdentifier = "galaxus-concept-v1";
+    /// <remarks>
+    /// Bumped to <c>v2</c> by the B-8 fix, which added the <c>"on bike"</c> phrase. The dimension
+    /// list and its order are unchanged — only the query-side lexicon grew — but a vector cached
+    /// under <c>v1</c> was computed by a lexicon that projected <c>mode:on-bike</c> onto nothing,
+    /// so it is not interchangeable with one computed now.
+    /// </remarks>
+    public const string ModelIdentifier = "galaxus-concept-v2";
 
     /// <summary>
     /// Dense cosine floor suggested for this concept space.
@@ -818,6 +824,13 @@ public sealed class ConceptEmbeddingSource : IEmbeddingSource
         Add("bikepacking", Cycling, 1.0f, StorageAndCarry, 0.6f, CarriedWeight, 0.5f, TravelPortability, 0.4f);
         Add("helmet", Cycling, 0.8f);
         Add("gravel", Cycling, 0.7f);
+        // The B-8 counterpart to "on foot" above, and the half that was silently dead: the seed's
+        // mode:on-bike tag keys as "on bike" (LookupKey strips the prefix), and with no entry here
+        // it projected onto NOTHING — the tag would have been authored, printed on the Use: line,
+        // and read by no dimension. Deliberately asymmetric with "on foot": walking means the
+        // person carries the load, so "on foot" also fires CarriedWeight; on a bicycle the bicycle
+        // carries it, so this one does not.
+        Add("on bike", Cycling, 0.9f);
 
         // ── Apparel and layering ─────────────────────────────────────────────────────────────
         Add("merino", ApparelLayering, 1.0f, HikingTrekking, 0.4f);

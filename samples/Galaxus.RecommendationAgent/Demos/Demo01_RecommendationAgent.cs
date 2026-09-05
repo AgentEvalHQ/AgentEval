@@ -171,15 +171,37 @@ public static class Demo01_RecommendationAgent
 
         PrintRequest(profile, prompt, personalizationDisabled);
 
+        // ── §F.8 — THE ABSTENTION GATE, BEFORE ANY SPEND (§8.1 B-1) ───────────
+        //
+        // This is the whole fix, and it is four lines. The gate used to run inside
+        // ApplyWithAbstentionGate, on an answer that had ALREADY been assembled — so on Luca's
+        // turn the model was constructed, ran, searched and presented, and only then was told
+        // that the turn should never have reached it. The console printed "the gate is structural
+        // and ran BEFORE any model spend" underneath, unconditionally, on every single one of
+        // those runs. The claim was false and the interface made it anyway.
+        //
+        // ⚠ It short-circuits BOTH arms, not only the live one. The offline baseline spends no
+        // tokens but it does spend searches, and the design's claim is "when it fires, no search
+        // has run" — an offline arm that searches anyway would leave that sentence half-true,
+        // which is the state this row exists to end.
+        if (GuardrailPipeline.ShouldAbstain(context, out var abstainReason))
+        {
+            PrintPreSpendAbstention(profile, map, classified, context, abstainReason, offline);
+            await GuardrailControls.RunAsync().ConfigureAwait(false);
+            return;
+        }
+
         // ── Retrieval seam ────────────────────────────────────────────────────
         var retriever = await BuildRetrieverAsync(catalogue, cancellationToken).ConfigureAwait(false);
-        GalaxusTools.Bind(retriever);
+        GalaxusTools.Bind(retriever, profile.Market);   // §8.1 B-17 — the market is bound, not defaulted
         GalaxusTools.AssertBound();
         PrintRetrievalBanner(retriever);
 
         // ── Phase 2: the model presents (or the offline arm stands in for it) ──
         IReadOnlyList<PresentedRecommendation> presented;
+        IReadOnlyList<string?> userEvidence;
         IReadOnlyDictionary<string, IReadOnlyList<string>> provenance;
+        IReadOnlySet<string>? candidateSet;
         int toolCallsUsed;
         string? budgetSummary = null;
         string? robinSaid = null;
@@ -187,8 +209,13 @@ public static class Demo01_RecommendationAgent
         if (offline)
         {
             PrintOfflineBanner();
-            (presented, provenance) = await RunOfflineBaselineAsync(map, context, retriever, catalogue, cancellationToken)
-                .ConfigureAwait(false);
+            (presented, provenance, candidateSet) =
+                await RunOfflineBaselineAsync(map, context, retriever, catalogue, cancellationToken).ConfigureAwait(false);
+
+            // The baseline arm composes its own presentations, so it can and does write the user
+            // side — but it writes it out of the SAME signal the attribution used, which is the
+            // tautology B-5 is about. It is recorded as absent so the ledger's note stays honest.
+            userEvidence  = [.. presented.Select(_ => (string?)null)];
             toolCallsUsed = RecommendationPrinter.OmitToolCalls;
         }
         else
@@ -202,20 +229,25 @@ public static class Demo01_RecommendationAgent
             Config.PrintAzureTarget();
             Console.WriteLine();
 
-            var run = await RunAgentAsync(profile, prompt, cancellationToken).ConfigureAwait(false);
+            var run = await RunAgentAsync(profile, prompt, context, cancellationToken).ConfigureAwait(false);
             if (run is null) return;   // the failure was already printed in full
 
             presented     = run.Presented;
+            userEvidence  = run.UserEvidence;
             provenance    = run.Provenance;
+            candidateSet  = run.CandidateSet;
             toolCallsUsed = run.ToolCallsUsed;
             budgetSummary = run.BudgetSummary;
             robinSaid     = run.Text;
         }
 
         // ── Phase 3: CODE screens what was presented ──────────────────────────
-        var (raw, preLedgerDrops) = Assemble(presented, provenance, map, catalogue, replenishment);
+        var screeningContext = context with { CandidateProductIds = candidateSet };
 
-        var outcome = GuardrailPipeline.ApplyWithAbstentionGate(raw, context);
+        var (raw, preLedgerDrops, modelStatedUserSides) =
+            Assemble(presented, userEvidence, provenance, map, catalogue, replenishment);
+
+        var outcome = GuardrailPipeline.ApplyWithAbstentionGate(raw, screeningContext);
         var ledger  = outcome.Ledger;
 
         // Drops decided before the pipeline (duplicate presentations) are replayed into the
@@ -230,24 +262,81 @@ public static class Demo01_RecommendationAgent
         ledger.ToolCallsUsed = Math.Max(0, toolCallsUsed);
         ledger.ToolCallCap   = toolCallsUsed >= 0 ? ToolCallCap : 0;
 
-        NoteDerivedUserSide(ledger, offline);
+        NoteEvidenceArms(ledger, offline, presented.Count, modelStatedUserSides);
 
         // ── Phase 4: print ────────────────────────────────────────────────────
         Console.WriteLine();
         RecommendationPrinter.PrintAnswer(profile.User, map, classified, outcome, toolCallsUsed,
-            toolCallsUsed >= 0 ? ToolCallCap : RecommendationPrinter.OmitToolCalls);
+            toolCallsUsed >= 0 ? ToolCallCap : RecommendationPrinter.OmitToolCalls,
+            gateRanBeforeSpend: false);
 
         PrintPresentationAudit(presented, outcome.Cleaned);
         if (budgetSummary is not null) PrintBudgetNote(budgetSummary);
         if (robinSaid is not null) PrintRobinsProse(robinSaid);
+
+        await GuardrailControls.RunAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Prints the turn that never reached a model: the pre-spend abstention (§F.8, §8.1 B-1).
+    /// </summary>
+    /// <remarks>
+    /// The ledger here records ZERO presentations rather than a list of drops, and that is the
+    /// observable difference the fix makes. Under the old ordering Luca's ledger read
+    /// "n in → 0 out, n dropped(abstained)" — n items the model had already been paid to produce.
+    /// It now reads "0 in → 0 out", because there was nothing to drop.
+    /// </remarks>
+    private static void PrintPreSpendAbstention(
+        CustomerProfile profile,
+        InterestMap map,
+        IReadOnlyList<ClassifiedPurchase> classified,
+        GuardrailContext context,
+        string reason,
+        bool offline)
+    {
+        var ledger = new GuardrailLedger();
+        ledger.RecordInput(0);
+        ledger.RecordOutput(0);
+        ledger.GiftExcluded = map.ExcludedBecauseGift.Count;
+        ledger.Note(GuardrailStage.AbstentionGate, GuardrailReasons.Abstained, "—", reason);
+        ledger.Note(GuardrailStage.AbstentionGate, GuardrailReasons.ArmInapplicable, "every downstream arm",
+            "the gate fired BEFORE the retriever was built and before the agent was constructed, so no "
+          + "search ran, no token was spent and NO other guardrail arm was exercised on this turn. A clean "
+          + "ledger here is a statement about the gate alone");
+
+        var abstained = RecommendationSet.Abstain(
+            reason,
+            GuardrailPipeline.ClarifyingQuestions(context),
+            [.. map.Signals.Select(InterestSignalDto.From)]);
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("  ⏸  Abstention gate fired BEFORE the model was constructed — this turn cost 0 prompt tokens");
+        Console.WriteLine($"     and made 0 searches{(offline ? " (the offline arm is short-circuited too)" : "")}.");
+        Console.ResetColor();
+        Console.WriteLine();
+
+        RecommendationPrinter.PrintAnswer(
+            profile.User, map, classified, abstained,
+            new Dictionary<string, PriceStockSnapshot>(StringComparer.Ordinal), ledger,
+            RecommendationPrinter.OmitToolCalls, RecommendationPrinter.OmitToolCalls,
+            gateRanBeforeSpend: true);
     }
 
     // ── The agent run ─────────────────────────────────────────────────────────
 
     /// <summary>What one live agent run produced. Null from <see cref="RunAgentAsync"/> means it failed and said so.</summary>
+    /// <param name="Presented">The <c>PresentRecommendation</c> calls, verbatim, in order.</param>
+    /// <param name="UserEvidence">The fifth argument of each of those calls, index-aligned with <paramref name="Presented"/>.</param>
+    /// <param name="Provenance">Product id → the search needs that surfaced it.</param>
+    /// <param name="CandidateSet">Every product id ANY retrieval route returned (§8.1 B-6a). Null means nothing recorded.</param>
+    /// <param name="ToolCallsUsed">Refusable calls spent.</param>
+    /// <param name="BudgetSummary">Every counter against its own cap.</param>
+    /// <param name="Text">Robin's prose. Never parsed.</param>
     private sealed record AgentRun(
         IReadOnlyList<PresentedRecommendation> Presented,
+        IReadOnlyList<string?> UserEvidence,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Provenance,
+        IReadOnlySet<string>? CandidateSet,
         int ToolCallsUsed,
         string BudgetSummary,
         string? Text);
@@ -269,7 +358,11 @@ public static class Demo01_RecommendationAgent
       + "Pass that id to GetUserProfile, GetPurchaseHistory and GetInterestMap. Never substitute another customer, "
       + "and never invent an id. The next message is the customer speaking.";
 
-    private static async Task<AgentRun?> RunAgentAsync(CustomerProfile profile, string prompt, CancellationToken cancellationToken)
+    private static async Task<AgentRun?> RunAgentAsync(
+        CustomerProfile profile,
+        string prompt,
+        GuardrailContext advisoryContext,
+        CancellationToken cancellationToken)
     {
         Console.WriteLine($"  Creating {RecommendationAgentFactory.AgentName} — eleven read-only tools, asserted at construction...\n");
 
@@ -300,7 +393,11 @@ public static class Demo01_RecommendationAgent
         // Both scopes are AsyncLocal and both must wrap the run: the budget bounds the spend
         // (§F.9), the capture records the PresentRecommendation calls verbatim (§0.5 / D-1).
         using var budget  = ToolCallBudget.BeginScope(ToolCallCap);
-        using var capture = GalaxusTools.BeginRunCapture();
+
+        // The capture is handed the SAME context the pipeline will screen against afterwards, so
+        // the advisory warnings the model receives and the drops the ledger records cannot come
+        // from two different bars (§8.1 B-13).
+        using var capture = GalaxusTools.BeginRunCapture(advisoryContext);
 
         AgentResponse? response;
         var startedAt = DateTimeOffset.UtcNow;
@@ -338,15 +435,17 @@ public static class Demo01_RecommendationAgent
         // Read the run-scoped state BEFORE the scopes are disposed — outside them both
         // collections read empty, and an empty capture is indistinguishable from a model
         // that presented nothing.
-        var presented  = GalaxusTools.PresentedInCurrentRun;
-        var provenance = GalaxusTools.RetrievalProvenanceInCurrentRun;
-        var used       = ToolCallBudget.Used;          // REFUSABLE calls only — presentations are not in it
-        var summary    = ToolCallBudget.Summary;       // every counter against its own cap, for the footer
+        var presented    = GalaxusTools.PresentedInCurrentRun;
+        var userEvidence = GalaxusTools.UserEvidenceInCurrentRun;
+        var provenance   = GalaxusTools.RetrievalProvenanceInCurrentRun;
+        var candidates   = GalaxusTools.CandidateSetInCurrentRun;
+        var used         = ToolCallBudget.Used;        // REFUSABLE calls only — presentations are not in it
+        var summary      = ToolCallBudget.Summary;     // every counter against its own cap, for the footer
 
         RecommendationPrinter.PrintTraceFooter();
         PrintToolTrace(response, elapsed, summary);
 
-        return new AgentRun(presented, provenance, used, summary, response.Text);
+        return new AgentRun(presented, userEvidence, provenance, candidates, used, summary, response.Text);
     }
 
     // ── The offline baseline arm ──────────────────────────────────────────────
@@ -363,7 +462,8 @@ public static class Demo01_RecommendationAgent
     /// fail on this path; the ledger says so rather than banking a clean sheet it did not earn.
     /// </remarks>
     private static async Task<(IReadOnlyList<PresentedRecommendation> Presented,
-                               IReadOnlyDictionary<string, IReadOnlyList<string>> Provenance)>
+                               IReadOnlyDictionary<string, IReadOnlyList<string>> Provenance,
+                               IReadOnlySet<string> CandidateSet)>
         RunOfflineBaselineAsync(
             InterestMap map,
             GuardrailContext context,
@@ -373,6 +473,7 @@ public static class Demo01_RecommendationAgent
     {
         var presented  = new List<PresentedRecommendation>();
         var provenance = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        var candidates = new HashSet<string>(StringComparer.Ordinal);
         var taken      = new HashSet<string>(StringComparer.Ordinal);
 
         var exclude = new HashSet<string>(context.OwnedProductIds, StringComparer.Ordinal);
@@ -388,6 +489,11 @@ public static class Demo01_RecommendationAgent
 
             var result = await retriever.SearchAsync(query, cancellationToken).ConfigureAwait(false);
             Console.WriteLine($"   🔎 SearchProductsByMeaning(\"{Clip(signal.Label, 62)}\") → {result.Count} candidate(s)");
+
+            // EVERY hit, not only the kept ones (§8.1 B-6a). The candidate set is what retrieval
+            // put in front of the selector; narrowing it to what the selector chose would make the
+            // containment check compare a set with itself.
+            foreach (var hit in result.Hits) candidates.Add(hit.ProductId);
 
             var kept = 0;
             foreach (var hit in result.Hits)
@@ -414,37 +520,48 @@ public static class Demo01_RecommendationAgent
         }
 
         Console.WriteLine();
-        return (presented, provenance);
+        return (presented, provenance, candidates);
     }
 
     // ── Assembly: tool calls → RecommendationSet ──────────────────────────────
 
     /// <summary>A drop decided before the pipeline ran, replayed into its ledger afterwards.</summary>
-    private sealed record PreDrop(GuardrailStage Stage, string Reason, string Subject, string Detail);
+    internal sealed record PreDrop(GuardrailStage Stage, string Reason, string Subject, string Detail);
 
     /// <summary>
     /// Builds the answer from the <c>PresentRecommendation</c> calls — the ONLY sanctioned channel.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// ⚠ <b>Read this before quoting the evidence numbers.</b> The frozen tool signature carries
-    /// only the PRODUCT side of §F.3's two-sided evidence: <c>evidence</c> is one
-    /// <c>attr:</c> / <c>review:</c> citation and there is no argument for the user side. So the
-    /// user side is DERIVED here — from retrieval provenance, i.e. from which search need
-    /// actually surfaced the SKU — and not written by the model.
+    /// <b>Two paths for the user side, and the ledger always says which one ran (§8.1 B-5).</b>
+    /// When the model supplies <c>userEvidence</c>, its label and its purchase ids are carried
+    /// through UNCHANGED and verified against the code-derived map: an invented label fails,
+    /// somebody else's id fails, a gift fails, and — the arm that only exists on this path — one
+    /// of the customer's OWN ids cited for an interest it does not evidence fails.
     /// </para>
     /// <para>
-    /// That has a consequence worth stating out loud rather than discovering later: on this path
-    /// the user-side arm of <see cref="EvidenceRequiredFilter"/> can only fail one way — when NO
-    /// derived interest explains the product at all. It cannot catch a model that cites the wrong
-    /// purchase, because the model was never given the chance to cite one. The discriminating
-    /// checks in this demo are the ones that read the model's own arguments: catalogue grounding,
-    /// citation resolution, the stated-price scan, the sensitive-prose scan and the out-of-stock
-    /// acknowledgement. <see cref="NoteDerivedUserSide"/> writes that into the ledger.
+    /// ⚠ When the model omits it, the user side is DERIVED from retrieval provenance, and on that
+    /// path the user-side arm can only fail one way: when no derived interest explains the product
+    /// at all. It cannot catch a wrongly cited purchase, because nothing was cited. That is not a
+    /// defect in the check, it is the absence of an input — and it is why the derivation is now
+    /// the fallback rather than the only option, and why <see cref="NoteEvidenceArms"/> counts how
+    /// many items took which path.
+    /// </para>
+    /// <para>
+    /// Nothing here repairs a bad argument. A user-side label the model got wrong stays wrong all
+    /// the way into the filter, because a repaired argument is a defect that can never fire.
     /// </para>
     /// </remarks>
-    private static (RecommendationSet Raw, IReadOnlyList<PreDrop> Drops) Assemble(
+    /// <param name="presented">The <c>PresentRecommendation</c> calls, verbatim.</param>
+    /// <param name="userEvidence">The fifth argument of each call, index-aligned with <paramref name="presented"/>.</param>
+    /// <param name="provenance">Product id → the search needs that surfaced it. The fallback user side.</param>
+    /// <param name="map">The code-derived interest map.</param>
+    /// <param name="catalogue">The catalogue façade.</param>
+    /// <param name="replenishment">The repeat-buy tray, built before the model ran.</param>
+    /// <returns>The assembled answer, the pre-pipeline drops, and how many items carried a MODEL-stated user side.</returns>
+    internal static (RecommendationSet Raw, IReadOnlyList<PreDrop> Drops, int ModelStatedUserSides) Assemble(
         IReadOnlyList<PresentedRecommendation> presented,
+        IReadOnlyList<string?> userEvidence,
         IReadOnlyDictionary<string, IReadOnlyList<string>> provenance,
         InterestMap map,
         Catalogue catalogue,
@@ -453,10 +570,12 @@ public static class Demo01_RecommendationAgent
         var recommendations = new List<RecommendationDto>();
         var drops           = new List<PreDrop>();
         var seen            = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var modelStated     = 0;
 
-        foreach (var item in presented)
+        for (var i = 0; i < presented.Count; i++)
         {
-            var sku = item.Sku.Trim();
+            var item = presented[i];
+            var sku  = item.Sku.Trim();
 
             if (!seen.Add(sku))
             {
@@ -467,10 +586,31 @@ public static class Demo01_RecommendationAgent
 
             catalogue.TryGet(sku, out var product);
 
+            var (key, value) = ResolveProductSide(product, item);
+            var reviewId = item.Citation is { Kind: EvidenceRefKind.Review } review ? review.Token : null;
+
+            // ── the MODEL's own user side, when it wrote one ────────────────────────────
+            var raw = i < userEvidence.Count ? userEvidence[i] : null;
+            if (UserEvidenceRef.TryParse(raw, out var stated))
+            {
+                modelStated++;
+
+                // Verbatim. The label is not matched fuzzily against the map and the ids are not
+                // filtered down to the ones that happen to fit — either would repair the claim
+                // before the filter got to test it.
+                var cited = map.FindSignal(stated.SignalLabel);
+
+                recommendations.Add(new RecommendationDto(
+                    sku,
+                    item.Reason,
+                    new EvidenceDto(stated.SignalLabel, stated.PurchaseIds, key, value, reviewId),
+                    Confidence(cited, product)));
+                continue;
+            }
+
+            // ── the fallback: derive it from which search surfaced the SKU ──────────────
             var needs  = provenance.TryGetValue(sku, out var recorded) ? recorded : [];
             var signal = AttributeSignal(needs, product, map);
-
-            var (key, value) = ResolveProductSide(product, item);
 
             recommendations.Add(new RecommendationDto(
                 sku,
@@ -482,18 +622,18 @@ public static class Demo01_RecommendationAgent
                     signal is not null && !IsStatedInSession(signal) ? signal.EvidencePurchaseIds : [],
                     key,
                     value,
-                    item.Citation is { Kind: EvidenceRefKind.Review } review ? review.Token : null),
+                    reviewId),
                 Confidence(signal, product)));
         }
 
-        var raw = RecommendationSet.Empty with
+        var assembled = RecommendationSet.Empty with
         {
             InterestMap     = [.. map.Signals.Select(InterestSignalDto.From)],
             Recommendations = recommendations,
             Replenishment   = replenishment
         };
 
-        return (raw, drops);
+        return (assembled, drops, modelStated);
     }
 
     /// <summary>
@@ -738,12 +878,28 @@ public static class Demo01_RecommendationAgent
     /// score — see <see cref="GuardrailLedger.HasInapplicableArm"/>, which makes the renderer
     /// print the warning in red.
     /// </remarks>
-    private static void NoteDerivedUserSide(GuardrailLedger ledger, bool offline)
+    /// <param name="ledger">The turn's ledger.</param>
+    /// <param name="offline">True when the baseline arm stood in for the model.</param>
+    /// <param name="presentedCount">How many presentations were made in total.</param>
+    /// <param name="modelStatedUserSides">How many of them carried a MODEL-written user side (§8.1 B-5).</param>
+    private static void NoteEvidenceArms(GuardrailLedger ledger, bool offline, int presentedCount, int modelStatedUserSides)
     {
-        ledger.Note(GuardrailStage.EvidenceRequired, GuardrailReasons.ArmInapplicable, "user-side evidence",
-            "the PresentRecommendation signature carries only the PRODUCT side, so the user side is DERIVED from "
-          + "retrieval provenance. It can fail only when no derived interest explains the product at all — it cannot "
-          + "catch a wrongly cited purchase, because the model was never asked to cite one. Do not read its silence as a pass");
+        // ── §8.1 B-5: this note is now CONDITIONAL, and that is the point ───────────────
+        //
+        // It used to be written unconditionally, which made it true — the user side really was
+        // always derived — and useless, because a note that never varies tells a reader nothing
+        // about the run in front of them. Now it fires only for the items whose user side the
+        // model did NOT supply, and its absence is a positive statement: every recommendation on
+        // this turn carried a citation the filter was able to test.
+        var derived = Math.Max(0, presentedCount - modelStatedUserSides);
+        if (derived > 0)
+        {
+            ledger.Note(GuardrailStage.EvidenceRequired, GuardrailReasons.ArmInapplicable, "user-side evidence",
+                $"{derived} of {presentedCount} presentation(s) carried NO userEvidence argument, so their user side was "
+              + "DERIVED from retrieval provenance. On those the arm can fail only when no derived interest explains the "
+              + "product at all — it cannot catch a wrongly cited purchase, because nothing was cited. Do not read its "
+              + "silence as a pass");
+        }
 
         // ⚠ The PRODUCT side has two silent arms on this path as well, and leaving them unnamed
         // let a two-sided check read as a clean sheet on a turn where only one side could fire.

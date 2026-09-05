@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
 namespace Galaxus.RecommendationAgent.Agents;
@@ -17,7 +17,7 @@ namespace Galaxus.RecommendationAgent.Agents;
 /// </para>
 /// <para>
 /// So the ONE sanctioned recommendation channel is the
-/// <c>PresentRecommendation(sku, reason, evidence, outOfStock)</c> tool call. Every check reads
+/// <c>PresentRecommendation(sku, reason, evidence, outOfStock, userEvidence)</c> tool call. Every check reads
 /// an argument by name instead of regexing prose. <c>RecommendationSet</c> is ASSEMBLED from
 /// those calls plus the code-derived interest map — never parsed out of the model's text.
 /// </para>

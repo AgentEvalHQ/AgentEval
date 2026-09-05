@@ -30,7 +30,19 @@ public enum GuardrailStage
     ConfidenceBands,
 
     /// <summary>Render-time price and stock re-verification (§F.4).</summary>
-    PriceStock
+    PriceStock,
+
+    /// <summary>
+    /// Candidate-set containment (§8.1 B-6a) — the model may only present what retrieval put in
+    /// front of it. Appended after <see cref="PriceStock"/> so no existing member's ordinal moves.
+    /// </summary>
+    CandidateContainment,
+
+    /// <summary>
+    /// Compatibility against the customer's own hardware (§8.1 B-7). Appended for the same
+    /// reason as <see cref="CandidateContainment"/>.
+    /// </summary>
+    Compatibility
 }
 
 /// <summary>What the pipeline did to an item.</summary>
@@ -71,6 +83,17 @@ public static class GuardrailReasons
 
     /// <summary>§F.3 — a cited purchase id does not belong to this customer.</summary>
     public const string ForeignPurchaseId = "foreign_purchase_id";
+
+    /// <summary>
+    /// §F.3 / §8.1 B-5 — a cited purchase id belongs to this customer but is NOT one of the
+    /// purchases that evidence the cited interest signal.
+    /// </summary>
+    /// <remarks>
+    /// This is the arm that only exists once the model writes the user side itself. While the
+    /// user side was DERIVED from retrieval provenance the comparison was <c>x ⊆ x</c> and could
+    /// not fail — see the <see cref="ArmInapplicable"/> note Demo 1 writes when the fallback runs.
+    /// </remarks>
+    public const string PurchaseDoesNotEvidenceSignal = "purchase_does_not_evidence_signal";
 
     /// <summary>§B.3 — a cited purchase id was classified as a gift, so it is evidence about a different person.</summary>
     public const string GiftPurchaseCited = "gift_purchase_cited";
@@ -117,6 +140,26 @@ public static class GuardrailReasons
     /// <summary>The same SKU was presented more than once in one turn.</summary>
     public const string DuplicatePresentation = "duplicate_presentation";
 
+    /// <summary>
+    /// §8.1 B-6a — the SKU is real, but no retrieval route in this turn returned it. Existence is
+    /// not containment: a model that names a catalogue id it never retrieved has guessed.
+    /// </summary>
+    public const string OutsideCandidateSet = "outside_candidate_set";
+
+    /// <summary>
+    /// §8.1 B-7 — the accessory declares a <c>compat:</c> value in a family the customer's own
+    /// hardware constrains, with a different value. 54 mm against an owned 58 mm is not a near miss.
+    /// </summary>
+    public const string IncompatibleWithOwned = "incompatible_with_owned";
+
+    /// <summary>
+    /// §8.1 B-16 — a consumable the customer buys on a cadence, offered as a DISCOVERY. It belongs
+    /// in the replenishment lane, and saying so is the difference between a working lane and a
+    /// silent one: before this reason existed, Sofia's cartridges dropped as
+    /// <see cref="AlreadyOwned"/> and the replenishment lane was never seen working.
+    /// </summary>
+    public const string ReplenishmentNotDiscovery = "replenishment_not_discovery";
+
     /// <summary>§F.8 — the pre-search gate fired and nothing was searched for.</summary>
     public const string Abstained = "abstained";
 
@@ -132,12 +175,14 @@ public static class GuardrailReasons
     public static readonly IReadOnlyList<string> All =
     [
         Ungrounded, AlreadyOwned, DurableStillInHorizon,
-        MissingEvidence, UnknownSignalLabel, ForeignPurchaseId, GiftPurchaseCited, StatedNeedCitesHistory,
+        MissingEvidence, UnknownSignalLabel, ForeignPurchaseId, PurchaseDoesNotEvidenceSignal,
+        GiftPurchaseCited, StatedNeedCitesHistory,
         AttributeNotFound, AttributeValueMismatch, ReviewNotFound, UnresolvableEvidence,
         SensitiveCategory, SensitiveLabel, SensitiveProse,
         LowConfidence, ConfidenceOutOfRange,
         StatedPrice, OutOfStock, MarketUnavailable,
-        DuplicatePresentation, Abstained, ArmInapplicable
+        DuplicatePresentation, OutsideCandidateSet, IncompatibleWithOwned, ReplenishmentNotDiscovery,
+        Abstained, ArmInapplicable
     ];
 
     /// <summary>True when <paramref name="reason"/> is one of <see cref="All"/> (ordinal).</summary>
@@ -291,7 +336,16 @@ public sealed class GuardrailLedger
     /// pipeline runs, upstream of anything this ledger observes, and printing a zero here when
     /// two purchases were actually excluded would understate the best guardrail in the demo.
     /// </summary>
-    public int GiftExcluded { get; set; }
+    /// <remarks>
+    /// ⚠ NULLABLE, and that is the point. The exclusion happens upstream of anything this ledger
+    /// observes, so only a caller that HAS the interest map can fill it in — Demo 1 does, Demo 2's
+    /// presentation node does not. Rendering a plain <c>int</c> printed <c>gift-excluded 0</c> on
+    /// Demo 2's panel for Marco, who has TWO gift exclusions: a false zero, in the flattering
+    /// direction, produced by a caller that never supplied the number rather than by a run in which
+    /// nothing was excluded. Null prints as "not supplied by this caller" and cannot be misread as
+    /// a measurement.
+    /// </remarks>
+    public int? GiftExcluded { get; set; }
 
     /// <summary>How many surviving items had their price and stock re-read from the catalogue (§F.4).</summary>
     public int PriceStockVerified { get; private set; }
@@ -353,6 +407,37 @@ public sealed class GuardrailLedger
     }
 
     /// <summary>
+    /// The three counters that are populated upstream and have no entry of their own:
+    /// <see cref="GiftExcluded"/>, <see cref="PriceStockVerified"/> and
+    /// <see cref="PriceStockRequested"/> (§8.1 B-15).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A populated-but-unread counter is the shape that hides a dead arm: nothing on screen moves
+    /// when the mechanism behind it stops working, so nobody notices. Rendering all three costs two
+    /// lines and makes the two best guardrails in the demo — the gift exclusion and the render-time
+    /// price re-read — countable rather than merely asserted.
+    /// </para>
+    /// <para>
+    /// ⚠ Read <c>price/stock re-verified n of m</c> for what it is. The stage runs LAST, so
+    /// <c>m</c> is the number of items that SURVIVED to reach it plus the replenishment lane — not
+    /// the number the model presented. On Marco's offline run six presentations become five
+    /// survivors before the price stage, so the honest figure is <c>5 of 5</c>. A gap between
+    /// <c>n</c> and <c>m</c> means an item reached the stage and was dropped there
+    /// (<see cref="GuardrailReasons.StatedPrice"/> or
+    /// <see cref="GuardrailReasons.MarketUnavailable"/>), which is why both halves are printed.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> ToCounterLines() =>
+    [
+        GiftExcluded is { } gifts
+            ? string.Create(CultureInfo.InvariantCulture, $"· gift-excluded {gifts}")
+            : "· gift-excluded n/a — this caller did not supply the count",
+        string.Create(CultureInfo.InvariantCulture,
+            $"· price/stock re-verified {PriceStockVerified} of {PriceStockRequested} (survivors at the stage, not presented)")
+    ];
+
+    /// <summary>
     /// The ledger panel body, one string per line, without box drawing — the renderer owns
     /// the frame. Inapplicable-arm notes are listed LAST and prefixed, because an arm that
     /// could not run is the single most misleading thing a clean-looking ledger can hide.
@@ -377,6 +462,7 @@ public sealed class GuardrailLedger
 
         if (lines.Count == 0) lines.Add("· nothing to report — no item was dropped, demoted or held back");
 
+        lines.AddRange(ToCounterLines());
         lines.Add(ToSummaryLine());
         return lines;
     }

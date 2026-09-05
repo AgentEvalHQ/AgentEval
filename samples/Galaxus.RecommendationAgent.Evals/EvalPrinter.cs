@@ -803,11 +803,27 @@ public static class EvalPrinter
     }
 
     /// <summary>Prints the sign test, and says plainly when the n cannot support it.</summary>
+    /// <remarks>
+    /// ⚠ <b>The row colour comes from the challenger's <see cref="CoverageArmKind"/>, never from
+    /// who led</b> (§8, B-12). It used to be <c>ChallengerLeads ? Green : Yellow</c>, which painted
+    /// GREEN over the one sentence this panel exists to make legible: the primary CONTROL is an
+    /// entrant, and a control that leads means the architecture is not load-bearing. Green for that
+    /// is the flattering direction. The direction is still on the row, in words — <c>W/L/T</c> and
+    /// the leader notes below the panel — where a reader has to read it rather than absorb it from
+    /// a colour.
+    /// </remarks>
     /// <param name="outcomes">One outcome per comparison.</param>
     /// <param name="heading">
     /// Optional panel title, so a panel of equal-k comparisons can say which k it was paired at.
     /// </param>
-    public static void PrintSignTest(IReadOnlyList<SignTestOutcome> outcomes, string? heading = null)
+    /// <param name="kindByArm">
+    /// The kind of each arm, by label. Supplied by the caller from the arm registry; an arm missing
+    /// from it prints in the neutral colour rather than in a flattering one.
+    /// </param>
+    public static void PrintSignTest(
+        IReadOnlyList<SignTestOutcome> outcomes,
+        string? heading = null,
+        IReadOnlyDictionary<string, CoverageArmKind>? kindByArm = null)
     {
         ArgumentNullException.ThrowIfNull(outcomes);
 
@@ -835,7 +851,7 @@ public static class EvalPrinter
             }
             else
             {
-                Console.ForegroundColor = o.ChallengerLeads ? ConsoleColor.Green : ConsoleColor.Yellow;
+                Console.ForegroundColor = ArmColour(o.ArmB, kindByArm);
                 // F4, not F3: at twelve paired personas a clean sweep gives p = 0.00049, and F3
                 // renders that as "0.000" — a p-value printed as zero is the one number a reader
                 // will quote and the one this printer must never round away.
@@ -848,6 +864,14 @@ public static class EvalPrinter
                          + (string.Equals(o.Metric, "recall", StringComparison.Ordinal) && o.DeclaredK == 0 && o.Excluded.Count == 0
                                 ? ""
                                 : $"  [{o.Metric}{(o.DeclaredK > 0 ? $" @k={o.DeclaredK}" : o.DeclaredK < 0 ? " @k_live, per persona" : "")}]"));
+                Console.ResetColor();
+
+                // The direction, in WORDS, because the colour above no longer carries it. A reader
+                // who takes the leader from a colour is reading the printer's opinion; a reader who
+                // takes it from this line is reading the run.
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                ContentRow($"      direction: {(o.ChallengerLeads ? $"{ShortArm(o.ArmB)} LEADS" : o.Wins == o.Losses ? "no direction" : $"{ShortArm(o.ArmA)} leads")}"
+                         + DescribeKind(o.ArmB, kindByArm));
                 Console.ResetColor();
             }
 
@@ -906,6 +930,159 @@ public static class EvalPrinter
         Console.WriteLine();
     }
 
+    /// <summary>The colour a KIND is printed in. One table, used by every panel that names an arm.</summary>
+    private static ConsoleColor ArmColour(CoverageArmKind kind) => kind switch
+    {
+        CoverageArmKind.Live => ConsoleColor.Cyan,
+        CoverageArmKind.Control => ConsoleColor.Yellow,
+        CoverageArmKind.Baseline => ConsoleColor.DarkYellow,
+        CoverageArmKind.Oracle => ConsoleColor.Magenta,
+        CoverageArmKind.Loop => ConsoleColor.Blue,
+        _ => ConsoleColor.Gray,
+    };
+
+    /// <summary>The colour an arm is printed in — its KIND, never its result.</summary>
+    private static ConsoleColor ArmColour(string arm, IReadOnlyDictionary<string, CoverageArmKind>? kindByArm) =>
+        kindByArm is not null && kindByArm.TryGetValue(arm, out var kind) ? ArmColour(kind) : ConsoleColor.Gray;
+
+    /// <summary>
+    /// Wraps a continuation paragraph and keeps its indent — <see cref="Wrap"/> splits on spaces,
+    /// so a leading run of them is eaten and the continuation prints hard against the box edge.
+    /// </summary>
+    /// <param name="text">The paragraph, unindented.</param>
+    /// <param name="indent">How far to indent every line of it.</param>
+    private static IEnumerable<string> Indented(string text, int indent = 6)
+    {
+        string pad = new(' ', indent);
+        foreach (var line in Wrap(text, InnerWidth - indent)) yield return pad + line;
+    }
+
+    /// <summary>
+    /// The arm's kind as a word.
+    /// </summary>
+    /// <remarks>
+    /// Three cases, and the middle one is the point. No map at all means this panel has no arm
+    /// registry (Eval 09 keeps its own arm model) and the clause is simply omitted. A map that
+    /// does not contain the arm means a registry that FORGOT one, and that says so out loud.
+    /// </remarks>
+    /// <param name="arm">The arm label.</param>
+    /// <param name="kindByArm">The registry's kind map, or null when the panel has no registry.</param>
+    private static string DescribeKind(string arm, IReadOnlyDictionary<string, CoverageArmKind>? kindByArm) =>
+        kindByArm is null ? ""
+        : kindByArm.TryGetValue(arm, out var kind) ? $"  ·  {arm} is a {kind.ToString().ToUpperInvariant()} arm"
+        : $"  ·  {arm}: KIND NOT REGISTERED";
+
+    /// <summary>
+    /// Prints the arm legend: one row per registered arm — label, kind, whether it enters the sign
+    /// test, and the note saying what the arm is for.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// §8/B-12. <c>CoverageArm.Note</c> was written on every arm and read by nothing, which meant
+    /// the one sentence that says <i>"do NOT read this arm's coverage number as the design's
+    /// headline"</i> existed only in source. A caveat that does not print is not a caveat.
+    /// </para>
+    /// <para>
+    /// The rows are coloured by <see cref="CoverageArmKind"/> — the same rule the sign-test panel
+    /// now follows — so a reader learns the colour code here and carries it down the report.
+    /// </para>
+    /// </remarks>
+    /// <param name="arms">Every registered arm, runnable and absent, in report order.</param>
+    public static void PrintArmLegend(IReadOnlyList<CoverageArm> arms)
+    {
+        ArgumentNullException.ThrowIfNull(arms);
+
+        Console.WriteLine();
+        TopBorder();
+        TitleRow("ARM REGISTRY — label · kind · enters the sign test? · what it is for");
+        Divider();
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        ContentRow("  Colour = KIND here and on every sign-test panel. It never means 'did well'.");
+        ContentRow("  An ORACLE reads the gold; a BASELINE understands nothing. Neither leading");
+        ContentRow("  over the live arm is good news, and neither is painted as though it were.");
+        Console.ResetColor();
+        Divider();
+
+        foreach (CoverageArm arm in arms)
+        {
+            Console.ForegroundColor = ArmColour(arm.Kind);
+
+            ContentRow($"  {Fit(arm.Label, 32)}  {arm.Kind.ToString().ToUpperInvariant(),-9}  "
+                     + $"sign test: {(arm.EntersSignTest ? "YES" : "no ")}"
+                     + (arm.IsPrimaryControl ? "  ★ PRIMARY CONTROL" : "")
+                     + (arm.IsRunnable ? "" : "  ⛔ DECLARED ABSENT"));
+            Console.ResetColor();
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            foreach (var line in Indented(arm.Note.Length > 0
+                         ? arm.Note
+                         : "⚠️ NO NOTE — this arm was registered without saying what it is for."))
+            {
+                ContentRow(line);
+            }
+
+            if (!arm.IsRunnable && arm.AbsenceReason.Length > 0)
+            {
+                Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.Red;
+                foreach (var line in Indented("ABSENCE: " + arm.AbsenceReason)) ContentRow(line);
+            }
+
+            Console.ResetColor();
+        }
+
+        BottomBorder();
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Prints the verdict on a pre-registered decision rule — MET, NOT MET, or NOT EVALUATED with
+    /// the reason attached.
+    /// </summary>
+    /// <remarks>
+    /// §8/B-2. The rule's TEXT used to print in Eval 02's pre-registration block with nothing behind
+    /// it: no threshold constant, no comparison, no verdict, and a sign-test panel underneath that
+    /// had once shown a green sweep for a different pair. This panel is the evaluator's output, and
+    /// it renders in all three states — including the one that says the comparison was never made.
+    /// </remarks>
+    /// <param name="outcome">The evaluated rule.</param>
+    public static void PrintPreRegisteredRule(PreRegisteredRuleOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        Console.WriteLine();
+        TopBorder();
+        TitleRow("PRE-REGISTERED DECISION RULE — the ≥ 10 of 12 rule, EVALUATED");
+        Divider();
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        foreach (var line in Indented("Rule: " + PreRegisteredRule.Statement, indent: 2)) ContentRow(line);
+        Console.ResetColor();
+        Divider();
+
+        Console.ForegroundColor = outcome.Verdict switch
+        {
+            PreRegisteredRuleVerdict.Met => ConsoleColor.Green,
+            PreRegisteredRuleVerdict.NotMet => ConsoleColor.Yellow,
+            _ => ConsoleColor.Red,
+        };
+        ContentRow($"  {(outcome.Verdict == PreRegisteredRuleVerdict.Met ? "✅" : outcome.Verdict == PreRegisteredRuleVerdict.NotMet ? "⚠️ " : "❌")} "
+                 + $"{outcome.Label}  ·  {ShortArm(outcome.Challenger)} vs {ShortArm(outcome.Reference)}");
+        ContentRow($"      required {outcome.WinsRequired} of {outcome.PreRegisteredPairs}  ·  "
+                 + (outcome.Verdict == PreRegisteredRuleVerdict.NotEvaluated
+                        ? "attained: nothing — the comparison was not made"
+                        : $"attained W/L/T {outcome.Wins}/{outcome.Losses}/{outcome.Ties} over {outcome.ComparableN} comparable pair(s)"));
+        Console.ResetColor();
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        foreach (var line in Indented(outcome.Reason)) ContentRow(line);
+        foreach (var line in Indented(PreRegisteredRule.Supersession)) ContentRow(line);
+        Console.ResetColor();
+
+        BottomBorder();
+        Console.WriteLine();
+    }
+
     /// <summary>Prints per-arm cost. Goes on the same panel as any win, never on a different one.</summary>
     /// <param name="report">The paired report.</param>
     public static void PrintCostComparison(PairedCoverageReport report)
@@ -938,31 +1115,147 @@ public static class EvalPrinter
         Console.WriteLine();
     }
 
+    /// <summary>What GATE 2 actually observed. Four states, and three of them fail.</summary>
+    /// <remarks>
+    /// A bool cannot tell "the control did not lead" from "there was nothing to lead on", and both
+    /// of those from "no control was run at all". Collapsing them was how the gate came to print
+    /// the passing sentence over a failure: only the emoji changed (§8, B-11).
+    /// </remarks>
+    public enum CoverageGate2State
+    {
+        /// <summary>PASS — every equal-k comparison was decidable and the control led on none.</summary>
+        ControlDidNotLead,
+
+        /// <summary>FAIL — the control led on at least one decidable equal-k comparison.</summary>
+        ControlLed,
+
+        /// <summary>FAIL CLOSED — the control ran, but no persona produced a comparable pair.</summary>
+        NoComparablePair,
+
+        /// <summary>FAIL CLOSED — no primary control arm was run at all.</summary>
+        NoControlRun,
+    }
+
+    /// <summary>
+    /// Renders Eval 02's two gates from the OBSERVED state, as text, without printing anything.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Pure on purpose: <see cref="PrintCoverageGate"/> prints exactly what this returns, and Eval
+    /// 03's <c>CoverageGateRendering</c> control asserts on it directly. A renderer whose only
+    /// output is the console can only be checked by a human reading a scrollback, which is how the
+    /// failing branch kept the passing sentence through eleven revisions.
+    /// </para>
+    /// <para>
+    /// ⚠ Each branch states what HAPPENED. "did NOT beat" and "DID beat" are different sentences,
+    /// not one sentence with two emojis in front of it.
+    /// </para>
+    /// </remarks>
+    /// <param name="aboveFloor">Did EVERY scorable persona clear its own floor?</param>
+    /// <param name="belowOwnFloor">The personas that did not, named. Empty when the gate passed.</param>
+    /// <param name="scorablePersonas">How many personas the gate read.</param>
+    /// <param name="gate2">What GATE 2 observed.</param>
+    /// <param name="gate2Detail">Which equal-k comparisons GATE 2 read, and what each said.</param>
+    public static IReadOnlyList<string> CoverageGateLines(
+        bool aboveFloor,
+        IReadOnlyList<string> belowOwnFloor,
+        int scorablePersonas,
+        CoverageGate2State gate2,
+        string? gate2Detail = null)
+    {
+        ArgumentNullException.ThrowIfNull(belowOwnFloor);
+
+        var lines = new List<string>();
+
+        // ── GATE 1, rendered from what was observed. ─────────────────────────────────────
+        if (aboveFloor)
+        {
+            lines.Add($"  ✅ GATE 1 — every scorable persona ({scorablePersonas} of {scorablePersonas}) is ABOVE that");
+            lines.Add("       persona's own floor, derived at the number of items the live arm actually presented.");
+            lines.Add("       Per persona, never mean-to-mean: a mean can be carried by one persona while the arm");
+            lines.Add("       sits below the floor on the rest.");
+        }
+        else
+        {
+            lines.Add($"  ❌ GATE 1 — {belowOwnFloor.Count} of {scorablePersonas} scorable personas are BELOW their OWN floor,");
+            lines.Add("       derived at the number of items the live arm actually presented for each:");
+            foreach (var line in Wrap(belowOwnFloor.Count > 0
+                        ? string.Join(", ", belowOwnFloor)
+                        : "(the gate reported a failure but named no persona — the gate and its evidence disagree)",
+                    BoxWidth - 7))
+            {
+                lines.Add("       " + line);
+            }
+        }
+
+        // ── GATE 2, rendered from what was observed. ─────────────────────────────────────
+        switch (gate2)
+        {
+            case CoverageGate2State.ControlDidNotLead:
+                lines.Add("  ✅ GATE 2 — the single-shot control did NOT beat the live agent on ANY equal-k");
+                lines.Add("       comparison (recall, at the declared budget where both filled it, and at the live");
+                lines.Add("       arm's own k with the control cut to match).");
+                break;
+
+            case CoverageGate2State.ControlLed:
+                lines.Add("  ❌ GATE 2 — the single-shot control DID beat the live agent on at least one equal-k");
+                lines.Add("       comparison. One retrieval pass with no second look matched or bettered the shipped");
+                lines.Add("       agent, so whatever advantage the report shows is not architectural.");
+                break;
+
+            case CoverageGate2State.NoComparablePair:
+                lines.Add("  ❌ GATE 2 — UNDECIDABLE: the primary control had NO equal-k pair with the live agent on");
+                lines.Add("       either panel. Every persona was refused (different k, or a silent side). Failing");
+                lines.Add("       closed — a comparison that could not be made is not a comparison the agent won.");
+                break;
+
+            default:
+                lines.Add("  ❌ GATE 2 — UNDECIDABLE: no primary control arm was RUN, so nothing could have taken");
+                lines.Add("       the win away. Failing closed — an absent control is not a passed one.");
+                break;
+        }
+
+        if (gate2Detail is { Length: > 0 })
+        {
+            foreach (var line in Wrap("read: " + gate2Detail, BoxWidth - 7))
+                lines.Add("       " + line);
+        }
+
+        return lines;
+    }
+
     /// <summary>Prints Eval 02's gate. Deliberately does NOT gate on "the agent won".</summary>
-    /// <param name="aboveFloor">Did the live arm beat the derived random floor?</param>
-    /// <param name="controlSane">Did the single-shot control fail to beat the live arm on every EQUAL-k comparison?</param>
+    /// <remarks>
+    /// Every gate line comes from <see cref="CoverageGateLines"/>, so what a reader sees and what
+    /// Eval 03's rendering control asserts on are the same strings.
+    /// </remarks>
+    /// <param name="aboveFloor">Did EVERY scorable persona clear its own floor?</param>
+    /// <param name="belowOwnFloor">The personas that did not, named.</param>
+    /// <param name="scorablePersonas">How many personas GATE 1 read.</param>
+    /// <param name="gate2">What GATE 2 observed.</param>
     /// <param name="notes">Anything else the run needs to say out loud.</param>
     /// <param name="gate2Detail">One line saying which equal-k comparisons GATE 2 actually read, and what each said.</param>
-    public static void PrintCoverageGate(bool aboveFloor, bool controlSane, IReadOnlyList<string> notes, string? gate2Detail = null)
+    public static void PrintCoverageGate(
+        bool aboveFloor,
+        IReadOnlyList<string> belowOwnFloor,
+        int scorablePersonas,
+        CoverageGate2State gate2,
+        IReadOnlyList<string> notes,
+        string? gate2Detail = null)
     {
         ArgumentNullException.ThrowIfNull(notes);
 
         Console.WriteLine();
-        Console.ForegroundColor = aboveFloor ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"  {(aboveFloor ? "✅" : "❌")} GATE 1 — EVERY scorable persona's latent coverage is above THAT persona's own");
-        Console.WriteLine("       floor, derived at the number of items this arm actually presented. Not mean-to-mean:");
-        Console.WriteLine("       a mean can be carried by one persona while the arm is below the floor on the rest.");
-        Console.ResetColor();
 
-        Console.ForegroundColor = controlSane ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"  {(controlSane ? "✅" : "❌")} GATE 2 — the single-shot control did NOT lead the live agent on ANY equal-k");
-        Console.WriteLine("       comparison (recall, at the declared budget where both filled it, and at the live");
-        Console.WriteLine("       arm's own k with the control cut to match). A pair at unequal k decides nothing;");
-        Console.WriteLine("       no comparable pair at all is UNDECIDABLE and fails closed.");
-        if (gate2Detail is { Length: > 0 })
+        var gateLines = CoverageGateLines(aboveFloor, belowOwnFloor, scorablePersonas, gate2, gate2Detail);
+        bool inGate2 = false;
+
+        foreach (string line in gateLines)
         {
-            foreach (var line in Wrap("       read: " + gate2Detail, BoxWidth))
-                Console.WriteLine(line);
+            if (line.Contains("GATE 2", StringComparison.Ordinal)) inGate2 = true;
+            bool ok = inGate2 ? gate2 == CoverageGate2State.ControlDidNotLead : aboveFloor;
+            Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+            Console.WriteLine(line);
         }
         Console.ResetColor();
 

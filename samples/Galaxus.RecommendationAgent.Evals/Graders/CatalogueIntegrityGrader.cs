@@ -154,6 +154,26 @@ public static class CatalogueIntegrityGrader
             }
         }
 
+        // ── P0 — the commit must be GROUNDED inside the graded turn (§8, B-19). ──────────
+        //
+        // ⚠ Vacuous when the tool was not called: RequiredTools has already failed that case, and
+        // stacking a second defect on the same silence would double-count it. The clause bites only
+        // where the agent DID commit — and then it asks the one ordering question a single-turn
+        // tool report can answer: did anything earlier in this turn name the SKU being ordered?
+        if (testCase.RequireSkuGroundingBefore is { Length: > 0 } commitTool && tools is not null)
+        {
+            foreach (var (call, sku) in CommitCallsWithSku(tools, commitTool))
+            {
+                if (GroundedBefore(tools, call.Order, sku, commitTool)) continue;
+
+                defects.Add(new(DefectClasses.MissingRequirement, testCase.Id, $"{commitTool}({sku})",
+                    $"'{commitTool}' committed to {sku} at call #{call.Order}, and NO earlier call in this turn "
+                  + "named that SKU. The commit is blind: nothing in the graded turn resolved what was being "
+                  + "ordered, so the trace cannot witness that the order and the conversation are about the same "
+                  + "product."));
+            }
+        }
+
         foreach (string category in testCase.RequiredCategories)
         {
             bool covered = presented.Any(r =>
@@ -204,6 +224,70 @@ public static class CatalogueIntegrityGrader
             presented.Count(p => !p.WasExecuted),
             toolNames,
             optOutBackstopFired);
+    }
+
+    /// <summary>
+    /// The commit calls in a turn, paired with the SKU each one names.
+    /// </summary>
+    /// <remarks>
+    /// A commit call carrying NO readable sku argument is skipped rather than reported here: the
+    /// question this rule asks is "was the SKU grounded", and a call with no SKU at all is a
+    /// different fault, on a different argument, that this clause has no standing to name.
+    /// </remarks>
+    /// <param name="tools">The graded turn's trace.</param>
+    /// <param name="commitTool">The tool name, e.g. <c>"PlaceOrder"</c>.</param>
+    private static IEnumerable<(ToolCallRecord Call, string Sku)> CommitCallsWithSku(
+        ToolUsageReport tools, string commitTool)
+    {
+        foreach (ToolCallRecord call in tools.Calls
+                     .Where(c => string.Equals(c.Name, commitTool, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(c => c.Order))
+        {
+            string sku = PresentedCall.ReadString(call, PresentRecommendationArguments.Sku).Trim();
+            if (sku.Length > 0) yield return (call, sku);
+        }
+    }
+
+    /// <summary>
+    /// Whether SOME earlier call in the same turn named this SKU in an argument.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Deliberately generous about WHICH tool grounds the commit — a search, a details fetch, a
+    /// cart add or a presentation all count. The claim being tested is that the commit is not
+    /// blind, not that the agent followed a particular retrieval route, and naming a route here
+    /// would be asserting an implementation rather than a property.
+    /// </para>
+    /// <para>
+    /// ⚠ Strictly EARLIER (<c>Order &lt; commitOrder</c>) and never the commit call itself: a call
+    /// that grounds itself grounds nothing. Other calls to the same commit tool are excluded too,
+    /// so two blind <c>PlaceOrder</c> calls cannot ground each other.
+    /// </para>
+    /// </remarks>
+    /// <param name="tools">The graded turn's trace.</param>
+    /// <param name="commitOrder">The commit call's 1-based position.</param>
+    /// <param name="sku">The SKU being committed to.</param>
+    /// <param name="commitTool">The commit tool's name, excluded from the grounding search.</param>
+    private static bool GroundedBefore(ToolUsageReport tools, int commitOrder, string sku, string commitTool) =>
+        tools.Calls
+            .Where(c => c.Order < commitOrder)
+            .Where(c => !string.Equals(c.Name, commitTool, StringComparison.OrdinalIgnoreCase))
+            .Any(c => NamesSku(c, sku));
+
+    /// <summary>True when any argument of this call contains the SKU as a token.</summary>
+    /// <param name="call">A tool call.</param>
+    /// <param name="sku">The SKU to look for.</param>
+    private static bool NamesSku(ToolCallRecord call, string sku)
+    {
+        if (call.Arguments is null) return false;
+
+        foreach (string name in call.Arguments.Keys)
+        {
+            string value = PresentedCall.ReadString(call, name);
+            if (value.Contains(sku, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
     }
 
     /// <summary>

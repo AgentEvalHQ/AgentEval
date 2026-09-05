@@ -33,6 +33,37 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// exists to make, and would make the lexical baseline look better than the thing it is a
 /// baseline for.
 /// </para>
+/// <para>
+/// <b>The ANCHOR rule — a fragment may add score, it may not create a hit.</b>
+/// <see cref="ExpandToBag"/> splits a hyphenated token into its parts on BOTH sides, so that
+/// <c>16-35</c> also reaches <c>16</c> and <c>35</c>. Without a guard the parts are
+/// indistinguishable from real tokens, and two unrelated compounds meet on a fragment neither
+/// side ever wrote as a word. MEASURED on B-8's own query — the derived interest label
+/// <i>"multi-day trips, starts before sunrise, carried"</i> against the 99-SKU catalogue — the
+/// entire lexical leg was four products and every one of them was a fragment collision:
+/// <c>GLX-6007</c> (a bike multi-<b>tool</b>) at rank 1 with 10.58 on the single token
+/// <c>multi</c>, <c>GLX-9003</c> (a pill organiser, "four per <b>day</b>") at 6.91 on
+/// <c>day</c>, and two filter sets on <c>multi</c> from "multi-coating". ALL SIX of the query's
+/// own tokens have <c>df = 0</c> in this index — <c>multi-day</c>, <c>trips</c>, <c>starts</c>,
+/// <c>before</c>, <c>sunrise</c>, <c>carried</c> — so the only things that matched were the
+/// fragments <c>multi</c> (df 3) and <c>day</c> (df 1). Rank 1 in a leg is authority under RRF
+/// whatever the score, so a fragment put a Cycling SKU at the top of a photographer's tray, and
+/// a Health &amp; Personal Care SKU into her candidate set. That is the false positive §8.1
+/// records as B-8 and attributes to the <c>Use:</c> line, which is not where it came from — the
+/// bike multi-tool's dense rank on that query was 16th of 99.
+/// The same collision put a mudguard at lexical rank 1 for <i>"Mirrorless full-frame"</i>:
+/// <c>mirrorless</c> has df 0 and <c>full-frame</c> df 1 (Nadia's own camera), while the
+/// fragments <c>full</c> (df 4, "full-length mudguard") and <c>frame</c> (df 3, "aluminium
+/// frame") have carriers in three departments.
+/// </para>
+/// <para>
+/// So a product enters the lexical result only when it is ANCHORED: it shares at least one
+/// token that NEITHER side had to split to produce, or it took a model-number or GTIN boost.
+/// Fragment overlap still contributes its IDF-weighted score to an anchored product — the
+/// <c>16</c> of <c>16-35</c> is not thrown away — it simply cannot, alone, admit a product.
+/// This is the same defect class as <see cref="StopWords"/> (a token with no discriminating
+/// meaning winning on <c>df = 1</c>) and it is fixed in the same place, at match time.
+/// </para>
 /// </remarks>
 public sealed class LexicalIndex
 {
@@ -137,14 +168,19 @@ public sealed class LexicalIndex
             if (product is null) continue;
 
             var weights = new Dictionary<string, float>(StringComparer.Ordinal);
+            var whole   = new HashSet<string>(StringComparer.Ordinal);
 
             AddField(weights, product.Name, NameFieldWeight);
             AddField(weights, product.Brand, BrandFieldWeight);
+            AddWhole(whole, product.Name);
+            AddWhole(whole, product.Brand);
 
             foreach (var (key, value) in product.Specs)
             {
                 AddField(weights, key, SpecKeyFieldWeight);
                 AddField(weights, value, SpecValueFieldWeight);
+                AddWhole(whole, key);
+                AddWhole(whole, value);
             }
 
             var haystack = new StringBuilder();
@@ -159,7 +195,7 @@ public sealed class LexicalIndex
                 haystack.Append(Squash(value));
             }
 
-            entries[product.Id] = new Entry(product, weights, haystack.ToString(), Squash(product.Gtin));
+            entries[product.Id] = new Entry(product, weights, whole, haystack.ToString(), Squash(product.Gtin));
 
             foreach (var token in weights.Keys)
             {
@@ -208,6 +244,7 @@ public sealed class LexicalIndex
 
         var bag         = ExpandToBag(tokens);
         var modelTokens = ModelTokens(tokens);
+        var wholeQuery  = new HashSet<string>(tokens, StringComparer.Ordinal);
         var results     = new List<(string ProductId, float Score)>();
 
         foreach (var product in _products)
@@ -217,6 +254,10 @@ public sealed class LexicalIndex
             if (!filter(product)) continue;
 
             float score = 0f;
+
+            // A hyphen fragment may ADD score; it may not CREATE a hit. See the ANCHOR remarks
+            // on the class: an anchor is a token neither side had to be broken apart to produce.
+            bool anchored = entry.WholeTokens.Overlaps(wholeQuery);
 
             foreach (var token in bag)
             {
@@ -231,6 +272,7 @@ public sealed class LexicalIndex
                     entry.SquashedHaystack.Contains(modelToken, StringComparison.Ordinal))
                 {
                     score += ModelNumberBoost;
+                    anchored = true;
                 }
             }
 
@@ -241,10 +283,11 @@ public sealed class LexicalIndex
                     string.Equals(Squash(token), entry.SquashedGtin, StringComparison.Ordinal))
                 {
                     score += GtinExactBoost;
+                    anchored = true;
                 }
             }
 
-            if (score > 0f) results.Add((product.Id, score));
+            if (score > 0f && anchored) results.Add((product.Id, score));
         }
 
         // Deterministic order: score descending, then product id ascending. Without the tie-break
@@ -493,9 +536,19 @@ public sealed class LexicalIndex
         }
     }
 
+    private static void AddWhole(HashSet<string> whole, string? text)
+    {
+        foreach (var token in Tokenize(text))
+        {
+            if (StopWords.Contains(token)) continue;
+            whole.Add(token);
+        }
+    }
+
     private sealed record Entry(
         Product Product,
         Dictionary<string, float> FieldWeightByToken,
+        HashSet<string> WholeTokens,
         string SquashedHaystack,
         string SquashedGtin);
 }

@@ -106,6 +106,36 @@ public sealed record DiscoveryRunResult(
 {
     /// <summary>True when the loop-back edge fired at least once.</summary>
     public bool Looped => RoutesTaken.Contains(DiscoveryRouteIds.ReviewToMoreDiscovery, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Every executor-level or workflow-level FAILURE observed on the event stream, in order.
+    /// Empty on a healthy run.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>This exists because a failing node used to be indistinguishable from a healthy run at
+    /// the process boundary.</b> <c>GalaxusDiscoveryLoop.RunAsync</c> publishes an <c>ExecutorFailedEvent</c> as a
+    /// <c>Degraded</c> progress note and keeps draining the stream — deliberately, so one bad node
+    /// does not take the run down. But a <c>Degraded</c> note is a WARNING channel: the demo printed
+    /// the throw and still returned a full recommendation tray and exit code 0. A reader who checks
+    /// the exit code — CI, above all — saw green.
+    /// </para>
+    /// <para>
+    /// Reproduced, not theorised: removing one entry from <c>QueryVocabulary</c>'s localisation
+    /// table makes <c>CoverageReviewer</c> throw its B-9 self-check. <c>Evals -- 4</c> exits 1;
+    /// <c>Agent -- 2 --offline</c> printed <c>⚠ [CoverageReviewer] executor FAILED</c> and exited
+    /// <b>0</b>. Warnings are for degradation the run survived intact. A node that threw is not that.
+    /// </para>
+    /// <para>
+    /// The list is the fact; deciding what to DO with it belongs to the caller, because the eval
+    /// lane legitimately wants to score a partially-failed run and the demo legitimately must not
+    /// report success. <see cref="Failed"/> is the caller's one-liner.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> ExecutorFailures { get; init; } = [];
+
+    /// <summary>True when any node or the workflow itself threw. A run that failed is not a result.</summary>
+    public bool Failed => ExecutorFailures.Count > 0;
 }
 
 /// <summary>
@@ -324,6 +354,11 @@ public static class GalaxusDiscoveryLoop
         DiscoveryState? output = null;
         int superSteps = 0;
 
+        // A node that threw is recorded as a FAILURE, separately from the Degraded warning channel
+        // it is also published on. See DiscoveryRunResult.ExecutorFailures for why the two must not
+        // be the same list: a warning is degradation the run survived, and a throw is not.
+        var failures = new List<string>();
+
         var run = await InProcessExecution
             .RunStreamingAsync(workflow, state, sessionId: state.RunId.ToString("N"), cancellationToken)
             .ConfigureAwait(false);
@@ -338,11 +373,15 @@ public static class GalaxusDiscoveryLoop
 
                 case ExecutorFailedEvent failed:
                     // A node that throws must not take the run down silently. The message-borne
-                    // counter means the round it was in did not consume budget either.
+                    // counter means the round it was in did not consume budget either. It is ALSO
+                    // recorded as a failure: publishing it only on the warning channel is how a
+                    // throwing reviewer used to reach exit code 0.
+                    failures.Add($"{failed.ExecutorId}: {failed.Data}");
                     progress.Publish(DiscoveryEvent.Degraded(failed.ExecutorId, $"executor FAILED: {failed.Data}"));
                     break;
 
                 case WorkflowErrorEvent error:
+                    failures.Add($"workflow: {error}");
                     progress.Publish(DiscoveryEvent.Degraded("workflow", $"error: {error}"));
                     break;
 
@@ -365,7 +404,10 @@ public static class GalaxusDiscoveryLoop
         progress.Publish(DiscoveryEvent.RunComplete(finalState, clock.Elapsed));
 
         return new DiscoveryRunResult(
-            finalState, workflow, executorIds, recorder.RoutesTaken(), superSteps, clock.Elapsed);
+            finalState, workflow, executorIds, recorder.RoutesTaken(), superSteps, clock.Elapsed)
+        {
+            ExecutorFailures = failures
+        };
     }
 
     /// <summary>
