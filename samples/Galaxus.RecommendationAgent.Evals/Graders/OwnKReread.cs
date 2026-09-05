@@ -36,12 +36,19 @@ public sealed record OwnKRereadRow(
 /// </para>
 /// <para>
 /// <b>Two sources for the live cells, and the row says which.</b> In a live run the cells come
-/// from this process, with every rep's presented list in hand, so the cut is rep-matched: each
-/// control is cut to each live rep's own k and the cuts are averaged, exactly as the live reps
-/// are. From a PERSISTED snapshot only the rep-averaged cell survives — a ROUNDED MEAN k and a
-/// mean recall — so the control is cut once, to that rounded k, and the row is marked. The
-/// precision of a persisted live cell is not recoverable (no item list) and is printed as not
-/// recorded, never as zero.
+/// from this process, with every rep's presented list in hand, so every rep — live and control
+/// alike — is cut to ONE budget: the MINIMUM the live arm presented across its reps. From a
+/// PERSISTED snapshot only the rep-averaged cell survives — a ROUNDED MEAN k and a mean recall —
+/// so the control is cut once, to that rounded k, and the row is marked. The precision of a
+/// persisted live cell is not recoverable (no item list) and is printed as not recorded, never as
+/// zero.
+/// </para>
+/// <para>
+/// <b>Why the minimum and not the mean.</b> A rounded rep-mean is a budget no rep necessarily had:
+/// reps at 5 / 6 / 5 round to 5, but rep 2's sixth item would then be graded at a k it was never
+/// cut to. The minimum is the only k every rep can be cut to without padding, recall is monotone
+/// in k, and so the choice moves the live arm's own number DOWN or leaves it alone. It never
+/// flatters the arm under test. The raw per-rep counts go into the row's note.
 /// </para>
 /// <para>
 /// <b>A silent live cell is not re-read.</b> k = 0 has nothing to cut a control to. The row is
@@ -84,12 +91,31 @@ public static class OwnKReread
                 continue;
             }
 
-            // The live cell at its OWN k: each rep cut to its own count (an identity cut) so the
-            // precision@k_r and the floor are carried, then averaged like any other cell.
+            // ⚠ ONE budget for the whole row, and it is the MINIMUM the live arm presented.
+            //
+            // The rep-matched form of this — every rep cut to its OWN count, then averaged —
+            // is what shipped, and it CRASHED the 2026-09-05 live run: reps at 5 / 6 / 5 produce
+            // three cuts at three different DeclaredK, and CoverageScore.Mean refuses to average
+            // those (correctly: they are different quantities, and the guard is the whole point of
+            // this eval). The guard is not the defect. Handing it cuts made at different budgets
+            // was.
+            //
+            // The minimum is the only budget every rep can actually be cut to without padding a
+            // short rep with items it never presented. Recall is monotone in k, so cutting the
+            // longer reps DOWN can only lower the live arm's own number — the re-read errs
+            // against the arm under test, never in its favour — and the raw per-rep counts are
+            // printed in the note so nothing is hidden by the choice.
+            int kRow = nonSilent.Min(r => r.Count);
+
             var liveCuts = nonSilent
-                .Select(r => InterestCoverageGrader.GradeAtDeclaredK(persona, goldByPersona, r, r.Count))
+                .Select(r => InterestCoverageGrader.GradeAtDeclaredK(persona, goldByPersona, r, kRow))
                 .ToList();
-            CoverageScore liveCell = CoverageScore.Mean(liveCuts) with { KUniformAcrossReps = true };
+
+            // No `with { KUniformAcrossReps = true }`. That flag is exactly what
+            // SignTestAtEqualK reads to decide a pair is comparable, so asserting it here would be
+            // the artifact under test supplying an input to its own pass/fail. Mean COMPUTES it,
+            // and after a common cut it computes true because every rep really does carry kRow.
+            CoverageScore liveCell = CoverageScore.Mean(liveCuts);
 
             var controls = new Dictionary<string, CoverageScore?>(StringComparer.Ordinal);
             var shortControls = new List<string>();
@@ -100,37 +126,28 @@ public static class OwnKReread
                 if (armReps.Count == 0) { controls[arm] = null; continue; }
                 IReadOnlyList<PresentedCall> list = armReps[0];
 
-                // Rep-matched: the control is cut to EACH live rep's k, and the cuts average
-                // exactly as the live reps do. Two reps at k = 4 and one at k = 3 pair against
-                // two 4-item cuts and one 3-item cut — never against one rounded-mean cut.
-                var cuts = new List<CoverageScore>();
-                foreach (var rep in nonSilent)
-                {
-                    if (list.Count < rep.Count) { cuts.Clear(); break; }
-                    cuts.Add(InterestCoverageGrader.GradeAtDeclaredK(persona, goldByPersona, list, rep.Count));
-                }
-
-                if (cuts.Count == 0) { controls[arm] = null; shortControls.Add(arm); continue; }
-                controls[arm] = CoverageScore.Mean(cuts) with { KUniformAcrossReps = true };
+                // One cut, to the row's one budget. A deterministic arm has one rep, and cutting
+                // the same list to the same k three times and averaging is that same cut.
+                if (list.Count < kRow) { controls[arm] = null; shortControls.Add(arm); continue; }
+                controls[arm] = InterestCoverageGrader.GradeAtDeclaredK(persona, goldByPersona, list, kRow);
             }
 
-            // The row's k is the rounded rep-mean; DeclaredK on the cells is that same number so
-            // the equal-k rule sees one budget on both sides. The cut itself was rep-matched.
-            int kLive = liveCell.PresentedCount;
-            bool uniform = nonSilent.All(r => r.Count == nonSilent[0].Count);
-            liveCell = liveCell with { DeclaredK = kLive };
+            // Every cell on this row was cut to kRow, so DeclaredK and PresentedCount already ARE
+            // kRow on both sides. Nothing is overwritten after the fact.
+            int kLive = kRow;
+            bool uniform = nonSilent.All(r => r.Count == kRow);
 
             report.Record(persona, liveArm, liveCell);
             foreach (var (arm, cut) in controls)
             {
-                if (cut is { } c) report.Record(persona, arm, c with { DeclaredK = kLive });
+                if (cut is { } c) report.Record(persona, arm, c);
             }
 
             string note = string.Join(" ",
                 new[]
                 {
                     nonSilent.Count < liveReps.Count ? $"{liveReps.Count - nonSilent.Count} of {liveReps.Count} live rep(s) SILENT and excluded." : "",
-                    uniform ? "" : $"live reps presented {string.Join("/", nonSilent.Select(r => r.Count))} — controls cut rep-by-rep.",
+                    uniform ? "" : $"live reps presented {string.Join("/", nonSilent.Select(r => r.Count))} — EVERY rep cut to k = {kRow}, the minimum, so one budget covers the cell. Cutting down can only lower the live number.",
                     shortControls.Count > 0 ? $"presented fewer than k_live: {string.Join(", ", shortControls)}." : "",
                 }.Where(s => s.Length > 0));
 

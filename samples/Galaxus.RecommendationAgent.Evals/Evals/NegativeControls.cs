@@ -95,6 +95,7 @@ public static class NegativeControls
         rows.Add(CheckGraderSanity());
         rows.Add(CheckCoverageGateRendering());
         rows.Add(CheckPreRegisteredRuleReachability());
+        rows.Add(CheckOwnKRereadAtVaryingK());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -1779,6 +1780,178 @@ public static class NegativeControls
                 ? $"WinsRequired = {PreRegisteredRule.WinsRequired} · 10/2/0 → MET · 9/3/0 → NOT MET · all-refused → NOT "
                 + $"EVALUATED · missing outcome → NOT EVALUATED · the live loop-vs-agent pair → {live.Label} "
                 + $"({live.Reason})"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 12 — the own-k RE-READ, on reps that presented DIFFERENT counts. ═════════
+
+    /// <summary>
+    /// Proves the own-k re-read survives — and stays honest on — the case that crashed the
+    /// 2026-09-05 paid run: a live arm whose repetitions presented different numbers of items.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What happened.</b> <c>OwnKReread.FromThisRun</c> graded each repetition at its OWN count
+    /// and handed the results to <see cref="CoverageScore.Mean"/>, which refuses — correctly — to
+    /// average cuts made at different declared budgets. On that run exactly two personas triggered
+    /// it (5 / 6 / 5 and 4 / 5 / 5) and the process died after all 36 live turns, taking both gates
+    /// and the cost panel with it. <b>The guard is not the defect and is not relaxed here</b>; the
+    /// last check below re-asserts that it still throws.
+    /// </para>
+    /// <para>
+    /// <b>Why it needs a control at all.</b> The condition is invisible to a one-repetition run and
+    /// to any run whose arm presents a constant k, so nothing in the free lane could reach it. This
+    /// row reaches it deterministically, in milliseconds, with no model and no credentials — and it
+    /// pins the DIRECTION of the fix as well as its existence: the common budget is the MINIMUM the
+    /// arm presented, not the rounded rep-mean, so a rep that presented more is cut DOWN. Recall is
+    /// monotone in k, so that can only lower the number of the arm under test. A re-read that
+    /// rounded up would grade a rep at a budget it never presented, in the flattering direction.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckOwnKRereadAtVaryingK()
+    {
+        const string liveArm = "live — k varies across reps";
+        const string controlArm = "control — deterministic";
+
+        var problems = new List<string>();
+        var golds = CoveragePersonas.All.ToDictionary(p => p.Id, p => InterestMapGold.Derive(p.Id), StringComparer.Ordinal);
+
+        // Six real catalogue products in one fixed order. Every cut below is a prefix of this list,
+        // so every citation the graders resolve is a real one.
+        var skus = Catalogue.Default.CoreProducts.Take(6).Select(p => p.Id).ToList();
+        var scorable = CoveragePersonas.All.Where(p => golds.TryGetValue(p.Id, out var g) && !g.LatentIsEmpty)
+                                           .Select(p => p.Id).Take(3).ToList();
+
+        if (skus.Count < 6 || scorable.Count < 3)
+        {
+            return new ControlRowSnapshot(
+                "OwnKRereadAtVaryingK",
+                "the own-k re-read must survive reps that presented different counts.",
+                $"FIXTURE UNAVAILABLE — {skus.Count} catalogue product(s) and {scorable.Count} scorable persona(s); "
+              + "this row needs 6 and 3. Reported as a fault, not skipped: an unbuildable control is not a passing one.",
+                false);
+        }
+
+        static PresentedCall Call(string sku, int order) => new(sku, "", "", false, order, null, true, true);
+        List<PresentedCall> Take(int n) => [.. skus.Take(n).Select((s, i) => Call(s, i + 1))];
+
+        // The three shapes: the two the live run actually produced, and the uniform one that must
+        // not move. 4 / 5 / 5 is the discriminating case — its rounded rep-mean is 5 and its
+        // minimum is 4, so a row that reports 5 has rounded UP to a budget one rep never reached.
+        var shapes = new (string Persona, int[] Reps, int ExpectedK, bool ExpectedUniform)[]
+        {
+            (scorable[0], [5, 6, 5], 5, false),
+            (scorable[1], [4, 5, 5], 4, false),
+            (scorable[2], [5, 5, 5], 5, true),
+        };
+
+        var ownK = new PairedCoverageReport();
+        foreach (var (persona, repCounts, _, _) in shapes)
+        {
+            var reps = repCounts.Select(Take).ToList();
+            foreach (var rep in reps) ownK.RecordPresented(persona, liveArm, rep);
+            ownK.Record(persona, liveArm, CoverageScore.Mean(
+                [.. reps.Select(r => InterestCoverageGrader.GradeWithControls(persona, golds, r))]));
+
+            var control = Take(6);
+            ownK.RecordPresented(persona, controlArm, control);
+            ownK.Record(persona, controlArm, InterestCoverageGrader.GradeWithControls(persona, golds, control));
+        }
+
+        PairedCoverageReport report;
+        IReadOnlyList<OwnKRereadRow> rows;
+        try
+        {
+            (report, rows, _) = OwnKReread.FromThisRun(ownK, liveArm, [controlArm], golds);
+        }
+        catch (Exception ex)
+        {
+            return new ControlRowSnapshot(
+                "OwnKRereadAtVaryingK",
+                "the own-k re-read must survive a live arm whose reps presented DIFFERENT counts (5/6/5 and 4/5/5 "
+              + "on the 2026-09-05 run), cut every cell to ONE budget — the MINIMUM, never a rounded mean — and "
+              + "leave the equal-k pairing comparable. The rep-averaging guard must still refuse mixed budgets.",
+                $"THREW: {ex.GetType().Name} — {ex.Message} This is the 2026-09-05 crash, reproduced offline in "
+              + "milliseconds. Two of twelve personas were enough to end a 36-turn paid run.",
+                false);
+        }
+
+        foreach (var (persona, repCounts, expectedK, expectedUniform) in shapes)
+        {
+            var row = rows.FirstOrDefault(r => string.Equals(r.PersonaId, persona, StringComparison.Ordinal));
+            if (row is null) { problems.Add($"{persona}: no re-read row at all."); continue; }
+
+            string shape = string.Join("/", repCounts);
+            if (row.KLive != expectedK)
+                problems.Add($"{persona} presented {shape} and the row reports k = {row.KLive}, not {expectedK} — the minimum.");
+            if (row.KUniform != expectedUniform)
+                problems.Add($"{persona} presented {shape} and the row reports KUniform = {row.KUniform}.");
+            if (!expectedUniform && !row.Note.Contains(shape, StringComparison.Ordinal))
+                problems.Add($"{persona}'s note does not print the raw per-rep counts {shape}; the reader cannot see what was cut.");
+
+            if (row.Live.DeclaredK != expectedK || row.Live.PresentedCount != expectedK)
+                problems.Add($"{persona}'s LIVE cell is at DeclaredK {row.Live.DeclaredK} / k {row.Live.PresentedCount}, not {expectedK}.");
+            if (!row.Live.KUniformAcrossReps)
+                problems.Add($"{persona}'s LIVE cell is marked NON-uniform after a common cut, so the equal-k rule will refuse a pair it should accept.");
+
+            if (row.ControlsAtKLive.TryGetValue(controlArm, out var cut) && cut is { } c)
+            {
+                if (c.DeclaredK != expectedK || c.PresentedCount != expectedK)
+                    problems.Add($"{persona}'s CONTROL cell is at DeclaredK {c.DeclaredK} / k {c.PresentedCount}, not {expectedK}.");
+            }
+            else
+            {
+                problems.Add($"{persona}: the control was not cut to k = {expectedK} at all.");
+            }
+        }
+
+        // The cut must run in the NON-FLATTERING direction. Persona 0's second rep presented six;
+        // grading it at six can only serve at least as many gold tokens as grading it at five.
+        double atSix = InterestCoverageGrader.GradeAtDeclaredK(scorable[0], golds, Take(6), 6).Latent;
+        double atFive = InterestCoverageGrader.GradeAtDeclaredK(scorable[0], golds, Take(6), 5).Latent;
+        if (atFive > atSix + 1e-12)
+            problems.Add($"cutting a 6-item rep to k = 5 RAISED its recall ({atFive:F3} vs {atSix:F3}) — the cut is not a prefix.");
+
+        // The pairing the re-read exists to make possible must actually be available.
+        var paired = report.SignTestAtEqualK(liveArm, controlArm, CoverageMetric.Recall);
+        if (paired.ComparedN != shapes.Length || paired.Excluded.Count != 0)
+        {
+            problems.Add($"the equal-k sign test compared {paired.ComparedN} of {shapes.Length} pairs and refused "
+                       + $"{paired.Excluded.Count} — a re-read that leaves every pair NOT COMPARABLE has re-read nothing.");
+        }
+
+        // ⚠ AND THE GUARD IS STILL A GUARD. Relaxing Mean to get past the crash would have been the
+        // one repair that made the eval worse, so this row would go red if anyone did.
+        bool guardHeld = false;
+        try
+        {
+            _ = CoverageScore.Mean(
+            [
+                InterestCoverageGrader.GradeAtDeclaredK(scorable[0], golds, Take(5), 4),
+                InterestCoverageGrader.GradeAtDeclaredK(scorable[0], golds, Take(5), 5),
+            ]);
+        }
+        catch (ArgumentException)
+        {
+            guardHeld = true;
+        }
+
+        if (!guardHeld)
+            problems.Add("CoverageScore.Mean averaged two cuts made at DIFFERENT declared budgets — the equal-k guard has been relaxed.");
+
+        return new ControlRowSnapshot(
+            "OwnKRereadAtVaryingK",
+            "the own-k re-read must survive a live arm whose reps presented DIFFERENT counts (5/6/5 and 4/5/5 on "
+          + "the 2026-09-05 run, which it crashed on), cut every cell of a row to ONE budget — the MINIMUM the arm "
+          + "presented, never a rounded mean that no rep reached — leave the equal-k pairing COMPARABLE, print the "
+          + "raw per-rep counts, and leave a uniform persona untouched. CoverageScore.Mean must still REFUSE mixed "
+          + "budgets: the guard is not the defect.",
+            problems.Count == 0
+                ? $"5/6/5 → k = 5 (non-uniform, counts printed) · 4/5/5 → k = 4, the MINIMUM, where the rounded mean "
+                + $"would have said 5 · 5/5/5 → k = 5, uniform · {paired.ComparedN} of {shapes.Length} pairs comparable, "
+                + $"0 refused · cutting 6 → 5 moved recall {atSix:F3} → {atFive:F3} (never up) · Mean still refuses "
+                + "two budgets"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

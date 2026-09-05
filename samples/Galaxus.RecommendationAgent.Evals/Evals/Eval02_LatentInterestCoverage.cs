@@ -90,6 +90,21 @@ public static class Eval02_LatentInterestCoverage
     public const int QuickReps = 1;
 
     /// <summary>
+    /// Repetitions per persona for the live arm under <c>--dry-run</c>. <b>Two, not one, and the
+    /// reason is a crash.</b>
+    /// </summary>
+    /// <remarks>
+    /// The 2026-09-05 paid run died in <see cref="OwnKReread.FromThisRun"/> because two personas
+    /// presented a different number of items on different repetitions and the rep-averaging guard
+    /// refused, correctly, to average cuts made at two budgets. <b>One repetition cannot produce
+    /// that condition</b>, so the free stage of the three-stage protocol was structurally incapable
+    /// of reaching it however carefully it was run. Two repetitions, with a stub whose presentation
+    /// count differs between them (<see cref="DryRunStubPresentation"/>), make the condition
+    /// reachable at zero cost.
+    /// </remarks>
+    public const int DryRunReps = 2;
+
+    /// <summary>
     /// Snapshot key used when <c>--only</c> restricts the run to one persona — stage two of the
     /// three-stage run protocol. A one-persona probe must never overwrite the full-cohort record.
     /// </summary>
@@ -196,7 +211,12 @@ public static class Eval02_LatentInterestCoverage
 
         var retriever = await EvalRuntime.EnsureBoundAsync(ct).ConfigureAwait(false);
 
-        int reps = dryRun ? 1 : quick ? QuickReps : Reps;
+        // ⚠ The dry run runs MORE than one rep, and that is load-bearing rather than thorough.
+        // At one rep no arm can present a different k on two reps of the same persona, so the
+        // condition that crashed the 2026-09-05 paid run — CoverageScore.Mean handed cuts made at
+        // two different budgets — cannot exist in a one-rep dry run at all. Stage one of the
+        // three-stage protocol was structurally blind here, not badly run.
+        int reps = dryRun ? DryRunReps : quick ? QuickReps : Reps;
         int declaredK = CoverageArms.DeclaredK;
         var harness = new MAFEvaluationHarness(verbose: false);
         var options = new EvaluationOptions
@@ -211,9 +231,15 @@ public static class Eval02_LatentInterestCoverage
         // The dry-run stub ASKS before presenting on Jonas (USR-JV-08) and nowhere else, so the
         // harness's second turn is exercised on exactly the persona whose instructed silence
         // failed GATE 1 "alone" on the 2026-09-04 live run.
-        var liveAgent = dryRun
-            ? RecommendationAgentFactory.Create(StubChatClient.AskThenPresentAgent(Personas.JonasUserId))
-            : RecommendationAgentFactory.Create();
+        //
+        // ⚠ And in a dry run it is built FRESH PER REP, presenting a different number of products
+        // on alternate reps. The live agent varies its own k across reps — measured, USR-JV-08
+        // presented 5 / 6 / 5 and USR-PB-11 4 / 5 / 5 — and a stub with a constant k makes that
+        // condition unreachable, which is exactly why the free stage of the protocol could not see
+        // the crash. The rep counter lives at the FACTORY, one increment per session, not inside
+        // the stub's decide function: per-model-call state is what made two earlier stubs drift.
+        var liveAgent = dryRun ? null : RecommendationAgentFactory.Create();
+        int dryRunRep = 0;
 
         // The ONE place an arm is constructed. Every arm — live, control, baseline, oracle, loop —
         // comes out of CoverageArms with this context, so a new arm is a new row in the registry
@@ -225,7 +251,9 @@ public static class Eval02_LatentInterestCoverage
         // once more on the same session. Silence is scored only after that.
         var armContext = new CoverageArmContext(
             retriever,
-            LiveAgentFactory: () => new ClarifyingTurnAdapter(new ApprovalAwareAgentAdapter(liveAgent)),   // fresh session per rep
+            LiveAgentFactory: () => new ClarifyingTurnAdapter(new ApprovalAwareAgentAdapter(   // fresh session per rep
+                liveAgent ?? RecommendationAgentFactory.Create(
+                    StubChatClient.AskThenPresentAgent(Personas.JonasUserId, DryRunStubPresentation(dryRunRep++))))),
             DryRun: dryRun,
             DeclaredK: declaredK);
 
@@ -389,21 +417,61 @@ public static class Eval02_LatentInterestCoverage
         string rereadProvenance;
         CoverageSnapshot? persisted = dryRun ? EvalResultStore.LoadCoverage(EvalResultStore.CoverageKey) : null;
 
-        if (!dryRun)
+        // ⚠ THE LIVE-ONLY BRANCH, NOW RUN IN BOTH MODES.
+        //
+        // OwnKReread.FromThisRun is where the 2026-09-05 paid run died, after all 36 live turns,
+        // taking BOTH gates and the cost panel with it — and `--dry-run` could not see it, because
+        // the dry run took the FromSnapshot branch instead, at one rep, against a stub whose
+        // presentation count never moved. A check that cannot reach the code it certifies is the
+        // defect shape this suite exists to catch. Three changes, and they only work together:
+        //   (1) the dry run presents a DIFFERENT number of products on successive reps and runs at
+        //       DryRunReps ≥ 2, so the varying-k CONDITION exists at all;
+        //   (2) FromThisRun is called below in both modes — the dry run still PRINTS the persisted
+        //       re-read, because a stub's cells are not a result, but the live code path has been
+        //       executed and whether it survived is one of the dry run's plumbing checks;
+        //   (3) a throw is caught here rather than unwinding the process. Losing two gates and a
+        //       cost panel to one grader exception is a worse outcome than a red line and an
+        //       exit code, and the exception text goes into the notes verbatim.
+        (PairedCoverageReport Report, IReadOnlyList<OwnKRereadRow> Rows, string Provenance)? thisRun = null;
+        string thisRunOutcome;
+
+        try
         {
-            (rereadReport, rereadRows, rereadProvenance) = OwnKReread.FromThisRun(ownK, ArmLive, deterministicArms, goldByPersona);
+            thisRun = OwnKReread.FromThisRun(ownK, ArmLive, deterministicArms, goldByPersona);
+            int recut = thisRun.Value.Rows.Count(r => !r.KUniform);
+            thisRunOutcome = $"the live-run re-read produced {thisRun.Value.Rows.Count} row(s); {recut} persona(s) "
+                           + "presented a DIFFERENT k across reps and were cut to the minimum, so one budget covers "
+                           + "the cell.";
+        }
+        catch (ArgumentException ex)
+        {
+            thisRunOutcome = $"the live-run re-read THREW and was contained: {ex.Message}";
+            notes.Add("🔴 THE OWN-k RE-READ THREW. It was caught rather than allowed to unwind the process, so the "
+                    + "gates, the cost panel and the snapshot below still printed — but the own-k panel is NOT "
+                    + "MEASURED on this run and the eval exits non-zero. Exception: " + ex.Message);
+        }
+
+        if (!dryRun && thisRun is { } live)
+        {
+            (rereadReport, rereadRows, rereadProvenance) = live;
+        }
+        else if (!dryRun)
+        {
+            rereadProvenance = "the own-k re-read THREW — see the note. No rows.";
         }
         else if (persisted is not null)
         {
             (rereadReport, rereadRows, rereadProvenance) = OwnKReread.FromSnapshot(ownK, persisted, ArmLive, deterministicArms, goldByPersona);
             notes.Add($"RE-READ SOURCE: the live cells on the own-k panel are the PERSISTED run of {persisted.RunAt:u} "
                     + $"(DeclaredK = {persisted.DeclaredK}; utterance {(persisted.Utterance.Length == 0 ? "NOT recorded — pre-dates the declared budget" : "recorded")}). "
-                    + "The stub's cells were NOT used there. The declared-k panel's live column IS the stub.");
+                    + "The stub's cells were NOT used there. The declared-k panel's live column IS the stub. "
+                    + "The LIVE-run re-read path was still executed over the stub's own reps and " + thisRunOutcome);
         }
         else
         {
             rereadProvenance = "no persisted live run on disk and this is a dry run — nothing to re-read";
-            notes.Add("RE-READ SKIPPED: no persisted Eval 02 snapshot exists, so there is no live run to re-read at its own k.");
+            notes.Add("RE-READ SKIPPED: no persisted Eval 02 snapshot exists, so there is no live run to re-read at its own k. "
+                    + "The LIVE-run re-read path was still executed over the stub's own reps and " + thisRunOutcome);
         }
 
         EvalPrinter.PrintOwnKReread(rereadRows, ArmLive, deterministicArms, rereadProvenance);
@@ -668,7 +736,8 @@ public static class Eval02_LatentInterestCoverage
             // repository's three-stage run protocol — could not fail. A stage that cannot fail is
             // not a stage. It now asserts the same class of property Eval 01's dry run does.
             bool plumbingHeld = DryRunPlumbingHeld(ownK, atK, goldByPersona, floors, precisionFloors, armsThatThrew,
-                                                   declaredK, atKRecall, persisted, rereadRows, preRegistered);
+                                                   declaredK, atKRecall, persisted, rereadRows, preRegistered,
+                                                   thisRun, thisRunOutcome, reps);
             bool secondTurnWired = SecondTurnPlumbingHeld(secondTurns);
             return plumbingHeld && secondTurnWired ? 0 : 1;
         }
@@ -679,8 +748,32 @@ public static class Eval02_LatentInterestCoverage
         Console.WriteLine($"  📁 Snapshot saved → {EvalResultStore.StorageLocation} ({snapshotKey})");
         Console.ResetColor();
 
-        return aboveFloor && controlSane ? 0 : 1;
+        // ⚠ A contained re-read throw is still a FAILURE. It is caught so the gates, the cost panel
+        // and the snapshot survive it; it is not caught so the run can call itself clean.
+        return aboveFloor && controlSane && thisRun is not null ? 0 : 1;
     }
+
+    /// <summary>
+    /// The products the dry-run stub presents on repetition <paramref name="rep"/> — TWO on even
+    /// repetitions, THREE on odd ones.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The variation is the point, not the products.</b> A stub that presents the same count on
+    /// every repetition makes the varying-k condition unreachable, and that is precisely why the
+    /// free stage of the three-stage protocol could not see the crash that killed the 2026-09-05
+    /// paid run. Alternating 2 / 3 reproduces the SHAPE of what the live agent does (5 / 6 / 5 on
+    /// USR-JV-08, 4 / 5 / 5 on USR-PB-11) at zero cost.
+    /// </para>
+    /// <para>
+    /// The counts stay deliberately small and the products deliberately constant across personas,
+    /// so the stub's coverage number remains obviously not a result — the dry run must not begin to
+    /// look like a plausible agent.
+    /// </para>
+    /// </remarks>
+    /// <param name="rep">Zero-based repetition index, incremented once per constructed session.</param>
+    public static string[] DryRunStubPresentation(int rep) =>
+        rep % 2 == 0 ? ["GLX-8003", "GLX-2001"] : ["GLX-8003", "GLX-2001", "GLX-1002"];
 
     /// <summary>
     /// Says, per comparison and per panel, who leads — with the n it leads on and the pairs it
@@ -849,6 +942,13 @@ public static class Eval02_LatentInterestCoverage
     ///   <item><description><b>The pre-registered rule rendered a VERDICT</b> (§8, B-2). Not a
     ///   particular verdict — any of the three, with a reason attached. A rule text with no
     ///   evaluator behind it is what this check exists to make impossible to ship again.</description></item>
+    ///   <item><description><b>The LIVE-ONLY re-read branch RAN</b>
+    ///   (<see cref="OwnKReread.FromThisRun"/>). It is the branch the 2026-09-05 paid run died in,
+    ///   after 36 live turns, and the dry run used to take the other one.</description></item>
+    ///   <item><description><b>…and it ran on the CONDITION it died of.</b> At least one persona
+    ///   presented a different number of items across its reps. Exercising a branch on input that
+    ///   cannot trigger its fault certifies nothing, so this check reports plainly that it could
+    ///   not see its own subject rather than going green beside it.</description></item>
     /// </list>
     /// </remarks>
     private static bool DryRunPlumbingHeld(
@@ -862,7 +962,10 @@ public static class Eval02_LatentInterestCoverage
         IReadOnlyList<SignTestOutcome> atKRecall,
         CoverageSnapshot? persisted,
         IReadOnlyList<OwnKRereadRow> rereadRows,
-        PreRegisteredRuleOutcome preRegistered)
+        PreRegisteredRuleOutcome preRegistered,
+        (PairedCoverageReport Report, IReadOnlyList<OwnKRereadRow> Rows, string Provenance)? thisRunReread,
+        string thisRunRereadOutcome,
+        int reps)
     {
         var scored = goldByPersona.Where(kv => !kv.Value.LatentIsEmpty).Select(kv => kv.Key)
             .Where(id => ownK.Personas.Contains(id, StringComparer.Ordinal)).ToList();
@@ -911,6 +1014,18 @@ public static class Eval02_LatentInterestCoverage
             && string.Equals(preRegistered.Reference, ArmLive, StringComparison.Ordinal)
             && preRegistered.WinsRequired == PreRegisteredRule.WinsRequired;
 
+        // ⚠ THE TWO CHECKS THE 2026-09-05 CRASH IS THE REASON FOR, and they are separate on
+        // purpose. The first asks whether the live-only branch RAN. The second asks whether the
+        // CONDITION that branch fell over on was present while it ran — because a branch exercised
+        // on input that cannot trigger the fault certifies nothing, and the honest thing for a
+        // check that cannot reach its own subject is to say so rather than go green.
+        bool liveRereadRan = thisRunReread is not null;
+
+        var varyingKPersonas = ownK.Personas
+            .Where(p => ownK.PresentedRepsOf(p, ArmLive).Where(r => r.Count > 0).Select(r => r.Count).Distinct().Count() > 1)
+            .ToList();
+        bool varyingKReached = varyingKPersonas.Count > 0;
+
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("  ─── DRY-RUN PLUMBING CHECKS (a stub cannot prove anything else) ──────");
@@ -949,9 +1064,20 @@ public static class Eval02_LatentInterestCoverage
             + $"EVALUATED for the loop-vs-agent pair and rendered {preRegistered.Label}, with a reason."
             : "the pre-registered rule rendered NO verdict for the loop-vs-agent pair, or rendered one with no reason. "
             + "That is the B-2 defect: rule text with no evaluator behind it.");
+        Line(liveRereadRan, liveRereadRan
+            ? $"the LIVE-ONLY own-k re-read branch (OwnKReread.FromThisRun) RAN in this dry run: {thisRunRereadOutcome}"
+            : $"the LIVE-ONLY own-k re-read branch FAILED in this dry run: {thisRunRereadOutcome}");
+        Line(varyingKReached, varyingKReached
+            ? $"…and it ran ON THE CONDITION IT DIED OF: {varyingKPersonas.Count} persona(s) presented a DIFFERENT "
+            + $"number of items across their {reps} reps ({string.Join(", ", varyingKPersonas.Take(4))}"
+            + (varyingKPersonas.Count > 4 ? ", …" : "") + "). The branch was reached with varying k, not merely reached."
+            : $"⚠ THIS CHECK CANNOT SEE ITS OWN SUBJECT. The live-only branch ran, but no persona presented a "
+            + $"different k across its {reps} reps, so the equal-k averaging condition that crashed the 2026-09-05 "
+            + "paid run was never produced. A green line above would be a fact about the stub, not about the branch.");
 
         return goldDerived && floorsDefined && precisionFloorsDefined && liveMeasured && silentArms.Count == 0
-            && noneThrew && cutBounded && cutFired && refusalFired && rereadRan && everyArmHasANote && ruleRendered;
+            && noneThrew && cutBounded && cutFired && refusalFired && rereadRan && everyArmHasANote && ruleRendered
+            && liveRereadRan && varyingKReached;
 
         static void Line(bool ok, string text)
         {
