@@ -103,12 +103,22 @@ public static class Eval02b_StatedNeedSatisfaction
 
     private sealed record WiringRow(string Name, string Expectation, string Observed, bool Ok);
 
+    /// <summary>The key a one-case probe writes to. NEVER the full-cohort key.</summary>
+    public const string ProbeSnapshotKey = OfflineSnapshotStore.StatedNeedKey + "_probe";
+
     /// <summary>Runs the eval.</summary>
     /// <param name="quick">One live repetition instead of three.</param>
     /// <param name="dryRun">Stub the live arm; spend nothing; assert the plumbing.</param>
+    /// <param name="onlyCase">
+    /// Restrict the run to one case id (<c>SN-01</c> … ) — the one-item real run that is stage two
+    /// of the three-stage protocol. The snapshot then goes to <see cref="ProbeSnapshotKey"/>, so a
+    /// single-case probe can never overwrite the full-cohort record, and the GATE is reported as a
+    /// probe result: n = 1 decides nothing about the cohort in either direction.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>0 passed, 1 a gate or a wiring check failed, 3 the live arm was not measured.</returns>
-    public static async Task<int> RunAsync(bool quick = false, bool dryRun = false, CancellationToken ct = default)
+    public static async Task<int> RunAsync(
+        bool quick = false, bool dryRun = false, string? onlyCase = null, CancellationToken ct = default)
     {
         PrintHeader();
 
@@ -122,8 +132,30 @@ public static class Eval02b_StatedNeedSatisfaction
             return 1;
         }
 
+        IReadOnlyList<StatedNeedCase> selected = onlyCase is null
+            ? StatedNeedCases.All
+            : [.. StatedNeedCases.All.Where(c => string.Equals(c.Id, onlyCase, StringComparison.OrdinalIgnoreCase))];
+
+        if (selected.Count == 0)
+        {
+            EvalPrinter.PrintRefusal(
+                $"--only {onlyCase} matches no stated-need case.",
+                "Case ids: " + string.Join(", ", StatedNeedCases.All.Select(c => c.Id)) + ".");
+            return 2;
+        }
+
         bool liveMeasurable = dryRun || Config.IsConfigured;
         PrintMode(dryRun, liveMeasurable);
+
+        if (onlyCase is not null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  🔬 ONE-CASE PROBE — {selected[0].Id} only. Stage two of the three-stage protocol.");
+            Console.WriteLine($"     n = 1: the cohort mean is not reachable, the snapshot goes to '{ProbeSnapshotKey}'");
+            Console.WriteLine("     and never to the full-cohort key, and the gate below is this ONE case's, not the suite's.");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
 
         var retriever = await EvalRuntime.EnsureBoundAsync(ct).ConfigureAwait(false);
 
@@ -150,6 +182,7 @@ public static class Eval02b_StatedNeedSatisfaction
             DryRun: dryRun);
 
         var arms = BuildArms();
+        var ledger = new SpendLedger();
         var cells = new Dictionary<(string CaseId, string Arm), ConstraintScore>();
         var floors = new Dictionary<string, double>(StringComparer.Ordinal);
         var executedFloor = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -162,7 +195,7 @@ public static class Eval02b_StatedNeedSatisfaction
         foreach (Arm absent in arms.Where(a => a.Factory is null))
             notes.Add($"Arm '{absent.Label}' is DECLARED ABSENT and was not run. {absent.Note}");
 
-        foreach (StatedNeedCase testCase in StatedNeedCases.All)
+        foreach (StatedNeedCase testCase in selected)
         {
             var satisfying = ConstraintSatisfactionGrader.SatisfyingSet(testCase);
             double floor = ConstraintSatisfactionGrader.UniformDrawFloor(testCase);
@@ -197,7 +230,8 @@ public static class Eval02b_StatedNeedSatisfaction
                     IEvaluableAgent agent = arm.Factory(context, rep);
                     ConstraintScore? score = await ScoreAsync(
                         testCase, agent, harness, options, arm.Label, rep, armReps,
-                        print: arm.Role != ArmRole.Floor, ct).ConfigureAwait(false);
+                        print: arm.Role != ArmRole.Floor, ct,
+                        ledger: arm.Role == ArmRole.Live && !dryRun ? ledger : null).ConfigureAwait(false);
 
                     if (score is null)
                     {
@@ -235,6 +269,7 @@ public static class Eval02b_StatedNeedSatisfaction
         var runnable = arms.Where(a => a.Factory is not null).ToList();
         PrintTable(runnable, applicable, cells, floors, liveMeasurable, dryRun);
         PrintFloors(applicable, floors, executedFloor, cells);
+        ledger.Print(Config.Model, "Eval 02b");
 
         var wiring = CheckWiring(runnable, applicable, cells, floors, executedFloor, threw, liveMeasurable);
         PrintWiring(wiring);
@@ -272,9 +307,12 @@ public static class Eval02b_StatedNeedSatisfaction
             return CredentialGuard.NotMeasuredExitCode;
         }
 
-        string path = OfflineSnapshotStore.Save(OfflineSnapshotStore.StatedNeedKey, ToSnapshot(runnable, applicable, inapplicable, cells, floors, liveReps));
+        string snapshotKey = onlyCase is null ? OfflineSnapshotStore.StatedNeedKey : ProbeSnapshotKey;
+        string path = OfflineSnapshotStore.Save(snapshotKey, ToSnapshot(runnable, applicable, inapplicable, cells, floors, liveReps));
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"  📁 Snapshot saved → {path}");
+        if (onlyCase is not null)
+            Console.WriteLine($"     (probe key '{ProbeSnapshotKey}' — the full-cohort record at '{OfflineSnapshotStore.StatedNeedKey}' is untouched.)");
         Console.ResetColor();
 
         return liveAboveFloor ? 0 : 1;
@@ -339,7 +377,8 @@ public static class Eval02b_StatedNeedSatisfaction
         int rep,
         int reps,
         bool print,
-        CancellationToken ct)
+        CancellationToken ct,
+        SpendLedger? ledger = null)
     {
         var tc = new TestCase
         {
@@ -353,6 +392,9 @@ public static class Eval02b_StatedNeedSatisfaction
         {
             result = await harness.RunEvaluationAsync(agent, tc, options, ct).ConfigureAwait(false);
         }
+
+        // Only ever non-null for the LIVE arm — see the note at the same seam in Eval 02c.
+        ledger?.Record(result.Performance);
 
         if (result.HasError)
         {

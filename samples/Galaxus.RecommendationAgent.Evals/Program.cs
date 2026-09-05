@@ -67,8 +67,10 @@ if (parsed is null)
     Console.Error.WriteLine("  --quick      fewer repetitions in Evals 02, 02b, 02c, 08 and 09");
     Console.Error.WriteLine("  --judge      Eval 01's ADVISORY justification judge. Never changes a gate.");
     Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent, nothing written");
-    Console.Error.WriteLine("  --only <id>  Eval 02 only: run ONE persona (stage two of the run protocol). Its snapshot");
-    Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record.");
+    Console.Error.WriteLine("  --only <id>  Evals 02, 02b and 02c: run ONE case (stage two of the run protocol). 02 takes a");
+    Console.Error.WriteLine("               persona id, 02b a case id (SN-01…), 02c a customer id (USR-NB-01…). The snapshot");
+    Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record. NOT honoured under");
+    Console.Error.WriteLine("               --ci for 02b/02c — a CI chain must never be silently narrowed to one case.");
     Console.Error.WriteLine("  --concept-vectors  score in the authored 24-dimension concept space. THE DEFAULT —");
     Console.Error.WriteLine("                     deterministic, no key, identical on every machine, so two runs of");
     Console.Error.WriteLine("                     this suite cannot silently score in two spaces.");
@@ -103,8 +105,8 @@ try
         {
             "1" => await Eval01_CatalogueIntegrity.RunAsync(judge: parsed.Judge, dryRun: parsed.DryRun),
             "2" => await Eval02_LatentInterestCoverage.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyPersona: parsed.OnlyPersona),
-            "2b" => await Eval02b_StatedNeedSatisfaction.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
-            "2c" => await Eval02c_HeldOutNextPurchase.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
+            "2b" => await Eval02b_StatedNeedSatisfaction.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
+            "2c" => await Eval02c_HeldOutNextPurchase.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
             "3" => await NegativeControls.RunAsync(),
             "4" => await Eval04_ReviewInjectionContainment.RunAsync(),
             "5" => await Eval05_RecommendationQuality.RunAsync(dryRun: parsed.DryRun),
@@ -425,8 +427,8 @@ static async Task<int> ShowMenuAsync(ParsedArgs parsed)
         {
             '1' => await Eval01_CatalogueIntegrity.RunAsync(judge: parsed.Judge, dryRun: parsed.DryRun),
             '2' => await Eval02_LatentInterestCoverage.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyPersona: parsed.OnlyPersona),
-            'b' or 'B' => await Eval02b_StatedNeedSatisfaction.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
-            'c' or 'C' => await Eval02c_HeldOutNextPurchase.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
+            'b' or 'B' => await Eval02b_StatedNeedSatisfaction.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
+            'c' or 'C' => await Eval02c_HeldOutNextPurchase.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
             '3' => await NegativeControls.RunAsync(),
             '4' => await Eval04_ReviewInjectionContainment.RunAsync(),
             '5' => await Eval05_RecommendationQuality.RunAsync(dryRun: parsed.DryRun),

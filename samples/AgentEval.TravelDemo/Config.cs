@@ -141,10 +141,23 @@ public static class Config
         Console.ResetColor();
     }
 
+    /// <summary>
+    /// A fingerprint that identifies the key WITHOUT reproducing any of it: the first eight hex
+    /// characters of its SHA-256.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ This deliberately does NOT print characters of the key itself. The previous version showed
+    /// <c>first4…last4</c> — eight real characters of the secret — and this banner prints at the top of
+    /// every demo and eval run, so those characters reached every terminal scrollback, every
+    /// <c>--log</c> file and every screenshot taken of a sample in a public repository. A hash prefix
+    /// answers the only question the banner exists to answer ("is this the key I expected?") equally
+    /// well, because two different keys give two different prefixes — and it cannot be run backwards.
+    /// </remarks>
     private static string FingerprintKey(string? key)
     {
         if (string.IsNullOrEmpty(key)) return "(unset)";
-        if (key.Length <= 8)           return $"(set, {key.Length} chars — too short to fingerprint)";
-        return $"{key[..4]}…{key[^4..]} ({key.Length} chars)";
+
+        var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key));
+        return $"sha256:{Convert.ToHexString(digest)[..8].ToLowerInvariant()} ({key.Length} chars)";
     }
 }

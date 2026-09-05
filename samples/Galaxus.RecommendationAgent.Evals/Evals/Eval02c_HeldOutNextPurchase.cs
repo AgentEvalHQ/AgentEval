@@ -87,6 +87,9 @@ public static class Eval02c_HeldOutNextPurchase
     /// <summary>The executed floor: a uniform draw from the pool.</summary>
     public const string ArmFloor = "Uniform draw from the pool";
 
+    /// <summary>The key a one-case probe writes to. NEVER the full-cohort key.</summary>
+    public const string ProbeSnapshotKey = OfflineSnapshotStore.HeldOutKey + "_probe";
+
     private enum ArmRole { Live, Loop, Reference, Floor }
 
     private sealed record Arm(
@@ -103,9 +106,15 @@ public static class Eval02c_HeldOutNextPurchase
     /// <summary>Runs the eval.</summary>
     /// <param name="quick">One live repetition instead of three.</param>
     /// <param name="dryRun">Stub the live arm; spend nothing; assert the plumbing.</param>
+    /// <param name="onlyCase">
+    /// Restrict the run to one customer id (<c>USR-NB-01</c> … ) — the one-item real run that is
+    /// stage two of the three-stage protocol. The snapshot then goes to
+    /// <see cref="ProbeSnapshotKey"/> and never to the full-cohort key.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>0 the wiring held and the live arm was measured, 1 a wiring check failed, 3 the live arm was not measured.</returns>
-    public static async Task<int> RunAsync(bool quick = false, bool dryRun = false, CancellationToken ct = default)
+    public static async Task<int> RunAsync(
+        bool quick = false, bool dryRun = false, string? onlyCase = null, CancellationToken ct = default)
     {
         PrintHeader();
 
@@ -126,9 +135,32 @@ public static class Eval02c_HeldOutNextPurchase
             return 1;
         }
 
+        IReadOnlyList<HeldOutTarget> allTargets = targets;
+        if (onlyCase is not null)
+        {
+            targets = [.. allTargets.Where(t => string.Equals(t.PersonaId, onlyCase, StringComparison.OrdinalIgnoreCase))];
+            if (targets.Count == 0)
+            {
+                EvalPrinter.PrintRefusal(
+                    $"--only {onlyCase} matches no hold-out target.",
+                    "Target customer ids: " + string.Join(", ", allTargets.Select(t => t.PersonaId)) + ".");
+                return 2;
+            }
+        }
+
         bool liveMeasurable = dryRun || Config.IsConfigured;
         PrintMode(dryRun, liveMeasurable, targets.Count);
         PrintScope(targets);
+
+        if (onlyCase is not null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  🔬 ONE-CASE PROBE — {targets[0].PersonaId} only. Stage two of the three-stage protocol.");
+            Console.WriteLine($"     n = 1 of {allTargets.Count}: no hit-rate is reachable, the snapshot goes to '{ProbeSnapshotKey}',");
+            Console.WriteLine("     never to the full-cohort key. What this probe can show is that the live arm ran and what it presented.");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
 
         var retriever = await EvalRuntime.EnsureBoundAsync(ct).ConfigureAwait(false);
 
@@ -155,6 +187,7 @@ public static class Eval02c_HeldOutNextPurchase
             DryRun: dryRun);
 
         var arms = BuildArms();
+        var ledger = new SpendLedger();
         var runnable = arms.Where(a => a.Factory is not null).ToList();
         var cells = new Dictionary<(string PersonaId, string Arm), HitCell>();
         var notes = new List<string>();
@@ -198,7 +231,8 @@ public static class Eval02c_HeldOutNextPurchase
                         IEvaluableAgent agent = arm.Factory!(context, rep);
                         HitScore? hit = await ScoreAsync(
                             target, agent, harness, options, arm.Label, rep, armReps,
-                            print: arm.Role != ArmRole.Floor, ct).ConfigureAwait(false);
+                            print: arm.Role != ArmRole.Floor, ct,
+                            ledger: arm.Role == ArmRole.Live && !dryRun ? ledger : null).ConfigureAwait(false);
 
                         if (hit is null)
                         {
@@ -253,6 +287,7 @@ public static class Eval02c_HeldOutNextPurchase
 
         PrintTable(runnable, targets, cells, liveMeasurable, dryRun);
         PrintFloors(targets, cells);
+        ledger.Print(Config.Model, "Eval 02c");
 
         var wiring = CheckWiring(runnable, targets, cells, threw, probes, probesOk, loopObserved, loopSawHidden, poolObserved, poolMismatches, liveMeasurable);
         PrintWiring(wiring);
@@ -287,14 +322,17 @@ public static class Eval02c_HeldOutNextPurchase
             return CredentialGuard.NotMeasuredExitCode;
         }
 
-        string path = OfflineSnapshotStore.Save(OfflineSnapshotStore.HeldOutKey, ToSnapshot(runnable, targets, cells, liveReps));
+        string snapshotKey = onlyCase is null ? OfflineSnapshotStore.HeldOutKey : ProbeSnapshotKey;
+        string path = OfflineSnapshotStore.Save(snapshotKey, ToSnapshot(runnable, targets, cells, liveReps));
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"  📁 Snapshot saved → {path}");
+        if (onlyCase is not null)
+            Console.WriteLine($"     (probe key '{ProbeSnapshotKey}' — the full-cohort record at '{OfflineSnapshotStore.HeldOutKey}' is untouched.)");
         Console.ResetColor();
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("  ✅ EVAL 02c — the wiring held and the live arm was measured. Its hit-rate is REPORTED, not gated:");
-        Console.WriteLine("     n = 13 targets on a hand-authored corpus cannot carry a verdict about the agent in either direction.");
+        Console.WriteLine($"     n = {targets.Count} target(s) on a hand-authored corpus cannot carry a verdict about the agent in either direction.");
         Console.ResetColor();
         return 0;
     }
@@ -344,7 +382,8 @@ public static class Eval02c_HeldOutNextPurchase
         int rep,
         int reps,
         bool print,
-        CancellationToken ct)
+        CancellationToken ct,
+        SpendLedger? ledger = null)
     {
         var tc = new TestCase
         {
@@ -358,6 +397,10 @@ public static class Eval02c_HeldOutNextPurchase
         {
             result = await harness.RunEvaluationAsync(agent, tc, options, ct).ConfigureAwait(false);
         }
+
+        // Only ever non-null for the LIVE arm: an offline arm costs nothing, and counting its turn
+        // would make every per-turn figure in the ledger a different question's answer.
+        ledger?.Record(result.Performance);
 
         if (result.HasError)
         {

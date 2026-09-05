@@ -2700,3 +2700,199 @@ done
 ```
 
 Every command must exit 0. The whole sweep's live embedding spend is well under one cent.
+
+---
+
+## §21 — Evals 02b and 02c run LIVE, for the first time (2026-09-05)
+
+*Every earlier section of this file that quotes an 02b or 02c number quotes it from a `--dry-run`, where
+the "Single Agent (Robin)" column is a stub presenting the same two products for every case — §20.6 and
+§20.7 say so in their own headers. **This section replaces that column with a measurement.** Neither eval
+had ever written a cohort snapshot: before this run the snapshot directory held no
+`eval02b_stated_need.json` and no `eval02c_held_out.json`. Nothing else about either eval changed. The
+offline arms, the floors and the wiring are the same code that produced §20's numbers, and every place
+they reproduce §20 exactly is stated below as the control it is.*
+
+**Why these two and not the other seven.** They are the only evals in the suite whose gold is not authored
+by the thing under test. 02b's gold is a conjunction of structured catalogue facts — price, stock, seller,
+category path, a spec value, ownership, and `compat:`, which is the one tag family
+`EmbeddingDocument.UseTagPrefixes` deliberately keeps OUT of the index. 02c's target is a purchase line
+that already existed in `Personas.cs`, selected by one stated rule. Neither reads the `context:` / `trip:`
+/ `weight:` / `skill:` vocabulary that the retrieval index embeds and that a two-line tag join scores
+1.000 on in Eval 02.
+
+### 21.1 Space — and a correction to how broadly the threshold caveat has been stated
+
+Both runs used **`--concept-vectors`, the default**. §19/§20 record three space-dependent, uncalibrated
+constants. Checked against these two evals' actual call path, **only one of the three is in it**:
+
+| constant | where it lives | in 02b/02c's path? |
+|---|---|---|
+| `ConfidenceBands` 0.70 / 0.45 | `GuardrailPipeline.Apply` → Demo 01 / Demo 02 only | **No.** 02b/02c grade `PresentRecommendation` calls straight off the trace via `PresentedCall.FromToolUsage`; `RecommendationAgentFactory.Create()` does not run the guardrail pipeline. |
+| `Demo01.AttributionFloor` 0.20 | `Demo01_RecommendationAgent` | **No.** Same reason. |
+| `HybridRetriever` dense floor **0.28** | `EvalRuntime.EnsureBoundAsync` → every semantic tool call | **Yes.** |
+
+So the standing warning that "any live number is filtered by constants known to be mis-calibrated"
+**over-states it for these two evals**: two of the three never touch them. The one that does, 0.28, is
+named `UncalibratedDenseScoreFloor` in *both* embedding sources — it is uncalibrated in the concept space
+as well, not merely carried into the real one. The concept space remains the right place to spend: it is
+the scored space, it needs no key, it is byte-identical on any machine, and it is the regime the tray
+behaviour in `ConfidenceBands`' own remarks was observed in.
+
+### 21.2 The stage log — the standing three-stage protocol, followed in full
+
+| stage | command | exit | what it established |
+|---|---|---|---|
+| 1 | `-- 2b --dry-run` | **0** | 6 of 6 wiring checks held; the stub live column **failed** the gate on 12 of 12 cases — the gate demonstrably can fail |
+| 1 | `-- 2c --dry-run` | **0** | 7 of 7 wiring checks held, including all three hold-out leak probes |
+| 1 | `-- 2b --dry-run --only SN-01`, `-- 2c --dry-run --only USR-NB-01` | **0**, **0** | the new one-case probe path, spending nothing |
+| 1 | `-- 2b --dry-run --only NOPE` | **2** | an unknown id refuses and prints the valid ids; it does not silently run all twelve |
+| 1 | full `--dry-run` output re-diffed after the code change | **identical** | byte-identical to the pre-change baseline — `--only` and the ledger are inert unless asked for |
+| 1 | `-- 3` re-run after the change | **0** | `Broken06_ConstraintBlindRecommender` still caught; Eval 03 scores its floor draws *through* 02b's `ScoreAsync`, so this is the regression check on that seam |
+| 2 | `-- 2b --quick --only SN-01` | **0** | 1 live turn · 45,665 tok · 31.9 s · USD 0.2715 · 12 tool calls ending in `PresentRecommendation("GLX-1009")` — the single satisfier |
+| 2 | `-- 2c --quick --only USR-NB-01` | **0** | 1 live turn · 146,528 tok · 61.4 s · USD 0.8129 · 5 `PresentRecommendation` calls |
+| 3 | `-- 2b --quick` | **0** | 12 live turns · 734,693 tok · 480.1 s · **USD 4.4071** |
+| 3 | `-- 2c --quick` | **0** | 13 live turns · 1,136,046 tok · 551.8 s · **USD 6.4750** |
+
+**Measured spend: USD 11.9665 over 27 live turns and 2,062,932 tokens** (stage 2 USD 1.0844 + stage 3
+USD 10.8821). Every figure is accumulated by the new `SpendLedger` from `TestResult.Performance`, which
+counts turns whose provider returned a real usage block **separately** from turns where
+`MAFEvaluationHarness` fell back to estimating tokens from text length. All 27 turns were of the first
+kind — `token-estimated 0 · unaccounted 0` — so **the token counts are measurements**. The currency is
+those tokens times this repository's `ModelPricing` row for `gpt-5.5` (USD 5 / 1M in, USD 30 / 1M out);
+it is arithmetic over a table, not an invoice.
+
+Prompt tokens are 96 % of the bill in both evals (705,349 of 734,693; 1,104,254 of 1,136,046). This is a
+tool-loop cost, not a generation cost: each turn re-sends a growing transcript through 10–25 tool calls.
+
+### 21.3 Eval 02b — every arm, with k, and where the comparison is not admissible
+
+n = 12 applicable cases. Mean chance floor **0.019** (`|S|/N` per case, 0.010–0.040); executed floor
+**0.020** over 50 uniform draws × 12 cases, inside its ±0.007 band. All six wiring checks held; the
+oracle scored exactly 1.000 on all twelve (accepting direction) and the blind draw landed at floor
+(rejecting direction).
+
+| arm | mean k | precision (macro) | micro | vs the live arm |
+|---|---|---|---|---|
+| **live — Single Agent (Robin)** | **1.92** | **0.889** | **20 / 23** | — |
+| oracle — constraint filter | **1.92** | 1.000 | 23 / 23 | **COMPARABLE** — identical mean k, exactly equal k on 7 of 12 cases |
+| Control — single shot | 5.00 | 0.183 | 11 / 60 | **NOT COMPARABLE** — k 5.0 vs 1.9 |
+| Baseline — tag join (Eval 02's *oracle*) | 5.00 | 0.167 | 10 / 60 | **NOT COMPARABLE** — k 5.0 vs 1.9 |
+| Demo 2 loop, deterministic | 7.92 | 0.053 | 6 / 95 | **NOT COMPARABLE** — k 7.9 vs 1.9 |
+| Demo 2 loop, utterance-blind | 9.67 | 0.071 | 9 / 116 | **NOT COMPARABLE** — k 9.7 vs 1.9 |
+| Broken06 — uniform draw | 5.00 | 0.020 | — | the floor, executed |
+
+Every deterministic row reproduces §20.6's concept column to three decimals. That is the control on the
+claim that only the live column moved.
+
+**The gate the live arm passed is not a low bar — it is one that four of the five other entrants fail.**
+Re-running 02b's own gate condition ("strictly above its OWN floor on EVERY applicable case, silent on
+none") across every arm:
+
+| arm | passes the live gate? | cases below floor or silent |
+|---|---|---|
+| **live** | **PASS** | 0 of 12 |
+| oracle | PASS | 0 of 12 (by construction) |
+| tag join | **FAIL** | 3 of 12 — SN-01, SN-09, SN-11 |
+| single shot | **FAIL** | 4 of 12 — SN-01, SN-03, SN-09, SN-12 |
+| loop, utterance-blind | **FAIL** | 5 of 12 |
+| loop, deterministic | **FAIL** | 8 of 12 |
+| Broken06 uniform draw | **FAIL** | 7 of 12 |
+
+⚠ **What 02b's headline cannot see, stated because the flattering reading is available.** Precision's
+denominator is supplied by the arm under test — the co-moving-operand shape. The floor is immune to it
+(a uniform draw of *any* size scores `|S|/N`, so "above floor" is sound), but the *ranking* between arms
+of different k is not, which is why five of six rows above read NOT COMPARABLE. And precision has no
+recall channel at all: on **SN-09** the satisfying set has four members, the live arm presented two, both
+satisfying — precision 1.000, recall 0.5, and the metric cannot tell the difference. That is what 02c is
+for.
+
+### 21.4 Eval 02c — held-out next purchase, every arm at k = 5
+
+n = 13 targets, every arm cut to k = 5 in presentation order. Analytic floor **sku 0.052 / leaf 0.056**;
+executed floor **0.062 / 0.063**, inside its ±0.026 band. All seven wiring checks held, including the
+three hold-out leak probes: 13 of 13 probes saw the reduced history, 0 of 13 loop runs had the hidden SKU
+in `OwnedProductIds`, 0 pool mismatches in 650 draws.
+
+| arm | sku@5 | leaf@5 | hits | 95 % Clopper-Pearson | separated from the 0.052 floor? |
+|---|---|---|---|---|---|
+| **live — Single Agent (Robin)** | **0.385** | **0.385** | 5 / 13 | [0.139, 0.684] | **yes** |
+| Control — single shot | 0.231 | 0.231 | 3 / 13 | [0.050, 0.538] | **no** — lower bound 0.050 sits under the floor |
+| Demo 2 loop, deterministic | 0.077 | 0.077 | 1 / 13 | [0.002, 0.360] | no |
+| Baseline — tag join | 0.077 | 0.077 | 1 / 13 | [0.002, 0.360] | no |
+| Baseline — popularity | 0.000 | 0.000 | 0 / 13 | [0.000, 0.247] | no |
+| uniform draw from the pool | 0.062 | 0.063 | — | — | the floor, executed |
+
+Again every deterministic row reproduces §20.7's concept column exactly.
+
+**The live lead over the single-shot control is NOT established.** Paired over the same 13 targets:
+**W/L/T = 3/1/9, discordant n = 4, exact two-sided sign p = 0.6250.** Two hits of difference on n = 13.
+The eval's own text is the right verdict and is quoted rather than paraphrased: *"CANNOT: rank two working
+arms. One hit is 0.077 of rate; the 95 % interval on any rate here spans most of [0, 1]."* What **is**
+supported is the weaker and cleaner statement above: at k = 5, the live arm is the only entrant whose
+interval clears the chance floor.
+
+⚠ **The live arm forfeited 3 of 13 targets by abstaining** — `USR-LM-09`, `USR-RB-10`, `USR-PB-11`. On
+the canonical history question the shipped prompt's abstention rule *can* legitimately fire (step 3:
+fewer than two independent signals and no stated need). A silent turn is scored a **miss** here because a
+hit was possible, and it is flagged rather than excused. Mean own-k is therefore **3.8**: over the ten
+turns where it answered it presented 4.94 — it fills the k = 5 budget when it answers, so those ten are a
+genuine equal-k contest and the three are forfeits. Restricted to the ten answered targets the rate is
+5/10 = 0.500, 95 % CI [0.187, 0.813]; that is a **secondary** read and does not replace 5/13, because a
+forfeit is a miss.
+
+**One target is unreachable for every stock-gated arm**: `USR-NB-01`'s hidden `GLX-2003` is out of stock.
+It depresses all rates equally.
+
+### 21.5 What these two runs do and do not support
+
+**Supported.**
+
+1. **The recommender turns a shopper's sentence into a constraint-satisfying pick.** 20 of 23 presented
+   items satisfied every stated constraint; 12 of 12 cases above their own floor; silent on none; at the
+   same mean k as an oracle that is handed the filter. It is the only entrant besides that oracle to pass
+   02b's gate — Eval 02's oracle and Eval 02's primary control both fail it. This is measured on gold
+   that is code-checked and does not touch the vocabulary the index embeds.
+2. **At k = 5 on held-out next purchase, it is the only arm separated from chance.** 0.385 [0.139, 0.684]
+   against a 0.052 floor.
+3. **It uses the tool channel, not prose.** 25 of 25 stage-3 turns were graded off `PresentRecommendation`
+   calls; the only turns with nothing to grade are the three deliberate abstentions in 02c.
+
+**Not supported — and this is the part that must not be softened.**
+
+1. **"The agent beats the deterministic baselines at next-purchase prediction" is NOT SHOWN.** p = 0.6250
+   on the paired comparison against the single-shot control. It leads; the lead is indistinguishable from
+   chance at n = 13.
+2. **02b's 0.889 is not comparable to any non-oracle arm.** k 1.9 vs 5.0/7.9/9.7. The only admissible
+   comparison in 02b is against the oracle, and there the live arm is **below** the ceiling: 0.889 vs
+   1.000.
+3. **02b measures precision only.** SN-09 shows precision 1.000 while half the satisfying set was missed.
+4. **Neither eval says anything about the real embedding space.** These are concept-space numbers.
+5. **Neither eval was run at full reps.** `--quick` is 1 repetition; the live arm is stochastic, and
+   SN-01 alone scored 1.000 in the stage-2 probe and 0.500 in the stage-3 run. Every live cell here is
+   one draw.
+
+**The plain answer to "is the recommender good": on stated-need constraint satisfaction, yes, and it is
+the only non-oracle arm that clears the bar. On next-purchase prediction, not shown — it leads every
+baseline and the lead does not survive n = 13.**
+
+### 21.6 What changed in the code to make this run possible, and why
+
+Three changes, all additive, all verified inert on the paths they do not touch:
+
+1. **`--only <id>` now works for 02b and 02c** (it was Eval 02 only). Stage two of the standing protocol
+   needs a single paid unit and neither eval had one. Snapshots from a one-case run go to
+   `eval02b_stated_need_probe` / `eval02c_held_out_probe` and **never** to the full-cohort key; an
+   unmatched id exits 2 with the valid ids listed. Deliberately **not** honoured under `--ci` for these
+   two — a CI chain must never be silently narrowed to one case.
+2. **`SpendLedger`** (new) accumulates the LIVE arm's turns only, from the harness's own usage block, and
+   prints measured-vs-token-estimated turn counts separately so an estimate can never be reported as a
+   measurement. Before it, the honest answer to "what did this cost" was "unknown" — the numbers were on
+   `TestResult.Performance` and simply never printed.
+3. `ScoreAsync` in both evals takes an optional trailing `SpendLedger?`. Eval 03 calls 02b's `ScoreAsync`
+   for its Broken06 row; it passes no ledger and `-- 3` still exits 0 with that control caught.
+
+⚠ **Unrelated observation, recorded because it reaches every eval transcript.** `Config.PrintAzureTarget`
+prints an API-key *fingerprint* — first four and last four characters plus the length. It is deliberate
+(`FingerprintKey`) and it is 8 of 84 characters, but it lands in stdout and therefore in every `--log`
+file and every pasted transcript. Not changed here; named so the decision is a decision.
