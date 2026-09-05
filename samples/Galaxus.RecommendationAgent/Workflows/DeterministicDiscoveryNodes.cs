@@ -213,8 +213,21 @@ public static class CoverageReviewGate
 
         foreach (var interest in starved)
         {
-            lines.Add($"{interest.Id} \"{interest.Label}\" has no candidate above the score floor " +
-                      string.Create(CultureInfo.InvariantCulture, $"({DiscoveryState.MinCandidateScore:0.0000})"));
+            // ⚠ THE LINE NAMES THE REASON THIS INTEREST IS STARVED, not the only reason there used
+            //   to be. Since the coverage gate stopped keying on the retriever's ranking there are
+            //   two, and they have two different answers: an interest that NAMES NOTHING is starved
+            //   with candidates well above the floor, and printing "no candidate above the score
+            //   floor (0.0120)" beside two candidates at 0.5 sends the reader to the threshold —
+            //   which is exactly the fix that must not be made.
+            var starvedCoverage = state.CoverageFor(interest.Id);
+            lines.Add(starvedCoverage.AttributionVocabularyEmpty
+                ? $"{interest.Id} \"{interest.Label}\" NAMES NOTHING a product could be matched against — no attribute "
+                + "hint, no category hint, no content word. "
+                + string.Create(CultureInfo.InvariantCulture,
+                      $"{starvedCoverage.CandidateProductIds.Count} candidate(s) came back at best score {starvedCoverage.BestScore:0.0000}; ")
+                + "a query with no content still returns a ranked list, so that is not evidence. NOT a threshold problem."
+                : $"{interest.Id} \"{interest.Label}\" has no candidate above the score floor " +
+                  string.Create(CultureInfo.InvariantCulture, $"({DiscoveryState.MinCandidateScore:0.0000})"));
 
             var gap = CoverageGapWriter.Write(state, catalogue, interest);
             if (gap is not null) gaps.Add(gap);

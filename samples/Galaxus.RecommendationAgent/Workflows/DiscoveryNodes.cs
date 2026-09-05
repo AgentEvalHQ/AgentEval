@@ -298,10 +298,16 @@ public static class DiscoveryProjection
         ArgumentNullException.ThrowIfNull(interest);
         ArgumentNullException.ThrowIfNull(coverage);
 
-        // ⚠ The bar is the ATTRIBUTABLE count — what the status is actually decided on — and the
-        //   credited count is printed beside it whenever the two differ. A ledger that shows only
-        //   "2 candidate(s)" next to UNCOVERED reads as a broken gate; showing "2 credited, 0
-        //   attributable" says what happened.
+        // ⚠ The bar is the ATTRIBUTABLE count and the credited count is printed beside it whenever
+        //   the two differ. A ledger that shows only "2 candidate(s)" next to UNCOVERED reads as a
+        //   broken gate; showing "2 credited, 0 attributable" says what happened.
+        //
+        // ⚠ AND THE BAR IS NOT THE STATUS. ClassifyCoverage decides UNCOVERED / COVERED from the
+        //   candidate count, the score floor and whether the interest names anything at all — NOT
+        //   from this count. So an empty bar beside COVERED is a real and deliberate sight: it is
+        //   USR-NB-01's "Headlamps", covered on six candidates of which zero is a headlamp. That
+        //   disagreement is the finding (InterestCoverage.AttributableProductIds), and hiding it by
+        //   drawing the bar from the credited count instead would be hiding it.
         int attributable = coverage.AttributableProductIds.Count;
         int filled = Math.Clamp(attributable * 2, 0, 10);
         var bar = new string('█', filled) + new string('░', 10 - filled);

@@ -443,12 +443,22 @@ public static class Eval02_LatentInterestCoverage
                            + "presented a DIFFERENT k across reps and were cut to the minimum, so one budget covers "
                            + "the cell.";
         }
-        catch (ArgumentException ex)
+        // ⚠ EVERY exception, not just ArgumentException. The 2026-09-05 crash happened to be an
+        //   ArgumentException, but the property being bought here is the BLAST RADIUS — two gates,
+        //   the cost panel and the snapshot surviving a grader fault after 36 paid turns — and a
+        //   catch scoped to the one exception that has already been seen buys that property only
+        //   for faults that have already happened. FromThisRun indexes goldByPersona and reads a
+        //   report keyed by arm label; a KeyNotFoundException from either would have unwound the
+        //   process exactly as before, past a comment saying it could not.
+        //   Nothing is swallowed: the type and message go into the notes verbatim, the panel prints
+        //   NOT MEASURED, and the eval exits non-zero.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            thisRunOutcome = $"the live-run re-read THREW and was contained: {ex.Message}";
-            notes.Add("🔴 THE OWN-k RE-READ THREW. It was caught rather than allowed to unwind the process, so the "
-                    + "gates, the cost panel and the snapshot below still printed — but the own-k panel is NOT "
-                    + "MEASURED on this run and the eval exits non-zero. Exception: " + ex.Message);
+            thisRunOutcome = $"the live-run re-read THREW and was contained: {ex.GetType().Name} — {ex.Message}";
+            notes.Add($"🔴 THE OWN-k RE-READ THREW ({ex.GetType().FullName}). It was caught rather than allowed to "
+                    + "unwind the process, so the gates, the cost panel and the snapshot below still printed — but "
+                    + "the own-k panel is NOT MEASURED on this run and the eval exits non-zero. Exception: "
+                    + ex.Message);
         }
 
         if (!dryRun && thisRun is { } live)

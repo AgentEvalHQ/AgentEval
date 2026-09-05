@@ -2038,6 +2038,32 @@ public static class NegativeControls
         if (workflowWins.Outcome != Eval09Outcome.WorkflowWins)
             problems.Add($"a comparable, significant workflow lead rendered {workflowWins.Outcome}, not WorkflowWins — the new branch swallowed a real result.");
 
+        // ── 2b. THE LOOP CONTROL IS SUBJECT TO THE SAME RULE, and it gates the exit code.
+        //
+        //   `Losses <= Wins` is trivially TRUE at 0/0, so once the pairing became equal-k an
+        //   all-refused rubber-stamp comparison passed the clause whose only job is to void an
+        //   architecture claim — and passed GATE 3, which decides Eval 09's exit code. An absent
+        //   control is not a cleared one.
+        static SignTestOutcome StampPairing(int wins, int losses, int ties, IReadOnlyList<string>? refused = null) =>
+            new(Eval09_HypothesisComparison.ArmRubberStamp, Eval09_HypothesisComparison.ArmWorkflow,
+                wins, losses, ties, PValue: 1.0, MeanDelta: 0.0, CiLow: double.NaN, CiHigh: double.NaN,
+                MinimumAttainableP: 1.0, Metric: "recall", NotComparable: refused, DeclaredK: CoverageArms.DeclaredK);
+
+        var stampRefusedAll = StampPairing(0, 0, 0, [.. Enumerable.Range(1, 12).Select(i => $"USR-{i:00} (k 5 vs 7)")]);
+
+        if (Eval09PreRegistration.LoopIsLoadBearing(stampRefusedAll))
+            problems.Add("an all-refused rubber-stamp comparison PASSED the loop-is-load-bearing test — 0 ≤ 0 read as a control that was cleared, and GATE 3 turns on that.");
+        if (!Eval09PreRegistration.LoopIsLoadBearing(StampPairing(3, 3, 6)))
+            problems.Add("a comparable TIE failed the loop-is-load-bearing test — the fix went too far and now refuses a real observation of no difference.");
+        if (Eval09PreRegistration.LoopIsLoadBearing(StampPairing(2, 7, 0)))
+            problems.Add("a rubber stamp that LED still passed the loop-is-load-bearing test.");
+
+        var stampUndecidable = Eval09PreRegistration.Decide(Pairing(11, 1, 0, 0.0063), stampRefusedAll, cleanBudget, 0, 0);
+        if (stampUndecidable.Outcome != Eval09Outcome.NotComparableAtEqualK)
+            problems.Add($"a significant workflow lead with an ALL-REFUSED rubber-stamp control rendered {stampUndecidable.Outcome} — a win declared while the clause that would void it was never evaluated.");
+        if (!stampUndecidable.Reasons.Any(r => r.Contains("CLAUSE 3", StringComparison.Ordinal) && r.Contains("NOT COMPARABLE", StringComparison.Ordinal)))
+            problems.Add("clause 3 does not report the refusal — it still reads 'the rubber stamp did not lead' on a comparison that was never made.");
+
         // ── 3. The remedy must come from THIS run's ledger. ──
         var judged = new Eval09JudgedReport(Eval09PreRegistration.JudgedCriteria);
         var notLive = new Eval09Verdict(Eval09Outcome.ArmNotLive, "NO WIN — the live arm was not live.", []);
@@ -2066,6 +2092,31 @@ public static class NegativeControls
         if (string.Equals(returnedText, cancelledText, StringComparison.Ordinal))
             problems.Add("the remedy text is IDENTICAL for a run whose calls all returned and one whose calls were cancelled — it is not derived from the ledger at all.");
 
+        // ── 3b. AND THE PANEL MUST NOT QUOTE THE UNMADE COMPARISON EITHER.
+        //
+        //   ArmNotLive, SilenceInTheComparison and Confounded all fire BEFORE the NOT-COMPARABLE
+        //   branch, so an undecidable primary reaches their prose. It used to interpolate
+        //   primary.Wins/Losses/Ties and primary.PValue unconditionally, and on the 2026-09-05 run
+        //   shape (voided cells + 0 comparable pairs) the panel read "the paired result ran 0/0/0
+        //   (W/L/T) in neither direction … at p = 1.0000" — the exact reading clause 1 had just
+        //   been rewritten to refuse, one box higher up the page.
+        string voidedOnUndecidable = string.Join(" ", Eval09_HypothesisComparison.NegativeResultText(
+            notLive, refusedAll, cleanBudget, 0.701, 0.750, judged));
+
+        if (voidedOnUndecidable.Contains("0/0/0", StringComparison.Ordinal))
+            problems.Add("the ArmNotLive panel still prints a W/L/T of 0/0/0 for a comparison in which every pair was REFUSED — an unmade comparison rendered as a tied one.");
+        if (voidedOnUndecidable.Contains("p = 1.0000", StringComparison.Ordinal))
+            problems.Add("the ArmNotLive panel still quotes p = 1.0000 for an undecidable primary — a number produced by arithmetic over zero pairs, printed as a measurement.");
+        if (!voidedOnUndecidable.Contains("NOT COMPARABLE", StringComparison.Ordinal))
+            problems.Add("the ArmNotLive panel does not say the endpoint was NOT COMPARABLE, so the reader is left to infer it from a missing number.");
+
+        // …and it still reports a real one. Suppressing the numbers on every verdict would look
+        // identical on the row above and would delete the finding rather than qualify it.
+        string voidedOnComparable = string.Join(" ", Eval09_HypothesisComparison.NegativeResultText(
+            notLive, Pairing(4, 5, 3, 0.7539), cleanBudget, 0.701, 0.750, judged));
+        if (!voidedOnComparable.Contains("4/5/3", StringComparison.Ordinal) || !voidedOnComparable.Contains("p = 0.7539", StringComparison.Ordinal))
+            problems.Add("the ArmNotLive panel no longer prints the W/L/T and p of a comparison that WAS made — the suppression is unconditional.");
+
         // ── 4. And the monotonicity the honest report rests on. Cutting an over-filled answer to
         //       the declared budget can only REMOVE served gold, never add it — which is why
         //       "the workflow's own-k number is its best case at equal k" is a fact, not a hope. ──
@@ -2083,14 +2134,19 @@ public static class NegativeControls
             "Eval 09 pairs at equal k now, so its rule must (a) render an all-refused comparison as NOT COMPARABLE "
           + "rather than as NO DIFFERENCE — an empty sign test returns p = 1.0000 by arithmetic and that is the "
           + "absence of a comparison, not agreement; (b) still reach WorkflowWins and NoDifferenceDetected on "
-          + "comparable pairings, or the refusal is just a rule that never decides; (c) print an ArmNotLive remedy "
-          + "DERIVED from the run's own ledger — no timeout fix on a run with 0 cancelled calls, and the timeout fix "
-          + "still offered on one with 6; and (d) rest on a cut that is a prefix, so cutting to k can only lower "
-          + "recall.",
+          + "comparable pairings, or the refusal is just a rule that never decides; (c) apply the SAME rule to the "
+          + "rubber-stamp control, which gates the exit code through GATE 3 and whose 'Losses ≤ Wins' test is "
+          + "trivially true at 0/0; (d) keep the W/L/T and the p-value out of the PANEL as well, on the verdicts "
+          + "that fire before the NOT-COMPARABLE branch; (e) print an ArmNotLive remedy DERIVED from the run's own "
+          + "ledger — no timeout fix on a run with 0 cancelled calls, and the timeout fix still offered on one with "
+          + "6; and (f) rest on a cut that is a prefix, so cutting to k can only lower recall.",
             problems.Count == 0
                 ? $"12 refused → NOT COMPARABLE (clause 1 names the refusal) · 4/6/2 p=0.7539 → NoDifferenceDetected · "
-                + $"11/1/0 p=0.0063 → WorkflowWins · remedy at 120/120/0 names parsing and NOT the timeout, at 7/1/6 "
-                + $"names the timeout, and the two texts differ · cutting 8 → {CoverageArms.DeclaredK} moved recall "
+                + $"11/1/0 p=0.0063 → WorkflowWins · an all-refused rubber stamp FAILS the load-bearing test and voids "
+                + $"an 11/1 lead (clause 3 names the refusal), a tie still passes · the ArmNotLive panel prints no "
+                + $"0/0/0 and no p on an undecidable primary, and still prints 4/5/3 p=0.7539 on a comparable one · "
+                + $"remedy at 120/120/0 names parsing and NOT the timeout, at 7/1/6 names the timeout, and the two "
+                + $"texts differ · cutting 8 → {CoverageArms.DeclaredK} moved recall "
                 + $"{atEight:F3} → {atFive:F3} (never up)"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
@@ -2309,7 +2365,7 @@ public static class NegativeControls
         }
 
         if (!namesNothing.IsStarved)
-            problems.Add("an interest that names NOTHING does not report IsStarved, so the reviewer's veto never fires.");
+            problems.Add("an interest that names NOTHING does not report IsStarved.");
 
         // And the same row for an interest that DOES name something must come out Covered, or this
         // is a gate that refuses everything — which would look identical on the row above.
@@ -2328,6 +2384,52 @@ public static class NegativeControls
         live.CandidateProductIds.Add("GLX-3005");
         live.BestScore = 1.0;
         live.AttributionVocabularyEmpty = true;
+
+        // ⚠ THROUGH THE PATH THE WORKFLOW ACTUALLY TAKES, not through a convenience property.
+        //
+        // `InterestCoverage.IsStarved` above is read by NOTHING in the shipped workflow: the
+        // reviewer's veto goes through CoverageVerdictProjection.Starved, which asks the question
+        // itself, and DiscoveryPreGate.TryRejectCheaply routes on that. PROVEN by re-introducing
+        // the defect in place: with the AttributionVocabularyEmpty clause deleted from Starved and
+        // everything else fixed, this control still went GREEN and `-- 3` exited 0. A control that
+        // asserts a property the production path does not consult certifies the property, not the
+        // behaviour.
+        var starved = CoverageVerdictProjection.Starved(state);
+        if (!starved.Any(i => string.Equals(i.Id, contentless.Id, StringComparison.Ordinal)))
+        {
+            problems.Add("CoverageVerdictProjection.Starved — the path the reviewer's veto and the pre-model gate "
+                       + $"actually take — did NOT list an interest that names nothing, on {live.CandidateProductIds.Count} "
+                       + $"candidate(s) at best score {live.BestScore:0.000}. The gate is still reading the ranking there.");
+        }
+
+        // …and it must not veto an interest that DOES name something, or the veto is a refusal of
+        // everything and the row above proves nothing.
+        var namingState = new DiscoveryState { CustomerId = Personas.LucaUserId, Market = "CH", Language = "fr" };
+        var naming = SessionRequest("I need a 58 mm espresso tamper and a scale");
+        namingState.Interests.Add(naming);
+        var namingCoverage = namingState.CoverageFor(naming.Id);
+        namingCoverage.QueriesRun.Add("58 mm espresso tamper");
+        namingCoverage.CandidateProductIds.Add("GLX-3004");
+        namingCoverage.BestScore = 1.0;
+        if (CoverageVerdictProjection.Starved(namingState).Any(i => string.Equals(i.Id, naming.Id, StringComparison.Ordinal)))
+            problems.Add("CoverageVerdictProjection.Starved vetoed an interest that DOES name something — it refuses everything.");
+
+        // ── And the line the pre-gate PRINTS must name the reason it actually fired. ──
+        //
+        // The pre-gate published one sentence per starved interest and it was a constant: "has no
+        // candidate above the score floor (0.0120)". There are two ways to be starved now, and on
+        // THIS one candidates cleared the floor comfortably — so the printed line sent the reader
+        // to a threshold, which is the fix that must not be made. Same shape as Eval 09's clause-5
+        // remedy blaming a timeout that had not fired.
+        var pregateLines = new List<string>();
+        var sink = new CapturingProgressSink(pregateLines);
+        CoverageReviewGate.TryRejectCheaply(state, Catalogue.Default, sink);
+
+        string pregate = string.Join(" | ", pregateLines);
+        if (!pregate.Contains("NAMES NOTHING", StringComparison.Ordinal))
+            problems.Add($"the pre-gate did not say WHY this interest is starved — it printed: \"{Shorten(pregate, 70)}\".");
+        if (pregate.Contains("no candidate above the score floor", StringComparison.Ordinal))
+            problems.Add("the pre-gate blames the SCORE FLOOR for an interest whose candidates cleared it — the printed remedy points at the one number that must not be moved.");
 
         var gap = CoverageGapWriter.Write(state, Catalogue.Default, contentless);
         if (gap is not null)
@@ -2364,6 +2466,21 @@ public static class NegativeControls
                 + "not that a --real-vectors run abstains again. That needs a paid run."
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
+    }
+
+    /// <summary>Collects the DETAIL lines of every published discovery event, so a control can read what a node PRINTED.</summary>
+    /// <remarks>
+    /// A sentence a node publishes is part of what this suite ships — the 2026-09-05 arc turned on
+    /// a printed remedy that named the wrong cause twice — so it has to be reachable by a control
+    /// rather than only by a human reading a console.
+    /// </remarks>
+    /// <param name="lines">The list every event's detail lines are appended to.</param>
+    private sealed class CapturingProgressSink(List<string> lines) : IDiscoveryProgressSink
+    {
+        public void Publish(DiscoveryEvent discoveryEvent)
+        {
+            if (discoveryEvent?.Detail is { } detail) lines.AddRange(detail);
+        }
     }
 
     private static string Format(double value) =>

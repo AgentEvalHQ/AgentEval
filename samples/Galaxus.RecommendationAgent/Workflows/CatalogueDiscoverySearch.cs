@@ -105,15 +105,15 @@ public sealed class CatalogueDiscoverySearch(
                 // ⚠ Resolved BEFORE the seen-dedup, because the credit above happens before it
                 //   too: a product already seen on another interest's query still gets credited
                 //   here, so it must be screened here as well or the two ledgers disagree.
-                bool known = _catalogue.TryGet(hit.ProductId, out var product) && product is not null;
+                Product? product = _catalogue.TryGet(hit.ProductId, out var resolved) ? resolved : null;
 
                 if (!coverage.CandidateProductIds.Contains(hit.ProductId, StringComparer.Ordinal))
                 {
                     coverage.CandidateProductIds.Add(hit.ProductId);
 
                     // ── The coverage signal. Not the score. ──
-                    if (known && forInterest is not null
-                        && InterestAttribution.IsAttributable(_catalogue, forInterest, product!, out string why))
+                    if (product is not null && forInterest is not null
+                        && InterestAttribution.IsAttributable(_catalogue, forInterest, product, out string why))
                     {
                         coverage.AttributableProductIds.Add(hit.ProductId);
                         coverage.AttributionReasons[hit.ProductId] = why;
@@ -128,7 +128,7 @@ public sealed class CatalogueDiscoverySearch(
                     continue;
                 }
 
-                if (!known) continue;
+                if (product is null) continue;
 
                 var candidate = DiscoveryProjection.ToCandidate(
                     _catalogue, product, hit.Score, entry.InterestId, entry.Query);

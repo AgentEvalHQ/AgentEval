@@ -44,9 +44,12 @@ namespace Galaxus.RecommendationAgent.Workflows;
 /// </para>
 /// <para>
 /// <b>It is deliberately lenient in the accepting direction.</b> Any one of the three signals is
-/// enough, and the word test matches on substrings so that "espresso" reaches "espresso machine
-/// descaler". The failure this guards against is a product with NO connection at all being counted
-/// as coverage; a narrow test would start dropping true matches, which fails in the direction that
+/// enough, the product's title, brand, category path and attribute tokens are all folded into one
+/// haystack, and the word test accepts a prefix relation in either direction — so "espresso"
+/// reaches the "espresso" token of "espresso machine descaler" and "Headlamps" reaches "Headlamp".
+/// It is NOT a substring test: see <see cref="WordsMeet"/>, where "over" deliberately fails to meet
+/// "cover". The failure this guards against is a product with NO connection at all being counted as
+/// coverage; a narrower test would start dropping true matches, which fails in the direction that
 /// makes the loop look worse than it is.
 /// </para>
 /// </remarks>

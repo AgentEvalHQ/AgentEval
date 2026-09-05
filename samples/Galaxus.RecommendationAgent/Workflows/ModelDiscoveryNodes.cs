@@ -590,9 +590,17 @@ public sealed class ModelCoverageReviewer(Catalogue catalogue, DiscoveryModelCal
             var coverage = state.CoverageFor(interest.Id);
             builder.AppendLine(CultureInfo.InvariantCulture,
                 $"  {interest.Id}  queries run: {(coverage.QueriesRun.Count == 0 ? "(none)" : string.Join(" | ", coverage.QueriesRun))}");
+            // ⚠ WHAT THE REVIEWER SEES IS PINNED TO WHAT ITS INSTRUCTIONS SAY IT SEES.
+            //   CoverageReviewerPrompt is design §C.3 verbatim and describes this ledger as "the
+            //   queries already run, how many candidates came back, the best search score". An
+            //   "attributable" count was briefly added here on 2026-09-06: a field the pinned
+            //   instructions do not name, sent to a live model with no definition, changing the
+            //   paid workflow's input in a way nothing measured. The attributable channel belongs
+            //   on the CONSOLE ledgers (DiscoveryPresentation, DiscoveryProjection.CoverageBar),
+            //   where it informs a reader; putting it in the prompt is a design change and has to
+            //   be made as one.
             builder.AppendLine(CultureInfo.InvariantCulture,
-                $"      candidates: {coverage.CandidateProductIds.Count} credited, "
-              + $"{coverage.AttributableProductIds.Count} attributable   best score: {coverage.BestScore:0.0000}   "
+                $"      candidates: {coverage.CandidateProductIds.Count}   best score: {coverage.BestScore:0.0000}   "
               + $"status: {coverage.Status}");
         }
 

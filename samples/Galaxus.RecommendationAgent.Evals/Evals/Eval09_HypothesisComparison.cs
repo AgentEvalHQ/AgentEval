@@ -720,7 +720,13 @@ public static class Eval09_HypothesisComparison
         // stamp covered better. A TIE is deliberately not a failure: two arms that score identically
         // have not shown the loop to be worthless, only that this metric cannot see the difference —
         // and the coverage panel says that in its own words.
-        bool loopIsLoadBearing = versusRubberStamp.Losses <= versusRubberStamp.Wins;
+        //
+        // ⚠ AND IT FAILS CLOSED WHEN THE COMPARISON WAS NEVER MADE. Until 2026-09-06 this read
+        // `Losses <= Wins` alone. That was safe while the pairing was k-blind, because a k-blind
+        // pairing always produces pairs; at equal k it can refuse every one, and 0 ≤ 0 is true, so
+        // an unmade comparison passed a GATE that decides this eval's exit code. An absent control
+        // is not a passed one — the same rule Eval 02's GATE 2 already applies.
+        bool loopIsLoadBearing = Eval09PreRegistration.LoopIsLoadBearing(versusRubberStamp);
 
         bool judgeFloorDefined = judged.FloorIsDefined(ArmJudgeFloor);
 
@@ -810,6 +816,7 @@ public static class Eval09_HypothesisComparison
     /// <param name="report">The paired coverage report.</param>
     /// <param name="armLabel">The arm's label.</param>
     /// <param name="repLabel">The repetition label, for the console line.</param>
+    /// <param name="declaredK">The presentation budget the cut cell is scored at — the only cell a pairing may read.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>
     /// The score (null when the turn threw), the harness result and the presented calls. The
@@ -1442,16 +1449,38 @@ public static class Eval09_HypothesisComparison
         Row("  primary endpoint  paired latent coverage, workflow − single agent");
         WrapRow($"  arms              {Format(workflowMean)} (workflow, n={report.LatentCount(ArmWorkflow)})  vs  "
               + $"{Format(agentMean)} (agent, n={report.LatentCount(ArmSingleAgent)})");
-        Row($"  paired result     W/L/T {primary.Wins}/{primary.Losses}/{primary.Ties}   mean Δ {Format(primary.MeanDelta)}");
-        Row($"  exact two-sided p {primary.PValue:F4}   alpha {Eval09PreRegistration.PrimaryAlpha:F2}");
-        WrapRow($"  attainable p      {primary.MinimumAttainableP:F4} at the n = {primary.EffectiveN} this run "
-              + $"ATTAINED after {primary.Ties} tie(s)");
+        // ⚠ THESE THREE ROWS ARE NOT PRINTED FOR A COMPARISON THAT WAS NEVER MADE.
+        //
+        // An exact sign test over zero pairs returns W/L/T 0/0/0 and p = 1.0000 BY ARITHMETIC.
+        // Printing that in the summary block reads as "the arms tied and the p-value agrees" — the
+        // flattering misreading — and it read exactly that way on the 2026-09-05 run shape, where
+        // ArmNotLive fires before the NOT-COMPARABLE branch and the panel still said "the paired
+        // result ran 0/0/0 … at p = 1.0000". Clause 1 below already refuses that reading; the rows
+        // a reader meets FIRST must not contradict it.
+        if (primary.Undecidable)
+        {
+            WrapRow($"  paired result     NOT COMPARABLE — 0 pairs at equal k, {primary.Excluded.Count} refused");
+            WrapRow("  exact two-sided p n/a — an empty sign test returns 1.0000 by arithmetic, not by measurement, "
+                  + "and it is not evidence that the arms agree");
+            WrapRow("  attainable p      n/a — no pair was compared, so no split of this run could have reached any p");
+        }
+        else
+        {
+            Row($"  paired result     W/L/T {primary.Wins}/{primary.Losses}/{primary.Ties}   mean Δ {Format(primary.MeanDelta)}");
+            Row($"  exact two-sided p {primary.PValue:F4}   alpha {Eval09PreRegistration.PrimaryAlpha:F2}");
+            WrapRow($"  attainable p      {primary.MinimumAttainableP:F4} at the n = {primary.EffectiveN} this run "
+                  + $"ATTAINED after {primary.Ties} tie(s)");
+        }
+
         WrapRow($"  (ceiling was      {Eval09PreRegistration.TheoreticalMinimumTwoSidedP(report.Personas.Count):F5} "
               + $"at n = {report.Personas.Count} with no ties — a bound, never the number a run reports)");
         WrapRow($"  budget ratio      {(budget.BothArmsReportedTokens ? budget.Ratio.ToString("F2", CultureInfo.InvariantCulture) + "×" : "UNMEASURED")}"
               + $"   limit {Eval09PreRegistration.MaximumTokenRatio:F2}×");
-        WrapRow($"  rubber stamp      workflow W/L/T {versusRubberStamp.Wins}/{versusRubberStamp.Losses}/"
-              + $"{versusRubberStamp.Ties} against a reviewer that never says no");
+        WrapRow(versusRubberStamp.Undecidable
+            ? $"  rubber stamp      NOT COMPARABLE at equal k — {versusRubberStamp.Excluded.Count} refused, so the "
+            + "loop-is-load-bearing control was not established either way"
+            : $"  rubber stamp      workflow W/L/T {versusRubberStamp.Wins}/{versusRubberStamp.Losses}/"
+            + $"{versusRubberStamp.Ties} against a reviewer that never says no");
         Console.ResetColor();
 
         Divider();
@@ -1516,10 +1545,25 @@ public static class Eval09_HypothesisComparison
         Eval09JudgedReport judged)
     {
         int pairs = primary.Wins + primary.Losses + primary.Ties;
-        bool significant = primary.PValue < Eval09PreRegistration.PrimaryAlpha;
+        bool significant = !primary.Undecidable && primary.PValue < Eval09PreRegistration.PrimaryAlpha;
         string direction = primary.ChallengerLeads ? "toward the workflow"
                          : primary.Losses > primary.Wins ? "toward the single agent"
                          : "in neither direction";
+
+        // ⚠ ONE PLACE RENDERS "what the endpoint did", and it refuses to render a comparison that
+        //   was never made as a result. Three of the branches below used to interpolate
+        //   primary.Wins/Losses/Ties and primary.PValue unconditionally. At equal k those are
+        //   0/0/0 and 1.0000 BY ARITHMETIC when every pair was refused, and the ArmNotLive branch
+        //   in particular fires BEFORE the NOT-COMPARABLE verdict — so the 2026-09-05 run shape
+        //   printed "the paired result ran 0/0/0 (W/L/T) in neither direction … at p = 1.0000",
+        //   which is the flattering misreading this eval had just removed from clause 1.
+        string endpoint = primary.Undecidable
+            ? $"the endpoint was NOT COMPARABLE: all {primary.Excluded.Count} persona(s) were refused at equal k, so "
+            + "there is no W/L/T and no p-value — the 1.0000 an empty sign test returns is the absence of a "
+            + $"comparison. {Format(agentMean)} against {Format(workflowMean)} are the two arms' UNPAIRED means, "
+            + "and a difference between unpaired means over different persona sets is not a result"
+            : $"the paired result ran {primary.Wins}/{primary.Losses}/{primary.Ties} (W/L/T) {direction}, "
+            + $"{Format(agentMean)} against {Format(workflowMean)}, at p = {primary.PValue:F4}";
 
         var text = new List<string>();
 
@@ -1531,29 +1575,23 @@ public static class Eval09_HypothesisComparison
                        + "was not live on every cell: a model stage timed out or failed and the loop fell back to its "
                        + "deterministic node, as it is built to. Those cells were removed, not averaged.");
                 text.Add("");
-                text.Add($"WHAT IT SAYS. On the cells that survived, the paired result ran {primary.Wins}/{primary.Losses}/"
-                       + $"{primary.Ties} (W/L/T) {direction}, {Format(agentMean)} against {Format(workflowMean)}, at "
-                       + $"p = {primary.PValue:F4} — a number about a SUBSET of personas, on a run whose arm was partly "
-                       + "code. It is printed so the reader can see what was lost, and it is not the comparison.");
+                text.Add($"WHAT IT SAYS. On the cells that survived, {endpoint} — a number about a SUBSET of personas, "
+                       + "on a run whose arm was partly code. It is printed so the reader can see what was lost, and "
+                       + "it is not the comparison.");
                 break;
 
             case Eval09Outcome.Confounded:
                 text.Add("The comparison was VOIDED before its result could be read, and it was voided by a clause "
                        + "this eval fixed in advance precisely so that it could not be waived afterwards.");
                 text.Add("");
-                text.Add(budget.BothArmsReportedTokens
+                text.Add((budget.BothArmsReportedTokens
                     ? $"WHAT IT SAYS. The two arms did not spend comparably: {budget.AgentTokensPerTurn:F0} tokens per "
                     + $"graded turn for the single agent against {budget.WorkflowTokensPerTurn:F0} for the workflow, a "
                     + $"ratio of {budget.Ratio:F2}× against a pre-registered limit of "
-                    + $"{Eval09PreRegistration.MaximumTokenRatio:F2}×. On the endpoint itself the paired result ran "
-                    + $"{primary.Wins}/{primary.Losses}/{primary.Ties} (W/L/T) {direction}, "
-                    + $"{Format(agentMean)} against {Format(workflowMean)}, at p = {primary.PValue:F4}"
-                    + (significant ? "." : ", which does not reach alpha anyway.")
+                    + $"{Eval09PreRegistration.MaximumTokenRatio:F2}×. On the endpoint itself, {endpoint}"
                     : $"WHAT IT SAYS. The arms' spend is UNMEASURED ({string.Join("; ", budget.Reasons)}). On the "
-                    + $"endpoint itself the paired result ran {primary.Wins}/{primary.Losses}/"
-                    + $"{primary.Ties} (W/L/T) {direction}, {Format(agentMean)} against {Format(workflowMean)}, at "
-                    + $"p = {primary.PValue:F4}"
-                    + (significant ? "." : ", which does not reach alpha anyway."));
+                    + $"endpoint itself, {endpoint}")
+                    + (primary.Undecidable ? "." : significant ? "." : ", which does not reach alpha anyway."));
 
                 if (significant && primary.ChallengerLeads)
                 {
@@ -1591,15 +1629,20 @@ public static class Eval09_HypothesisComparison
                 break;
 
             case Eval09Outcome.NotComparableAtEqualK:
-                text.Add("The comparison was NOT MADE. Every persona was refused at equal k: on each one the two arms "
-                       + "presented different numbers of items, or a side was silent, and latent coverage is a recall "
-                       + "— monotone in the number of items presented. Pairing them anyway would have measured list "
-                       + "length and reported it as architecture.");
+                text.Add("A comparison this verdict depends on was NOT MADE. Every persona in it was refused at equal "
+                       + "k: on each one the two arms presented different numbers of items, or a side was silent, and "
+                       + "latent coverage is a recall — monotone in the number of items presented. Pairing them "
+                       + "anyway would have measured list length and reported it as architecture.");
                 text.Add("");
-                text.Add($"WHAT IT SAYS. Nothing about which architecture is better. The {primary.Excluded.Count} "
-                       + "refused pair(s) are listed in the sign-test panel with both k's, so the reader can see "
-                       + "exactly where the comparison ran out. ⚠ The p-value beside an empty sign test is 1.0000 by "
-                       + "arithmetic, not by measurement, and it is not evidence that the arms agree.");
+                text.Add(primary.Undecidable
+                    ? $"WHAT IT SAYS. Nothing about which architecture is better. The {primary.Excluded.Count} "
+                    + "refused pair(s) are listed in the sign-test panel with both k's, so the reader can see exactly "
+                    + "where the comparison ran out. ⚠ The p-value beside an empty sign test is 1.0000 by arithmetic, "
+                    + "not by measurement, and it is not evidence that the arms agree."
+                    : "WHAT IT SAYS. The PRIMARY endpoint did produce comparable pairs, but the rubber-stamp control "
+                    + "did not — and that control is the one that would void an architecture claim, so a result read "
+                    + "without it would be read without its own veto. The refused pairs are listed in the sign-test "
+                    + "panel with both k's.");
                 break;
 
             case Eval09Outcome.SingleAgentWins:
@@ -1665,6 +1708,17 @@ public static class Eval09_HypothesisComparison
               + "a repair pass that is itself counted as a degraded stage), then re-run. Lowering the bar for what "
               + "counts as live would not be a fix either way.",
 
+            // The third case the ledger can be in, and it is neither of the two above: NOTHING was
+            // attempted. `EveryWorkflowCallReturned` is false there (0 > 0 fails), so without this
+            // the branch below would print "0 attempted / 0 returned / 0 cancelled … so calls
+            // really did go missing" — a claim the ledger it quotes contradicts in the same
+            // sentence. A remedy derived from a ledger has to survive an EMPTY ledger.
+            Eval09Outcome.ArmNotLive when budget.WorkflowAttempted == 0 =>
+                "WHAT WOULD CHANGE THE ANSWER. Not the timeout, and not the parsing: this run's workflow ledger "
+              + "records NO attempted model call at all, so no stage got as far as failing. Find out why the meter "
+              + "saw nothing — an unbound client, a stage skipped before its call, or a ledger that is not wired "
+              + "under this arm — before reading anything else on this page as a fact about the workflow.",
+
             Eval09Outcome.ArmNotLive =>
                 $"WHAT WOULD CHANGE THE ANSWER. A run on which every model stage RETURNS. This run's workflow ledger "
               + $"reads {budget.WorkflowAttempted} attempted / {budget.WorkflowReturned} returned / "
@@ -1704,6 +1758,14 @@ public static class Eval09_HypothesisComparison
                 "WHAT WOULD CHANGE THE ANSWER. Finding out why an arm went silent — a refusal, a tool budget, a "
               + "timeout, an empty retrieval — and either fixing it or scoring reliability as its own endpoint "
               + "instead of letting it leak into a quality number.",
+
+            // An undecidable primary can reach this switch under ANOTHER verdict — ArmNotLive,
+            // silence and the loop control all fire before the NOT-COMPARABLE branch — and the
+            // power sentence below would then blame an n the run never had a chance to collect.
+            _ when primary.Undecidable =>
+                "WHAT WOULD CHANGE THE ANSWER. Not more personas: the endpoint had no comparable pair at all, so "
+              + "power is not the binding constraint here. Making the two arms present the SAME number of items is, "
+              + "and after that whichever fault this verdict names above.",
 
             _ =>
                 $"WHAT WOULD CHANGE THE ANSWER. n = {primary.EffectiveN} non-tied pairs is what this run had, and the "
@@ -1751,9 +1813,11 @@ public static class Eval09_HypothesisComparison
 
         GateLine(loopIsLoadBearing, "GATE 3 — THE LOOP IS LOAD-BEARING", new[]
         {
-            "A reviewer that rubber-stamps round 1 did NOT lead the live workflow. If it had, the",
-            "second round would be costing tokens for nothing, the reviewer rather than the",
-            "architecture would be the thing under test, and any 'workflow wins' claim would be void.",
+            "A reviewer that rubber-stamps round 1 was COMPARED with the live workflow at equal k and",
+            "did NOT lead it. If it had, the second round would be costing tokens for nothing, the",
+            "reviewer rather than the architecture would be the thing under test, and any 'workflow",
+            "wins' claim would be void. FAILS CLOSED when no persona could be paired at equal k: a",
+            "comparison that was never made did not establish that the stamp does not lead.",
         });
 
         GateLine(judgeFloorDefined, "GATE 4 — EVERY JUDGED NUMBER HAS ITS FLOOR", new[]
@@ -1942,14 +2006,17 @@ public enum Eval09Outcome
     ArmNotLive,
 
     /// <summary>
-    /// The primary endpoint had NO pair at equal k. Every persona was refused because the two arms
-    /// presented different numbers of items, or one side was silent.
+    /// A comparison the verdict depends on had NO pair at equal k — the primary endpoint, or the
+    /// rubber-stamp control that would void an architecture claim. Every persona in it was refused
+    /// because the two arms presented different numbers of items, or one side was silent.
     /// </summary>
     /// <remarks>
     /// This is not "no difference detected" and must never be printed as one. A comparison that
     /// could not be made has no direction, and reading its p-value — necessarily 1.0000 over zero
     /// pairs — as agreement between the arms is the flattering misreading. MEASURED on the
-    /// 2026-09-05 run: 0 of 21 workflow reps presented the agent's k of 5.
+    /// 2026-09-05 run: 0 of 21 workflow reps presented the agent's k of 5. It covers the
+    /// loop-is-load-bearing control for the same reason: <c>Losses &lt;= Wins</c> is trivially true
+    /// at 0/0, so an unmade control comparison would otherwise read as a cleared one.
     /// </remarks>
     NotComparableAtEqualK,
 }
@@ -1971,6 +2038,10 @@ public sealed record Eval09Verdict(Eval09Outcome Outcome, string Headline, IRead
 /// <param name="WorkflowTokensPerTurn">Mean total tokens per graded turn for the workflow, or NaN when incomplete.</param>
 /// <param name="Ratio">Larger over smaller, or NaN when unmeasured.</param>
 /// <param name="Reasons">Every reason the comparison is confounded, in the order it was found. Empty when it is not.</param>
+/// <param name="WorkflowAttempted">Model calls the workflow arm's ledger saw asked for.</param>
+/// <param name="WorkflowReturned">How many of them came back.</param>
+/// <param name="WorkflowCancelled">How many were cancelled at the per-call ceiling.</param>
+/// <param name="WorkflowFailed">How many threw.</param>
 public sealed record Eval09Budget(
     bool BothArmsRan,
     bool BothArmsReportedTokens,
@@ -2176,6 +2247,32 @@ public static class Eval09PreRegistration
     }
 
     /// <summary>
+    /// True when the rubber-stamp control was actually COMPARED with the live workflow at equal k
+    /// and did not lead it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>An undecidable comparison is a FAIL here, not a pass.</b> The test used to be
+    /// <c>Losses &lt;= Wins</c> alone, which was safe only while the pairing was k-blind: a k-blind
+    /// pairing always produces pairs. At equal k it can refuse every persona, and <c>0 &lt;= 0</c>
+    /// is true — so an unmade comparison passed the clause whose whole job is to void an
+    /// architecture claim, and it passed GATE 3, which decides this eval's exit code. An absent
+    /// control is not a cleared one; the same rule Eval 02's GATE 2 already states.
+    /// </para>
+    /// <para>
+    /// A TIE is deliberately still a pass: two arms that score identically have not shown the loop
+    /// to be worthless, only that this metric cannot see the difference. A REFUSAL is different —
+    /// it is the absence of the observation, not an observation of no difference.
+    /// </para>
+    /// </remarks>
+    /// <param name="versusRubberStamp">The workflow against the rubber-stamp reviewer, at equal k.</param>
+    public static bool LoopIsLoadBearing(SignTestOutcome versusRubberStamp)
+    {
+        ArgumentNullException.ThrowIfNull(versusRubberStamp);
+        return !versusRubberStamp.Undecidable && versusRubberStamp.Losses <= versusRubberStamp.Wins;
+    }
+
+    /// <summary>
     /// Applies the rule. The ONLY thing in this eval that names a winner.
     /// </summary>
     /// <remarks>
@@ -2228,9 +2325,23 @@ public static class Eval09PreRegistration
                 + ". An unmeasured budget is treated as confounded, not as equal — failing open here would let a run "
                 + "with a hole in its usage data declare a winner, and the hole opens in the flattering direction.",
 
-            $"CLAUSE 3 (the loop is load-bearing): against a reviewer that approves on round 1 every time, the "
-          + $"workflow went {versusRubberStamp.Wins}/{versusRubberStamp.Losses}/{versusRubberStamp.Ties} "
-          + $"(W/L/T). {(versusRubberStamp.Losses > versusRubberStamp.Wins ? "The rubber stamp LED — the second round bought nothing." : "The rubber stamp did not lead.")}",
+            // ⚠ "The rubber stamp did not lead" is a CLAIM, and a claim needs a comparison behind
+            // it. At equal k this pairing can refuse every persona, and 0/0/0 with `Losses > Wins`
+            // false used to render as the reassuring half of this sentence — an unmade comparison
+            // read as a control that was cleared. Same fault as clause 1's, one clause further
+            // down, and this one gates the eval's exit code through GATE 3.
+            versusRubberStamp.Undecidable
+                ? $"CLAUSE 3 (the loop is load-bearing): NOT COMPARABLE. None of the "
+                + $"{versusRubberStamp.Excluded.Count} persona(s) could be paired at equal k against the reviewer "
+                + "that approves on round 1 every time, so this control was not established either way. It is NOT "
+                + "'the rubber stamp did not lead' — nothing was compared. Refused: "
+                + string.Join("; ", versusRubberStamp.Excluded.Take(4))
+                + (versusRubberStamp.Excluded.Count > 4 ? ", …" : "") + "."
+                : $"CLAUSE 3 (the loop is load-bearing): against a reviewer that approves on round 1 every time, the "
+                + $"workflow went {versusRubberStamp.Wins}/{versusRubberStamp.Losses}/{versusRubberStamp.Ties} "
+                + $"(W/L/T) over {versusRubberStamp.ComparedN} pair(s) at equal k"
+                + (versusRubberStamp.Excluded.Count > 0 ? $", {versusRubberStamp.Excluded.Count} refused" : "")
+                + $". {(versusRubberStamp.Losses > versusRubberStamp.Wins ? "The rubber stamp LED — the second round bought nothing." : "The rubber stamp did not lead.")}",
 
             silentCells == 0
                 ? "CLAUSE 4 (no silence): every cell presented at least one recommendation."
@@ -2281,11 +2392,18 @@ public static class Eval09PreRegistration
                 reasons);
         }
 
-        if (versusRubberStamp.Losses > versusRubberStamp.Wins)
+        if (!LoopIsLoadBearing(versusRubberStamp))
         {
-            return new Eval09Verdict(Eval09Outcome.LoopNotLoadBearing,
-                "NO WIN — a reviewer that RUBBER-STAMPS round 1 led the real loop. Any architecture claim is void.",
-                reasons);
+            return versusRubberStamp.Undecidable
+                ? new Eval09Verdict(Eval09Outcome.NotComparableAtEqualK,
+                    $"NO WINNER — the LOOP-IS-LOAD-BEARING control was NOT COMPARABLE. All "
+                  + $"{versusRubberStamp.Excluded.Count} persona(s) were refused at equal k against the rubber-stamp "
+                  + "reviewer, so the clause that would void an architecture claim was never evaluated. An absent "
+                  + "control is not a cleared one.",
+                    reasons)
+                : new Eval09Verdict(Eval09Outcome.LoopNotLoadBearing,
+                    "NO WIN — a reviewer that RUBBER-STAMPS round 1 led the real loop. Any architecture claim is void.",
+                    reasons);
         }
 
         // ⚠ BEFORE any p-value is read. An empty sign test returns p = 1.0000, and 1.0000 read as
