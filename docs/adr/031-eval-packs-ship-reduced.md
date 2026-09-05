@@ -1,10 +1,10 @@
 # ADR-031 (draft) — Eval Packs: a portable, versioned eval suite keyed by subject × use case
 
-> **Location note (2026-09-04):** companion documents referenced below — `EvalPacks_Design.md` (the reduced-scope design this ADR now defers to) and `EvalPack_Galaxus_WorkedExample.md` — live in `strategy/Galaxus/`, which is local-only (gitignored), until promoted.
+> **Location note (superseded 2026-09-05):** the two companion documents this ADR used to defer to — `EvalPacks_Design.md` (the reduced-scope design) and `EvalPack_Galaxus_WorkedExample.md` (the worked evidence) — lived in `strategy/Galaxus/`, which is gitignored and local-only, so **no reader of this repository could ever open them.** Both were **deleted on 2026-09-05** and everything this ADR depended on them for is now stated in-repo: **S1–S5 in §0.1**, the findings **V1–V7 in §0.2**, and the portability verdict in **§0.3**. This ADR no longer points outside the repository for anything load-bearing.
 
 **Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.**
-**What survives:** five items, no new format, no new root, no new verbs — **S1**–**S5**, stated in full in **[§0.1](#01-the-five-surviving-items-s1s5--the-authoritative-statement) below**, which is the authoritative statement of them. The six findings (V1–V6) that sank the format and the Stage-2 gate live in `EvalPacks_Design.md` §1.2 and §3 — **that file is in `strategy/Galaxus/`, which is gitignored and local-only, so it is not readable from this repository**; S1–S5 are restated here for that reason. `pack.json` is Stage 2, unproven, gated on a real second use case.
-**Why this body is kept:** it is the record of what was rejected and why. Nothing below is scheduled; where it disagrees with `EvalPacks_Design.md`, that document wins. Evidence for the verdict: `strategy/Galaxus/EvalPack_Galaxus_WorkedExample.md` — **local-only, not readable from this repository**, so its load-bearing claim was re-measured against the tree on 2026-09-05 instead: `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. Confirmed. (The "nine ports gated on AE-06" figure was not re-measured and must not be quoted as current.)
+**What survives:** five items, no new format, no new root, no new verbs — **S1**–**S5**, stated in full in **[§0.1](#01-the-five-surviving-items-s1s5--the-authoritative-statement)**, which is the authoritative statement of them. The findings that sank the format and set the Stage-2 gate are **V1–V7 in [§0.2](#02-the-findings-that-sank-the-format--v1v7)**. `pack.json` is Stage 2, unproven, gated on a real second use case.
+**Why this body is kept:** it is the record of what was rejected and why. **Nothing below §0.3 is scheduled**, and where the body disagrees with §0.1–§0.3 or with ADR-030, the body loses. The worked example's load-bearing claim was **re-measured against the tree on 2026-09-05** rather than cited: `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. Confirmed. (The "nine ports gated on AE-06" figure was **not** re-measured and must not be quoted as current.)
 **Original status line (retained):** PROPOSED — design only. No code written.
 **Depends on:** ADR-030 (meta-evaluation: floors, controls, exact tests) · AE-01 (assertions → `AssertionResult`) · AE-05 (undecidable) · plan-13 T3.11 (deferred agent-manifest ADR).
 **Supersedes nothing. Forks nothing.**
@@ -32,9 +32,9 @@
 ## §0.1 THE FIVE SURVIVING ITEMS (S1–S5) — THE AUTHORITATIVE STATEMENT
 
 Restated in-repo on **2026-09-05**, because the companion document that held them
-(`EvalPacks_Design.md`) lives under `strategy/`, which is gitignored: the header's link to it does not
-resolve from `docs/adr/`, and the surviving scope existed only as one sentence. Anyone reading this
-ADR to find out what is still on the table reads this section.
+(`EvalPacks_Design.md`) lived under `strategy/`, which is gitignored: the header's link to it did not
+resolve from `docs/adr/`, and the surviving scope existed only as one sentence. That file has since
+been deleted. Anyone reading this ADR to find out what is still on the table reads this section.
 
 | # | Item | Status |
 |---|---|---|
@@ -67,6 +67,100 @@ ADR-030, **ADR-030 wins**; the body is kept as the record of what was rejected, 
 `ObservationCensus.Measured / Total`, not `(Total - Inapplicable) / Total`, because ADR-030 splits
 the excluded cases into `NotApplicable` (a corpus finding) and `NotMeasured` (an operational
 finding), and pooling them hides which one you have.
+
+---
+
+## §0.2 THE FINDINGS THAT SANK THE FORMAT — V1–V7
+
+*Restated in-repo on 2026-09-05 from `EvalPacks_Design.md` §1.2, which is deleted. This is the
+authoritative record of **why** the body below is rejected; it is not a summary of it. Every "verified"
+claim was checked against the tree at the time of the verdict, 2026-09-04.*
+
+| # | Finding | Consequence |
+|---|---|---|
+| **V1** | **Comparability does not need the manifest.** The draft concedes it in its own §5.2: per-case hashes recorded *on the run* make the `REDRAWN` set computable *"without either pack still being on disk"*. Extend that one sentence to the eval's key, version, effective bar, floor and judge fingerprint — all of which the runner knows at execution time — and `pack compare` becomes a **pure function of two run directories** | The manifest's comparability role evaporates. What remains is *authoring*, and per V3 there is no author who is not also a compiler user |
+| **V2** | **One `contentHash` over the whole manifest kills the feature on first use.** The draft hashes `pack.json` entire — including `provenance.generatedAt`, `git.commit`, `pack.description`, every `controls[].expectation` prose sentence. Re-running `pack hash --write` on a different commit produces a **different hash for a byte-identical set of rules**. Every historical baseline classifies `RULES_CHANGED`, `pack compare` exits 13 and prints nothing, and `--allow-incomparable` is in every CI script within a month. The draft's own §1.3 promises *"PATCH — prose only … hashes unchanged in the fields that gate"* and **no such hash exists in its schema** — a straight internal contradiction | If the pack is ever built, **three hashes, not one**, is non-negotiable |
+| **V3** | **The worked example does not fit the format, and the draft never prices the rewrite.** Verified: `grep -c "IEval\b"` over `samples/Galaxus.RecommendationAgent.Evals` returns **0**. Nine evals are `public static class EvalNN_… { static Task<int> RunAsync(…) }` that print to `Console` and return exit codes. **Zero `EvalResult` are produced.** The entire pack pipeline is `IEval.EvaluateAsync → EvalResult → EvalResultPersistence.ToScenarioResult → ScenarioResult`; nothing in the sample enters it at any point | Expressing Galaxus as a runnable pack is **nine ports**, weeks-to-a-quarter, not days. ⚠️ *The "gated behind AE-06" half of this finding was not re-measured on 2026-09-05 and must not be quoted as current* |
+| **V4** | **Portability delta over the status quo is zero.** A pack needs the agent, the eval assembly, the domain predicates, the host project and a multi-turn harness. All five are in this repo. The set of people who can run a pack is a **subset** of the set who have the repo — and everyone with the repo can already type `dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3` | The honest name is *hashed run archive with a declarative index*, **not** *portable eval suite*. See §0.3 |
+| **V5** | **`RunManifest.Pack` charges a hash-format break to every benchmark family in the product.** `CanonicalRunManifestConverter` writes every property unconditionally — which is why `seed`/`tag`/`workspaceTag` are absent from all 46 on-disk manifests yet still in the hash domain as explicit nulls. Adding a `pack` block emits `"pack":null` for every run, **invalidates all 46 stored hashes**, and turns `agenteval doctor` red workspace-wide | The pack reference belongs in `summary.json` (projected by `CanonicalJsonProjector`, so an added optional field affects only runs that carry it). Zero hash change, zero migration. **This is why S2 must not touch `RunManifest`** |
+| **V6** | **Format proliferation.** The draft adds 4 persisted document kinds (`pack.json`, `controls.json`, `profiles/expected.json`, `PackBaseline`), 1 new root, **retires 0**, and forks *baselines* a fourth time (`MemoryBaseline`, the empty `RunSummary` slot, `ISkillBaselineStore`'s ledger, the Gatekeeper cert — then `PackBaseline`). Its own §10 Q4 says *"a third fork is the failure state"* and then ships the fourth | Fill the empty `baselines/` slot with the shape it already declares. **Do not add `PackBaseline`** |
+| **V7** | **`profiles/expected.json` is dead data by construction.** The draft *proves* that `archetypes.json`'s `expected_scores` has zero readers in `src/` and zero hits in `report.html` — then reproduces its shape as advisory. A hand-written number that gates nothing and **cannot go stale detectably** | Cut it. The correct replacement is a principle: **"a degenerate expectation must be realised as a control, not declared as a number."** Same family as ADR-030 §3.2 |
+
+**The one capability that justified any work at all, and it is real.** Verified:
+`EvalResultStore.cs` writes `{key}.json` into `.agenteval/samples/…/snapshots/` and **overwrites it
+every run**. The directory holds exactly five files, one per eval — no run id, no timestamp, no
+history — and the tree is gitignored.
+
+> **There is never a second data point.**
+
+So *"coverage moved 0.6088 → 0.4583 — was that the agent, the corpus, or the judge?"* **cannot
+currently be asked**, because the previous number is gone and nothing recorded what produced it. The
+proof that this hurts today was already on disk at the time of the verdict: `MEASUREMENT_STATUS.md`
+§2.3 reported the live coverage column as **0.076** (correctly labelled a `--dry-run` stub) while the
+store held a live run at **0.6088** — a hand-maintained numbers table gone stale against the machine,
+exactly as its own §9 (*"do not edit a number in this file by hand"*) anticipated. **That is what S1
+and S2 buy. Everything else on the pack's list is already available or actively made worse by
+serialisation.**
+
+---
+
+## §0.3 PORTABILITY — THE RECORD / TEMPLATE SPLIT
+
+*Restated in-repo on 2026-09-05 from `EvalPack_Galaxus_WorkedExample.md` Part 4, which is deleted.
+**This supersedes §9 of the body below**, whose sentence "portable as an executable suite to any
+machine that has (a) the eval assembly and (b) the host project" is the specific claim the worked
+example refuted.*
+
+Three things that sentence does not survive:
+
+1. **There is no eval assembly.** Zero of nine evals implement `IEval`; `evals[].key` is the pack's
+   stated portability boundary and it **resolves nothing**.
+2. **It is not portable to a second subject inside this repository.** Eval 09 needs two subjects in one
+   pack; Eval 07's subject is the workflow. Before any question about *someone else's* agent, the pack
+   cannot express *this* suite.
+3. **Everything that carries information is corpus-shaped.** The cases are 14 hand-authored adversarial
+   turns against 99 hand-authored SKUs; the floors are hypergeometric functions of *this* pool; the
+   thresholds are choices about *this* corpus; the special-category term list contains `wahl`.
+
+**Two artifacts are hiding inside one word, and separating them is the finding.**
+
+**(A) The pack INSTANCE — a record.** Audience: this team over time, and a reviewer who has never run
+it. It answers *did the bar move? did the corpus move? is this the same measurement as last month?
+what does a 0.6088 mean — against what floor, on which corpus, under which control ledger?* The
+comparability machinery earns its keep here **and only here**. This is what S1, S2 and S5 build.
+
+**(B) The pack TEMPLATE — the actually reusable artifact, and it needs its own schema.** The same
+`evals[]` / `controls[]` skeleton with **no `corpora[]`**, `floor.kind` present with `from` *unbound*,
+thresholds *absent*, control expectations as prose with `implementedBy: null`. Not scheduled; recorded
+so the distinction is not lost.
+
+**What a second consumer can actually take, at zero edits:** the **five floor formulae**
+(`AtLeastOneHit(pool, favourable, k)`, `AvoidsAll`, `1/N` forced choice, exact two-sided sign test,
+`0.5^n`/`0.25^n` conjunctions, `1/k!` for order) — *and these are **library** material, ADR-030 §4.3–§4.4,
+not pack material; they should ship in the library rather than be copied per consumer*; the **seven
+control archetypes** (hallucinator, uncited-but-grounded, single-pass, persona-blind, rubber-stamp
+loop, constant-policy ceiling, grader-sanity-both-directions) as *names, expectations and the
+both-directions rule*; the **pairing invariant** (every prohibition has a permission partner on
+near-identical input — the sharpest instance is a **byte-identical** utterance under opposite policy);
+the **six defect classes** split 4 hard / 2 soft; and **the gate discipline as schema** — a floor
+required per eval, `undefined` demanding a reason, controls before scores, VOID ≠ FAIL, "nothing
+measured" ≠ "passed", an empty denominator failing closed. **That last row is the actual product of
+this ADR and it is 100% transferable.**
+
+**Does not transfer at all:** the 14 integrity cases · 12 personas · 38 derived gold tokens · 99 SKUs ·
+every floor *value* · every threshold *value* · the judge rubrics' wording · `wahl` · the host entry
+point · all nine eval implementations.
+
+**The sentence that replaces §9's:**
+
+> A pack is portable **as a record of a measurement**: it survives a machine change, a clone, a CI
+> runner, a six-month gap and a reviewer who has never run it, and it is what makes two runs of the
+> same thing comparable and two runs of different things refuse to compare. It is **not** portable as a
+> suite: its cases are its corpus, its floors are functions of that corpus, its predicates are code,
+> its subject is code, and its evals may not exist as `IEval` at all. What a second consumer can take
+> is the **template** — the control archetypes, the defect taxonomy, the floor formulae, the pairing
+> invariant and the gate discipline. That is a different artifact with a different schema, and calling
+> both of them "a pack" is how the promise gets overstated.
 
 ---
 
@@ -1179,6 +1273,12 @@ Note also that **11 already means "nothing was measured"** — the same concept 
 ---
 
 ## §9. PORTABILITY LIMITS — stated plainly
+
+> ⚠️ **SUPERSEDED 2026-09-05 by [§0.3](#03-portability--the-recordtemplate-split).** This section's
+> claim that a pack is portable "as an executable suite to any machine that has (a) the eval assembly
+> and (b) the host project" is the specific sentence the worked example refuted: **there is no eval
+> assembly** (0 of 9 evals implement `IEval`), and the pack cannot express this suite even inside this
+> repository. Read §0.3 instead; what follows is kept as the record of what was claimed.
 
 ### What a pack CARRIES
 

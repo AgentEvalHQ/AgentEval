@@ -221,8 +221,42 @@ Surveyed: OpenAI Evals, DeepEval, Ragas, promptfoo, LangSmith, Braintrust, Inspe
   *variance* (bootstrap stderr, Wilson CIs, clustered stderr) and still answers only "how much does
   the score move", never "could this eval have produced a bad score at all".
 
-*(The ecosystem sweep is inherited from `Ecosystem_ChanceFloor_Comparison.md` and was not re-run
-this session. Treat the nine-framework claim as of that document's date.)*
+**The evidence, folded in-repo on 2026-09-05.** This table previously lived in
+`strategy/Galaxus/Ecosystem_ChanceFloor_Comparison.md`, which is gitignored and therefore was not
+readable from this repository — a citation nobody could check. That file is deleted; its evidence is
+here. ⚠️ **The sweep itself is still the one performed on 2026-09-04 and was not re-run** (Q8): treat
+every row as of that date, not as of today.
+
+| Framework | Evidence for "no chance-floor / negative-control machinery" |
+|---|---|
+| **HELM** | Metrics docs enumerate ~50 metrics in 7 categories; no random baseline, chance level or null model. Code search `"random baseline" repo:stanford-crfm/helm` → **0 hits** |
+| **Inspect (UK AISI)** | Metrics page lists `accuracy, mean, var, std, stderr, bootstrap_stderr, ci, ci_wilson, frequency, categorical, krippendorff_alpha` — no baseline/chance metric. `"random baseline"`, `"negative control"` → **0**. The nearest artefact is a **test double, not a control**: `mockllm.py`, *"Always returns default_output"*, explicitly **no randomness** |
+| **DeepEval** | `"random baseline"` → **0**; nothing in the metric docs |
+| **Ragas** | Metrics overview has no mention of baselines or chance |
+| **promptfoo** | `"chance level"`, `"negative control"` → **0**. `"random_baseline"` → 1 hit: a **blog post about RLVR**, not a feature |
+| **Braintrust / autoevals** | `"random baseline"`, `"chance level"`, `"negative control"`, `"random_baseline"` → **all 0**. It *does* ship a "baseline experiment" (`base_experiment`) — but that is **a previous run of your own system**, not a degenerate policy |
+| **LangSmith / openevals** | Evaluation-concepts doc covers human / code / LLM-judge / pairwise; **no** baseline, chance, variance or significance |
+| **M.E.AI.Evaluation** | Namespace type list and libraries doc contain **no** baseline or chance concept |
+| **OpenAI Evals — the one exception** | `RandomBaselineSolver`, verbatim: *"A solver that randomly answers `yes` or `no` for any input. We view this baseline as equivalent to randomly guessing."* It exists in `already_said_that/solvers.py` and `track_the_stat/solvers.py` and is registered as a runnable "model" in two YAMLs. **The shape of the exception is the finding: a per-eval, hand-rolled convention inside individual eval directories, not a framework capability.** No harness computes it, no report model carries it, nothing requires it |
+
+**Statistical rigour, for calibration of the claim:** Inspect is in a different league and it is honest to
+say so — `var`, `std`, `stderr`, `bootstrap_stderr` (1000 resamples), `ci`, `ci_wilson`,
+`krippendorff_alpha`, and **clustered standard errors** via `stderr(cluster=...)`. Everyone else stops
+at repetition (Braintrust `trialCount`, LangSmith `num_repetitions`, promptfoo `--repeat`) with **no
+significance testing found in any of them**. **No framework in the set ships paired significance
+testing** — no paired bootstrap, no McNemar, no paired t-test — though four ship pairwise *judging*.
+Outside the set, EleutherAI's `lm-evaluation-harness` reports bootstrap stderr per task, which puts it
+in Inspect's tier.
+
+**Uncertainty flags carried forward, because a 0-hit is not a proof:** GitHub code search indexes the
+default branch and can miss things, and the API rate-limited the sweep mid-run. Confidence is **high**
+for HELM / Inspect / autoevals / DeepEval (0 hits *plus* corroborating doc reads), **medium** for Ragas
+and langsmith-sdk (those queries were rate-limited; doc reads only). "ndcg" was not exhaustively
+grepped — treat MRR/NDCG as *not documented* rather than *absent*.
+
+**The differentiating point, stated plainly:** every framework here answers *"what score did the system
+get?"*. Several answer *"how much does that score move between runs?"*. **None of them answers "could
+this eval have produced a bad score at all?"**
 
 ### 2.5 The live-run proof — real money, $6.34, today
 
@@ -251,6 +285,51 @@ direction:
   bound.
 - The constant-policy ceiling was **typed as 8** in a comment and **measured at 10**; the refuser was
   typed 8 and measured 5. A hand-typed baseline is a baseline someone chose.
+
+### 2.6 One qualification this ADR owes its own claim — we are not quite at zero
+
+*Added 2026-09-05, folded from `strategy/Galaxus/AgentEval_NonLlm_Inventory.md` before that file was
+deleted. §2.4 says meta-evaluation is shipped by nobody. Inside this repository that is very nearly
+true, and the exception has to be named or §3 is arguing against a strawman of our own making.*
+
+**`GateCalibrationHarness` — `AgentEval.Guardrails.Judges` — already does part of it.** It computes a
+full confusion matrix (TP/TN/FP/FN), decisive accuracy, a **dangerous-error (FN) count**, FPR, and κ
+against gold; promotion is **fail-closed**, requiring `PromotionCriteriaConfigured && SufficientData`;
+and it carries an optional **deterministic-baseline comparison**:
+
+```csharp
+beatsBaseline = judgeAccuracy > baselineAccuracy && fn <= bfn;
+```
+
+**That is the only place in this library that asks "does the judge beat a deterministic detector?"** —
+which is a meta-evaluation question, not a scoring question. Three things keep it from refuting §2.4
+and all three are the point:
+
+1. It is a **judge**-scoring instrument. It answers *"is this judge good?"*, never *"could this eval
+   have failed?"* — no chance floor, no applicability, no unit-of-analysis collapse.
+2. It emits a `CalibrationReport`, **never an `EvalResult`**, and is wired to nothing else. It is a
+   seventh result shape in all but name, which is exactly what §3.2 forbids the meta lane from
+   becoming.
+3. Its baseline is *supplied*, not *derived*. `baselineAccuracy` is whatever the caller hands it.
+
+**Consequence, binding on Slice 2.** `AgentEval.Evals.Meta` **must reconcile with this harness or
+state in writing why not.** Shipping a second, unconnected meta-evaluation instrument beside it is the
+fork this ADR exists to refuse, and it would be a fork in the one place §3.2 says a fork is worst.
+`FloorComparison`/`PairedEvalComparer` and `beatsBaseline` are answering neighbouring questions; if the
+former cannot express the latter, that is a finding about the design, not about the harness.
+
+**Two smaller corrections from the same inventory, recorded so nobody re-derives them wrong:**
+
+- **`PerformanceBenchmark` has the `IEval` signature and is not an `IEval`.** It exposes
+  `EvaluateAsync(EvalInput, CancellationToken) → EvalResult` and builds a real three-leaf
+  `CapByWorst` composite, but is declared `public class PerformanceBenchmark` with no interface, and
+  carries a `SyntheticEval : IEval` **stub whose only method throws**, present purely to satisfy an
+  `EvalComponent` constructor. `OwaspBenchmarkRun` / `NistBenchmarkRun` / `MitreBenchmarkRun` use the
+  identical duck-typed + throwing-stub pattern. That is four real measurement families that cannot be
+  composed — the §2.2 reachability gap one layer further down, and **not counted in §5's line delta**.
+- **`CalibratedEvaluator` (§2.1, contract #2) is a naming trap.** It is not statistical calibration; it
+  is multi-LLM consensus voting (`judges.Select(j => (IEvaluator)new ChatClientEvaluator(j.Client))`).
+  **It adds cost, not determinism.** One of contract #2's "2 real implementations" is this.
 
 ---
 
@@ -284,7 +363,10 @@ AgentEval will not ship, and any PR adding one is closed with a link to this sub
   `levenshtein`, or a schema-validation assertion type;
 - BLEU, ROUGE, GLEU, METEOR, chrF, or any n-gram overlap metric;
 - exact-match scoring as a shipped eval;
-- NDCG, MRR, recall@k as *new* work (the two that already exist stay where they are; they are not
+- NDCG, MRR, recall@k as *new* work (the two that already exist are
+  `src/AgentEval.Core/Metrics/Retrieval/MRRMetric.cs` and `RecallAtKMetric.cs` — **named here on
+  2026-09-05 because the inventory that fed this ADR wrongly claimed neither existed**; they stay
+  where they are and they are not
   extended);
 - an assertion DSL, YAML-configured or otherwise;
 - **a deterministic `IEvaluator` implementation** (see §3.3).
@@ -1414,7 +1496,8 @@ rule.**
 `contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.
 
 **Q8 — Unverified items to check before executing**, not decisions but they gate execution:
-- the ecosystem sweep (§2.4) was **not re-run this session**;
+- the ecosystem sweep (§2.4) was **not re-run this session** — its per-framework evidence was folded
+  into §2.4 in-repo on 2026-09-05, so the claim is now *checkable*, but it is still not *re-checked*;
 - the funded-slice line delta (§5.2, ~−974) is an **attribution estimate, not a measurement**;
 - `AgentEval.Abstractions`' packaging path (Q2);
 - the `~3,800` full-design library-growth figure is the migration lane's estimate at this repo's
