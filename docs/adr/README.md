@@ -50,9 +50,8 @@ Each ADR follows this structure:
 | [027](027-typedmemeval-semantic-temporal-bitemporal.md) | TypedMemEval — Semantic, Temporal and Bitemporal Verticals (design) | Proposed (design only; generation gated) | 2026-08-18 |
 | [028](028-typedmemeval-acceptance-on-discrimination.md) | TypedMemEval — accept a shape on measured discrimination, not a coverage proxy | Proposed | 2026-08-31 |
 | [029](029-procedural-memory-declarative-and-enacted.md) | Procedural memory — a finding, and a request to reopen a bilateral agreement | Accepted, then REVERSED by its own §10–§12: the Procedural vertical is built (80q, headroom +0.81) and released standalone | 2026-09-03 |
-
-| [030](030-meta-evaluation-is-the-lane.md) | Meta-evaluation is the lane; contract unification is not — chance floors, exact tests, applicability as first-class; `IEval` kept by adaptation; deterministic assertion catalogue rejected by name | Proposed | 2026-09-04 |
-| [031](031-eval-packs-ship-reduced.md) | Eval Packs — adversarial verdict DON'T BUILD as scoped; SHIP REDUCED to five items on the existing `subjects/` tree, no new format | Proposed (reduced) | 2026-09-04 |
+| [030](030-meta-evaluation-is-the-lane.md) | Meta-evaluation is the lane; contract unification is not — chance floors, exact tests, applicability as first-class; `IEval` kept by adaptation; deterministic assertion catalogue rejected by name | Accepted (Slice 0 already shipped in `a396c5b4`; ratification funds Slices 1–2 only) | 2026-09-05 |
+| [031](031-eval-packs-ship-reduced.md) | Eval Packs — adversarial verdict DON'T BUILD as scoped; SHIP REDUCED to five items on the existing `subjects/` tree, no new format | Proposed (reduced; S1–S5 in §0.1. S3 restated against ADR-030 as ratified) | 2026-09-05 |
 ---
 
 *Template based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)*

@@ -3,8 +3,8 @@
 > **Location note (2026-09-04):** companion documents referenced below — `EvalPacks_Design.md` (the reduced-scope design this ADR now defers to) and `EvalPack_Galaxus_WorkedExample.md` — live in `strategy/Galaxus/`, which is local-only (gitignored), until promoted.
 
 **Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.**
-**What survives:** five items, no new format, no new root, no new verbs — S1 `EvalResultStore` → `IOutputStore`, S2 `ScenarioResult.Input` + `stimulusHash`, S3 `EvalScore.ChanceFloor` + `Applicable` + `"inapplicable"`, S4 `controlLedger` + verdict `VOID` + exit 12, S5 `agenteval compare` (exit 13 on incomparable). The reduced plan, the six findings (V1–V6) that sank the format, and the Stage-2 gate live in [`EvalPacks_Design.md`](./EvalPacks_Design.md) §1.2 and §3. `pack.json` is Stage 2, unproven, gated on a real second use case.
-**Why this body is kept:** it is the record of what was rejected and why. Nothing below is scheduled; where it disagrees with `EvalPacks_Design.md`, that document wins. Evidence for the verdict: [`EvalPack_Galaxus_WorkedExample.md`](./EvalPack_Galaxus_WorkedExample.md) (zero `IEval` in the sample; nine ports gated on AE-06).
+**What survives:** five items, no new format, no new root, no new verbs — **S1**–**S5**, stated in full in **[§0.1](#01-the-five-surviving-items-s1s5--the-authoritative-statement) below**, which is the authoritative statement of them. The six findings (V1–V6) that sank the format and the Stage-2 gate live in `EvalPacks_Design.md` §1.2 and §3 — **that file is in `strategy/Galaxus/`, which is gitignored and local-only, so it is not readable from this repository**; S1–S5 are restated here for that reason. `pack.json` is Stage 2, unproven, gated on a real second use case.
+**Why this body is kept:** it is the record of what was rejected and why. Nothing below is scheduled; where it disagrees with `EvalPacks_Design.md`, that document wins. Evidence for the verdict: `strategy/Galaxus/EvalPack_Galaxus_WorkedExample.md` — **local-only, not readable from this repository**, so its load-bearing claim was re-measured against the tree on 2026-09-05 instead: `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. Confirmed. (The "nine ports gated on AE-06" figure was not re-measured and must not be quoted as current.)
 **Original status line (retained):** PROPOSED — design only. No code written.
 **Depends on:** ADR-030 (meta-evaluation: floors, controls, exact tests) · AE-01 (assertions → `AssertionResult`) · AE-05 (undecidable) · plan-13 T3.11 (deferred agent-manifest ADR).
 **Supersedes nothing. Forks nothing.**
@@ -26,6 +26,47 @@
 | 9 | Portability | Cases/thresholds/floors/controls/gates travel. **The subject does not.** Named host entry point, failing at load. | — honest limit |
 
 **Standing rule obeyed:** no new result model. `EvalResult` / `EvalScore` / `ScenarioResult` / `AssertionResult` are the only carriers. The pack is an *input* artifact and a *run reference*; it never becomes a sixth result type.
+
+---
+
+## §0.1 THE FIVE SURVIVING ITEMS (S1–S5) — THE AUTHORITATIVE STATEMENT
+
+Restated in-repo on **2026-09-05**, because the companion document that held them
+(`EvalPacks_Design.md`) lives under `strategy/`, which is gitignored: the header's link to it does not
+resolve from `docs/adr/`, and the surviving scope existed only as one sentence. Anyone reading this
+ADR to find out what is still on the table reads this section.
+
+| # | Item | Status |
+|---|---|---|
+| **S1** | `EvalResultStore` → `IOutputStore`. One store interface; the pack reporter writes through the same path as everything else. | Not started |
+| **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | Not started |
+| **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 |
+| **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; depends on ADR-030's deferred controls |
+| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | Not started; depends on S2 |
+
+### ⚠️ S3 as originally written is refuted by the ADR it depends on
+
+The header sentence said S3 was **`EvalScore.ChanceFloor` + `Applicable` + `"inapplicable"`**. ADR-030
+was ratified on 2026-09-05 and **two of those three no longer exist as designed**:
+
+| ADR-031 said | ADR-030 ruling | S3 as it now stands |
+|---|---|---|
+| `EvalScore.ChanceFloor` (a nullable init-only property) | **CUT** — ADR-030 §3.2 / finding D6. A composite has a `Score` and cannot have a floor, so the node consumers actually read would carry `chanceFloor: null` forever; and the number without its derivation is unusable. | Floors live in `EvalDetails.Dimensions["chance_floor*"]` plus one `EvalEvidence("chance-floor", kind, derivation)` — **zero schema change**. The typed floor object lives at the **suite** level in `FloorComparison`. |
+| `EvalScore.Applicable` (a `bool` / `bool?`) | **REJECTED** — ADR-030 §4.2. A tri-state `bool?` is the silent-`{}` shape: `null` reads as "nobody set it" and the first consumer writes `?? true`. | `EvalScore.Measurement`, a `MeasurementState` enum with a real named default (`Measured` / `NotApplicable` / `NotMeasured`), guarded by a backing field + validating `init` accessor on both `Measurement` and `Passed`. |
+| label `"inapplicable"` | **KEPT** — ADR-030 Slice 1.4, and it is the **one schema change budgeted for the entire programme** (schema v1.1, `label` enum gains `"inapplicable"`, `score.measurement` added). | Unchanged. |
+
+**Consequences for this document's body, which was written before those rulings and has not been
+rewritten:** every reference below to `EvalScore.ChanceFloor`, `EvalScore.Applicable`, `IChanceFloor`
+or `FloorGatedCodeEval` — including §6.5, the C4/C5 rows, and the `floor.Value` mapping row — is
+**stale**. `IChanceFloor` and `FloorGatedCodeEval` were also cut by ADR-030 (finding D1: a
+`FloorDerivationContext` carrying a full `EvalInput` lets the arm size its own null, which is worse
+than the convention it replaced, because a reviewer would trust it). Where this body disagrees with
+ADR-030, **ADR-030 wins**; the body is kept as the record of what was rejected, per the header.
+
+**`minApplicable` (§6.5) survives in spirit and needs one substitution:** the denominator is
+`ObservationCensus.Measured / Total`, not `(Total - Inapplicable) / Total`, because ADR-030 splits
+the excluded cases into `NotApplicable` (a corpus finding) and `NotMeasured` (an operational
+finding), and pooling them hides which one you have.
 
 ---
 

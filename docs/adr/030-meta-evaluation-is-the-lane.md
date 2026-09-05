@@ -1,7 +1,10 @@
 # ADR-030: Meta-evaluation is the lane. Contract unification is not.
 
-- **Status:** **Proposed — review gate.** Nothing in §8 is funded until this document is ratified.
-  Status `Proposed` is a gate, not a placeholder (the ADR-026 precedent).
+- **Status:** **Accepted (2026-09-05).** Ratification is what funds §8: Slices 1 and 2 are now
+  funded. Slice 0 was **already executed** before ratification (see the ratification note) — the gate
+  it was meant to sit behind did not hold, and saying so is part of accepting the document. Status
+  `Proposed` was a gate, not a placeholder (the ADR-026 precedent); it has now been cleared, and
+  everything in "Deferred until a second team asks" (§8) remains unfunded.
 - **How it got here, which is the useful part:** a four-lane design was produced (contract
   unification, meta-evaluation, harness bridge, assertions) and put to an adversarial review. The
   review returned **RETHINK the unification half, SHIP a much smaller meta-evaluation slice**, and it
@@ -10,7 +13,9 @@
   structural — **do not work as specified, and one of them does not compile.** This ADR is the
   design after those rulings were applied, not the design that was reviewed. §7 records what was
   refuted, including by this document's own earlier draft.
-- **Date:** 2026-09-04. Supersedes `ADR-030-DRAFT_NonLlm_MetaEvaluation.md` (deleted on write).
+- **Dates:** authored **2026-09-04** (`a396c5b4`); **ratified 2026-09-05**, with §4.2's guard
+  corrected and §3.3's input claim corrected on the way in — see §0.0. Supersedes
+  `ADR-030-DRAFT_NonLlm_MetaEvaluation.md` (deleted on write).
 - **Decision in one line:** **Adopt meta-evaluation — chance floors, exact tests, paired
   significance, unit-of-analysis, applicability — as AgentEval's differentiating concern, defined
   over a framework-neutral observation tuple rather than over `EvalResult`; keep `IEval` as the one
@@ -24,12 +29,63 @@
 
 ---
 
+## 0.0 RATIFICATION NOTE — 2026-09-05
+
+**Ratified by:** the repository owner (`joslat`), on branch `joslat/digitec-galaxus` at `b57496f2`.
+**Reviewed against the tree, not against the brief.** Four checks were re-run this session; three
+confirmed the decision, one corrected a supporting sentence, and one changed what ratification means.
+
+| Check | Result |
+|---|---|
+| Does the flagship harness reach the good contract, from a consumer's side? | **Confirmed, and harder than §2.2 states.** `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. A consumer with zero `IEval` references cannot be served by anything defined over `EvalResult`. This is the evidence that makes §4.1 (the neutral `Observation` tuple, BCL-only) load-bearing rather than stylistic: it is the only part of this design that a zero-`IEval` consumer can adopt without migrating first. |
+| Is `IEval`'s input gap as large as §3.3 claims? | **No — corrected in §3.3.** `EvalInput` already carries `ToolCalls`, `ToolDefinitions` and `ExpectedActions`. The real gap against `ToolCallRecord` is **three fields** (`WasExecuted`, `ApprovalState`, `Order`) plus one `ToolUsageReport → EvalInput` projection. The bridge is cheaper than the document implied. It stays deferred anyway, because §6.2's reasons for deferring it are **breaking-change** reasons (gates defaulting on; `TestResult.Score` exactness dead by construction), not input-model-cost reasons, and those survive the correction untouched. |
+| Is the §4.2 guard sound? | **No — folded in this ratification.** The D2 fix (guard on `EvalResult`'s primary constructor) is itself bypassable by a `with` clone and sits on the wrong type. Replaced by the backing-field + validating-init-accessor pattern already shipped twice in this repo. See §4.2 and the new §7.1 row **D2b**. |
+| Are §2.3's five defects still shipped and live? | **No. All five are fixed**, in `a396c5b4` — the same commit that added this ADR. |
+
+**What ratification actually funds, stated as a diff and not as an intent.**
+
+- **Slice 0 is DONE, not funded.** All seven items landed in `a396c5b4` ("three-valued
+  `AssertionResult`, assertion→result wiring, ADR-030 Slice 0"), which is also the commit that
+  created this file. §2.3 and §8 Slice 0 therefore describe a tree state that **no longer exists**;
+  they are kept verbatim as the evidence that motivated the decision, and this note is the correction
+  that stops them being read as current. Verified fixed this session: `CompositeEval` all-skipped now
+  reports `label:"skipped"` (`CompositeEval.cs:149-187`); `MAFEvaluationHarness` now reads
+  `EvaluationFailed` (`:635`, `:657`); `ToolInputAccuracyEval`'s two flattering `Build(1.0, true,
+  "none")` sites now skip (`:124`, `:219`); `ToolUsageExtractor` sees `ToolApprovalRequestContent`
+  (5 sites); `MicrosoftEvaluatorAdapter` is `: IMetric, IEval` — the dual-target that §9 Q3
+  recommended; `EvalResultPersistence` populates `ScenarioResult.Assertions` from
+  `AgentEvalScope.Current`.
+- **The ADR's own gate did not hold.** "Nothing in §8 is funded until this document is ratified" was
+  violated in the commit that wrote the sentence. Recorded rather than quietly dropped: a gate that
+  is authored and cleared in one commit is not a gate, and this is the second document in this repo
+  where the artifact under review supplied an input to its own approval.
+- **Slices 1 and 2 are what ratification funds**, and neither exists in `src/` — verified this
+  session: no `MeasurementState`, no `AgentEval.Evals.Meta`, no `ExactTests`, no `EvalInput.CaseId`.
+  The stop rule (Slice 2.6) is therefore still ahead of us, not behind us.
+- **The "Deferred until a second team asks" bucket stays unfunded**, including all three items the
+  review found actually wrong (D1, D8, D10).
+
+**Open questions closed by this ratification:** Q1 **yes** (the honest framing is wanted; the
+demotion stands). Q3 **dual-target**, already implemented that way in `a396c5b4`. Q7 **normative** —
+§3.1's exclusion list is normative text in this ADR and a PR adding `contains` is closed with a link
+to it. **Still open and still gating their own slices:** Q2 (packaging), Q4 (schema v1.1 timing —
+gates Slice 1.4), Q5 (controls — unfunded, which is the answer unless it is revisited), Q6 (the stop
+rule — recommend it actually stops), Q8 (four unverified items; the §5.2 line delta remains an
+attribution estimate and must not be quoted as a measurement).
+
+**Not ratified:** nothing in §8's deferred bucket, and no line-count claim in §5. §5.1's
+"−2,791 (13.7%)" and §5.2's "~−974" are projections of a migration nobody has performed.
+
+---
+
 ## 0. READING ORDER, AND THE ONE THING TO TAKE IF YOU READ NOTHING ELSE
 
-The valuable half of this ADR is **§8 Slice 0** — five bug fixes, no new public types, all five
-defects **shipped and live in `src/` today**. They need no ADR, no new contract, no schema change
-and no second consumer. Everything after that is progressively more speculative and progressively
-less funded.
+The valuable half of this ADR was **§8 Slice 0** — bug fixes, no new public types, every defect
+shipped and live in `src/` when this was written. **They are now fixed** (`a396c5b4`; see §0.0), so
+the valuable half of this ADR *as a plan* is now **Slices 1 and 2**: applicability, and the
+BCL-only statistics module. Everything after those is progressively more speculative and
+progressively less funded, and §2.3 should be read as the case that was made, not as a description
+of the tree.
 
 If the reader takes one sentence: *AgentEval's differentiator is not that it can score a string
 deterministically — every competitor can. It is that it can tell you whether your eval, judge or
@@ -115,8 +171,13 @@ the harness sets it to 'the agent produced non-empty text', which would score a 
 
 ### 2.3 Five defects that are shipped, live, and flattering
 
-Each verified by reading the file this session. Each fails in the direction that makes an agent look
-better than it is — which is the direction that survives review.
+> **⚠️ HISTORICAL AS OF 2026-09-05. All five are FIXED**, in `a396c5b4` — the same commit that added
+> this ADR. Kept verbatim because they are the evidence the decision was made on, and because a
+> defect table rewritten after the fix stops being a record of what was actually wrong. Do **not**
+> cite any row here as a current property of `src/`. §0.0 carries the per-item verification.
+
+Each verified by reading the file at the time of writing. Each fails in the direction that makes an
+agent look better than it is — which is the direction that survives review.
 
 | # | Defect | Location | Why it is flattering |
 |---|---|---|---|
@@ -286,9 +347,30 @@ The secondary reasons are real but are claims about AgentEval's current assets, 
 - It **nests** (`EvalDetails.SubResults`, depth-capped at 32). A suite is a tree.
 
 **The honest caveat that shapes everything else:** `IEval` wins on output, composition, provenance
-and applicability. It **loses on input**. `IMetric`'s `EvaluationContext` already carries
-`ToolUsage`, `Timeline`, `Performance` and `ExpectedTools`; `EvalInput` carries none of them. That is
-not a coincidence — it is *why* 26 structural metrics were written against `IMetric`.
+and applicability. It **loses on input** — but by less than this document originally claimed, and the
+correction is recorded rather than absorbed.
+
+> **Corrected at ratification (2026-09-05).** The sentence here read *"`IMetric`'s
+> `EvaluationContext` already carries `ToolUsage`, `Timeline`, `Performance` and `ExpectedTools`;
+> `EvalInput` carries none of them."* **The second clause is false.** `EvalInput` already carries
+> `ToolCalls` (`IReadOnlyList<ToolCall>`, with a chronological-ordering contract), `ToolDefinitions`
+> and `ExpectedActions` — verified at `src/AgentEval.Abstractions/Evals/EvalInput.cs`. What it
+> genuinely lacks, measured against `ToolCallRecord`
+> (`src/AgentEval.Abstractions/Models/ToolCallRecord.cs`), is **three fields on `EvalInput.ToolCall`
+> — `WasExecuted`, `ApprovalState`, `Order`** — plus a `ToolUsageReport → EvalInput` projection.
+> `Timeline` and `Performance` remain genuinely absent.
+>
+> **This makes the bridge cheaper than the document implied, and it does not reopen the decision.**
+> The bridge is deferred in §8 for the reasons in §6.2 — two gates that default ON and flip
+> dataset-driven consumers pass→fail on a minor, and a `TestResult.Score` exactness guarantee that is
+> dead by construction. Those are breaking-change reasons. They are unaffected by how few fields the
+> input gap is, and they are why the bridge is deferred rather than cheap-and-therefore-funded. What
+> the correction does change: **"`EvalInput` cannot carry tool data" must not be cited as a reason
+> for anything**, by this document or by any document depending on it.
+
+The residual input gap is still *why* 26 structural metrics were written against `IMetric`:
+`EvaluationContext` hands a metric a whole `ToolUsageReport` with timing, ordering and execution
+state already joined, and `EvalInput` hands it three plain fields per call.
 
 | Contract | Disposition | Funded when |
 |---|---|---|
@@ -423,49 +505,189 @@ public enum MeasurementState
 }
 ```
 
-**On `EvalScore`, as a non-positional init-only property** — the `EvalDetails.Summary` precedent, so
-positional construction and deconstruction are unaffected:
+It lands **on `EvalScore` as a non-positional init-only property** — the `EvalDetails.Summary`
+precedent, so positional construction and deconstruction are unaffected. The full declaration is
+below, after the guard ruling, because the guard is what determines how the property is declared.
 
-```csharp
-// src/AgentEval.Abstractions/Evals/EvalScore.cs — the 7 positional parameters are UNTOUCHED.
-public sealed record EvalScore(double Value, int? Ordinal, string Label, bool Passed,
-                               double? Threshold, string Severity, double? Confidence)
-{
-    public MeasurementState Measurement { get; init; } = MeasurementState.Measured;
+**Where the guard goes, and why it took three attempts.** The invariant is one sentence — *a score
+that is not a measurement can never be `Passed`* — and it has now been placed wrongly twice. Both
+wrong placements are recorded, because the second one was this document's own fix for the first.
 
-    /// <summary>The only sanctioned way to build a not-applicable score. See the analyzer note below.</summary>
-    public static EvalScore NotApplicable() =>
-        new(0.0, null, "inapplicable", false, null, "none", null) { Measurement = MeasurementState.NotApplicable };
-}
-```
+**Attempt 1 (the draft, and the meta lane): a throwing initializer on `Measurement` itself.**
+Refuted twice over, and both refutations are decisive:
 
-**The guard does NOT go here.** The draft (and the meta lane) put a throwing initializer on
-`Measurement` itself. That was refuted twice over and both refutations are decisive:
-
-1. **It does not compile.** `Value`/`Threshold`/`Confidence` can self-validate because they are
-   *positional parameters* — the initializer reads the primary-constructor parameter.
-   `Measurement` is not a parameter, so `Measurement is …` inside its own initializer is CS0236.
+1. **It does not compile.** `Value`/`Threshold`/`Confidence` could self-validate in an initializer
+   because they are *positional parameters* — the initializer reads the primary-constructor
+   parameter. `Measurement` is not a parameter, so `Measurement is …` inside its own initializer is
+   **CS0236**.
 2. **Even if it compiled it could never fire.** A non-positional init-only property is set by an
    object initializer or `with`, which runs **after** the property initializer. The initializer
    would always observe `default` = `Measured`. The one invariant the entire applicability design
    rests on would have had no enforcement point.
 
-The guard goes where a fully-constructed `EvalScore` **is** a positional parameter:
+**Attempt 2 (recorded as D2's fix): move the guard to `EvalResult`'s primary constructor.**
+**Also insufficient — established by a compiled probe at ratification, and this is the correction
+being folded in.** Two independent failures:
+
+1. **A `with` clone skips it.** `EvalResult.Score`'s *initializer* runs on the constructor path only.
+   `result with { Score = someNotApplicableScoreThatClaimsPassed }` invokes the **init accessor**,
+   and an auto-property's accessor validates nothing. This is bit-for-bit the shape of **AE-01**
+   (`AssertionResult.Passed`) and **AE-08** (`EvalScore.Value`) — both already found and fixed in
+   this repo, both by the same reasoning, and the guard was written a third time in the form both
+   fixes exist to forbid.
+2. **It is on the wrong type.** The invariant's two operands, `Measurement` and `Passed`, both live
+   on `EvalScore`. `EvalScore` is public and is read directly by all five aggregation strategies;
+   guarding at `EvalResult` leaves every un-wrapped `EvalScore` unguarded and makes "was it wrapped
+   yet?" load-bearing.
+
+**Attempt 3, and the one to implement: a private backing field plus a validating `init` accessor on
+each operand.** This is the pattern the repo has shipped **twice**; copy it, do not invent a third:
+
+- `src/AgentEval.Abstractions/Output/AssertionResult.cs` — `Passed` declared explicitly with
+  `private readonly bool _passed` and a validating `init`, so a `with { Passed = true }` copy of an
+  `Inconclusive` result is refused (AE-01).
+- `src/AgentEval.Abstractions/Evals/EvalScore.cs` — `Value` / `Threshold` / `Confidence` on
+  `private readonly` fields with validating `init` accessors, so `with { Value = double.NaN }` is
+  refused (AE-08).
+
+Mirror their tests too: `tests/AgentEval.Tests/Assertions/AssertionResultWithExpressionTests.cs`
+and `tests/AgentEval.Tests/Evals/EvalScoreWithExpressionTests.cs`.
 
 ```csharp
-// src/AgentEval.Abstractions/Evals/EvalResult.cs
-public EvalScore Score { get; init; } =
-    Score.Measurement is not MeasurementState.Measured && Score.Passed
-        ? throw new ArgumentException(
-            "A non-measured score cannot be Passed. The case had nothing to fire against; " +
-            "undecidable is not a pass.", nameof(Score))
-        : Score;
+// src/AgentEval.Abstractions/Evals/EvalScore.cs
+// The 7 positional parameters are UNTOUCHED. Passed is REDECLARED (it stays positional; only its
+// storage and its accessor change) because it is one of the invariant's two operands and a `with`
+// can set it from either side.
+public sealed record EvalScore(
+    double Value, int? Ordinal, string Label, bool Passed,
+    double? Threshold, string Severity, double? Confidence)
+{
+    // ── existing AE-08 fields, unchanged ────────────────────────────────────────────────────────
+    private readonly double _value = EnsureFinite(Value, nameof(Value));
+    private readonly double? _threshold = EnsureFiniteOrNull(Threshold, nameof(Threshold));
+    private readonly double? _confidence = EnsureFiniteOrNull(Confidence, nameof(Confidence));
+
+    // ── new. Declared BEFORE _passed so the ctor path reads a settled Measurement. ──────────────
+    // Measured is default(MeasurementState) = 0, so on the constructor path the pair is always
+    // (Measured, Passed) and there is nothing to validate; Measurement can only become non-Measured
+    // via an object initializer or a `with`, both of which run AFTER the field initialisers.
+    private readonly MeasurementState _measurement = MeasurementState.Measured;
+    private readonly bool _passed = Passed;
+
+    /// <summary>
+    /// Whether the eval decided and the thing held. Positional, so every existing call site and
+    /// every persisted artifact is unchanged.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to <see langword="true"/> on a copy whose <see cref="Measurement"/> is not
+    /// <see cref="MeasurementState.Measured"/>. The primary constructor cannot reach that state —
+    /// <see cref="Measurement"/> is still <c>Measured</c> while the field initialisers run — so the
+    /// constructor path assigns directly and only the copy path validates.
+    /// </exception>
+    public bool Passed
+    {
+        get => _passed;
+        init
+        {
+            EnsureDecidable(_measurement, value, nameof(Passed));
+            _passed = value;
+        }
+    }
+
+    /// <summary>
+    /// Whether this score is a real measurement. Non-positional and init-only, so positional
+    /// construction and deconstruction are unaffected and the default is <c>Measured</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to a non-measured state on a score whose <see cref="Passed"/> is
+    /// <see langword="true"/> — on an object initializer, a <c>with</c> copy, and deserialisation
+    /// alike, since all three route through this accessor.
+    /// </exception>
+    public MeasurementState Measurement
+    {
+        get => _measurement;
+        init
+        {
+            EnsureDecidable(value, _passed, nameof(Measurement));
+            _measurement = value;
+        }
+    }
+
+    /// <summary>The only sanctioned way to build a not-applicable score.</summary>
+    /// <remarks>The REASON does not live here — it goes to <c>EvalDetails.Summary</c> (and
+    /// <c>Recommendations</c>), per D13. A bare <c>n/a</c> with no reason is the blank cell the
+    /// rendering rule exists to forbid.</remarks>
+    public static EvalScore NotApplicable(string severity = "none") =>
+        new(0.0, null, "inapplicable", false, null, severity, null)
+        { Measurement = MeasurementState.NotApplicable };
+
+    // One predicate, both accessors. The guard is on the PAIR, so it cannot be satisfied by
+    // arriving at the bad state from the other side.
+    private static void EnsureDecidable(MeasurementState measurement, bool passed, string member)
+    {
+        if (measurement is not MeasurementState.Measured && passed)
+        {
+            throw new ArgumentException(
+                $"A score whose Measurement is '{measurement}' cannot be Passed. The case had " +
+                "nothing to fire against, or the instrument did not run; undecidable is not a pass. " +
+                $"Use {nameof(EvalScore)}.{nameof(NotApplicable)}(...) or EvalResult.Skipped(...).",
+                member);   // the member the caller actually assigned, so the ParamName is testable
+        }
+    }
+}
 ```
 
-Plus an architecture test banning `Measurement = MeasurementState.NotApplicable` in object
-initializers outside `EvalScore.NotApplicable()`. The same non-enforcement bug exists in the
-assertions lane's `AssertionResult.Applicability`; that lane is deferred, and this ruling travels
-with it.
+**Why this closes the hole the constructor guard left open**, spelled out because the failure is
+order-dependent and a reviewer will want to check it:
+
+- The record's compiler-generated **copy constructor copies every field first**, then the `with`
+  block's init accessors run in source order. So each accessor sees the *other* operand's copied
+  value, and **both orderings are caught**: `score with { Passed = true, Measurement = NotApplicable }`
+  throws on the second assignment, and `score with { Measurement = NotApplicable, Passed = true }`
+  throws on the second assignment too.
+- `EvalScore.NotApplicable() with { Passed = true }` — the exact bypass that defeated attempt 2 —
+  throws.
+- **Deserialisation is covered and fails closed.** `System.Text.Json` fills positional members
+  through the constructor and init-only members after, so an artifact carrying
+  `{"passed": true, "measurement": "NotApplicable"}` throws when `Measurement` is set. That is the
+  ADR-025 direction: refuse the artifact rather than load a pass that was never earned.
+- **`EvalResult` needs no guard at all.** A bad `EvalScore` is now unconstructable, so pass/fail
+  authority stops depending on whether the score happened to be wrapped yet.
+
+**All of the above was compiled and run**, not reasoned about: a 16-assertion probe on `net8.0`
+exercised every path in this subsection — both `with` orderings, the object-initializer path,
+positional deconstruction, the surviving AE-08 `NaN` guard, a legal round-trip, and the hostile
+artifact. All 16 hold. Two results worth carrying into the implementation:
+
+- **`Measurement` participates in record equality** (it is a field), so
+  `EvalScore.NotApplicable() != new EvalScore(0.0, null, "inapplicable", false, null, "none", null)`.
+  That is correct — an inapplicable score and a fabricated look-alike are different facts — but any
+  test or cache keyed on `EvalScore` equality will see new inequalities the day Slice 1 lands.
+- **The escape hatch, declared rather than discovered later.**
+  `notApplicableScore with { Measurement = MeasurementState.Measured, Passed = true }` **succeeds**.
+  It is a deliberate two-step re-declaration — the author must assert *both* "this is a real
+  measurement" *and* "it passed" in the same expression — and there is no way to forbid it without
+  making `Measurement` immutable after construction, which would break the legal
+  `NotMeasured`-on-a-timeout path. It fails in the flattering direction, so: the architecture test
+  that bans `Measurement = …` outside `EvalScore.NotApplicable()` must also flag
+  `Measurement = MeasurementState.Measured` appearing in any `with` block, and that grep is the only
+  thing standing between this hatch and someone using it to clear an inconvenient `n/a`.
+
+**Residual, declared:** the guard binds `Measurement` to `Passed`, not to `Label`. A score with
+`Label = "inapplicable"` and `Measurement = Measured` is still spellable. That asymmetry is
+deliberate — `Label` is a free string that historical artifacts round-trip through, and a second
+guard on it would reject documents that are merely old rather than wrong. The canonical mapping
+table below is normative for producers; `CountsTowardAggregate()` reads **both**, so a mislabelled
+score cannot leak into an aggregate through the label alone.
+
+An **architecture test** still bans `Measurement = MeasurementState.NotApplicable` in object
+initializers outside `EvalScore.NotApplicable()`, but it is now a style rule, not the enforcement
+point — the accessor is.
+
+The assertions lane proposed the same invariant as `AssertionResult.Applicability` and would have
+had the same non-enforcement bug. It no longer can: `AssertionResult` **shipped** in `a396c5b4` with
+the three-valued `AssertionOutcome` and the correct pattern (AE-01), and it is now the precedent this
+subsection copies rather than a lane waiting on this ruling.
 
 Canonical mapping, normative:
 
@@ -1054,13 +1276,15 @@ and it makes the neutral-tuple ruling (§4.1) non-negotiable.**
 
 ### 7.1 What the adversarial review refuted, and what was done about it
 
-Recorded so the reversals are visible rather than quietly absorbed. Fifteen findings; **eleven
-changed the design**.
+Recorded so the reversals are visible rather than quietly absorbed. Fifteen findings from the
+adversarial review, of which **eleven changed the design**; plus **D2b**, added at ratification,
+which refuted D2's own fix. Sixteen rows, twelve reversals.
 
 | # | Finding | Ruling taken |
 |---|---|---|
 | D1 | `FloorGatedCodeEval` **does not prevent the defect it exists to prevent** — `FloorDerivationContext.Input` is a full `EvalInput`, so `int k = ctx.Input.ToolCalls!.Count(...)` spells the exact Galaxus defect inside `DeriveFloor`. Worse than the convention it replaces, because a reviewer would trust it. | **CUT.** Not in any funded slice. Rebuild only with a *redacted* context (`Query`, `GroundTruth`, `Context`, `ToolDefinitions`, `ExpectedActions`, `ArmProfile` — nothing the arm produced), and only if a second consumer asks. Until then: convention + review checklist, same protection, 200 fewer lines. |
-| D2 | The `NotApplicable ⇒ !Passed` guard **does not compile** (CS0236, self-reference in a non-positional initializer) **and could never fire** (property initializers run before object initializers). | **FIXED** — guard moved to `EvalResult`'s primary constructor, plus a factory and an architecture test (§4.2). |
+| D2 | The `NotApplicable ⇒ !Passed` guard **does not compile** (CS0236, self-reference in a non-positional initializer) **and could never fire** (property initializers run before object initializers). | **FIXED, then the fix was itself refuted — see D2b.** The original ruling moved the guard to `EvalResult`'s primary constructor. **That ruling is SUPERSEDED**; the diagnosis was right and the placement was wrong. |
+| **D2b** | **D2's own fix is insufficient.** The guard on `EvalResult`'s primary constructor is an *initializer*, which runs on the constructor path only: `result with { Score = aNotApplicableScoreClaimingPassed }` invokes the init accessor and an auto-property's accessor validates nothing. It is also on the wrong type — both operands of the invariant live on `EvalScore`, which is public and read directly by all five aggregation strategies, so an un-wrapped `EvalScore` was never covered. **Found at ratification by a compiled probe**, not by review. Same class as **AE-01** (`AssertionResult.Passed`) and **AE-08** (`EvalScore.Value`): both already found and fixed in this repo by the same reasoning, and the guard was written a third time in the form both fixes exist to forbid. | **FIXED (2026-09-05)** — the guard is now a private backing field plus a validating `init` accessor on **both** `EvalScore.Passed` and `EvalScore.Measurement`, so the clone path validates too. Full code and the 16-assertion probe result in §4.2. `EvalResult` carries no guard at all. **Standing rule this makes explicit: in this repo, a record invariant enforced by a property *initializer* is not enforced. Only an `init` accessor over a backing field is.** |
 | D3 | Two verdicts in one artifact, free to disagree: the composite's `Threshold==null` path reads only severity, so an all-skipped composite is `passed:true, value:0.0` **today**. | **Slice 0 item 1** fixes the shipped bug. The bridge's competing verdict is deferred; when it lands, the harness reads the tree's verdict rather than recomputing. |
 | D4 | The non-breaking claim is false in three ways (gates on by default; `Score` exactness dead by construction; schema `additionalProperties:false`). | **ACCEPTED** — §6.2, all three named, gates deferred and defaulted off when they land. |
 | D5 | The meta layer is welded to `EvalResult`, foreclosing its only strong strategic option. | **ACCEPTED, non-negotiable** — §4.1, neutral `Observation` tuple, BCL-only. |
@@ -1090,7 +1314,14 @@ D10) are all in the deferred bucket.
 
 ### Slice 0 — bug fixes. ~1 week. Zero new public types, no ADR needed, no schema change.
 
-Each item fixes a defect that is **shipped and live**.
+> **✅ DONE — shipped in `a396c5b4` (2026-09-04 21:29), before this ADR was ratified.** All seven
+> items landed, and 0.4 landed as the **dual-target** `MicrosoftEvaluatorAdapter : IMetric, IEval`
+> that §9 Q3 recommended. The table below is retained as the acceptance record; the "fails today"
+> notes were true when written and are not any more. **The gate this slice was meant to sit behind —
+> "nothing in §8 is funded until this document is ratified" — was authored and cleared in one
+> commit.** That is recorded in §0.0 rather than dropped.
+
+Each item fixed a defect that was **shipped and live**.
 
 | # | Change | Acceptance criterion | The test that would prove it |
 |---|---|---|---|
@@ -1106,7 +1337,7 @@ Each item fixes a defect that is **shipped and live**.
 
 | # | Change | Acceptance criterion | Test |
 |---|---|---|---|
-| 1.1 | `MeasurementState` enum + `EvalScore.Measurement` init-only + `EvalScore.NotApplicable()` factory, **guard in `EvalResult`'s ctor** (§4.2) | `new EvalResult(..., Score: EvalScore.NotApplicable() with { Passed = true }, ...)` throws | `NotApplicableScore_CannotBePassed()` |
+| 1.1 | `MeasurementState` enum + `EvalScore.Measurement` init-only + `EvalScore.NotApplicable()` factory, **guard as a backing field + validating `init` accessor on both `EvalScore.Passed` and `EvalScore.Measurement`** — the AE-01/AE-08 pattern, §4.2 as folded 2026-09-05. **No guard on `EvalResult`.** | `EvalScore.NotApplicable() with { Passed = true }` throws, **and so does** `measuredPassingScore with { Measurement = MeasurementState.NotApplicable }` — the invariant is on the pair, so neither side can reach the bad state | `NotApplicableScore_CannotBePassed()` + a `…WithExpressionTests` file mirroring `EvalScoreWithExpressionTests.cs`, covering **both** `with` orderings, the object-initializer path, and a hostile `{"passed":true,"measurement":"NotApplicable"}` artifact failing deserialisation closed |
 | 1.2 | `EvalScoreExtensions.CountsTowardAggregate()`; all five aggregations route through it (fixes the `CapByWorst` asymmetry) | One predicate, five call sites | `InapplicableLeaf_DoesNotEqual_ZeroScoredLeaf()` — a composite `{0.8, 0.8, n/a}` scores **0.80**; `{0.8, 0.8, 0.0}` scores **0.533**; assert not equal |
 | 1.3 | `ObservationCensus` + the rule that no mean renders without its denominator | `0.62 (8 of 12 measured, 3 n/a, 1 not measured)`; `Census.Void` renders `VOID`, never `0.00` | `VoidAggregate_DoesNotRenderAsZero()` |
 | 1.4 | Schema **v1.1**: `score.measurement`, `label` enum gains `"inapplicable"`. **Not `chanceFloor`.** `$id` bumped; `ContentHasher` canonical converter updated | v1.1 documents validate; the release note carries the **byte-level prediction** that every historical `ScenarioResult` content hash changes at this boundary | `SchemaV1_1_AcceptsInapplicable()` + a golden-hash test pinning the new value |
