@@ -649,6 +649,16 @@ For the record, and explicitly not the comparison: on the surviving cells the pa
 smallest p this n could have reached was 0.0020, so unlike Eval 02c this comparison was **not** underpowered —
 it simply found no difference.
 
+🔴 **CORRECTION (MEASUREMENT_STATUS §23, 2026-09-05) — that paired result is also k-BLIND, and the
+direction of the confound is now known.** Robin presented exactly **k = 5 on all 24 reps**; the workflow
+presented **3–11 and never 5, on 0 of 21 scored reps** (mean k 6.875). Latent coverage is recall and
+monotone in k, so the workflow was scored on a larger slate on 16 of those 21 reps. Eval 09 pairs through
+`PairedCoverageReport.SignTest`, whose own docstring says it ignores k and names Eval 09 as the only
+remaining caller; `SignTestAtEqualK` and `GradeAtDeclaredK` — the fix Eval 02 already uses — are not
+called. **Under the equal-k rule all twelve pairs are NOT COMPARABLE, and cutting the workflow to k = 5
+can only lower its 0.701 while Robin's 0.750 does not move**, so the workflow cannot reach p &lt; 0.05 on
+this run in any outcome. Read §23 before quoting −0.049 or 0.7539.
+
 **Gates that held, and they matter:**
 
 - ✅ **GATE 2 — SPEND MEASURED.** Both arms made model calls and both reported usage. (The dry run could not

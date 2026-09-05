@@ -3179,3 +3179,274 @@ The wiring change (four `const`s became space-resolved properties) was verified 
 before any value moved: with `CalibratedThresholds.Concept` and `.RealVectors` both set to
 `PreCalibration`, all eight concept-space demo runs are byte-identical to the same runs at commit
 `2f4d8510`, after normalising the render timestamp and the wall clock.
+
+---
+
+## §23 — The single agent vs the workflow: the comparison is UNANSWERABLE, and the blocker is not n (2026-09-05)
+
+**Question put to this section:** *which is better, the single agent or the workflow?*
+**Answer: not answerable — and the thing that stops it is not sample size.** Two of the five clauses of
+Eval 09's own pre-registered rule fail, one of them (equal budget, 4.29× against a 1.50× limit) is a
+property of the two architectures rather than of the run, and a third defect — the pairing is **k-blind**
+— sits underneath both. `USD 0.00` was spent producing this section.
+
+### 23.1 First correction: a live comparison already exists
+
+The brief that opened this work said *"Demo 2's arm has only ever run on its DETERMINISTIC path in Eval
+02/09, so no live comparison exists."* **That is stale for Eval 09 and correct for Evals 02, 02b and 02c.**
+
+| eval | what the "workflow" arm is | live? |
+|---|---|---|
+| **Eval 09** | `LiveDiscoveryWorkflowArm`, `Offline = false` | ✅ **LIVE — ran 2026-09-05, 24 runs, 120 model calls** |
+| Eval 02 | `DiscoveryLoopAdapter` | ❌ deterministic, zero model calls, and says so |
+| Eval 02b | `ArmLoop = DiscoveryLoopAdapter.ArmLabel` | ❌ deterministic |
+| Eval 02c | `ArmLoop = DiscoveryLoopAdapter.ArmLabel` | ❌ deterministic |
+
+The live run is `Docs/runs/2026-09-05_18-18-07-f5874915/38-eval09-ab-comparison.log`, concept space,
+gpt-5.5, **USD 29.49 measured** — 24 live agent runs + 24 live workflow runs + 72 judge calls, 432 model
+round-trips. Its verdict is **NO WIN**, and this section is the reading of it that had not been done.
+
+### 23.2 The three-stage protocol, and why stage 3 was NOT bought
+
+* **Stage 1 — `-- 9 --dry-run` at HEAD `3ba68a9f`: exit 0.** All thirteen plumbing checks hold, including
+  the two that can fail: a degraded stage voids **its own cell and only its cell**, and a cancelled
+  attempt reaches the ledger (`workflow attempted 73 · returned 71 · cancelled 2`). The instrument is
+  intact. Nothing spent.
+* **Stage 2 / stage 3 — DECLINED, deliberately.** A paid re-run costs **USD 29.49 and ~100 minutes** and
+  **cannot change the outcome**, because clause 2 is arithmetic about the two architectures (§23.6) and
+  the primary endpoint's direction is already fixed by monotonicity (§23.4). Buying a known "NO WIN —
+  CONFOUNDED" is a purchase, not a measurement. What a re-run *would* buy is named and priced in §23.11.
+
+⚠ **This is the one place in this document where a stage of the standing protocol was skipped on
+purpose.** It is recorded as a decision, not as an omission.
+
+### 23.3 The defect underneath both clauses: the headline pairing is k-BLIND
+
+`Eval09_HypothesisComparison.cs:526-530` calls `PairedCoverageReport.SignTest`, whose own docstring
+(`PairedCoverageReport.cs:293-302`) reads:
+
+> ⚠ **This pairing ignores how many items each side presented.** … Eval 02 no longer calls it; it pairs
+> through `SignTestAtEqualK`, which refuses unequal-k pairs. **It is kept, unchanged, because Eval 09
+> still reads it** — and Eval 09's own review findings are that lane's to act on.
+
+`Eval09_HypothesisComparison.cs:812` grades with `InterestCoverageGrader.GradeWithControls`, whose own
+comment (`InterestCoverageGrader.cs:272-273`) reads:
+
+> ⚠ This is the OWN-k grading. Two scores from this method are comparable only when the two arms
+> presented the same number of items.
+
+`GradeAtDeclaredK` — the fix, written for this exact hazard on 2026-09-04, and used by Eval 02 — is not
+called. **So Eval 09 grades at each arm's own k and pairs k-blind.** Measured on the live run:
+
+| | Robin | discovery loop |
+|---|---|---|
+| reps scored | 24 | 21 (3 voided) |
+| **k presented** | **5 on all 24 reps, exactly** | 3, 4, 4, 4, 4, 6, 6, 6, 6, 6, 7, 7, 7, 7, 8, 9, 9, 9, 10, 10, 11 |
+| mean k (per-persona means) | **5.000** | **6.875** |
+| reps at k = 5 | 24 of 24 | **0 of 21** |
+
+**Not one workflow repetition presented the five items the utterance asked for.** Latent coverage is
+recall and monotone in k, so the workflow was scored on a strictly larger slate than the agent on 16 of
+21 reps and a strictly smaller one on 5. Under the equal-k rule this repository already ships, **every
+one of the twelve pairs is NOT COMPARABLE.**
+
+### 23.4 The attainable p — stated BEFORE the verdict, as §21 taught
+
+Three separate designs, three separate ceilings:
+
+| design | non-tied pairs | **smallest attainable two-sided p** | reachable? |
+|---|---|---|---|
+| as run (k-blind, n = 12) | 10 after 2 ties | **0.0020** | yes — the run was **not** underpowered |
+| at equal k = 5 (n = 8, §23.5) | ≤ 8 | **0.0078** | yes, if ≤ 2 of the 8 tie |
+| at equal k, **for the workflow to win** | — | **1.0000** | ❌ **unreachable on this run** |
+
+The last row is the result. Cutting the workflow from its own k to k = 5 can only remove served gold
+tokens, never add them (`TopK` takes a prefix in presentation order; `Grade` unions a set over that
+prefix), and Robin's number does not move at all because it was already at k = 5 on every rep. So on the
+eight personas the equal-k rule can compare, the workflow's own-k standing of **W/L/T 3/4/1
+(p = 1.0000)** is its **best case**; every flip the cut can produce goes to the agent. **The workflow
+cannot reach p < 0.05 on this run at equal k under any outcome. The agent can (0.0078, requiring a clean
+8-0 sweep).**
+
+### 23.5 Per persona — every metric that exists, with its floor
+
+Latent coverage (recall), rep-averaged. `k` is what that arm presented; `floor` is the random-draw floor
+**at that arm's own k**, which is why the workflow's floor is higher wherever it presented more.
+
+| persona | Robin k / floor / **latent** | workflow k / floor / **latent** | rubber stamp | floor arm | equal-k comparable? |
+|---|---|---|---|---|---|
+| USR-NB-01 | 5 / 0.154 / **0.667** | 9.5 / 0.279 / **0.833** | 0.333 | 0.000 | ✅ |
+| USR-MI-02 | 5 / 0.154 / **0.667** | 7 / 0.211 / **1.000** | 1.000 | 0.000 | ✅ |
+| USR-SK-03 | 5 / 0.153 / **0.833** | 6 / 0.181 / **0.667** | 0.667 | 0.000 | ✅ (1 rep voided) |
+| USR-AR-06 | 5 / 0.151 / **1.000** | 4 / 0.122 / **0.167** | 1.000 | 0.000 | ❌ under-filled 4, 4 |
+| USR-TS-07 | 5 / 0.120 / **0.833** | 6.5 / 0.152 / **0.833** | 1.000 | 0.000 | ❌ rep at k = 3 |
+| USR-JV-08 | 5 / 0.104 / **0.667** | 6.5 / 0.133 / **0.500** | 0.000 (k=2) | 0.000 | ❌ rep at k = 4 |
+| USR-LM-09 | 5 / 0.127 / **0.625** | 7.5 / 0.187 / **0.375** | 0.250 | 0.000 | ✅ |
+| USR-RB-10 | 5 / 0.151 / **1.000** | 6 / 0.180 / **1.000** | 1.000 | 0.000 | ✅ (1 rep voided) |
+| USR-PB-11 | 5 / 0.153 / **0.833** | 6 / 0.181 / **0.667** | 0.667 | 0.000 | ✅ (1 rep voided) |
+| USR-NK-12 | 5 / 0.104 / **0.375** | 5.5 / 0.113 / **0.875** | 0.250 | 0.000 | ❌ rep at k = 4 |
+| USR-MB-13 | 5 / 0.135 / **0.500** | 7.5 / 0.197 / **0.667** | 0.333 | 0.000 | ✅ |
+| USR-DF-14 | 5 / 0.151 / **1.000** | 10.5 / 0.299 / **0.833** | 0.000 | 0.000 | ✅ |
+| **MEAN** | **0.750** (floor 0.138) | **0.701** (floor 0.186) | **0.542** | **0.000** | **8 of 12** |
+
+Every cell above was re-derived from the run log's per-rep lines and **reproduces all twelve printed
+rep-means and all twelve printed rounded k values exactly**; that agreement is the only reason the
+derived rows below are quoted at all.
+
+**Excluding the four under-filled personas is close to neutral and slightly favours the workflow** — it
+removes two agent leads (AR-06, JV-08), one workflow lead (NK-12) and one tie (TS-07). Declared because
+an exclusion rule that quietly helped one side would be indistinguishable from this one.
+
+Other channels, all n = 12:
+
+| channel | Robin | workflow | rubber stamp | floor arm | chance |
+|---|---|---|---|---|---|
+| cross-persona forced choice | **0.583** (7/12) | 0.500 (6/12) | 0.333 (4/12) | 0.000 | **0.083, unsaturable** |
+| manifest coverage (n = 6) | 0.000 | 0.083 | 0.083 | 0.000 | high — regression channel only |
+| **latent minus own-k floor** (derived here) | **+0.612** | **+0.515** | +0.409 | 0.000 | — |
+| rounds taken | n/a | 3×1, 14×2, 7×3 · P(1 round) = **0.125** | 12×1 · P = **1.000** | n/a | — |
+| loop-back edge traversed | n/a | **21 of 24 runs** | 0 of 12 | n/a | — |
+| wall clock per run | **52.8 s** | **158.3 s (3.00× slower)** | 0.008 s | 0.000 s | — |
+| tokens per graded turn | **112 972** | **26 319** | 0 | 0 | — |
+| measured cost | **USD 15.61** | USD 10.91 | 0 | 0 | judge USD 2.97 |
+
+The floor-subtracted row is **derived in this section, not by the instrument.** Subtracting a
+random-draw expectation is a first-order correction for the k advantage, not a calibrated
+normalisation — but it points the same way the exact monotonicity argument does, and it roughly doubles
+the agent's raw lead (−0.049 → −0.097).
+
+### 23.6 Clause 2 is not a bad run. It is arithmetic about the two architectures.
+
+One `MeteredChatClient` sits under both arms at the raw `IChatClient` layer. **Every attempted call
+returned and reported usage — 240 / 120 / 72 attempted, 0 cancelled, 0 failed, 0 usage-less.** This is a
+measurement, not a hole.
+
+| | model calls / graded turn | prompt tok | completion tok | **tok / turn** |
+|---|---|---|---|---|
+| Robin | 240 / 24 = **10.0** | 2 629 062 | 82 258 | **112 972** |
+| discovery loop | 120 / 24 = **5.0** | 321 709 | 309 956 | **26 319** |
+
+**Ratio 4.29× against a pre-registered limit of 1.50×.** The shape is the explanation: the agent's
+prompt:completion ratio is **32:1** — a ReAct tool loop re-sending a growing context ten times — while
+the workflow's is **1.04:1**, five focused stage prompts each emitting a JSON envelope. Bringing the two
+inside 1.50× means shortening the agent's tool loop or inflating the workflow's stages, i.e. **changing
+an architecture so that the eval can compare it.** Moving `MaximumTokenRatio` after seeing 4.29× is
+tuning a control to fit a result. Neither is available.
+
+⚠ Note the direction the clause was written for, and the direction it actually fired in. Its own remark
+predicted the *workflow* would be the expensive arm. The measurement inverted that. The clause is still
+right — it now protects the workflow from being beaten by a better-funded agent — and that is the
+strongest evidence in this document that it was written before the numbers arrived.
+
+**Cost-adjusting does not rescue the comparison, and the reason is instructive.** Coverage per million
+tokens: workflow **26.63**, Robin **6.64** — the workflow is 4.01× more efficient. But the rubber-stamp
+control scores **0.542 with zero model tokens**, i.e. unbounded efficiency, and the contentless floor is
+undefined. **A cost-adjusted ranking is won by the arm with no model in it.** So efficiency is a fact to
+report, never the answer to "which is better".
+
+### 23.7 Clause 5 failed — and the eval's own printed remedy is aimed at the wrong cause
+
+The verdict panel prints: *"raise the per-call ceiling (`DiscoveryLoopOptions.ModelCallTimeout`) or fix
+the deployment's latency, and re-run",* citing 2026-09-04 evidence that 6 of 7 Demo 2 calls were
+abandoned at the 60 s ceiling. **On the 2026-09-05 run that cause did not occur:** the ledger records
+**120 attempted / 120 returned / 0 cancelled**, and the dry run proves the meter records cancellations
+when they happen. Both fallback sites fire on *content*, not on time —
+`ModelDiscoveryNodes.cs:341` (`envelope?.Interests is { Count: > 0 }` false) and `:529`
+(`verdict is null`, whose own text says *"the reviewer produced nothing parseable twice"*).
+
+**The 5 degraded stages on 3 cells were unparseable model output. Raising the timeout would have fixed
+none of them.** The remedy text is printed unconditionally from a prior run's diagnosis.
+
+### 23.8 02b and 02c cannot enter this comparison at all
+
+The brief asked for 02b constraint precision and 02c hit-rate per arm. They exist — and **the workflow
+arm in both is the deterministic `DiscoveryLoopAdapter`, zero model calls.**
+
+| | live single agent | workflow (**deterministic**) | single-shot | oracle / tag-join | floor |
+|---|---|---|---|---|---|
+| **02b precision** (n = 12) | **0.949** at mean k ≈ 1.8 | 0.053 at mean k ≈ 8.6 | 0.183 at k = 5 | 1.000 / 0.167 | **0.019** analytic, 0.020 executed |
+| **02c sku@5** (n = 13) | **0.333** | 0.077 | 0.231 | 0.077 | **0.052** analytic, 0.062 executed |
+
+Pairing either row against a live agent varies **architecture and model presence together** — the
+co-moving-operands hazard this repository names by that phrase. 02b additionally is not at equal k (1.8
+against 8.6, and its precision denominator punishes the larger k, so the confound runs the other way
+from Eval 09's). **Neither row is admissible evidence about architecture. Reported so the absence is
+visible, not so it can be read.**
+
+### 23.9 The verdict
+
+> **NOT ANSWERABLE — and not for want of n.** Three independent disqualifications stand, in this order:
+>
+> 1. **The arm labelled LIVE was not live** on 3 of 24 cells (clause 5). Those cells are voided.
+> 2. **The budgets differ by 4.29× against a 1.50× limit** (clause 2), and the gap is architectural. **No
+>    n, no number of reps and no persona corpus can move a ratio.**
+> 3. **The pairing is k-blind.** Zero of 21 workflow reps presented the agent's k. Under the equal-k rule
+>    this repository already ships, every pair is NOT COMPARABLE.
+>
+> **What can be said, exactly.** On latent coverage the **single agent leads, 0.750 to 0.701, and the
+> equal-k correction can only widen that lead** — the workflow's 0.701 is an upper bound at k = 5, the
+> agent's 0.750 is exact. At p = 0.7539 (attainable 0.0020) the lead is **not distinguishable from
+> chance**, and the workflow **cannot** reach significance at equal k on this run in any outcome. The
+> agent bought that lead with **4.29× the tokens** and returned it in **3.00× less wall clock**.
+>
+> **What is clean, well-powered and not in dispute:** both live architectures beat a contentless answer
+> on **12 of 12 personas, p = 0.0005**, and the live loop beats a reviewer that never says no
+> (W/L/T 6/2/4, mean Δ +0.160) with `P(rounds = 1) = 0.125` against the rubber stamp's 1.000 and the
+> loop-back edge traversed on 21 of 24 runs. **The second round is doing work.** That is a real result
+> about the workflow and it survives every clause above.
+>
+> **The honest shape of the answer is that "which is better" is ill-posed for these two systems as
+> shipped.** One is a recall-leader at 4.29× the cost and a third of the latency; the other is
+> 4.01× more token-efficient, auditable stage by stage, and is the only one of the two with a
+> containment structure (Eval 04). Nothing in this suite converts those into a single ordering, and the
+> arm that wins the cost-adjusted ranking has no model in it.
+
+### 23.10 Defects found in Eval 09, declared and NOT repaired
+
+Not repaired because each changes a headline eval's grading and none can be validated without the paid
+re-run §23.2 declined. Repairing a gate and then not exercising it is how a green tick stops meaning
+anything.
+
+| # | where | what |
+|---|---|---|
+| **1** | `Eval09_HypothesisComparison.cs:526-530` | pairs through **k-blind `SignTest`** where `SignTestAtEqualK` exists and `PairedCoverageReport.cs:299` names Eval 09 as the sole reason the old method is still kept |
+| **2** | `Eval09_HypothesisComparison.cs:812` | grades with `GradeWithControls` (own k) instead of `GradeAtDeclaredK(…, 5)`, so **`DeclaredK = 0`, `PrecisionAtK` is `NaN`, and the k-invariant channel is never computed.** The grader's own docstring calls reading recall alone "half the answer" |
+| **3** | verdict panel, "WHAT WOULD CHANGE THE ANSWER" | prints a **timeout remedy** for a run whose ledger shows **0 cancelled calls** (§23.7). The cause was unparseable output |
+| **4** | `eval09_hypothesis_ab.json` | the saved snapshot's `Label` field reads **"Eval 02 — Latent-Interest Coverage (paired, n = 12)"** |
+| **5** | judged criterion 4 | both live arms score **0.000** where an empty answer scores **1.000** — a criterion whose floor is above both entrants measures nothing about either |
+
+⚠ Fixing #1 and #2 together drops the recall pairing to **n = 8** (four personas under-fill the five
+slots) and would make the contentless-floor comparison — the eval's one clean result — vanish entirely,
+because a silent side is never comparable. That interaction is why the fix is a design decision and not
+a patch.
+
+### 23.11 What a real answer would require, and what it costs
+
+1. **Cut both arms to the declared k = 5 and pair through `SignTestAtEqualK` on recall AND precision@k.**
+   Both methods exist and Eval 02 already uses them. Free to write; needs a paid run to produce numbers;
+   costs the floor comparison (above).
+2. **Make the workflow's stages return parseable envelopes.** 5 fallbacks over 120 calls ≈ 4%. Not a
+   timeout fix.
+3. **Clause 2 — no legitimate route exists.** Either accept that the two systems are not comparable at
+   equal budget and report both arms *with* their budgets, or pre-register a different endpoint
+   (coverage per token) — knowing §23.6 shows a zero-token control wins it.
+4. **Cost, measured, at the observed rate (USD 5/1M in, USD 30/1M out — this repository's table,
+   reproduces all three published per-arm figures to the cent):** full re-run **USD 29.49 / ~100 min**;
+   `--quick` (1 rep, all 12 personas) **≈ USD 14.75 / ~50 min**. A `--real-vectors` live Eval 09 has
+   **never been run** and would be a genuinely new measurement — of clauses 1, 3, 4 and 5. Not of
+   clause 2.
+
+### 23.12 How to re-derive §23
+
+```
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 9 --dry-run                 # free. exit 0, 13 plumbing checks
+L="$E/Docs/runs/2026-09-05_18-18-07-f5874915/38-eval09-ab-comparison.log"
+grep -oE 'Robin \(Demo 1\) rep .* at k=[0-9]+'   "$L" | grep -oE 'k=[0-9]+' | sort | uniq -c   # 24x k=5
+grep -oE 'discovery loop \(Demo 2\) rep .* at k=[0-9]+' "$L" | grep -oE 'k=[0-9]+'             # 21 values, none 5
+sed -n '2746,3135p' "$L"                               # every panel quoted above
+```
+
+Nothing in §23 was measured by a new paid run. Every figure is either read from the 2026-09-05 log and
+its own printed panels, re-derived from that log's per-rep lines and checked against the panels it
+must reproduce, or computed in closed form from the token ledger.
