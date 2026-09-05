@@ -46,6 +46,29 @@ public sealed class HybridRetriever : IProductRetriever
     /// resolves. A floor is also a property of an embedding SPACE, so a value calibrated for
     /// <c>text-embedding-3-small</c> does not transfer to <see cref="ConceptEmbeddingSource"/> —
     /// which is why <see cref="IEmbeddingSource.SuggestedDenseScoreFloor"/> exists at all.
+    /// <para>
+    /// ⚠ <b>That per-space seam exists but is not USED: both sources return 0.28, and B-21 made the
+    /// number load-bearing on a path where it had barely bitten before.</b> Measured 2026-09-05 over
+    /// the 53 query strings the fourteen personas' interest maps actually issue, dense candidates
+    /// retrieved before the floor versus discarded by it:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>concept space — 781 kept, <b>166 cut (17.5%)</b>; 10 queries reach the dense leg with
+    ///         nothing to rank (a zero vector) and the run is reported DEGRADED for those.</item>
+    ///   <item><c>--real-vectors</c> — 626 kept, <b>646 cut (50.8%)</b>; 0 queries degraded, but
+    ///         <b>3</b> have every dense hit fall under the floor, so the dense leg contributes
+    ///         nothing for them and NOTHING reports it — the retriever is not degraded, it simply
+    ///         ranked nothing.</item>
+    /// </list>
+    /// <para>
+    /// So one un-recalibrated constant discards half the dense candidates in one space and a sixth
+    /// in the other. It is NOT re-tuned here — the calibration METHOD above is still the honest
+    /// answer, and picking a second number so the two spaces cut alike would be fitting the floor to
+    /// the output. It is written down because a threshold that quietly became the dominant filter on
+    /// a newly working path must not be discovered later. Note also what this does to Eval 03's
+    /// ARM D: "the query embedded to something non-zero" is not "the dense leg ranked something",
+    /// and on the real path those two differ for 3 of the queries.
+    /// </para>
     /// </summary>
     public const float DefaultDenseScoreFloor = 0.28f;
 

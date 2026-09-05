@@ -2187,9 +2187,13 @@ only thing that moved it, and 19.3 says how.
    declared here rather than absorbed.
 
 5. **`GLX-6001` (Cycling handlebar bag) and `GLX-6004` / `GLX-6009` (Lezyne bike lights)** reach
-   Nadia's tray on the real path — the lights for the derived signal `"Headlamps"`. Both spaces
-   handle a bare leaf-category name badly; the concept path answers `"Headlamps"` with a hiking shoe
-   and trekking poles. Not repaired here.
+   Nadia's tray on the real path — the lights for the derived signal `"Headlamps"`. Not repaired here.
+   ⚠ **CORRECTED 2026-09-05:** this item used to add "both spaces handle a bare leaf-category name
+   badly". They do not handle it the same way, and §20.9 now carries the measurement: on the real path
+   `"Headlamps"` ranks the actual Petzl headlamp `GLX-2002` **first** at cosine 0.471 and it is dropped
+   only because Nadia already owns it; the bike lights are ranks 2–3. The concept path's ranks 2–5 are
+   genuinely unrelated. Attributing the real path's card list to retrieval was an
+   artifact-vs-layer error.
 
 ### 19.8 What is still open
 
@@ -2457,10 +2461,19 @@ Three of those movements are worth naming, and they do not all point the same wa
   0 reviews) reaches Marco only on the real path; `GLX-3007` (1Zpresso, `context:whole-bean`, 0 ratings,
   0 reviews) reaches Sofia only on the real path. Both are exactly the shape of item a review-volume
   ranker cannot see. **Checked against the tag lists in `CatalogueSeed`, not inferred from a comment.**
-* **Both spaces answer a bare leaf-category name badly, and neither is repaired.** Nadia's derived
-  signal `"Headlamps"` returns a hiking shoe and trekking poles on the concept path and two Lezyne
-  *bicycle* lights on the real path. Neither is a headlamp. §19.7 item 5 said this; a second space
-  measuring it the same way is a second observation of one defect, not two.
+* **Nadia's `"Headlamps"` signal PRESENTS a hiking shoe and trekking poles on the concept path and two
+  Lezyne *bicycle* lights on the real path — but only one of those two is a retrieval failure.**
+  ⚠ **CORRECTED 2026-09-05 (adversarial re-review): this bullet, and §19.7 item 5, previously said the
+  signal "returns" those items in both spaces and that "neither is a headlamp", attributing a
+  presentation-layer effect to retrieval in a space where retrieval was right.** Measured directly
+  against the retriever: on `--real-vectors` the dense leg ranks **`GLX-2002` Petzl Actik Core headlamp
+  FIRST, cosine 0.471** — category `Outdoor & Hiking > Lighting > Headlamps`, the exactly correct
+  product — ahead of the two Lezyne lights at 0.450 / 0.429. It is absent from the cards because it is
+  Nadia's **own purchase `PUR-NB-04`**, the very purchase the `"Headlamps"` signal is derived from, and
+  the already-owned screen removes it. The concept path ranks the headlamp first too (0.858) but its
+  next four are a trekking pack, a hiking shoe, poles and a watch, so what it presents really is
+  unrelated. **One defect, in one space** — plus a shared, separate observation that a demo whose top
+  hit is always the customer's own purchase will present rank 2 and 3 whatever they are. Not repaired.
 * `GLX-5008` (a food steamer) reaching Sofia at conf 0.43 is a **Kitchen** leak into a coffee persona;
   the 0.45 floor dropped it. `GLX-6001` (a cycling handlebar bag) reaching Nadia at 0.40 is the same
   shape, also dropped. On the concept path `GLX-6001` reaches her tray at 0.48 and is **shown** —
@@ -2516,11 +2529,27 @@ travel tripod 0.72 — against 3 on the concept path, where the 16-35 mm lens is
 communicator is absent. For "multi-day trips, starts before sunrise, carried" that is the better tray,
 and it is the same judgement §19.1's probe made.
 
-**Demo 02's confidences are NOT space-dependent** — 0.54–0.69 on concept, 0.55–0.69 on real for the same
-persona. Demo 02's Ranker does not use `Demo01.Confidence`, so the §19.7 item 1 finding is a **Demo 01**
-finding, and this is the measurement that bounds it.
+**Demo 02's confidences are NOT space-dependent** — Nadia's twelve cards span **0.54–0.78** on concept
+and **0.55–0.79** on real. Demo 02's `DeterministicRanker.Confidence` is
+`(interest strength + squashed RRF score) / 2` and contains **no cosine at all**, so it cannot inherit a
+cosine's space-dependent magnitude; what little it does inherit is rank agreement between the two legs.
+That is why the §19.7 item 1 finding is a **Demo 01** finding, and this is the measurement that bounds it.
 
-### 20.11 What the sweep FOUND — four things, declared and not repaired
+> ⚠ **CORRECTED 2026-09-05 (adversarial re-review).** This paragraph first read "0.54–0.69 on concept,
+> 0.55–0.69 on real", which contradicted the paragraph immediately above it — Nadia's real primary tray
+> is *listed there* at 0.79 / 0.78 / 0.76 / 0.72, and a primary tray requires ≥ 0.70. The quoted ranges
+> had been read off the "you might also consider" tray only, with the primary tray omitted from both
+> sides. Direction of the error: it understated **both** spaces symmetrically, so the conclusion
+> ("not space-dependent") survives unchanged and only the evidence for it was wrong. Re-measured with
+> `-- 2 --offline --user USR-NB-01` in both spaces.
+
+### 20.11 What the sweep FOUND — seven things, declared and not repaired
+
+> ⚠ **Items 5–7 were added 2026-09-05 by an adversarial re-review of B-21, not by the sweep.** The sweep
+> found ONE space-dependent threshold and wrote it up as *the* one. There are **three**, and the sweep's
+> own framing — "the one regression the fix caused" — was what stopped it looking for the other two.
+> Item 7 is a control that was described as stronger than it is. All three are in the flattering
+> direction, which is the direction this project's own rule says to instrument hardest.
 
 1. **`ConfidenceBands` is space-dependent on THREE personas, not one.** §19.7 measured Nadia. Measured on
    all of them: concept 0.48–0.85, real 0.40–0.63, and **the primary tray is empty on the real path for
@@ -2547,6 +2576,57 @@ finding, and this is the measurement that bounds it.
    0.28 floor for reasons that have nothing to do with category vocabulary. Luca's `-- 2` run prints it
    in both spaces. **Wording not changed here** — changing it moves a string three evals read.
 
+5. **`Demo01.AttributionFloor` is the SECOND space-dependent threshold, and its documented evidence is
+   REFUTED on the real path.** Its XML remark recorded, as the clean end of its behaviour, that *"the
+   gaming headset scores below 0.20 against every signal of all three espresso/hiking personas … which
+   is the product the gift trap must never surface"* — measured, honestly, **in the concept space**.
+   B-21 moved that cosine into whichever space resolved, and the constant did not move with it.
+   Re-measured over the fourteen derived signals of `USR-NB-01` / `USR-MI-02` / `USR-SK-03` against
+   `GLX-4004`:
+
+   | space | range over the 14 signals | clears the 0.20 floor |
+   |---|---|---|
+   | concept | **0.000 on every one** — the authored lexicon shares no dimension with it | 0 of 14 |
+   | `--real-vectors` | 0.059 – **0.224** | **1 of 14** — Nadia's `"Headlamps"` at **0.224** |
+
+   The headset is still stopped, but by the SECOND filter alone: confidence `(0.52 + 0.224)/2 = 0.372`,
+   under `SecondaryThreshold` 0.45. **A series of two loose filters became a series of one on that
+   path.** Why the grip goes: a 24-dimension authored cosine between unrelated texts is very often
+   *exactly* 0, so 0.20 sits above the mass; a `text-embedding-3-small` cosine is not — over all 99
+   products, per-label medians are 0.144–0.209 real against 0.000–0.244 concept, and the share of the
+   catalogue clearing 0.20 for the two most specific labels goes 24/99 → 42/99 and 24/99 → 62/99. **The
+   floor sits near the median of the real-space distribution.** Declared in the constant's own remarks.
+   **Not re-tuned**, for item 1's reason.
+6. **`HybridRetriever`'s 0.28 dense floor is the THIRD, and it is the one doing the most work.** The
+   per-space seam exists (`IEmbeddingSource.SuggestedDenseScoreFloor`) and is *not used*: both sources
+   return the same 0.28, which `ConceptEmbeddingSource` already calls "an unverified assumption".
+   Measured over the 53 query strings the fourteen personas' maps actually issue:
+
+   | space | dense candidates kept | cut by the floor | queries whose dense leg ranks nothing |
+   |---|---|---|---|
+   | concept | 781 | **166 (17.5 %)** | 10 — all reported **DEGRADED** (zero vector) |
+   | `--real-vectors` | 626 | **646 (50.8 %)** | **3 — reported as NOT degraded** |
+
+   One un-recalibrated constant discards half the dense candidates in one space and a sixth in the
+   other. The last column is the sharper half: on the real path a query can embed fine, reach the dense
+   leg, and have every hit fall under the floor — and the diagnostics say `Degraded = false`, because
+   "degraded" means *the leg had nothing to run on*, not *the leg returned nothing*. **This bounds Eval
+   03's ARM D**: "0 of 50 unanswerable" means every query embeds, not that every query is ranked.
+7. **Eval 03's ARM B was described as stronger than it is — a co-derived key.** Its remark claimed the
+   arm checks "the re-rendered document hashing to a key the file actually carries" and that this is
+   "exactly the check that fails when the document template is bumped without a rebuild". The loader
+   keys each stored vector by `HashQuery(EmbeddingDocument.ForProduct(product))` rendered with **this
+   build's** template, and the arm looks it up with the same expression on the same product in the same
+   process. **Measured:** the committed asset reloaded with every vector ROTATED by one product — all 99
+   keys present, every vector describing a different product, stamp untouched — still reads **0 of 99
+   unanswerable**, while `cosine(committed[GLX-1001], rotated[GLX-1001]) = 0.6438` makes the corruption
+   plainly visible. What catches a template bump is the `documentTemplateVersion` **string**, not the
+   lookup; a change to `ForProduct` that forgets to bump `TemplateVersion` is invisible to this arm.
+   The only check on the asset's *contents* is `EmbeddingSpace`'s space-identity probe, **which runs on
+   the real-vector path only** — so on the concept default nothing verifies them at all. The arm's
+   remark and its printed description are corrected; the arm itself is unchanged, because what it does
+   report (asset present, stamps valid, vectors decodable, every catalogue id covered) is real.
+
 ### 20.12 What did NOT move — measured, not assumed
 
 * `-- 0`, the termination proof: **6 of 6 probes, byte-identical** across the two spaces. The probes run
@@ -2559,6 +2639,9 @@ finding, and this is the measurement that bounds it.
 * Luca in both demos: identical in every field, in both spaces. The abstention gate is upstream of
   retrieval, and this is the measurement of that.
 * Arm C (18 of 56, 10 of them latent-gold) and arm B (0 of 99): identical in both spaces, by design.
+  ⚠ Arm B's 0 of 99 is identical in both spaces for a weaker reason than "by design" suggests — its
+  key is co-derived and it reads 0 of 99 over a deliberately corrupted asset too. See §20.11 item 7
+  before quoting it as evidence about the vectors.
 
 ### 20.13 Still open
 
@@ -2566,7 +2649,11 @@ finding, and this is the measurement that bounds it.
    by B-21 and by this sweep. Closing it means choosing a concept dimension per phrase, which moves
    every coverage cell.
 2. **Arm D — 8 of 50 issued queries dead on the DEFAULT path.** Unchanged.
-3. **`ConfidenceBands` has one set of thresholds for two spaces** (§20.11 item 1).
+3. **THREE thresholds have one value for two spaces**, not one: `ConfidenceBands.PrimaryThreshold` /
+   `SecondaryThreshold` (§20.11 item 1), `Demo01.AttributionFloor` (item 5) and
+   `HybridRetriever.DefaultDenseScoreFloor` (item 6). They should be derived per space from one
+   held-out slice, in one pass, rather than three times by hand — that is the shape of the fix, and it
+   is the reason none of them is re-tuned individually here.
 4. **No live, model-backed figures were re-derived.** Every eval run in §20 used `--dry-run`; the agent
    column is a stub everywhere. The README's live numbers are still the pre-B-21 ones and are still
    owed a paid re-run.
@@ -2574,7 +2661,21 @@ finding, and this is the measurement that bounds it.
    it is not reproducible off the machine that made it. The old reason (it exits 1) stays refuted.
 6. **`strategy/Galaxus/Galaxus_RecommendationAgent_Design.md` §8.1 is still not updated** — gitignored,
    local-only. `strategy/Galaxus/Galaxus_Retrieval_Explained.html` **was** rewritten against §19 + §20 in
-   the same change that added this section.
+   the same change that added this section. ⚠ **`strategy/Galaxus/MASTER_PLAN.md` is stale too and was
+   NOT named here before**: its architecture row still reads *"the embedding assets do not exist —
+   `samples/Galaxus.RecommendationAgent/Data/` is absent"* and its phase table still lists generating
+   them as open subtask 2.1. Both were false from B-6 onward and B-21 then deleted one of the two
+   assets. Same lane, same gitignore, and the omission is the point: a "what is still stale" list that
+   names one local document and not its sibling reads as complete when it is not.
+7. **The asset's CONTENTS are verified on the real-vector path only.** `EmbeddingSpace`'s
+   space-identity probe is the single check that the committed vectors are the right numbers rather
+   than merely present and well-formed (§20.11 item 7), and it does not run on the concept default.
+   A cheap closure exists — pin one product's committed vector against a checked-in expected cosine,
+   or a hash of the decoded bytes — and is not done here.
+8. **Nothing meters spend outside Demo 01** (§20.11 item 3), and the amount is larger than that item
+   implies. Measured: `-- 2 --offline --user USR-NB-01 --real-vectors` issues **9 distinct live query
+   calls + 1 identity probe, 246 prompt tokens**, and prints only the space banner. Eval 03's ARM A
+   embeds 56 phrases and ARM D 50 queries live, and prints no call count at all.
 
 ### 20.14 How to re-derive §20
 

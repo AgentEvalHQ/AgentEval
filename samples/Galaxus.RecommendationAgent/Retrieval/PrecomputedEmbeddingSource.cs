@@ -61,6 +61,18 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// grows to include things this process happened to look up.
 /// </para>
 /// <para>
+/// ⚠ <b>"Once" means once per BYTE-IDENTICAL text, and the two keys in this class disagree about
+/// that.</b> The committed lookup keys on <see cref="EmbeddingDocument.HashQuery"/>, which trims,
+/// lower-cases and collapses whitespace; the memo keys on the exact ordinal string. So two texts
+/// this class's own key function calls identical are embedded TWICE. Measured 2026-09-05: a query
+/// and its upper-cased self have the same <c>HashQuery</c> key, cost two live calls, and come back
+/// at cosine <b>0.856</b> to each other — a real difference in the answer, not just in the bill.
+/// The asymmetry is safe in the direction that matters (nothing is served a vector computed from
+/// different text) and it is the cheap way round; it is written down because "one text, one call"
+/// is otherwise read as stronger than it is. Callers that compose a query should not rely on case
+/// or spacing being normalised away for them.
+/// </para>
+/// <para>
 /// <b>Still not the key-free default.</b> This path needs credentials, so
 /// <see cref="ConceptEmbeddingSource"/> remains what <see cref="EmbeddingSpace"/> resolves to when
 /// none are present — and, per <see cref="EmbeddingSpace.AutoPrefers"/>, what it prefers even when

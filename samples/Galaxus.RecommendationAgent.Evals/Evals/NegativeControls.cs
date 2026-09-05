@@ -1102,7 +1102,10 @@ public static class NegativeControls
           + "the arm's low score is then a property of the corpus rather than of the arm. ARM B (the committed "
           + "text-embedding-3-small INDEX, no key, no live path): every product document must be answerable "
           + "straight from the asset. A product the asset cannot answer for is a product the dense leg cannot "
-          + "rank, and it is what a template bump without a rebuild looks like. Since B-21 this arm's denominator "
+          + "rank, which is what a catalogue grown without a rebuild looks like. ⚠ Its key is CO-DERIVED — the "
+          + "loader and this arm both render the document with THIS build's template — so it can see an ABSENT "
+          + "or unparseable vector and cannot see a WRONG one: measured against an asset with every vector "
+          + "rotated by one product it still read 0 of 99. Since B-21 this arm's denominator "
           + "is the CATALOGUE, not the phrase list — the query-vector asset it used to count against is deleted. "
           + "ARM C (the concept space, measured directly): the space --concept-vectors forces "
           + "and every asset-load failure falls back to, reported whether or not this run used it. ARM D is the "
@@ -1221,10 +1224,39 @@ public static class NegativeControls
     /// <para>
     /// So the arm now measures the surviving, and load-bearing, half: the INDEX. Every product's
     /// embedding document must be answerable straight from the committed asset, with no live path
-    /// attached. That is the non-vacuous asset check — stamp validity, dimensional agreement, and
-    /// the re-rendered document hashing to a key the file actually carries — and it is exactly the
-    /// check that fails when the document template is bumped without a rebuild. Its denominator is
-    /// the CATALOGUE, not the phrase list.
+    /// attached. Its denominator is the CATALOGUE, not the phrase list.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>What this arm CANNOT see, stated because the first version of this remark claimed the
+    /// opposite.</b> It said the arm checks "the re-rendered document hashing to a key the file
+    /// actually carries", and called that "exactly the check that fails when the document template
+    /// is bumped without a rebuild". Neither is true, and the reason is the gate-self-examination
+    /// rule this project keeps: <see cref="PrecomputedEmbeddingSource"/>'s loader keys each stored
+    /// vector by <c>HashQuery(EmbeddingDocument.ForProduct(product))</c> rendered with THIS build's
+    /// template, and this arm then looks the vector up with the same expression on the same product
+    /// in the same process. The key is CO-DERIVED, so the lookup cannot fail on the vector's
+    /// content and cannot fail on a template change either. What actually catches a template bump
+    /// is the <c>documentTemplateVersion</c> STRING comparison at load — a declared version, not a
+    /// render — so a change to <see cref="EmbeddingDocument.ForProduct"/> that forgets to bump
+    /// <see cref="EmbeddingDocument.TemplateVersion"/> leaves this arm reading 0 of 99 over vectors
+    /// that describe text no longer produced anywhere.
+    /// </para>
+    /// <para>
+    /// <b>MEASURED 2026-09-05, rather than reasoned about.</b> The committed asset was reloaded with
+    /// every vector ROTATED by one product — all 99 keys still present, every vector describing a
+    /// different product, the stamp untouched. This arm read <b>0 of 99 unanswerable</b>. The
+    /// corruption is plainly visible: the cosine between <c>GLX-1001</c>'s committed vector and the
+    /// rotated file's vector for <c>GLX-1001</c> is <b>0.6438</b>. It is visible to
+    /// <see cref="EmbeddingSpace"/>'s space-identity probe, which re-embeds a product document LIVE
+    /// and would fail its 0.98 floor — and that probe runs only on the real-vector path, so on the
+    /// concept default nothing checks the asset's contents at all.
+    /// </para>
+    /// <para>
+    /// <b>So what the arm genuinely reports</b> is narrower and still worth having: the asset exists
+    /// and parses; its model, dimensions, keying and template stamps validate; every vector decodes
+    /// to the right length; and every catalogue product id is PRESENT in it — which is what fails
+    /// when the catalogue grows without a rebuild, and what read 99 of 99 dead before B-6 committed
+    /// an asset at all. It says nothing about whether the numbers in it are the right numbers.
     /// </para>
     /// <para>
     /// It deliberately still attaches no live source: this arm reports on the ASSET, so it must

@@ -78,6 +78,40 @@ public static class Demo01_RecommendationAgent
     /// — its confidence lands at 0.39, under <see cref="ConfidenceBands.SecondaryThreshold"/>, and
     /// it is dropped. Two loose filters in series, both stated; neither is a measured probability.
     /// </para>
+    /// <para>
+    /// ⚠ <b>SPACE-DEPENDENT, and the paragraph above was measured in ONE space — re-measured
+    /// 2026-09-05 (B-21).</b> Half of <see cref="AttributeSignalAsync"/>'s match is a cosine, and
+    /// B-21 moved that cosine onto whichever space <see cref="EmbeddingSpace"/> resolved. This
+    /// constant did not move with it, and <see cref="ConfidenceBands"/> carries the same warning for
+    /// the same reason — it was added there and not here, which is the omission this paragraph
+    /// closes.
+    /// </para>
+    /// <para>
+    /// <b>The headline rejection above is REFUTED on the real-vector path.</b> The gaming headset
+    /// <c>GLX-4004</c>, embedded against the fourteen derived signals of the three espresso/hiking
+    /// personas: on the concept path every one of the fourteen scores <b>exactly 0.000</b> — the
+    /// authored lexicon gives it no shared dimension at all. On <c>--real-vectors</c> the fourteen
+    /// run 0.059–0.224, and <b>one of them CLEARS this floor</b>: Nadia's <c>"Headlamps"</c> signal
+    /// at <b>0.224</b>. The product the gift trap must never surface is attributable there.
+    /// It is still stopped, but by the SECOND filter only — confidence
+    /// <c>(0.52 + 0.224) / 2 = 0.372</c> is under <see cref="ConfidenceBands.SecondaryThreshold"/> —
+    /// so a series of two loose filters became a series of one on that path.
+    /// </para>
+    /// <para>
+    /// <b>Why the floor loses its grip there.</b> A 24-dimension authored cosine between unrelated
+    /// texts is very often EXACTLY zero, so 0.20 sits far above the mass of the distribution. A
+    /// <c>text-embedding-3-small</c> cosine between two arbitrary catalogue texts is not: measured
+    /// over all 99 products for five real signal labels, the per-label medians are 0.144–0.209 on
+    /// the real path against 0.000–0.244 on the concept path, and the fraction of the catalogue
+    /// clearing 0.20 for the two most specific labels goes 24/99 → 42/99 and 24/99 → 62/99.
+    /// The floor sits near the MEDIAN of the real-space distribution.
+    /// </para>
+    /// <para>
+    /// <b>NOT re-tuned</b>, for the reason <see cref="ConfidenceBands"/> gives: a second number
+    /// chosen so the real path rejects what the concept path rejected is fitting the threshold to
+    /// the output. What is owed is a per-space floor DERIVED from a held-out slice, listed beside
+    /// the confidence bands in <c>MEASUREMENT_STATUS.md</c> §20.11.
+    /// </para>
     /// </remarks>
     public const double AttributionFloor = 0.20;
 
