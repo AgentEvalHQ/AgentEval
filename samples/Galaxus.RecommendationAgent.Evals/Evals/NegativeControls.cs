@@ -97,6 +97,7 @@ public static class NegativeControls
         rows.Add(CheckPreRegisteredRuleReachability());
         rows.Add(CheckOwnKRereadAtVaryingK());
         rows.Add(CheckEval09RuleAndRemedy());
+        rows.Add(CheckJudgeEchoJoins());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -2090,6 +2091,127 @@ public static class NegativeControls
                 + $"11/1/0 p=0.0063 → WorkflowWins · remedy at 120/120/0 names parsing and NOT the timeout, at 7/1/6 "
                 + $"names the timeout, and the two texts differ · cutting 8 → {CoverageArms.DeclaredK} moved recall "
                 + $"{atEight:F3} → {atFive:F3} (never up)"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 14 — the judge's echo must join, and a real invention must still not. ═════
+
+    /// <summary>
+    /// Proves Eval 05's criterion join survives the form the evaluator itself renders criteria in,
+    /// and that it has not become promiscuous in the process.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What actually happened on 2026-09-05.</b>
+    /// <c>src/AgentEval.Core/Core/ChatClientEvaluator.cs:46</c> prints the rubric as
+    /// <c>$"{i + 1}. {c}"</c>. The judge echoed each criterion back with that ordinal attached, and
+    /// <c>Reconcile</c> compared it against the UNPREFIXED declared text — so the exact match, the
+    /// normalised match and the 48-character prefix match all failed on a three-character offset.
+    /// Every declared criterion lost its verdict, every returned criterion became "a criterion
+    /// nobody declared", and three cells scored 0.0/100 as an artefact. USR-NB-01's SEPARATION
+    /// failure is downstream of it. <b>The judge did not invent a rubric; we did not recognise our
+    /// own text.</b>
+    /// </para>
+    /// <para>
+    /// <b>Both directions, because a looser matcher is the obvious wrong fix.</b> The echo must
+    /// join; a criterion that really is different must still be refused; and the join must not be
+    /// positional — the same criteria returned in reverse order must land on their own axes, not
+    /// on their neighbours'.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckJudgeEchoJoins()
+    {
+        var problems = new List<string>();
+        var rubric = Eval05_RecommendationQuality.Criteria.Discovery;
+
+        // Exactly what ChatClientEvaluator renders, and therefore exactly what a faithful judge
+        // echoes. Derived from the renderer's own expression, not transcribed from a log.
+        static IReadOnlyList<CriterionResult> AsRendered(
+            IReadOnlyList<Eval05_RecommendationQuality.WeightedCriterion> rubric, bool reversed = false) =>
+        [
+            .. (reversed ? rubric.Reverse() : rubric)
+                .Select(w => (Index: rubric.ToList().FindIndex(x => x.Criterion.Key == w.Criterion.Key), w.Criterion))
+                .Select(x => new CriterionResult
+                {
+                    Criterion = $"{x.Index + 1}. {x.Criterion.Text}",
+                    Met = true,
+                    Explanation = $"echoed for {x.Criterion.Key}",
+                })
+        ];
+
+        // ── 1. The echo joins, and every declared criterion gets ITS OWN verdict. ──
+        var (judged, extra) = Eval05_RecommendationQuality.Reconcile(rubric, AsRendered(rubric));
+
+        int noVerdict = judged.Count(j => j.Met is null);
+        if (noVerdict > 0)
+            problems.Add($"{noVerdict} of {rubric.Count} declared criteria got NO verdict from a judge that echoed the rubric exactly as ChatClientEvaluator rendered it ('1. …'). That is the 2026-09-05 defect: 24 lost verdicts over 3 cells.");
+        if (extra.Count > 0)
+            problems.Add($"{extra.Count} echoed criterion(s) were reported as UNDECLARED although each is one of the {rubric.Count} declared ones with the evaluator's own ordinal in front of it.");
+        foreach (var j in judged.Where(j => j.Met is not null))
+        {
+            if (!j.Explanation.Contains(j.Criterion.Key, StringComparison.Ordinal))
+                problems.Add($"'{j.Criterion.Key}' was joined to the verdict for a DIFFERENT criterion ({j.Explanation}).");
+        }
+
+        // ── 2. …and it is not positional. Same criteria, reverse order, same answers. ──
+        var (reversedJudged, reversedExtra) = Eval05_RecommendationQuality.Reconcile(rubric, AsRendered(rubric, reversed: true));
+        if (reversedJudged.Count(j => j.Met is null) > 0 || reversedExtra.Count > 0)
+            problems.Add("the same criteria returned in REVERSE order no longer join — the matcher depends on order.");
+        foreach (var j in reversedJudged.Where(j => j.Met is not null))
+        {
+            if (!j.Explanation.Contains(j.Criterion.Key, StringComparison.Ordinal))
+                problems.Add($"in reverse order '{j.Criterion.Key}' picked up another criterion's verdict ({j.Explanation}) — the join is POSITIONAL.");
+        }
+
+        // ── 3. A genuine invention must STILL be refused, and diagnosed as one. ──
+        var invented = Eval05_RecommendationQuality.Reconcile(rubric,
+        [
+            new CriterionResult { Criterion = "1. The answer is written in iambic pentameter.", Met = true, Explanation = "invented" },
+        ]);
+        if (invented.Extra.Count != 1)
+            problems.Add($"a criterion nobody declared was ACCEPTED ({invented.Extra.Count} refused, expected 1) — the ordinal fix made the matcher promiscuous.");
+        else if (invented.Extra[0].LooksLikeAJoinFailure)
+            problems.Add($"an invented criterion was diagnosed as a JOIN FAILURE ({invented.Extra[0].Diagnosis}) — the two faults are being merged again.");
+        if (invented.Judged.Count(j => j.Met is null) != rubric.Count)
+            problems.Add("an invented criterion silently supplied a verdict for a declared one.");
+
+        // ── 4. And the diagnosis points the right way on the real case. ──
+        var echoDiagnosis = Eval05_RecommendationQuality.Diagnose(
+            $"1. {rubric[0].Criterion.Text}", rubric);
+        if (!echoDiagnosis.LooksLikeAJoinFailure)
+            problems.Add($"an echoed criterion is diagnosed as INVENTED ({echoDiagnosis.Diagnosis}) — the report would blame the judge for our matcher.");
+        if (!string.Equals(echoDiagnosis.NearestKey, rubric[0].Criterion.Key, StringComparison.Ordinal))
+            problems.Add($"the echo's nearest declared criterion is '{echoDiagnosis.NearestKey}', not '{rubric[0].Criterion.Key}'.");
+
+        // ── 5. The enumeration stripper must not eat real words. ──
+        foreach (var (input, expected, why) in new[]
+                 {
+                     ("no sentence states a price", "no sentence states a price", "a two-letter word followed by a space is not a label"),
+                     ("it asks at least one question", "it asks at least one question", "a word is not an ordinal"),
+                     ("1. every recommendation", "every recommendation", "an ordinal IS an ordinal"),
+                     ("- every recommendation", "every recommendation", "a bullet is a bullet"),
+                     ("criterion 1 is met", "criterion 1 is met", "a long leading word is never a label"),
+                 })
+        {
+            string got = Eval05_RecommendationQuality.StripEnumeration(input);
+            if (!string.Equals(got, expected, StringComparison.Ordinal))
+                problems.Add($"StripEnumeration(\"{input}\") = \"{got}\", expected \"{expected}\" — {why}.");
+        }
+
+        return new ControlRowSnapshot(
+            "JudgeEchoJoinsToDeclaredRubric",
+            "ChatClientEvaluator.cs:46 renders the rubric as \"1. <text>\", so a judge that echoes faithfully returns "
+          + "the ordinal too. Eval 05's join must recognise that as OUR criterion — on 2026-09-05 it did not, and 24 "
+          + "verdicts over 3 cells were discarded as 'criteria nobody declared', scoring those cells 0.0/100 as an "
+          + "artefact. The join must also stay strict: a genuinely different criterion is still refused and diagnosed "
+          + "as INVENTED rather than as a join failure, the match is by TEXT and never by position, and the ordinal "
+          + "stripper never eats a real leading word.",
+            problems.Count == 0
+                ? $"all {rubric.Count} echoed criteria join and carry their OWN verdicts · the same set in reverse "
+                + "order joins identically (not positional) · an invented criterion is still refused and diagnosed "
+                + $"INVENTED · an echo is diagnosed JOIN FAILURE against '{echoDiagnosis.NearestKey}' "
+                + $"({echoDiagnosis.OverlapChars} shared chars) · 5 of 5 stripper cases behave"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

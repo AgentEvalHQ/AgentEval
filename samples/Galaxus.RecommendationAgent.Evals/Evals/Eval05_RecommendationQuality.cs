@@ -316,6 +316,53 @@ public static class Eval05_RecommendationQuality
     //  Results
     // ══════════════════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// A criterion the judge returned that could not be joined to any declared axis — with the
+    /// evidence a reader needs to tell WHOSE fault that is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two very different things used to print as one line.</b> A judge that graded an entirely
+    /// different rubric is a grading fault on the judge's side. A judge that echoed OUR criterion
+    /// back in a surface form our matcher did not recognise is a join fault on OUR side, and the
+    /// grades it produced are perfectly good ones we threw away. MEASURED on 2026-09-05: all 24
+    /// "criteria nobody declared" across 3 cells were the second kind, and the eval reported them
+    /// as the first.
+    /// </para>
+    /// <para>
+    /// <see cref="OverlapChars"/> is how many leading characters the returned text shares with the
+    /// nearest declared criterion after normalisation. Long overlap and no match means the join
+    /// broke; near-zero overlap means the judge really did answer something else.
+    /// </para>
+    /// </remarks>
+    /// <param name="Returned">The criterion string the judge sent back, verbatim.</param>
+    /// <param name="NearestKey">The declared criterion it most resembles, or null when it resembles none.</param>
+    /// <param name="OverlapChars">Leading characters shared with that criterion, after normalisation.</param>
+    public sealed record UnjoinedCriterion(string Returned, string? NearestKey, int OverlapChars)
+    {
+        /// <summary>
+        /// True when the returned text substantially IS a declared criterion that the matcher
+        /// failed to join — our defect, not the judge's.
+        /// </summary>
+        public bool LooksLikeAJoinFailure => OverlapChars >= JoinFailureOverlapChars;
+
+        /// <summary>How this row should be read, in one phrase.</summary>
+        public string Diagnosis =>
+            LooksLikeAJoinFailure
+                ? $"JOIN FAILURE on our side — {OverlapChars} leading chars are shared with the declared "
+                + $"'{NearestKey}' criterion, so the judge answered OUR rubric and the matcher did not recognise it"
+                : NearestKey is null
+                    ? "INVENTED — it shares no leading text with any declared criterion"
+                    : $"INVENTED — its nearest declared criterion ('{NearestKey}') shares only {OverlapChars} leading char(s)";
+    }
+
+    /// <summary>
+    /// How many shared leading characters make an unjoined criterion a JOIN failure rather than an
+    /// invention. Well under <see cref="PrefixMatchLength"/>, so anything the matcher itself would
+    /// have accepted is far above it.
+    /// </summary>
+    public const int JoinFailureOverlapChars = 16;
+
     /// <summary>One judged criterion after the declared set has been reconciled with what came back.</summary>
     /// <param name="Criterion">The declared axis.</param>
     /// <param name="Weight">Its weight in this case's rubric.</param>
@@ -329,7 +376,7 @@ public static class Eval05_RecommendationQuality
     /// <param name="Presentations">How many <c>PresentRecommendation</c> calls the turn made.</param>
     /// <param name="EvidenceResolved">How many of those carried a citation that resolves against the catalogue.</param>
     /// <param name="Judged">Per-criterion verdicts, in declared order.</param>
-    /// <param name="ExtraCriteria">Criteria the judge returned that were never declared.</param>
+    /// <param name="ExtraCriteria">Criteria the judge returned that could not be joined, each with its diagnosis.</param>
     /// <param name="HolisticScore">The harness's own <c>overallScore</c>. Reported for contrast, never used.</param>
     /// <param name="Summary">The judge's summary sentence.</param>
     /// <param name="DurationMs">Wall time of the turn.</param>
@@ -343,7 +390,7 @@ public static class Eval05_RecommendationQuality
         int Presentations,
         int EvidenceResolved,
         IReadOnlyList<JudgedCriterion> Judged,
-        IReadOnlyList<string> ExtraCriteria,
+        IReadOnlyList<UnjoinedCriterion> ExtraCriteria,
         int HolisticScore,
         string Summary,
         double DurationMs,
@@ -590,7 +637,7 @@ public static class Eval05_RecommendationQuality
     /// </remarks>
     /// <param name="rubric">The declared axes and weights.</param>
     /// <param name="returned">What the judge sent back. Null is treated as empty.</param>
-    public static (IReadOnlyList<JudgedCriterion> Judged, IReadOnlyList<string> Extra) Reconcile(
+    public static (IReadOnlyList<JudgedCriterion> Judged, IReadOnlyList<UnjoinedCriterion> Extra) Reconcile(
         IReadOnlyList<WeightedCriterion> rubric,
         IReadOnlyList<CriterionResult>? returned)
     {
@@ -620,7 +667,37 @@ public static class Eval05_RecommendationQuality
             judged.Add(new JudgedCriterion(declared.Criterion, declared.Weight, match.Met, match.Explanation));
         }
 
-        return (judged, [.. pool.Select(c => c.Criterion)]);
+        return (judged, [.. pool.Select(c => Diagnose(c.Criterion, rubric))]);
+    }
+
+    /// <summary>
+    /// Says which declared criterion an unjoined string most resembles, and by how much — so a
+    /// broken join is never printed as a judge that invented a rubric.
+    /// </summary>
+    /// <param name="returned">The criterion string the judge sent back.</param>
+    /// <param name="rubric">The declared axes.</param>
+    public static UnjoinedCriterion Diagnose(string? returned, IReadOnlyList<WeightedCriterion> rubric)
+    {
+        ArgumentNullException.ThrowIfNull(rubric);
+
+        // Normalise already un-renders the ordinal; stripping twice would eat real text.
+        string text = returned ?? "";
+        string mine = Normalise(text);
+
+        string? nearest = null;
+        int best = 0;
+
+        foreach (WeightedCriterion declared in rubric)
+        {
+            string theirs = Normalise(declared.Criterion.Text);
+            int shared = 0;
+            int limit = Math.Min(mine.Length, theirs.Length);
+            while (shared < limit && mine[shared] == theirs[shared]) shared++;
+
+            if (shared > best) { best = shared; nearest = declared.Criterion.Key; }
+        }
+
+        return new UnjoinedCriterion(text, nearest, best);
     }
 
     private const int PrefixMatchLength = 48;
@@ -632,10 +709,69 @@ public static class Eval05_RecommendationQuality
             && string.Equals(a[..length], b[..length], StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Whitespace-normalises and lower-cases, then removes ONE leading enumeration marker.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>THIS IS UN-RENDERING OUR OWN PROMPT, NOT GUESSING.</b>
+    /// <c>src/AgentEval.Core/Core/ChatClientEvaluator.cs:46</c> builds the criteria block as
+    /// <c>string.Join("\n", criteria.Select((c, i) =&gt; $"{i + 1}. {c}"))</c> — it prepends the
+    /// ordinal itself. A judge that echoes back exactly what it was shown returns
+    /// <c>"1. Every recommendation is tied to…"</c> where the rubric holds
+    /// <c>"Every recommendation is tied to…"</c>, and a three-character offset defeats the exact
+    /// match, the normalised match and the 48-character prefix match alike.
+    /// </para>
+    /// <para>
+    /// <b>MEASURED, 2026-09-05 run, <c>34-eval05-quality-judged.log</c>:</b> 24 lines reading "the
+    /// judge returned a criterion nobody declared", on 3 of 10 judged cells — every one of them one
+    /// of this eval's own five Discovery criteria carrying the ordinal the evaluator printed. The
+    /// judge did not invent a rubric. It answered ours and we failed to recognise our own text.
+    /// USR-NB-01's SEPARATION failure is downstream of exactly this.
+    /// </para>
+    /// <para>
+    /// <b>Deliberately narrow.</b> ONE marker, only at the start, only the forms a list renderer
+    /// produces: <c>1.</c> <c>1)</c> <c>(1)</c> <c>a.</c> <c>-</c> <c>*</c> <c>•</c> <c>#1</c>.
+    /// Everything after it is matched as TEXT, exactly as before. Nothing here matches by position,
+    /// and a criterion that is genuinely different stays unjoined and is reported as such — see
+    /// <see cref="Diagnose"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="normalised">Text that has already been through <c>Normalise</c>.</param>
+    public static string StripEnumeration(string normalised)
+    {
+        ArgumentNullException.ThrowIfNull(normalised);
+
+        int i = 0;
+        if (i < normalised.Length && (normalised[i] == '(' || normalised[i] == '#')) i++;
+
+        int labelStart = i;
+        while (i < normalised.Length && (char.IsAsciiDigit(normalised[i]) || char.IsAsciiLetterLower(normalised[i]))) i++;
+        int labelLength = i - labelStart;
+
+        // A bullet: no label at all, just the mark.
+        if (labelLength == 0 && labelStart == 0 && normalised.Length > 1
+            && (normalised[0] == '-' || normalised[0] == '*' || normalised[0] == '•')
+            && normalised[1] == ' ')
+        {
+            return normalised[2..];
+        }
+
+        // A label has to be SHORT — "1", "12", "a", "iv". Anything longer is a word, and stripping
+        // a word is how a normaliser starts inventing matches.
+        if (labelLength is < 1 or > 3) return normalised;
+
+        while (i < normalised.Length && (normalised[i] == '.' || normalised[i] == ')' || normalised[i] == ':' || normalised[i] == '-')) i++;
+        if (i == labelStart + labelLength) return normalised;      // no separator: not an enumeration
+        while (i < normalised.Length && normalised[i] == ' ') i++;
+
+        return i >= normalised.Length ? normalised : normalised[i..];
+    }
+
     private static string Normalise(string? text) =>
         text is null
             ? string.Empty
-            : string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+            : StripEnumeration(string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant());
 
     // ══════════════════════════════════════════════════════════════════════════════════════
     //  The answer packet
@@ -996,11 +1132,35 @@ public static class Eval05_RecommendationQuality
           + $"≤{AbstentionMaximumPresentations} on the thin-signal persona. Chance floor 0.0000: no constant policy "
           + "passes both halves.");
 
+        // ⚠ The two ways this gate can fail are counted SEPARATELY, because they are two different
+        //   faults with two different owners and they were printing as one line. A judge that
+        //   answered a different rubric is the judge's fault; a judge that echoed OUR criterion in
+        //   a surface form the matcher did not recognise is OURS, and the grades it returned were
+        //   good ones we discarded. MEASURED 2026-09-05: 24 of 24 were the second kind.
+        var allRows = agentRows.Concat(controlRows).ToList();
+        var unjoined = allRows.SelectMany(r => r.ExtraCriteria).ToList();
+        int joinFailures = unjoined.Count(u => u.LooksLikeAJoinFailure);
+        int invented = unjoined.Count - joinFailures;
+        int missingVerdicts = allRows.Sum(r => r.Judged.Count(j => j.Met is null));
+
         Line(instrument,
             $"INSTRUMENT HEALTH: every declared criterion came back with a verdict on all "
-          + $"{agentRows.Count + controlRows.Count} judged cases, none was invented, and no turn threw. "
+          + $"{allRows.Count} judged cases, none was invented, and no turn threw. "
+          + $"Observed: {missingVerdicts} declared criterion(s) with NO verdict · {invented} INVENTED criterion(s) "
+          + $"(the judge answered something we did not ask) · {joinFailures} JOIN FAILURE(s) (the judge answered "
+          + "OUR criterion and the matcher did not recognise it — our defect, and the verdicts it returned were "
+          + "thrown away). "
           + $"(MAFEvaluationHarness discards EvaluationResult.EvaluationFailed, so a parse failure arrives as "
           + $"score 50 with an empty criteria list — detected here as missing verdicts, never read as a grade.)");
+
+        if (joinFailures > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"       ⚠ {joinFailures} of those {unjoined.Count} unjoined criterion(s) are OURS, not the judge's. "
+                            + "Fix the join before reading a single 0.0/100 on this run as a grade — a weighted score "
+                            + "whose criteria were dropped by the matcher is an artefact of the matcher.");
+            Console.ResetColor();
+        }
 
         Line(separation,
             $"SEPARATION: the agent scores strictly above the popularity control on "
@@ -1138,6 +1298,20 @@ public static class Eval05_RecommendationQuality
           + "thin-signal persona presented nothing.");
         Line(clean, "no case threw and no declared criterion came back without a verdict.");
 
+        // 5 — and BOTH surface forms of the echo were actually joined. A check that only ever sees
+        //     one form certifies one form. The stub answered half the cells with the evaluator's
+        //     own ordinal in front of the criterion — the form the 2026-09-05 live judge used and
+        //     the form that broke the join — and half with the bare text.
+        bool bothFormsEchoed = judge.OrdinalEchoes > 0 && judge.BareEchoes > 0;
+        Line(bothFormsEchoed,
+            bothFormsEchoed
+                ? $"the criterion join was exercised in BOTH surface forms: {judge.OrdinalEchoes} cell(s) answered "
+                + $"with ChatClientEvaluator's own ordinal (\"1. …\", the form a real judge echoes and the form that "
+                + $"broke on 2026-09-05) and {judge.BareEchoes} with the bare text. Check 2 above holds for both."
+                : $"⚠ ONLY ONE SURFACE FORM WAS EXERCISED ({judge.OrdinalEchoes} ordinal, {judge.BareEchoes} bare). "
+                + "A stub that echoes more helpfully than a real judge makes this dry run blind to the join fault "
+                + "the paid run will hit.");
+
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine();
         Console.WriteLine("  NOT tested by a dry run: SEPARATION. The stub judge does not read the answer, so both arms");
@@ -1147,7 +1321,7 @@ public static class Eval05_RecommendationQuality
         Console.ResetColor();
         Console.WriteLine();
 
-        return criteriaSurvived && weightsJoined && bothDirections && clean;
+        return criteriaSurvived && weightsJoined && bothDirections && clean && bothFormsEchoed;
 
         static void Line(bool ok, string text)
         {
@@ -1196,9 +1370,17 @@ public static class Eval05_RecommendationQuality
           + "the run did not reach Azure.";
 
         private readonly List<IReadOnlyList<string>> _observed = [];
+        private int _ordinalEchoes;
+        private int _bareEchoes;
 
         /// <summary>The criteria lists the stub was asked about, in call order.</summary>
         public IReadOnlyList<IReadOnlyList<string>> Observed => _observed;
+
+        /// <summary>Calls answered echoing the evaluator's ordinal ("1. …") — the form a real judge uses.</summary>
+        public int OrdinalEchoes => _ordinalEchoes;
+
+        /// <summary>Calls answered echoing the bare criterion text.</summary>
+        public int BareEchoes => _bareEchoes;
 
         /// <inheritdoc/>
         public Task<ChatResponse> GetResponseAsync(
@@ -1209,15 +1391,32 @@ public static class Eval05_RecommendationQuality
             ArgumentNullException.ThrowIfNull(messages);
 
             IReadOnlyList<string> criteria = ExtractCriteria(messages);
+
+            // ⚠ THE SURFACE FORM ALTERNATES, AND THAT IS THE POINT.
+            //
+            // This stub used to echo the criterion with ChatClientEvaluator's ordinal STRIPPED —
+            // i.e. more helpfully than any real model does — so the dry run could not reach the
+            // join that broke on 2026-09-05, when a real judge echoed "1. Every recommendation…"
+            // and Eval 05 recorded all five of its own criteria as "nobody declared". A stub that
+            // behaves better than the thing it stands in for makes the free stage of the protocol
+            // blind to exactly the faults the paid stage will hit.
+            //
+            // Even calls echo the ORDINAL form the evaluator renders; odd calls echo the bare text.
+            // Both are exercised in one dry run, and the weighted-score check below fails if either
+            // stops joining. The call index is per-cell state on a per-run instance, not per-model-
+            // call state, so it cannot drift the way an earlier agent stub's parity did.
+            bool echoOrdinal = _observed.Count % 2 == 0;
             _observed.Add(criteria);
+            if (echoOrdinal) _ordinalEchoes++; else _bareEchoes++;
 
             var sb = new StringBuilder();
             sb.Append("{\"criteriaResults\":[");
             for (int i = 0; i < criteria.Count; i++)
             {
                 if (i > 0) sb.Append(',');
+                string echoed = echoOrdinal ? $"{i + 1}. {criteria[i]}" : criteria[i];
                 sb.Append(CultureInfo.InvariantCulture,
-                    $"{{\"criterion\":{Quote(criteria[i])},\"met\":{(i % 2 == 0 ? "true" : "false")},"
+                    $"{{\"criterion\":{Quote(echoed)},\"met\":{(i % 2 == 0 ? "true" : "false")},"
                   + $"\"explanation\":\"stub judge — criterion {i + 1} answered by index parity, not by reading\"}}");
             }
             sb.Append(CultureInfo.InvariantCulture,
@@ -1415,10 +1614,14 @@ public static class Eval05_RecommendationQuality
             Console.ResetColor();
         }
 
-        foreach (string extra in row.ExtraCriteria)
+        foreach (UnjoinedCriterion extra in row.ExtraCriteria)
         {
+            // ⚠ The DIAGNOSIS is printed, not just the string. "A criterion nobody declared" read
+            // as a judge that went off-script, and on the 2026-09-05 run all 24 of them were our
+            // own criteria carrying the ordinal our evaluator printed in front of them.
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"      ⚠️  the judge returned a criterion nobody declared: \"{Clip(extra, 90)}\"");
+            Console.WriteLine($"      ⚠️  UNJOINED criterion — {extra.Diagnosis}.");
+            Console.WriteLine($"          returned: \"{Clip(extra.Returned, 90)}\"");
             Console.ResetColor();
         }
 
