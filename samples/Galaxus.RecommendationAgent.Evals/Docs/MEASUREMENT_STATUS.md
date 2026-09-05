@@ -2222,3 +2222,380 @@ dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4 --real-vecto
 Every line marked SPENDS issues live embedding calls; the whole set above is well under one cent.
 To confirm the no-key path, unset `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` and run the
 `--real-vectors` line: it must print the concept-space fallback **and its reason**.
+
+---
+
+## §20 — B-21 measured in full: 34 commands, both spaces, and the four things the sweep found (2026-09-05)
+
+*§19 recorded the fix and the handful of numbers that motivated it. §20 is the SWEEP: every command in
+the brief, run in BOTH embedding spaces on this tree, with the numbers that moved and the reasons.
+Two different comparisons live in this section and they are never mixed:*
+
+* **fix-axis (before → after)** — pre-B-21 versus this tree. Its "before" column is quoted from §17,
+  which measured it; nothing here re-ran the old code.
+* **space-axis (concept ↔ real)** — two spaces on the SAME tree. These are **not** two versions and
+  **not** a ranking of one architecture against another. Every cell says which axis it is on.
+
+⚠ **Every eval run below used `--dry-run` where the eval takes a model, so the "Single Agent (Robin)"
+column is a STUB in all of them.** Nothing in §20 is a measurement of the agent. What is measured is
+retrieval, the deterministic arms, the controls, and the plumbing.
+
+### 20.1 Exit codes — 34 distinct commands, both spaces
+
+| command | `--concept-vectors` (default) | `--real-vectors` |
+|---|---|---|
+| evals `-- 3` | **0** | **0** |
+| evals `-- 1 --dry-run` | **0** | **0** |
+| evals `-- 2 --dry-run` | **0** | **0** |
+| evals `-- 2b --dry-run` | **0** | **0** |
+| evals `-- 2c --dry-run` | **0** | **0** |
+| evals `-- 4` | **0** | **0** |
+| evals `-- 9 --dry-run` | **0** | **0** |
+| evals `--ci --dry-run` | **0** | **0** |
+| agent `-- 1 --offline` (Nadia) | **0** | **0** |
+| agent `-- 2 --offline` (Marco, the loop) | **0** | **0** |
+| agent `-- 0` (termination proof) | **0** | **0** |
+| agent `-- 1 --offline --user {MI-02, SK-03, LF-04}` | **0** x3 | **0** x3 |
+| agent `-- 2 --offline --user {NB-01, SK-03, LF-04}` | **0** x3 | **0** x3 |
+
+**34 of 34 exit 0.** On the fix axis the two that moved are `-- 4` (**1 → 0**) and `--ci --dry-run`
+(**1 → 0**) on the real path; §17 recorded both as 1, and §19.2 already declared that verdict refuted.
+`dotnet build AgentEval.sln` is 0 errors, 150 warnings (all pre-existing analyser noise in
+`AgentEval.Tests`).
+
+### 20.2 The headline: arm D is 0 of 50, and the recommender can ask for what it wants
+
+| Eval 03 arm | what it asks | concept | real, before B-21 (§17) | real, now |
+|---|---|---|---|---|
+| **A** | can the 56 AUTHORED phrases be embedded, in the space this run resolved? | 18 of 56 dead | **56 of 56 dead** | **0 of 56** |
+| **B** | is every product answerable straight from the committed asset? | 0 of 99 | (asked of the phrase list then; see §19.7 item 4) | **0 of 99** |
+| **C** | same as A but always in the CONCEPT space — the fixed reference | 18 of 56 | 18 of 56 | 18 of 56 |
+| **D** | **can the 50 queries the system ACTUALLY ISSUES be embedded?** | **8 of 50 dead** | **38 of 50 dead** | **0 of 50** |
+
+**Arm D is 0 of 50 on the real path. The recommender can now ask for everything it wants to ask for.**
+That is the sentence B-21 was for, and it is the arm that matters: arms A and C measure a list somebody
+wrote down, arm D measures the strings the code composes at run time.
+
+Three things this number does **not** say, stated because the flattering reading is available:
+
+1. **It is near-vacuous on the real path.** A live embedder returns a vector for any non-empty text, so
+   arm D there can only fail if the live path is unreachable — no credentials, a stamp mismatch, a
+   failed identity probe. Its value is now a *reachability* check, and §19.7 item 3 says so. The
+   non-vacuous instrument is **arm C**, which is why arm C is measured on every run and is now in the
+   verdict.
+2. **It does not mean the answers are better.** Being able to ask is not being answered well. §20.5
+   through §20.10 are where that is measured, and the answer there is mixed.
+3. **Arm D is still 8 of 50 on the DEFAULT path** — `"Active bookshelf"`, `"Handheld hybrid"`,
+   `"Over-ear wireless"` and five more. B-21 did not touch it. The default is still the space where 8
+   issued queries in 50 reach the dense leg with a zero vector.
+
+### 20.3 Eval 03 — everything else, both spaces
+
+`-- 3` prints **16 rows: 12 gating (all 12 caught) + 4 advisory (2 tripping)** in both spaces, exactly
+as §17 recorded. The two advisory findings are `AuthoredQueryPhraseRetrievability` and
+`SuppressionDetectorExercised`, in both. Beyond the arm block, **four numbers differ between the
+spaces**, and all four are control arms retrieving differently — not instrument changes:
+
+| Eval 03 row | concept | real |
+|---|---|---|
+| `Broken03_SingleShotWorkflow` mean latent | **0.729** | **0.701** |
+| — its `USR-DF-14` cell | 1.000 (3/3) | **0.667 (2/3)** |
+| `Broken05_RubberStampReviewer` presented | **57** | **60** |
+| — its `USR-JV-08` cell | presented **2** | presented **5** |
+
+`Broken04` is 0.000 against the 0.138 floor and `Broken06` lands at z = +0.12σ of its analytic floor in
+both spaces. **No control stopped catching in either space.**
+
+### 20.4 Eval 04 — the injection case reaches the arms in both spaces now
+
+| | concept | real, before B-21 (§17) | real, now |
+|---|---|---|---|
+| exit | 0 | **1** | **0** |
+| candidate set k, across the four arms | **25–40** | **1–7** | **26–37** |
+| GATE A (the unconstrained probe WAS injected) | pass | — | pass |
+| GATE B (every constrained arm contained it on all five checks) | pass | — | pass |
+| D3-01 loop arm | rounds 1/3, k 25, presented 11 | — | rounds 1/3, **k 26, presented 12** |
+
+The chance-of-missing-by-luck figures move with k and are printed per arm: 0.596–0.747 (concept),
+0.626–0.737 (real). The real path is no longer the degenerate k = 1–7 that made every arm INAPPLICABLE.
+
+### 20.5 Eval 02 — at the declared k = 5, where pairing is legal
+
+All six arms are cut to k = 5 on this panel, so the space-axis comparison is **at equal k and is
+legal**, with one exception noted below. n = 12 personas.
+
+| arm | recall@5 concept | recall@5 real | prec@5 concept | prec@5 real | mean k shown |
+|---|---|---|---|---|---|
+| Single Agent (Robin) | 0.076 | 0.076 | 0.050 | 0.050 | 2.0 / 2.0 — **A STUB. Not a result.** |
+| Control — single shot | **0.729** | **0.701** | **0.517** | **0.450** | 5.0 / 5.0 |
+| Baseline — popularity | 0.000 | 0.000 | 0.000 | 0.000 | 5.0 / 5.0 |
+| Baseline — tag join (oracle) | 1.000 | 1.000 | 1.000 | 1.000 | 5.0 / 5.0 |
+| Loop control — rubber stamp | **0.542** | **0.403** | 0.383 | 0.267 | **4.8 / 5.0** |
+| Discovery Workflow (Demo 2) — deterministic | **0.375** | **0.458** | 0.300 | 0.300 | 9.7 / 9.9, cut to 5 |
+
+**⚠ NOT COMPARABLE, one cell:** the rubber stamp's `USR-JV-08` presented **2** items on the concept path
+and **5** on the real path. Eleven of its twelve cells are at k = 5; that one is not, and it is inside
+both means above. The other five arms are at equal k on all twelve.
+
+**The one honest signal about the architecture in this table:** at equal k, the real space **re-orders**
+the loop's list without finding more in it. Its OWN-k latent mean is **0.625 in both spaces** — the same
+number by coincidence of the per-persona sums, not because the cells match — while recall@5 rises
+**0.375 → 0.458**. The gold carriers were already in the loop's candidate list on the concept path; on
+the real path more of them are in the **first five**.
+
+Per persona, Demo 2's deterministic arm, recall@5 (the cut-to-5 column above):
+
+| persona | concept | real | |
+|---|---|---|---|
+| USR-NB-01 | 0.33 | **1.00** | up |
+| USR-TS-07 | 0.33 | **0.67** | up |
+| USR-MB-13 | 0.00 | **0.33** | up |
+| USR-AR-06 | 0.67 | **0.33** | down |
+| MI-02, SK-03, JV-08, LM-09, RB-10, PB-11, NK-12, DF-14 | — | — | eight unchanged |
+
+Three up, one down, eight unchanged. **That is 4 moved cells out of 12, and it is not a significance
+claim**: the eval's own text says a difference between two arms smaller than the oracle-to-control gap
+is no evidence at all, and 4 of 12 is well inside it.
+
+**Both gates read the same in both spaces**: GATE 1 fails (9 of 12 personas below their own floor — the
+stub being a stub) and GATE 2 passes. The `>= 10-of-12` pre-registered rule is NOT EVALUATED in both,
+for the declared reason (no second comparable entrant).
+
+### 20.6 Eval 02b — where the k-confound bites, and the arm that survives it
+
+Eval 02b's precision is `satisfying / presented`, and the loop arms present their own k. That k is **not
+equal across the spaces**, so the loop columns below are marked NOT COMPARABLE and the satisfier COUNT
+is given instead.
+
+| arm | k | precision concept | precision real | verdict |
+|---|---|---|---|---|
+| live (stub) | 2 / 2 | 0.000 | 0.000 | a stub |
+| loop (Demo 2 deterministic) | **mean 7.9 / 8.3** | 0.053 | 0.032 | **NOT COMPARABLE — unequal k** |
+| loop, utterance-blind | **mean 9.6 / 9.9** | 0.071 | 0.055 | **NOT COMPARABLE — unequal k** |
+| oracle | 1–4 | 1.000 | 1.000 | by construction |
+| **1-shot control** | **5 / 5** | **0.183** | **0.150** | **comparable — WORSE on real** |
+| tag-join | 5 / 5 | 0.167 | 0.167 | unchanged; it joins tags, it does not retrieve |
+| Broken06 uniform draw | 5 | 0.020 | 0.020 | the floor, executed |
+
+Read at the level the k-confound permits:
+
+* **The one equal-k arm got worse.** The single-shot control satisfies **11** stated needs across 12
+  cases x 5 slots on the concept path and **9** on the real path (0.183 → 0.150). Both are far above the
+  0.019 mean floor; neither is near the oracle's 1.000.
+* **Counting satisfiers rather than dividing by k**, the loop finds **6** on concept and **4** on real,
+  in the same **4 of 12** cases either way. So the drop in its precision column is *partly* the longer
+  list and *partly* fewer satisfiers — and this eval cannot separate those two at n = 12.
+* **The direction is opposite to Eval 02's.** Eval 02 rewards latent-interest coverage and the real
+  space helps there; Eval 02b rewards satisfying a STATED constraint (a mount, a price ceiling, a
+  capacity) and the real space does not help there. That is what a dense semantic leg is and is not for:
+  cosine similarity does not know that 54 mm is not 58 mm. **This is the first measured signal that the
+  two evals pull on different properties**, and it is reported, not resolved.
+
+### 20.7 Eval 02c — held-out next purchase
+
+| arm | k | sku@5 concept | sku@5 real |
+|---|---|---|---|
+| live (stub) | 2 | 0.000 | 0.000 |
+| **loop** | **5** | **0.077** (1 of 13) | **0.154** (2 of 13) |
+| 1-shot | 5 | 0.231 | 0.231 |
+| tag-join | 5 | 0.077 | 0.077 |
+| popularity | 5 | 0.000 | 0.000 |
+| uniform draw (the floor, executed) | 5 | 0.062 | 0.062 |
+
+leaf@5 equals sku@5 in every cell of both runs. The loop's extra hit is **`USR-SK-03`**, whose held-out
+target `GLX-5003` (Vacuum canisters) enters its top five only on the real path. At its own k,
+`USR-EW-05` also flips (miss → hit at k = 10).
+
+**This is one hit.** The eval's own text is quoted rather than paraphrased: *"CANNOT: rank two working
+arms. One hit is 0.077 of rate; the 95% interval on any rate here spans most of [0, 1]."* 1 → 2 of 13 is
+inside that. It is recorded because it moved, not because it decides anything.
+
+### 20.8 Evals 01, 09 and CI
+
+* **Eval 01** — the two outputs are **identical apart from the three-line space banner**. Byte-diffed. It
+  grades catalogue integrity on a scripted presentation channel and never retrieves, so this is the
+  expected result, and it is the control on the claim that a space change cannot leak into an eval that
+  does not retrieve.
+* **Eval 09** — same gates, same plumbing checks, same voided cell (`USR-MB-13`), same token ledger
+  (agent 25 / workflow 73 calls) in both spaces. Two things move:
+  * the workflow arm's in-session interest goes from **12–14 candidates** to **14–18**;
+  * **two personas change stop reason.** `USR-LM-09` and `USR-NK-12` are `GapsUnresolvable` on the
+    concept path and `RoundLimitReached` on the real path, because their round-2 proposal no longer
+    *"repeats one already run"* — the extra retrieval breadth gives the loop a materially different
+    query to try. **All 12 personas are `RoundLimitReached` on the real path.** This is the dry-run stub
+    reviewer, which never approves; with a real reviewer it would not be.
+* **`--ci --dry-run`** — exit **0** in both spaces, all eleven steps pass their plumbing. On the real
+  path it prints the spend banner once and embeds live throughout. **It still must not enter CI**, for
+  the §19.8 reason: it needs credentials, it spends, and a scored run under it is not reproducible off
+  the machine that made it.
+
+### 20.9 Demo 01, all four personas, both spaces
+
+Space axis. Retrieval is identical in shape — **3 searches, 6/6/6 candidates, for all three
+non-abstaining personas in both spaces** — and everything that differs is downstream of that.
+
+| persona | concept: ledger, tray | real: ledger, tray |
+|---|---|---|
+| Nadia `USR-NB-01` | `6 in → 6 out` · 0 dropped · 3 demoted · **primary 3**, also 3 · conf **0.48–0.80** | `6 in → 5 out` · **1 dropped** · 5 demoted · **primary EMPTY**, also 5 · conf **0.40–0.59** |
+| Marco `USR-MI-02` | `6 in → 5 out` · 1 dropped (owned-class) · 3 demoted · **primary 2**, also 3 · conf **0.64–0.85** | `6 in → 5 out` · 1 dropped (owned-class) · 5 demoted · **primary EMPTY**, also 5 · conf **0.54–0.63** |
+| Sofia `USR-SK-03` | `6 in → 6 out` · 0 dropped · 5 demoted · **primary 1**, also 5 · conf **0.48–0.80** | `6 in → 5 out` · **1 dropped** · 5 demoted · **primary EMPTY**, also 5 · conf **0.43–0.62** |
+| Luca `USR-LF-04` | **abstains** · `0 in → 0 out` | **abstains** · `0 in → 0 out` — byte-identical |
+
+**Selection, by SKU id** (the `PresentRecommendation` calls, not the rendered cards):
+
+| persona | concept | real | moved |
+|---|---|---|---|
+| Nadia | 8005, 1002, 2008, 2004, 2010, 6001 | 1011, 8005, 6004, 6009, 2010, 6001 | **3 of 6.** OUT: `GLX-1002` 16-35 lens, `GLX-2008` hiking shoe, `GLX-2004` trekking poles. IN: `GLX-1011` Manfrotto travel tripod, `GLX-6004` / `GLX-6009` Lezyne bike lights |
+| Marco | **3004**, 5010, 5004, 3010, 3013, 3007 | 5010, **5011**, 5004, 3010, 3013, 3007 | **1 of 6.** OUT: `GLX-3004` Normcore WDT tool. IN: `GLX-5011` NanoFoamer Pro |
+| Sofia | 3009, **3011**, 3002, **3013**, 5015, **3010** | 3009, **3001**, 3002, **3007**, 5015, **5008** | **3 of 6.** OUT: Dezcal, Eureka Mignon, Cafiza. IN: `GLX-3001` Sage Barista Express, `GLX-3007` 1Zpresso hand grinder, `GLX-5008` Tefal steamer |
+| Luca | (none — abstains) | (none — abstains) | 0 |
+
+Three of those movements are worth naming, and they do not all point the same way:
+
+* **The real path surfaces the cold-start marketplace plant that carries the persona's OWN latent-gold
+  tag, and the concept path surfaces neither.** `GLX-5011` (NanoFoamer, `context:latte-art`, 0 ratings,
+  0 reviews) reaches Marco only on the real path; `GLX-3007` (1Zpresso, `context:whole-bean`, 0 ratings,
+  0 reviews) reaches Sofia only on the real path. Both are exactly the shape of item a review-volume
+  ranker cannot see. **Checked against the tag lists in `CatalogueSeed`, not inferred from a comment.**
+* **Both spaces answer a bare leaf-category name badly, and neither is repaired.** Nadia's derived
+  signal `"Headlamps"` returns a hiking shoe and trekking poles on the concept path and two Lezyne
+  *bicycle* lights on the real path. Neither is a headlamp. §19.7 item 5 said this; a second space
+  measuring it the same way is a second observation of one defect, not two.
+* `GLX-5008` (a food steamer) reaching Sofia at conf 0.43 is a **Kitchen** leak into a coffee persona;
+  the 0.45 floor dropped it. `GLX-6001` (a cycling handlebar bag) reaching Nadia at 0.40 is the same
+  shape, also dropped. On the concept path `GLX-6001` reaches her tray at 0.48 and is **shown** —
+  declared in §19.3 and unchanged.
+
+**Live-embedding cost, per Demo 01 run** (printed by the demo itself):
+
+| run | live query calls | served free | prompt tokens |
+|---|---|---|---|
+| Nadia | 4 (4 distinct texts) + 1 identity probe | 53 memo + 105 index | **178** |
+| Marco | 4 + 1 probe | 53 + 105 | **180** |
+| Sofia | 6 (6 distinct) + 1 probe | 75 + 105 | **192** |
+| Luca | **0 — no probe, no banner, no space resolved** | — | **0** |
+
+Luca's zero is structural and worth keeping: **the abstention gate fires before any retriever is
+constructed**, so `--real-vectors` costs literally nothing on a turn that abstains.
+
+### 20.10 Demo 02, all four personas, both spaces
+
+| persona | concept | real |
+|---|---|---|
+| Nadia `USR-NB-01` | rounds **1**/3 · `CoverageSufficient` · 7 searches · 24 discovered · `11 in → 10 out`, **1 dropped (sensitive_category)** · primary tray **3** | rounds **1**/3 · `CoverageSufficient` · 7 searches · **25** discovered · `12 in → 12 out`, **0 dropped** · primary tray **4** |
+| **Marco `USR-MI-02`** (the headline `-- 2`) | rounds **2**/3 · **`NoProgress`** · 9 searches · 20 discovered · `12 in → 11 out`, 1 dropped | rounds **3**/3 · **`GapsUnresolvable`** · 10 searches · 21 discovered · `12 in → 10 out`, **2 dropped** |
+| Sofia `USR-SK-03` | rounds 1/3 · `CoverageSufficient` · 9 searches · 24 discovered · `12 in → 12 out` | rounds 1/3 · `CoverageSufficient` · 9 searches · **28** discovered · `12 in → 12 out` |
+| Luca `USR-LF-04` | rounds 1/3 · `GapsUnresolvable` · 1 search · **0 candidates** · `0 in → 0 out` | **identical in every field** |
+
+**Marco is the one that changes the demo narrative, and the mechanism is legible in the trace.** The
+round-2 gap query is the same string in both spaces — `Search("dose")` — and it returns **0 on the
+concept path** and **1 on the real path**. Zero makes the reviewer resolve `NoProgress` and stop at
+round 2; one makes the interest `PARTIAL`, the loop-back fires, and round 3 runs. `--help` promises
+*"Marco's coverage leaves gaps and the loop runs 3 rounds"*; **on the default path it runs 2. On the
+real path it runs 3, which is what the demo script says.**
+
+**What the real path's `"dose"` matched is `GLX-9003`, an Anabox weekly pill organiser** — the dense leg
+read "dose" as a medication dose and returned a Health & Personal Care leaf for a coffee-scale gap. Two
+consequences, both measured:
+
+1. **The sensitive-category guardrail caught it.** `GLX-9003 — sensitive_category` is in Marco's real
+   ledger and is one of his two drops. The arm that is `arm_inapplicable` on his concept run is
+   **exercised** on his real run.
+2. **Round 3's query is then `Search("Pill organisers", cat=Health & Personal Care > Medication
+   management > Pill organisers)` → 0.** The loop derived its next query from the leaf of the one
+   candidate it got, and that leaf was the wrong department. The vocabulary constraint did not stop it —
+   correctly, since "Pill organisers" *is* catalogue vocabulary. **Not repaired.**
+
+Nadia moves the other way: the sensitive-category drop is on her **concept** run and not her real one,
+so that guardrail arm is exercised in exactly one space per persona and in neither for Sofia or Luca.
+**A guardrail arm exercised in one space is not evidence it works in the other.**
+
+Nadia's primary tray on the real path is 4 items — `GLX-1011` Manfrotto tripod 0.79, `GLX-8005` power
+bank 0.78, `GLX-2009` Garmin inReach Mini 2 satellite communicator 0.76, `GLX-1004` Peak Design carbon
+travel tripod 0.72 — against 3 on the concept path, where the 16-35 mm lens is second and the satellite
+communicator is absent. For "multi-day trips, starts before sunrise, carried" that is the better tray,
+and it is the same judgement §19.1's probe made.
+
+**Demo 02's confidences are NOT space-dependent** — 0.54–0.69 on concept, 0.55–0.69 on real for the same
+persona. Demo 02's Ranker does not use `Demo01.Confidence`, so the §19.7 item 1 finding is a **Demo 01**
+finding, and this is the measurement that bounds it.
+
+### 20.11 What the sweep FOUND — four things, declared and not repaired
+
+1. **`ConfidenceBands` is space-dependent on THREE personas, not one.** §19.7 measured Nadia. Measured on
+   all of them: concept 0.48–0.85, real 0.40–0.63, and **the primary tray is empty on the real path for
+   Nadia, Marco AND Sofia** — every persona that has a tray at all. `PrimaryThreshold` is 0.70 and
+   nothing in the real space reaches it. Not re-tuned: a second pair of thresholds chosen to make the
+   real tray resemble the concept tray is fitting the threshold to the output, and it would be one more
+   number in this sample derived from the thing it is meant to judge.
+2. **The real space reaches across departments harder, and the guardrails are what stops it.** Three
+   measured instances: `"dose"` → pill organiser (dropped, sensitive category), `"Vacuum canisters"` →
+   food steamer for Sofia (dropped, below the confidence floor), `"multi-day…"` → cycling handlebar bag
+   for Nadia (dropped at 0.40; **shown at 0.48 on the concept path**). The screen is doing real work in
+   both spaces and more of it in the real one. **A retrieval leg that reaches further needs the screen
+   more, not less** — an argument for the guardrail pipeline, not against the real vectors.
+3. **The spend accounting line is Demo 01's only.** `-- 1` prints live calls, memo hits, index hits and
+   prompt tokens. Demo 02 prints the space banner but **no spend line**, and the eval suite prints
+   neither a spend line nor a call count. A `--real-vectors` run of `--ci` spends and does not say how
+   much. Found here; not fixed here, because the fix is a shared meter and that is its own change.
+4. **One diagnostic sentence is now broader than what the run tested.** When an interest gets zero
+   candidates, `CoverageReview.FromCategoryNames` prints *"no catalogue category shares a word with this
+   interest — the CATALOGUE has nothing here … not fixable by searching again"*. The first clause is
+   exactly true — it is a token test over category paths, and it is what decides whether the repair
+   route exists. The second clause generalises to a claim about the catalogue that, on the real path,
+   the run did not test: a live-embedded query is scored against all 99 products and can fall below the
+   0.28 floor for reasons that have nothing to do with category vocabulary. Luca's `-- 2` run prints it
+   in both spaces. **Wording not changed here** — changing it moves a string three evals read.
+
+### 20.12 What did NOT move — measured, not assumed
+
+* `-- 0`, the termination proof: **6 of 6 probes, byte-identical** across the two spaces. The probes run
+  on a scripted retriever, and this is the control on that.
+* Eval 01: identical apart from the banner (§20.8).
+* Eval 03's control set: **12 of 12 gating rows caught, 2 advisory findings, in both spaces.**
+* Eval 04's gates A and B: pass in both.
+* Eval 02's two gates, its arm registry, its sign-test verdict (`NOT EVALUATED`): identical.
+* Eval 09's gates, plumbing checks, voided cell and token ledger: identical.
+* Luca in both demos: identical in every field, in both spaces. The abstention gate is upstream of
+  retrieval, and this is the measurement of that.
+* Arm C (18 of 56, 10 of them latent-gold) and arm B (0 of 99): identical in both spaces, by design.
+
+### 20.13 Still open
+
+1. **Arm C — 18 of 56 authored phrases embed to zero in the concept space**, 10 latent-gold. Unchanged
+   by B-21 and by this sweep. Closing it means choosing a concept dimension per phrase, which moves
+   every coverage cell.
+2. **Arm D — 8 of 50 issued queries dead on the DEFAULT path.** Unchanged.
+3. **`ConfidenceBands` has one set of thresholds for two spaces** (§20.11 item 1).
+4. **No live, model-backed figures were re-derived.** Every eval run in §20 used `--dry-run`; the agent
+   column is a stub everywhere. The README's live numbers are still the pre-B-21 ones and are still
+   owed a paid re-run.
+5. **`--real-vectors` still must not enter CI** — it needs credentials, it spends, and a scored run under
+   it is not reproducible off the machine that made it. The old reason (it exits 1) stays refuted.
+6. **`strategy/Galaxus/Galaxus_RecommendationAgent_Design.md` §8.1 is still not updated** — gitignored,
+   local-only. `strategy/Galaxus/Galaxus_Retrieval_Explained.html` **was** rewritten against §19 + §20 in
+   the same change that added this section.
+
+### 20.14 How to re-derive §20
+
+```
+dotnet build AgentEval.sln -v q                                        # 0 errors
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+for s in --concept-vectors --real-vectors ; do                         # every --real-vectors line SPENDS
+  dotnet run --project $E -- 3            $s
+  dotnet run --project $E -- 1  --dry-run $s
+  dotnet run --project $E -- 2  --dry-run $s
+  dotnet run --project $E -- 2b --dry-run $s
+  dotnet run --project $E -- 2c --dry-run $s
+  dotnet run --project $E -- 4            $s
+  dotnet run --project $E -- 9  --dry-run $s
+  dotnet run --project $E --ci  --dry-run $s
+  dotnet run --project $A -- 0            $s
+  for u in USR-NB-01 USR-MI-02 USR-SK-03 USR-LF-04 ; do
+    dotnet run --project $A -- 1 --offline --user $u $s
+    dotnet run --project $A -- 2 --offline --user $u $s
+  done
+done
+```
+
+Every command must exit 0. The whole sweep's live embedding spend is well under one cent.
