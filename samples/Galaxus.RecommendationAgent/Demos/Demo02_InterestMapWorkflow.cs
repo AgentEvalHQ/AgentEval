@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using Galaxus.RecommendationAgent.Catalog;
+using Galaxus.RecommendationAgent.Retrieval;
 using Galaxus.RecommendationAgent.Workflows;
 
 namespace Galaxus.RecommendationAgent.Demos;
@@ -98,6 +99,12 @@ public static class Demo02_InterestMapWorkflow
         }
 
         PrintWhatToWatch();
+
+        // Which SPACE every search below runs in, resolved and printed BEFORE the first one. The
+        // loop asks EmbeddingSpace for the same source, so this line is a statement about the run
+        // rather than a label beside it.
+        EmbeddingSpace.Resolve(Catalogue.Default.All).PrintBanner();
+        Console.WriteLine();
 
         var sink = new ConsoleDiscoveryProgressSink();
 

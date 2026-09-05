@@ -35,6 +35,7 @@
 using System.Text;
 using Galaxus.RecommendationAgent;
 using Galaxus.RecommendationAgent.Evals;
+using Galaxus.RecommendationAgent.Retrieval;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -57,7 +58,8 @@ var parsed = ParsedArgs.Parse(args);
 if (parsed is null)
 {
     Console.Error.WriteLine(
-        "Usage: [1..9|2b|2c] [--ci] [--skip-slow] [--quick] [--judge] [--dry-run] [--only <persona-id>] [--log [path]] [--model <deployment>]");
+        "Usage: [1..9|2b|2c] [--ci] [--skip-slow] [--quick] [--judge] [--dry-run] [--only <persona-id>] "
+      + "[--concept-vectors|--real-vectors] [--log [path]] [--model <deployment>]");
     Console.Error.WriteLine();
     Console.Error.WriteLine("  --ci         run every eval 1..9 (plus 2b and 2c) in order and return the WORST exit code");
     Console.Error.WriteLine("  --skip-slow  with --ci: leave out Evals 08 and 09 (tens of paid turns each).");
@@ -67,6 +69,11 @@ if (parsed is null)
     Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent, nothing written");
     Console.Error.WriteLine("  --only <id>  Eval 02 only: run ONE persona (stage two of the run protocol). Its snapshot");
     Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record.");
+    Console.Error.WriteLine("  --concept-vectors  score in the authored 24-dimension concept space. THE DEFAULT.");
+    Console.Error.WriteLine("  --real-vectors     score in the committed text-embedding-3-small space instead (no key,");
+    Console.Error.WriteLine("               nothing spent). Its query cache holds only anticipated text, so a");
+    Console.Error.WriteLine("               run-time-composed need misses and that search runs LEXICAL-ONLY. Numbers");
+    Console.Error.WriteLine("               from the two spaces are NOT comparable; every report prints which it used.");
     Console.Error.WriteLine();
     Console.Error.WriteLine($"  {CredentialGuard.NeedsModelSummary}");
     Console.Error.WriteLine("  Evals 2b and 2c are HYBRID: their offline arms run and print without a key; their live column");
@@ -77,6 +84,11 @@ if (parsed is null)
 IDisposable? logScope = null;
 if (parsed.LogRequested) logScope = ConsoleLogRecorder.StartLogging(parsed.LogPath);
 if (!string.IsNullOrEmpty(parsed.ModelOverride)) Config.ModelOverride = parsed.ModelOverride;
+
+// Before EvalRuntime builds anything. EmbeddingSpace refuses to move once resolved, so a suite
+// cannot end up with one eval's numbers from the concept space and the next one's from
+// text-embedding-3-small.
+Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace.Requested = parsed.Space;
 
 try
 {
@@ -491,6 +503,17 @@ internal sealed class ParsedArgs
     /// </summary>
     public string? OnlyPersona { get; private set; }
 
+    /// <summary>
+    /// Which embedding space every eval retrieves in: the authored concept vectors (the default)
+    /// or the committed <c>text-embedding-3-small</c> assets.
+    /// </summary>
+    /// <remarks>
+    /// A coverage cell scored in one space is not comparable with the same cell scored in the
+    /// other, so the space is printed by every eval that prints such a number and is recorded in
+    /// the <c>AuthoredQueryPhraseRetrievability</c> control row.
+    /// </remarks>
+    public EmbeddingSpaceChoice Space { get; private set; } = EmbeddingSpaceChoice.Auto;
+
     /// <summary>True when <paramref name="value"/> is an eval selector rather than a path.</summary>
     /// <param name="value">A bare positional argument.</param>
     public static bool IsSelector(string value) => Array.IndexOf(Selectors, value) >= 0;
@@ -547,6 +570,19 @@ internal sealed class ParsedArgs
                 case "--only":
                     if (i + 1 >= args.Length) return null;
                     parsed.OnlyPersona = args[++i];
+                    break;
+
+                // ── Which embedding SPACE every arm retrieves in. Asking for both is a typo,
+                //    not a request, and a run that silently picked one would attribute its
+                //    numbers to a space nobody chose.
+                case "--concept-vectors":
+                    if (parsed.Space is EmbeddingSpaceChoice.RealVectors) return null;
+                    parsed.Space = EmbeddingSpaceChoice.ConceptVectors;
+                    break;
+
+                case "--real-vectors":
+                    if (parsed.Space is EmbeddingSpaceChoice.ConceptVectors) return null;
+                    parsed.Space = EmbeddingSpaceChoice.RealVectors;
                     break;
 
                 default:

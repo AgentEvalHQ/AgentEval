@@ -32,11 +32,19 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// instead of retrieving against stale vectors.
 /// </para>
 /// <para>
-/// <b>A known limit, said plainly.</b> The query cache can only hold queries someone anticipated.
-/// The needs the agent actually searches with are model-generated at run time, so a novel need is
-/// a cache miss by construction. With credentials it falls through to the live source; without
-/// them it degrades. That is why <see cref="ConceptEmbeddingSource"/>, not this class, is the
-/// offline default: it can embed anything, deterministically, with no key.
+/// <b>A known limit, said plainly — and now MEASURED.</b> The query cache can only hold queries
+/// someone anticipated. The needs the agent searches with are composed at run time — a conjunction
+/// label is a JOIN of phrases, a leaf-category signal is a category name, a live agent writes its
+/// own — so a novel need is a cache miss by construction. With credentials it falls through to the
+/// live source; without them it degrades. That is why <see cref="ConceptEmbeddingSource"/>, not
+/// this class, is the offline default: it can embed anything, deterministically, with no key.
+/// </para>
+/// <para>
+/// The size of that limit, measured 2026-09-05 (B-7): <b>38 of the 50</b> distinct queries the
+/// scored personas' interest maps issue are absent from the committed asset, Demo 01's offline arm
+/// falls from 6 recommendations to 0 on this path, and Eval 04's injection case stops reaching the
+/// candidate set at all. <see cref="EmbeddingSpace"/> is where that choice is made and printed;
+/// this class is not reached for by default, and the reason is a number rather than a preference.
 /// </para>
 /// </remarks>
 public sealed class PrecomputedEmbeddingSource : IEmbeddingSource

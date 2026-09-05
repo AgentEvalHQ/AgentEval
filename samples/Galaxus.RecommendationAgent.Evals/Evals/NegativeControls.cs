@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using AgentEval.MAF;
-using Galaxus.RecommendationAgent.Retrieval;   // ConceptEmbeddingSource — the offline query embedder
+using Galaxus.RecommendationAgent.Retrieval;   // EmbeddingSpace — the ONE place the space is chosen
 using Galaxus.RecommendationAgent.Signals;     // InterestMapBuilder.ContextPhrases
+using Galaxus.RecommendationAgent.Workflows;   // DiscoveryInterestMapping.QueryTermsFor — arm D's input
 
 namespace Galaxus.RecommendationAgent.Evals;
 
@@ -976,13 +977,12 @@ public static class NegativeControls
     /// would create exactly the incentive this suite exists to refuse.
     /// </para>
     /// <para>
-    /// <b>B-6 (2026-09-05) added a SECOND arm, and the row is deliberately still red.</b> Arm A is
-    /// the offline concept path above — the path every demo and every eval actually runs on — and
-    /// it is unchanged at 18 of 56. Arm B is the committed real-vector path
+    /// <b>B-6 (2026-09-05) added a SECOND arm, and the row was deliberately still red.</b> Arm A
+    /// was the offline concept path above and arm B the committed real-vector path
     /// (<see cref="PrecomputedEmbeddingSource"/> over the two <c>text-embedding-3-small</c> assets,
-    /// no live fallback, no key). B-6's acceptance is arm B reading 0 of 56, and it does. The row's
-    /// verdict is A AND B, so it stays a FINDING: reporting green because a path nothing runs on is
-    /// clean would be the flattering pass this suite exists to refuse.
+    /// no live fallback, no key). B-6's acceptance was arm B reading 0 of 56, and it did — but arm
+    /// A was hard-wired to <see cref="ConceptEmbeddingSource"/> and so could not report on whatever
+    /// the run in front of it was actually retrieving with.
     /// </para>
     /// <para>
     /// ⚠ <b>What arm B does and does not verify, because the difference is the whole point.</b> A
@@ -995,6 +995,35 @@ public static class NegativeControls
     /// read 56 of 56 dead. That is the state this arm can return to, and it is why the arm is worth
     /// having at all.
     /// </para>
+    /// <para>
+    /// <b>B-7 (2026-09-05) rewired arm A onto the RESOLVED path and added two more arms.</b> Arm A
+    /// now embeds through <see cref="EmbeddingSpace"/> — the same source Demo 01, Demo 02 and
+    /// <see cref="EvalRuntime"/> retrieve with — so the number describes THIS run rather than a
+    /// space nobody chose. Two arms exist to keep that honest:
+    /// </para>
+    /// <para>
+    /// <b>ARM C, the concept space, measured directly and always.</b> When the selector resolves to
+    /// the concept space arm A and arm C are the same measurement; when it resolves to the assets
+    /// arm A and arm B are. Either way one pair CO-MOVES, so the row says which pair and prints the
+    /// third number regardless. Arm C is what <c>--concept-vectors</c> and every asset-load
+    /// fallback land on, so a hole there is a live hazard even on a run that did not use it.
+    /// </para>
+    /// <para>
+    /// <b>ARM D, the THING rather than the proxy.</b> An authored phrase is not what the arms ask
+    /// with. A conjunction label is a JOIN of up to
+    /// <see cref="InterestMapBuilder.MaximumLabelPhrases"/> phrases, a capability gap names a
+    /// companion class and a leaf-category signal is a category name — and those are the exact
+    /// strings <c>RetrievalQuery.Need</c> carries. Arm D embeds the queries the scored personas'
+    /// interest maps actually produce (<see cref="DiscoveryInterestMapping.QueryTermsFor"/>). It
+    /// exists because arms A–C can all read 0 while retrieval is dead: a cache holding every
+    /// ATOMIC phrase holds none of the JOINS, so on the committed-asset path the proxy passes and
+    /// the thing fails. Without arm D this row would have gone green on exactly the change that
+    /// broke the dense leg — the flattering direction, which is the one to instrument hardest.
+    /// </para>
+    /// <para>
+    /// The verdict is A AND B AND D. Adding D can only make the row harder to satisfy; nothing was
+    /// relaxed to accommodate the new arm A.
+    /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckAuthoredQueryPhrasesRetrieve()
     {
@@ -1004,60 +1033,139 @@ public static class NegativeControls
             .SelectMany(p => InterestMapGold.Derive(p.Id).Latent)
             .ToHashSet(StringComparer.Ordinal);
 
-        var dead = new List<string>();
+        int total = InterestMapBuilder.ContextPhrases.Count;
+
+        // ── ARM A — the RESOLVED path. Whatever EmbeddingSpace handed the retrievers this run is
+        //    what gets measured, so the row can no longer report on a space nothing ran on.
+        var space = EmbeddingSpace.Resolve(Catalogue.Default.All);
+        var (deadA, deadGoldA) = MeasureAuthoredPhrases(text => EmbedThrough(space.Source, text), goldTokens);
+
+        // ── ARM B — the committed assets, loaded HERE and independently of the selector, with no
+        //    live fallback: the arm must measure the ASSET, not the credentials of whoever ran it.
+        var (deadB, noteB) = MeasureRealVectorArm();
+
+        // ── ARM C — the concept space, measured directly. It never co-moves with the selector,
+        //    which is what makes it worth printing on a run that resolved to the assets.
+        var (deadC, deadGoldC) = MeasureAuthoredPhrases(
+            text => ConceptEmbeddingSource.Instance.Embed(text), goldTokens);
+
+        // ── ARM D — the queries the arms actually issue, on the resolved path.
+        var (issuedTotal, deadIssued, issuedExamples) = MeasureIssuedQueries(space.Source);
+
+        bool armAClean = deadA == 0;
+        bool armBClean = deadB == 0;
+        bool armDClean = deadIssued == 0;
+        bool allRetrievable = armAClean && armBClean && armDClean;
+
+        var coMoves = space.Chosen == EmbeddingSpaceChoice.RealVectors
+            ? "ARM A and ARM B are the same source on this run, so their agreement is ONE fact, not two — read ARM C and ARM D."
+            : "ARM A and ARM C are the same source on this run, so their agreement is ONE fact, not two — read ARM B and ARM D.";
+
+        return new ControlRowSnapshot(
+            "AuthoredQueryPhraseRetrievability",
+            "the searching arms should be able to ASK for every interest the gold rewards, in the space this run "
+          + "actually retrieves in. ARM A (the RESOLVED path — whatever EmbeddingSpace handed the retrievers): a "
+          + "query that embeds to ZERO, or that the source answers UNAVAILABLE, gives the dense leg nothing, and "
+          + "the arm's low score is then a property of the corpus rather than of the arm. ARM B (the committed "
+          + "text-embedding-3-small assets, no key, no live fallback): a phrase absent from the asset, or an asset "
+          + "whose model / dimensions / template stamp fail to validate, is the same nothing. A real model cannot "
+          + "return a zero vector, so ARM B's zero test alone is near-vacuous; what it verifies is asset PRESENCE "
+          + "and stamp validity. ARM C (the concept space, measured directly): the space --concept-vectors forces "
+          + "and every asset-load failure falls back to, reported whether or not this run used it. ARM D is the "
+          + "THING the other three only proxy: the actual query strings the scored personas' interest maps produce "
+          + "— joins of phrases, companion classes, category names — none of which is an authored phrase.",
+            $"SPACE: {space.Source.Name} ({space.Source.ModelId}, {space.Source.Dimensions} dims) · {space.Reason}"
+          + $" · ARM A (resolved path): {deadA} of {total} authored phrase(s) unanswerable"
+          + (deadA == 0 ? "." : $"; {deadGoldA.Count} of them latent-GOLD: {string.Join(", ", deadGoldA)}.")
+          + $" · ARM B (committed real vectors): {deadB} of {total} dead — {noteB}"
+          + $" · ARM C (concept space, always measured): {deadC} of {total} embed to ZERO"
+          + (deadC == 0 ? "." : $"; {deadGoldC.Count} latent-GOLD: {string.Join(", ", deadGoldC)}.")
+          + $" · ARM D (the queries actually issued, on the resolved path): {deadIssued} of {issuedTotal} unanswerable"
+          + (deadIssued == 0 ? "." : $" — e.g. {string.Join(" | ", issuedExamples)}.")
+          + $" · {coMoves}"
+          + (allRetrievable
+                ? " Every arm can ASK for every interest the gold rewards, and for every query it actually issues."
+                : " READ EVERY EVAL 02 ARM NUMBER WITH THIS IN FRONT OF IT: on the interests listed above the dense "
+                + "retrieval leg contributes nothing, so a low coverage cell there is not evidence that the arm "
+                + "failed to reason. ADVISORY — closing ARM C means choosing a concept mapping per phrase, which "
+                + "moves every coverage cell, so it is reported rather than silently repaired; closing ARM D on the "
+                + "real-vector path means embedding the composed labels, which is a paid rebuild. Neither is done "
+                + "here, and a green row while either is open would claim a fix the suite has not had."),
+            allRetrievable,
+            Gating: false);
+    }
+
+    /// <summary>
+    /// Counts the authored context phrases an embedder cannot answer — a zero vector and an
+    /// <c>Unavailable</c> alike, because the dense leg gets the same nothing from both.
+    /// </summary>
+    /// <param name="embed">The embedder under test.</param>
+    /// <param name="goldTokens">Latent-gold suffixes, so a dead phrase that costs a persona its gold is named.</param>
+    private static (int Dead, List<string> DeadGold) MeasureAuthoredPhrases(
+        Func<string, ReadOnlyMemory<float>> embed,
+        IReadOnlySet<string> goldTokens)
+    {
+        int dead = 0;
         var deadGold = new List<string>();
 
         foreach (var (suffix, phrase) in InterestMapBuilder.ContextPhrases.OrderBy(k => k.Key, StringComparer.Ordinal))
         {
-            var vector = ConceptEmbeddingSource.Instance.Embed(phrase);
-            bool zero = true;
-            foreach (float component in vector)
-            {
-                if (Math.Abs(component) > 1e-6f) { zero = false; break; }
-            }
+            if (!IsDead(embed(phrase))) continue;
 
-            if (!zero) continue;
-
-            dead.Add(suffix);
+            dead++;
             if (goldTokens.Contains(suffix)) deadGold.Add(suffix);
         }
 
-        int total = InterestMapBuilder.ContextPhrases.Count;
-        bool conceptArmClean = dead.Count == 0;
+        return (dead, deadGold);
+    }
 
-        // ── Arm B — the committed real-vector path (B-6). No live fallback is passed, so a phrase
-        //    absent from the asset comes back Unavailable rather than quietly costing a live call:
-        //    the arm must measure the ASSET, not the credentials of whoever ran it.
-        var (realDead, realNote) = MeasureRealVectorArm();
-        bool realArmClean = realDead == 0;
-        bool allRetrievable = conceptArmClean && realArmClean;
+    /// <summary>
+    /// ARM D: the query strings the scored personas' interest maps actually produce, counted on
+    /// the resolved path.
+    /// </summary>
+    /// <remarks>
+    /// These come from <see cref="DiscoveryInterestMapping.QueryTermsFor"/> — the same method the
+    /// loop's round-1 plan is built from, and whose first entry is the label Demo 01's offline
+    /// baseline arm passes straight to <c>RetrievalQuery.For</c>. Deterministic: no model, no
+    /// credentials, no network.
+    /// </remarks>
+    /// <param name="source">The resolved embedding source.</param>
+    private static (int Total, int Dead, List<string> Examples) MeasureIssuedQueries(IEmbeddingSource source)
+    {
+        var queries = new SortedSet<string>(StringComparer.Ordinal);
 
-        return new ControlRowSnapshot(
-            "AuthoredQueryPhraseRetrievability",
-            "every phrase in InterestMapBuilder.ContextPhrases should be ASKABLE on BOTH embedding paths. "
-          + "That phrase is not decoration: it is the query the searching arms issue for the interest. "
-          + "ARM A (offline concept retriever, the path every demo and eval actually runs on): a phrase the "
-          + "24-dimension lexicon does not know embeds to ZERO, the dense leg returns nothing, and the arm's "
-          + "low score is then a property of the corpus rather than of the arm. ARM B (the committed "
-          + "text-embedding-3-small assets, no key, no live fallback): a phrase absent from the asset, or an "
-          + "asset whose model / dimensions / template stamp fail to validate, comes back UNAVAILABLE — "
-          + "operationally the same nothing. A real model cannot return a zero vector, so arm B's zero test "
-          + "alone is near-vacuous; what it actually verifies is asset PRESENCE and stamp validity.",
-            $"ARM A (concept, the live path): {dead.Count} of {total} authored phrase(s) embed to the ZERO vector"
-          + (dead.Count == 0 ? "." : $": {string.Join(", ", dead)}.")
-          + $" Of those, {deadGold.Count} are latent-GOLD tokens for a scored persona"
-          + (deadGold.Count == 0 ? "." : $": {string.Join(", ", deadGold)}.")
-          + $" · ARM B (committed real vectors): {realDead} of {total} dead — {realNote}"
-          + (allRetrievable
-                ? " Every arm can at least ASK for every interest the gold rewards, on both paths."
-                : " READ EVERY EVAL 02 ARM NUMBER WITH THIS IN FRONT OF IT: on the interests listed above the "
-                + "dense retrieval leg contributes nothing, so a low coverage cell there is not evidence that "
-                + "the arm failed to reason. ADVISORY — fixing ARM A means choosing a concept mapping per phrase, "
-                + "which moves every coverage cell, so it is reported rather than silently repaired. B-6 closed "
-                + "ARM B and deliberately did NOT close ARM A: the committed assets are not what the suite runs "
-                + "on, and a green row here would say they were."),
-            allRetrievable,
-            Gating: false);
+        foreach (var persona in CoveragePersonas.All)
+        {
+            var profile = UserProfiles.Require(persona.Id);
+            var map = InterestMapBuilder.Build(
+                profile.User,
+                profile.Purchases,
+                Catalogue.Default.BySku,
+                statedNeeds: null,
+                asOf: Catalogue.DemoToday,
+                sensitiveCategoryNames: Catalogue.Default.SensitiveCategories);
+
+            foreach (var signal in map.Signals)
+            {
+                foreach (var term in DiscoveryInterestMapping.QueryTermsFor(signal))
+                {
+                    if (!string.IsNullOrWhiteSpace(term)) queries.Add(term);
+                }
+            }
+        }
+
+        int dead = 0;
+        var examples = new List<string>();
+
+        foreach (var query in queries)
+        {
+            if (!IsDead(EmbedThrough(source, query))) continue;
+
+            dead++;
+            if (examples.Count < 3) examples.Add($"\"{Shorten(query, 46)}\"");
+        }
+
+        return (queries.Count, dead, examples);
     }
 
     /// <summary>
@@ -1090,21 +1198,53 @@ public static class NegativeControls
         int dead = 0;
         foreach (var phrase in InterestMapBuilder.ContextPhrases.Values)
         {
-            var vector = source.EmbedAsync(phrase).AsTask().GetAwaiter().GetResult();
-            if (vector.IsUnavailable()) { dead++; continue; }
-
-            bool zero = true;
-            foreach (float component in vector.Span)
-            {
-                if (Math.Abs(component) > 1e-6f) { zero = false; break; }
-            }
-            if (zero) dead++;
+            if (IsDead(EmbedThrough(source, phrase))) dead++;
         }
 
         return (dead,
                 $"{source.CachedVectorCount} committed '{source.ModelId}' vectors at {source.Dimensions} dims, "
               + $"{source.FallbackCalls} live call(s) made"
               + (source.LoadWarnings.Count == 0 ? "." : $"; {source.LoadWarnings.Count} load warning(s)."));
+    }
+
+    /// <summary>
+    /// Embeds through an <see cref="IEmbeddingSource"/> synchronously. Safe only for the OFFLINE
+    /// sources this row measures — both complete without a network call, which is why no live
+    /// fallback is ever attached to either of them.
+    /// </summary>
+    /// <param name="source">The source.</param>
+    /// <param name="text">The text.</param>
+    private static ReadOnlyMemory<float> EmbedThrough(IEmbeddingSource source, string text)
+    {
+        var pending = source.EmbedAsync(text);
+        return pending.IsCompleted ? pending.Result : pending.AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// True when a vector gives the dense leg nothing: UNAVAILABLE (the source cannot answer this
+    /// text at all) or all-zero (it recognised nothing in it). The two states are different and
+    /// are described differently elsewhere; for the purpose of "can this arm ask?" they are the
+    /// same nothing.
+    /// </summary>
+    /// <param name="vector">The vector.</param>
+    private static bool IsDead(ReadOnlyMemory<float> vector)
+    {
+        if (vector.IsUnavailable()) return true;
+
+        foreach (float component in vector.Span)
+        {
+            if (Math.Abs(component) > 1e-6f) return false;
+        }
+        return true;
+    }
+
+    /// <summary>Trims a query for a console line without hiding that it was trimmed.</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="budget">Maximum characters.</param>
+    private static string Shorten(string text, int budget)
+    {
+        var single = text.ReplaceLineEndings(" ").Trim();
+        return single.Length <= budget ? single : single[..Math.Max(0, budget - 1)] + "…";
     }
 
     // ══ Control 6 — the METRIC itself. Does latent coverage have room to discriminate? ════

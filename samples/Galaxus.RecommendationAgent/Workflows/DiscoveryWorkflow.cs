@@ -317,9 +317,15 @@ public static class GalaxusDiscoveryLoop
             ? recorder
             : new CompositeDiscoveryProgressSink(options.Progress, recorder);
 
+        // EmbeddingSpace, not a literal source: the space is chosen once per process (default
+        // concept, --real-vectors for the committed text-embedding-3-small assets) and printed, so
+        // this loop and Demo 01 can never be running in two different spaces in one session.
         var retriever = options.Retriever
             ?? await HybridRetriever
-                .BuildAsync(catalogue.All, ConceptEmbeddingSource.Instance, cancellationToken: cancellationToken)
+                .BuildAsync(
+                    catalogue.All,
+                    EmbeddingSpace.Resolve(catalogue.All).Source,
+                    cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
         var chatClient = options.Offline ? null : options.ChatClient ?? CreateChatClient();

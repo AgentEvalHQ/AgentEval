@@ -42,12 +42,13 @@
        EmbeddedResource pointing at a missing file is a hard build error (MSB3030), which
        is why they were absent until the assets existed.
 
-       ⚠ Adding them does NOT change how the demo retrieves. The default embedding source
-       on every demo and eval path is still ConceptEmbeddingSource (authored concept
-       vectors, deterministic, no key, no network) — see MEASUREMENT_STATUS §16. The
-       committed assets are the real-vector path that PrecomputedEmbeddingSource loads and
-       that the AuthoredQueryPhraseRetrievability control measures; nothing else reads them
-       today, and that is stated rather than implied. -->
+       Since B-7 (2026-09-05) these files ARE a retrieval path: EmbeddingSpace resolves the
+       embedding source for both demos, the discovery workflow and the eval suite, and the
+       "real-vectors" switch points it here. The DEFAULT is still ConceptEmbeddingSource
+       (authored concept vectors, deterministic, no key, no network) — because the query
+       side of this cache holds only anticipated text, so on the real-vector path Demo 01
+       recommends nothing and Eval 04 fails. Measured, both spaces, in
+       MEASUREMENT_STATUS §17. -->
   <ItemGroup>
     <EmbeddedResource Include="Data\catalogue.embeddings.json" />
     <EmbeddedResource Include="Data\queries.embeddings.json" />

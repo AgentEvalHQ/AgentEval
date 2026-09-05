@@ -64,6 +64,10 @@ if (parsed.LogRequested) logScope = ConsoleLogRecorder.StartLogging(parsed.LogPa
 if (!string.IsNullOrEmpty(parsed.ModelOverride)) Config.ModelOverride = parsed.ModelOverride;
 if (!string.IsNullOrEmpty(parsed.EmbeddingModelOverride)) Config.EmbeddingModelOverride = parsed.EmbeddingModelOverride;
 
+// Before ANY retriever is built. EmbeddingSpace throws if this moves after something resolved,
+// which is the guard against one run reporting numbers from two incomparable vector spaces.
+EmbeddingSpace.Requested = parsed.Space;
+
 try
 {
     if (parsed.RebuildEmbeddings)
@@ -161,6 +165,18 @@ static ParsedArgs? ParseArgs(string[] args)
 
             case "--rebuild-embeddings":
                 parsed.RebuildEmbeddings = true;
+                break;
+
+            // ── Which embedding SPACE retrieves. Parsed here and applied below, before any
+            //    retriever exists, because EmbeddingSpace refuses to change once resolved.
+            case "--concept-vectors":
+                if (parsed.Space is EmbeddingSpaceChoice.RealVectors) return null;
+                parsed.Space = EmbeddingSpaceChoice.ConceptVectors;
+                break;
+
+            case "--real-vectors":
+                if (parsed.Space is EmbeddingSpaceChoice.ConceptVectors) return null;
+                parsed.Space = EmbeddingSpaceChoice.RealVectors;
                 break;
 
             default:
@@ -442,6 +458,14 @@ Flags:
                          selects the products, and the panel says so. This is the
                          baseline arm — the thing a claim about the agent needs.
   --rebuild-embeddings   Regenerate Data/*.embeddings.json from a live embedding model.
+  --concept-vectors      Retrieve in the authored 24-dimension concept space. THE DEFAULT.
+                         It embeds ANY text with no key, so a query composed at run time
+                         still reaches the dense leg.
+  --real-vectors         Retrieve in the committed text-embedding-3-small space instead
+                         (Data/*.embeddings.json, still no key, nothing spent). Real
+                         vectors — but the QUERY side of a cache holds only text somebody
+                         anticipated, and a run-time-composed need is a miss, which turns
+                         that search LEXICAL-ONLY. Both spaces are printed in the banner.
   --model <deployment>   Override AZURE_OPENAI_DEPLOYMENT for this run only.
   --embedding-model <d>  Override AZURE_OPENAI_EMBEDDING_DEPLOYMENT for this run only.
   --model-timeout <secs> Demo 02 only. Wall-clock ceiling on ONE model call (default 60).
@@ -468,4 +492,7 @@ sealed record ParsedArgs
     public string? ModelOverride { get; set; }
     public string? EmbeddingModelOverride { get; set; }
     public int? ModelTimeoutSeconds { get; set; }
+
+    /// <summary>Which embedding space to retrieve in. Auto lets <c>EmbeddingSpace</c> decide.</summary>
+    public EmbeddingSpaceChoice Space { get; set; } = EmbeddingSpaceChoice.Auto;
 }

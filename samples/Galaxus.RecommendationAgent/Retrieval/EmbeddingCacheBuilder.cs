@@ -38,11 +38,19 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// an empty <c>Data/</c> folder.
 /// </para>
 /// <para>
-/// <b>What generating the assets did NOT do.</b> Every demo and eval path still builds its
-/// <c>HybridRetriever</c> with <see cref="ConceptEmbeddingSource"/>. Committing real vectors does
-/// not silently move the demo onto them, and this class must not be read as if it had: the assets
-/// are the real-vector path, and moving the default onto them is a separate, declared change that
-/// would move every measured number in the suite.
+/// <b>What reads these assets, since B-7 (2026-09-05).</b> <see cref="EmbeddingSpace"/> resolves
+/// the embedding source for every demo, the discovery workflow and the eval suite, and
+/// <c>--real-vectors</c> points it at these files. The DEFAULT is still
+/// <see cref="ConceptEmbeddingSource"/>, and that is a measured choice rather than inertia: the
+/// query side of this cache holds only text somebody anticipated, so the composed labels the arms
+/// search with miss it, and on the real-vector path Demo 01 recommends nothing and Eval 04 fails.
+/// The numbers are in <see cref="EmbeddingSpace.AutoPrefers"/> and in MEASUREMENT_STATUS §17.
+/// </para>
+/// <para>
+/// <b>The query set is the lever.</b> <see cref="DefaultQuerySet"/> is what a future rebuild would
+/// have to grow for the real-vector path to be a viable default — the composed conjunction labels,
+/// the leaf-category names, the companion classes. That is a paid run and a declared change, not a
+/// default flip.
 /// </para>
 /// </remarks>
 public static class EmbeddingCacheBuilder

@@ -644,11 +644,19 @@ public static class Demo01_RecommendationAgent
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Match</b> is the better of two legs. The concept-space cosine is the one that matters:
-    /// it connects "owns whole beans and vacuum canisters but no grinder" to a search for "a burr
-    /// grinder for espresso at home" with not one shared word. Token overlap is the fallback for a
-    /// need whose vocabulary the concept lexicon does not cover, where the cosine is legitimately
-    /// 0 for everything.
+    /// <b>Match</b> is the better of two legs. The cosine is the one that matters: it connects
+    /// "owns whole beans and vacuum canisters but no grinder" to a search for "a burr grinder for
+    /// espresso at home" with not one shared word. Token overlap is the fallback for a need whose
+    /// vocabulary the space does not cover, where the cosine is legitimately 0 for everything.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The cosine is taken in whichever space <see cref="EmbeddingSpace"/> resolved</b>, which
+    /// is the same space that did the retrieving — so this is not an independent check on
+    /// retrieval, and never was. On the <c>--real-vectors</c> path it degrades further and in a
+    /// specific direction: a product's embedding document is in the committed asset, but a
+    /// run-time-composed signal LABEL is not, so the label comes back Unavailable, the cosine is 0
+    /// for every signal, and attribution falls back to token overlap ALONE. That is a real change
+    /// in what this method measures and it is why the space is printed beside the numbers.
     /// </para>
     /// <para>
     /// <b>Ranking</b> among the signals that clear the floor is <c>match × strength</c> — two
@@ -682,15 +690,17 @@ public static class Demo01_RecommendationAgent
         InterestSignal? best = null;
         double bestRank = 0.0;
 
+        var products = Catalogue.Default.All;
+
         foreach (var signal in map.Signals)
         {
-            var label  = ConceptEmbeddingSource.Instance.Embed(signal.Label);
+            var label  = EmbeddingSpace.EmbedOffline(products, signal.Label);
             var tokens = ContentTokens(signal.Label);
 
             double match = 0.0;
             foreach (var probe in probes)
             {
-                double cosine  = EmbeddingVectors.DotOfUnitVectors(label, ConceptEmbeddingSource.Instance.Embed(probe));
+                double cosine  = EmbeddingVectors.DotOfUnitVectors(label.Span, EmbeddingSpace.EmbedOffline(products, probe).Span);
                 double overlap = Overlap(tokens, ContentTokens(probe));
                 match = Math.Max(match, Math.Max(cosine, overlap));
             }
@@ -786,19 +796,32 @@ public static class Demo01_RecommendationAgent
     /// </para>
     /// <para>
     /// So this is the mean of two code-derived quantities — the strength of the interest signal
-    /// the product was credited to, and the concept-space fit between the product's own embedding
-    /// document and that signal's label. Both are unmeasured against outcomes. It is a routing
+    /// the product was credited to, and the embedding-space fit between the product's own document
+    /// and that signal's label. Both are unmeasured against outcomes. It is a routing
     /// heuristic for the two trays and nothing more; the reliability curve of this number against
     /// a gold set belongs to the eval lane, and until that runs no claim is made about it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>CO-MOVING OPERANDS, and the coupling is now selectable rather than fixed.</b> The fit
+    /// is computed in the SAME space that retrieved the product, so a product retrieved because it
+    /// is near the label scores well on being near the label. That was already true and this change
+    /// does not repair it. What it does change is the second operand's behaviour per space: on the
+    /// concept path both texts embed and the fit is a real cosine; on the <c>--real-vectors</c>
+    /// path the product document is in the committed asset but the composed label is NOT, so the
+    /// fit collapses to 0 and this number becomes <c>strength / 2</c> — one operand, not two,
+    /// and every card lands in a lower band. The coupling gets LOOSER on that path only by
+    /// deleting one side of it, which is worse, not better.
     /// </para>
     /// </remarks>
     private static double Confidence(InterestSignal? signal, Product? product)
     {
         if (signal is null || product is null) return 0.0;
 
+        var products = Catalogue.Default.All;
+
         var fit = EmbeddingVectors.DotOfUnitVectors(
-            ConceptEmbeddingSource.Instance.Embed(signal.Label),
-            ConceptEmbeddingSource.Instance.Embed(EmbeddingDocument.ForProduct(product)));
+            EmbeddingSpace.EmbedOffline(products, signal.Label).Span,
+            EmbeddingSpace.EmbedOffline(products, EmbeddingDocument.ForProduct(product)).Span);
 
         return Math.Clamp((signal.Strength + Math.Max(0.0, fit)) / 2.0, 0.0, 1.0);
     }
@@ -857,14 +880,18 @@ public static class Demo01_RecommendationAgent
     /// Builds the retriever the three semantic tools search through.
     /// </summary>
     /// <remarks>
-    /// The offline <see cref="ConceptEmbeddingSource"/> is the default on purpose: it is
-    /// deterministic, needs no key, and genuinely retrieves by meaning.
-    /// <see cref="PrecomputedEmbeddingSource"/> is NOT reached for first — with no committed
-    /// asset it yields <c>denseAvailable = false</c>, and the demo would silently lose the
-    /// cross-category match that is its entire point.
+    /// <see cref="EmbeddingSpace"/> decides which space this run retrieves in — the authored
+    /// concept vectors (the default, and what <c>--concept-vectors</c> forces) or the committed
+    /// <c>text-embedding-3-small</c> assets (<c>--real-vectors</c>). The decision is printed by
+    /// <see cref="PrintRetrievalBanner"/>, so a reader always knows which space produced the
+    /// numbers on the screen, and the SAME resolved source backs the confidence arithmetic in
+    /// <see cref="Confidence"/> — one run is never half in one space and half in another.
     /// </remarks>
     private static async Task<IProductRetriever> BuildRetrieverAsync(Catalogue catalogue, CancellationToken cancellationToken)
-        => await HybridRetriever.BuildAsync(catalogue.All, ConceptEmbeddingSource.Instance, cancellationToken: cancellationToken)
+        => await HybridRetriever.BuildAsync(
+                     catalogue.All,
+                     EmbeddingSpace.Resolve(catalogue.All).Source,
+                     cancellationToken: cancellationToken)
                                 .ConfigureAwait(false);
 
     // ── Ledger annotations ────────────────────────────────────────────────────
@@ -1098,6 +1125,11 @@ public static class Demo01_RecommendationAgent
         Console.WriteLine($"  Retrieval: {retriever.Name} over {retriever.ProductCount} products · "
                         + $"dense leg {(retriever.DenseAvailable ? "available" : "UNAVAILABLE")}");
         Console.ResetColor();
+
+        // Which SPACE produced everything below. A reader who cannot see this cannot tell an
+        // authored 24-dimension cosine from a text-embedding-3-small one, and the two are not
+        // comparable — see EmbeddingSpace.
+        EmbeddingSpace.Current?.PrintBanner();
 
         if (retriever is HybridRetriever { DenseAvailable: false } hybrid)
             RecommendationPrinter.PrintDegradedRetrievalNotice(hybrid.DenseUnavailableReason);

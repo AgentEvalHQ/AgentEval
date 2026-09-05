@@ -44,6 +44,14 @@ The default retrieval path is an authored 24-dimension concept space
 (`Retrieval/ConceptEmbeddingSource.cs`), not committed OpenAI vectors. That is
 why **most of this sample runs with no credentials at all.**
 
+Since B-7 (2026-09-05) the committed `text-embedding-3-small` vectors are a real,
+selectable retrieval path — `--real-vectors`, which also needs no key and spends
+nothing — and `Retrieval/EmbeddingSpace.cs` is the one place the space is chosen.
+The default is still the concept space, for a measured reason: the query side of
+that cache holds only anticipated text, so on the real-vector path Demo 1
+recommends nothing and Eval 04's injection gate fails. Both spaces print
+themselves in every banner. `MEASUREMENT_STATUS.md` §17 has the full comparison.
+
 **Free — no key, no network, no model call. All of this runs on a laptop with the
 environment variables unset:**
 
@@ -165,10 +173,15 @@ point: `RrfK = 60`, 24 candidates pulled per leg, `topK` 8 by default (max 12).
   reproducible. `AzureEmbeddingSource` / `PrecomputedEmbeddingSource` /
   `EmbeddingCacheBuilder` implement the real-vector path, and since B-6
   (2026-09-05) the two committed vector assets exist — 99 product + 71 query
-  `text-embedding-3-small` vectors at 1536 dims, embedded as resources. ⚠ They
-  are **not** what the demo retrieves with: the dense leg is still
-  `ConceptEmbeddingSource` on every demo and eval path, and only Eval 03's
-  `AuthoredQueryPhraseRetrievability` arm B reads the assets.
+  `text-embedding-3-small` vectors at 1536 dims, embedded as resources.
+  `EmbeddingSpace.cs` (B-7) is the **one** place the space is chosen — the
+  default is the concept source, `--real-vectors` selects the committed assets,
+  `--concept-vectors` forces the default, and an asset that fails its stamp check
+  falls back LOUDLY rather than silently. No live fallback is ever attached, so
+  neither path can spend money. ⚠ The real-vector path is **not** the default and
+  should not be read as better: its query cache holds only anticipated text, so
+  38 of the 50 queries the arms actually issue miss it — Demo 1 then recommends
+  nothing and Eval 04 fails. `MEASUREMENT_STATUS.md` §17.
 - **Lexical leg** — `LexicalIndex.cs`: IDF-weighted token overlap with an exact
   boost for model numbers and GTINs, because Galaxus customers type `α7 IV`,
   `A7IV` and `ILCE-7M4` for one product and a 1536-dimensional vector treats the
@@ -406,7 +419,7 @@ pass.
 |---|---|---|
 | `LatentCoverageDiscrimination` | advisory | every persona's random-draw floor must stay below 0.50, or the metric is a decoration |
 | `LatentCoveragePersonaDiscrimination` | advisory | the tag-join oracle must identify its own customer above the 0.083 chance rate, or latent coverage carries **zero** information about personalisation |
-| `AuthoredQueryPhraseRetrievability` | advisory | every authored query phrase must be ASKABLE on **both** embedding paths. **Arm A** (offline concept retriever — the path everything actually runs on): a phrase the 24-dimension lexicon does not know embeds to zero and the dense leg returns nothing, so the arm's low score is a property of the corpus. **Arm B** (the committed `text-embedding-3-small` assets, no key): a phrase absent from the asset, or an asset whose model / dimensions / template stamp fail to validate, answers `Unavailable` — the same nothing. Verdict is A ∧ B |
+| `AuthoredQueryPhraseRetrievability` | advisory | the searching arms must be able to ASK for every interest the gold rewards, in the space this run actually retrieves in. **Arm A** (the RESOLVED path, whatever `EmbeddingSpace` handed the retrievers): a query that embeds to zero, or that the source answers `Unavailable`, gives the dense leg nothing. **Arm B** (the committed `text-embedding-3-small` assets, no key, no live fallback): asset presence and stamp validity. **Arm C** (the concept space, measured directly and always, so one number never co-moves with the selector). **Arm D** (the queries the arms actually ISSUE — joins, companion classes, category names; the THING the other three only proxy). Verdict is A ∧ B ∧ D |
 | `Broken01_HallucinatingRecommender` | **gates** | score 0/14 and trip D1, D4/D6 and D5 |
 | `Broken02_UncitedRecommender` | **gates** | pass D1 and D2 while failing D5 everywhere — proves the suite distinguishes *which* invariant broke |
 | `Broken03_SingleShotWorkflow` | **gates** | be a **valid comparator**: present something, no phantom SKU, every citation resolves. A control that presents nothing would pass "the loop wins" for the wrong reason |
@@ -564,12 +577,19 @@ else:**
   evidence the arm failed to reason. Read every Eval 02 number with this in front
   of it. **Arm B (the committed real vectors, added by B-6): 0 of 56 dead** — 170
   `text-embedding-3-small` vectors at 1536 dims load from the embedded assets with
-  no key and no live call. The row stays a FINDING because its verdict is A ∧ B:
-  arm B is clean and **nothing retrieves against it**, so a green row here would
-  claim a fix the suite has not had. Arm B's zero test is also near-vacuous on its
-  own — a real model cannot return a zero vector — so what it verifies is asset
-  presence and stamp validity, demonstrated by bumping the template version and
-  watching it read 56 of 56 dead. See `MEASUREMENT_STATUS.md` §16.
+  no key and no live call. Arm B's zero test is near-vacuous on its own — a real
+  model cannot return a zero vector — so what it verifies is asset presence and
+  stamp validity, demonstrated by bumping the template version and watching it
+  read 56 of 56 dead. See `MEASUREMENT_STATUS.md` §16.
+  **Since B-7 the row has four arms and its verdict is A ∧ B ∧ D.** Arm A now
+  measures the *resolved* path, so under `--real-vectors` it reads **0 of 56** and
+  B-6's acceptance is met. The row is still a FINDING, and the reason is the new
+  **arm D: the queries the arms actually issue** — joins of phrases, companion
+  classes, category names, none of which is an authored phrase. Arm D reads
+  **8 of 50** dead on the default concept path and **38 of 50** on the real-vector
+  path. Arm C reports the concept space unconditionally, so the row always carries
+  one number that cannot co-move with the selector. Without arm D this row would
+  have gone green on the change that broke retrieval. `MEASUREMENT_STATUS.md` §17.
 
 **Deterministic-arm coverage means** (Eval 02's six-arm matrix, identical in the
 dry run and the live run because these arms make no model call): single-shot
@@ -831,14 +851,14 @@ silently repaired.
 
 | # | Gap | Why it was not fixed |
 |---|---|---|
-| 1 | **10 dead query phrases, STILL OPEN after B-6.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero on the offline concept path (`AuthoredQueryPhraseRetrievability`, arm A) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 committed real `text-embedding-3-small` vectors and closed the row's *arm B*; it deliberately did **not** touch arm A, and nothing retrieves against the committed assets |
+| 1 | **10 dead query phrases, STILL OPEN after B-6 and B-7.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero in the concept space (`AuthoredQueryPhraseRetrievability`, arm C — and arm A whenever that space is the resolved one, which is the default) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 closed the row's *arm B*; B-7 made arm A measure the resolved path and added arms C and D. Neither touched the lexicon. B-7 also found the **larger** version of this defect: **8 of the 50 queries the arms actually issue** are dead in the concept space too, and 38 of 50 on the real-vector path |
 | 2 | **`"wahl"` in the political-opinion term set** | Changing a screening term changes what the eval measures. Same precedent as #1 |
 | 3 | **Demo 2's 60 s model timeout** vs `gpt-5.5`'s latency on the three JSON-envelope stages | A threshold decision, not a verification one. `--model-timeout` exists precisely to change it, and the 60 s value is documented as measured (without it a stalled deployment queues ~40 min) |
 | 4 | **`DetectOptOutBackstop` is unverified and uncovered** — the only reader of the tool-result channel | Localising it (extractor vs. detector) needs one instrumented live turn |
 | 5 | **The pre-registered A/B has never been run.** Eval 09 was built to run it — both arms live, spend metered under each, a CONFOUNDED verdict if the budgets diverge — and it is the single most valuable thing left to do here | It costs a second live architecture across twelve personas × 2 reps plus a judge call per cell: roughly 20–45 minutes and a bill the cost panel reports exactly. Nobody has spent it |
 | 6 | **Two-sided evidence is one-and-a-half-sided** — no `userEvidence` argument on `PresentRecommendation` | The fix is purely additive (a fifth argument, never a rename — `Domain/Recommendation.cs` is the cross-lane contract), but it changes the frozen tool signature both projects grade against |
 | 7 | **Demo 1 has no candidate-set containment** | The candidate set must first be widened to *every* retrieval route — today only the three semantic tools record provenance, so `BrowseCategory` results legitimately arrive with none. Enforcing before widening would drop legitimate results |
-| 8 | ~~**The two committed embedding assets do not exist.**~~ **CLOSED 2026-09-05 (B-6).** `Data/catalogue.embeddings.json` (99 vectors) and `Data/queries.embeddings.json` (71) now hold real `text-embedding-3-small` output at 1536 dims, template stamp `v2`, and the two `<EmbeddedResource>` lines landed in the same commit | 170 live calls, 13 383 prompt tokens, ≈ USD 0.00027. Every Eval 02 cell was re-measured and **none moved**, because nothing retrieves against the assets: every demo and eval still builds its retriever with `ConceptEmbeddingSource`. `MEASUREMENT_STATUS.md` §16 has the full before/after and the four residual limits |
+| 8 | ~~**The two committed embedding assets do not exist.**~~ **CLOSED 2026-09-05 (B-6), and wired 2026-09-05 (B-7).** `Data/catalogue.embeddings.json` (99 vectors) and `Data/queries.embeddings.json` (71) hold real `text-embedding-3-small` output at 1536 dims, template stamp `v2` | B-6: 170 live calls, 13 383 prompt tokens, ≈ USD 0.00027; no Eval 02 cell moved, because nothing retrieved against the assets. B-7 built `EmbeddingSpace` so `--real-vectors` does retrieve against them (no key, nothing spent) and measured both spaces. **The default did not move, and the measurement is why:** on the real-vector path 38 of 50 issued queries miss the cache, Demo 1 falls from 6 recommendations to 0 for every persona that has any, and Eval 04 exits 1. `MEASUREMENT_STATUS.md` §17 |
 | 9 | **The D-3 vocabulary control is monolingual.** The fix is to give the *catalogue's own* category and attribute vocabulary de/fr/it forms — **not** to widen with review text, which is the laundering channel | A corpus authoring task with its own re-measurement cost |
 | 10 | **Evals 05, 06, 08 and 09 have no measured results in this file.** All four need credentials and all four landed after the measured live run; the binaries that produced the Eval 01/02 numbers contained Evals 01–04 only. (Eval 07 needs no model, was run on 2026-09-04 against the current tree and **is** reported.) | Reporting a number for any of them here would be reporting a number nobody ran |
 | 11 | **The tree is moving faster than any document about it.** Evals 05–09, `--skip-slow` and `CredentialGuard` all landed on 2026-09-04 between the measured live run and this file being written; the earlier record of a warning-free build predates them, and a build today also emits `CS0162: Unreachable code detected` at `Eval04_ReviewInjectionContainment.cs:72` | Nothing to fix in this README beyond re-reading the tree before quoting it. Re-run `Evals -- 3`, `-- 4`, `-- 7` and `--ci --dry-run` — all four are free — before trusting any figure above |

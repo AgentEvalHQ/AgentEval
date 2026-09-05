@@ -21,11 +21,16 @@ namespace Galaxus.RecommendationAgent.Evals;
 /// binding is asserted, not assumed.
 /// </para>
 /// <para>
-/// <b>Offline by construction.</b> The default embedding source is
-/// <see cref="ConceptEmbeddingSource"/> — authored concept vectors, deterministic, no API key.
-/// <see cref="PrecomputedEmbeddingSource"/> is deliberately NOT the default: with no committed
-/// vector asset it yields <c>denseAvailable = false</c>, and the eval would then be scoring a
-/// lexical-only agent while the report still said "hybrid".
+/// <b>Offline by construction, and the SPACE is selected in one place.</b> The source comes from
+/// <see cref="EmbeddingSpace"/>, which resolves to <see cref="ConceptEmbeddingSource"/> by default
+/// (authored concept vectors, deterministic, no API key) and to
+/// <see cref="PrecomputedEmbeddingSource"/> over the committed <c>text-embedding-3-small</c> assets
+/// under <c>--real-vectors</c>. Neither ever attaches a live fallback, so no eval can spend money
+/// on an embedding call by accident. Which space was used is printed by
+/// <see cref="EnsureBoundAsync"/> on the bind that builds the index, and reported by the
+/// <c>AuthoredQueryPhraseRetrievability</c>
+/// control, because a coverage number produced in the concept space and one produced in
+/// <c>text-embedding-3-small</c> are not comparable and must never be tabulated together.
 /// </para>
 /// </remarks>
 public static class EvalRuntime
@@ -50,8 +55,16 @@ public static class EvalRuntime
         if (_retriever is not null && GalaxusTools.IsBound) return _retriever;
 
         var catalogue = Catalogue.Default;
+        var space     = EmbeddingSpace.Resolve(catalogue.All);
+
+        // Printed on the ONE bind that builds the index, before any eval has scored anything. A
+        // coverage cell from the concept space and one from text-embedding-3-small answer
+        // different questions, and a report that does not name the space invites a reader to
+        // tabulate them together.
+        space.PrintBanner();
+
         HybridRetriever retriever = await HybridRetriever
-            .BuildAsync(catalogue.All, ConceptEmbeddingSource.Instance, cancellationToken: ct)
+            .BuildAsync(catalogue.All, space.Source, cancellationToken: ct)
             .ConfigureAwait(false);
 
         GalaxusTools.Bind(retriever);
