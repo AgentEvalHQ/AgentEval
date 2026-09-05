@@ -743,7 +743,7 @@ public static class Eval02_LatentInterestCoverage
         }
 
         string snapshotKey = onlyPersona is null ? EvalResultStore.CoverageKey : ProbeSnapshotKey;
-        EvalResultStore.SaveCoverage(snapshotKey, ownK.ToSnapshot(floors, declaredK, GalaxusEvalPrompt.CoverageCanonical, atK));
+        EvalResultStore.SaveCoverage(snapshotKey, ownK.ToSnapshot(floors, declaredK, GalaxusEvalPrompt.CoverageCanonical, atK, "Eval 02 — Latent-Interest Coverage"));
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"  📁 Snapshot saved → {EvalResultStore.StorageLocation} ({snapshotKey})");
         Console.ResetColor();

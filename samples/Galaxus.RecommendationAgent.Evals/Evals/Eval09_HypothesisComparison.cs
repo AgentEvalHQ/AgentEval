@@ -313,7 +313,14 @@ public static class Eval09_HypothesisComparison
 
         var liveAgent = RecommendationAgentFactory.Create(agentClient);
 
+        // TWO reports over the same turns, exactly as Eval 02 keeps them. `report` scores each arm
+        // at whatever it presented — the floors, the forced choice, the cost, the telemetry, the
+        // snapshot. `atK` scores the same turns cut to the DECLARED budget, and it is the ONLY one
+        // any pairing is allowed to read. One turn, two readings; neither is derived from the other
+        // after the fact.
+        int declaredK = CoverageArms.DeclaredK;
         var report = new PairedCoverageReport();
+        var atK = new PairedCoverageReport();
         var judged = new Eval09JudgedReport(Eval09PreRegistration.JudgedCriteria);
         var floors = new Dictionary<string, double>(StringComparer.Ordinal);
         var notes = new List<string>();
@@ -366,6 +373,7 @@ public static class Eval09_HypothesisComparison
             {
                 int armReps = live ? reps : 1;
                 var armScores = new List<CoverageScore>(armReps);
+                var armCutScores = new List<CoverageScore>(armReps);
 
                 for (int rep = 1; rep <= armReps; rep++)
                 {
@@ -398,7 +406,7 @@ public static class Eval09_HypothesisComparison
                     ledger?.RecordTurn();
 
                     Eval09ArmCell cell = await ScoreArmAsync(
-                        persona, goldByPersona, arm, harness, options, report, label, repLabel, ct)
+                        persona, goldByPersona, arm, harness, options, report, label, repLabel, declaredK, ct)
                         .ConfigureAwait(false);
 
                     string cellName = $"{persona.Id} · {EvalPrinter.ShortArm(label)} · {repLabel}";
@@ -502,11 +510,20 @@ public static class Eval09_HypothesisComparison
                     }
 
                     armScores.Add(score);
+                    if (cell.Cut is { } cutScore) armCutScores.Add(cutScore);
                 }
 
                 if (armScores.Count > 0)
                 {
                     report.Record(persona.Id, label, CoverageScore.Mean(armScores));
+
+                    // Every rep of an arm is cut to the SAME declared budget, so Mean's equal-k
+                    // guard is satisfied by construction here and KUniformAcrossReps is COMPUTED
+                    // from the cuts rather than asserted.
+                    if (armCutScores.Count > 0)
+                    {
+                        atK.Record(persona.Id, label, CoverageScore.Mean(armCutScores));
+                    }
                 }
                 else
                 {
@@ -522,21 +539,48 @@ public static class Eval09_HypothesisComparison
 
         EvalPrinter.PrintForcedChoice(report, forcedChoiceFloor, scorablePersonas);
 
-        // The PRIMARY endpoint, and the two comparisons the decision rule reads.
-        SignTestOutcome primary = report.SignTest(ArmSingleAgent, ArmWorkflow);
-        SignTestOutcome versusRubberStamp = report.SignTest(ArmRubberStamp, ArmWorkflow);
-        SignTestOutcome agentVersusRubberStamp = report.SignTest(ArmRubberStamp, ArmSingleAgent);
-        SignTestOutcome workflowVersusFloor = report.SignTest(ArmJudgeFloor, ArmWorkflow);
-        SignTestOutcome agentVersusFloor = report.SignTest(ArmJudgeFloor, ArmSingleAgent);
+        // ⚠ EVERY PAIRING GOES THROUGH THE EQUAL-k RULE, ON THE CUT CELLS.
+        //
+        // Until 2026-09-06 these five lines read `report.SignTest(...)` — the k-BLIND method whose
+        // own docstring named this eval as the sole reason it was still kept. MEASURED on the
+        // 2026-09-05 live run: Robin presented exactly k = 5 on all 24 reps, the workflow presented
+        // 3–11 and NEVER 5, on 0 of 21 scored reps (mean k 6.875). Latent coverage is recall and
+        // monotone in k, so 16 of those 21 pairs scored the workflow on a strictly larger slate.
+        //
+        // ⚠ AND THIS IS NOT "NOW IT IS FAIR". Switching methods cannot rescue that run's verdict
+        // and must not be reported as though it might. Cutting the workflow to k = 5 can only
+        // REMOVE served gold tokens (TopK is a prefix, Grade unions a set over it), while Robin's
+        // 0.750 does not move because it was already at k = 5 on every rep. So the workflow's
+        // own-k standing is its BEST case at equal k and it cannot reach p < 0.05 in any outcome.
+        // What this changes is what the eval is allowed to SAY: pairs that are not at equal k are
+        // now listed NOT COMPARABLE instead of being counted as wins, losses and ties.
+        SignTestOutcome primary = atK.SignTestAtEqualK(ArmSingleAgent, ArmWorkflow, CoverageMetric.Recall);
+        SignTestOutcome versusRubberStamp = atK.SignTestAtEqualK(ArmRubberStamp, ArmWorkflow, CoverageMetric.Recall);
+        SignTestOutcome agentVersusRubberStamp = atK.SignTestAtEqualK(ArmRubberStamp, ArmSingleAgent, CoverageMetric.Recall);
+
+        // The k-INVARIANT channel, which this eval never computed at all: GradeWithControls leaves
+        // PrecisionAtK undefined, so the only endpoint on the page was the one that moves with k.
+        // Reported, never gated — the pre-registered rule names recall and is not being rewritten
+        // after the fact.
+        SignTestOutcome primaryPrecision = atK.SignTestAtEqualK(ArmSingleAgent, ArmWorkflow, CoverageMetric.PrecisionAtK);
 
         EvalPrinter.PrintSignTest(
         [
             primary,
             versusRubberStamp,
             agentVersusRubberStamp,
-            workflowVersusFloor,
-            agentVersusFloor,
+            primaryPrecision,
         ]);
+
+        // ── The contentless floor: a FLOOR CHECK, and it is no longer dressed as a sign test. ──
+        //
+        // The two rows that used to sit under the panel above paired each live arm against the
+        // contentless arm and reported W/L/T 12/0/0, p = 0.0005. Under the equal-k rule those pairs
+        // do not exist: the floor arm presents NOTHING by construction, and a silent side is never
+        // at equal k with an answer. Deleting the rows would delete a real statement, so the
+        // statement is made in the form it was always in — a count against a floor, with the floor
+        // printed beside it — rather than as a p-value it was never entitled to.
+        PrintFloorCheck(report, atK, floors, notes);
 
         var budget = Eval09Budget.Measure(agentTokens, workflowTokens);
         PrintBudgetPanel(budget, agentTokens, workflowTokens, judgeTokens, dryRun);
@@ -707,7 +751,15 @@ public static class Eval09_HypothesisComparison
                 new Eval09DryRunEvidence(voidedCells, secondTurns, budget, verdict)) ? 0 : 1;
         }
 
-        EvalResultStore.SaveCoverage(SnapshotKey, report.ToSnapshot(floors));
+        // ⚠ The label is the CALLER's, not the method's. This snapshot went to disk reading
+        // "Eval 02 — Latent-Interest Coverage" for as long as it existed (MEASUREMENT_STATUS
+        // §23.10, defect 4): a different eval, different arms, different question, saved under
+        // another eval's name. The own-k cells are saved, and the declared-k cut beside them —
+        // the pairing reads the second, so a record that kept only the first could not be
+        // re-checked against the verdict it produced.
+        EvalResultStore.SaveCoverage(SnapshotKey, report.ToSnapshot(
+            floors, declaredK, GalaxusEvalPrompt.CoverageCanonical, atK,
+            "Eval 09 — Single agent vs discovery workflow"));
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"  📁 Coverage snapshot saved → {EvalResultStore.StorageLocation}\\{SnapshotKey}.json");
         Console.WriteLine("     ⚠ The JUDGED panel and the TOKEN LEDGER are printed, not snapshotted. CoverageSnapshot");
@@ -774,6 +826,7 @@ public static class Eval09_HypothesisComparison
         PairedCoverageReport report,
         string armLabel,
         string repLabel,
+        int declaredK,
         CancellationToken ct)
     {
         var testCase = new TestCase
@@ -806,20 +859,117 @@ public static class Eval09_HypothesisComparison
             Console.WriteLine($"      {armLabel,-34} {repLabel,-16} ❌ the turn threw: {result.Error?.Message}");
             Console.WriteLine("                                                          EXCLUDED — not scored 0.000.");
             Console.ResetColor();
-            return new Eval09ArmCell(null, result, []);
+            return new Eval09ArmCell(null, null, result, []);
         }
 
         IReadOnlyList<PresentedCall> presented = PresentedCall.FromToolUsage(result.ToolUsage);
-        CoverageScore score = InterestCoverageGrader.GradeWithControls(persona.Id, goldByPersona, presented);
 
-        return new Eval09ArmCell(score, result, presented);
+        // ⚠ TWO readings of one turn, and only one of them may ever be paired.
+        //
+        // `Own` is the arm at whatever k it chose — the floors, the forced choice, the telemetry.
+        // `Cut` is the same turn cut to the DECLARED budget, which is the only cell an equal-k
+        // pairing may touch. Until 2026-09-06 this method produced only the first and the eval
+        // paired it k-blind: MEASURED on the 2026-09-05 live run, Robin presented exactly 5 items
+        // on all 24 reps and the workflow presented 3–11 and never 5, on 0 of 21 scored reps.
+        // Latent coverage is recall and monotone in k, so 16 of those 21 pairs compared a longer
+        // slate against a shorter one and the difference was reported as architecture.
+        CoverageScore own = InterestCoverageGrader.GradeWithControls(persona.Id, goldByPersona, presented);
+        CoverageScore cut = InterestCoverageGrader.GradeAtDeclaredK(persona.Id, goldByPersona, presented, declaredK);
+
+        return new Eval09ArmCell(own, cut, result, presented);
     }
 
-    /// <summary>One arm's one rep: the score, the harness result it was read from, and the presented calls.</summary>
-    /// <param name="Score">The deterministic coverage score, or null when the turn threw.</param>
+    /// <summary>
+    /// The contentless-floor comparison, printed as the FLOOR CHECK it is rather than as a paired
+    /// sign test it is not entitled to be.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this is not a sign test.</b> The floor arm presents nothing, on purpose — that is what
+    /// makes it a floor. Under the equal-k rule a silent side is never comparable with an answer, so
+    /// pairing against it produces twelve refusals and no verdict. The claim it used to carry
+    /// ("both live architectures beat a contentless answer on 12 of 12 personas, p = 0.0005") is
+    /// true and worth keeping; it is a count of personas that presented at least one gold-carrying
+    /// product, and it is printed as that.
+    /// </para>
+    /// <para>
+    /// <b>And a stronger check is printed beside it,</b> because "beat an empty answer" is a bar any
+    /// arm clears by presenting one right item: whether each arm cleared its OWN random-draw floor,
+    /// persona by persona, at the k it actually presented. That floor is derived from the corpus,
+    /// it rises with k, and it is the number a coverage cell has to be read against.
+    /// </para>
+    /// </remarks>
+    /// <param name="report">The own-k report — floors are derived at each arm's own presentation count.</param>
+    /// <param name="atK">The declared-budget report, for the cut cells' own floors.</param>
+    /// <param name="floors">The per-persona degenerate-draw floor, for the record.</param>
+    /// <param name="notes">Notes to append the finding to.</param>
+    private static void PrintFloorCheck(
+        PairedCoverageReport report, PairedCoverageReport atK,
+        IReadOnlyDictionary<string, double> floors, List<string> notes)
+    {
+        string[] entrants = [ArmSingleAgent, ArmWorkflow, ArmRubberStamp];
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  ─── FLOOR CHECK — not a paired sign test, and it never was one ────────");
+        Console.ResetColor();
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("      The contentless arm presents NOTHING by construction, so no pair with it is at");
+        Console.WriteLine("      equal k and the equal-k rule refuses every one. What survives is a COUNT with a");
+        Console.WriteLine("      floor beside it, which is what the 12/0/0 always was.");
+        Console.ResetColor();
+
+        // A floor that is not at the floor is a wiring fault, and it is checked before it is used.
+        var floorCells = report.Personas.Select(p => report.ScoreOf(p, ArmJudgeFloor)).Where(s => s is not null).ToList();
+        bool floorIsZero = floorCells.Count > 0 && floorCells.All(s => s!.Value.Latent == 0.0);
+        if (!floorIsZero)
+        {
+            notes.Add($"🔴 THE CONTENTLESS FLOOR ARM DID NOT SCORE 0.000 on every persona "
+                    + $"({floorCells.Count(s => s!.Value.Latent != 0.0)} of {floorCells.Count} nonzero). It is supposed "
+                    + "to present nothing. Every 'beats the floor' count below is uninterpretable until that is "
+                    + "explained — the floor is supplying the bar it is measured against.");
+        }
+
+        foreach (string arm in entrants)
+        {
+            var cells = report.Personas
+                .Select(p => (Persona: p, Score: report.ScoreOf(p, arm)))
+                .Where(x => x.Score is { IsScorable: true })
+                .ToList();
+
+            if (cells.Count == 0) continue;
+
+            int beatsContentless = cells.Count(x => x.Score!.Value.Latent > 0.0);
+            var belowOwn = cells.Where(x => x.Score!.Value.AboveOwnFloor is not true).Select(x => x.Persona).ToList();
+            double meanFloor = cells.Average(x => x.Score!.Value.LatentFloor);
+            double meanK = cells.Average(x => (double)x.Score!.Value.PresentedCount);
+
+            bool clean = beatsContentless == cells.Count && belowOwn.Count == 0;
+            Console.ForegroundColor = clean ? ConsoleColor.Green : ConsoleColor.Yellow;
+            Console.WriteLine($"      {EvalPrinter.ShortArm(arm),-26} beats the contentless answer on {beatsContentless}/{cells.Count} "
+                            + $"· clears its OWN random-draw floor on {cells.Count - belowOwn.Count}/{cells.Count} "
+                            + $"(mean floor {Format(meanFloor)} at mean k {meanK:F1})"
+                            + (belowOwn.Count > 0 ? $" · BELOW on {string.Join(", ", belowOwn)}" : ""));
+            Console.ResetColor();
+        }
+
+        var cutFloor = atK.Personas.Select(p => atK.ScoreOf(p, ArmJudgeFloor)).Where(s => s is not null).ToList();
+        notes.Add("FLOOR CHECK, not a sign test: the contentless arm is SILENT by construction, so under the equal-k "
+                + "rule every pair with it is NOT COMPARABLE and no p-value is available for it. The claim that "
+                + "survives is a count — how many personas each arm beat an empty answer on, and how many it cleared "
+                + "its own random-draw floor on — printed above with the floor beside it. The earlier form of this "
+                + "result, 'W/L/T 12/0/0, p = 0.0005', paired a k = 5 answer against a k = 0 non-answer and is "
+                + "withdrawn as a p-value, not as a finding."
+                + (cutFloor.Count > 0 ? $" At the declared budget the floor arm's precision@k is {Format(cutFloor.Average(s => s!.Value.PrecisionAtK))}, which is 0 by construction and not a measurement of anything." : ""));
+    }
+
+    /// <summary>One arm's one rep: both scores, the harness result they were read from, and the presented calls.</summary>
+    /// <param name="Score">The coverage score at the arm's OWN k, or null when the turn threw. Floors and telemetry only.</param>
+    /// <param name="Cut">The same turn cut to the DECLARED budget — the only cell that may be paired.</param>
     /// <param name="Result">The harness result, judge rows included.</param>
     /// <param name="Presented">The presentation calls in the trace.</param>
-    private readonly record struct Eval09ArmCell(CoverageScore? Score, TestResult Result, IReadOnlyList<PresentedCall> Presented);
+    private readonly record struct Eval09ArmCell(
+        CoverageScore? Score, CoverageScore? Cut, TestResult Result, IReadOnlyList<PresentedCall> Presented);
 
     /// <summary>The per-cell console line, printed by the caller once the cell's fate is decided.</summary>
     /// <remarks>
@@ -1281,6 +1431,7 @@ public static class Eval09_HypothesisComparison
             Eval09Outcome.SingleAgentWins => ConsoleColor.Green,
             Eval09Outcome.Confounded => ConsoleColor.Red,
             Eval09Outcome.ArmNotLive => ConsoleColor.Red,
+            Eval09Outcome.NotComparableAtEqualK => ConsoleColor.Red,
             _ => ConsoleColor.Yellow,
         };
         WrapRow("  " + verdict.Headline);
@@ -1353,7 +1504,10 @@ public static class Eval09_HypothesisComparison
     /// <param name="agentMean">The single agent's mean latent coverage.</param>
     /// <param name="judged">The judged report, for the criterion count.</param>
     /// <returns>Paragraphs, unwrapped. An empty string is a blank line.</returns>
-    private static IReadOnlyList<string> NegativeResultText(
+    // internal, not private: Eval 03's Eval09RemedyIsLedgerDerived control asserts that the
+    // ArmNotLive remedy stops prescribing a timeout fix on a run whose calls all returned. A
+    // remedy that only exists inside a print method cannot be checked by anything.
+    internal static IReadOnlyList<string> NegativeResultText(
         Eval09Verdict verdict,
         SignTestOutcome primary,
         Eval09Budget budget,
@@ -1436,6 +1590,18 @@ public static class Eval09_HypothesisComparison
                        + "failure as a quality difference.");
                 break;
 
+            case Eval09Outcome.NotComparableAtEqualK:
+                text.Add("The comparison was NOT MADE. Every persona was refused at equal k: on each one the two arms "
+                       + "presented different numbers of items, or a side was silent, and latent coverage is a recall "
+                       + "— monotone in the number of items presented. Pairing them anyway would have measured list "
+                       + "length and reported it as architecture.");
+                text.Add("");
+                text.Add($"WHAT IT SAYS. Nothing about which architecture is better. The {primary.Excluded.Count} "
+                       + "refused pair(s) are listed in the sign-test panel with both k's, so the reader can see "
+                       + "exactly where the comparison ran out. ⚠ The p-value beside an empty sign test is 1.0000 by "
+                       + "arithmetic, not by measurement, and it is not evidence that the arms agree.");
+                break;
+
             case Eval09Outcome.SingleAgentWins:
                 text.Add("The comparison came out in the direction the design did not predict: one agent with eleven "
                        + "tools beat the five-executor workflow on the endpoint this eval pre-registered.");
@@ -1482,12 +1648,40 @@ public static class Eval09_HypothesisComparison
         text.Add("");
         text.Add(verdict.Outcome switch
         {
+            // ⚠ THE REMEDY IS DERIVED FROM THIS RUN'S OWN LEDGER, not printed from a prior run's
+            // diagnosis. It used to prescribe raising DiscoveryLoopOptions.ModelCallTimeout on
+            // every ArmNotLive verdict, citing 2026-09-04's "6 of 7 calls abandoned at the 60 s
+            // ceiling". On 2026-09-05 the ledger read 120 attempted / 120 returned / 0 cancelled
+            // and five stages fell back anyway — on unparseable output. The panel sent the reader
+            // to a timeout that had not fired. A stage falls back for two different reasons and
+            // they have two different fixes, so the ledger decides which sentence is printed.
+            Eval09Outcome.ArmNotLive when budget.EveryWorkflowCallReturned =>
+                $"WHAT WOULD CHANGE THE ANSWER. NOT the timeout. This run's ledger reads {budget.WorkflowAttempted} "
+              + $"attempted / {budget.WorkflowReturned} returned / {budget.WorkflowCancelled} cancelled / "
+              + $"{budget.WorkflowFailed} failed on the workflow arm, so every model call this eval asked for came "
+              + "back. A stage that fell back with its call in hand fell back on CONTENT — an interest envelope or a "
+              + "reviewer verdict the stage could not parse — and raising DiscoveryLoopOptions.ModelCallTimeout would "
+              + "fix none of it. What would: make the stages' envelopes parseable (a schema-constrained response, or "
+              + "a repair pass that is itself counted as a degraded stage), then re-run. Lowering the bar for what "
+              + "counts as live would not be a fix either way.",
+
             Eval09Outcome.ArmNotLive =>
-                "WHAT WOULD CHANGE THE ANSWER. A run on which every model stage returns: raise the per-call ceiling "
-              + "(DiscoveryLoopOptions.ModelCallTimeout) or fix the deployment's latency, and re-run. MEASURED on "
-              + "2026-09-04, 6 of 7 Demo 2 model calls were abandoned at the 60 s ceiling, so at that ceiling this "
-              + "arm is not expected to be live on any persona. Lowering the bar for what counts as live would not "
-              + "be a fix.",
+                $"WHAT WOULD CHANGE THE ANSWER. A run on which every model stage RETURNS. This run's workflow ledger "
+              + $"reads {budget.WorkflowAttempted} attempted / {budget.WorkflowReturned} returned / "
+              + $"{budget.WorkflowCancelled} cancelled / {budget.WorkflowFailed} failed, so calls really did go "
+              + "missing: raise the per-call ceiling (DiscoveryLoopOptions.ModelCallTimeout) or fix the deployment's "
+              + "latency, and re-run. ⚠ Check the count before acting on this: a cell whose call RETURNED and still "
+              + "fell back failed on unparseable content, and no timeout change touches that. Lowering the bar for "
+              + "what counts as live would not be a fix.",
+
+            Eval09Outcome.NotComparableAtEqualK =>
+                "WHAT WOULD CHANGE THE ANSWER. Making the two arms present the same number of items. The utterance "
+              + $"declares a budget of k = {CoverageArms.DeclaredK} and both arms are cut to it, so a refusal here "
+              + "means an arm UNDER-FILLED the budget — it presented fewer than k and there is nothing to cut. That "
+              + "is an instruction-following property of the arm, and it is worth measuring in its own right rather "
+              + "than papered over. ⚠ What would NOT be a fix: pairing k-blind again. Coverage is recall and monotone "
+              + "in k, so an unequal-k pairing measures list length as much as architecture, and it measures it in "
+              + "whichever direction the more verbose arm happens to run.",
 
             Eval09Outcome.Confounded when !budget.BothArmsReportedTokens =>
                 "WHAT WOULD CHANGE THE ANSWER. Getting complete usage out of the provider on every attempted call — "
@@ -1746,6 +1940,18 @@ public enum Eval09Outcome
     /// winner.
     /// </summary>
     ArmNotLive,
+
+    /// <summary>
+    /// The primary endpoint had NO pair at equal k. Every persona was refused because the two arms
+    /// presented different numbers of items, or one side was silent.
+    /// </summary>
+    /// <remarks>
+    /// This is not "no difference detected" and must never be printed as one. A comparison that
+    /// could not be made has no direction, and reading its p-value — necessarily 1.0000 over zero
+    /// pairs — as agreement between the arms is the flattering misreading. MEASURED on the
+    /// 2026-09-05 run: 0 of 21 workflow reps presented the agent's k of 5.
+    /// </remarks>
+    NotComparableAtEqualK,
 }
 
 /// <summary>The verdict, with every reason it reached that verdict.</summary>
@@ -1771,8 +1977,26 @@ public sealed record Eval09Budget(
     double AgentTokensPerTurn,
     double WorkflowTokensPerTurn,
     double Ratio,
-    IReadOnlyList<string> Reasons)
+    IReadOnlyList<string> Reasons,
+    int WorkflowAttempted = 0,
+    int WorkflowReturned = 0,
+    int WorkflowCancelled = 0,
+    int WorkflowFailed = 0)
 {
+    /// <summary>
+    /// True when EVERY workflow model call the ledger saw came back — nothing cancelled at a
+    /// ceiling, nothing failed.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ This exists so the remedy panel can stop prescribing a timeout fix for a run that had no
+    /// timeouts. MEASURED on 2026-09-05: 120 attempted / 120 returned / 0 cancelled, while five
+    /// stages still fell back — on output the stage could not PARSE. Raising the per-call ceiling
+    /// would have fixed none of them, and the panel said to raise it anyway, because the sentence
+    /// was printed unconditionally from a PRIOR run's diagnosis.
+    /// </remarks>
+    public bool EveryWorkflowCallReturned =>
+        WorkflowAttempted > 0 && WorkflowCancelled == 0 && WorkflowFailed == 0 && WorkflowReturned == WorkflowAttempted;
+
     /// <summary>True when the arms' spend differs by more than the pre-registered factor, or could not be measured.</summary>
     /// <remarks>
     /// An UNMEASURED ratio is confounded, not clean, and so is an INCOMPLETE one. Failing open on
@@ -1828,7 +2052,11 @@ public sealed record Eval09Budget(
                 : $"spend ratio {ratio:F2}× exceeds the pre-registered {Eval09PreRegistration.MaximumTokenRatio:F2}×");
         }
 
-        return new Eval09Budget(bothRan, bothComplete, a, w, ratio, reasons);
+        return new Eval09Budget(bothRan, bothComplete, a, w, ratio, reasons,
+            WorkflowAttempted: workflow.Calls,
+            WorkflowReturned: workflow.Returned,
+            WorkflowCancelled: workflow.Cancelled,
+            WorkflowFailed: workflow.Failed);
     }
 }
 
@@ -1970,14 +2198,26 @@ public static class Eval09PreRegistration
 
         var reasons = new List<string>
         {
-            $"CLAUSE 1 (significance): p = {primary.PValue:F4} against alpha = {PrimaryAlpha:F2}, with the workflow "
-          + $"{(primary.ChallengerLeads ? "leading" : primary.Wins == primary.Losses ? "level" : "behind")} "
-          + $"{primary.Wins}/{primary.Losses} on non-tied pairs. The smallest p this n could reach was "
-          + $"{primary.MinimumAttainableP:F4}"
-          + (primary.UnderpoweredByConstruction
-              ? " — above alpha, so NO split of these pairs could have produced a significant result. This clause "
-              + "was unreachable on this run, and that is a fact about the run's power, not about the architectures."
-              : "."),
+            primary.Undecidable
+                ? $"CLAUSE 1 (significance): NOT COMPARABLE. Not one of the {primary.Excluded.Count} persona(s) could "
+                + "be paired at equal k — the two arms presented different numbers of items, or one side was silent. "
+                + "There is no p-value here, and the 1.0000 an empty sign test returns is the absence of a "
+                + "comparison, NOT agreement between the arms. Refused: "
+                + string.Join("; ", primary.Excluded.Take(6))
+                + (primary.Excluded.Count > 6 ? $"; … and {primary.Excluded.Count - 6} more" : "") + "."
+                : $"CLAUSE 1 (significance): p = {primary.PValue:F4} against alpha = {PrimaryAlpha:F2}, with the workflow "
+                + $"{(primary.ChallengerLeads ? "leading" : primary.Wins == primary.Losses ? "level" : "behind")} "
+                + $"{primary.Wins}/{primary.Losses} on non-tied pairs, over {primary.ComparedN} pair(s) at equal k"
+                + (primary.Excluded.Count > 0
+                    ? $" — {primary.Excluded.Count} persona(s) were REFUSED as not comparable and entered neither the "
+                    + $"count nor the p-value ({string.Join("; ", primary.Excluded.Take(4))}"
+                    + (primary.Excluded.Count > 4 ? ", …" : "") + ")"
+                    : "")
+                + $". The smallest p this n could reach was {primary.MinimumAttainableP:F4}"
+                + (primary.UnderpoweredByConstruction
+                    ? " — above alpha, so NO split of these pairs could have produced a significant result. This clause "
+                    + "was unreachable on this run, and that is a fact about the run's power, not about the architectures."
+                    : "."),
 
             budget.BothArmsReportedTokens
                 ? $"CLAUSE 2 (equal budget): spend ratio {budget.Ratio:F2}× against a limit of {MaximumTokenRatio:F2}× "
@@ -1998,11 +2238,22 @@ public static class Eval09PreRegistration
                 + "are scored as earned zeros, and their presence means part of this comparison is between an answer "
                 + "and an absence.",
 
+            // ⚠ "timed out" is NOT in this sentence, and its absence is a correction. The clause
+            // used to say "time out or fail", and the remedy panel below used to prescribe raising
+            // DiscoveryLoopOptions.ModelCallTimeout, citing a 2026-09-04 run in which 6 of 7 model
+            // calls were abandoned at the 60 s ceiling. On the 2026-09-05 run that cause did not
+            // occur: the ledger records 120 attempted / 120 returned / 0 cancelled. Both fallback
+            // sites fire on CONTENT — an interest envelope that did not parse, a reviewer verdict
+            // that did not parse twice — and a timeout remedy would have fixed none of them.
+            // The clause now names what the code actually does and lets the run say which it was.
             voidedCells == 0
                 ? "CLAUSE 5 (the live arm was live): no live-workflow cell fell back to a deterministic stage."
-                : $"CLAUSE 5 (the live arm was live): {voidedCells} live-workflow cell(s) had a model stage time out or "
-                + "fail and fall back to its deterministic node. Those cells are VOIDED — out of the mean, out of the "
-                + "judged panel, missing from the pairing — and a comparison with a voided live cell names no winner.",
+                : $"CLAUSE 5 (the live arm was live): {voidedCells} live-workflow cell(s) had a model stage fall back to "
+                + "its deterministic node. A stage falls back when its call does not RETURN (cancelled at the per-call "
+                + "ceiling, or failed) or when it returns output the stage cannot PARSE — and those are different "
+                + "faults with different fixes, so read the ATTEMPTED / RETURNED / CANCELLED counts in the budget "
+                + "panel before choosing one. Those cells are VOIDED — out of the mean, out of the judged panel, "
+                + "missing from the pairing — and a comparison with a voided live cell names no winner.",
         };
 
         if (voidedCells > 0)
@@ -2034,6 +2285,17 @@ public static class Eval09PreRegistration
         {
             return new Eval09Verdict(Eval09Outcome.LoopNotLoadBearing,
                 "NO WIN — a reviewer that RUBBER-STAMPS round 1 led the real loop. Any architecture claim is void.",
+                reasons);
+        }
+
+        // ⚠ BEFORE any p-value is read. An empty sign test returns p = 1.0000, and 1.0000 read as
+        // "the arms agree" is the flattering misreading of a comparison that was never made.
+        if (primary.Undecidable)
+        {
+            return new Eval09Verdict(Eval09Outcome.NotComparableAtEqualK,
+                $"NO WINNER — NOT COMPARABLE. All {primary.Excluded.Count} persona(s) were refused at equal k: the "
+              + "arms presented different numbers of items, or a side was silent. A comparison that could not be "
+              + "made has no direction.",
                 reasons);
         }
 

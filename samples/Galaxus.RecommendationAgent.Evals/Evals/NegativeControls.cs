@@ -96,6 +96,7 @@ public static class NegativeControls
         rows.Add(CheckCoverageGateRendering());
         rows.Add(CheckPreRegisteredRuleReachability());
         rows.Add(CheckOwnKRereadAtVaryingK());
+        rows.Add(CheckEval09RuleAndRemedy());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -1532,9 +1533,24 @@ public static class NegativeControls
         var equalK = pairing.SignTestAtEqualK("A", "B", CoverageMetric.Recall);
         if (equalK.Wins != 1 || equalK.Losses != 0 || equalK.Ties != 0 || equalK.Excluded.Count != 2)
             problems.Add($"the equal-k sign test counted W/L/T {equalK.Wins}/{equalK.Losses}/{equalK.Ties} with {equalK.Excluded.Count} refused — expected 1/0/0 with 2 refused (one unequal k, one silent).");
-        var blind = pairing.SignTest("A", "B");
-        if (blind.Wins != 3)
-            problems.Add("the k-blind sign test no longer counts every pair — Eval 09's reading of it changed underneath it.");
+        // ⚠ AND THERE MUST BE NO WAY BACK. This used to assert that the k-BLIND overload still
+        // counted every pair, because Eval 09 read it. Eval 09 now pairs at equal k and the
+        // overload is deleted, so the assertion that replaces it is the stronger one: the type
+        // must expose NO pairing method that ignores k. A method whose only property is that it
+        // cannot refuse an incomparable pair should not be reachable, and re-adding one — under
+        // any name that pairs without a CoverageMetric and a k — turns this row red.
+        var pairingMethods = typeof(PairedCoverageReport)
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(m => m.ReturnType == typeof(SignTestOutcome))
+            .ToList();
+        var kBlind = pairingMethods
+            .Where(m => !m.GetParameters().Any(pp => pp.ParameterType == typeof(CoverageMetric)))
+            .Select(m => m.Name)
+            .ToList();
+        if (kBlind.Count > 0)
+            problems.Add($"PairedCoverageReport still exposes {kBlind.Count} k-BLIND pairing method(s): {string.Join(", ", kBlind)}. A pairing that cannot refuse an unequal-k pair measures list length.");
+        if (pairingMethods.Count == 0)
+            problems.Add("PairedCoverageReport exposes NO pairing method at all — the equal-k test has been removed rather than the k-blind one.");
 
         return new ControlRowSnapshot(
             "GraderSanity",
@@ -1952,6 +1968,128 @@ public static class NegativeControls
                 + $"would have said 5 · 5/5/5 → k = 5, uniform · {paired.ComparedN} of {shapes.Length} pairs comparable, "
                 + $"0 refused · cutting 6 → 5 moved recall {atSix:F3} → {atFive:F3} (never up) · Mean still refuses "
                 + "two budgets"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 13 — Eval 09's rule must say NOT COMPARABLE, and its remedy must fit the run. ══
+
+    /// <summary>
+    /// Proves the three things Eval 09's decision rule has to do once its pairing became equal-k:
+    /// refuse to call an unmade comparison a draw, keep the ordinary verdicts reachable, and print
+    /// a remedy derived from THIS run's ledger rather than from a previous run's diagnosis.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why an undecidable comparison needs its own verdict.</b> An exact sign test over zero
+    /// pairs returns p = 1.0000 by arithmetic. Fed to a rule that reads only "p &lt; alpha?", that
+    /// renders as NO DIFFERENCE DETECTED — the two arms agreeing — when what actually happened is
+    /// that no pair could be compared at all. It is the flattering misreading, and it is the one a
+    /// run with 0 of 21 reps at the agent's k would have produced.
+    /// </para>
+    /// <para>
+    /// <b>Why the remedy is checked.</b> The ArmNotLive panel prescribed raising
+    /// <c>DiscoveryLoopOptions.ModelCallTimeout</c> unconditionally, citing a 2026-09-04 run in
+    /// which 6 of 7 calls were abandoned at the ceiling. The 2026-09-05 run's ledger read 120
+    /// attempted / 120 returned / 0 cancelled and five stages fell back anyway — on unparseable
+    /// output. Both ledgers are replayed here and the text must differ between them.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckEval09RuleAndRemedy()
+    {
+        var problems = new List<string>();
+
+        static SignTestOutcome Pairing(int wins, int losses, int ties, double p, IReadOnlyList<string>? refused = null) =>
+            new(Eval09_HypothesisComparison.ArmSingleAgent, Eval09_HypothesisComparison.ArmWorkflow,
+                wins, losses, ties, PValue: p, MeanDelta: 0.0, CiLow: double.NaN, CiHigh: double.NaN,
+                MinimumAttainableP: wins + losses > 0 ? Eval09PreRegistration.TheoreticalMinimumTwoSidedP(wins + losses) : 1.0,
+                Metric: "recall", NotComparable: refused, DeclaredK: CoverageArms.DeclaredK);
+
+        static Eval09Budget Budget(int attempted, int returned, int cancelled) =>
+            new(BothArmsRan: true, BothArmsReportedTokens: cancelled == 0,
+                AgentTokensPerTurn: 100_000, WorkflowTokensPerTurn: 90_000, Ratio: 1.11,
+                Reasons: cancelled == 0 ? [] : ["a call was cancelled"],
+                WorkflowAttempted: attempted, WorkflowReturned: returned, WorkflowCancelled: cancelled, WorkflowFailed: 0);
+
+        var cleanBudget = Budget(120, 120, 0);
+        var loopLeads = Pairing(6, 2, 4, 0.2891);
+
+        // ── 1. An UNMADE comparison is not a draw. ──
+        var refusedAll = Pairing(0, 0, 0, 1.0,
+            [.. Enumerable.Range(1, 12).Select(i => $"USR-{i:00} (k 5 vs 7)")]);
+        var undecidable = Eval09PreRegistration.Decide(refusedAll, loopLeads, cleanBudget, silentCells: 0, voidedCells: 0);
+
+        if (undecidable.Outcome != Eval09Outcome.NotComparableAtEqualK)
+            problems.Add($"12 refused pairs and p = 1.0000 rendered {undecidable.Outcome}, not NotComparableAtEqualK — an unmade comparison read as agreement between the arms.");
+        if (!undecidable.Headline.Contains("NOT COMPARABLE", StringComparison.Ordinal))
+            problems.Add("the undecidable headline does not say NOT COMPARABLE.");
+        if (!undecidable.Reasons.Any(r => r.Contains("NOT COMPARABLE", StringComparison.Ordinal) && r.Contains("CLAUSE 1", StringComparison.Ordinal)))
+            problems.Add("clause 1 does not report the refusal — it still reads as a significance result.");
+
+        // ── 2. …and the ordinary verdicts are still reachable. Refusing everything would be an
+        //       equally useless rule, and it would be invisible from the row above alone. ──
+        var noDifference = Eval09PreRegistration.Decide(Pairing(4, 6, 2, 0.7539), loopLeads, cleanBudget, 0, 0);
+        if (noDifference.Outcome != Eval09Outcome.NoDifferenceDetected)
+            problems.Add($"a comparable, non-significant pairing rendered {noDifference.Outcome}, not NoDifferenceDetected.");
+
+        var workflowWins = Eval09PreRegistration.Decide(Pairing(11, 1, 0, 0.0063), loopLeads, cleanBudget, 0, 0);
+        if (workflowWins.Outcome != Eval09Outcome.WorkflowWins)
+            problems.Add($"a comparable, significant workflow lead rendered {workflowWins.Outcome}, not WorkflowWins — the new branch swallowed a real result.");
+
+        // ── 3. The remedy must come from THIS run's ledger. ──
+        var judged = new Eval09JudgedReport(Eval09PreRegistration.JudgedCriteria);
+        var notLive = new Eval09Verdict(Eval09Outcome.ArmNotLive, "NO WIN — the live arm was not live.", []);
+
+        string AllReturned() => string.Join(" ", Eval09_HypothesisComparison.NegativeResultText(
+            notLive, Pairing(4, 5, 3, 0.7539), Budget(120, 120, 0), 0.701, 0.750, judged));
+        string SomeCancelled() => string.Join(" ", Eval09_HypothesisComparison.NegativeResultText(
+            notLive, Pairing(4, 5, 3, 0.7539), Budget(7, 1, 6), 0.701, 0.750, judged));
+
+        string returnedText = AllReturned();
+        string cancelledText = SomeCancelled();
+
+        // The marker is the PRESCRIPTION, not the identifier. The corrected text still names
+        // ModelCallTimeout — to say it would fix nothing — so matching the bare symbol would go
+        // red on the fix itself.
+        const string prescribesTimeout = "raise the per-call ceiling";
+
+        if (returnedText.Contains(prescribesTimeout, StringComparison.Ordinal))
+            problems.Add("with 120 attempted / 120 returned / 0 cancelled the remedy STILL prescribes raising the per-call ceiling — a fix for a fault that did not occur.");
+        if (!returnedText.Contains("parse", StringComparison.OrdinalIgnoreCase))
+            problems.Add("with every call returned the remedy does not name unparseable output, which is the only remaining way a stage can fall back.");
+        if (!returnedText.Contains("120 attempted", StringComparison.Ordinal))
+            problems.Add("the remedy does not quote the ledger it claims to be derived from.");
+        if (!cancelledText.Contains(prescribesTimeout, StringComparison.Ordinal))
+            problems.Add("with 6 of 7 calls cancelled the remedy no longer offers the timeout fix — the correction went too far and now misses the case it was written for.");
+        if (string.Equals(returnedText, cancelledText, StringComparison.Ordinal))
+            problems.Add("the remedy text is IDENTICAL for a run whose calls all returned and one whose calls were cancelled — it is not derived from the ledger at all.");
+
+        // ── 4. And the monotonicity the honest report rests on. Cutting an over-filled answer to
+        //       the declared budget can only REMOVE served gold, never add it — which is why
+        //       "the workflow's own-k number is its best case at equal k" is a fact, not a hope. ──
+        var golds = CoveragePersonas.All.ToDictionary(p => p.Id, p => InterestMapGold.Derive(p.Id), StringComparer.Ordinal);
+        string persona = CoveragePersonas.All.First(p => golds.TryGetValue(p.Id, out var g) && !g.LatentIsEmpty).Id;
+        var eight = Catalogue.Default.CoreProducts.Take(8)
+            .Select((prod, i) => new PresentedCall(prod.Id, "", "", false, i + 1, null, true, true)).ToList();
+        double atEight = InterestCoverageGrader.GradeAtDeclaredK(persona, golds, eight, 8).Latent;
+        double atFive = InterestCoverageGrader.GradeAtDeclaredK(persona, golds, eight, CoverageArms.DeclaredK).Latent;
+        if (atFive > atEight + 1e-12)
+            problems.Add($"cutting an 8-item answer to k = {CoverageArms.DeclaredK} RAISED recall ({atFive:F3} vs {atEight:F3}) — the cut is not a prefix and the monotonicity argument does not hold.");
+
+        return new ControlRowSnapshot(
+            "Eval09RuleAndRemedy",
+            "Eval 09 pairs at equal k now, so its rule must (a) render an all-refused comparison as NOT COMPARABLE "
+          + "rather than as NO DIFFERENCE — an empty sign test returns p = 1.0000 by arithmetic and that is the "
+          + "absence of a comparison, not agreement; (b) still reach WorkflowWins and NoDifferenceDetected on "
+          + "comparable pairings, or the refusal is just a rule that never decides; (c) print an ArmNotLive remedy "
+          + "DERIVED from the run's own ledger — no timeout fix on a run with 0 cancelled calls, and the timeout fix "
+          + "still offered on one with 6; and (d) rest on a cut that is a prefix, so cutting to k can only lower "
+          + "recall.",
+            problems.Count == 0
+                ? $"12 refused → NOT COMPARABLE (clause 1 names the refusal) · 4/6/2 p=0.7539 → NoDifferenceDetected · "
+                + $"11/1/0 p=0.0063 → WorkflowWins · remedy at 120/120/0 names parsing and NOT the timeout, at 7/1/6 "
+                + $"names the timeout, and the two texts differ · cutting 8 → {CoverageArms.DeclaredK} moved recall "
+                + $"{atEight:F3} → {atFive:F3} (never up)"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

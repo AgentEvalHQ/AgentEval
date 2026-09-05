@@ -288,41 +288,19 @@ public sealed class PairedCoverageReport
         .. _personaOrder.Where(p => ScoreOf(p, arm) is { IsScorable: true } s && s.AboveOwnFloor is not true)
     ];
 
-    /// <summary>
-    /// Exact two-sided sign test on the paired per-case LATENT deltas, plus a fixed-seed bootstrap
-    /// CI on the mean delta — <b>k-blind</b>.
-    /// </summary>
-    /// <remarks>
-    /// ⚠ <b>This pairing ignores how many items each side presented.</b> MEASURED on Eval 02's
-    /// 2026-09-04 live run, it paired a 5-item control against a 0–4-item live agent on a recall
-    /// metric that is monotone in k, and reported the difference as architecture. Eval 02 no
-    /// longer calls it; it pairs through <see cref="SignTestAtEqualK"/>, which refuses unequal-k
-    /// pairs. It is kept, unchanged, because Eval 09 still reads it — and Eval 09's own review
-    /// findings are that lane's to act on, not this method's to pre-empt by changing under it.
-    /// </remarks>
-    /// <param name="armA">Reference arm.</param>
-    /// <param name="armB">Challenger arm.</param>
-    public SignTestOutcome SignTest(string armA, string armB)
-    {
-        var deltas = new List<double>();
-        int wins = 0, losses = 0, ties = 0;
-
-        foreach (string persona in _personaOrder)
-        {
-            var a = ScoreOf(persona, armA);
-            var b = ScoreOf(persona, armB);
-            if (a is not { IsScorable: true } || b is not { IsScorable: true }) continue;
-
-            double delta = b.Value.Latent - a.Value.Latent;
-            deltas.Add(delta);
-
-            if (delta > 0) wins++;
-            else if (delta < 0) losses++;
-            else ties++;
-        }
-
-        return Summarise(armA, armB, wins, losses, ties, deltas, CoverageMetric.Recall, [], declaredK: 0);
-    }
+    // ══ THE K-BLIND SIGN TEST IS GONE. ═══════════════════════════════════════════════════
+    //
+    // `SignTest(armA, armB)` paired per-case latent coverage while IGNORING how many items each
+    // side presented. Coverage is recall and monotone in k, so it measured list length as much as
+    // architecture. MEASURED twice, in both directions: on Eval 02's 2026-09-04 run it paired
+    // 5-item controls against a 0–4-item live agent, and on Eval 09's 2026-09-05 run it paired a
+    // workflow presenting 3–11 items (0 of 21 reps at k = 5) against an agent presenting exactly 5
+    // on all 24. Its own docstring said it was "kept, unchanged, because Eval 09 still reads it".
+    // Eval 09 no longer reads it, so there is no reason left to keep a method whose only property
+    // is that it cannot refuse an incomparable pair.
+    //
+    // Everything pairs through SignTestAtEqualK below. NegativeControls.GraderSanity asserts that
+    // no k-blind pairing method exists on this type, so re-introducing one goes red.
 
     /// <summary>
     /// Exact two-sided sign test over EQUAL-k pairs only. A persona whose two cells were scored at
@@ -484,9 +462,17 @@ public sealed class PairedCoverageReport
     }
 
     /// <summary>Freezes the comparison into a serialisable snapshot.</summary>
+    /// <remarks>
+    /// ⚠ <paramref name="label"/> has NO default. It was a hard-coded "Eval 02 — Latent-Interest
+    /// Coverage" string for as long as this method existed, so Eval 09's saved snapshot — a
+    /// different eval, different arms, different question — carried Eval 02's name on disk
+    /// (MEASUREMENT_STATUS §23.10, defect 4). A default would let the next caller inherit the same
+    /// wrong name silently.
+    /// </remarks>
     /// <param name="randomFloorByPersona">Per-persona random-draw floors, for the record.</param>
-    public CoverageSnapshot ToSnapshot(IReadOnlyDictionary<string, double> randomFloorByPersona) =>
-        ToSnapshot(randomFloorByPersona, declaredK: 0, utterance: "", atDeclaredK: null);
+    /// <param name="label">What this comparison IS. The caller names itself; nothing here guesses.</param>
+    public CoverageSnapshot ToSnapshot(IReadOnlyDictionary<string, double> randomFloorByPersona, string label) =>
+        ToSnapshot(randomFloorByPersona, declaredK: 0, utterance: "", atDeclaredK: null, label);
 
     /// <summary>
     /// Freezes the comparison into a serialisable snapshot, with the declared-budget cut beside
@@ -497,17 +483,20 @@ public sealed class PairedCoverageReport
     /// <param name="declaredK">The budget the utterance declared, or 0 when it declared none.</param>
     /// <param name="utterance">The customer utterance every arm was given, verbatim.</param>
     /// <param name="atDeclaredK">The same arms scored at the declared budget, or null.</param>
+    /// <param name="label">What this comparison IS. The caller names itself; nothing here guesses.</param>
     public CoverageSnapshot ToSnapshot(
         IReadOnlyDictionary<string, double> randomFloorByPersona,
         int declaredK,
         string utterance,
-        PairedCoverageReport? atDeclaredK)
+        PairedCoverageReport? atDeclaredK,
+        string label)
     {
         ArgumentNullException.ThrowIfNull(randomFloorByPersona);
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
 
         return new CoverageSnapshot
         {
-            Label = $"Eval 02 — Latent-Interest Coverage (paired, n = {_personaOrder.Count})",
+            Label = $"{label} (paired, n = {_personaOrder.Count})",
             PersonaCount = _personaOrder.Count,
             Arms = [.. _armOrder],
             DeclaredK = declaredK,
