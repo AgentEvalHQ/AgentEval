@@ -244,8 +244,9 @@ public static class Demo01_RecommendationAgent
         // ── Phase 3: CODE screens what was presented ──────────────────────────
         var screeningContext = context with { CandidateProductIds = candidateSet };
 
-        var (raw, preLedgerDrops, modelStatedUserSides) =
-            Assemble(presented, userEvidence, provenance, map, catalogue, replenishment);
+        var (raw, preLedgerDrops, modelStatedUserSides) = await AssembleAsync(
+            presented, userEvidence, provenance, map, catalogue, replenishment, cancellationToken)
+            .ConfigureAwait(false);
 
         var outcome = GuardrailPipeline.ApplyWithAbstentionGate(raw, screeningContext);
         var ledger  = outcome.Ledger;
@@ -271,6 +272,12 @@ public static class Demo01_RecommendationAgent
             gateRanBeforeSpend: false);
 
         PrintPresentationAudit(presented, outcome.Cleaned);
+
+        // What the live query path cost, after the banner warned that it would. Silent on the
+        // concept path, where there is nothing to report and a "0 calls" line would only invite
+        // someone to quote it as evidence about a path that never ran.
+        EmbeddingSpace.PrintLiveSpend();
+
         if (budgetSummary is not null) PrintBudgetNote(budgetSummary);
         if (robinSaid is not null) PrintRobinsProse(robinSaid);
 
@@ -558,14 +565,20 @@ public static class Demo01_RecommendationAgent
     /// <param name="map">The code-derived interest map.</param>
     /// <param name="catalogue">The catalogue façade.</param>
     /// <param name="replenishment">The repeat-buy tray, built before the model ran.</param>
+    /// <param name="cancellationToken">
+    /// Cancellation. This method became async at B-9: the confidence and attribution arithmetic
+    /// embeds through <see cref="EmbeddingSpace"/>, which on the <c>--real-vectors</c> path reaches
+    /// a live embedding deployment.
+    /// </param>
     /// <returns>The assembled answer, the pre-pipeline drops, and how many items carried a MODEL-stated user side.</returns>
-    internal static (RecommendationSet Raw, IReadOnlyList<PreDrop> Drops, int ModelStatedUserSides) Assemble(
+    internal static async Task<(RecommendationSet Raw, IReadOnlyList<PreDrop> Drops, int ModelStatedUserSides)> AssembleAsync(
         IReadOnlyList<PresentedRecommendation> presented,
         IReadOnlyList<string?> userEvidence,
         IReadOnlyDictionary<string, IReadOnlyList<string>> provenance,
         InterestMap map,
         Catalogue catalogue,
-        IReadOnlyList<ReplenishmentDto> replenishment)
+        IReadOnlyList<ReplenishmentDto> replenishment,
+        CancellationToken cancellationToken = default)
     {
         var recommendations = new List<RecommendationDto>();
         var drops           = new List<PreDrop>();
@@ -604,13 +617,13 @@ public static class Demo01_RecommendationAgent
                     sku,
                     item.Reason,
                     new EvidenceDto(stated.SignalLabel, stated.PurchaseIds, key, value, reviewId),
-                    Confidence(cited, product)));
+                    await ConfidenceAsync(cited, product, cancellationToken).ConfigureAwait(false)));
                 continue;
             }
 
             // ── the fallback: derive it from which search surfaced the SKU ──────────────
             var needs  = provenance.TryGetValue(sku, out var recorded) ? recorded : [];
-            var signal = AttributeSignal(needs, product, map);
+            var signal = await AttributeSignalAsync(needs, product, map, cancellationToken).ConfigureAwait(false);
 
             recommendations.Add(new RecommendationDto(
                 sku,
@@ -623,7 +636,7 @@ public static class Demo01_RecommendationAgent
                     key,
                     value,
                     reviewId),
-                Confidence(signal, product)));
+                await ConfidenceAsync(signal, product, cancellationToken).ConfigureAwait(false)));
         }
 
         var assembled = RecommendationSet.Empty with
@@ -652,11 +665,13 @@ public static class Demo01_RecommendationAgent
     /// <para>
     /// ⚠ <b>The cosine is taken in whichever space <see cref="EmbeddingSpace"/> resolved</b>, which
     /// is the same space that did the retrieving — so this is not an independent check on
-    /// retrieval, and never was. On the <c>--real-vectors</c> path it degrades further and in a
-    /// specific direction: a product's embedding document is in the committed asset, but a
-    /// run-time-composed signal LABEL is not, so the label comes back Unavailable, the cosine is 0
-    /// for every signal, and attribution falls back to token overlap ALONE. That is a real change
-    /// in what this method measures and it is why the space is printed beside the numbers.
+    /// retrieval, and never was. That coupling is now uniform across both paths, which it was not
+    /// before B-9: while the real-vector path served queries from a 71-entry table, a
+    /// run-time-composed signal LABEL was Unavailable, every cosine here was 0, and attribution
+    /// silently fell back to token overlap ALONE. Queries are embedded live now, so the cosine is
+    /// a real cosine on both paths and this method measures the same thing on each. The space is
+    /// still printed beside the numbers, because a 24-dimension authored cosine and a
+    /// text-embedding-3-small one are not comparable to each other.
     /// </para>
     /// <para>
     /// <b>Ranking</b> among the signals that clear the floor is <c>match × strength</c> — two
@@ -669,7 +684,11 @@ public static class Demo01_RecommendationAgent
     /// should always have done.
     /// </para>
     /// </remarks>
-    private static InterestSignal? AttributeSignal(IReadOnlyList<string> needs, Product? product, InterestMap map)
+    private static async Task<InterestSignal?> AttributeSignalAsync(
+        IReadOnlyList<string> needs,
+        Product? product,
+        InterestMap map,
+        CancellationToken cancellationToken = default)
     {
         if (map.Signals.Count == 0) return null;
 
@@ -694,14 +713,15 @@ public static class Demo01_RecommendationAgent
 
         foreach (var signal in map.Signals)
         {
-            var label  = EmbeddingSpace.EmbedOffline(products, signal.Label);
+            var label  = await EmbeddingSpace.EmbedAsync(products, signal.Label, cancellationToken).ConfigureAwait(false);
             var tokens = ContentTokens(signal.Label);
 
             double match = 0.0;
             foreach (var probe in probes)
             {
-                double cosine  = EmbeddingVectors.DotOfUnitVectors(label.Span, EmbeddingSpace.EmbedOffline(products, probe).Span);
-                double overlap = Overlap(tokens, ContentTokens(probe));
+                var probeVector = await EmbeddingSpace.EmbedAsync(products, probe, cancellationToken).ConfigureAwait(false);
+                double cosine   = EmbeddingVectors.DotOfUnitVectors(label.Span, probeVector.Span);
+                double overlap  = Overlap(tokens, ContentTokens(probe));
                 match = Math.Max(match, Math.Max(cosine, overlap));
             }
 
@@ -802,26 +822,50 @@ public static class Demo01_RecommendationAgent
     /// a gold set belongs to the eval lane, and until that runs no claim is made about it.
     /// </para>
     /// <para>
-    /// ⚠ <b>CO-MOVING OPERANDS, and the coupling is now selectable rather than fixed.</b> The fit
-    /// is computed in the SAME space that retrieved the product, so a product retrieved because it
-    /// is near the label scores well on being near the label. That was already true and this change
-    /// does not repair it. What it does change is the second operand's behaviour per space: on the
-    /// concept path both texts embed and the fit is a real cosine; on the <c>--real-vectors</c>
-    /// path the product document is in the committed asset but the composed label is NOT, so the
-    /// fit collapses to 0 and this number becomes <c>strength / 2</c> — one operand, not two,
-    /// and every card lands in a lower band. The coupling gets LOOSER on that path only by
-    /// deleting one side of it, which is worse, not better.
+    /// ⚠ <b>CO-MOVING OPERANDS — still true, and now true in the same way on both paths.</b> The
+    /// fit is computed in the SAME space that retrieved the product, so a product retrieved because
+    /// it is near the label scores well on being near the label. B-9 does not repair that and does
+    /// not claim to; breaking the coupling means finding a second, independent signal, which is an
+    /// eval-lane question.
+    /// </para>
+    /// <para>
+    /// What B-9 DID change is that the defect is now one defect rather than two. Before it, the
+    /// <c>--real-vectors</c> path had the product document in the committed asset and the composed
+    /// label absent from it, so the fit collapsed to 0 and this number quietly became
+    /// <c>strength / 2</c> — one operand, not two, every card a band lower, and the coupling
+    /// "looser" only in the sense that one side of it had been deleted. Live query embedding makes
+    /// both operands real on both paths.
+    /// </para>
+    /// <para>
+    /// <b>Why this call site is ASYNC, and what the alternative would have cost.</b> It goes
+    /// through <see cref="EmbeddingSpace"/>, which on the real-vector path reaches the network. The
+    /// alternative was to leave confidence and attribution on the concept space while retrieval
+    /// moved — and that is a change in KIND, not a shortcut: it would put one run's retrieval and
+    /// one run's confidence in two incomparable spaces, so a card stamped
+    /// <c>text-embedding-3-small</c> in the banner would carry a 24-dimension authored number, and
+    /// the co-moving-operands caveat above would silently be replaced by a different, uncalibrated
+    /// one that nobody had measured. Two spaces in one report is the exact failure
+    /// <see cref="EmbeddingSpace.Requested"/> throws to prevent. An async call chain is cheaper
+    /// than that, and the per-run memo makes it cheap in money too: the product documents are all
+    /// cache hits against the committed index, and the only live texts are the handful of distinct
+    /// signal labels, each embedded once.
     /// </para>
     /// </remarks>
-    private static double Confidence(InterestSignal? signal, Product? product)
+    private static async Task<double> ConfidenceAsync(
+        InterestSignal? signal,
+        Product? product,
+        CancellationToken cancellationToken = default)
     {
         if (signal is null || product is null) return 0.0;
 
         var products = Catalogue.Default.All;
 
-        var fit = EmbeddingVectors.DotOfUnitVectors(
-            EmbeddingSpace.EmbedOffline(products, signal.Label).Span,
-            EmbeddingSpace.EmbedOffline(products, EmbeddingDocument.ForProduct(product)).Span);
+        var labelVector   = await EmbeddingSpace.EmbedAsync(products, signal.Label, cancellationToken).ConfigureAwait(false);
+        var productVector = await EmbeddingSpace
+            .EmbedAsync(products, EmbeddingDocument.ForProduct(product), cancellationToken)
+            .ConfigureAwait(false);
+
+        var fit = EmbeddingVectors.DotOfUnitVectors(labelVector.Span, productVector.Span);
 
         return Math.Clamp((signal.Strength + Math.Max(0.0, fit)) / 2.0, 0.0, 1.0);
     }
@@ -885,7 +929,7 @@ public static class Demo01_RecommendationAgent
     /// <c>text-embedding-3-small</c> assets (<c>--real-vectors</c>). The decision is printed by
     /// <see cref="PrintRetrievalBanner"/>, so a reader always knows which space produced the
     /// numbers on the screen, and the SAME resolved source backs the confidence arithmetic in
-    /// <see cref="Confidence"/> — one run is never half in one space and half in another.
+    /// <see cref="ConfidenceAsync"/> — one run is never half in one space and half in another.
     /// </remarks>
     private static async Task<IProductRetriever> BuildRetrieverAsync(Catalogue catalogue, CancellationToken cancellationToken)
         => await HybridRetriever.BuildAsync(

@@ -10,17 +10,26 @@ using Galaxus.RecommendationAgent.Signals;
 namespace Galaxus.RecommendationAgent.Retrieval;
 
 /// <summary>
-/// The <c>--rebuild-embeddings</c> path (design §D.4): regenerates the two committed JSON assets
-/// from a live embedding deployment, so the offline demo can one day run on real
-/// <c>text-embedding-3-small</c> vectors rather than on the concept stand-in.
+/// The <c>--rebuild-embeddings</c> path (design §D.4): regenerates the committed product-vector
+/// asset from a live embedding deployment, so the real-vector retrieval path has an index to search.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This spends money.</b> One embedding call per product plus one per entry of
-/// <see cref="DefaultQuerySet"/> — <b>170 calls and 13 383 prompt tokens</b> on the shipped
-/// catalogue (99 products + 17 canonical queries + 54 authored interest phrases), MEASURED
-/// 2026-09-05 against <c>text-embedding-3-small</c>. It is a deliberate, explicit, occasional
-/// action behind a CLI switch, never something the demo does on startup.
+/// <b>This spends money.</b> One embedding call per product — <b>99 calls</b> on the shipped
+/// catalogue. The B-6 run that produced the committed asset cost 170 calls and 13 383 prompt tokens
+/// (≈ USD 0.00027) because it also embedded 71 query texts; that half is gone, so a rebuild today is
+/// roughly 58 % of it. It is a deliberate, explicit, occasional action behind a CLI switch, never
+/// something the demo does on startup.
+/// </para>
+/// <para>
+/// <b>The query asset is DELETED, and that is the B-9 fix rather than a simplification.</b> This
+/// builder used to write a second file holding 71 pre-guessed query vectors — 17 canonical prompts
+/// and 54 authored interest phrases — and <see cref="PrecomputedEmbeddingSource"/> served queries out
+/// of it. A query composed at run time is not one of 71 guesses, so it missed, came back
+/// <c>Unavailable</c>, and <c>--real-vectors</c> retrieved NOTHING. The <c>DefaultQuerySet</c>,
+/// <c>CanonicalQueries</c> and <c>AuthoredInterestPhrases</c> lists existed only to feed that file
+/// and went with it. Queries are now embedded LIVE at search time, which is what a production
+/// retrieval system does: the INDEX is precomputed, the QUERY is not.
 /// </para>
 /// <para>
 /// <b>It refuses to write a file that would misrepresent itself.</b> The <c>model</c> stamp is
@@ -31,26 +40,10 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// what was written and by what.
 /// </para>
 /// <para>
-/// <b>The two <c>EmbeddedResource</c> entries are now IN the csproj</b>, restored in the same
-/// commit that added the assets (B-6, 2026-09-05) — an <c>EmbeddedResource</c> pointing at a file
-/// that does not exist is a hard build error (MSB3030), which is why they were absent until then.
-/// The reminder below still prints, because it is right for the next person who regenerates into
-/// an empty <c>Data/</c> folder.
-/// </para>
-/// <para>
-/// <b>What reads these assets, since B-7 (2026-09-05).</b> <see cref="EmbeddingSpace"/> resolves
-/// the embedding source for every demo, the discovery workflow and the eval suite, and
-/// <c>--real-vectors</c> points it at these files. The DEFAULT is still
-/// <see cref="ConceptEmbeddingSource"/>, and that is a measured choice rather than inertia: the
-/// query side of this cache holds only text somebody anticipated, so the composed labels the arms
-/// search with miss it, and on the real-vector path Demo 01 recommends nothing and Eval 04 fails.
-/// The numbers are in <see cref="EmbeddingSpace.AutoPrefers"/> and in MEASUREMENT_STATUS §17.
-/// </para>
-/// <para>
-/// <b>The query set is the lever.</b> <see cref="DefaultQuerySet"/> is what a future rebuild would
-/// have to grow for the real-vector path to be a viable default — the composed conjunction labels,
-/// the leaf-category names, the companion classes. That is a paid run and a declared change, not a
-/// default flip.
+/// <b>The stamp is load-bearing twice over.</b> <see cref="EmbeddingSpace"/> reads the asset's
+/// <c>model</c> field to decide which live deployment may embed queries against it — the committed
+/// index names the only embedder that can answer questions about it — and then proves the space with
+/// an identity probe. So what this builder stamps decides what a later run is allowed to search with.
 /// </para>
 /// </remarks>
 public static class EmbeddingCacheBuilder
@@ -58,94 +51,18 @@ public static class EmbeddingCacheBuilder
     /// <summary>File name of the product-vector asset (keyed by product id).</summary>
     public const string CatalogueAssetFileName = "catalogue.embeddings.json";
 
-    /// <summary>File name of the query-vector asset (keyed by SHA-256 of the normalised query).</summary>
-    public const string QueriesAssetFileName = "queries.embeddings.json";
-
     /// <summary>The folder the assets live in, relative to the project root.</summary>
     public const string DataFolderName = "Data";
 
-    /// <summary>UTF-8 with no byte-order mark — the encoding both committed assets are written in.</summary>
+    /// <summary>UTF-8 with no byte-order mark — the encoding the committed asset is written in.</summary>
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// The canonical demo and eval queries, from <see cref="GalaxusDemoPrompts"/> — the only query
-    /// texts that can be anticipated ahead of a run.
-    /// </summary>
-    /// <remarks>
-    /// <b>Coverage is bounded and it is worth saying so.</b> The needs the agent actually sends to
-    /// <c>SearchProductsByMeaning</c> are composed by the model at run time from an interest-map
-    /// label, so a novel need is a cache miss by construction. Precomputed query vectors make the
-    /// scripted demo path free and deterministic; they do not make the system offline-capable. That
-    /// is <see cref="ConceptEmbeddingSource"/>'s job.
-    /// </remarks>
-    public static IReadOnlyList<string> CanonicalQueries { get; } =
-    [
-        GalaxusDemoPrompts.NadiaLatentInterest,
-        GalaxusDemoPrompts.MarcoGiftTrap,
-        GalaxusDemoPrompts.MarcoStatedGamingInterest,
-        GalaxusDemoPrompts.SofiaReplenishmentAndGap,
-        GalaxusDemoPrompts.LucaThinSignal,
-        GalaxusDemoPrompts.PhantomSkuProbe,
-        GalaxusDemoPrompts.OutOfStockProbe,
-        GalaxusDemoPrompts.NearMissBrandProbe,
-        GalaxusDemoPrompts.SensitiveInferenceProbe,
-        GalaxusDemoPrompts.SensitiveStatedNeed,
-        GalaxusDemoPrompts.StatedNeedIdenticalUtterance,
-        GalaxusDemoPrompts.CommitPressureNoConfirm,
-        GalaxusDemoPrompts.CommitConfirmed,
-        GalaxusDemoPrompts.EvidenceFabricationTemptation,
-        GalaxusDemoPrompts.EvidenceSupportedClaim,
-        GalaxusDemoPrompts.LanguageInvarianceDe,
-        GalaxusDemoPrompts.LanguageInvarianceFr,
-    ];
-
-    /// <summary>
-    /// The authored interest phrases — every distinct value of
-    /// <see cref="InterestMapBuilder.ContextPhrases"/>, in ordinal key order.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>These are queries, not decoration.</b> <c>InterestMapBuilder.ComposeConjunctionLabel</c>
-    /// turns a context-tag suffix into one of these strings and that string IS what a searching arm
-    /// asks the retriever for. They belong in the query asset for exactly the reason
-    /// <see cref="CanonicalQueries"/> does: they are known ahead of any run, so their vectors can be
-    /// computed once instead of on every run.
-    /// </para>
-    /// <para>
-    /// <b>Why this list was added at B-6.</b> Without it the committed query asset carried
-    /// <b>0 of 54</b> of them, so there was no real-vector path for any authored interest at all,
-    /// and B-6's acceptance — <c>AuthoredQueryPhraseRetrievability</c> reporting zero dead phrases
-    /// on the real-vector path — was not merely unmet but unmeasurable. Measured before the change.
-    /// </para>
-    /// <para>
-    /// <b>What it does NOT cover, said plainly.</b> A label is a JOIN of up to
-    /// <c>InterestMapBuilder.MaximumLabelPhrases</c> = 3 of these phrases, and the joined string is
-    /// a different text with a different hash. Caching the parts does not cache the whole. This list
-    /// makes each authored interest INDIVIDUALLY askable on the committed-asset path; it does not
-    /// make the demo's composed queries cache hits.
-    /// </para>
-    /// </remarks>
-    public static IReadOnlyList<string> AuthoredInterestPhrases { get; } =
-        InterestMapBuilder.ContextPhrases
-            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-            .Select(pair => pair.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-    /// <summary>
-    /// What <c>--rebuild-embeddings</c> embeds into the query asset when no explicit set is given:
-    /// <see cref="CanonicalQueries"/> followed by <see cref="AuthoredInterestPhrases"/>, de-duplicated.
-    /// </summary>
-    public static IReadOnlyList<string> DefaultQuerySet { get; } =
-        CanonicalQueries.Concat(AuthoredInterestPhrases).Distinct(StringComparer.Ordinal).ToArray();
-
-    /// <summary>
-    /// Regenerates both assets and writes them, printing a TravelDemo-style progress panel.
+    /// Regenerates the product-vector asset and writes it, printing a TravelDemo-style progress panel.
     /// </summary>
     /// <param name="products">The catalogue to embed.</param>
     /// <param name="source">The embedding source. Normally <see cref="AzureEmbeddingSource"/>.</param>
     /// <param name="outputDirectory">Where to write. Null resolves the project's <c>Data/</c> folder.</param>
-    /// <param name="queries">Query texts to embed. Null uses <see cref="DefaultQuerySet"/>.</param>
     /// <param name="allowOfflineSource">Permits generating assets from an offline source. Off by default, on purpose.</param>
     /// <param name="cancellationToken">Cancellation.</param>
     /// <returns>What was written, or null when the run refused to write.</returns>
@@ -153,7 +70,6 @@ public static class EmbeddingCacheBuilder
         IReadOnlyList<Product> products,
         IEmbeddingSource source,
         string? outputDirectory = null,
-        IEnumerable<string>? queries = null,
         bool allowOfflineSource = false,
         CancellationToken cancellationToken = default)
     {
@@ -181,8 +97,7 @@ public static class EmbeddingCacheBuilder
         var directory = outputDirectory ?? ResolveOutputDirectory();
         Directory.CreateDirectory(directory);
 
-        var queryTexts = (queries ?? DefaultQuerySet).Where(q => !string.IsNullOrWhiteSpace(q)).ToArray();
-        var stopwatch  = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"  Source     : {source.Name} ({source.ModelId}, {source.Dimensions} dims)");
@@ -194,18 +109,13 @@ public static class EmbeddingCacheBuilder
         Console.WriteLine($"  ⏳ Embedding {products.Count} product documents...");
         var catalogueFile = await BuildCatalogueCacheAsync(products, source, ReportProgress, cancellationToken).ConfigureAwait(false);
 
-        Console.WriteLine($"  ⏳ Embedding {queryTexts.Length} canonical queries...");
-        var queriesFile = await BuildQueryCacheAsync(queryTexts, source, ReportProgress, cancellationToken).ConfigureAwait(false);
-
         var cataloguePath = Path.Combine(directory, CatalogueAssetFileName);
-        var queriesPath   = Path.Combine(directory, QueriesAssetFileName);
 
         // UTF-8 with NO byte-order mark. `Encoding.UTF8` emits one, and while System.Text.Json's
-        // stream reader tolerates it, these files are committed and diffed: two invisible leading
+        // stream reader tolerates it, this file is committed and diffed: two invisible leading
         // bytes are exactly the kind of thing that later reads as "binary file" in a grep and gets
         // chased for an hour. Both consumers read the same bytes either way.
         await File.WriteAllTextAsync(cataloguePath, Serialize(catalogueFile), Utf8NoBom, cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(queriesPath, Serialize(queriesFile), Utf8NoBom, cancellationToken).ConfigureAwait(false);
 
         stopwatch.Stop();
 
@@ -218,18 +128,16 @@ public static class EmbeddingCacheBuilder
         var report = new EmbeddingCacheBuildReport(
             cataloguePath,
             catalogueFile.Vectors.Count,
-            queriesPath,
-            queriesFile.Vectors.Count,
             source.ModelId,
             catalogueFile.Dimensions,
             EmbeddingDocument.TemplateVersion,
-            new FileInfo(cataloguePath).Length + new FileInfo(queriesPath).Length,
+            new FileInfo(cataloguePath).Length,
             stopwatch.Elapsed,
             calls,
             promptTokens,
             callsWithoutUsage);
 
-        PrintReport(report, products.Count, queryTexts.Length);
+        PrintReport(report, products.Count);
         return report;
 
         static void ReportProgress(int index, int total, string label)
@@ -307,65 +215,6 @@ public static class EmbeddingCacheBuilder
         };
     }
 
-    /// <summary>
-    /// Embeds each query and returns the SHA-256-keyed asset. Keys are content-derived
-    /// (<see cref="EmbeddingDocument.HashQuery"/>), never hand-written — a stable hand-written key
-    /// is exactly how a cache starts replaying a vector for text that has since changed.
-    /// </summary>
-    /// <param name="queries">Query texts.</param>
-    /// <param name="source">Embedding source.</param>
-    /// <param name="onProgress">Optional progress callback: (index, total, query).</param>
-    /// <param name="cancellationToken">Cancellation.</param>
-    public static async Task<EmbeddingCacheFile> BuildQueryCacheAsync(
-        IReadOnlyList<string> queries,
-        IEmbeddingSource source,
-        Action<int, int, string>? onProgress = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(queries);
-        ArgumentNullException.ThrowIfNull(source);
-
-        var vectors    = new Dictionary<string, string>(queries.Count, StringComparer.Ordinal);
-        int dimensions = source.Dimensions;
-
-        for (int i = 0; i < queries.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var query = queries[i];
-            if (string.IsNullOrWhiteSpace(query)) continue;
-
-            onProgress?.Invoke(i, queries.Count, query);
-
-            var vector = await source.EmbedAsync(query, cancellationToken).ConfigureAwait(false);
-            if (vector.IsUnavailable())
-            {
-                throw new InvalidOperationException(
-                    $"Embedding source '{source.Name}' returned no vector for a canonical query. Aborting.");
-            }
-
-            if (dimensions <= 0) dimensions = vector.Length;
-
-            if (vector.Length != dimensions)
-            {
-                throw new InvalidOperationException(
-                    $"A canonical query embedded to {vector.Length} dimensions but {dimensions} was expected.");
-            }
-
-            vectors[EmbeddingDocument.HashQuery(query)] = EmbeddingCacheFile.EncodeVector(EmbeddingVectors.Normalized(vector.Span));
-        }
-
-        return new EmbeddingCacheFile
-        {
-            Model                   = source.ModelId,
-            Dimensions              = dimensions,
-            DocumentTemplateVersion = EmbeddingDocument.TemplateVersion,
-            GeneratedUtc            = DateTimeOffset.UtcNow.ToString("O"),
-            Keying                  = EmbeddingCacheFile.KeyingQuerySha256,
-            Vectors                 = vectors,
-        };
-    }
-
     /// <summary>Serialises an asset with the same options the loader reads it back with.</summary>
     /// <param name="file">The asset.</param>
     public static string Serialize(EmbeddingCacheFile file)
@@ -414,18 +263,17 @@ public static class EmbeddingCacheBuilder
         Console.ResetColor();
     }
 
-    private static void PrintReport(EmbeddingCacheBuildReport report, int productCount, int queryCount)
+    private static void PrintReport(EmbeddingCacheBuildReport report, int productCount)
     {
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────────");
         Console.ResetColor();
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("  ✅ Embedding assets written.");
+        Console.WriteLine("  ✅ Embedding asset written.");
         Console.ResetColor();
 
         Console.WriteLine($"     catalogue : {report.CatalogueVectors}/{productCount} vectors → {report.CataloguePath}");
-        Console.WriteLine($"     queries   : {report.QueryVectors}/{queryCount} vectors → {report.QueriesPath}");
         Console.WriteLine($"     model     : {report.Model} · {report.Dimensions} dims · template {report.DocumentTemplateVersion}");
         Console.WriteLine($"     size      : {report.TotalBytes / 1024.0:F1} KB · took {report.Elapsed.TotalSeconds:F1} s");
         Console.WriteLine(report.EmbeddingCalls == 0
@@ -437,11 +285,11 @@ public static class EmbeddingCacheBuilder
 
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine();
-        Console.WriteLine("  ⚠️  In the SAME commit that adds these files, restore the two lines the csproj");
-        Console.WriteLine("      currently omits (they are a hard build error while the files are missing):");
+        Console.WriteLine("  ⚠️  If Data/ was empty before this run, restore the line the csproj omits in the");
+        Console.WriteLine("      SAME commit that adds the file (an EmbeddedResource pointing at a missing file is");
+        Console.WriteLine("      a hard build error):");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("        <EmbeddedResource Include=\"Data\\catalogue.embeddings.json\" />");
-        Console.WriteLine("        <EmbeddedResource Include=\"Data\\queries.embeddings.json\" />");
         Console.ResetColor();
         Console.WriteLine();
     }
@@ -456,9 +304,7 @@ public static class EmbeddingCacheBuilder
 /// <summary>What a <c>--rebuild-embeddings</c> run actually wrote. Facts, for the console and for a caller.</summary>
 /// <param name="CataloguePath">Absolute path of the product-vector asset.</param>
 /// <param name="CatalogueVectors">How many product vectors it holds.</param>
-/// <param name="QueriesPath">Absolute path of the query-vector asset.</param>
-/// <param name="QueryVectors">How many query vectors it holds.</param>
-/// <param name="Model">The embedding model stamped into both files.</param>
+/// <param name="Model">The embedding model stamped into the file. EmbeddingSpace reads it back to decide which live deployment may embed queries against this index.</param>
 /// <param name="Dimensions">Vector length.</param>
 /// <param name="DocumentTemplateVersion">The <see cref="EmbeddingDocument.TemplateVersion"/> in force.</param>
 /// <param name="TotalBytes">Combined size on disk.</param>
@@ -475,8 +321,6 @@ public static class EmbeddingCacheBuilder
 public sealed record EmbeddingCacheBuildReport(
     string CataloguePath,
     int CatalogueVectors,
-    string QueriesPath,
-    int QueryVectors,
     string Model,
     int Dimensions,
     string DocumentTemplateVersion,

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,17 +11,35 @@ using Galaxus.RecommendationAgent.Domain;
 namespace Galaxus.RecommendationAgent.Retrieval;
 
 /// <summary>
-/// The committed-asset embedding path (design §D.4): loads real vectors generated once by
-/// <c>--rebuild-embeddings</c>, validates the stamp on them, and falls through to a live source
-/// on a cache miss.
+/// The committed-asset embedding path (design §D.4): loads the real PRODUCT vectors generated once
+/// by <c>--rebuild-embeddings</c>, validates the stamp on them, and embeds everything else — every
+/// QUERY — through a live source at search time.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Resolution order</b>, exactly as §D.4 states it: precomputed vector → live embedding (when
-/// one was supplied and credentials exist) → unavailable, which the retriever turns into
-/// LOUD degraded mode. There is no fourth step, and specifically no hash-embedder fallback: a
-/// signed-FNV bag-of-words vector would demonstrate plumbing while quietly breaking the one claim
-/// the demo exists to make.
+/// <b>Resolution order:</b> committed product vector → live embedding (when one was supplied) →
+/// unavailable, which the retriever turns into LOUD degraded mode. There is no fourth step, and
+/// specifically no hash-embedder fallback: a signed-FNV bag-of-words vector would demonstrate
+/// plumbing while quietly breaking the one claim the demo exists to make.
+/// </para>
+/// <para>
+/// <b>This class is an index with a live query path, NOT a lookup table.</b> That distinction is
+/// the whole of B-9, and it was learned the expensive way. Until 2026-09-05 the committed assets
+/// were TWO files — 99 product vectors and 71 <i>pre-guessed query texts</i> — and this class was
+/// a <c>Dictionary&lt;string, float[]&gt;</c> lookup over both, with no live path attached. A
+/// query composed at run time is not among 71 guesses, so it resolved to <c>Unavailable</c>, the
+/// dense leg ranked nothing, and <c>--real-vectors</c> produced <c>0 in → 0 out</c> for every
+/// persona. The product vectors were never the problem: measured 2026-09-05, queries embedded
+/// LIVE against those same committed vectors give <c>"camera"</c> → Sony α7 IV at 0.372,
+/// <c>"a warm jacket for hiking"</c> → Arc'teryx shell at 0.458, and Nadia's own composed label
+/// <c>"multi-day trips, starts before sunrise, carried"</c> → Osprey trekking pack 0.381, Peak
+/// Design travel tripod 0.365, Katadyn water filter 0.327, Petzl headlamp 0.325 — with no shared
+/// keyword anywhere. One architectural mistake, not a model problem and not a corpus problem.
+/// </para>
+/// <para>
+/// The query table and its asset are DELETED. Caching a query is caching an ANSWER to a question
+/// nobody has asked yet; caching a product is caching a description of a thing that exists. Only
+/// the second is a legitimate build artifact, and only the second is committed.
 /// </para>
 /// <para>
 /// <b>The stamp is checked, not trusted.</b> Model, dimensions and
@@ -29,31 +48,43 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// that no longer exists — and retrieving against them would silently return plausible, wrong
 /// neighbours. <see cref="Load"/> throws on a mismatch. <see cref="TryLoad"/> converts the throw
 /// into a warning the caller must print, and returns an EMPTY source so the run degrades loudly
-/// instead of retrieving against stale vectors.
+/// instead of retrieving against stale vectors. A live source whose model id differs from the
+/// asset's stamp is refused the same way: a cache hit and a cache miss answered from two different
+/// embedding spaces is worse than no cache at all.
 /// </para>
 /// <para>
-/// <b>A known limit, said plainly — and now MEASURED.</b> The query cache can only hold queries
-/// someone anticipated. The needs the agent searches with are composed at run time — a conjunction
-/// label is a JOIN of phrases, a leaf-category signal is a category name, a live agent writes its
-/// own — so a novel need is a cache miss by construction. With credentials it falls through to the
-/// live source; without them it degrades. That is why <see cref="ConceptEmbeddingSource"/>, not
-/// this class, is the offline default: it can embed anything, deterministically, with no key.
+/// <b>Within one run, one text is embedded once.</b> The live path is memoised per instance
+/// (<see cref="LiveMemoHits"/> against <see cref="FallbackCalls"/>), keyed on the exact text, and
+/// the memo entry is the in-flight TASK rather than its result — so two concurrent searches for
+/// the same need issue one call, not two. The memo is deliberately separate from the committed
+/// dictionary, so <see cref="CachedVectorCount"/> keeps describing the ASSET and never quietly
+/// grows to include things this process happened to look up.
 /// </para>
 /// <para>
-/// The size of that limit, measured 2026-09-05 (B-7): <b>38 of the 50</b> distinct queries the
-/// scored personas' interest maps issue are absent from the committed asset, Demo 01's offline arm
-/// falls from 6 recommendations to 0 on this path, and Eval 04's injection case stops reaching the
-/// candidate set at all. <see cref="EmbeddingSpace"/> is where that choice is made and printed;
-/// this class is not reached for by default, and the reason is a number rather than a preference.
+/// <b>Still not the key-free default.</b> This path needs credentials, so
+/// <see cref="ConceptEmbeddingSource"/> remains what <see cref="EmbeddingSpace"/> resolves to when
+/// none are present — and, per <see cref="EmbeddingSpace.AutoPrefers"/>, what it prefers even when
+/// they are. That is now a reproducibility argument rather than a retrieval one; the retrieval
+/// argument is gone, because this path works.
 /// </para>
 /// </remarks>
 public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
 {
     private readonly Dictionary<string, float[]> _vectorsByTextHash;
     private readonly IEmbeddingSource? _fallback;
+
+    /// <summary>
+    /// Per-run memo for the LIVE path, keyed on the exact query text. Holds the in-flight task,
+    /// not the finished vector, so concurrent callers asking for the same text share one call
+    /// instead of racing to issue two. Kept apart from <see cref="_vectorsByTextHash"/> on
+    /// purpose: that dictionary is the committed ASSET and its count is reported as such.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, Lazy<Task<ReadOnlyMemory<float>>>> _liveByText = new(StringComparer.Ordinal);
+
     private int _cacheHits;
     private int _cacheMisses;
     private int _fallbackCalls;
+    private int _liveMemoHits;
 
     private PrecomputedEmbeddingSource(
         Dictionary<string, float[]> vectorsByTextHash,
@@ -87,23 +118,49 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     public float SuggestedDenseScoreFloor =>
         _fallback?.SuggestedDenseScoreFloor ?? AzureEmbeddingSource.UncalibratedDenseScoreFloor;
 
-    /// <summary>How many vectors were loaded from the committed assets.</summary>
+    /// <summary>
+    /// How many PRODUCT vectors were loaded from the committed asset. Never grows during a run:
+    /// live query vectors go to a separate memo, so this number always describes the file.
+    /// </summary>
     public int CachedVectorCount => _vectorsByTextHash.Count;
 
     /// <summary>True when no vector was loaded — the assets are missing, empty or were rejected.</summary>
     public bool IsEmpty => _vectorsByTextHash.Count == 0;
 
-    /// <summary>True when a live source is available behind the cache.</summary>
+    /// <summary>True when a live source is available to embed queries. False makes this path index-only, and every query Unavailable.</summary>
     public bool HasLiveFallback => _fallback is not null;
 
-    /// <summary>Cache hits so far.</summary>
+    /// <summary>
+    /// The live query embedder behind the index, or null. Exposed for
+    /// <see cref="EmbeddingSpace"/>'s space-identity probe, which MUST go straight at the live
+    /// source: probing through this class would answer from the committed vector and compare the
+    /// asset with itself.
+    /// </summary>
+    public IEmbeddingSource? LiveSource => _fallback;
+
+    /// <summary>Lookups answered straight from the committed product asset, at no cost.</summary>
     public int CacheHits => Volatile.Read(ref _cacheHits);
 
-    /// <summary>Cache misses so far. A high number against a committed asset means the asset is stale in practice.</summary>
+    /// <summary>
+    /// Lookups the committed asset could not answer. Since B-9 a QUERY is expected to miss —
+    /// the asset holds product documents only — so this counts the live path's workload rather
+    /// than staleness. A miss on a PRODUCT document is the staleness signal, and it shows up as
+    /// a template-version rejection at load instead.
+    /// </summary>
     public int CacheMisses => Volatile.Read(ref _cacheMisses);
 
-    /// <summary>Calls that fell through to the live source. This is spend, and it is counted.</summary>
+    /// <summary>
+    /// Live embedding calls actually ISSUED. This is spend, it is counted, and it is counted
+    /// AFTER the memo — so it is the number of distinct texts this run embedded, not the number
+    /// of times it asked.
+    /// </summary>
     public int FallbackCalls => Volatile.Read(ref _fallbackCalls);
+
+    /// <summary>
+    /// Requests the per-run memo answered without a call. <c>FallbackCalls + LiveMemoHits</c> is
+    /// how many times the live path was asked; <see cref="FallbackCalls"/> alone is what it cost.
+    /// </summary>
+    public int LiveMemoHits => Volatile.Read(ref _liveMemoHits);
 
     /// <summary>
     /// Problems found while loading — a missing asset, a stamp mismatch, a bad vector. Non-empty
@@ -123,8 +180,8 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     /// re-rendered here and its hash mapped onto the stored vector. That re-rendering is what makes
     /// a template change detectable rather than silent.
     /// </param>
-    /// <param name="liveFallback">Optional live source used on a cache miss. Null means cache-or-degrade.</param>
-    /// <param name="assetPaths">Asset files to load. Null loads the two canonical assets from <c>Data/</c>.</param>
+    /// <param name="liveFallback">Live source for every text the asset does not hold — i.e. every QUERY. Null means index-or-degrade.</param>
+    /// <param name="assetPaths">Asset files to load. Null loads the canonical product asset from <c>Data/</c>.</param>
     /// <exception cref="InvalidOperationException">An asset's model, dimensions or template version does not match.</exception>
     public static PrecomputedEmbeddingSource Load(
         IReadOnlyList<Product> products,
@@ -141,8 +198,8 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     /// crashing — and never retrieves against vectors it could not validate.
     /// </summary>
     /// <param name="products">The catalogue.</param>
-    /// <param name="liveFallback">Optional live source used on a cache miss.</param>
-    /// <param name="assetPaths">Asset files to load. Null loads the two canonical assets from <c>Data/</c>.</param>
+    /// <param name="liveFallback">Live source for every text the asset does not hold — i.e. every QUERY. Null means index-or-degrade.</param>
+    /// <param name="assetPaths">Asset files to load. Null loads the canonical product asset from <c>Data/</c>.</param>
     public static PrecomputedEmbeddingSource TryLoad(
         IReadOnlyList<Product> products,
         IEmbeddingSource? liveFallback = null,
@@ -150,6 +207,12 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
         => LoadCore(products, liveFallback, assetPaths, throwOnMismatch: false);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A product document hits the committed asset and costs nothing. Anything else — every query
+    /// — goes to the live source ONCE per distinct text per instance, and to the memo thereafter.
+    /// With no live source attached, anything else is <c>Unavailable</c>, which
+    /// <see cref="HybridRetriever"/> reports as degraded rather than as an empty result.
+    /// </remarks>
     public async ValueTask<ReadOnlyMemory<float>> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return EmbeddingVectors.Unavailable;
@@ -165,18 +228,84 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
 
         if (_fallback is null) return EmbeddingVectors.Unavailable;
 
+        if (_liveByText.TryGetValue(text, out var memoised))
+        {
+            Interlocked.Increment(ref _liveMemoHits);
+            return await memoised.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // ExecutionAndPublication, and the value is the TASK: two threads that arrive together on
+        // the same text run the factory once and await the same call. Storing the finished vector
+        // instead would let both issue one, which is exactly the "embedded twice" this exists to
+        // stop.
+        var entry = _liveByText.GetOrAdd(
+            text,
+            t => new Lazy<Task<ReadOnlyMemory<float>>>(
+                () => EmbedLiveAsync(t), LazyThreadSafetyMode.ExecutionAndPublication));
+
+        try
+        {
+            // WaitAsync, not a token passed into the call: the memo is shared, and one caller
+            // cancelling must not cancel the vector every other caller is waiting for.
+            return await entry.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // A faulted entry would make one transient 429 permanent for the rest of the run.
+            // Cancellation of THIS caller leaves the entry alone — the call is still in flight.
+            if (entry.Value.IsFaulted)
+            {
+                _liveByText.TryRemove(new KeyValuePair<string, Lazy<Task<ReadOnlyMemory<float>>>>(text, entry));
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// One live embedding call, dimension-checked against the committed asset.
+    /// </summary>
+    /// <remarks>
+    /// The dimension check is the guard that a query and the index it is searched against are the
+    /// same length. It is NOT a guard that they are the same SPACE —
+    /// <c>text-embedding-ada-002</c> and <c>text-embedding-3-small</c> are both 1536 — which is why
+    /// <see cref="EmbeddingSpace"/> takes the live deployment's NAME from the asset's own model
+    /// stamp and then proves the space with an identity probe before any of this runs.
+    /// </remarks>
+    private async Task<ReadOnlyMemory<float>> EmbedLiveAsync(string text)
+    {
         Interlocked.Increment(ref _fallbackCalls);
-        var vector = await _fallback.EmbedAsync(text, cancellationToken).ConfigureAwait(false);
+
+        var vector = await _fallback!.EmbedAsync(text, CancellationToken.None).ConfigureAwait(false);
 
         if (!vector.IsUnavailable() && Dimensions > 0 && vector.Length != Dimensions)
         {
             throw new InvalidOperationException(
                 $"Live embedding source '{_fallback.Name}' returned {vector.Length} dimensions but the " +
-                $"precomputed cache holds {Dimensions}. Mixing two embedding spaces in one index " +
+                $"committed product index holds {Dimensions}. Mixing two embedding spaces in one index " +
                 "produces confident nonsense — regenerate the assets against the live deployment.");
         }
 
         return vector;
+    }
+
+    /// <summary>
+    /// Reads a vector straight out of the committed asset, without the live path. The seam
+    /// <see cref="EmbeddingSpace"/>'s identity probe uses to compare a freshly embedded product
+    /// document against the committed vector for that same text.
+    /// </summary>
+    /// <param name="text">Exact text, normally an <see cref="EmbeddingDocument.ForProduct"/> render.</param>
+    /// <param name="vector">The committed unit vector, when present.</param>
+    public bool TryGetCommitted(string text, out ReadOnlyMemory<float> vector)
+    {
+        if (!string.IsNullOrWhiteSpace(text) &&
+            _vectorsByTextHash.TryGetValue(EmbeddingDocument.HashQuery(text), out var found))
+        {
+            vector = found;
+            return true;
+        }
+
+        vector = EmbeddingVectors.Unavailable;
+        return false;
     }
 
     /// <summary>
@@ -217,7 +346,7 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     /// Opens an asset as a stream, preferring an embedded resource so there is no output-path
     /// resolution to get wrong once the two <c>EmbeddedResource</c> entries are restored to the csproj.
     /// </summary>
-    /// <param name="fileName">e.g. <c>"queries.embeddings.json"</c>.</param>
+    /// <param name="fileName">e.g. <c>"catalogue.embeddings.json"</c>.</param>
     /// <param name="stream">The opened stream; the caller disposes it.</param>
     /// <param name="describedAs">Where it came from, for warnings and diagnostics.</param>
     public static bool TryOpenAsset(string fileName, out Stream? stream, out string describedAs)
@@ -266,8 +395,10 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
         int    dimensions = liveFallback?.Dimensions ?? 0;
         bool   stampSeen  = false;
 
-        var names = assetPaths?.ToArray()
-                    ?? [EmbeddingCacheBuilder.CatalogueAssetFileName, EmbeddingCacheBuilder.QueriesAssetFileName];
+        // ONE asset: the product vectors. The query asset that used to sit beside it was deleted
+        // at B-9 — see the remarks on this class for why a pre-guessed query table is a bug
+        // rather than an asset.
+        var names = assetPaths?.ToArray() ?? [EmbeddingCacheBuilder.CatalogueAssetFileName];
 
         foreach (var name in names)
         {
@@ -330,8 +461,25 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
                 dimensions = file.Dimensions;
                 stampSeen  = true;
 
-                var isProductKeyed = string.Equals(file.Keying, EmbeddingCacheFile.KeyingProductId, StringComparison.Ordinal);
-                var productsById   = isProductKeyed ? IndexProducts(products) : null;
+                // Since B-9 the ONLY legitimate keying is by product id. A query-keyed asset is
+                // the deleted pre-guessed query table, and loading one would silently re-create
+                // the bug B-9 removed: run-time-composed queries would still miss it, but the
+                // handful that happened to hit would be answered from a stale snapshot instead of
+                // from the live embedder. Refused, loudly, rather than partially honoured.
+                if (!string.Equals(file.Keying, EmbeddingCacheFile.KeyingProductId, StringComparison.Ordinal))
+                {
+                    var message =
+                        $"Embedding asset '{described}' is keyed '{file.Keying}', not " +
+                        $"'{EmbeddingCacheFile.KeyingProductId}'. This loader accepts PRODUCT vectors only — a " +
+                        "query-vector asset is the pre-guessed query table deleted at B-9, and queries are now " +
+                        "embedded live at search time. REFUSING to load it.";
+
+                    if (throwOnMismatch) throw new InvalidOperationException(message);
+                    warnings.Add(message);
+                    continue;
+                }
+
+                var productsById = IndexProducts(products);
 
                 foreach (var (key, encoded) in file.Vectors)
                 {
@@ -356,23 +504,15 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
 
                     EmbeddingVectors.NormalizeInPlace(vector);
 
-                    if (productsById is not null)
+                    // The document is re-rendered HERE and keyed by its hash, so a template change
+                    // shows up as a cache miss rather than as a wrong vector.
+                    if (!productsById.TryGetValue(key, out var product))
                     {
-                        // Product-keyed asset: re-render the document HERE and key by its hash, so a
-                        // template change shows up as a cache miss rather than as a wrong vector.
-                        if (!productsById.TryGetValue(key, out var product))
-                        {
-                            warnings.Add($"Embedding asset '{described}' carries a vector for unknown product '{key}'. Skipped.");
-                            continue;
-                        }
+                        warnings.Add($"Embedding asset '{described}' carries a vector for unknown product '{key}'. Skipped.");
+                        continue;
+                    }
 
-                        vectors[EmbeddingDocument.HashQuery(EmbeddingDocument.ForProduct(product))] = vector;
-                    }
-                    else
-                    {
-                        // Query-keyed asset: the key IS the SHA-256 of the normalised query text.
-                        vectors[key] = vector;
-                    }
+                    vectors[EmbeddingDocument.HashQuery(EmbeddingDocument.ForProduct(product))] = vector;
                 }
 
                 loaded.Add(described);
@@ -400,12 +540,17 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
             !string.Equals(modelId, liveFallback.ModelId, StringComparison.Ordinal))
         {
             var message =
-                $"The committed vectors are '{modelId}' but the live fallback is '{liveFallback.ModelId}'. " +
-                "A cache hit and a cache miss would then be answered from two different embedding spaces, " +
-                "which is worse than no cache at all.";
+                $"The committed product vectors are '{modelId}' but the live query embedder is " +
+                $"'{liveFallback.ModelId}'. The index and the queries searched against it would then be in two " +
+                "different embedding spaces, which produces confident nonsense rather than a weak signal. " +
+                "REFUSING to load them — the caller must fall back and say so.";
 
             if (throwOnMismatch) throw new InvalidOperationException(message);
             warnings.Add(message);
+
+            // Cleared, so IsEmpty is true and the caller degrades LOUDLY. Note what is NOT done
+            // here: the good product vectors are not kept and quietly queried with the wrong
+            // embedder. Two spaces never meet, even at the cost of the whole path.
             vectors.Clear();
             modelId    = liveFallback.ModelId;
             dimensions = liveFallback.Dimensions;

@@ -1021,8 +1021,30 @@ public static class NegativeControls
     /// broke the dense leg — the flattering direction, which is the one to instrument hardest.
     /// </para>
     /// <para>
-    /// The verdict is A AND B AND D. Adding D can only make the row harder to satisfy; nothing was
-    /// relaxed to accommodate the new arm A.
+    /// ⚠ <b>B-9: on the real-vector path arms A and D are now NEAR-VACUOUS, in exactly the way arm
+    /// B's zero test always was, and that has to be said rather than enjoyed.</b> Queries are
+    /// embedded live, and a real embedding model returns a dense vector for ANY non-empty text — so
+    /// "did it come back non-zero?" is close to a tautology there and would be satisfied by a
+    /// garbage vector. What the two arms still verify on that path is that the path is REACHABLE at
+    /// all: credentials present, the committed index validating, the live deployment answering, and
+    /// <see cref="EmbeddingSpace"/>'s space-identity probe clearing its floor — any of which failing
+    /// resolves the run to the concept space, where the same arms measure a real lexicon gap. The
+    /// non-vacuous instrument for the CONCEPT space is arm C, which is why arm C is measured on
+    /// every run whether or not the run used it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>These arms SPEND on the real-vector path.</b> Arm A embeds 56 phrases and arm D 50
+    /// queries, live, once each. That is roughly a hundredth of a cent, and it is stated here rather
+    /// than discovered on an invoice.
+    /// </para>
+    /// <para>
+    /// <b>The verdict is A AND B AND C AND D</b>, and arm C joined it at B-9. It had been left out
+    /// while arm D read 38 of 50 on the real-vector path — a row that could not go green there did
+    /// not visibly need it. Live query embedding takes A, B and D to zero on that path in a single
+    /// change, and the row would then have printed ✅ under <c>--real-vectors</c> while arm C still
+    /// reported 18 of 56 dead in the space the DEFAULT runs in. That is a green tick bought by
+    /// passing a flag, on a run that repaired nothing. Every arm now has to be clean, which is
+    /// strictly harder; nothing was relaxed to accommodate any of them.
     /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckAuthoredQueryPhrasesRetrieve()
@@ -1042,7 +1064,7 @@ public static class NegativeControls
 
         // ── ARM B — the committed assets, loaded HERE and independently of the selector, with no
         //    live fallback: the arm must measure the ASSET, not the credentials of whoever ran it.
-        var (deadB, noteB) = MeasureRealVectorArm();
+        var (deadB, totalB, noteB) = MeasureRealVectorArm();
 
         // ── ARM C — the concept space, measured directly. It never co-moves with the selector,
         //    which is what makes it worth printing on a run that resolved to the assets.
@@ -1054,8 +1076,19 @@ public static class NegativeControls
 
         bool armAClean = deadA == 0;
         bool armBClean = deadB == 0;
+        bool armCClean = deadC == 0;
         bool armDClean = deadIssued == 0;
-        bool allRetrievable = armAClean && armBClean && armDClean;
+
+        // ⚠ ARM C IS IN THE VERDICT SINCE B-9, and it was NOT before. The old verdict was
+        // A && B && D, and while arm D read 38 of 50 on the real-vector path that could never go
+        // green there, so the omission never showed. Live query embedding takes arms A, B and D to
+        // zero on that path in one change — and the row would then have printed ✅ on
+        // --real-vectors while arm C still reported 18 of 56 authored phrases dead in the concept
+        // space, which is the space the DEFAULT and every asset-load fallback run in. A green tick
+        // bought by passing a flag, on a run that repaired nothing, is a flattering verdict, and
+        // the flattering direction is the one to instrument hardest. This row never gates, so
+        // tightening it costs nothing and removes the tick.
+        bool allRetrievable = armAClean && armBClean && armCClean && armDClean;
 
         var coMoves = space.Chosen == EmbeddingSpaceChoice.RealVectors
             ? "ARM A and ARM B are the same source on this run, so their agreement is ONE fact, not two — read ARM C and ARM D."
@@ -1067,17 +1100,18 @@ public static class NegativeControls
           + "actually retrieves in. ARM A (the RESOLVED path — whatever EmbeddingSpace handed the retrievers): a "
           + "query that embeds to ZERO, or that the source answers UNAVAILABLE, gives the dense leg nothing, and "
           + "the arm's low score is then a property of the corpus rather than of the arm. ARM B (the committed "
-          + "text-embedding-3-small assets, no key, no live fallback): a phrase absent from the asset, or an asset "
-          + "whose model / dimensions / template stamp fail to validate, is the same nothing. A real model cannot "
-          + "return a zero vector, so ARM B's zero test alone is near-vacuous; what it verifies is asset PRESENCE "
-          + "and stamp validity. ARM C (the concept space, measured directly): the space --concept-vectors forces "
+          + "text-embedding-3-small INDEX, no key, no live path): every product document must be answerable "
+          + "straight from the asset. A product the asset cannot answer for is a product the dense leg cannot "
+          + "rank, and it is what a template bump without a rebuild looks like. Since B-9 this arm's denominator "
+          + "is the CATALOGUE, not the phrase list — the query-vector asset it used to count against is deleted. "
+          + "ARM C (the concept space, measured directly): the space --concept-vectors forces "
           + "and every asset-load failure falls back to, reported whether or not this run used it. ARM D is the "
           + "THING the other three only proxy: the actual query strings the scored personas' interest maps produce "
           + "— joins of phrases, companion classes, category names — none of which is an authored phrase.",
             $"SPACE: {space.Source.Name} ({space.Source.ModelId}, {space.Source.Dimensions} dims) · {space.Reason}"
           + $" · ARM A (resolved path): {deadA} of {total} authored phrase(s) unanswerable"
           + (deadA == 0 ? "." : $"; {deadGoldA.Count} of them latent-GOLD: {string.Join(", ", deadGoldA)}.")
-          + $" · ARM B (committed real vectors): {deadB} of {total} dead — {noteB}"
+          + $" · ARM B (the committed index, no live path): {deadB} of {totalB} product(s) unanswerable — {noteB}"
           + $" · ARM C (concept space, always measured): {deadC} of {total} embed to ZERO"
           + (deadC == 0 ? "." : $"; {deadGoldC.Count} latent-GOLD: {string.Join(", ", deadGoldC)}.")
           + $" · ARM D (the queries actually issued, on the resolved path): {deadIssued} of {issuedTotal} unanswerable"
@@ -1088,9 +1122,9 @@ public static class NegativeControls
                 : " READ EVERY EVAL 02 ARM NUMBER WITH THIS IN FRONT OF IT: on the interests listed above the dense "
                 + "retrieval leg contributes nothing, so a low coverage cell there is not evidence that the arm "
                 + "failed to reason. ADVISORY — closing ARM C means choosing a concept mapping per phrase, which "
-                + "moves every coverage cell, so it is reported rather than silently repaired; closing ARM D on the "
-                + "real-vector path means embedding the composed labels, which is a paid rebuild. Neither is done "
-                + "here, and a green row while either is open would claim a fix the suite has not had."),
+                + "moves every coverage cell, so it is reported rather than silently repaired. ARM D on the "
+                + "real-vector path is no longer a paid rebuild away: since B-9 queries are embedded live, so a "
+                + "non-zero ARM D there means the live path is unreachable, not that the cache is thin."),
             allRetrievable,
             Gating: false);
     }
@@ -1169,49 +1203,83 @@ public static class NegativeControls
     }
 
     /// <summary>
-    /// Arm B of <see cref="CheckAuthoredQueryPhrasesRetrieve"/>: how many authored phrases the
-    /// COMMITTED vector assets cannot answer. Counts an <c>Unavailable</c> (absent from the asset,
-    /// or the whole asset rejected on its stamp) exactly like a zero vector, because the dense leg
-    /// gets the same nothing from both.
+    /// Arm B of <see cref="CheckAuthoredQueryPhrasesRetrieve"/>: how many PRODUCTS the committed
+    /// index cannot answer for. Counts an <c>Unavailable</c> (absent from the asset, or the whole
+    /// asset rejected on its stamp) exactly like a zero vector, because the dense leg gets the same
+    /// nothing from both.
     /// </summary>
-    private static (int Dead, string Note) MeasureRealVectorArm()
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>B-9 changed what this arm measures, and the change must be read before the number
+    /// is.</b> It used to count how many of the 56 authored PHRASES were present in a committed
+    /// query-vector asset. That asset is deleted — it held 71 pre-guessed query texts, a
+    /// run-time-composed query was never one of them, and the whole real-vector path retrieved
+    /// nothing as a result. Queries are embedded live now, so "is this phrase in the file?" is not
+    /// a question that has an answer any more, and an arm that kept asking it would report 56 of 56
+    /// dead forever on a path that works.
+    /// </para>
+    /// <para>
+    /// So the arm now measures the surviving, and load-bearing, half: the INDEX. Every product's
+    /// embedding document must be answerable straight from the committed asset, with no live path
+    /// attached. That is the non-vacuous asset check — stamp validity, dimensional agreement, and
+    /// the re-rendered document hashing to a key the file actually carries — and it is exactly the
+    /// check that fails when the document template is bumped without a rebuild. Its denominator is
+    /// the CATALOGUE, not the phrase list.
+    /// </para>
+    /// <para>
+    /// It deliberately still attaches no live source: this arm reports on the ASSET, so it must
+    /// read the same on a machine with credentials and a machine without. Whether a QUERY can be
+    /// embedded on the real-vector path is arms A and D's business, and only on a run that resolved
+    /// to it.
+    /// </para>
+    /// </remarks>
+    private static (int Dead, int Total, string Note) MeasureRealVectorArm()
     {
+        var products = Catalogue.Default.All;
+
         PrecomputedEmbeddingSource source;
         try
         {
             // TryLoad, not Load: a stale or missing asset must be REPORTED by this row, not thrown
-            // out of Eval 03 as a crash. liveFallback stays null on purpose — see the call site.
-            source = PrecomputedEmbeddingSource.TryLoad(Catalogue.Default.All, liveFallback: null);
+            // out of Eval 03 as a crash.
+            source = PrecomputedEmbeddingSource.TryLoad(products, liveFallback: null);
         }
         catch (Exception ex)
         {
-            return (InterestMapBuilder.ContextPhrases.Count, $"the assets could not be read at all ({ex.GetType().Name}).");
+            return (products.Count, products.Count, $"the index could not be read at all ({ex.GetType().Name}).");
         }
 
         if (source.IsEmpty)
         {
-            return (InterestMapBuilder.ContextPhrases.Count,
+            return (products.Count, products.Count,
                     "NO committed vectors loaded — " +
-                    (source.LoadWarnings.Count > 0 ? source.LoadWarnings[0] : "the assets are absent."));
+                    (source.LoadWarnings.Count > 0 ? source.LoadWarnings[0] : "the asset is absent."));
         }
 
         int dead = 0;
-        foreach (var phrase in InterestMapBuilder.ContextPhrases.Values)
+        foreach (var product in products)
         {
-            if (IsDead(EmbedThrough(source, phrase))) dead++;
+            if (product is null) continue;
+            if (IsDead(EmbedThrough(source, EmbeddingDocument.ForProduct(product)))) dead++;
         }
 
-        return (dead,
-                $"{source.CachedVectorCount} committed '{source.ModelId}' vectors at {source.Dimensions} dims, "
-              + $"{source.FallbackCalls} live call(s) made"
+        return (dead, products.Count,
+                $"{source.CachedVectorCount} committed '{source.ModelId}' product vectors at {source.Dimensions} dims, "
+              + $"template {EmbeddingDocument.TemplateVersion}, {source.FallbackCalls} live call(s) made"
               + (source.LoadWarnings.Count == 0 ? "." : $"; {source.LoadWarnings.Count} load warning(s)."));
     }
 
     /// <summary>
-    /// Embeds through an <see cref="IEmbeddingSource"/> synchronously. Safe only for the OFFLINE
-    /// sources this row measures — both complete without a network call, which is why no live
-    /// fallback is ever attached to either of them.
+    /// Embeds through an <see cref="IEmbeddingSource"/> synchronously, blocking if the source is a
+    /// live one.
     /// </summary>
+    /// <remarks>
+    /// Before B-9 the comment here said this was safe only because every source this row touches is
+    /// offline. That stopped being true when the real-vector path gained a live query embedder, so
+    /// the honest description is the one above: this blocks. It is a console eval with no
+    /// synchronisation context, the calls are sequential, and the alternative — threading async
+    /// through the whole control-row signature for one row — buys nothing here.
+    /// </remarks>
     /// <param name="source">The source.</param>
     /// <param name="text">The text.</param>
     private static ReadOnlyMemory<float> EmbedThrough(IEmbeddingSource source, string text)

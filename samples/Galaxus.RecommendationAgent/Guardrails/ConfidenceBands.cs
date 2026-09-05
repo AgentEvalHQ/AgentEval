@@ -44,6 +44,29 @@ public enum ConfidenceBand
 /// <c>also_consider</c> with confidence 0.90 is promoted, and one it put in
 /// <c>recommendations</c> with 0.50 is demoted. The model proposes; the band decides.
 /// </para>
+/// <para>
+/// ⚠ <b>These two numbers are UNMEASURED and, worse, they are SPACE-DEPENDENT — measured
+/// 2026-09-05 (B-9).</b> Half of <c>Demo01.Confidence</c> is a cosine, and a cosine's typical
+/// magnitude is a property of the embedding space, not of the product. The 24-dimension authored
+/// concept space produces large cosines between related texts; <c>text-embedding-3-small</c>
+/// produces small ones for the same pairs. So the SAME catalogue, the SAME interest map and the
+/// SAME six products land in different trays depending only on the flag:
+/// </para>
+/// <list type="bullet">
+///   <item><c>-- 1 --offline</c> (concept): confidences 0.46–0.80, six items, three demoted, none dropped.</item>
+///   <item><c>-- 1 --offline --real-vectors</c>: confidences 0.40–0.59, so NOTHING clears
+///         <see cref="PrimaryThreshold"/> — five demoted to "also consider" and one dropped under
+///         <see cref="SecondaryThreshold"/>. The primary tray is empty, and not because the
+///         products are worse.</item>
+/// </list>
+/// <para>
+/// <see cref="IEmbeddingSource.SuggestedDenseScoreFloor"/> already says a retrieval floor belongs to
+/// a SPACE and may not be carried between them. These thresholds have exactly the same property and
+/// nobody had said so. They are NOT re-tuned here: picking a second pair of numbers to make the
+/// real-vector tray look like the concept tray would be fitting the threshold to the output, which
+/// is the failure this project keeps a rule about. The honest statement is that a band assignment
+/// is only comparable within one space, and the space is printed above every tray.
+/// </para>
 /// </remarks>
 public static class ConfidenceBands
 {

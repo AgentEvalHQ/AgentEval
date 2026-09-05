@@ -631,10 +631,15 @@ public static class GuardrailControls
             evidence = GalaxusTools.UserEvidenceInCurrentRun;
         }
 
-        var (raw, _, _) = Demo01_RecommendationAgent.Assemble(
+        // Blocking on the assembler, exactly as the PresentRecommendation call above blocks: these
+        // scripted controls are a synchronous harness around an async pipeline. AssembleAsync
+        // became async at B-9 because the confidence arithmetic now embeds in whichever space the
+        // run resolved, and on the real-vector path that reaches the network.
+        var (raw, _, _) = Demo01_RecommendationAgent.AssembleAsync(
             presented, evidence,
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal),
-            context.InterestMap, catalogue, []);
+            context.InterestMap, catalogue, [])
+            .GetAwaiter().GetResult();
 
         return GuardrailPipeline.Apply(raw, context);
     }

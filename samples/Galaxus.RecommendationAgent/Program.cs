@@ -35,7 +35,7 @@ Console.OutputEncoding = Encoding.UTF8;
 //   --user <USR-XX-NN>      Persona to run. Overrides the digit's persona.
 //   --no-personalization    §F.6 opt-out: history is not read, the turn runs on stated need.
 //   --offline               Skip the model entirely; run the deterministic baseline arm.
-//   --rebuild-embeddings    Regenerate Data/*.embeddings.json from a LIVE embedding model.
+//   --rebuild-embeddings    Regenerate Data/catalogue.embeddings.json from a LIVE embedding model.
 //   --model <deployment>    Override AZURE_OPENAI_DEPLOYMENT for this run only.
 //   --embedding-model <d>   Override AZURE_OPENAI_EMBEDDING_DEPLOYMENT for this run only.
 //   --model-timeout <secs>  Demo 02 only: wall-clock ceiling on ONE model call.
@@ -380,7 +380,13 @@ static async Task ShowMenuAsync(ParsedArgs parsed)
 
 // ── --rebuild-embeddings ──────────────────────────────────────────────────────
 
-// Regenerates the two committed embedding assets from a LIVE embedding deployment.
+// Regenerates the committed PRODUCT embedding index from a LIVE embedding deployment.
+//
+// One asset, since B-9: there used to be a second holding 71 pre-guessed query vectors, and
+// serving queries out of it is what made the real-vector path retrieve nothing. Queries are
+// embedded live at search time now. What this switch writes is the INDEX, and its model stamp
+// is load-bearing: EmbeddingSpace reads it back to decide which live deployment is even allowed
+// to embed queries against these vectors.
 //
 // The builder refuses an offline source unless told otherwise, and it is not told otherwise
 // here: writing authored concept vectors into a file named catalogue.embeddings.json would
@@ -407,8 +413,8 @@ static async Task RebuildEmbeddingsAsync()
         if (report is null) return;   // the builder printed its own refusal
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("  ⚠️  Restore the two <EmbeddedResource> lines in Galaxus.RecommendationAgent.csproj");
-        Console.WriteLine("     in the SAME commit that adds these files, or they ship unreferenced.");
+        Console.WriteLine("  ⚠️  Restore the <EmbeddedResource> line in Galaxus.RecommendationAgent.csproj");
+        Console.WriteLine("     in the SAME commit that adds this file, or it ships unreferenced.");
         Console.ResetColor();
     }
 }
@@ -457,15 +463,22 @@ Flags:
   --offline              Skip the model. The deterministic retrieval + guardrail path
                          selects the products, and the panel says so. This is the
                          baseline arm — the thing a claim about the agent needs.
-  --rebuild-embeddings   Regenerate Data/*.embeddings.json from a live embedding model.
+  --rebuild-embeddings   Regenerate Data/catalogue.embeddings.json from a live embedding
+                         model. 99 calls; it spends.
   --concept-vectors      Retrieve in the authored 24-dimension concept space. THE DEFAULT.
-                         It embeds ANY text with no key, so a query composed at run time
-                         still reaches the dense leg.
-  --real-vectors         Retrieve in the committed text-embedding-3-small space instead
-                         (Data/*.embeddings.json, still no key, nothing spent). Real
-                         vectors — but the QUERY side of a cache holds only text somebody
-                         anticipated, and a run-time-composed need is a miss, which turns
-                         that search LEXICAL-ONLY. Both spaces are printed in the banner.
+                         Deterministic, no key, no network, identical on every machine —
+                         which is why it is the default: an Auto that preferred real
+                         vectors would score in a different space depending on whether a
+                         key happened to be set.
+  --real-vectors         Retrieve in the real text-embedding-3-small space: the 99
+                         committed PRODUCT vectors, with every QUERY embedded LIVE at
+                         search time against the deployment the asset's own model stamp
+                         names. NEEDS CREDENTIALS AND SPENDS (a fraction of a cent). With
+                         no key it falls back to the concept space and says so. Before
+                         retrieving it proves the two are one space by re-embedding a
+                         product document and checking it against its committed vector —
+                         expected 1.0, and the measured value is printed. Both spaces are
+                         printed in the banner; nothing is ever downgraded silently.
   --model <deployment>   Override AZURE_OPENAI_DEPLOYMENT for this run only.
   --embedding-model <d>  Override AZURE_OPENAI_EMBEDDING_DEPLOYMENT for this run only.
   --model-timeout <secs> Demo 02 only. Wall-clock ceiling on ONE model call (default 60).

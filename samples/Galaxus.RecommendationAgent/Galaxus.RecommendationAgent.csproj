@@ -31,27 +31,31 @@
     <PackageReference Include="OpenTelemetry.Api" />
   </ItemGroup>
 
-  <!-- The two committed vector assets (design §D.4 / §G). Generated 2026-09-05 by running
+  <!-- The committed PRODUCT vector index (design §D.4 / §G). Generated 2026-09-05 by running
        this project with the "rebuild-embeddings" switch and the embedding-model override
        pointed at text-embedding-3-small (the exact command line is in MEASUREMENT_STATUS §16;
        XML comments cannot carry a double hyphen, so it is not repeated here).
-       170 live calls, 13 383 prompt tokens, ≈ USD 0.00027. Real text-embedding-3-small
-       vectors: 99 product documents + 71 query texts, 1536 dims, template stamp v2.
+       Real text-embedding-3-small vectors: 99 product documents, 1536 dims, template stamp v2.
 
-       These two lines and the two files land in the SAME commit on purpose — an
-       EmbeddedResource pointing at a missing file is a hard build error (MSB3030), which
-       is why they were absent until the assets existed.
+       This line and the file land in the SAME commit on purpose — an EmbeddedResource
+       pointing at a missing file is a hard build error (MSB3030), which is why it was
+       absent until the asset existed.
 
-       Since B-7 (2026-09-05) these files ARE a retrieval path: EmbeddingSpace resolves the
-       embedding source for both demos, the discovery workflow and the eval suite, and the
-       "real-vectors" switch points it here. The DEFAULT is still ConceptEmbeddingSource
-       (authored concept vectors, deterministic, no key, no network) — because the query
-       side of this cache holds only anticipated text, so on the real-vector path Demo 01
-       recommends nothing and Eval 04 fails. Measured, both spaces, in
-       MEASUREMENT_STATUS §17. -->
+       ONE asset, since B-9 (2026-09-05). There used to be a second, queries.embeddings.json,
+       holding 71 pre-guessed query texts, and PrecomputedEmbeddingSource served queries out
+       of it. A query composed at run time is not one of 71 guesses, so it missed, the dense
+       leg ranked nothing, and the "real-vectors" path produced 0 in and 0 out for every
+       persona. It is deleted. The INDEX is precomputed and committed; the QUERY is embedded
+       live at search time against the deployment this file's own model stamp names, and
+       EmbeddingSpace proves the two are one space with an identity probe before retrieving.
+
+       The DEFAULT is still ConceptEmbeddingSource (authored concept vectors, deterministic,
+       no key, no network) — but for a different reason than before B-9: not because real
+       vectors retrieve badly (they do not), but because an Auto that preferred them would
+       resolve differently depending on whether a key is present, and a scored suite may not
+       change space with the environment. Measured, both spaces, in MEASUREMENT_STATUS §18. -->
   <ItemGroup>
     <EmbeddedResource Include="Data\catalogue.embeddings.json" />
-    <EmbeddedResource Include="Data\queries.embeddings.json" />
   </ItemGroup>
 
 </Project>
