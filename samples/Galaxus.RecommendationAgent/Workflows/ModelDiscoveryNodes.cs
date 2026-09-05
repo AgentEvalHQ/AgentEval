@@ -591,7 +591,9 @@ public sealed class ModelCoverageReviewer(Catalogue catalogue, DiscoveryModelCal
             builder.AppendLine(CultureInfo.InvariantCulture,
                 $"  {interest.Id}  queries run: {(coverage.QueriesRun.Count == 0 ? "(none)" : string.Join(" | ", coverage.QueriesRun))}");
             builder.AppendLine(CultureInfo.InvariantCulture,
-                $"      candidates: {coverage.CandidateProductIds.Count}   best score: {coverage.BestScore:0.0000}   status: {coverage.Status}");
+                $"      candidates: {coverage.CandidateProductIds.Count} credited, "
+              + $"{coverage.AttributableProductIds.Count} attributable   best score: {coverage.BestScore:0.0000}   "
+              + $"status: {coverage.Status}");
         }
 
         builder.AppendLine();

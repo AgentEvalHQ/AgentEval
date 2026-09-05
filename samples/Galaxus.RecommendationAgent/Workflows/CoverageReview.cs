@@ -44,8 +44,16 @@ public static class CoverageVerdictProjection
 
             var coverage = state.CoverageFor(interest.Id);
             if (coverage.QueriesRun.Count == 0) continue;           // not yet explored ≠ starved
-            if (coverage.CandidateProductIds.Count == 0 || coverage.BestScore < DiscoveryState.MinCandidateScore)
+            // ⚠ An interest that NAMES NOTHING is starved however much came back for it. A query
+            //   with no content still returns a ranked list, and treating the top of that list as
+            //   evidence is how a contentless utterance came to look covered (Luca / USR-LF-04,
+            //   MEASUREMENT_STATUS §22). Neither threshold below has moved.
+            if (coverage.AttributionVocabularyEmpty
+                || coverage.CandidateProductIds.Count == 0
+                || coverage.BestScore < DiscoveryState.MinCandidateScore)
+            {
                 starved.Add(interest);
+            }
         }
 
         return starved;
@@ -384,6 +392,23 @@ public static class CoverageGapWriter
         ArgumentNullException.ThrowIfNull(interest);
 
         var coverage = state.CoverageFor(interest.Id);
+
+        // ⚠ There is no materially different query for an interest that names nothing. Both
+        //   repairs below narrow or re-word an existing query using the interest's own terms, and
+        //   an interest with an EMPTY attribution vocabulary has none to narrow with — so writing
+        //   a gap for it would send the loop round again to re-rank the same arbitrary list. NULL
+        //   here is what makes the reviewer report GAPS_UNRESOLVABLE in round 1, which is the
+        //   honest answer to "Hi — what do you recommend for me?" from a customer with one
+        //   purchase: ask, do not guess.
+        if (coverage.AttributionVocabularyEmpty)
+        {
+            coverage.LastGapReason =
+                "This interest names nothing a product could be matched against — no attribute hint, no category "
+              + "hint, and no content word in the customer's own words. A query with no content still returns a "
+              + "ranked list, so 'something came back' is not evidence here.";
+            return null;
+        }
+
         var seenForInterest = new List<ProductCandidate>();
 
         foreach (var productId in coverage.CandidateProductIds)

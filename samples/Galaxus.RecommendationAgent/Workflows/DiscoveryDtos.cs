@@ -205,14 +205,64 @@ public sealed class InterestCoverage
     /// <summary>Best fused score any query produced for it.</summary>
     public double BestScore { get; set; }
 
+    /// <summary>
+    /// The subset of <see cref="CandidateProductIds"/> that actually carries something this
+    /// interest names — see <see cref="InterestAttribution"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>REPORTED, NOT GATED — and the difference is deliberate.</b> A candidate is credited to
+    /// the interest whose query surfaced it, and a query always returns its best match whether or
+    /// not that match has anything to do with the interest. What GATES is the narrower and
+    /// unambiguous case: an interest that names NOTHING
+    /// (<see cref="AttributionVocabularyEmpty"/>) cannot be covered by anything.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The wider finding this channel measures is real and is NOT acted on here.</b>
+    /// MEASURED on the concept space, 2026-09-06: USR-NB-01's interest "Headlamps" was marked
+    /// COVERED on six candidates of which <b>zero</b> is a headlamp (hiking shoes, trekking poles,
+    /// a watch, a chest pack, a rear light, a running vest — she already owns the only headlamp,
+    /// so it is excluded from retrieval), and "Mirrorless full-frame" on six of which zero is a
+    /// camera body. Gating on the attributable count would be the honest reading, and it would
+    /// flip four of Eval 07's five personas and remove the corpus's only APPROVED exit — a change
+    /// to what the shipped demo answers, not just to a gate. It is measured and printed so that
+    /// decision is made on numbers rather than made silently.
+    /// </para>
+    /// </remarks>
+    public List<string> AttributableProductIds { get; } = [];
+
+    /// <summary>Best fused score among the ATTRIBUTABLE candidates. NaN when there are none.</summary>
+    public double BestAttributableScore { get; set; } = double.NaN;
+
+    /// <summary>
+    /// True when this interest names nothing a product could be matched against — no attribute
+    /// hint, no category hint and no content word in its query terms or label.
+    /// </summary>
+    /// <remarks>
+    /// Recorded rather than worked around. An interest nobody can describe stays STARVED, because
+    /// the alternative — falling back to counting candidates — turns it into an interest that
+    /// everything covers, which is the flattering direction.
+    /// </remarks>
+    public bool AttributionVocabularyEmpty { get; set; }
+
+    /// <summary>Why each attributable candidate counted, by product id. For the printed ledger.</summary>
+    public Dictionary<string, string> AttributionReasons { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Where it stands right now.</summary>
     public CoverageStatus Status { get; set; } = CoverageStatus.Unexplored;
 
     /// <summary>Why it was last judged short, or null.</summary>
     public string? LastGapReason { get; set; }
 
-    /// <summary>True when nothing has ever come back for it.</summary>
-    public bool IsStarved => CandidateProductIds.Count == 0;
+    /// <summary>
+    /// True when nothing that names this interest has ever come back for it.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ An interest that NAMES NOTHING is starved whatever came back for it. A query with no
+    /// content still returns a ranked list — something is always top of one — so "the retriever
+    /// returned something" is not "the interest was served".
+    /// </remarks>
+    public bool IsStarved => CandidateProductIds.Count == 0 || AttributionVocabularyEmpty;
 }
 
 /// <summary>One selected recommendation, after the Ranker's deterministic post-checks.</summary>

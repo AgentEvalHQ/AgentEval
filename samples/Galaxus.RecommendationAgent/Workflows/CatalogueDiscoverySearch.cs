@@ -83,6 +83,14 @@ public sealed class CatalogueDiscoverySearch(
             var coverage = state.CoverageFor(entry.InterestId);
             coverage.QueriesRun.Add(entry.Query);
 
+            // The interest this query was run FOR. Attribution is decided against it, not against
+            // the score the retriever happened to return.
+            var forInterest = state.FindInterest(entry.InterestId);
+            if (forInterest is not null)
+                coverage.AttributionVocabularyEmpty = InterestAttribution.Vocabulary(forInterest).Count == 0
+                    && forInterest.AttributeHints.Count == 0
+                    && forInterest.CategoryHints.Count == 0;
+
             // Named, not counted. The search line is published AFTER ingest so it can say WHICH
             // products this query discovered — "→ 6" tells an audience a query worked, it does
             // not tell them what the loop learned, and the vocabulary-transfer argument is
@@ -94,8 +102,25 @@ public sealed class CatalogueDiscoverySearch(
             {
                 if (hit.Score > coverage.BestScore) coverage.BestScore = hit.Score;
 
+                // ⚠ Resolved BEFORE the seen-dedup, because the credit above happens before it
+                //   too: a product already seen on another interest's query still gets credited
+                //   here, so it must be screened here as well or the two ledgers disagree.
+                bool known = _catalogue.TryGet(hit.ProductId, out var product) && product is not null;
+
                 if (!coverage.CandidateProductIds.Contains(hit.ProductId, StringComparer.Ordinal))
+                {
                     coverage.CandidateProductIds.Add(hit.ProductId);
+
+                    // ── The coverage signal. Not the score. ──
+                    if (known && forInterest is not null
+                        && InterestAttribution.IsAttributable(_catalogue, forInterest, product!, out string why))
+                    {
+                        coverage.AttributableProductIds.Add(hit.ProductId);
+                        coverage.AttributionReasons[hit.ProductId] = why;
+                        if (double.IsNaN(coverage.BestAttributableScore) || hit.Score > coverage.BestAttributableScore)
+                            coverage.BestAttributableScore = hit.Score;
+                    }
+                }
 
                 if (!state.SeenProductIds.Add(hit.ProductId))
                 {
@@ -103,7 +128,7 @@ public sealed class CatalogueDiscoverySearch(
                     continue;
                 }
 
-                if (!_catalogue.TryGet(hit.ProductId, out var product) || product is null) continue;
+                if (!known) continue;
 
                 var candidate = DiscoveryProjection.ToCandidate(
                     _catalogue, product, hit.Score, entry.InterestId, entry.Query);
@@ -219,6 +244,27 @@ public sealed class CatalogueDiscoverySearch(
         ArgumentNullException.ThrowIfNull(coverage);
 
         if (coverage.QueriesRun.Count == 0) return CoverageStatus.Unexplored;
+
+        // ⚠ AN INTEREST THAT NAMES NOTHING CANNOT BE COVERED BY ANYTHING.
+        //
+        // This is the gate that let Luca (USR-LF-04) through. His utterance — "Hi — what do you
+        // recommend for me?" — carries no product content, so the interest built from it has an
+        // EMPTY attribution vocabulary: no attribute hint, no category hint, and not one content
+        // word once our own "stated this session: " label prefix is removed. The retriever still
+        // returns its best match for a contentless query, because something is always top of a
+        // ranked list, and the two rules below then counted those matches as coverage. When the
+        // re-derived real-vectors dense floor let two arbitrary products through, 0 candidates and
+        // GAPS_UNRESOLVABLE became 2 candidates, a second round and five recommendations — two of
+        // them espresso accessories credited to an "Over-ear wireless" interest
+        // (MEASUREMENT_STATUS §22).
+        //
+        // ⚠ THE THRESHOLDS BELOW ARE UNTOUCHED. MinCandidateScore is still 0.012 and the dense
+        // floor is still the per-space derived one. Moving either to make one persona come out
+        // right would fit a calibrated number to a result AND leave the gate asking the same wrong
+        // question for everyone else. What changed is the question: an interest is not covered by
+        // products that answer a query it never really asked.
+        if (coverage.AttributionVocabularyEmpty) return CoverageStatus.Uncovered;
+
         if (coverage.CandidateProductIds.Count == 0) return CoverageStatus.Uncovered;
         if (coverage.BestScore < DiscoveryState.MinCandidateScore) return CoverageStatus.Uncovered;
 

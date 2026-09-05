@@ -98,6 +98,7 @@ public static class NegativeControls
         rows.Add(CheckOwnKRereadAtVaryingK());
         rows.Add(CheckEval09RuleAndRemedy());
         rows.Add(CheckJudgeEchoJoins());
+        rows.Add(CheckContentlessRequestIsNotCovered());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -2212,6 +2213,155 @@ public static class NegativeControls
                 + "order joins identically (not positional) · an invented criterion is still refused and diagnosed "
                 + $"INVENTED · an echo is diagnosed JOIN FAILURE against '{echoDiagnosis.NearestKey}' "
                 + $"({echoDiagnosis.OverlapChars} shared chars) · 5 of 5 stripper cases behave"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 15 — a contentless request is not covered by whatever came back. ═════════
+
+    /// <summary>
+    /// Proves the coverage gate keys on whether an interest NAMES anything, not on how the
+    /// retriever happened to score a ranked list — and that the two thresholds involved did not
+    /// move to achieve it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The regression.</b> Deriving the dense floor per space (MEASUREMENT_STATUS §22) moved the
+    /// real-vectors floor DOWN, from a transported 0.280 to 0.223. Luca Ferrari (USR-LF-04) has one
+    /// purchase, zero independent signals and types <i>"Hi — what do you recommend for me?"</i>. He
+    /// went from 0 candidates and <c>GAPS_UNRESOLVABLE</c> — the correct abstention — to 2
+    /// candidates, a second discovery round and five recommendations, two of them espresso
+    /// accessories credited to an <i>"Over-ear wireless"</i> interest.
+    /// </para>
+    /// <para>
+    /// <b>Why this row is space-independent, and what it therefore cannot show.</b> The regression
+    /// only appears under <c>--real-vectors</c>, which embeds every query LIVE and spends. So the
+    /// mechanism is exercised here instead: a coverage row is SYNTHESISED with more candidates and
+    /// a higher score than the real-space run produced, and the gate must still refuse it. That
+    /// proves the gate no longer keys on the score. It does <b>not</b> prove the end-to-end
+    /// real-space run abstains again — that needs a paid run and is not claimed.
+    /// </para>
+    /// <para>
+    /// <b>Both directions, and the thresholds.</b> An interest that names something real must still
+    /// be covered on the same row shape, or the fix is just a gate that never approves; and
+    /// <c>MinCandidateScore</c> and the pre-calibration dense floor must both still read the values
+    /// they were derived at, because moving a calibrated number to make one persona come out right
+    /// is the failure this row exists to make visible.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckContentlessRequestIsNotCovered()
+    {
+        var problems = new List<string>();
+
+        // ── The interest a contentless utterance produces, built by the SHIPPED mapper. ──
+        static Interest SessionRequest(string utterance) =>
+            DiscoveryInterestMapping.ToInterest(
+                new InterestSignal(
+                    Label: utterance,
+                    Strength: 1.0,
+                    EvidenceKind: InterestEvidenceKinds.StatedInSession,
+                    EvidencePurchaseIds: []),
+                "I-1");
+
+        var contentless = SessionRequest(GalaxusDemoPrompts.LucaThinSignal);
+        var vocabulary = InterestAttribution.Vocabulary(contentless);
+
+        if (vocabulary.Count != 0)
+        {
+            problems.Add($"the contentless request \"{Shorten(GalaxusDemoPrompts.LucaThinSignal, 40)}\" produced an "
+                       + $"attribution vocabulary of [{string.Join(", ", vocabulary)}] — it should name NOTHING.");
+        }
+
+        // ⚠ And specifically not OUR OWN label prefix. "stated this session: " is written by
+        //   DiscoveryInterestMapping, not by the customer, so a product whose text contained
+        //   "session" would otherwise have counted as covering the request — the harness supplying
+        //   an input to its own gate.
+        foreach (string ours in InterestAttribution.Fold(DiscoveryInterestMapping.SessionRequestLabelPrefix)
+                     .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (vocabulary.Contains(ours, StringComparer.Ordinal))
+                problems.Add($"'{ours}' comes from OUR label prefix and is in the attribution vocabulary.");
+        }
+
+        // A request that DOES name something must keep its vocabulary.
+        var stated = SessionRequest("I need a 58 mm espresso tamper and a scale");
+        if (!InterestAttribution.Vocabulary(stated).Contains("espresso", StringComparer.Ordinal))
+            problems.Add("a request that names 'espresso' lost it from the attribution vocabulary — the fix is eating real words.");
+
+        // ── The gate, on a row RICHER than the one the real space produced. ──
+        static InterestCoverage Row(bool vocabularyEmpty, int candidates, double bestScore)
+        {
+            var coverage = new InterestCoverage { InterestId = "I-1", AttributionVocabularyEmpty = vocabularyEmpty };
+            coverage.QueriesRun.Add("a query that ran");
+            for (int i = 0; i < candidates; i++) coverage.CandidateProductIds.Add($"GLX-90{i:00}");
+            coverage.BestScore = bestScore;
+            return coverage;
+        }
+
+        // 5 candidates and a perfect score — strictly more than the 2 the lower real-space floor
+        // let through — and it must STILL be uncovered and starved.
+        var namesNothing = Row(vocabularyEmpty: true, candidates: 5, bestScore: 1.0);
+        if (CatalogueDiscoverySearch.ClassifyCoverage(namesNothing) != CoverageStatus.Uncovered)
+        {
+            problems.Add($"an interest that names NOTHING was classified "
+                       + $"{CatalogueDiscoverySearch.ClassifyCoverage(namesNothing)} on 5 candidates at score 1.000 — "
+                       + "the gate is still reading the retriever's ranking rather than the interest.");
+        }
+
+        if (!namesNothing.IsStarved)
+            problems.Add("an interest that names NOTHING does not report IsStarved, so the reviewer's veto never fires.");
+
+        // And the same row for an interest that DOES name something must come out Covered, or this
+        // is a gate that refuses everything — which would look identical on the row above.
+        var namesSomething = Row(vocabularyEmpty: false, candidates: 5, bestScore: 1.0);
+        if (CatalogueDiscoverySearch.ClassifyCoverage(namesSomething) != CoverageStatus.Covered)
+            problems.Add("an interest that DOES name something was not Covered on the same row — the gate refuses everything.");
+        if (namesSomething.IsStarved)
+            problems.Add("an interest that DOES name something reports IsStarved on 5 candidates.");
+
+        // ── No materially different query exists for it, so the loop must not go round again. ──
+        var state = new DiscoveryState { CustomerId = Personas.LucaUserId, Market = "CH", Language = "fr", SessionRequest = GalaxusDemoPrompts.LucaThinSignal };
+        state.Interests.Add(contentless);
+        var live = state.CoverageFor(contentless.Id);
+        live.QueriesRun.Add(GalaxusDemoPrompts.LucaThinSignal);
+        live.CandidateProductIds.Add("GLX-3004");
+        live.CandidateProductIds.Add("GLX-3005");
+        live.BestScore = 1.0;
+        live.AttributionVocabularyEmpty = true;
+
+        var gap = CoverageGapWriter.Write(state, Catalogue.Default, contentless);
+        if (gap is not null)
+        {
+            problems.Add($"a gap with a 'next query' was written for an interest that names nothing (\"{Shorten(gap.NextQuery ?? "", 40)}\") — "
+                       + "the loop would go round again to re-rank the same arbitrary list instead of reporting GAPS_UNRESOLVABLE.");
+        }
+
+        if (live.LastGapReason is not { Length: > 0 })
+            problems.Add("nothing was recorded on the coverage row to say WHY no query was written — the refusal is silent.");
+
+        // ── The thresholds have NOT moved. ──
+        if (DiscoveryState.MinCandidateScore != 0.012)
+            problems.Add($"MinCandidateScore is {DiscoveryState.MinCandidateScore}, not 0.012 — a threshold moved to paper over the gate.");
+        if (Math.Abs(HybridRetriever.DefaultDenseScoreFloor - CalibratedThresholds.PreCalibration.DenseScoreFloor) > 1e-9)
+            problems.Add("the pre-calibration dense floor no longer equals the value the transport rule is anchored to.");
+
+        return new ControlRowSnapshot(
+            "ContentlessRequestIsNotCovered",
+            "an interest that NAMES NOTHING must never be covered, however many candidates a query returned for it "
+          + "and however well they scored — a query with no content still returns a ranked list, because something "
+          + "is always top of one. That is what let Luca's \"Hi — what do you recommend for me?\" turn from "
+          + "GAPS_UNRESOLVABLE into five recommendations when the re-derived real-vectors dense floor let two "
+          + "arbitrary products through. The gate must also still COVER an interest that does name something, no "
+          + "query may be written for one that does not, and MinCandidateScore and the dense floor must both still "
+          + "read their derived values: fixing this by moving a calibrated threshold is the failure, not the fix.",
+            problems.Count == 0
+                ? $"the contentless request names NOTHING (vocabulary empty, and our own '"
+                + $"{DiscoveryInterestMapping.SessionRequestLabelPrefix.Trim()}' prefix is excluded from it) · 5 "
+                + "candidates at score 1.000 → UNCOVERED and STARVED · the same row for an interest that names "
+                + "something → COVERED · no next query is written, with the reason recorded · MinCandidateScore "
+                + $"still {DiscoveryState.MinCandidateScore:0.000}, dense floor still "
+                + $"{HybridRetriever.DefaultDenseScoreFloor:0.000}. ⚠ SPACE-INDEPENDENT: this proves the MECHANISM, "
+                + "not that a --real-vectors run abstains again. That needs a paid run."
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

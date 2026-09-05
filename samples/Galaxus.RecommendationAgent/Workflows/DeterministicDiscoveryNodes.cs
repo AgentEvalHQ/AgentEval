@@ -569,7 +569,11 @@ public static class DiscoveryPresentation
         {
             var coverage = state.CoverageFor(interest.Id);
             Console.WriteLine($"     • {interest.Id}  {interest.Label} — searched {coverage.QueriesRun.Count} time(s), " +
-                              $"{coverage.CandidateProductIds.Count} candidate(s)");
+                              $"{coverage.CandidateProductIds.Count} candidate(s) credited, " +
+                              $"{coverage.AttributableProductIds.Count} of them carrying anything this interest names"
+                            + (coverage.AttributionVocabularyEmpty
+                                ? " (⚠ and this interest names NOTHING a product could be matched against)"
+                                : ""));
             if (coverage.LastGapReason is { Length: > 0 } reason)
                 Console.WriteLine($"       {reason}");
         }

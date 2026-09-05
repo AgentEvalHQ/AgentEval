@@ -298,13 +298,21 @@ public static class DiscoveryProjection
         ArgumentNullException.ThrowIfNull(interest);
         ArgumentNullException.ThrowIfNull(coverage);
 
-        int filled = Math.Clamp(coverage.CandidateProductIds.Count * 2, 0, 10);
+        // ⚠ The bar is the ATTRIBUTABLE count — what the status is actually decided on — and the
+        //   credited count is printed beside it whenever the two differ. A ledger that shows only
+        //   "2 candidate(s)" next to UNCOVERED reads as a broken gate; showing "2 credited, 0
+        //   attributable" says what happened.
+        int attributable = coverage.AttributableProductIds.Count;
+        int filled = Math.Clamp(attributable * 2, 0, 10);
         var bar = new string('█', filled) + new string('░', 10 - filled);
 
         var reason = coverage.LastGapReason is { Length: > 0 } why ? "  " + Fit(why, 46) : string.Empty;
+        string credited = attributable == coverage.CandidateProductIds.Count
+            ? string.Empty
+            : $" of {coverage.CandidateProductIds.Count} credited";
 
         return string.Create(CultureInfo.InvariantCulture,
-            $"{interest.Id,-4} {bar}  {coverage.CandidateProductIds.Count,2} candidate(s)  " +
+            $"{interest.Id,-4} {bar}  {attributable,2} attributable{credited}  " +
             $"{coverage.Status.ToString().ToUpperInvariant(),-10}{reason}");
     }
 
