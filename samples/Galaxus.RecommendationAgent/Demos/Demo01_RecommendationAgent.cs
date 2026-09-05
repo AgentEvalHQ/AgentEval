@@ -112,8 +112,15 @@ public static class Demo01_RecommendationAgent
     /// the output. What is owed is a per-space floor DERIVED from a held-out slice, listed beside
     /// the confidence bands in <c>MEASUREMENT_STATUS.md</c> §20.11.
     /// </para>
+    /// <para>
+    /// ✅ <b>DERIVED PER SPACE, 2026-09-05.</b> The paragraph above states what was owed and it has
+    /// now been paid: the value comes from <see cref="CalibratedThresholds"/>, one row per embedding
+    /// space, derived on a fit slice that deliberately EXCLUDES every persona whose tray is printed.
+    /// No longer a <c>const</c>, because a compile-time constant cannot depend on which space
+    /// resolved and this number does.
+    /// </para>
     /// </remarks>
-    public const double AttributionFloor = 0.20;
+    public static double AttributionFloor => CalibratedThresholds.Current.AttributionFloor;
 
     /// <summary>
     /// A consumable enters the replenishment tray once this fraction of its typical cadence has
@@ -718,7 +725,12 @@ public static class Demo01_RecommendationAgent
     /// should always have done.
     /// </para>
     /// </remarks>
-    private static async Task<InterestSignal?> AttributeSignalAsync(
+    /// <param name="needs">The search needs that surfaced this product. Empty falls back to the product's own document.</param>
+    /// <param name="product">The presented product.</param>
+    /// <param name="map">The customer's derived interest map.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The credited signal, or null when nothing clears <see cref="AttributionFloor"/>.</returns>
+    public static async Task<InterestSignal?> AttributeSignalAsync(
         IReadOnlyList<string> needs,
         Product? product,
         InterestMap map,
@@ -748,15 +760,13 @@ public static class Demo01_RecommendationAgent
         foreach (var signal in map.Signals)
         {
             var label  = await EmbeddingSpace.EmbedAsync(products, signal.Label, cancellationToken).ConfigureAwait(false);
-            var tokens = ContentTokens(signal.Label);
 
             double match = 0.0;
             foreach (var probe in probes)
             {
                 var probeVector = await EmbeddingSpace.EmbedAsync(products, probe, cancellationToken).ConfigureAwait(false);
                 double cosine   = EmbeddingVectors.DotOfUnitVectors(label.Span, probeVector.Span);
-                double overlap  = Overlap(tokens, ContentTokens(probe));
-                match = Math.Max(match, Math.Max(cosine, overlap));
+                match = Math.Max(match, AttributionMatch(signal.Label, probe, cosine));
             }
 
             // The floor is on the MATCH, never on the rank: a very strong interest must not be
@@ -901,8 +911,40 @@ public static class Demo01_RecommendationAgent
 
         var fit = EmbeddingVectors.DotOfUnitVectors(labelVector.Span, productVector.Span);
 
-        return Math.Clamp((signal.Strength + Math.Max(0.0, fit)) / 2.0, 0.0, 1.0);
+        return ConfidenceFrom(signal.Strength, fit);
     }
+
+    /// <summary>
+    /// The shipped ATTRIBUTION MATCH arithmetic, as one public expression: the better of the
+    /// space's cosine and the token-overlap fallback.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from <see cref="AttributeSignalAsync"/> — which now calls it — so the calibration
+    /// lane can collect the distribution this floor cuts by evaluating the SHIPPED formula rather
+    /// than a second copy of it. A calibration harness that re-implements the arithmetic it is
+    /// calibrating derives a threshold for a function the product does not run.
+    /// </remarks>
+    /// <param name="signalLabel">The derived interest's label — the left-hand side of the overlap.</param>
+    /// <param name="probe">The search need that surfaced the product, or the product's own embedding document.</param>
+    /// <param name="cosine">The cosine between the two in the RESOLVED embedding space.</param>
+    public static double AttributionMatch(string signalLabel, string probe, double cosine) =>
+        Math.Max(cosine, Overlap(ContentTokens(signalLabel), ContentTokens(probe)));
+
+    /// <summary>
+    /// The shipped CONFIDENCE arithmetic, as one public expression: the mean of the signal's
+    /// strength and the product's fit, clamped to 0..1.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from <see cref="ConfidenceAsync"/> for the reason
+    /// <see cref="AttributionMatch"/> gives. Note the shape: <paramref name="signalStrength"/> is
+    /// space-INDEPENDENT (it is derived from purchase history) and <paramref name="fit"/> is a
+    /// cosine, so exactly half of every confidence moves when the embedding space changes and the
+    /// other half does not. That asymmetry is why the confidence bands are space-dependent at all.
+    /// </remarks>
+    /// <param name="signalStrength">The attributed interest signal's strength, 0..1.</param>
+    /// <param name="fit">Cosine between the signal label and the product's embedding document. Negative reads as 0.</param>
+    public static double ConfidenceFrom(double signalStrength, double fit) =>
+        Math.Clamp((signalStrength + Math.Max(0.0, fit)) / 2.0, 0.0, 1.0);
 
     // ── The replenishment lane ────────────────────────────────────────────────
 

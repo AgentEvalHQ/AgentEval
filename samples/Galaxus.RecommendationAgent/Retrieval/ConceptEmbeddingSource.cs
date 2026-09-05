@@ -208,7 +208,14 @@ public sealed class ConceptEmbeddingSource : IEmbeddingSource
     public bool IsOffline => true;
 
     /// <inheritdoc />
-    public float SuggestedDenseScoreFloor => UncalibratedDenseScoreFloor;
+    /// <remarks>
+    /// ✅ <b>DERIVED for THIS space.</b> No longer <see cref="UncalibratedDenseScoreFloor"/> — that
+    /// constant's own summary called its equality with the Azure source "an unverified assumption",
+    /// and the assumption is now discharged rather than repeated:
+    /// <see cref="CalibratedThresholds.Concept"/> and <see cref="CalibratedThresholds.RealVectors"/>
+    /// are derived separately, on the same fit slice, by the same rule.
+    /// </remarks>
+    public float SuggestedDenseScoreFloor => CalibratedThresholds.Concept.DenseScoreFloor;
 
     /// <inheritdoc />
     /// <remarks>

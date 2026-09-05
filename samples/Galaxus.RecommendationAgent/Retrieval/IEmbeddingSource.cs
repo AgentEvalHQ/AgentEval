@@ -44,10 +44,12 @@ public interface IEmbeddingSource
 
     /// <summary>
     /// The dense cosine floor this source suggests for <see cref="HybridRetriever"/>.
-    /// <b>UNMEASURED for every source in this project.</b> It lives on the source rather than on
-    /// the retriever because a floor is a property of an embedding SPACE: a threshold picked for
-    /// <c>text-embedding-3-small</c> cosines says nothing about concept-vector cosines. Calibrating
-    /// one and reusing it for the other would be a number with no provenance.
+    /// <b>DERIVED PER SPACE 2026-09-05</b> — see <see cref="CalibratedThresholds"/>. It lives on the
+    /// source rather than on the retriever because a floor is a property of an embedding SPACE: a
+    /// threshold picked for <c>text-embedding-3-small</c> cosines says nothing about concept-vector
+    /// cosines. Calibrating one and reusing it for the other would be a number with no provenance —
+    /// which is exactly what every implementation of this property did until the derivation ran: all
+    /// three returned 0.28.
     /// </summary>
     float SuggestedDenseScoreFloor { get; }
 

@@ -1,0 +1,130 @@
+{
+  "Space": "real-vectors",
+  "SpaceReason": "requested on the command line (--real-vectors): 99 committed \u0027text-embedding-3-small\u0027 product vectors validated, and QUERIES are embedded LIVE against deployment \u0027text-embedding-3-small\u0027 at search time. Space identity probe: cosine 1.0000 against the committed vector for the same text (expected 1.0000, floor 0.98). Probed on \u0027GLX-1001\u0027. \u26A0\uFE0F  AZURE_OPENAI_EMBEDDING_DEPLOYMENT resolves to \u0027text-embedding-ada-002\u0027, which was NOT used: the committed index names the only embedder that can answer questions about it, and two embedding models are two spaces. Rebuild the index if you want a different one.",
+  "GeneratedUtc": "2026-09-05T16:08:17.8201414+00:00",
+  "FitPersonas": [
+    "USR-EW-05",
+    "USR-AR-06",
+    "USR-TS-07",
+    "USR-JV-08",
+    "USR-LM-09",
+    "USR-RB-10",
+    "USR-PB-11",
+    "USR-NK-12",
+    "USR-MB-13",
+    "USR-DF-14"
+  ],
+  "HeldOutPersonas": [
+    "USR-NB-01",
+    "USR-MI-02",
+    "USR-SK-03",
+    "USR-LF-04"
+  ],
+  "AbstainingPersonas": [
+    "USR-LF-04 (only 0 independent interest signal(s) at or above 0.35 \u2014 the threshold is 2 \u2014 and no need was stated in this session. Two questions are cheaper and more honest than a guess.)",
+    "USR-JV-08 (only 1 independent interest signal(s) at or above 0.35 \u2014 the threshold is 2 \u2014 and no need was stated in this session. Two questions are cheaper and more honest than a guess.)"
+  ],
+  "QueriesWithNoDenseLeg": [],
+  "Cuts": [
+    {
+      "Threshold": "HybridRetriever.DenseScoreFloor",
+      "PreCalibrationValue": 0.2800000011920929,
+      "FitRows": 528,
+      "HeldOutRows": 216,
+      "TargetAdmitRate": 0.8031914893617021,
+      "DerivedValue": 0.223,
+      "DerivedFitAdmitRate": 0.7973484848484849,
+      "DerivedHeldOutAdmitRate": 0.9722222222222222,
+      "PreCalibrationFitAdmitRate": 0.3768939393939394,
+      "PreCalibrationHeldOutAdmitRate": 0.6157407407407407,
+      "NullDerivedValue": 0.417,
+      "NullAdmitRateAtDerived": 0.23850991775520078,
+      "NullRows": 2067,
+      "FitPercentiles": {
+        "p05": 0.165,
+        "p25": 0.229,
+        "p50": 0.262,
+        "p75": 0.301,
+        "p90": 0.357,
+        "p95": 0.392,
+        "p99": 0.484,
+        "mean": 0.27
+      }
+    },
+    {
+      "Threshold": "Demo01.AttributionFloor",
+      "PreCalibrationValue": 0.2,
+      "FitRows": 2475,
+      "HeldOutRows": 1386,
+      "TargetAdmitRate": 0.33090909090909093,
+      "DerivedValue": 0.221,
+      "DerivedFitAdmitRate": 0.33171717171717174,
+      "DerivedHeldOutAdmitRate": 0.36075036075036077,
+      "PreCalibrationFitAdmitRate": 0.4173737373737374,
+      "PreCalibrationHeldOutAdmitRate": 0.4444444444444444,
+      "NullDerivedValue": 1,
+      "NullAdmitRateAtDerived": 0.33171717171717174,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0.089,
+        "p25": 0.141,
+        "p50": 0.182,
+        "p75": 0.251,
+        "p90": 0.377,
+        "p95": 0.5,
+        "p99": 1,
+        "mean": 0.221
+      }
+    },
+    {
+      "Threshold": "ConfidenceBands.PrimaryThreshold",
+      "PreCalibrationValue": 0.7,
+      "FitRows": 42,
+      "HeldOutRows": 18,
+      "TargetAdmitRate": 0.2857142857142857,
+      "DerivedValue": 0.52,
+      "DerivedFitAdmitRate": 0.2857142857142857,
+      "DerivedHeldOutAdmitRate": 0.7222222222222222,
+      "PreCalibrationFitAdmitRate": 0,
+      "PreCalibrationHeldOutAdmitRate": 0,
+      "NullDerivedValue": "NaN",
+      "NullAdmitRateAtDerived": 0.03434343434343434,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0.37,
+        "p25": 0.434,
+        "p50": 0.464,
+        "p75": 0.526,
+        "p90": 0.582,
+        "p95": 0.587,
+        "p99": 0.649,
+        "mean": 0.477
+      }
+    },
+    {
+      "Threshold": "ConfidenceBands.SecondaryThreshold",
+      "PreCalibrationValue": 0.45,
+      "FitRows": 42,
+      "HeldOutRows": 18,
+      "TargetAdmitRate": 0.7380952380952381,
+      "DerivedValue": 0.437,
+      "DerivedFitAdmitRate": 0.7142857142857143,
+      "DerivedHeldOutAdmitRate": 0.8888888888888888,
+      "PreCalibrationFitAdmitRate": 0.5714285714285714,
+      "PreCalibrationHeldOutAdmitRate": 0.8888888888888888,
+      "NullDerivedValue": "NaN",
+      "NullAdmitRateAtDerived": 0.2109090909090909,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0.37,
+        "p25": 0.434,
+        "p50": 0.464,
+        "p75": 0.526,
+        "p90": 0.582,
+        "p95": 0.587,
+        "p99": 0.649,
+        "mean": 0.477
+      }
+    }
+  ]
+}

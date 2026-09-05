@@ -256,7 +256,12 @@ order**, and each one removes rather than down-ranks:
    layer: **154 terms** across health / reproductive / religion / politics / union /
    ethnicity / biometrics, in four languages, screened against every emitted
    interest label and every `reason` string, before anything is priced.
-4. `ConfidenceBands` — 0.70 primary, 0.45 secondary. Below 0.45 is dropped.
+4. `ConfidenceBands` — **DERIVED PER SPACE** (`CalibratedThresholds`): concept
+   0.703 primary / 0.455 secondary, `--real-vectors` **0.520 / 0.437**. They were
+   one pair of constants for both spaces until 2026-09-05, and in the real space
+   the old 0.70 admitted **nothing** — the primary tray was structurally empty.
+   Derived on a fit slice that excludes all four demo personas; the held-out slice
+   did **not** corroborate the real-space pair. `MEASUREMENT_STATUS.md` §22.
 5. `PriceStockRefresher` — **last**, so it only pays to verify survivors. The
    renderer prints the verified figure; the model never states a price.
 
@@ -875,10 +880,18 @@ German and English. And the rubber-stamp arm's clean sheet is reported
 
 **What would actually be needed.** Real purchase logs rather than authored ones;
 gold that is not derived from the same field the index embeds; **one paid run of
-Eval 09**, so the pre-registered rule has two entrants and a verdict; a held-out
-calibration set for the
-confidence bands and the dense-score floor (the ~26-pair set the design specifies
-has never been built); and, for any claim about revenue, **an online A/B test**.
+Eval 09**, so the pre-registered rule has two entrants and a verdict; and, for any
+claim about revenue, **an online A/B test**.
+
+The held-out calibration this list used to ask for **has been done** (2026-09-05,
+`MEASUREMENT_STATUS.md` §22) — differently from how the design specified it, and
+the difference matters: no new gold was authored. The four cuts are transported
+between spaces at a fixed admit rate read off the concept space, on a fit slice of
+ten customers that deliberately EXCLUDES the four whose trays the demos print. That
+answers "what is 0.28 in the other space"; it does **not** answer "was 0.28 ever
+right", and a second, chance-tail rule computed alongside it says the dense floor is
+cleared by 57 % of arbitrary catalogue products in the concept space. The ~26-pair
+gold set the design specifies is still not built.
 Offline evaluation catches regressions before an A/B test costs real revenue. It
 does not replace the A/B test.
 

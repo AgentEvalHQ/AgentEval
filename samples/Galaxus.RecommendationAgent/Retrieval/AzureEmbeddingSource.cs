@@ -84,7 +84,12 @@ public sealed class AzureEmbeddingSource : IEmbeddingSource, IDisposable
     public bool IsOffline => false;
 
     /// <inheritdoc />
-    public float SuggestedDenseScoreFloor => UncalibratedDenseScoreFloor;
+    /// <remarks>
+    /// ✅ <b>DERIVED for the real space</b> — see <see cref="CalibratedThresholds.RealVectors"/>.
+    /// This source embeds the QUERIES that search the committed <c>text-embedding-3-small</c> index,
+    /// so its floor is that index's floor and not a second opinion about it.
+    /// </remarks>
+    public float SuggestedDenseScoreFloor => CalibratedThresholds.RealVectors.DenseScoreFloor;
 
     /// <summary>How many embedding calls this source has issued. Printed by <c>--rebuild-embeddings</c>; it is spend.</summary>
     public int CallCount => Volatile.Read(ref _callCount);

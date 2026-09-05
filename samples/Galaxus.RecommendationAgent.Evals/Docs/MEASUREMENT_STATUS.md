@@ -2649,11 +2649,13 @@ That is why the §19.7 item 1 finding is a **Demo 01** finding, and this is the 
    by B-21 and by this sweep. Closing it means choosing a concept dimension per phrase, which moves
    every coverage cell.
 2. **Arm D — 8 of 50 issued queries dead on the DEFAULT path.** Unchanged.
-3. **THREE thresholds have one value for two spaces**, not one: `ConfidenceBands.PrimaryThreshold` /
-   `SecondaryThreshold` (§20.11 item 1), `Demo01.AttributionFloor` (item 5) and
-   `HybridRetriever.DefaultDenseScoreFloor` (item 6). They should be derived per space from one
-   held-out slice, in one pass, rather than three times by hand — that is the shape of the fix, and it
-   is the reason none of them is re-tuned individually here.
+3. ✅ **CLOSED 2026-09-05 — see §22.** The three thresholds are derived per space, in one pass, on one
+   held-out slice named before anything was fitted. Concept: 0.280 / 0.200 / 0.703 / 0.455 (demo output
+   byte-identical — the shipped concept constants were fine). Real-vectors: **0.223 / 0.221 / 0.520 /
+   0.437** (every one moved; the primary tray fills). Two of the four held-out checks came back
+   contradicting the fit slice and were shipped as derived rather than repaired. The original entry
+   read: *"THREE thresholds have one value for two spaces, not one … they should be derived per space
+   from one held-out slice, in one pass, rather than three times by hand."*
 4. **No live, model-backed figures were re-derived.** Every eval run in §20 used `--dry-run`; the agent
    column is a stub everywhere. The README's live numbers are still the pre-B-21 ones and are still
    owed a paid re-run.
@@ -2896,3 +2898,284 @@ Three changes, all additive, all verified inert on the paths they do not touch:
 prints an API-key *fingerprint* — first four and last four characters plus the length. It is deliberate
 (`FingerprintKey`) and it is 8 of 84 characters, but it lands in stdout and therefore in every `--log`
 file and every pasted transcript. Not changed here; named so the decision is a decision.
+
+---
+
+## §22 — The three space-dependent thresholds, DERIVED per space (2026-09-05)
+
+§20.13 item 3 named what was owed: *"THREE thresholds have one value for two spaces … they should be
+derived per space from one held-out slice, in one pass, rather than three times by hand — that is the
+shape of the fix, and it is the reason none of them is re-tuned individually here."* This is that one
+pass. Four cut points, two spaces, one split, one rule, and a second rule computed alongside it
+precisely because the first one cannot check itself.
+
+### 22.1 The held-out split — named before anything was fitted
+
+`Galaxus.RecommendationAgent.Evals.Calibration.CalibrationSplit`, its own file, committed before the
+first population was collected. The unit is the **customer**, not the case: two rows from one interest
+map are not independent, so a case-level split would leak the fit slice into the held-out slice through
+the shared map.
+
+| slice | n | ids |
+|---|---|---|
+| **HELD OUT** | 4 | `USR-NB-01` `USR-MI-02` `USR-SK-03` `USR-LF-04` |
+| **FIT** | 10 | `USR-EW-05` `USR-AR-06` `USR-TS-07` `USR-JV-08` `USR-LM-09` `USR-RB-10` `USR-PB-11` `USR-NK-12` `USR-MB-13` `USR-DF-14` |
+
+**The direction is the point.** The held-out slice is exactly the four personas whose trays the demos
+PRINT. Holding them out makes "the number that makes the trays look right" structurally unavailable —
+no cut derived here could have been steered by an output anybody looks at, because none of their rows is
+in the population any cut was taken from. The convenient split is the other one.
+
+`SelfCheck()` proves the two slices are a partition of `Personas.AllPersonaIds` — disjoint, exhaustive,
+no duplicates — and runs before every collection rather than living in a test the calibration does not
+execute.
+
+**Declared limits, three.** (1) Luca has one order line, so the §F.8 gate fires before retrieval and he
+contributes **no rows**: the effective held-out slice is THREE customers. `USR-JV-08` abstains for the
+same reason, so the effective fit slice is NINE. (2) Both slices score against the same 99 products —
+this isolates the CUSTOMER, not the catalogue. (3) The evals still score all fourteen; what the split
+guarantees is that the derivation did not READ the demo personas, not that the eval numbers are
+independent of the calibration.
+
+### 22.2 The rules — written down before the numbers
+
+**RULE 1 — EQUAL-TAIL TRANSPORT. This is the rule that ships.**
+
+* α := the fraction of the **concept** fit population that the pre-calibration constant admits.
+* cut(space) := the smallest score that space's own fit population produces whose admitted right tail
+  is still within α.
+* **Free parameters: none.** α is *read*, not chosen. All four constants were picked while only the
+  24-dimension concept space existed, so that is where the operating point lives.
+* ⚠ It preserves the shipped operating point; it cannot show that point was ever right. By
+  construction the concept row reproduces the old constant. The one thing it tests there is
+  **stability** — the same admit rate on customers never fitted on.
+
+**RULE 2 — CHANCE TAIL. Reported, not shipped.**
+
+* cut := the value an arbitrary catalogue product clears at most **1/99** of the time — one expected
+  by-chance admission per query, a budget fixed by the catalogue's size rather than chosen.
+* Applies only to the two cuts that ask *"is this related at all"* (the dense floor, the attribution
+  floor). Chance has no opinion about which TRAY a related item belongs in, and inventing a budget for
+  a routing line would be choosing a number and calling it derived.
+
+**Order statistic, not interpolation.** The cut is a value the population actually took. Interpolating
+invents a score no row produced, and the concept space has a large atom at exactly 0 — an interpolated
+cut lands inside the atom, where the realised rate is nothing like the requested one. Ties therefore
+push the realised rate *below* α, never above, and the realised rate is printed beside every derived
+number instead of being assumed equal to the target. The only other adjustment is rounding to three
+decimals, half away from zero.
+
+**Held-out use.** One question, asked once, after the cuts are fixed: does the derived value admit at
+the same rate on customers the derivation never saw? **No cut was moved because a held-out number came
+back unflattering** — that move converts the held-out slice into a second fit slice and leaves no
+held-out slice at all. Two of the four came back badly and are shipped as derived.
+
+### 22.3 The populations — what each cut actually screens
+
+| cut | one row is | fit rows | held-out rows |
+|---|---|---|---|
+| `HybridRetriever.DenseScoreFloor` | one dense cosine in the per-leg candidate list (`perLeg = 24`) | 376 concept / 528 real | 200 / 216 |
+| `Demo01.AttributionFloor` | one interest label against one product's embedding document, over all 99 | 2 475 | 1 386 |
+| `ConfidenceBands.Primary` / `Secondary` | one presented product's confidence on the deterministic arm | 42 | 18 |
+
+Every row comes out of the **shipped** arithmetic. `Demo01.AttributionMatch` and
+`Demo01.ConfidenceFrom` were extracted as public expressions from the private methods that already
+computed them, and both the product and the harness now call the same one — a calibration harness that
+re-implements the formula it is calibrating derives a threshold for a function the product does not run.
+The dense scores come from the same `ProductVectorIndex.Search` the retriever calls.
+
+⚠ **The attribution floor's offline-arm population is degenerate and was NOT fitted on.** On the
+deterministic arm the probe handed to `AttributeSignalAsync` *is* the searching signal's own label, so
+that signal matches itself at 1.000 and **the floor cannot drop anything there** — 23 of its 65 rows sit
+at 1.000. It is fitted on the label × product-document population instead: the one the model path's
+fallback screens, and the one the constant's own remarks measure. The degenerate population is collected
+and printed anyway, so the reader sees the degeneracy rather than taking the sentence on trust.
+
+⚠ **Queries whose dense leg cannot run contribute nothing.** Five fit-slice queries embed to an all-zero
+vector in the concept space (`"Heart-rate monitors"`, `"Road tyres"`, `"Active bookshelf"`, `"home bar,
+weighing every dose and yield"`, `"Over-ear wireless"`); none does in the real space. They are counted
+and named, never entered as zeros — a zero row would drag the derived floor down with it.
+
+**The populations are collected against the PRE-CALIBRATION anchor**, with the retriever's floor pinned
+to 0.28 while they are gathered. Left free, the confidence population would move the moment the derived
+dense floor shipped and the calibration would stop reproducing itself. **Verified: re-running `-- cal`
+in both spaces after the derived values shipped reproduces both records byte-for-byte** (every field but
+the timestamp).
+
+### 22.4 The derived values
+
+| cut | pre-calibration | **concept** | **real-vectors** | α |
+|---|---|---|---|---|
+| `HybridRetriever.DenseScoreFloor` | 0.28 | **0.280** | **0.223** | 0.803 |
+| `Demo01.AttributionFloor` | 0.20 | **0.200** | **0.221** | 0.331 |
+| `ConfidenceBands.PrimaryThreshold` | 0.70 | **0.703** | **0.520** | 0.286 |
+| `ConfidenceBands.SecondaryThreshold` | 0.45 | **0.455** | **0.437** | 0.738 |
+
+Records: `samples/Galaxus.RecommendationAgent.Evals/Calibration/derived/calibration.{concept,real-vectors}.json`
+— committed, not in the gitignored `.agenteval` store, because a derived threshold that ships in the
+product needs its provenance to ship with it.
+
+**Does the derived value differ materially from the shipped constant?**
+
+* **Concept — NO, and that is the result.** Two rows are identical; two moved by 0.003 and 0.005,
+  and those moves exist only because 0.700 and 0.450 are not scores the population ever took. **No fit
+  row lies between the old and the new value, and re-running all four demo personas through both demos
+  in this space produced byte-identical output** (§22.5). The shipped concept constants were fine. They
+  are still replaced by the derived values rather than rounded back, because rounding a derived value
+  onto the constant it was meant to replace is the tuning move running backwards.
+* **Real-vectors — YES, on all four, and on one of them enormously.** Measured in that space at the OLD
+  constants, on the fit slice: the dense floor admitted **0.377** where α is 0.803; the attribution floor
+  **0.417** where α is 0.331; the drop line **0.571** where α is 0.738; and `PrimaryThreshold` 0.70
+  admitted **0.000** — not one of the forty-two fit confidences reached it, that population's 95th
+  percentile being 0.587. §20.11 item 1 reported the empty primary tray as an observation about three
+  personas. It is not about those personas; it is the distribution.
+
+### 22.5 Held-out performance — and the two rows it refused to corroborate
+
+| cut | space | α | realised on fit | **realised on held-out** | verdict |
+|---|---|---|---|---|---|
+| dense floor | concept | 0.803 | 0.803 | 0.740 | consistent |
+| dense floor | real | 0.803 | 0.797 | **0.972** | **DIFFERS (0.169)** |
+| attribution | concept | 0.331 | 0.331 | 0.310 | consistent |
+| attribution | real | 0.331 | 0.332 | 0.361 | consistent |
+| primary | concept | 0.286 | 0.262 | 0.389 | DIFFERS (0.103), n = 18 |
+| primary | real | 0.286 | 0.286 | **0.722** | **DIFFERS (0.437)**, n = 18 |
+| secondary | concept | 0.738 | 0.738 | **1.000** | **DIFFERS (0.262)**, n = 18 |
+| secondary | real | 0.738 | 0.714 | 0.889 | DIFFERS (0.151), n = 18 |
+
+**The finding the held-out slice bought.** The four demo personas sit systematically HIGHER than the
+cohort on the confidence scale in both spaces, and on the dense scale in the real space. A cut derived
+on the cohort therefore admits more of them than its target. Two consequences, both declared:
+
+1. The confidence populations are **42 fit / 18 held-out rows**. A quantile on eighteen rows has a
+   resolution of one eighteenth; nothing here distinguishes 0.72 from 0.61.
+2. **Nothing was moved to fix this.** The real-space primary band is shipped at 0.520 with a held-out
+   realised rate 2.5× its target, and the concept drop line at 0.455 admitting 18 of 18. Read them as
+   operating points that hold on the ten customers they were derived from and demonstrably not on the
+   four they were not.
+
+### 22.6 What rule 2 said — and it is the uncomfortable half
+
+| cut | space | rule 1 (shipped) | rule 2 (chance tail) | share of ARBITRARY products clearing rule 1's value |
+|---|---|---|---|---|
+| dense floor | concept | 0.280 | **0.839** | **0.571** |
+| dense floor | real | 0.223 | **0.417** | 0.239 |
+| attribution | concept | 0.200 | 1.000 | 0.331 |
+| attribution | real | 0.221 | 1.000 | 0.332 |
+
+The shipped dense floor is cleared by **57 % of arbitrary catalogue products** in the concept space and
+24 % in the real one. It is a weak filter in both, and transport faithfully preserves that weakness —
+this is exactly what a rule anchored on an inherited operating point cannot tell you about itself, and
+the only reason it is visible here is that a second rule was computed. Rule 2 is **not shipped**: moving
+the dense floor from 0.28 to 0.84 is a redesign of retrieval, not a calibration of it, and it would be
+chosen on a corpus of 99 products with 9 contributing customers.
+
+The attribution rows read 1.000 because rule 1 and rule 2 are computed on the *same* population there
+(a signal against arbitrary products IS the attribution null), so their gap is purely the budget: 0.331
+against 0.0101.
+
+### 22.7 What moved in the demos — declared, not compensated
+
+**Concept space: NOTHING.** Demo 01 and Demo 02, all four personas, byte-identical after normalising
+the render timestamp and the wall clock.
+
+**Real-vector space, Demo 01** — the primary tray fills, and no drop count changes:
+
+| persona | before | after |
+|---|---|---|
+| `USR-NB-01` | 6 in → 5 out · 1 dropped · **5 demoted** (primary tray EMPTY) | 6 in → 5 out · 1 dropped · **3 demoted** |
+| `USR-MI-02` | 6 in → 5 out · 1 dropped · **5 demoted** (primary tray EMPTY) | 6 in → 5 out · 1 dropped · **0 demoted** |
+| `USR-SK-03` | 6 in → 5 out · 1 dropped · **5 demoted** (primary tray EMPTY) | 6 in → 5 out · 1 dropped · **0 demoted** |
+| `USR-LF-04` | abstains before retrieval | unchanged — abstains |
+
+The one drop per persona is unchanged: `GLX-6001` at 0.40 and `GLX-5008` at 0.43 are still below the
+derived 0.437 floor. The three "Nothing survived the guardrail pipeline for the primary tray" banners
+are gone. **Tray composition, named**: Nadia's `GLX-1011` and `GLX-8005` (both 0.59) promote; Marco's
+`GLX-5010 GLX-5011 GLX-5004 GLX-3010 GLX-3007` (0.54–0.63) all promote; Sofia's `GLX-3009 GLX-3001
+GLX-3002 GLX-3007 GLX-5015` (0.54–0.62) all promote.
+
+**Real-vector space, Demo 02** — every demotion disappears, and one persona changes character:
+
+| persona | before | after |
+|---|---|---|
+| `USR-NB-01` | 12 → 12 · 8 demoted · 1 round · 25 discovered | 12 → 12 · **0 demoted** · 1 round · 25 discovered |
+| `USR-MI-02` | 12 → 10 · 7 demoted · 3 rounds · GapsUnresolvable | 12 → 10 · **0 demoted** · 3 rounds · GapsUnresolvable |
+| `USR-SK-03` | 12 → 12 · 6 demoted · 1 round · 28 discovered | 12 → 12 · **0 demoted** · 1 round · **29 discovered** |
+| `USR-LF-04` | **0 → 0** · 1 round · **GapsUnresolvable** · 0 discovered · 0 recommended | **5 → 5** · 2 rounds · **CoverageSufficient** · 6 discovered · **5 recommended** |
+
+🔴 **Luca's Demo 02 is the sharp one and it is not flattering.** The lower real-space dense floor
+un-starved a contentless query: `"Hi — what do you recommend for me?"` went from 0 candidates to 2
+(`GLX-7001`, `GLX-7006`), the pre-model starvation gate no longer fired, the coverage reviewer proposed
+an interest from review text, its round-2 gap query `"noise"` pulled in a low-noise power supply, a WDT
+distribution tool and an RCA interconnect, and the customer with ONE order line was shown five
+recommendations. Two of them are espresso accessories credited to an "Over-ear wireless" interest.
+**Nothing was adjusted to compensate.** The vocabulary control did fire correctly throughout — `cabin`,
+`open`, `plan`, `office` were all refused, and the round-2 proposal was refused outright — so the
+containment story is intact; what changed is that retrieval stopped starving.
+
+### 22.8 What moved in the evals — every gate verdict identical, three arm numbers moved
+
+All 18 commands (9 per space) exit 0 before and after. `-- 0`'s termination proof, `-- 3`'s 16 control
+rows (12 gating caught, 4 advisory), `-- 4`'s gates A and B, `-- 1`, and every gate verdict in `-- 2`,
+`-- 2b`, `-- 2c` and `-- 9` are unchanged in both spaces. **Concept space: nothing moved at all** — the
+`--ci` diff is wall-clock noise.
+
+Real space, arm-level numbers that moved:
+
+| eval | arm | before | after | direction |
+|---|---|---|---|---|
+| 02 | Loop control — **rubber stamp** (a CONTROL) | mean recall 0.403, mean prec@k 0.267 | **0.458 / 0.317** | control got STRONGER |
+| 02 | Discovery Workflow — deterministic | mean k shown 9.9 | 10.2 | recall/prec unchanged |
+| 02c | Discovery Workflow — deterministic (`loop`) | sku@5 **0.154** (2/13), leaf@5 0.154 | **0.077** (1/13) | **REGRESSION** |
+| 04 | candidate-set sizes | 37 / 29 / 29 / 26 | 40 / 32 / 32 / 27 | chance-of-missing floors re-derived with them |
+
+Two of these deserve naming rather than a row:
+
+* ⚠ **The control improved, not the arm.** Eval 02's rubber-stamp loop control gained 0.055 recall and
+  0.050 precision while the deterministic arm gained neither. The separation between the shipped loop
+  and its own rubber-stamp narrowed, and it narrowed because retrieval got more permissive. No control
+  was weakened; one got stronger, which erodes the same margin from the other side.
+* ⚠ **Eval 02c's loop arm lost a hit** — `USR-NB-01` went 1/1 to a miss at k = 5, halving the arm's
+  sku@5 from 0.154 to 0.077 on n = 13. At that n a single hit is 0.077, so this is one item, and §20.7's
+  standing caveat applies: the eval cannot rank two working architectures.
+
+### 22.9 What this does NOT establish
+
+1. **Transport cannot validate the operating point it transports.** If 0.28 / 0.20 / 0.70 / 0.45 were
+   wrong in the concept space, their transports are wrong in the real one. Rule 2 is the only thing here
+   that even asks, and it says the dense floor is weak in both spaces.
+2. **The confidence rows rest on 42 fit and 18 held-out values.** They are the thinnest numbers in this
+   section and the held-out slice contradicted two of them.
+3. **Nine customers produced every fit row.** Two of the fourteen abstain; the fit slice is nine live
+   customers and 99 products, hand-authored to a structural target rather than sampled.
+4. **Nothing live was re-measured.** Every eval number above is `--dry-run`; the agent column is a stub.
+   §21's paid 02b/02c figures were taken at the PRE-calibration thresholds in the real space and are
+   **not** re-derived here — the correction in §21.1 still stands (only the dense floor was in 02b/02c's
+   path, and it has now moved from 0.28 to 0.223, so those two figures are owed a paid re-run before
+   being quoted against the current build).
+5. **`ChanceFloor.Empirical` (ADR-030 Slice 2) is the right long-term home for rule 2** and is not used:
+   Slice 2 is behind unratified questions, so this is done by hand and the migration is named rather
+   than assumed.
+
+### 22.10 How to re-derive §22
+
+```
+dotnet build AgentEval.sln -v q                                        # 0 errors
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+dotnet run --project $E -- cal --concept-vectors      # free. MUST run first: alpha is read here.
+dotnet run --project $E -- cal --real-vectors         # SPENDS: 38 query calls + 1 probe, 372 prompt tokens
+for s in --concept-vectors --real-vectors ; do        # every --real-vectors line SPENDS
+  dotnet run --project $E -- 3  $s ; dotnet run --project $E -- 4 $s
+  for e in 1 2 2b 2c 9 ; do dotnet run --project $E -- $e --dry-run $s ; done
+  dotnet run --project $E --ci --dry-run $s ; dotnet run --project $A -- 0 $s
+  for u in USR-NB-01 USR-MI-02 USR-SK-03 USR-LF-04 ; do
+    dotnet run --project $A -- 1 --offline --user $u $s
+    dotnet run --project $A -- 2 --offline --user $u $s
+  done
+done
+```
+
+The wiring change (four `const`s became space-resolved properties) was verified inert on its own,
+before any value moved: with `CalibratedThresholds.Concept` and `.RealVectors` both set to
+`PreCalibration`, all eight concept-space demo runs are byte-identical to the same runs at commit
+`2f4d8510`, after normalising the render timestamp and the wall clock.

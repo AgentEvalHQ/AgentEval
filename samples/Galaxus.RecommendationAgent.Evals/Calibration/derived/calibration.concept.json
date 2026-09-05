@@ -1,0 +1,136 @@
+{
+  "Space": "concept",
+  "SpaceReason": "requested on the command line (--concept-vectors).",
+  "GeneratedUtc": "2026-09-05T16:08:08.334188+00:00",
+  "FitPersonas": [
+    "USR-EW-05",
+    "USR-AR-06",
+    "USR-TS-07",
+    "USR-JV-08",
+    "USR-LM-09",
+    "USR-RB-10",
+    "USR-PB-11",
+    "USR-NK-12",
+    "USR-MB-13",
+    "USR-DF-14"
+  ],
+  "HeldOutPersonas": [
+    "USR-NB-01",
+    "USR-MI-02",
+    "USR-SK-03",
+    "USR-LF-04"
+  ],
+  "AbstainingPersonas": [
+    "USR-LF-04 (only 0 independent interest signal(s) at or above 0.35 \u2014 the threshold is 2 \u2014 and no need was stated in this session. Two questions are cheaper and more honest than a guess.)",
+    "USR-JV-08 (only 1 independent interest signal(s) at or above 0.35 \u2014 the threshold is 2 \u2014 and no need was stated in this session. Two questions are cheaper and more honest than a guess.)"
+  ],
+  "QueriesWithNoDenseLeg": [
+    "USR-EW-05: \u0022Heart-rate monitors\u0022",
+    "USR-AR-06: \u0022Road tyres\u0022",
+    "USR-TS-07: \u0022Active bookshelf\u0022",
+    "USR-PB-11: \u0022home bar, weighing every dose and yield\u0022",
+    "USR-MB-13: \u0022Over-ear wireless\u0022"
+  ],
+  "Cuts": [
+    {
+      "Threshold": "HybridRetriever.DenseScoreFloor",
+      "PreCalibrationValue": 0.2800000011920929,
+      "FitRows": 376,
+      "HeldOutRows": 200,
+      "TargetAdmitRate": 0.8031914893617021,
+      "DerivedValue": 0.28,
+      "DerivedFitAdmitRate": 0.8031914893617021,
+      "DerivedHeldOutAdmitRate": 0.74,
+      "PreCalibrationFitAdmitRate": 0.8031914893617021,
+      "PreCalibrationHeldOutAdmitRate": 0.74,
+      "NullDerivedValue": 0.839,
+      "NullAdmitRateAtDerived": 0.5714285714285714,
+      "NullRows": 763,
+      "FitPercentiles": {
+        "p05": 0.148,
+        "p25": 0.312,
+        "p50": 0.461,
+        "p75": 0.622,
+        "p90": 0.732,
+        "p95": 0.775,
+        "p99": 0.855,
+        "mean": 0.465
+      }
+    },
+    {
+      "Threshold": "Demo01.AttributionFloor",
+      "PreCalibrationValue": 0.2,
+      "FitRows": 2475,
+      "HeldOutRows": 1386,
+      "TargetAdmitRate": 0.33090909090909093,
+      "DerivedValue": 0.2,
+      "DerivedFitAdmitRate": 0.33090909090909093,
+      "DerivedHeldOutAdmitRate": 0.31024531024531027,
+      "PreCalibrationFitAdmitRate": 0.33090909090909093,
+      "PreCalibrationHeldOutAdmitRate": 0.31024531024531027,
+      "NullDerivedValue": 1,
+      "NullAdmitRateAtDerived": 0.33090909090909093,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0,
+        "p25": 0,
+        "p50": 0,
+        "p75": 0.312,
+        "p90": 0.5,
+        "p95": 0.663,
+        "p99": 1,
+        "mean": 0.173
+      }
+    },
+    {
+      "Threshold": "ConfidenceBands.PrimaryThreshold",
+      "PreCalibrationValue": 0.7,
+      "FitRows": 42,
+      "HeldOutRows": 18,
+      "TargetAdmitRate": 0.2857142857142857,
+      "DerivedValue": 0.703,
+      "DerivedFitAdmitRate": 0.2619047619047619,
+      "DerivedHeldOutAdmitRate": 0.3888888888888889,
+      "PreCalibrationFitAdmitRate": 0.2857142857142857,
+      "PreCalibrationHeldOutAdmitRate": 0.3888888888888889,
+      "NullDerivedValue": "NaN",
+      "NullAdmitRateAtDerived": 0.02303030303030303,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0.255,
+        "p25": 0.428,
+        "p50": 0.586,
+        "p75": 0.713,
+        "p90": 0.736,
+        "p95": 0.825,
+        "p99": 0.877,
+        "mean": 0.556
+      }
+    },
+    {
+      "Threshold": "ConfidenceBands.SecondaryThreshold",
+      "PreCalibrationValue": 0.45,
+      "FitRows": 42,
+      "HeldOutRows": 18,
+      "TargetAdmitRate": 0.7380952380952381,
+      "DerivedValue": 0.455,
+      "DerivedFitAdmitRate": 0.7380952380952381,
+      "DerivedHeldOutAdmitRate": 1,
+      "PreCalibrationFitAdmitRate": 0.7380952380952381,
+      "PreCalibrationHeldOutAdmitRate": 1,
+      "NullDerivedValue": "NaN",
+      "NullAdmitRateAtDerived": 0.20767676767676768,
+      "NullRows": 2475,
+      "FitPercentiles": {
+        "p05": 0.255,
+        "p25": 0.428,
+        "p50": 0.586,
+        "p75": 0.713,
+        "p90": 0.736,
+        "p95": 0.825,
+        "p99": 0.877,
+        "mean": 0.556
+      }
+    }
+  ]
+}

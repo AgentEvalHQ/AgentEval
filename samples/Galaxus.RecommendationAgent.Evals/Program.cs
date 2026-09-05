@@ -12,6 +12,7 @@
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 2b         # stated-need precision (offline arms run without a key)
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 2c         # held-out next purchase, hit-rate@k
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3          # negative controls
+//   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- cal --concept-vectors   # threshold calibration
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4          # D7 review injection
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 5          # judged quality
 //   dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 6          # tool trajectory
@@ -58,9 +59,12 @@ var parsed = ParsedArgs.Parse(args);
 if (parsed is null)
 {
     Console.Error.WriteLine(
-        "Usage: [1..9|2b|2c] [--ci] [--skip-slow] [--quick] [--judge] [--dry-run] [--only <persona-id>] "
+        "Usage: [1..9|2b|2c|cal] [--ci] [--skip-slow] [--quick] [--judge] [--dry-run] [--only <persona-id>] "
       + "[--concept-vectors|--real-vectors] [--log [path]] [--model <deployment>]");
     Console.Error.WriteLine();
+    Console.Error.WriteLine("  cal          derive the three SPACE-DEPENDENT thresholds for the resolved space. Spends only");
+    Console.Error.WriteLine("               on --real-vectors, and only to embed the interest labels. Run --concept-vectors");
+    Console.Error.WriteLine("               FIRST: it is where the transported operating point is read.");
     Console.Error.WriteLine("  --ci         run every eval 1..9 (plus 2b and 2c) in order and return the WORST exit code");
     Console.Error.WriteLine("  --skip-slow  with --ci: leave out Evals 08 and 09 (tens of paid turns each).");
     Console.Error.WriteLine("               They are then reported as exit 3 — NOT RUN — never as passes.");
@@ -108,6 +112,7 @@ try
             "2b" => await Eval02b_StatedNeedSatisfaction.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
             "2c" => await Eval02c_HeldOutNextPurchase.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun, onlyCase: parsed.OnlyPersona),
             "3" => await NegativeControls.RunAsync(),
+            "cal" => await Galaxus.RecommendationAgent.Evals.Calibration.ThresholdCalibration.RunAsync(),
             "4" => await Eval04_ReviewInjectionContainment.RunAsync(),
             "5" => await Eval05_RecommendationQuality.RunAsync(dryRun: parsed.DryRun),
             "6" => await Eval06_ToolTrajectory.RunAsync(dryRun: parsed.DryRun),
@@ -461,7 +466,7 @@ internal sealed record CiStep(
 internal sealed class ParsedArgs
 {
     /// <summary>Every eval selector this program accepts. The ONE list — the `--log` path sniffer reads it too.</summary>
-    private static readonly string[] Selectors = ["1", "2", "2b", "2c", "3", "4", "5", "6", "7", "8", "9"];
+    private static readonly string[] Selectors = ["1", "2", "2b", "2c", "3", "4", "5", "6", "7", "8", "9", "cal"];
 
     /// <summary>Eval selector (1..9), or null for the interactive menu.</summary>
     public string? Eval { get; private set; }

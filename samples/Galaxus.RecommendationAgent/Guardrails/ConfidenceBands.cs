@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using Galaxus.RecommendationAgent.Domain;
+using Galaxus.RecommendationAgent.Retrieval;
 
 namespace Galaxus.RecommendationAgent.Guardrails;
 
@@ -67,14 +68,51 @@ public enum ConfidenceBand
 /// is the failure this project keeps a rule about. The honest statement is that a band assignment
 /// is only comparable within one space, and the space is printed above every tray.
 /// </para>
+/// <para>
+/// ✅ <b>DERIVED PER SPACE 2026-09-05 — the paragraph above is SUPERSEDED in its conclusion and
+/// upheld in its diagnosis.</b> The two numbers are no longer unmeasured and no longer shared:
+/// <see cref="CalibratedThresholds"/> carries one row per space, each derived on a fit slice that
+/// EXCLUDES all four demo personas, by a rule written down before the numbers. What it found:
+/// </para>
+/// <list type="bullet">
+///   <item><b>concept</b> 0.703 / 0.455 against 0.70 / 0.45 — the moves are 0.003 and 0.005, no fit
+///         row lies between old and new, and re-running all four demo personas in this space
+///         produced BYTE-IDENTICAL output. A calibration that changes nothing is a real result.</item>
+///   <item><b>real-vectors</b> 0.520 / 0.437. The old 0.70 admitted <b>0.000</b> of the forty-two
+///         fit-slice confidences — that population's 95th percentile is 0.587 — so the empty
+///         primary tray this remark reports for three personas is a property of the SPACE, measured
+///         as a distribution rather than as three anecdotes. At 0.520 the tray fills: Marco's and
+///         Sofia's demo-01 trays go from 5 demoted / 0 primary to 0 demoted / 5 primary, Nadia's
+///         from 5 demoted to 3.</item>
+/// </list>
+/// <para>
+/// ⚠ <b>And the held-out slice REFUSED to corroborate the real row.</b> 0.520 admits 0.286 of the
+/// fit slice — its target — and <b>0.722</b> of the four demo personas it was never fitted on. Their
+/// confidences run higher than the cohort's in this space. Declared and NOT repaired: a cut moved
+/// because the held-out slice came back unflattering is a cut fitted on the held-out slice. Read the
+/// real-space bands as an operating point that holds on the ten customers it was derived from and
+/// demonstrably not on the four it was not.
+/// </para>
 /// </remarks>
 public static class ConfidenceBands
 {
-    /// <summary>At or above this, a recommendation reaches the primary tray. UNMEASURED.</summary>
-    public const double PrimaryThreshold = 0.70;
+    /// <summary>
+    /// At or above this, a recommendation reaches the primary tray. DERIVED PER SPACE — see
+    /// <see cref="CalibratedThresholds"/>.
+    /// </summary>
+    /// <remarks>
+    /// No longer a <c>const</c>, and the change is the point: a compile-time constant cannot depend
+    /// on which embedding space a run resolved, and this number does. It reads
+    /// <see cref="CalibratedThresholds.Current"/>, which is keyed off the RESOLVED source, so a run
+    /// that fell back to the concept space is banded by the concept space's cut.
+    /// </remarks>
+    public static double PrimaryThreshold => CalibratedThresholds.Current.ConfidencePrimary;
 
-    /// <summary>Below this, a recommendation is dropped entirely. UNMEASURED.</summary>
-    public const double SecondaryThreshold = 0.45;
+    /// <summary>
+    /// Below this, a recommendation is dropped entirely. DERIVED PER SPACE — see
+    /// <see cref="CalibratedThresholds"/>.
+    /// </summary>
+    public static double SecondaryThreshold => CalibratedThresholds.Current.ConfidenceSecondary;
 
     /// <summary>Classifies one confidence value.</summary>
     /// <param name="confidence">The model's self-reported confidence, nominally 0..1.</param>

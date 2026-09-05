@@ -127,8 +127,13 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     public bool IsOffline => _fallback is null || _fallback.IsOffline;
 
     /// <inheritdoc />
-    public float SuggestedDenseScoreFloor =>
-        _fallback?.SuggestedDenseScoreFloor ?? AzureEmbeddingSource.UncalibratedDenseScoreFloor;
+    /// <remarks>
+    /// ✅ <b>DERIVED for the real space</b> — see <see cref="CalibratedThresholds.RealVectors"/>. It
+    /// no longer defers to the live fallback and then to a shared constant: the committed index IS
+    /// the real space, with or without a live query path attached, so the floor is the same either
+    /// way and reading it from one place removes a branch that could have disagreed with itself.
+    /// </remarks>
+    public float SuggestedDenseScoreFloor => CalibratedThresholds.RealVectors.DenseScoreFloor;
 
     /// <summary>
     /// How many PRODUCT vectors were loaded from the committed asset. Never grows during a run:

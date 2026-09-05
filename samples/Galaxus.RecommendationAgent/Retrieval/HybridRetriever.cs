@@ -69,8 +69,27 @@ public sealed class HybridRetriever : IProductRetriever
     /// ARM D: "the query embedded to something non-zero" is not "the dense leg ranked something",
     /// and on the real path those two differ for 3 of the queries.
     /// </para>
+    /// <para>
+    /// ✅ <b>DERIVED PER SPACE 2026-09-05 — see <see cref="CalibratedThresholds"/>.</b> The per-space
+    /// seam is now USED: concept <b>0.280</b>, real-vectors <b>0.223</b>. This constant survives only
+    /// as the floor for a retriever built with NO embedding source — where there is no dense leg to
+    /// screen — and as the transport rule's anchor. Measured on the fit slice: the old 0.28 admitted
+    /// 0.803 of the concept per-leg lists and only <b>0.377</b> of the real ones, so transporting that
+    /// operating point moved the real floor DOWN, and the dense leg there now contributes more rather
+    /// than less.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Two things the derivation found that transport does not fix.</b> (1) A chance-tail cut on
+    /// the same corpus puts the floor at 0.839 (concept) and 0.417 (real): the shipped operating point
+    /// is cleared by <b>57 %</b> of ARBITRARY catalogue products in the concept space and 24 % in the
+    /// real one, so this floor is a weak filter in both and transport faithfully preserves that.
+    /// (2) In the real space the lower floor un-starved a contentless query — Luca's
+    /// <c>"Hi — what do you recommend for me?"</c> went from 0 candidates and
+    /// <c>GAPS_UNRESOLVABLE</c> to 2 candidates, a second discovery round and five recommendations.
+    /// Both are declared in <c>MEASUREMENT_STATUS.md</c> §22, and neither is compensated for elsewhere.
+    /// </para>
     /// </summary>
-    public const float DefaultDenseScoreFloor = 0.28f;
+    public static float DefaultDenseScoreFloor => CalibratedThresholds.PreCalibration.DenseScoreFloor;
 
     /// <summary>Fusion identifier reported in the diagnostics block.</summary>
     public const string FusionName = "rrf-k60";
