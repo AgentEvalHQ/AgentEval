@@ -1462,3 +1462,32 @@ Re-running the whole suite after both fixes and diffing against the pre-fix capt
 their `verified HH:MM:SS UTC` stock timestamps. **No score, floor, gate verdict, control verdict or
 exit code moved.** Both fixes are dormant on a healthy tree by construction — which is why each one's
 failing direction had to be demonstrated by ablation rather than observed in a normal run.
+
+---
+
+## §15 — CORRECTION to commit a92d8e9b's message (recorded 2026-09-05)
+
+`a92d8e9b`'s commit message claims **"control rows 8 → 13"** and **"-- 3 all 13 controls caught"**.
+Both are wrong, and the commit is pushed, so the message cannot be amended without a force-push.
+The record is corrected here instead.
+
+**Measured on the shipped tree** (`dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3`):
+
+| | Count | How derived |
+|---|---|---|
+| Control rows registered | **16** | `rows.Add(` in `NegativeControls.cs` |
+| — gating | **12** | 16 minus the 4 constructed `Gating: false` |
+| — advisory (never gate) | **4** | `Gating: false` |
+| Rows printing `✅ caught` | **12** | all gating rows |
+| Advisory rows currently tripping | **2** | `AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised` |
+
+**Where the wrong number came from:** a `grep -c "✅ caught"` over the console returned 13, because one
+match is a *prose line inside a row's description* (`Broken02AssertionOperandsLoadBearing` quotes the
+string `'✅ caught'` when explaining what the old assertion used to print). Counting a rendered symbol
+instead of the registration site is the same shape as every other defect in this file: the artifact under
+test supplied the number that described it.
+
+**The correct claim:** control rows went **8 → 16 (12 gating + 4 advisory)**; all **12 gating** controls
+are caught; **2 advisory instrument findings** are reported and do not gate.
+
+No behaviour changed. This entry corrects a published claim only.
