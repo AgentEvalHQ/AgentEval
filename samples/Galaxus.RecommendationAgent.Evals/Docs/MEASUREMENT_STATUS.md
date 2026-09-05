@@ -3632,8 +3632,10 @@ item **8.21**.
 
 ### 24.8 Persistence — verified, with the ablation's residue named
 
-Current pointers are all **HEAD, concept-space** records: `eval03_controls.json` (01:39:51, 22,992 B),
-`eval04_injection.json` (01:39:52, 4,664 B), `eval07_topology.json` (01:39:25, 12,908 B). The live suite's
+Current pointers are all **HEAD, concept-space** records: `eval03_controls.json` (01:56:27, 22,992 B),
+`eval04_injection.json` (01:56:27, 4,664 B), `eval07_topology.json` (01:39:25, 12,908 B). The 01:56:27 pair
+is the run's closing re-verification (`-- 3` then `--ci --dry-run`), and that last command moving them is
+§24.7 item 1 reproducing itself a second time. Store size after the run: **316 files**. The live suite's
 records — `eval01_integrity`, `eval02_coverage_ab`, `eval02b_stated_need`, `eval02c_held_out`,
 `eval09_hypothesis_ab` and the three probe keys — are **untouched**, because every eval that owns them ran
 `--dry-run`.

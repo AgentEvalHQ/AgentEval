@@ -1000,8 +1000,8 @@ adds a record rather than replacing one.
 
 | file | written | bytes | what it is |
 |---|---|---|---|
-| `eval03_controls.json` | 2026-09-06 01:39:51 | 22,992 | **this run**, `-- 3`, concept, `41cd09a2` |
-| `eval04_injection.json` | 2026-09-06 01:39:52 | 4,664 | **this run**, `-- 4`, concept, `41cd09a2` |
+| `eval03_controls.json` | 2026-09-06 01:56:27 | 22,992 | **this run**, concept, `41cd09a2` |
+| `eval04_injection.json` | 2026-09-06 01:56:27 | 4,664 | **this run**, concept, `41cd09a2` |
 | `eval07_topology.json` | 2026-09-06 01:39:25 | 12,908 | **this run**, `-- 7`, concept, `41cd09a2` |
 | `eval01_integrity.json` | 2026-09-05 18:33:51 | 3,951 | the live suite. Untouched — Eval 01 ran `--dry-run` |
 | `eval02_coverage_ab.json` | 2026-09-04 17:15:03 | 26,052 | the USD 18.56 paid run. Untouched, and it is what `-- 2 --dry-run` re-reads |
@@ -1012,10 +1012,11 @@ adds a record rather than replacing one.
 | `eval02c_held_out_probe.json` | 2026-09-05 16:16:33 | 3,032 | probe key |
 | `eval09_hypothesis_ab.json` | 2026-09-05 22:26:13 | 28,741 | the live suite, USD 29.49 |
 
-**Archives written by this run** (all under the same directory):
-`eval03_controls.{20260905T232614Z, 20260905T232630Z, 20260905T232724Z, 20260905T232828Z}.json` ·
-`eval04_injection.{20260905T232614Z, 20260905T232630Z, 20260905T232724Z, 20260905T232831Z}.json` ·
-`eval07_topology.{20260905T232120Z, 20260905T233153Z, 20260905T233156Z}.json`.
+**Archives written by this run:** every `-- 3`, `-- 4`, `-- 7` and `--ci --dry-run` invocation archived the
+previous pointer first, so the store gained one `eval03_controls.<stamp>.json` and one
+`eval04_injection.<stamp>.json` per Eval-03/04 execution (8 of each, including the two the CI dry runs made —
+see 22.5 finding 1) and three `eval07_topology.<stamp>.json`. They are all stamped `20260905T232…Z` /
+`20260905T233…Z` / `20260905T235…Z` (UTC of the pointer they copied). **Store size after the run: 316 files.**
 
 ⚠️ **Two archives are PRE-FIX and are not HEAD records.** They were produced by the deliberate ablation in
 22.4 with the tree at `a78d05e5`, and they are kept because they are the evidence:
