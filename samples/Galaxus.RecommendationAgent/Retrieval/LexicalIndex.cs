@@ -25,13 +25,30 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// score calibration between a cosine and a token count.
 /// </para>
 /// <para>
-/// <b>Indexed fields are deliberately narrow:</b> <see cref="Product.Name"/>,
-/// <see cref="Product.Brand"/>, and <see cref="Product.Specs"/> keys and values — exactly §D.3's
-/// list. Use-context tags are NOT indexed here. That is not an omission: the whole demonstration
-/// is that the cross-category link (hiking pack → travel tripod) lives on the <c>Use:</c> line
-/// and is invisible to lexical matching. Indexing tags here would blur the one claim the demo
-/// exists to make, and would make the lexical baseline look better than the thing it is a
-/// baseline for.
+/// <b>Indexed fields:</b> <see cref="Product.Name"/>, <see cref="Product.Brand"/>,
+/// <see cref="Product.Specs"/> keys and values, and — since B-9 (2026-09-05) —
+/// <see cref="Product.Description"/> at <see cref="DescriptionFieldWeight"/>. Use-context tags
+/// are still NOT indexed here. That is not an omission: the whole demonstration is that the
+/// cross-category link (hiking pack → travel tripod) lives on the <c>Use:</c> line and is
+/// invisible to lexical matching. Indexing tags here would blur the one claim the demo exists to
+/// make, and would make the lexical baseline look better than the thing it is a baseline for.
+/// </para>
+/// <para>
+/// <b>Why <see cref="Product.Description"/> was added, and what it is FOR.</b> §D.3's original
+/// field list was Name / Brand / Specs, and the omission was invisible until the dense leg went
+/// away. <see cref="EmbeddingDocument"/> carries the description (line 5 of the template), so on
+/// the dense path the prose is searchable; on the lexical path it was not indexed at all. The
+/// consequence, MEASURED 2026-09-05: with the dense leg unavailable, Nadia's three searches
+/// returned <b>0 candidates each</b> and Demo 01's offline arm fell from 6 recommendations to 0 —
+/// every one of her six products had been the dense leg's alone, because nothing in a Name, a
+/// Brand or a spec value answers "multi-day trips, starts before sunrise, carried". Degraded mode
+/// is supposed to DEGRADE. It COLLAPSED, and the reason was this list.
+/// </para>
+/// <para>
+/// So the description is indexed, and it is indexed at the LOWEST weight of any field. That is
+/// not timidity: it is the longest field by an order of magnitude, so an equal per-token weight
+/// would let prose volume out-vote an exact name match on sheer count. The weight is
+/// <b>chosen, not measured</b>, like every other weight in this class.
 /// </para>
 /// <para>
 /// <b>The ANCHOR rule — a fragment may add score, it may not create a hit.</b>
@@ -44,9 +61,9 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// <c>GLX-6007</c> (a bike multi-<b>tool</b>) at rank 1 with 10.58 on the single token
 /// <c>multi</c>, <c>GLX-9003</c> (a pill organiser, "four per <b>day</b>") at 6.91 on
 /// <c>day</c>, and two filter sets on <c>multi</c> from "multi-coating". ALL SIX of the query's
-/// own tokens have <c>df = 0</c> in this index — <c>multi-day</c>, <c>trips</c>, <c>starts</c>,
-/// <c>before</c>, <c>sunrise</c>, <c>carried</c> — so the only things that matched were the
-/// fragments <c>multi</c> (df 3) and <c>day</c> (df 1). Rank 1 in a leg is authority under RRF
+/// own tokens had <c>df = 0</c> in the index AS IT THEN WAS — <c>multi-day</c>, <c>trips</c>,
+/// <c>starts</c>, <c>before</c>, <c>sunrise</c>, <c>carried</c> — so the only things that matched
+/// were the fragments <c>multi</c> (df 3) and <c>day</c> (df 1). Rank 1 in a leg is authority under RRF
 /// whatever the score, so a fragment put a Cycling SKU at the top of a photographer's tray, and
 /// a Health &amp; Personal Care SKU into her candidate set. That is the false positive §8.1
 /// records as B-8 and attributes to the <c>Use:</c> line, which is not where it came from — the
@@ -64,6 +81,37 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// This is the same defect class as <see cref="StopWords"/> (a token with no discriminating
 /// meaning winning on <c>df = 1</c>) and it is fixed in the same place, at match time.
 /// </para>
+/// <para>
+/// ⚠ <b>Those df figures are pre-B-9 and are left standing as the RECORD OF THE DEFECT, not as a
+/// description of this index.</b> Indexing <see cref="Product.Description"/> moved every one of
+/// them, and the direction matters: the six tokens that had no carrier now have carriers, so the
+/// anchor rule is no longer doing the work alone. Re-measured 2026-09-05 on the same 99 SKUs,
+/// before → after: vocabulary <b>1177 → 1957</b>; <c>multi-day</c> 0 → 1, <c>starts</c> 0 → 1,
+/// <c>sunrise</c> 0 → 1, <c>before</c> 0 → 4, <c>carried</c> 0 → 6, <c>mirrorless</c> 0 → 2;
+/// <c>trips</c> is the one that stayed at 0. The fragments moved too — <c>multi</c> 3 → 6,
+/// <c>day</c> 1 → 7, <c>full</c> 4 → 6, <c>frame</c> 3 → 5 — which DAMPS them: a fragment with
+/// six carriers earns far less IDF than one with three, so the collision this rule was written
+/// against is weaker as well as blocked.
+/// </para>
+/// <para>
+/// <b>The anchor rule stays.</b> It is not made redundant by a bigger vocabulary — a fragment can
+/// still be the only thing two texts share — and the two guards compose: anchoring decides
+/// ADMISSION, the description decides whether there is anything to admit. What changed is the
+/// outcome on B-8's own query: <i>"multi-day trips, starts before sunrise, carried"</i> returned
+/// <b>0 lexical hits</b> before (four collisions, all correctly refused admission, and nothing
+/// left) and returns <b>8</b> now, led by <c>GLX-2003</c> Icebreaker merino base layer (9.79),
+/// <c>GLX-2002</c> Petzl Actik Core headlamp (9.34) and <c>GLX-2001</c> Osprey Kestrel 38
+/// trekking pack (4.18) — three products from the right department, admitted on whole tokens
+/// their own prose carries. On <i>"Mirrorless full-frame"</i> the intended answer
+/// <c>GLX-1001</c> stays rank 1 and its score rises 17.07 → 23.63, because <c>mirrorless</c>
+/// finally has a carrier to score on.
+/// </para>
+/// <para>
+/// <b>What it does NOT fix, measured in the same pass.</b> <i>"Headlamps"</i> still returns 0
+/// hits — the catalogue writes "headlamp" and this index does no stemming — and <i>"I want to
+/// shoot waterfalls on my hikes"</i> still returns 0. Neither is a description problem, and
+/// neither is repaired here.
+/// </para>
 /// </remarks>
 public sealed class LexicalIndex
 {
@@ -78,6 +126,20 @@ public sealed class LexicalIndex
 
     /// <summary>Field weight for tokens found in a spec KEY ("Filter thread").</summary>
     public const float SpecKeyFieldWeight = 1.0f;
+
+    /// <summary>
+    /// Field weight for tokens found in <see cref="Product.Description"/>. The lowest weight in
+    /// this class, and deliberately below <see cref="SpecKeyFieldWeight"/>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Chosen, not measured</b> — like every weight here. The ORDERING is the part that is
+    /// argued rather than picked: the description is the longest field by an order of magnitude,
+    /// so at an equal per-token weight prose volume would out-score an exact name match by count
+    /// alone, and a product merely MENTIONED in another product's copy would rank above the
+    /// product itself. A description token may make a product findable; it may not make it the
+    /// best answer.
+    /// </remarks>
+    public const float DescriptionFieldWeight = 0.75f;
 
     /// <summary>Flat bonus when a model-number-shaped query token appears inside the squashed name or specs.</summary>
     public const float ModelNumberBoost = 6.0f;
@@ -174,6 +236,15 @@ public sealed class LexicalIndex
             AddField(weights, product.Brand, BrandFieldWeight);
             AddWhole(whole, product.Name);
             AddWhole(whole, product.Brand);
+
+            // The description is indexed for SCORE and for ANCHORING alike. Anchoring is the
+            // half that matters: a token this product carries only in its prose must be able to
+            // ADMIT it to the result set, or degraded mode is still lexical-only over four
+            // fields that answer no need query. It is deliberately NOT added to the squashed
+            // haystack below — that surface backs the flat 6.0 model-number boost, which is an
+            // IDENTITY claim, and a model number named in another product's copy is a mention.
+            AddField(weights, product.Description, DescriptionFieldWeight);
+            AddWhole(whole, product.Description);
 
             foreach (var (key, value) in product.Specs)
             {
