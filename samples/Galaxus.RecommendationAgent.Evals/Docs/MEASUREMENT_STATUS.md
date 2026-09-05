@@ -1665,6 +1665,15 @@ re-derived by changing `EmbeddingDocument.TemplateVersion` and running `-- 3` ag
 
 ## §17 — B-7: the committed vectors become a real retrieval path, and what that measured (2026-09-05)
 
+> ⚠ **SUPERSEDED IN PART BY §19 (B-21, 2026-09-05). Read §19.2 before quoting anything below.**
+> Every number in this section was correctly measured. What was wrong was the ATTRIBUTION: the
+> figures were read as properties of the real-vector SPACE and they were properties of the 71-entry
+> pre-guessed query TABLE, which is now deleted. Specifically — "38 of 50 issued queries miss the
+> cache" → **0 of 50**; "Demo 01 falls from 6 recommendations to 0" → **`6 in → 5 out`**;
+> "Eval 04 FAILS / `--ci --dry-run` exits 1" → **exit 0, k 26–37**. The default did NOT move, but
+> the argument for it has: it is reproducibility now, not retrieval quality. The error ran in the
+> flattering direction for the key-free default.
+
 **This section spent nothing.** No model call, no embedding call. Every number below is from an
 offline run, in one of two embedding spaces, both of which need no key.
 
@@ -1885,6 +1894,12 @@ Nothing above spends money. The LOUD-fallback direction is re-derived by changin
 
 ## §18 — Independent verification of B-7 + ADR-030 Slice 1, and the README numbers it found stale (2026-09-05)
 
+> ⚠ **§18.5 item 3 is REFUTED by §19 (B-21).** It reads "`--real-vectors` must not enter CI — it
+> exits 1 on Eval 04, correctly." It exits **0**. The conclusion survives with a different reason:
+> that path now needs credentials and spends. This section faithfully reproduced §17, including its
+> misattribution — which is worth recording, because reproducing a number is not the same as
+> checking what it is a number ABOUT.
+
 Both lanes on `joslat/digitec-galaxus` re-run from a clean tree at `878e5da4`, nothing trusted as
 reported. Everything in §17 reproduced. Three things §17 could not have said are recorded here.
 
@@ -1974,6 +1989,8 @@ measured and kept.
    can distinguish the fix, so it correctly stays out.
 2. **Arm C is still 18 of 56** and **arm D 8 of 50 on the default path** (§17.5 items 1–2).
 3. **`--real-vectors` must not enter CI** — it exits 1 on Eval 04, correctly.
+   ⚠ **REFUTED by §19.** It exits **0** (k 26–37). It still must not enter CI: it needs credentials
+   and spends, and a scored run under it is not reproducible off the machine that made it.
 4. **The live-run figures in the README were not re-derived.** Re-running them costs ~USD 18.6.
    Only the dry-run and offline paths were re-measured here.
 
@@ -1991,3 +2008,217 @@ dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --offline --user U
 ```
 
 Nothing above spends money.
+
+---
+
+## §19 — B-21: the QUERY is embedded live, and every §17 verdict that rested on the query table (2026-09-05)
+
+*Everything below was re-measured on this tree. `--real-vectors` numbers are LIVE and cost money;
+the amounts are stated. `--concept-vectors` numbers spend nothing. Two phases, two commits, and they
+are reported separately because they move the same outputs for different reasons.*
+
+### 19.1 The diagnosis, established by probe before any code was written
+
+`PrecomputedEmbeddingSource` was a `Dictionary<string, float[]>` lookup over **two** committed files:
+99 real product vectors and **71 pre-guessed query texts**. A query composed at run time is not one
+of 71 guesses, so it hashed to nothing, returned `Unavailable`, and the dense leg ranked nothing.
+The lexical leg could not compensate because it indexed Name / Brand / Specs but **not**
+`Description`. Result on `--real-vectors`: **every persona `0 in → 0 out`**.
+
+**The product vectors were never the problem.** Probed 2026-09-05, queries embedded LIVE against the
+*committed* vectors, cosine top-5 (every score clears the 0.28 dense floor):
+
+| query | top hits |
+|---|---|
+| `"camera"` | 0.372 `GLX-1001` Sony α7 IV · 0.357 `GLX-1005` · 0.344 `GLX-2010` Camera Pod |
+| `"a warm jacket for hiking"` | 0.458 `GLX-2006` Arc'teryx · 0.395 `GLX-2003` merino · 0.390 `GLX-2011` |
+| `"multi-day trips, starts before sunrise, carried"` | 0.381 `GLX-2001` Osprey pack · 0.365 `GLX-1004` tripod · 0.328 `GLX-1011` · 0.327 `GLX-2005` filter · 0.325 `GLX-2002` headlamp |
+
+`"before sunrise"` → headlamp, `"carried"` → travel tripods, `"multi-day"` → trekking pack + water
+filter, **with no shared keyword**. One architectural mistake — not a model problem, not a corpus
+problem.
+
+### 19.2 What §17 and §18 got wrong, and in which direction
+
+§17's numbers were all real and all correctly measured. What was wrong was the **attribution**: they
+were read as properties of the real-vector *space* and they were properties of the query *table*.
+
+| claim, and where | status |
+|---|---|
+| §17: "on the real-vector path 38 of 50 issued queries miss the cache" | **true then, and the CAUSE is now removed** — 0 of 50 |
+| §17: "Demo 01 falls from 6 recommendations to 0" | **true then, refuted as a property of the space** — 6 in → 5 out |
+| §17: "Eval 04 FAILS, `--ci --dry-run` exits 1" | **refuted** — exit 0, k 26–37 |
+| §17.5 / §18.5: "`--real-vectors` must not enter CI — it exits 1 on Eval 04, correctly" | **REFUTED.** It exits 0. It still must not enter CI, for a *different* reason: it spends and it needs a key |
+| §17: "making real vectors the default would stop the dense leg running at all" | **REFUTED.** The default does not move, but the argument for it is now reproducibility, not retrieval |
+| §18.5 item 2: "arm C is still 18 of 56, arm D 8 of 50 on the default path" | **still true**, and untouched |
+
+**Direction of the error: flattering to the concept default.** The old text made the key-free default
+look like the retrieval-quality choice. It was not; it was the reproducibility choice, and nobody
+had separated the two.
+
+### 19.3 Phase 1 — `LexicalIndex` indexes `Description` (commit `46908e55`)
+
+The dense leg carried the description all along (`EmbeddingDocument` line 5); the lexical leg did
+not index it. Invisible until the dense leg went away — and then it was the whole failure. Indexed
+for **score and for anchoring**, at `DescriptionFieldWeight` **0.75**, the lowest weight in the
+class. Chosen, not measured; the *ordering* is what is argued (longest field ⇒ lowest per-token
+weight, or prose volume out-counts an exact name match). Deliberately **not** added to the squashed
+haystack, which backs the flat 6.0 model-number boost — that is an identity claim, and a model
+number in another product's copy is a mention.
+
+| lexical index, 99 SKUs | before | after |
+|---|---|---|
+| vocabulary | 1177 | **1957** |
+| `"multi-day trips, starts before sunrise, carried"` | **0 hits** | **8** — `GLX-2003` merino 9.79, `GLX-2002` headlamp 9.34, `GLX-2001` pack 4.18 |
+| `"Mirrorless full-frame"` | `GLX-1001` rank 1, 17.07 | `GLX-1001` rank 1, **23.63** |
+| df: `multi-day` / `starts` / `sunrise` / `before` / `carried` / `mirrorless` | 0 / 0 / 0 / 0 / 0 / 0 | 1 / 1 / 1 / 4 / 6 / 2 |
+| df fragments: `multi` / `day` / `full` / `frame` | 3 / 1 / 4 / 3 | 6 / 7 / 6 / 5 (**damped**) |
+| `"Headlamps"`, `"I want to shoot waterfalls on my hikes"` | 0 hits | **still 0** — no stemming; not a description problem |
+
+The ANCHOR rule stays: a bigger vocabulary does not make it redundant, and the two guards compose
+(anchoring decides admission, the description decides whether there is anything to admit). The df
+figures in the class doc are pre-B-21 and are now labelled as the record of the defect.
+
+**It moves the CONCEPT path, and that is declared:** `-- 1 --offline` stays `6 in → 6 out` but 2
+demoted → **3**, and the composition changes. IN: `GLX-8005` power bank, `GLX-2010` camera chest
+pack, `GLX-6001` handlebar bag. OUT: `GLX-2007` sleeping mat, `GLX-2012` watch, `GLX-1009` 24-105
+lens. `GLX-6001` is a **Cycling** SKU at the bottom of a photographer's tray at conf 0.48 — a
+cross-department leak, reported rather than tuned away. `-- 3`: 12/12 gating controls still caught,
+2 advisory findings unchanged, coverage 0.701 → **0.729** (`USR-DF-14` 0.667 → 1.000), presented
+56 → 57.
+
+### 19.4 Phase 2 — live query embedding (commit `fa57274f`)
+
+* `Data/queries.embeddings.json` **deleted**, with its `EmbeddedResource` line and the
+  `CanonicalQueries` / `AuthoredInterestPhrases` / `DefaultQuerySet` / `BuildQueryCacheAsync`
+  machinery that existed only to build it. **Nothing else read it** (checked by grep across `.cs`,
+  `.csproj`, `.md`, `.json`). A non-product-keyed asset is now **refused at load**, so dropping the
+  old file back into `Data/` cannot quietly re-create the bug.
+* The catalogue asset keeps its template-version and model stamps and still refuses **loudly**: an
+  index whose live embedder disagrees with its `model` field is *cleared*, not partially honoured.
+* **The live deployment's NAME comes from the asset's model stamp, never from configuration.** This
+  machine's `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` is `text-embedding-ada-002` — a different space at
+  the **same 1536 dimensions**, so no shape check anywhere could have caught it. When the configured
+  deployment differs, the banner says so and says why the stamp won.
+* **The space is proven, not assumed.** One product's exact embedding document is re-embedded live
+  and cosined against its committed vector. Expected **1.0 by construction**; measured **1.0000**,
+  printed every run. `SpaceIdentityProbeFloor = 0.98` is a float32/nondeterminism tolerance, not a
+  tuned threshold. Cost: one call.
+* **Per-run memo**, keyed on the exact text, holding the in-flight `Task` — so the same query is
+  never embedded twice, including under concurrency.
+* **No key ⇒ concept space, loudly.** Verified by running with `AZURE_OPENAI_API_KEY` /
+  `AZURE_OPENAI_ENDPOINT` unset: the banner prints the fallback and the reason.
+
+### 19.5 The confidence path — ASYNC, and why the alternative was rejected
+
+`Demo01.Confidence` and `AttributeSignal` called `EmbeddingSpace.EmbedOffline` **synchronously**, and
+a live embedder cannot serve that. Two options:
+
+**(a) keep those two call sites on the concept space.** Rejected. It is a change in *kind*: a card
+stamped `text-embedding-3-small` in the banner would carry a 24-dimension authored number, and the
+documented co-moving-operands caveat would silently be replaced by a **different, uncalibrated** one
+that nobody had measured. Two spaces in one report is exactly what `EmbeddingSpace.Requested` throws
+to prevent.
+
+**(b) an async path.** Taken. `Assemble` → `AssembleAsync`, `AttributeSignal` → `AttributeSignalAsync`,
+`Confidence` → `ConfidenceAsync`; `GuardrailControls.Screen` blocks, as it already did on the tool
+call. `EmbedOffline` is deleted rather than left as a landmine.
+
+**Measured cost of (b)**, `-- 1 --offline --real-vectors`: **4 query calls + 1 probe, 178 prompt
+tokens** ≈ USD 0.0000036. **53** requests were absorbed by the per-run memo and **105** by the
+committed index at no cost. The product documents are all index hits; the only live texts are the
+handful of distinct signal labels.
+
+### 19.6 The measurement
+
+| `-- 1 --offline --real-vectors` | before B-21 | after |
+|---|---|---|
+| candidates per search (×3) | **0 / 0 / 0** | **6 / 6 / 6** |
+| guardrail ledger | **`0 in → 0 out`** | **`6 in → 5 out`** · 1 dropped · 5 demoted |
+| dense leg | ran on a zero/absent vector | **ran** |
+| live spend | 0 (and it retrieved nothing) | 4 query calls + 1 probe, 178 tokens |
+
+| other paths | before | after |
+|---|---|---|
+| Eval 03 ARM A (authored phrases, resolved path), real | 56 of 56 dead | **0 of 56** |
+| Eval 03 ARM D (queries actually issued), real | **38 of 50** dead | **0 of 50** |
+| Eval 03 ARM D, concept | 8 of 50 | 8 of 50 (unchanged) |
+| Eval 03 ARM C (concept space, always) | 18 of 56 | 18 of 56 (unchanged) |
+| Eval 03 ARM B | 0 of 56 phrases | **0 of 99 products** — see 19.7 |
+| Eval 04 (D-3 injection containment), real | **exit 1**, k 1–7 | **exit 0**, k 26–37 |
+| Demo 02 Nadia (`-- 8`), real | GapsUnresolvable | **CoverageSufficient** — what `--help` promises |
+| Demo 02 Nadia (`-- 8`), real, ledger | — | 12 in → 12 out (concept: 11 in → 10 out) |
+| gating controls, both spaces | 12/12 | **12/12** |
+
+**The concept path is byte-identical to before phase 2, apart from the banner text.** Phase 1 is the
+only thing that moved it, and 19.3 says how.
+
+### 19.7 What the fix FOUND, declared and not repaired
+
+1. **`ConfidenceBands` thresholds are SPACE-DEPENDENT and nobody had said so.** Half of
+   `Demo01.Confidence` is a cosine, and a cosine's typical magnitude belongs to the space.
+   Same catalogue, same interest map, same products:
+   * concept → confidences **0.46–0.80**, six items, three demoted, none dropped;
+   * `--real-vectors` → **0.40–0.59**, so **nothing clears `PrimaryThreshold` 0.70** — five demoted
+     to "also consider" and one dropped under `SecondaryThreshold` 0.45. **The primary tray is
+     empty, and not because the products are worse.**
+
+   `IEmbeddingSource.SuggestedDenseScoreFloor` already says a *retrieval* floor belongs to a space.
+   These have the same property. **Not re-tuned**: picking a second pair of numbers to make the
+   real-vector tray resemble the concept tray is fitting the threshold to the output.
+
+2. **Eval 03's verdict was `A ∧ B ∧ D`, and that omission was about to pay off in the flattering
+   direction.** Live query embedding takes A, B and D to **0** on the real path in one change, so
+   the row would have printed ✅ under `--real-vectors` while **arm C still read 18 of 56 dead in
+   the space the DEFAULT runs in** — a green tick bought by passing a flag, on a run that repaired
+   nothing. **Arm C is now in the verdict.** The row never gates, so tightening it costs nothing.
+   Both spaces now report 2 instrument findings.
+
+3. **Arms A and D are now NEAR-VACUOUS on the real path**, exactly as arm B's zero test always was —
+   a real model returns a dense vector for any non-empty text. What they still verify there is that
+   the path is **reachable** (credentials, stamp, live deployment, identity probe). The non-vacuous
+   instrument for the concept space is arm C, which is why arm C is measured on every run.
+
+4. **Arm B measures something different now.** Its old question — "is this phrase in the query
+   asset?" — has no answer once the asset is deleted, and an arm that kept asking would read 56 of
+   56 dead forever on a path that works. It now measures the **index**: every product document must
+   be answerable straight from the committed asset, no live path attached. **0 of 99.** Denominator
+   changed from the phrase list to the catalogue; that is a change in what is measured and it is
+   declared here rather than absorbed.
+
+5. **`GLX-6001` (Cycling handlebar bag) and `GLX-6004` / `GLX-6009` (Lezyne bike lights)** reach
+   Nadia's tray on the real path — the lights for the derived signal `"Headlamps"`. Both spaces
+   handle a bare leaf-category name badly; the concept path answers `"Headlamps"` with a hiking shoe
+   and trekking poles. Not repaired here.
+
+### 19.8 What is still open
+
+1. **Arm C: 18 of 56 authored phrases embed to zero in the concept space**, 10 of them latent-gold.
+   Closing it means choosing a concept dimension per phrase, which moves every coverage cell.
+   Unchanged by B-21 and still reported rather than silently repaired.
+2. **Arm D: 8 of 50 issued queries dead on the DEFAULT path.** Unchanged.
+3. **`--real-vectors` still must not enter CI** — but the reason has changed. It no longer exits 1;
+   it **needs credentials and spends**, and a scored run under it is not reproducible off the
+   machine that made it.
+4. **The live-run (model-backed) figures in the README were not re-derived.** Only the offline and
+   dry-run paths were re-measured here.
+5. **`strategy/Galaxus/Galaxus_RecommendationAgent_Design.md` §8.1 was NOT updated** — that tree is
+   gitignored and local-only, so its B-6/B-7 rows still carry §17's refuted attribution.
+
+### 19.9 How to re-derive §19
+
+```
+dotnet build AgentEval.sln -v q                                                   # 0 errors
+dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline           # concept, free
+dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline --real-vectors   # SPENDS
+dotnet run --project samples/Galaxus.RecommendationAgent -- 8                     # loop, concept
+dotnet run --project samples/Galaxus.RecommendationAgent -- 8 --real-vectors      # SPENDS
+dotnet run --project samples/Galaxus.RecommendationAgent -- 0                     # termination proof
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3               # controls, concept
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors       # SPENDS
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4 --real-vectors       # SPENDS
+```
+
+Every line marked SPENDS issues live embedding calls; the whole set above is well under one cent.
+To confirm the no-key path, unset `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` and run the
+`--real-vectors` line: it must print the concept-space fallback **and its reason**.

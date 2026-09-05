@@ -1021,7 +1021,7 @@ public static class NegativeControls
     /// broke the dense leg — the flattering direction, which is the one to instrument hardest.
     /// </para>
     /// <para>
-    /// ⚠ <b>B-9: on the real-vector path arms A and D are now NEAR-VACUOUS, in exactly the way arm
+    /// ⚠ <b>B-21: on the real-vector path arms A and D are now NEAR-VACUOUS, in exactly the way arm
     /// B's zero test always was, and that has to be said rather than enjoyed.</b> Queries are
     /// embedded live, and a real embedding model returns a dense vector for ANY non-empty text — so
     /// "did it come back non-zero?" is close to a tautology there and would be satisfied by a
@@ -1038,7 +1038,7 @@ public static class NegativeControls
     /// than discovered on an invoice.
     /// </para>
     /// <para>
-    /// <b>The verdict is A AND B AND C AND D</b>, and arm C joined it at B-9. It had been left out
+    /// <b>The verdict is A AND B AND C AND D</b>, and arm C joined it at B-21. It had been left out
     /// while arm D read 38 of 50 on the real-vector path — a row that could not go green there did
     /// not visibly need it. Live query embedding takes A, B and D to zero on that path in a single
     /// change, and the row would then have printed ✅ under <c>--real-vectors</c> while arm C still
@@ -1079,7 +1079,7 @@ public static class NegativeControls
         bool armCClean = deadC == 0;
         bool armDClean = deadIssued == 0;
 
-        // ⚠ ARM C IS IN THE VERDICT SINCE B-9, and it was NOT before. The old verdict was
+        // ⚠ ARM C IS IN THE VERDICT SINCE B-21, and it was NOT before. The old verdict was
         // A && B && D, and while arm D read 38 of 50 on the real-vector path that could never go
         // green there, so the omission never showed. Live query embedding takes arms A, B and D to
         // zero on that path in one change — and the row would then have printed ✅ on
@@ -1102,7 +1102,7 @@ public static class NegativeControls
           + "the arm's low score is then a property of the corpus rather than of the arm. ARM B (the committed "
           + "text-embedding-3-small INDEX, no key, no live path): every product document must be answerable "
           + "straight from the asset. A product the asset cannot answer for is a product the dense leg cannot "
-          + "rank, and it is what a template bump without a rebuild looks like. Since B-9 this arm's denominator "
+          + "rank, and it is what a template bump without a rebuild looks like. Since B-21 this arm's denominator "
           + "is the CATALOGUE, not the phrase list — the query-vector asset it used to count against is deleted. "
           + "ARM C (the concept space, measured directly): the space --concept-vectors forces "
           + "and every asset-load failure falls back to, reported whether or not this run used it. ARM D is the "
@@ -1123,7 +1123,7 @@ public static class NegativeControls
                 + "retrieval leg contributes nothing, so a low coverage cell there is not evidence that the arm "
                 + "failed to reason. ADVISORY — closing ARM C means choosing a concept mapping per phrase, which "
                 + "moves every coverage cell, so it is reported rather than silently repaired. ARM D on the "
-                + "real-vector path is no longer a paid rebuild away: since B-9 queries are embedded live, so a "
+                + "real-vector path is no longer a paid rebuild away: since B-21 queries are embedded live, so a "
                 + "non-zero ARM D there means the live path is unreachable, not that the cache is thin."),
             allRetrievable,
             Gating: false);
@@ -1210,7 +1210,7 @@ public static class NegativeControls
     /// </summary>
     /// <remarks>
     /// <para>
-    /// ⚠ <b>B-9 changed what this arm measures, and the change must be read before the number
+    /// ⚠ <b>B-21 changed what this arm measures, and the change must be read before the number
     /// is.</b> It used to count how many of the 56 authored PHRASES were present in a committed
     /// query-vector asset. That asset is deleted — it held 71 pre-guessed query texts, a
     /// run-time-composed query was never one of them, and the whole real-vector path retrieved
@@ -1274,7 +1274,7 @@ public static class NegativeControls
     /// live one.
     /// </summary>
     /// <remarks>
-    /// Before B-9 the comment here said this was safe only because every source this row touches is
+    /// Before B-21 the comment here said this was safe only because every source this row touches is
     /// offline. That stopped being true when the real-vector path gained a live query embedder, so
     /// the honest description is the one above: this blocks. It is a console eval with no
     /// synchronisation context, the calls are sequential, and the alternative — threading async

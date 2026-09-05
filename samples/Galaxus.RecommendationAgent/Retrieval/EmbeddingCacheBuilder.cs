@@ -22,7 +22,7 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// something the demo does on startup.
 /// </para>
 /// <para>
-/// <b>The query asset is DELETED, and that is the B-9 fix rather than a simplification.</b> This
+/// <b>The query asset is DELETED, and that is the B-21 fix rather than a simplification.</b> This
 /// builder used to write a second file holding 71 pre-guessed query vectors — 17 canonical prompts
 /// and 54 authored interest phrases — and <see cref="PrecomputedEmbeddingSource"/> served queries out
 /// of it. A query composed at run time is not one of 71 guesses, so it missed, came back

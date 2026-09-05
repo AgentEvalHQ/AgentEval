@@ -633,7 +633,7 @@ public static class GuardrailControls
 
         // Blocking on the assembler, exactly as the PresentRecommendation call above blocks: these
         // scripted controls are a synchronous harness around an async pipeline. AssembleAsync
-        // became async at B-9 because the confidence arithmetic now embeds in whichever space the
+        // became async at B-21 because the confidence arithmetic now embeds in whichever space the
         // run resolved, and on the real-vector path that reaches the network.
         var (raw, _, _) = Demo01_RecommendationAgent.AssembleAsync(
             presented, evidence,

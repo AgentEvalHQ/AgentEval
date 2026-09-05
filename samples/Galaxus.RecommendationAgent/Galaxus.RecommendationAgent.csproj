@@ -41,7 +41,7 @@
        pointing at a missing file is a hard build error (MSB3030), which is why it was
        absent until the asset existed.
 
-       ONE asset, since B-9 (2026-09-05). There used to be a second, queries.embeddings.json,
+       ONE asset, since B-21 (2026-09-05). There used to be a second, queries.embeddings.json,
        holding 71 pre-guessed query texts, and PrecomputedEmbeddingSource served queries out
        of it. A query composed at run time is not one of 71 guesses, so it missed, the dense
        leg ranked nothing, and the "real-vectors" path produced 0 in and 0 out for every
@@ -50,10 +50,10 @@
        EmbeddingSpace proves the two are one space with an identity probe before retrieving.
 
        The DEFAULT is still ConceptEmbeddingSource (authored concept vectors, deterministic,
-       no key, no network) — but for a different reason than before B-9: not because real
+       no key, no network) — but for a different reason than before B-21: not because real
        vectors retrieve badly (they do not), but because an Auto that preferred them would
        resolve differently depending on whether a key is present, and a scored suite may not
-       change space with the environment. Measured, both spaces, in MEASUREMENT_STATUS §18. -->
+       change space with the environment. Measured, both spaces, in MEASUREMENT_STATUS §19. -->
   <ItemGroup>
     <EmbeddedResource Include="Data\catalogue.embeddings.json" />
   </ItemGroup>

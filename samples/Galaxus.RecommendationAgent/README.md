@@ -171,26 +171,38 @@ point: `RrfK = 60`, 24 candidates pulled per leg, `topK` 8 by default (max 12).
 - **Dense leg** — `ConceptEmbeddingSource.cs`: an authored **24 named-concept**
   space. Deterministic, key-free, and the reason every offline number here is
   reproducible. `AzureEmbeddingSource` / `PrecomputedEmbeddingSource` /
-  `EmbeddingCacheBuilder` implement the real-vector path, and since B-6
-  (2026-09-05) the two committed vector assets exist — 99 product + 71 query
-  `text-embedding-3-small` vectors at 1536 dims, embedded as resources.
-  `EmbeddingSpace.cs` (B-7) is the **one** place the space is chosen — the
-  default is the concept source, `--real-vectors` selects the committed assets,
-  `--concept-vectors` forces the default, and an asset that fails its stamp check
-  falls back LOUDLY rather than silently. No live fallback is ever attached, so
-  neither path can spend money. ⚠ The real-vector path is **not** the default and
-  should not be read as better: its query cache holds only anticipated text, so
-  38 of the 50 queries the arms actually issue miss it — Demo 1 then recommends
-  nothing and Eval 04 fails. `MEASUREMENT_STATUS.md` §17.
+  `EmbeddingCacheBuilder` implement the real-vector path: `Data/catalogue.embeddings.json`
+  holds **99 product** `text-embedding-3-small` vectors at 1536 dims, embedded as a
+  resource, and since B-21 (2026-09-05) every **query is embedded LIVE at search
+  time** — the index is precomputed, the query is not, which is what a production
+  retrieval system does. `EmbeddingSpace.cs` is the **one** place the space is
+  chosen: the default is the concept source, `--real-vectors` selects the committed
+  index plus live query embedding, `--concept-vectors` forces the default, and an
+  index that fails its stamp check, or a missing key, falls back LOUDLY rather than
+  silently. The live deployment's **name comes from the asset's own model stamp**,
+  never from `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — `ada-002` and `3-small` are both
+  1536 dims, so nothing downstream could catch the swap — and before retrieving,
+  one product document is re-embedded and cosined against its committed vector
+  (expected 1.0, **measured 1.0000**, printed every run).
+  ⚠ **`--real-vectors` NEEDS CREDENTIALS AND SPENDS** (`-- 1 --offline
+  --real-vectors`: 4 query calls + 1 probe, 178 prompt tokens). It is not the
+  default, and the reason is *reproducibility*, not quality: an `Auto` preferring it
+  would score in a different space depending on whether a key happened to be set.
+  It does retrieve better. `MEASUREMENT_STATUS.md` §19.
 - **Lexical leg** — `LexicalIndex.cs`: IDF-weighted token overlap with an exact
   boost for model numbers and GTINs, because Galaxus customers type `α7 IV`,
   `A7IV` and `ILCE-7M4` for one product and a 1536-dimensional vector treats the
-  difference as noise. It indexes **Name, Brand and Specs only** — use-context
-  tags are deliberately *not* indexed, so the cross-category link the demo exists
-  to show is invisible to it. In production this leg is the retailer's existing
+  difference as noise. It indexes **Name, Brand, Specs and Description** —
+  use-context tags are deliberately *not* indexed, so the cross-category link the
+  demo exists to show is invisible to it. In production this leg is the retailer's existing
   Elasticsearch: the claim is *fuse with their search*, not *replace it*, and RRF
   is chosen because it needs no score calibration between a cosine and a token
-  count.
+  count. Since **B-21** it also indexes **`Description`** at
+  `DescriptionFieldWeight` 0.75 — the lowest weight in the class — for both score
+  and anchoring. That is what makes retrieval *degrade* instead of *collapse* when
+  the dense leg is unavailable: before it, Nadia's three searches returned **0
+  candidates each** with no dense leg, because every one of her products had been
+  the dense leg's alone. Use-context tags are still deliberately not indexed.
 
 ### Signals / the interest map — `Signals/`
 
@@ -586,10 +598,20 @@ else:**
   B-6's acceptance is met. The row is still a FINDING, and the reason is the new
   **arm D: the queries the arms actually issue** — joins of phrases, companion
   classes, category names, none of which is an authored phrase. Arm D reads
-  **8 of 50** dead on the default concept path and **38 of 50** on the real-vector
-  path. Arm C reports the concept space unconditionally, so the row always carries
-  one number that cannot co-move with the selector. Without arm D this row would
-  have gone green on the change that broke retrieval. `MEASUREMENT_STATUS.md` §17.
+  **8 of 50** dead on the default concept path. Arm C reports the concept space
+  unconditionally, so the row always carries one number that cannot co-move with the
+  selector. Without arm D this row would have gone green on the change that broke
+  retrieval. `MEASUREMENT_STATUS.md` §17.
+  **Since B-21 the verdict is A ∧ B ∧ C ∧ D**, and arm C joined it for a reason worth
+  stating: live query embedding takes arms A, B and D to **0** on the real-vector
+  path (arm D was 38 of 50), so the row would have printed ✅ under `--real-vectors`
+  while arm C still read 18 of 56 dead in the space the **default** runs in — a
+  green tick bought by passing a flag, on a run that repaired nothing. Arm B was
+  also re-pointed: the query-vector asset it counted against is deleted, so it now
+  measures the **index** (99 of 99 product documents answerable). And arms A and D
+  are now near-vacuous on the real path in exactly the way arm B's zero test always
+  was — a real model embeds any text — so what they verify there is that the path is
+  *reachable*, not that a lexicon is complete. `MEASUREMENT_STATUS.md` §19.
 - **`SuppressionDetectorExercised` — ⚠️ FINDING.** Every D3 suppression case
   should have at least one negative control demonstrating its detector can fire.
   **C-05's is demonstrated** by `Broken02_UncitedRecommender`; **C-07's is NOT
@@ -871,14 +893,14 @@ silently repaired.
 
 | # | Gap | Why it was not fixed |
 |---|---|---|
-| 1 | **10 dead query phrases, STILL OPEN after B-6 and B-7.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero in the concept space (`AuthoredQueryPhraseRetrievability`, arm C — and arm A whenever that space is the resolved one, which is the default) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 closed the row's *arm B*; B-7 made arm A measure the resolved path and added arms C and D. Neither touched the lexicon. B-7 also found the **larger** version of this defect: **8 of the 50 queries the arms actually issue** are dead in the concept space too, and 38 of 50 on the real-vector path |
+| 1 | **10 dead query phrases, STILL OPEN after B-6 and B-7.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero in the concept space (`AuthoredQueryPhraseRetrievability`, arm C — and arm A whenever that space is the resolved one, which is the default) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 closed the row's *arm B*; B-7 made arm A measure the resolved path and added arms C and D. Neither touched the lexicon. B-7 also found the **larger** version of this defect: **8 of the 50 queries the arms actually issue** are dead in the concept space too. **B-21 closed the real-vector half** (live query embedding → arm D 38 of 50 → **0 of 50**) and put arm C **into the verdict**, so the row can no longer go green by passing `--real-vectors`. The concept-space lexicon is untouched and the row stays RED on both paths |
 | 2 | **`"wahl"` in the political-opinion term set** | Changing a screening term changes what the eval measures. Same precedent as #1 |
 | 3 | **Demo 2's 60 s model timeout** vs `gpt-5.5`'s latency on the three JSON-envelope stages | A threshold decision, not a verification one. `--model-timeout` exists precisely to change it, and the 60 s value is documented as measured (without it a stalled deployment queues ~40 min) |
 | 4 | **`DetectOptOutBackstop` is unverified and uncovered** — the only reader of the tool-result channel | Localising it (extractor vs. detector) needs one instrumented live turn |
 | 5 | **The pre-registered A/B has never been run.** Eval 09 was built to run it — both arms live, spend metered under each, a CONFOUNDED verdict if the budgets diverge — and it is the single most valuable thing left to do here | It costs a second live architecture across twelve personas × 2 reps plus a judge call per cell: roughly 20–45 minutes and a bill the cost panel reports exactly. Nobody has spent it |
 | 6 | **Two-sided evidence is one-and-a-half-sided** — no `userEvidence` argument on `PresentRecommendation` | The fix is purely additive (a fifth argument, never a rename — `Domain/Recommendation.cs` is the cross-lane contract), but it changes the frozen tool signature both projects grade against |
 | 7 | **Demo 1 has no candidate-set containment** | The candidate set must first be widened to *every* retrieval route — today only the three semantic tools record provenance, so `BrowseCategory` results legitimately arrive with none. Enforcing before widening would drop legitimate results |
-| 8 | ~~**The two committed embedding assets do not exist.**~~ **CLOSED 2026-09-05 (B-6), and wired 2026-09-05 (B-7).** `Data/catalogue.embeddings.json` (99 vectors) and `Data/queries.embeddings.json` (71) hold real `text-embedding-3-small` output at 1536 dims, template stamp `v2` | B-6: 170 live calls, 13 383 prompt tokens, ≈ USD 0.00027; no Eval 02 cell moved, because nothing retrieved against the assets. B-7 built `EmbeddingSpace` so `--real-vectors` does retrieve against them (no key, nothing spent) and measured both spaces. **The default did not move, and the measurement is why:** on the real-vector path 38 of 50 issued queries miss the cache, Demo 1 falls from 6 recommendations to 0 for every persona that has any, and Eval 04 exits 1. `MEASUREMENT_STATUS.md` §17 |
+| 8 | ~~**The two committed embedding assets do not exist.**~~ **CLOSED 2026-09-05 (B-6), wired (B-7), and the wiring CORRECTED (B-21).** `Data/catalogue.embeddings.json` holds 99 real `text-embedding-3-small` product vectors at 1536 dims, template stamp `v2`. The second asset, `queries.embeddings.json` (71 pre-guessed query texts), is **DELETED** | B-6: 170 live calls, 13 383 prompt tokens, ≈ USD 0.00027; no Eval 02 cell moved, because nothing retrieved against the assets. B-7 built `EmbeddingSpace` so `--real-vectors` retrieved against them, and reported that on that path 38 of 50 issued queries missed, Demo 1 fell 6 → 0 and Eval 04 exited 1. **Every one of those numbers was real and every one was a property of the query TABLE, not of the vectors** — a run-time-composed query is not one of 71 guesses. B-21 deleted the table and embeds queries LIVE: same catalogue, same vectors, `-- 1 --offline --real-vectors` goes **0 in → 0 out** to **6 in → 5 out**, arm D **38 of 50 → 0 of 50**, Eval 04 **exit 1 → exit 0** (k 1–7 → 26–37), Demo 2's Nadia **GapsUnresolvable → CoverageSufficient**. The default still does not move — but on a **reproducibility** argument now, the retrieval one having been refuted. `MEASUREMENT_STATUS.md` §19 |
 | 9 | **The D-3 vocabulary control is monolingual.** The fix is to give the *catalogue's own* category and attribute vocabulary de/fr/it forms — **not** to widen with review text, which is the laundering channel | A corpus authoring task with its own re-measurement cost |
 | 10 | **Evals 05, 06, 08 and 09 have no measured results in this file.** All four need credentials and all four landed after the measured live run; the binaries that produced the Eval 01/02 numbers contained Evals 01–04 only. (Eval 07 needs no model, was run on 2026-09-04 against the current tree and **is** reported.) | Reporting a number for any of them here would be reporting a number nobody ran |
 | 11 | **The tree is moving faster than any document about it.** Evals 05–09, `--skip-slow` and `CredentialGuard` all landed on 2026-09-04 between the measured live run and this file being written; the earlier record of a warning-free build predates them, and a build today also emits `CS0162: Unreachable code detected` at `Eval04_ReviewInjectionContainment.cs:72` | Nothing to fix in this README beyond re-reading the tree before quoting it. Re-run `Evals -- 3`, `-- 4`, `-- 7` and `--ci --dry-run` — all four are free — before trusting any figure above |

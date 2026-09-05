@@ -382,7 +382,7 @@ static async Task ShowMenuAsync(ParsedArgs parsed)
 
 // Regenerates the committed PRODUCT embedding index from a LIVE embedding deployment.
 //
-// One asset, since B-9: there used to be a second holding 71 pre-guessed query vectors, and
+// One asset, since B-21: there used to be a second holding 71 pre-guessed query vectors, and
 // serving queries out of it is what made the real-vector path retrieve nothing. Queries are
 // embedded live at search time now. What this switch writes is the INDEX, and its model stamp
 // is load-bearing: EmbeddingSpace reads it back to decide which live deployment is even allowed

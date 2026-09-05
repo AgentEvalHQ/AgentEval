@@ -26,7 +26,7 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// </para>
 /// <para>
 /// <b>Indexed fields:</b> <see cref="Product.Name"/>, <see cref="Product.Brand"/>,
-/// <see cref="Product.Specs"/> keys and values, and — since B-9 (2026-09-05) —
+/// <see cref="Product.Specs"/> keys and values, and — since B-21 (2026-09-05) —
 /// <see cref="Product.Description"/> at <see cref="DescriptionFieldWeight"/>. Use-context tags
 /// are still NOT indexed here. That is not an omission: the whole demonstration is that the
 /// cross-category link (hiking pack → travel tripod) lives on the <c>Use:</c> line and is
@@ -82,7 +82,7 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// meaning winning on <c>df = 1</c>) and it is fixed in the same place, at match time.
 /// </para>
 /// <para>
-/// ⚠ <b>Those df figures are pre-B-9 and are left standing as the RECORD OF THE DEFECT, not as a
+/// ⚠ <b>Those df figures are pre-B-21 and are left standing as the RECORD OF THE DEFECT, not as a
 /// description of this index.</b> Indexing <see cref="Product.Description"/> moved every one of
 /// them, and the direction matters: the six tokens that had no carrier now have carriers, so the
 /// anchor rule is no longer doing the work alone. Re-measured 2026-09-05 on the same 99 SKUs,

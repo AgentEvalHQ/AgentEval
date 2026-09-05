@@ -46,7 +46,7 @@ public enum EmbeddingSpaceChoice
 /// memoised, and <see cref="Requested"/> refuses to change once anything has resolved.
 /// </para>
 /// <para>
-/// <b>The real-vector path embeds its QUERIES LIVE, and that is the B-9 fix.</b> Until 2026-09-05
+/// <b>The real-vector path embeds its QUERIES LIVE, and that is the B-21 fix.</b> Until 2026-09-05
 /// this selector attached no live source and the committed assets carried a second file of 71
 /// pre-guessed query texts. A query composed at run time is not one of 71 guesses, so it came back
 /// <c>Unavailable</c>, the dense leg ranked nothing, and <c>--real-vectors</c> produced
@@ -105,7 +105,7 @@ public static class EmbeddingSpace
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>CONCEPT — and at B-9 the REASON changed completely while the answer did not.</b> That
+    /// <b>CONCEPT — and at B-21 the REASON changed completely while the answer did not.</b> That
     /// distinction is the whole of this comment, because a default kept for a reason that has been
     /// refuted is not a default, it is inertia.
     /// </para>
@@ -225,7 +225,7 @@ public static class EmbeddingSpace
             {
                 if (ReferenceEquals(_resolvedFor, products)) return _resolution;
 
-                // A DIFFERENT catalogue after something has already resolved. Before B-9 re-running
+                // A DIFFERENT catalogue after something has already resolved. Before B-21 re-running
                 // ResolveCore here was merely wasteful; now it would issue a second live probe and,
                 // worse, swap the process's embedding source out from under everything that had
                 // already retrieved with the first one — one report, two spaces, exactly what the
@@ -251,7 +251,7 @@ public static class EmbeddingSpace
     /// <remarks>
     /// <para>
     /// <b>Async because the resolved space may be LIVE.</b> This replaced a synchronous
-    /// <c>EmbedOffline</c> at B-9. That method was safe only while this selector refused to attach
+    /// <c>EmbedOffline</c> at B-21. That method was safe only while this selector refused to attach
     /// a live path, and it was the reason the confidence arithmetic could not join the real-vector
     /// path — so the choice was between two spaces in one run and an async call chain, and the
     /// async call chain is the one that keeps the banner honest.

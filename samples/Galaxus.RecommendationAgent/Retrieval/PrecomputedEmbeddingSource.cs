@@ -24,7 +24,7 @@ namespace Galaxus.RecommendationAgent.Retrieval;
 /// </para>
 /// <para>
 /// <b>This class is an index with a live query path, NOT a lookup table.</b> That distinction is
-/// the whole of B-9, and it was learned the expensive way. Until 2026-09-05 the committed assets
+/// the whole of B-21, and it was learned the expensive way. Until 2026-09-05 the committed assets
 /// were TWO files — 99 product vectors and 71 <i>pre-guessed query texts</i> — and this class was
 /// a <c>Dictionary&lt;string, float[]&gt;</c> lookup over both, with no live path attached. A
 /// query composed at run time is not among 71 guesses, so it resolved to <c>Unavailable</c>, the
@@ -142,7 +142,7 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
     public int CacheHits => Volatile.Read(ref _cacheHits);
 
     /// <summary>
-    /// Lookups the committed asset could not answer. Since B-9 a QUERY is expected to miss —
+    /// Lookups the committed asset could not answer. Since B-21 a QUERY is expected to miss —
     /// the asset holds product documents only — so this counts the live path's workload rather
     /// than staleness. A miss on a PRODUCT document is the staleness signal, and it shows up as
     /// a template-version rejection at load instead.
@@ -396,7 +396,7 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
         bool   stampSeen  = false;
 
         // ONE asset: the product vectors. The query asset that used to sit beside it was deleted
-        // at B-9 — see the remarks on this class for why a pre-guessed query table is a bug
+        // at B-21 — see the remarks on this class for why a pre-guessed query table is a bug
         // rather than an asset.
         var names = assetPaths?.ToArray() ?? [EmbeddingCacheBuilder.CatalogueAssetFileName];
 
@@ -461,9 +461,9 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
                 dimensions = file.Dimensions;
                 stampSeen  = true;
 
-                // Since B-9 the ONLY legitimate keying is by product id. A query-keyed asset is
+                // Since B-21 the ONLY legitimate keying is by product id. A query-keyed asset is
                 // the deleted pre-guessed query table, and loading one would silently re-create
-                // the bug B-9 removed: run-time-composed queries would still miss it, but the
+                // the bug B-21 removed: run-time-composed queries would still miss it, but the
                 // handful that happened to hit would be answered from a stale snapshot instead of
                 // from the live embedder. Refused, loudly, rather than partially honoured.
                 if (!string.Equals(file.Keying, EmbeddingCacheFile.KeyingProductId, StringComparison.Ordinal))
@@ -471,7 +471,7 @@ public sealed class PrecomputedEmbeddingSource : IEmbeddingSource
                     var message =
                         $"Embedding asset '{described}' is keyed '{file.Keying}', not " +
                         $"'{EmbeddingCacheFile.KeyingProductId}'. This loader accepts PRODUCT vectors only — a " +
-                        "query-vector asset is the pre-guessed query table deleted at B-9, and queries are now " +
+                        "query-vector asset is the pre-guessed query table deleted at B-21, and queries are now " +
                         "embedded live at search time. REFUSING to load it.";
 
                     if (throwOnMismatch) throw new InvalidOperationException(message);

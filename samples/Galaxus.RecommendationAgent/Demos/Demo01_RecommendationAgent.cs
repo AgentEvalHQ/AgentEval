@@ -566,7 +566,7 @@ public static class Demo01_RecommendationAgent
     /// <param name="catalogue">The catalogue façade.</param>
     /// <param name="replenishment">The repeat-buy tray, built before the model ran.</param>
     /// <param name="cancellationToken">
-    /// Cancellation. This method became async at B-9: the confidence and attribution arithmetic
+    /// Cancellation. This method became async at B-21: the confidence and attribution arithmetic
     /// embeds through <see cref="EmbeddingSpace"/>, which on the <c>--real-vectors</c> path reaches
     /// a live embedding deployment.
     /// </param>
@@ -666,7 +666,7 @@ public static class Demo01_RecommendationAgent
     /// ⚠ <b>The cosine is taken in whichever space <see cref="EmbeddingSpace"/> resolved</b>, which
     /// is the same space that did the retrieving — so this is not an independent check on
     /// retrieval, and never was. That coupling is now uniform across both paths, which it was not
-    /// before B-9: while the real-vector path served queries from a 71-entry table, a
+    /// before B-21: while the real-vector path served queries from a 71-entry table, a
     /// run-time-composed signal LABEL was Unavailable, every cosine here was 0, and attribution
     /// silently fell back to token overlap ALONE. Queries are embedded live now, so the cosine is
     /// a real cosine on both paths and this method measures the same thing on each. The space is
@@ -824,12 +824,12 @@ public static class Demo01_RecommendationAgent
     /// <para>
     /// ⚠ <b>CO-MOVING OPERANDS — still true, and now true in the same way on both paths.</b> The
     /// fit is computed in the SAME space that retrieved the product, so a product retrieved because
-    /// it is near the label scores well on being near the label. B-9 does not repair that and does
+    /// it is near the label scores well on being near the label. B-21 does not repair that and does
     /// not claim to; breaking the coupling means finding a second, independent signal, which is an
     /// eval-lane question.
     /// </para>
     /// <para>
-    /// What B-9 DID change is that the defect is now one defect rather than two. Before it, the
+    /// What B-21 DID change is that the defect is now one defect rather than two. Before it, the
     /// <c>--real-vectors</c> path had the product document in the committed asset and the composed
     /// label absent from it, so the fit collapsed to 0 and this number quietly became
     /// <c>strength / 2</c> — one operand, not two, every card a band lower, and the coupling
