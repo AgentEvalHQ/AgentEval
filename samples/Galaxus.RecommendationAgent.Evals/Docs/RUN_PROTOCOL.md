@@ -95,6 +95,21 @@ nothing to copy), then prove the store is clean with a scan that reports a COUNT
 The commands are in `MEASUREMENT_STATUS` §57.4a. **A published ablation that plants a secret and does
 not publish its cleanup is a defect in the ablation, not in whoever ran it.**
 
+> ✅ **STRONGER FORM, and it costs nothing — added 2026-09-06 (Wave-6 close-out,
+> `MEASUREMENT_STATUS` §62.6). Plant a SYNTHETIC secret, and there is no cleanup to get wrong.**
+> The reason a credential scan needs a positive control is that **a scan finding nothing proves
+> nothing until it has been shown able to hit** — and *that* is a property of the PATTERNS, not of
+> the value. A made-up host and a made-up 48-character key exercise every pattern, including the
+> literal `grep -F` leg, exactly as a real pair would: at the Wave-6 close-out all five patterns
+> fired on the synthetic plant (2 · 1 · 1 · 2 · 2) and the file was deleted in the same command,
+> with a re-scan of its path returning 0.
+>
+> **Use the real value only where the synthetic one genuinely cannot answer the question** — the
+> literal `grep -F` over the tree, which must search for the value that actually exists and must
+> report a COUNT and never a match. **Stage 0c's cleanup rule stays, for the cases that still need
+> a real plant** (§57.4a's `EverySnapshotSaysWhatProducedIt` ablation C is one: its subject is the
+> provenance note's own credential clause, and it must be shown to catch the thing it names).
+
 ### Stage 0b — RE-EXECUTE IN **BOTH SPACES**, and that includes the control you just wrote
 
 **Added 2026-09-06 (Wave-4 verification run, `MEASUREMENT_STATUS` §42). It is stage 0 applied to your

@@ -9095,3 +9095,401 @@ dotnet run --project $E --no-build -- 9 --dry-run --only USR-MI-02 ; echo $?   #
 ⚠️ **Restore an ablation from a COPY, never with `git checkout --`.** This wave lost every working
 change to `Eval09_HypothesisComparison.cs` to exactly that command, because the file carried the
 wave's edits as well as the ablation. Both ablations above were then re-run against a backup copy.
+
+---
+
+## 62. THE WAVE-6 CLOSE-OUT RUN at `4077efa8` — the state re-taken from outside, and `--no-incremental` is not the stable build command either (2026-09-06)
+
+**No code change. Sixteen commits verified, twenty-seven commands run with `$?` captured on every
+one, both spaces, and the paid run's every currency figure re-derived from its own usage blocks
+without reading §61's arithmetic.** Two findings, one of them in the row this plan added *to replace*
+a figure that had already been wrong twice.
+
+### 62.0 Wrong as specified — the wave has two names, and the section number the task gave was taken
+
+The task said *"a new section for Wave 6 at the next free number (Wave 5 occupies §44–§54)"*. Wave 5
+does occupy §44–§54, and the next free number is **§62** — §55 through §61 were written by the same
+batch of work the task calls Wave 6.
+
+**The batch and the block do not share a name, and neither is wrong.** `git rev-list --count
+4aae0993..HEAD` is **16**: `82908b15` → `4077efa8`. On disk those sixteen commits are already
+recorded as **four** blocks — `MASTER_PLAN` §0.4's *WAVE 6* (item 8.17, §55), *WAVE 7* (§§56–59),
+*WAVE 7's REVIEW PASS* (§60) and *WAVE 8* (§61). So "Wave 6" means the whole sixteen to the task and
+the first commit of them to the plan. **Nothing is renumbered** — roughly forty cross-references key
+off these names, and the §47 lesson is that renumbering to express a new reading silently invalidates
+them. Both names are recorded here instead, which is the cheap fix.
+
+### 62.1 🔴 `--no-incremental` has a warning count PER INVOCATION too, and §0.1 was quoting it as the stable one
+
+§54.2 established that `dotnet build AgentEval.sln` reports *"a warning count per invocation, not a
+warning count"* — 0, then 62, then 224 on one unchanged tree. `MASTER_PLAN` §0.1 then published
+`--no-incremental` **224** beside it as though the forced form were the durable one. **It is not.**
+
+| # | command, exactly as run | errors | warnings |
+|---|---|---|---|
+| 1 | `dotnet build AgentEval.sln` (first of the session) | **0** | **226** |
+| 2 | `dotnet build AgentEval.sln --no-incremental` | **0** | **226** |
+| 3 | `dotnet build AgentEval.sln` (nothing to compile since #2) | **0** | **0** |
+| 4 | `dotnet build AgentEval.sln --no-incremental` (byte-identical tree to #2) | **0** | **229** |
+
+**#2 and #4 are the same command over the same bytes and they disagree.** Direction: **flattering to
+the tree**, because a smaller published number reads as a cleaner repository, and 224 is smaller than
+either reading here. Blast radius: `MASTER_PLAN` §0.1's build row and any sentence quoting 224 or its
+unreconciled "+3". Corrected at its origin.
+
+✅ **And the stable quantity was found by asking a different question.** Warnings were extracted as
+`file(line,col): warning CODE` identities and de-duplicated:
+
+* build #2 → **65** distinct identities · build #4 → **65** distinct identities · `diff` between the
+  two sorted sets → **no difference at all**.
+
+**The total varies because each identity is re-emitted a varying number of times across the
+multi-TFM and multi-project passes; the identity SET does not vary.** That is the reportable
+quantity, and it is a set rather than a digit, which is why it does not decay. **The invariant that
+survives everything is `0 Error(s)`, under all four commands.**
+
+**The evals project's own warnings — 8 by one counting rule and 7 by another, and Wave 8's EIGHT is
+the right one.** The eight sites, listed rather than counted:
+
+```
+Evals\Eval02c_HeldOutNextPurchase.cs(704,97)  CS8602
+Evals\Eval02c_HeldOutNextPurchase.cs(705,88)  CS8602
+Evals\Eval09_HypothesisComparison.cs(2362,59) CS1574
+Evals\Eval09_HypothesisComparison.cs(2363,74) CS1574
+Evals\Eval09_HypothesisComparison.cs(2369,16) CS1574
+Evals\Graders\PairedCoverageReport.cs(428,32) CS8629
+Evals\Graders\PairedCoverageReport.cs(428,46) CS8629
+Evals\NegativeControls.cs(3005,51)            CS0162
+```
+
+⚠️ **Both CS8629 are on line 428**, so de-duplicating by `(file, line)` gives **7** and by
+`(file, line, column)` gives **8**. §0.1 has now carried three vintages of this figure — 3, then 6,
+then 8 — and every correction has been in the same direction. **The counting rule is the defect, not
+the arithmetic:** the number is meaningless without it, so the rule is stated with the number above
+and the sites are listed so the next reader counts rather than quotes. The agent project's own is
+**1**, the pre-existing `CS1572` at `Workflows/ModelDiscoveryNodes.cs(774)`, untouched by all sixteen
+commits.
+
+### 62.2 Three TFM totals, after a full build — identical to §54.3, §60 and §61
+
+Run after build #2 above (`--no-incremental` over the whole solution), then `--no-build` per TFM, so
+the multi-TFM stale-binary trap cannot apply:
+
+| TFM | passed | failed | skipped | total | `$?` |
+|---|---|---|---|---|---|
+| net10.0 | 9,699 | **0** | 2 | 9,701 | 0 |
+| net9.0 | 9,481 | **0** | 1 | 9,482 | 0 |
+| net8.0 | 9,481 | **0** | 1 | 9,482 | 0 |
+
+These grow whenever anyone adds a test. **The invariant is 0 failures on all three**, and no test file
+under `tests/` was touched by any of the sixteen commits — `git diff --name-status 4aae0993..HEAD`
+lists nineteen paths and **none of them is under `tests/` or `src/`**.
+
+### 62.3 The deterministic sweep — 27 commands, both spaces, every exit code OBSERVED with `$?`
+
+| command | concept `$?` | `--real-vectors` `$?` |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| `-- 7` | **1** | **1** |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| `--ci --dry-run` | **1** | **1** |
+| `agent -- 0` | 0 | — |
+| `agent -- 1 --offline` | 0 | — |
+| `agent -- 2 --offline` | 0 | — |
+
+**No exit code has moved since `0263141d`.** `-- 7` and `--ci --dry-run` are the only 1s, in both
+spaces, and both report the same thing: Eval 07 GATE B, deferred by decision.
+
+✅ **Both spaces genuinely resolve, read off the banner and never inferred from the flag:**
+
+```
+--real-vectors : Embedding space: precomputed+azure (text-embedding-3-small, 1536 dims)
+                 · 99 committed product vectors · queries embedded LIVE · space probe 1.0000
+default        : Embedding space: concept (galaxus-concept-v2, 24 dims) · queries embedded offline
+```
+
+⚠️ The real banner also states that `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` resolves to
+`text-embedding-ada-002` **and was not used** — the artefact names the space it RESOLVED, which is
+the §42 rule, and is why a fallback for want of credentials could not have passed unnoticed here.
+
+**The CI chain, in both spaces:** eleven members, **10** tight `passed` + **1** `FAILED`, and the
+FAILED is Eval 07. ⚠️ **The loose recap grep still over-counts and the extra hit is now pinned to a
+line:** `grep -c ": passed"` returns **11** because line 6041 of the CI log is a control's own prose
+quoting *"Eval 07: passed."*. Use `grep -cE "^ *· Eval [0-9a-c]+: passed\.$"`. Same shape as
+`baca28e4`; third sighting.
+
+**The real-vector half's live embedding spend, printed by the run:** `118 query call(s) for 118
+distinct text(s) + 1 space-identity probe · 329 request(s) served from the per-run memo and 297 from
+the committed index, at no cost · 1248 prompt token(s) in total`. That is a **third** independent
+arrival at §56's figure, and `297 = 3 × 99` is the three retrievers reading the committed index.
+
+### 62.4 The control panel — verified by ROW NAME, in both spaces
+
+**36 gating rows, every one `✅ caught`, `❌ NOT CAUGHT` = 0 · 7 advisory rows · 43 total, both
+spaces.** Not counted off a summary line: the row names were extracted from each `-- 3` log,
+de-duplicated and `diff`ed between the spaces — **the 36 gating names are identical and the 7
+advisory names are identical.**
+
+⚠️ **The TRIPPING advisory set is still space-dependent, and this is the second run to see it.**
+Concept trips **2** (`AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised`); real trips
+**3** (those two plus `DenseLegSaysWhenItRankedNothing`, the `1 of 50` silent dense wipeout §56
+measured). **Any sentence saying "two advisory findings" must name the space.**
+
+⚠️ **A trap for whoever automates this:** `grep -c "❌ NOT CAUGHT"` **exits 1** when the count is
+zero, which is the healthy state. The count is 0; the non-zero exit is `grep`'s, not the panel's.
+
+### 62.5 Persistence — the KEY SET, both agreement checks, and what the PAID run wrote
+
+**14 canonical keys.** Stated as a set, never as a file count or a byte size — §42.9 was corrected
+twice for doing that:
+
+```
+eval01_integrity          eval02_coverage_ab        eval02_coverage_ab_probe
+eval02b_stated_need       eval02b_stated_need_probe eval02c_held_out
+eval02c_held_out_probe    eval03_controls           eval04_injection
+eval05_quality            eval06_trajectory         eval07_topology
+eval09_hypothesis_ab      eval09_hypothesis_ab_probe
+```
+
+**Exactly three are written by a full sweep** — `eval03_controls`, `eval04_injection`,
+`eval07_topology` — established two ways that share no input:
+
+1. **The write ledger.** `--ci --dry-run`'s closing banner names those three and no others, in both
+   spaces, and it reports only keys whose file is still on disk.
+2. **A disk mtime query.** The three canonical files carry `15:06:37Z`, `15:06:38Z`, `15:06:40Z`,
+   inside the sweep; **the other eleven were unchanged to the second**, carrying stamps from
+   2026-09-05 and from earlier on 2026-09-06.
+
+**Archive-on-next-write, checked in both directions:**
+
+* **NEGATIVE** — for all three keys, no archive carries the *current* canonical's own stamp
+  (`eval07_topology.20260906T150640Z.json` does not exist). A file is archived when it is
+  *superseded*, not when it is written.
+* **POSITIVE** — for all three, the *previous* write's stamp is present as an archive
+  (`…150520Z`, `…150524Z`, `…150534Z`).
+
+**Which keys the PAID run wrote: exactly two**, `eval09_hypothesis_ab` (2026-09-06T14:27:09Z) and
+`eval09_hypothesis_ab_probe` (14:45:04Z). Established two independent ways, neither of them a file
+count:
+
+* **From the code**, which cannot be stale because a control checks it: line 4 of
+  `Eval09_HypothesisComparison.cs` declares `writes eval09_hypothesis_ab` and nothing else. The whole
+  declaration set was re-executed here — **11 files, 10 `writes`, 1 `deliberately-none`** (Eval 08),
+  exactly what `RUN_PROTOCOL` publishes.
+* **From the archive record**, which survives this close-out's own overwrites: the superseded 09-05
+  cohort sits at `eval09_hypothesis_ab.20260905T202613Z.json` and the superseded first probe at
+  `eval09_hypothesis_ab_probe.20260906T123936Z.json`. **No other canonical key carries a stamp in the
+  paid run's window.**
+
+### 62.6 Credentials — five patterns, every hit classified, and the scanner PROVEN able to hit first
+
+**43 files / 54,558 lines**: the paid run's eight archived logs and this close-out's own thirty-five.
+
+| pattern | hits | classification |
+|---|---|---|
+| P1 `[A-Za-z0-9]{32,}` (loose, run first) | **20 distinct** | **all 20 are C# identifiers** — control-row names (`CoverageCutIsNotTheConfidenceShapeParameter`, `SilentDenseWipeoutDetectorCanFire`, …), test class names, interface names |
+| P2 azure endpoint URL shape | **0** | — |
+| P3 `(api[_-]?key\|secret\|password\|bearer)` followed by 16+ chars | **0** | — |
+| P4 `[A-Za-z0-9+/]{40,}={0,2}` | **1 distinct** | `CoverageCutIsNotTheConfidenceShapeParameter` — a control-row name |
+| P5 literal `grep -F`, **count only, values never printed** | endpoint host **0** · full endpoint **0** · `AZURE_OPENAI_API_KEY` **0** · `OPENAI_API_KEY` **0** | — |
+
+✅ **POSITIVE CONTROL — a scan that finds nothing proves nothing until it is shown it can hit.** A
+**synthetic** secret (a made-up host and a made-up 48-character key, neither of them real) was written
+to a file in the scratchpad, the same five patterns were run against it, and **all five fired**:
+P1 2 · P2 1 · P3 1 · P4 2 · P5 host 1 / key 2. **`RUN_PROTOCOL` stage 0c honoured by construction**:
+the plant was synthetic, so no real value ever existed on disk to clean up; the file was deleted in
+the same command and a re-scan of its path returns 0.
+
+**The store, which is where a repo scan does not look** (`.agenteval/`, 1,849 files): key **0**, URL
+shape **0**, endpoint host **2 files** — and both are the pre-existing `gatekeeper/certs/` pair §60.4
+named, re-dated here at **2026-07-17T20:12:10Z** and **2026-07-11T21:55:04Z**, so **no run of these
+sixteen commits wrote either**. ✅ **§57.4a's cleanup HELD: not one snapshot in the store carries the
+host**, including the three this sweep rewrote.
+
+**The repository:** `samples/` **0** host / **0** key · `docs/` **0** / **0** · `strategy/Galaxus`
+**0** / **0**. Twelve `*.openai.azure.com` URL-shape hits were classified rather than counted:
+**all twelve are documentation placeholders** — `https://xxx.openai.azure.com/` and
+`https://your-resource.openai.azure.com/` in three sample READMEs and nine docs pages.
+
+### 62.7 The paid run, re-derived from its own usage blocks — §61's arithmetic reproduces, including the figure that had no printer
+
+Taken from the cohort's `EQUAL TOKEN BUDGET` panel, not from §61's prose:
+
+| ledger | attempted | returned | cancelled | failed | **no-use** | prompt | completion | USD |
+|---|---|---|---|---|---|---|---|---|
+| LIVE single agent — Robin | 268 | 268 | 0 | 0 | **0** | 3,060,305 | 83,196 | 17.7974 |
+| LIVE workflow — discovery loop | 121 | 121 | 0 | 0 | **0** | 316,856 | 330,316 | 11.4938 |
+| Judge (all arms) | 72 | 72 | 0 | 0 | **0** | 56,110 | 93,794 | 3.0944 |
+| **cohort total** | **461** | 461 | 0 | 0 | **0** | 3,433,271 | 507,306 | **32.3855** |
+
+Rate: `ModelPricing["gpt-5.5"]` = `(0.005m, 0.03m)` at `PerformanceMetrics.cs:92`, which the run
+itself prints as `0.00500/1K prompt, 0.03000/1K completion (USD)`. **461 round-trips, 0 usage-less on
+all three ledgers** — so nothing here is a lower bound.
+
+✅ **The independent check §61 offered reproduces exactly, and the two sides share no input:** the
+harness prints the agent arm at `¤17.7974` from its own cost snapshot; the ledger arithmetic
+`3,060,305 × 0.005/1K + 83,196 × 0.03/1K` gives **17.7974**.
+
+✅ **And the one figure in §61 with no printer behind it is confirmed.** `probe2` printed
+`USD 0.7753` and re-derives from its ledger (75,469 / 13,265) to the digit. **`probe1` printed no
+money at all** — it ran before §61.10's printer existed — and its published **USD 1.4725** re-derives
+from its own ledger (165,874 / 21,439) to the digit as well. Cohort + probes = **USD 34.6333**.
+
+✅ **A structural check nobody asked for, free:** `probe2`'s ledger has **seven** columns where the
+cohort's has six — the `half` column §61.7 added — and it reads **`half = 0` over 14 live round-trips**
+(7 agent + 3 workflow + 4 judge). An independent arrival at §61's *"a probe on the fixed ledger read
+half = 0 over 14 live calls"*.
+
+**The cohort's four gates and its verdict, re-read from the log:** GATE 1 ❌ (a live-workflow cell was
+VOIDED) · GATE 2 ✅ · GATE 3 ❌ (the rubber stamp did NOT fail to lead — it led) · GATE 4 ✅. Verdict
+**NO WIN**, clause `ArmNotLive`, **3** voided cells. Spend ratio **4.86×** against the pre-registered
+1.50×, `CONFOUNDED`.
+
+### 62.8 ⬜ WHAT THESE SIXTEEN COMMITS CHANGED ABOUT `MASTER_PLAN` §0.2's TWO HEADLINE CLAIMS: **NOTHING.** Measured two ways, not assumed
+
+1. **Neither instrument was touched.** `git diff --name-status 4aae0993..HEAD` lists nineteen paths
+   and **`Eval02b_StatedNeedSatisfaction.cs` and `Eval02c_HeldOutNextPurchase.cs` are not among
+   them.**
+2. **Neither instrument's stored record moved.** `eval02b_stated_need` is stamped
+   **2026-09-05T17:53:19Z** and `eval02c_held_out` **2026-09-05T18:20:12Z** — both before `82908b15`,
+   the first of the sixteen.
+
+The 0.889 / 1.000 at equal mean k, the 0.949 at full reps, the 0.385, the W/L/T 3/1/9, the
+p = 0.6250 and the 0.125 attainable floor **all stand exactly as §21 and §23 left them, and no wave
+since has bought a run that could move them.**
+
+### 62.9 What the paid run DID move — §0.2's THIRD block, item 2, which describes the 2026-09-05 run
+
+§0.2's third block is *"the architecture is NOT vindicated"*, and its item 2 is the Eval 09 paragraph.
+Four of its figures are superseded and one of its sentences is refuted:
+
+| §0.2 item 2, as published (the 2026-09-05 run) | 2026-09-06, re-derived in §62.7 |
+|---|---|
+| **USD 29.49** | **USD 32.3855** for the cohort (+ 2.2478 in probes = **34.6333**) |
+| 432 round-trips (`SUITE_SUMMARY` §1) | **461** |
+| **4.29×** token ratio against a 1.50× limit | **4.86×** against 1.50×, still `CONFOUNDED` |
+| *"10.0 model calls per turn against 5.0"* | ⚠️ **This run printed no calls-per-turn figure.** Not restated — deriving one from a stochastic lane is the shape the standing rule forbids. What it does print is **130,979 vs 26,966 tokens per graded turn** |
+| *"three independent disqualifications"* | GATE 1 ❌ and GATE 3 ❌, and **GATE 3 flipped ✅ → ❌** (§61) — the rubber stamp LED the live workflow. The disqualification COUNT is not restated, for the same reason as the row above |
+| 🔴 *"Stage 3 was **declined** and recorded as a decision — USD 29.49 to reproduce a guaranteed NO WIN is a purchase, not a measurement"* | **Historically true, presently false. Stage 3 WAS bought**, on 2026-09-06, and not for the reason it had been declined: 8.16 #5's rubric restatement needed a real judge, and §61.1 shows the eval had no smaller unit to sell |
+
+⚠️ **The deferral's own prediction HELD, and that is the flattering half, so state the other half
+beside it.** The run returned **NO WIN**, exactly as *"a guaranteed NO WIN"* predicted. But the
+prediction was right about the **outcome** and not about the **mechanism**: the disqualifier it named
+was the token ratio, and the clause the verdict actually read first was `ArmNotLive` — three voided
+cells, a different failure entirely. **A prediction that lands on the right verdict by the wrong route
+is a weaker confirmation than it reads as**, and §0.3's *"Eval 09 stage 3 — declined"* row now records
+a decision that was subsequently, deliberately, reversed.
+
+### 62.10 What this close-out does NOT claim
+
+* **No agent-side verdict was re-measured.** Every model-backed eval in the sweep ran under
+  `--dry-run`. The only live spend in this close-out is the real-vector half's **1,248 embedding
+  prompt tokens**; no chat model was called.
+* **The paid run was not re-run.** §62.7 re-derives its arithmetic from its own archived logs. Its
+  judged rates, its Bonferroni crossings and its floor cells are §61's measurement and are not
+  independently confirmed here — and §61 itself records that a judged row's significance verdict did
+  **not** reproduce across two runs of the same rubric.
+* **The 2026-09-05 → 2026-09-06 deltas in §62.9 are not attributed.** Cohort, rubric, meter and
+  persona-drop rule all changed between the two runs. §61.5 keeps those apart; this section only
+  records that the published digits are superseded.
+* **Build #2 vs #4 is not explained, only bounded.** The identity sets are equal, so the difference is
+  in re-emission, not in the code. Which pass re-emits and why was not established.
+* **No ablation was executed by this close-out.** It is a state re-take, not a review pass; §60 is the
+  pass that re-executed all eighteen.
+
+🔴 **And one defect this close-out's own writing produced, caught by running it rather than by reading
+it.** A sentence was drafted into `MASTER_PLAN` §0.1 saying *"no commit of this branch's Galaxus work
+has ever touched a file under `tests/` or `src/`"*. It is true of the sixteen commits
+(`git diff --name-status 4aae0993..HEAD -- tests/ src/` → empty) and of the unpushed range, and
+**false of the branch**: `main..HEAD` is **76** such paths, mostly ADR-030 Slice 2's +51 tests.
+Direction **flattering** — it makes the branch read as more surgical than it is. **The shape is a
+range-bounded fact restated without its range**, which is §62's own subject one level up, and the fix
+is the same as everywhere else in this document: name the range beside the number. Corrected before
+the commit; kept here rather than tidied away.
+
+### 62.11 RE-DERIVATION — every command in this section, in order
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+
+# 62.1 — the build, four readings. Report the command and the number TOGETHER or not at all.
+dotnet build AgentEval.sln                    2>&1 | tail -3   # 0 errors
+dotnet build AgentEval.sln --no-incremental   2>&1 | tail -3   # 0 errors; the WARNING TOTAL is per invocation
+dotnet build AgentEval.sln                    2>&1 | tail -3   # nothing to compile -> 0 warnings
+dotnet build AgentEval.sln --no-incremental   2>&1 | tail -3   # same command, same bytes, DIFFERENT total
+# the stable quantity — the identity SET, not the total:
+dotnet build AgentEval.sln --no-incremental 2>&1 \
+  | grep -oE "[A-Za-z0-9_\.]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+" | sort -u | wc -l   # -> 65
+# the evals project's own, LISTED (the counting rule is (file,line,col); by (file,line) it is 7):
+dotnet build AgentEval.sln --no-incremental 2>&1 | grep "warning " \
+  | grep "Galaxus.RecommendationAgent.Evals" | sort -u                                        # -> 8 sites
+
+# 62.2 — after the full build above, --no-build per TFM (the stale-binary trap).
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; echo "$t -> $?"; done
+
+# 62.3 — the sweep. $? on EVERY command, both spaces.
+for s in "" "--real-vectors"; do
+  for c in "1 --dry-run" "2 --dry-run" "2b --dry-run" "2c --dry-run" 3 4 \
+           "5 --dry-run" "6 --dry-run" 7 "8 --dry-run" "9 --dry-run" "--ci --dry-run"; do
+    dotnet run --project $E --no-build -- $c $s > /dev/null 2>&1; echo "$c $s -> $?"
+  done
+done
+for c in 0 "1 --offline" "2 --offline"; do dotnet run --project $A --no-build -- $c >/dev/null 2>&1; echo "agent $c -> $?"; done
+# the space actually RESOLVED — read the banner, never the flag:
+dotnet run --project $E --no-build -- 3 --real-vectors 2>&1 | grep -m1 "Embedding space:"
+# the CI recap: TIGHT, because a control's own prose quotes "Eval 07: passed."
+dotnet run --project $E --no-build -- --ci --dry-run > ci.log 2>&1; echo "$?"
+grep -cE "^ *. Eval [0-9a-c]+: passed\.$" ci.log      # -> 10   (loose `grep -c ": passed"` -> 11)
+grep -E  "^ *. Eval [0-9a-c]+: FAILED\.$"  ci.log      # -> Eval 07
+
+# 62.4 — the panel, by NAME and not by a summary line, in both spaces.
+for s in "" "--real-vectors"; do
+  dotnet run --project $E --no-build -- 3 $s > p.log 2>&1
+  grep -oE "(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+" p.log | sort -u | wc -l          # -> 36
+  grep -oE "[A-Za-z0-9_]+ +\(advisory" p.log | awk '{print $1}' | sort -u | wc -l    # -> 7
+  grep -c "NOT CAUGHT" p.log                                                         # -> 0 (grep exits 1: that is grep)
+done
+
+# 62.5 — persistence. The KEY SET, never a file count.
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+ls $S/*.json | xargs -n1 basename | sed 's/\.json$//' | grep -vE "\.[0-9]{8}T[0-9]{6}Z$" | sort   # -> 14 keys
+for k in eval03_controls eval04_injection eval07_topology; do
+  st=$(date -u -r $S/$k.json '+%Y%m%dT%H%M%SZ')
+  test -f "$S/$k.$st.json" && echo "$k ARCHIVED ITSELF (wrong)" || echo "$k: no archive at its own stamp (right)"
+done
+grep -n "SNAPSHOT-POLICY" $E/Evals/*.cs    # -> 11 files, 10 writes, 1 deliberately-none (Eval 08)
+
+# 62.6 — credentials. LOOSE FIRST, classify every hit, and prove the scanner can hit.
+grep -ohE "[A-Za-z0-9]{32,}" <logs> | sort -u                 # classify all of them; 20, all identifiers
+H=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed 's#^https\?://##; s#/.*$##')
+grep -Fc "$H" <logs> | awk -F: '{s+=$NF} END{print s+0}'      # COUNT ONLY. Never echo $H.
+# positive control: plant a SYNTHETIC secret (never a real one — RUN_PROTOCOL stage 0c), outside the repo,
+# run all five patterns against it, then delete it and re-scan the path.
+
+# 62.7 — the paid run's cost, from its own usage blocks. No re-run, no model call.
+R=$E/Docs/runs/2026-09-06_8.16-5-judged-run-4077efa8
+sed -n '/EQUAL TOKEN BUDGET/,/tok.turn prints/p' $R/eval09-cohort.log
+grep -E "^. +(LIVE|Judge)" $R/eval09-probe1-USR-MI-02.log $R/eval09-probe2-USR-MI-02.log
+grep -n "gpt-5\.5" src/AgentEval.Abstractions/Models/PerformanceMetrics.cs   # -> (0.005m, 0.03m)
+# prompt*0.005/1000 + completion*0.03/1000, per arm and summed:
+#   agent 17.7974 · workflow 11.4938 · judge 3.0944 · cohort 32.3855 · + 1.4725 + 0.7753 = 34.6333
+
+# 62.8 — the two headline claims, checked two ways.
+git diff --name-status 4aae0993..HEAD | grep -E "Eval02b|Eval02c"   # -> nothing
+date -u -r $S/eval02b_stated_need.json '+%Y-%m-%dT%H:%M:%SZ'        # -> 2026-09-05T17:53:19Z
+date -u -r $S/eval02c_held_out.json    '+%Y-%m-%dT%H:%M:%SZ'        # -> 2026-09-05T18:20:12Z
+
+# The tree, re-derived in the same breath it is quoted — never copied from a document.
+git rev-list --count main..HEAD ; git rev-list --count @{u}..HEAD ; git status --porcelain | wc -l
+git diff --name-status @{u}..HEAD -- tests/ src/    # -> empty
+git log  --oneline      @{u}..HEAD -- strategy/     # -> empty
+```
