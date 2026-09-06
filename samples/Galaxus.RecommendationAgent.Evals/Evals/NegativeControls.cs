@@ -83,31 +83,32 @@ public static class NegativeControls
         // but they are the sentences a reader has to have in front of them before the six green
         // rows below can mean anything. Printing them last let a panel of ticks be read as a
         // healthy suite when the metric underneath had no room left to discriminate.
-        rows.Add(CheckMetricDiscrimination());
-        rows.Add(await CheckPersonaDiscriminationAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(CheckAuthoredQueryPhrasesRetrieve());
-        rows.Add(await CheckSuppressionDetectorExercisedAsync(harness, options, ct).ConfigureAwait(false));
+        rows.Add(Guarded("MetricDiscrimination", CheckMetricDiscrimination));
+        rows.Add(await GuardedAsync("PersonaDiscrimination", () => CheckPersonaDiscriminationAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(Guarded("AuthoredQueryPhrasesRetrieve", CheckAuthoredQueryPhrasesRetrieve));
+        rows.Add(await GuardedAsync("SuppressionDetectorExercised", () => CheckSuppressionDetectorExercisedAsync(harness, options, ct)).ConfigureAwait(false));
 
-        rows.Add(await CheckHallucinatorAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckUncitedAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckBroken02OperandsAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckCommitOrderingAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckSingleShotAsync(retriever, harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckPopularityAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckRubberStampLoopAsync(retriever, harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckConstraintBlindFloorAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(await CheckConstantPolicyCeilingAsync(harness, options, ct).ConfigureAwait(false));
-        rows.Add(CheckGraderSanity());
-        rows.Add(CheckCoverageGateRendering());
-        rows.Add(CheckPreRegisteredRuleReachability());
-        rows.Add(CheckOwnKRereadAtVaryingK());
-        rows.Add(CheckEval09RuleAndRemedy());
-        rows.Add(CheckJudgeEchoJoins());
-        rows.Add(CheckContentlessRequestIsNotCovered());
-        rows.Add(CheckUnnameableInterestPresentsNothing());
-        rows.Add(await CheckRefusalDetectorsSeeTheRealShapeAsync().ConfigureAwait(false));
-        rows.Add(CheckWriteLedgerMatchesTheStore());
-        rows.Add(CheckEveryEvalDeclaresItsSnapshotPolicy());
+        rows.Add(await GuardedAsync("Hallucinator", () => CheckHallucinatorAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("Uncited", () => CheckUncitedAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("Broken02Operands", () => CheckBroken02OperandsAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("CommitOrdering", () => CheckCommitOrderingAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("SingleShot", () => CheckSingleShotAsync(retriever, harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("Popularity", () => CheckPopularityAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("RubberStampLoop", () => CheckRubberStampLoopAsync(retriever, harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("ConstraintBlindFloor", () => CheckConstraintBlindFloorAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("ConstantPolicyCeiling", () => CheckConstantPolicyCeilingAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(Guarded("GraderSanity", CheckGraderSanity));
+        rows.Add(Guarded("CoverageGateRendering", CheckCoverageGateRendering));
+        rows.Add(Guarded("PreRegisteredRuleReachability", CheckPreRegisteredRuleReachability));
+        rows.Add(Guarded("OwnKRereadAtVaryingK", CheckOwnKRereadAtVaryingK));
+        rows.Add(Guarded("Eval09RuleAndRemedy", CheckEval09RuleAndRemedy));
+        rows.Add(Guarded("JudgeEchoJoins", CheckJudgeEchoJoins));
+        rows.Add(Guarded("ContentlessRequestIsNotCovered", CheckContentlessRequestIsNotCovered));
+        rows.Add(Guarded("UnnameableInterestPresentsNothing", CheckUnnameableInterestPresentsNothing));
+        rows.Add(await GuardedAsync("RefusalDetectorsSeeTheRealShape", CheckRefusalDetectorsSeeTheRealShapeAsync).ConfigureAwait(false));
+        rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
+        rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
+        rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -126,6 +127,196 @@ public static class NegativeControls
         Console.ResetColor();
 
         return allTripped ? 0 : 1;
+    }
+
+    // ══ CONTAINMENT — a row that throws must fail as a row, never take the panel with it. ══
+    //
+    /// <summary>
+    /// The expectation printed for a row that threw instead of returning a verdict.
+    /// </summary>
+    internal const string ContainmentExpectation =
+        "every control row must RUN. A row that throws reports nothing, and an UNCONTAINED throw in this panel "
+      + "unwinds every other row AND loses eval03_controls.json with them — the run that found something ends "
+      + "with no record that it found it. Measured 2026-09-06: ablation D of plan item 8.20 killed the process "
+      + "(exit 127) out of the store's serialiser and took all 23 rows with it. That was contained inside ONE "
+      + "row; this contains the panel.";
+
+    /// <summary>
+    /// Runs one control row and converts a throw into a FAILED gating row.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>This cannot turn a failure into a pass.</b> A row that returns is returned unchanged —
+    /// the guard is on the exceptional path only — and a row that throws comes back with
+    /// <c>Tripped: false</c> and <c>Gating: true</c>, so the panel still exits 1. What changes is
+    /// that the reader is told WHICH row died and with what, and the other twenty-four rows and the
+    /// snapshot survive.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Cancellation is not a control failure and is NOT caught.</b> A cancelled run has no
+    /// verdict to report and must stop, not print a red row that reads like a defect.
+    /// </para>
+    /// <para>
+    /// <b>Why this is needed here and not only in the row that found it.</b> Rows 22–24 read the
+    /// source tree, invoke a real <c>AIFunction</c>, write and delete files in a shared store, and
+    /// use reflection. <see cref="SampleSourceRoot"/> alone throws
+    /// <see cref="DirectoryNotFoundException"/> whenever the eval binary runs from anywhere but the
+    /// repository tree.
+    /// </para>
+    /// </remarks>
+    /// <param name="name">The row's name, needed because a row that threw produced none.</param>
+    /// <param name="row">The control.</param>
+    private static ControlRowSnapshot Guarded(string name, Func<ControlRowSnapshot> row)
+    {
+        try
+        {
+            return row();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Threw(name, ex);
+        }
+    }
+
+    /// <summary>The asynchronous half of <see cref="Guarded"/>.</summary>
+    /// <param name="name">The row's name.</param>
+    /// <param name="row">The control.</param>
+    private static async Task<ControlRowSnapshot> GuardedAsync(string name, Func<Task<ControlRowSnapshot>> row)
+    {
+        try
+        {
+            return await row().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Threw(name, ex);
+        }
+    }
+
+    /// <summary>The failed row a throw becomes. Names the type and message, because "it threw" is unactionable.</summary>
+    /// <param name="name">The row's name.</param>
+    /// <param name="ex">What came out of it.</param>
+    private static ControlRowSnapshot Threw(string name, Exception ex) => new(
+        name,
+        ContainmentExpectation,
+        $"the row THREW {ex.GetType().Name}: {Shorten(ex.Message, 140)} — it reported no verdict, so it is NOT a pass. "
+      + "The panel continued and the snapshot was still written.",
+        false);
+
+    // ══ Control 25 — the panel must survive a row that throws (Wave 2 review). ════════════
+    //
+    /// <summary>
+    /// A control row that throws must come back as a FAILED row, and a row that returns must come
+    /// back untouched.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect this closes.</b> Every row was added straight into the list with no
+    /// containment. Wave 2's own commit message records what that costs: ablation D of plan item
+    /// 8.20 threw <c>ArgumentException</c> out of the store's serialiser, <i>"killed the process
+    /// (exit 127) and took the whole panel with it"</i>. It was contained inside that one row and
+    /// the panel was left open — and Wave 2 then added three rows that read the source tree, invoke
+    /// a real <c>AIFunction</c>, and write and delete files. <see cref="SampleSourceRoot"/> throws
+    /// outright whenever this binary runs from outside the repository.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Both directions, or the guard is a blanket pass.</b> A guard that returned a green row
+    /// on a throw would be the worst possible version of this — so the row asserts the failed row
+    /// is <c>Tripped: false</c> AND <c>Gating: true</c>, that it names the exception type and the
+    /// message, and that a SUCCEEDING row comes back byte-for-byte as itself.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It asserts its own INPUT.</b> A guard nothing routes through is a guard that does not
+    /// exist. The panel's own source is read and every <c>rows.Add(</c> is required to go through
+    /// <c>Guarded(</c> or <c>GuardedAsync(</c> — the shape <c>8f3e11c7</c> fixed in the meta-lane
+    /// grep gate, and the shape control 24 asserts one file over.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckEveryControlRowIsContained()
+    {
+        var problems = new List<string>();
+
+        // ── 1. A throwing row becomes a FAILED GATING row that names what happened. ──
+        const string message = "deliberate: the panel must survive this";
+        var thrown = Guarded("probe-that-throws", () => throw new InvalidOperationException(message));
+
+        if (thrown.Tripped)
+            problems.Add("a row that THREW came back tripped — the guard turns a dead control into a green one, which is worse than the crash.");
+        if (!thrown.Gating)
+            problems.Add("a row that threw came back ADVISORY — a control that could not run would stop failing the build.");
+        if (!thrown.Observed.Contains(nameof(InvalidOperationException), StringComparison.Ordinal))
+            problems.Add($"the failed row does not name the exception TYPE: \"{Shorten(thrown.Observed, 70)}\".");
+        if (!thrown.Observed.Contains(message, StringComparison.Ordinal))
+            problems.Add("the failed row does not carry the exception MESSAGE — \"it threw\" is a finding nobody can act on.");
+        if (!string.Equals(thrown.Name, "probe-that-throws", StringComparison.Ordinal))
+            problems.Add($"the failed row is named '{thrown.Name}' — a reader cannot tell which control died.");
+
+        // ── 2. …and a row that RETURNS is returned unchanged. Without this the guard could be a
+        //       blanket verdict and every row above it would mean nothing. ──
+        var green = new ControlRowSnapshot("probe-that-passes", "expectation", "observed", true);
+        var passed = Guarded("probe-that-passes", () => green);
+        if (!ReferenceEquals(passed, green))
+            problems.Add("a row that returned normally did not come back as itself — the guard is rewriting verdicts.");
+
+        var red = new ControlRowSnapshot("probe-that-fails", "expectation", "observed", false);
+        if (Guarded("probe-that-fails", () => red).Tripped)
+            problems.Add("a row that returned FALSE came back tripped — the guard is a blanket pass.");
+
+        // ── 3. The async half, and cancellation left alone. A cancelled run has no verdict and
+        //       must stop; a red row reading like a defect would be a lie about the corpus. ──
+        var thrownAsync = GuardedAsync("probe-async", () => throw new InvalidOperationException(message))
+            .GetAwaiter().GetResult();
+        if (thrownAsync.Tripped)
+            problems.Add("the ASYNC guard returned a tripped row for a throw — half the panel is unprotected.");
+
+        try
+        {
+            _ = Guarded("probe-cancelled", () => throw new OperationCanceledException());
+            problems.Add("an OperationCanceledException was swallowed into a failed row — a cancelled run would print a defect it did not find.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Correct: cancellation propagates.
+        }
+
+        // ── 4. The row's own input: every row in the panel actually goes through the guard. ──
+        int added = 0;
+        int guardedCalls = 0;
+        try
+        {
+            foreach (string line in File.ReadAllLines(Path.Combine(SampleSourceRoot(), "Evals", "NegativeControls.cs")))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith("rows.Add(", StringComparison.Ordinal)) continue;
+
+                added++;
+                if (trimmed.Contains("Guarded(", StringComparison.Ordinal)
+                 || trimmed.Contains("GuardedAsync(", StringComparison.Ordinal))
+                {
+                    guardedCalls++;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            problems.Add($"the panel's own source could not be read ({ex.GetType().Name}) — this row cannot assert what it claims.");
+        }
+
+        if (added < 20)
+            problems.Add($"only {added} `rows.Add(` line(s) were found in the panel's source — the scan is not reading what it thinks it is.");
+        if (added != guardedCalls)
+            problems.Add($"{added - guardedCalls} of {added} row(s) are added WITHOUT the guard — an uncontained row still takes the panel and the snapshot with it.");
+
+        return new ControlRowSnapshot(
+            "EveryControlRowIsContained",
+            ContainmentExpectation,
+            problems.Count == 0
+                ? $"a throwing row comes back FAILED and GATING, naming InvalidOperationException and its message · a "
+                + $"row that returns comes back as itself, pass and fail alike · the async half behaves the same · an "
+                + $"OperationCanceledException still propagates · and all {added} `rows.Add(` line(s) in this file go "
+                + "through the guard"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
     }
 
     // ══ Control 1 — must score 0 of 14 and trip D1, D4/D6 and D5. ═════════════════════════
@@ -2827,6 +3018,33 @@ public static class NegativeControls
                     .InvokeAsync(new AIFunctionArguments { ["userId"] = id }).ConfigureAwait(false)),
         ];
 
+        // ⚠ AND THE ROW'S OWN LIST IS DERIVED-CHECKED, one level down from the hazard above. The
+        //   list immediately above is hand-written, so a user-keyed tool added later that refuses
+        //   under the opt-out and is on NEITHER list would leave this row green — the same
+        //   "a shrunk list passes vacuously" shape the row exists to close for
+        //   BehaviouralHistoryToolNames. The set of tools that TAKE a userId is a fact about the
+        //   tool surface, so it is read off the surface rather than restated here.
+        string[] derivedUserKeyed =
+        [
+            .. typeof(GalaxusTools)
+                .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .Where(m => m.GetParameters().Any(p => string.Equals(p.Name, "userId", StringComparison.Ordinal)))
+                .Select(m => m.Name)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+        ];
+
+        string[] exercised = [.. userKeyedTools.Select(t => t.Name).Order(StringComparer.Ordinal)];
+
+        if (derivedUserKeyed.Length == 0)
+            problems.Add("no tool on GalaxusTools takes a 'userId' — the derivation below is asserting nothing.");
+        if (!derivedUserKeyed.SequenceEqual(exercised, StringComparer.Ordinal))
+        {
+            problems.Add($"this row invokes [{string.Join(", ", exercised)}] and the tool surface declares user-keyed "
+                       + $"[{string.Join(", ", derivedUserKeyed)}] — a tool that takes a customer id and is not "
+                       + "exercised here can refuse, or fail to, without this row noticing.");
+        }
+
         int refusing = 0;
         GalaxusTools.OverrideProfile(opted);
         try
@@ -3128,6 +3346,43 @@ public static class NegativeControls
                 problems.Add($"{name} declares it writes a snapshot and calls no store — a comment is not a record.");
             if (declaresNone && actuallyWrites)
                 problems.Add($"{name} declares deliberately-none and calls a store — the declaration is stale.");
+
+            // ⚠ AND WHAT THE RUN PRINTS MUST NOT CONTRADICT WHAT IT WROTE (Wave 2 review).
+            //   Eval 06's live gate printed "Eval 06 writes no snapshot: … an unread result file is
+            //   a liability" and then, three lines later, "📁 Snapshot saved". MEASURED on the live
+            //   run of 2026-09-06 01:20:57Z. The sentence was true when it was written; item 8.20
+            //   made it false and did not come back for it — 8.19's defect exactly, one file over,
+            //   reintroduced by the fix for the item beside it.
+            //
+            //   The rule, and its LIMIT stated rather than implied: in a file that declares it
+            //   writes, a PRINTED denial of persistence must be attributable to a dry run — the
+            //   words "dry run" in the same printed literal or in the six lines either side of it.
+            //   `if (dryRun) return;` deliberately does NOT count: it is what made Eval 06's
+            //   sentence live-only, so accepting it would accept the defect. This cannot see a
+            //   denial phrased in words it does not know; it can see every one in the suite today.
+            if (declaresWrites)
+            {
+                string[] lines = body.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+                string[] denials = ["no snapshot", "writes no snapshot", "nothing written", "not persist"];
+
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (!lines[i].Contains("Console.WriteLine", StringComparison.Ordinal)) continue;
+                    if (!denials.Any(d => lines[i].Contains(d, StringComparison.OrdinalIgnoreCase))) continue;
+
+                    int from = Math.Max(0, i - 6);
+                    int to = Math.Min(lines.Length, i + 7);
+                    string window = string.Join(' ', lines[from..to]);
+
+                    if (!window.Contains("dry run", StringComparison.OrdinalIgnoreCase))
+                    {
+                        problems.Add($"{name} declares it WRITES and prints a denial of it that no dry run explains, "
+                                   + $"at line {i + 1}: \"{Shorten(lines[i].Trim(), 80)}\" — a run that tells the "
+                                   + "reader it left nothing behind and then leaves a file is 8.19 with a different "
+                                   + "sentence.");
+                    }
+                }
+            }
 
             if (declaresWrites) writes++; else none++;
         }

@@ -970,9 +970,17 @@ public static class Eval06_ToolTrajectory
 
         if (dryRun) return;
 
+        // ⚠ THIS PARAGRAPH USED TO SAY "Eval 06 writes no snapshot", AND THE VERY NEXT LINE THE RUN
+        //   PRINTED WAS "📁 Snapshot saved". Measured on the live run of 2026-09-06 01:20:57Z, which
+        //   wrote eval06_trajectory.json (5 cases, 4,592 bytes) three lines after telling the reader
+        //   it would not. It was true when it was written and item 8.20 falsified it without coming
+        //   back here — the same shape as 8.19's banner, one file over, introduced by the fix for
+        //   the item that sits beside it. The claim is now about what the record IS, which is a fact
+        //   about this eval rather than a prediction about a store, and where the record came from
+        //   is printed by the writer itself in PersistRun.
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("     Eval 06 writes no snapshot: it shares no comparison inputs with Eval 03, and an");
-        Console.WriteLine("     unread result file is a liability rather than an asset.");
+        Console.WriteLine("     Eval 06's snapshot is a RECORD, not a gate: nothing reads it and nothing compares");
+        Console.WriteLine("     against it. It exists because the tool ORDER is recoverable from no other file.");
         Console.ResetColor();
     }
 
