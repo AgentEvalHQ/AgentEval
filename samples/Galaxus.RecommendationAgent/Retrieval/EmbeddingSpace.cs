@@ -162,6 +162,9 @@ public static class EmbeddingSpace
     private static EmbeddingSourceResolution? _resolution;
     private static IReadOnlyList<Product>? _resolvedFor;
 
+    /// <summary>Latch for <see cref="PrintLiveSpend"/>: the figure is printed at most once per process.</summary>
+    private static bool _liveSpendPrinted;
+
     /// <summary>
     /// The space this process was ASKED for. Set once from the command line, before anything
     /// retrieves.
@@ -283,9 +286,18 @@ public static class EmbeddingSpace
     /// as a cost is a fabricated measurement.
     /// </remarks>
     /// <param name="indent">Leading spaces, so it lines up with the caller's own panel.</param>
+    /// <remarks>
+    /// ⚠ <b>PRINT-ONCE per process.</b> Both entry points call it in a <c>finally</c> so that no
+    /// command can declare a cost and report none, and Demo 01 calls it inside its own panel where
+    /// the figure reads best. Without this latch that demo would print the line twice, and a reader
+    /// who added the two totals would double the bill. The second call is a no-op, not a second
+    /// measurement.
+    /// </remarks>
     public static void PrintLiveSpend(string indent = "  ")
     {
         if (Current is not { Source: PrecomputedEmbeddingSource index } || !index.HasLiveFallback) return;
+        if (_liveSpendPrinted) return;
+        _liveSpendPrinted = true;
 
         var azure = index.LiveSource as AzureEmbeddingSource;
 

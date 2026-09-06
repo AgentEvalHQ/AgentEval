@@ -96,6 +96,13 @@ try
 }
 finally
 {
+    // ⚠ A RUN THAT SAYS IT SPENDS MUST SAY HOW MUCH. `--real-vectors` prints "This run EMBEDS
+    //   QUERIES LIVE … it spends" on every entry point, and until 2026-09-06 only Demo 01 closed
+    //   the loop with the figure — `-- 2 --offline --real-vectors` declared a cost and reported
+    //   none. PrintLiveSpend is print-once per process, so Demo 01's in-panel call still lands
+    //   where it belongs and this one covers every other selector. Pinned by Eval 03's gating row
+    //   `ARunThatSaysItSpendsSaysHowMuch`.
+    Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace.PrintLiveSpend();
     logScope?.Dispose();
 }
 

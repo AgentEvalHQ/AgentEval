@@ -3353,12 +3353,22 @@ public static class NegativeControls
     {
         var problems = new List<string>();
 
-        string program = File.ReadAllText(Path.Combine(SampleSourceRoot(), "Program.cs"));
-        bool entryPointReports = program.Contains("EmbeddingSpace.PrintLiveSpend()", StringComparison.Ordinal);
-        if (!entryPointReports)
+        string agentRoot = Path.Combine(Directory.GetParent(SampleSourceRoot())!.FullName, "Galaxus.RecommendationAgent");
+
+        // BOTH entry points, because both print the "it spends" warning. The eval suite's was
+        // missing outright; the agent's reported only on Demo 01, so `-- 2 --offline
+        // --real-vectors` declared a cost and reported none.
+        foreach (var (label, path) in new[]
+                 {
+                     ("the eval suite's entry point", Path.Combine(SampleSourceRoot(), "Program.cs")),
+                     ("the agent's entry point", Path.Combine(agentRoot, "Program.cs")),
+                 })
         {
-            problems.Add("the eval entry point never calls EmbeddingSpace.PrintLiveSpend, so every --real-vectors "
-                       + "command warns that it spends and then reports no figure at all.");
+            if (!File.ReadAllText(path).Contains("EmbeddingSpace.PrintLiveSpend()", StringComparison.Ordinal))
+            {
+                problems.Add($"{label} never calls EmbeddingSpace.PrintLiveSpend, so its --real-vectors commands warn "
+                           + "that they spend and then report no figure at all.");
+            }
         }
 
         var reporter = typeof(Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace).GetMethod(
@@ -3370,9 +3380,7 @@ public static class NegativeControls
         }
         else
         {
-            string body = File.ReadAllText(Path.Combine(
-                Directory.GetParent(SampleSourceRoot())!.FullName,
-                "Galaxus.RecommendationAgent", "Retrieval", "EmbeddingSpace.cs"));
+            string body = File.ReadAllText(Path.Combine(agentRoot, "Retrieval", "EmbeddingSpace.cs"));
 
             if (!body.Contains("azure.PromptTokens", StringComparison.Ordinal))
                 problems.Add("the spend reporter no longer reads the provider's PromptTokens — a cost that is not from a usage block is an estimate.");
@@ -3380,6 +3388,12 @@ public static class NegativeControls
                 problems.Add("the reporter dropped its LOWER BOUND caveat, so a response carrying no usage block would be reported as costing nothing.");
             if (!body.Contains("EMBEDS QUERIES LIVE", StringComparison.Ordinal))
                 problems.Add("the 'this run spends' warning is gone — this row pairs a warning with a figure, and there is no warning left to pair.");
+
+            // ⚠ Demo 01 calls the reporter inside its own panel AND the agent's finally calls it
+            //   again. Without the print-once latch a reader who added the two totals would double
+            //   the bill, so the latch is part of the fix, not an optimisation.
+            if (!body.Contains("_liveSpendPrinted = true;", StringComparison.Ordinal))
+                problems.Add("the reporter no longer LATCHES — the field may still be declared, but nothing sets it, so a run with two call sites prints two totals for one bill.");
         }
 
         return new ControlRowSnapshot(
@@ -3391,10 +3405,11 @@ public static class NegativeControls
           + "figure a reader had, which is an assertion nobody measured. Reporting nothing is not the conservative "
           + "end of RUN_PROTOCOL's cost rule, it is outside it",
             problems.Count == 0
-                ? "the eval entry point calls EmbeddingSpace.PrintLiveSpend once per invocation, in a finally, so it "
-                + "fires whichever eval ran and whatever it returned · the reporter still reads the provider's "
-                + "PromptTokens rather than estimating · its LOWER BOUND caveat for responses without a usage block "
-                + "is intact · and it prints NOTHING on the concept path, where nothing is spent"
+                ? "BOTH entry points call EmbeddingSpace.PrintLiveSpend in a finally, so it fires whichever eval or "
+                + "demo ran and whatever it returned · the reporter still reads the provider's PromptTokens rather "
+                + "than estimating · its LOWER BOUND caveat for responses without a usage block is intact · it is "
+                + "print-once per process, so Demo 01's in-panel call and the finally cannot bill a reader twice · "
+                + "and it prints NOTHING on the concept path, where nothing is spent"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
