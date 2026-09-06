@@ -32,6 +32,7 @@ Every one of these passed a dry run and was still broken:
 | The ranker, offline | Rule 6 tells the model to cite `grounding_attribute_key` from a list whose tokens the resolver **rejects** — the agent punished for obeying its instructions. Visible only in a live trace. |
 | Eval 02, `--dry-run` exit 0 | **Crashes on the paid path.** The dry run cannot see the branch that crashes, so two gates and the cost panel never printed. ✅ *Fixed `cef95b6c` — the dry run now runs that branch AND varies the stub's `k`, and says which.* |
 | Eval 05, judged cells | The judge returned **criteria nobody declared**, on 3 of 10 cells. 🔴 *Corrected `a78d05e5`: it did not. It echoed OUR rubric with the ordinal `ChatClientEvaluator.cs:46` prints itself, and our matcher failed to recognise our own text. Same lesson, opposite subject — the live model behaved more faithfully than the stub, which stripped the ordinal.* |
+| Eval 06, `-- 6 --dry-run` exit 0, and the detector had just been REPAIRED | `ToolJson.SearchCapExhausted` carries `status = "budget_exhausted"` beside `code = "search_cap_exhausted"`, so a substring detector charged case T-03 with overrunning a **24-call** budget it had spent **16** of — the DISTINCT-SEARCH cap at 8/8 was what refused. ✅ *Fixed `4d35aaa2`; gating row `RefusalCodesDoNotAnswerForEachOther`.* **A stubbed tool result carries exactly one refusal code, so the two codes never meet in a dry run.** |
 
 The pattern: a dry run exercises the code the stub reaches. The defects live in the code only a real model
 reaches — different text, different language, different failure modes, different timing.
@@ -90,6 +91,19 @@ a shared store that no gate reads is a hazard a later reader can mistake for one
 > neither, and a paid run now leaves both. **The silence was the defect, not the missing file**: three
 > identical-looking silences, one deliberate and two accidental, with no way to tell them apart without
 > reading three files. That is what the declaration and its control remove.
+>
+> ✅ **VERIFIED ON PAID RUNS 2026-09-06** (`MEASUREMENT_STATUS` §27.5), because a claim that an eval persists
+> is worth nothing without the file: `eval05_quality.json` (3,257 B, 04:24:53) and `eval06_trajectory.json`
+> (4,137 B, 04:05:56, and a second time at 03:53:49 before the fix that run found). All **thirteen** pointers
+> are listed there with timestamps and bytes.
+
+## Capture the exit code — including, especially, of the expensive command
+
+`MEASUREMENT_STATUS` §27.4 records the one place this run failed its own standard: `-- 2` (36 live turns,
+¤27.1208, ~32 minutes) was launched **detached**, so no shell captured `$?`. Its exit had to be *derived*
+from the two printed gates plus `Eval02_LatentInterestCoverage.cs:765`. A derived exit code is not a
+measured one, and the command it was derived for is the most expensive in the suite. **Run the long one in
+the foreground, or redirect through a wrapper that writes the code beside the log.**
 
 ## Cost discipline
 
