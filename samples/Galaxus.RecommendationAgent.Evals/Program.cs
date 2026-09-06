@@ -131,6 +131,16 @@ try
 }
 finally
 {
+    // ⚠ A RUN THAT SAYS IT SPENDS MUST SAY HOW MUCH. On `--real-vectors` every eval prints
+    //   "This run EMBEDS QUERIES LIVE … it spends — a fraction of a cent, but not zero" and then,
+    //   until 2026-09-06, printed no figure at all: `EmbeddingSpace.PrintLiveSpend` existed and was
+    //   called only from Demo 01 and from `cal`, so thirteen of the fourteen commands in the
+    //   suite's own real-vector sweep declared a cost and reported none. RUN_PROTOCOL's cost rule
+    //   says to report the provider's usage blocks rather than an estimate; reporting nothing is
+    //   not the safe end of that rule, it is outside it. It prints once per invocation, from the
+    //   provider's own counters, and returns silently on the concept path where nothing is spent.
+    //   Pinned by Eval 03's gating row `ARunThatSaysItSpendsSaysHowMuch`.
+    Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace.PrintLiveSpend();
     logScope?.Dispose();
 }
 
@@ -369,8 +379,11 @@ static void PrintCiSummary(
         }
         else
         {
-            Console.WriteLine($"      {written.Count} snapshot(s) WERE written, by the eval(s) that call no model and");
-            Console.WriteLine("      therefore take no --dry-run parameter — they are real measurements, not stubs:");
+            // ⚠ CORRECTED 2026-09-06: this used to say the writers "take no --dry-run parameter".
+            //   Eval 07 has one, for hand use; what is true of all three is that the CHAIN runs
+            //   them for real, because there is nothing in them for a stub to replace.
+            Console.WriteLine($"      {written.Count} snapshot(s) WERE written, by the eval(s) that call no model — the");
+            Console.WriteLine("      chain runs them FOR REAL under --dry-run, so these are measurements, not stubs:");
             foreach (string key in written) Console.WriteLine($"        · {key}.json");
         }
         Console.ResetColor();

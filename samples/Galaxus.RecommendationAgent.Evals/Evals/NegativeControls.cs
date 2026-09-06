@@ -113,6 +113,7 @@ public static class NegativeControls
         rows.Add(Guarded("AboveChanceIsAnExactTest", CheckAboveChanceIsAnExactTest));
         rows.Add(Guarded("ForcedChoiceCountIsACountOfPersonas", CheckForcedChoiceCountIsACountOfPersonas));
         rows.Add(Guarded("CiChainRunsModelFreeEvalsForReal", CheckCiChainRunsModelFreeEvalsForReal));
+        rows.Add(Guarded("ARunThatSaysItSpendsSaysHowMuch", CheckARunThatSaysItSpendsSaysHowMuch));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
@@ -3313,6 +3314,87 @@ public static class NegativeControls
                 + "given NaN · ⚠ MEASURED on the shipped paid cohort: 7 of the live arm's 12 cells are SPLIT "
                 + "across reps, so the panel printed 6 of 12 where the cells say 7 — p = 0.000199 → 0.000015, "
                 + "▲ either way"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 29 — a run that says it spends must say how much (2026-09-06 verification run). ══
+    //
+    /// <summary>
+    /// Every command that warns it is spending must also report what it spent, from the provider's
+    /// own usage blocks.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> On <c>--real-vectors</c> every eval prints <i>"This run EMBEDS QUERIES
+    /// LIVE. It needs credentials and it spends — a fraction of a cent, but not zero"</i>.
+    /// <c>EmbeddingSpace.PrintLiveSpend</c> reports the actual figure — distinct texts embedded,
+    /// requests the memo absorbed, prompt tokens read from the responses' own usage blocks — and it
+    /// was called from exactly two places, <b>neither of them an eval</b>: Demo 01 and
+    /// <c>ThresholdCalibration</c>. Measured on this wave's own sweep: <b>thirteen</b> real-vector
+    /// commands declared a cost and <b>one</b> printed a number.
+    /// </para>
+    /// <para>
+    /// <b>Why that is not the safe end of the rule.</b> RUN_PROTOCOL's cost discipline says to
+    /// report cost from the provider's usage blocks and never from an estimate. Reporting NOTHING
+    /// is not conservative — it is outside the rule, and it leaves "a fraction of a cent" as the
+    /// only figure a reader has, which is an assertion nobody measured. It is the same shape as a
+    /// dry run that persists silently (item 8.19): the machinery was right and the reporting was
+    /// missing.
+    /// </para>
+    /// <para>
+    /// <b>Both halves are checked.</b> That the eval entry point calls the reporter at all, and
+    /// that the reporter still reads the PROVIDER's counters rather than estimating — including its
+    /// LOWER BOUND caveat for responses that carry no usage block, which is the clause that stops a
+    /// missing usage block being reported as zero.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckARunThatSaysItSpendsSaysHowMuch()
+    {
+        var problems = new List<string>();
+
+        string program = File.ReadAllText(Path.Combine(SampleSourceRoot(), "Program.cs"));
+        bool entryPointReports = program.Contains("EmbeddingSpace.PrintLiveSpend()", StringComparison.Ordinal);
+        if (!entryPointReports)
+        {
+            problems.Add("the eval entry point never calls EmbeddingSpace.PrintLiveSpend, so every --real-vectors "
+                       + "command warns that it spends and then reports no figure at all.");
+        }
+
+        var reporter = typeof(Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace).GetMethod(
+            nameof(Galaxus.RecommendationAgent.Retrieval.EmbeddingSpace.PrintLiveSpend),
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        if (reporter is null)
+        {
+            problems.Add("EmbeddingSpace.PrintLiveSpend no longer exists — the figure has no source.");
+        }
+        else
+        {
+            string body = File.ReadAllText(Path.Combine(
+                Directory.GetParent(SampleSourceRoot())!.FullName,
+                "Galaxus.RecommendationAgent", "Retrieval", "EmbeddingSpace.cs"));
+
+            if (!body.Contains("azure.PromptTokens", StringComparison.Ordinal))
+                problems.Add("the spend reporter no longer reads the provider's PromptTokens — a cost that is not from a usage block is an estimate.");
+            if (!body.Contains("LOWER BOUND", StringComparison.Ordinal))
+                problems.Add("the reporter dropped its LOWER BOUND caveat, so a response carrying no usage block would be reported as costing nothing.");
+            if (!body.Contains("EMBEDS QUERIES LIVE", StringComparison.Ordinal))
+                problems.Add("the 'this run spends' warning is gone — this row pairs a warning with a figure, and there is no warning left to pair.");
+        }
+
+        return new ControlRowSnapshot(
+            "ARunThatSaysItSpendsSaysHowMuch",
+            "a command that prints \"This run EMBEDS QUERIES LIVE … it spends\" must also print what it spent, from "
+          + "the provider's own usage blocks. MEASURED on the 2026-09-06 verification sweep: EmbeddingSpace."
+          + "PrintLiveSpend was called from Demo 01 and ThresholdCalibration and from no eval, so 13 of the 14 "
+          + "real-vector commands declared a cost and reported none — leaving \"a fraction of a cent\" as the only "
+          + "figure a reader had, which is an assertion nobody measured. Reporting nothing is not the conservative "
+          + "end of RUN_PROTOCOL's cost rule, it is outside it",
+            problems.Count == 0
+                ? "the eval entry point calls EmbeddingSpace.PrintLiveSpend once per invocation, in a finally, so it "
+                + "fires whichever eval ran and whatever it returned · the reporter still reads the provider's "
+                + "PromptTokens rather than estimating · its LOWER BOUND caveat for responses without a usage block "
+                + "is intact · and it prints NOTHING on the concept path, where nothing is spent"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
