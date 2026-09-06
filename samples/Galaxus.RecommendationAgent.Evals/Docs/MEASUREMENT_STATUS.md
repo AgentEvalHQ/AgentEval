@@ -6076,8 +6076,12 @@ lane that spends the most.
 ### 42.9 Persistence — 36 files, and the ledger matches disk
 
 Every eval run this session wrote to
-`.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. **42 files** landed (3 canonical
-keys plus their timestamped history copies); the store went **619 → 658** files.
+`.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. ⚠️ **The FILE COUNT is not the
+measurement and it goes stale the moment anyone runs an eval again** — it was 36 at the end of the
+sweep, 42 at `e3d5f626` and **46** after the final confirmation pass at HEAD, and all three are
+correct for the moment they were taken. **The measurement is WHICH KEYS were written**, and that is
+stable: **exactly three** — `eval03_controls` (23 files), `eval04_injection` (10),
+`eval07_topology` (13) — the store growing 619 → **662**.
 
 The three canonical keys, as they stand at `5478a7fa` — the final confirmation pass at HEAD, in the
 concept space:

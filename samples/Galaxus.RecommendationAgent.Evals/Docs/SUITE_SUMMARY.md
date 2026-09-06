@@ -1589,7 +1589,10 @@ the pre-run baseline.
 
 ### 25.5 Persistence
 
-**42 snapshot files** written; the store went **619 → 658**. Three canonical keys —
+**Exactly three keys** were written — `eval03_controls`, `eval04_injection`, `eval07_topology` —
+across **46 files** by the end of the run (⚠️ a file count is a function of how many times the evals
+were invoked and goes stale on the next run; the KEY SET is the stable fact). Store 619 → 662.
+The three canonical pointers —
 `eval03_controls.json` (44,995 B), `eval04_injection.json` (4,664 B), `eval07_topology.json`
 (16,895 B) — at 2026-09-06 07:06:23–07:06:54 UTC. **The write-ledger banner names exactly those
 three, in both spaces, and they are the three most recent files on disk.**
