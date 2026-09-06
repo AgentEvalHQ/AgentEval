@@ -3354,6 +3354,49 @@ public static class NegativeControls
         if (atFive > atEight + 1e-12)
             problems.Add($"cutting an 8-item answer to k = {CoverageArms.DeclaredK} RAISED recall ({atFive:F3} vs {atEight:F3}) — the cut is not a prefix and the monotonicity argument does not hold.");
 
+        // ── 5. THE METER UNDER CLAUSE 2 MUST NOT FOLD HALF A USAGE BLOCK IN AS A ZERO. ──
+        //
+        //   Clause 2 is the precondition that decides whether this eval may name a winner at all,
+        //   and every number in it comes off Eval09TokenLedger. Until 2026-09-06 the ledger's guard
+        //   read `InputTokenCount is null AND OutputTokenCount is null`, so a response with one side
+        //   missing was recorded as a COMPLETE reading with a zero on the missing side:
+        //   ReturnedWithoutUsage stayed 0, UsageComplete stayed true, GATE 2 passed, and the ratio
+        //   was computed from a half-measured total. Direction: FLATTERING — a lower bound printed
+        //   as a spend. It is the same defect §60.2 fixed in the agent's ChatSpend and did not fix
+        //   here. Three states, three readings, asserted apart.
+        var whole = new Eval09TokenLedger("probe · whole");
+        whole.RecordTurn();
+        whole.RecordReturned(new Microsoft.Extensions.AI.UsageDetails { InputTokenCount = 100, OutputTokenCount = 20 });
+
+        var half = new Eval09TokenLedger("probe · half");
+        half.RecordTurn();
+        half.RecordReturned(new Microsoft.Extensions.AI.UsageDetails { InputTokenCount = 100, OutputTokenCount = null });
+
+        var absent = new Eval09TokenLedger("probe · absent");
+        absent.RecordTurn();
+        absent.RecordReturned(null);
+
+        if (!whole.UsageComplete)
+            problems.Add("a ledger fed ONE complete usage block reads incomplete — the guard has gone red on the good case and would call every run confounded.");
+        if (half.UsageComplete)
+            problems.Add("a ledger fed HALF a usage block still reads COMPLETE, so clause 2's ratio is computed from a total with a hole in it and GATE 2 passes on an unmeasured budget.");
+        if (half.PartialUsage != 1)
+            problems.Add($"a half usage block was counted as {half.PartialUsage} partial call(s), so the panel cannot name what is missing.");
+        if (half.ReturnedWithoutUsage != 0)
+            problems.Add("a half usage block was counted as NO usage at all — the two are different facts and the tokens that DID arrive would be discarded.");
+        if (absent.ReturnedWithoutUsage != 1 || absent.PartialUsage != 0)
+            problems.Add("an absent usage block is no longer counted as absent — the original hole this ledger was built to see.");
+        if (half.UsageGap is not { } halfGap || !halfGap.Contains("LOWER BOUND", StringComparison.Ordinal))
+            problems.Add("the gap line for a half usage block does not call the total a LOWER BOUND, so a partial spend prints as a spend.");
+        if (absent.UsageGap is not { } absentGap)
+            problems.Add("an absent usage block produces NO gap line at all, so the run reports nothing missing.");
+        else if (string.Equals(absentGap, half.UsageGap, StringComparison.Ordinal))
+            problems.Add("the absent-block gap line and the half-block gap line are IDENTICAL — the panel cannot tell a reader which of the two happened, which is the conflation this clause exists for.");
+        else if (absentGap.Contains("LOWER BOUND", StringComparison.Ordinal))
+            problems.Add("the absent-block gap line calls its total a LOWER BOUND — an absent block contributes nothing at all, and borrowing the half-block's wording erases the difference from the other side.");
+        if (string.Equals(half.Accounting, absent.Accounting, StringComparison.Ordinal))
+            problems.Add("the per-arm accounting line is IDENTICAL for a half block and an absent one.");
+
         return new ControlRowSnapshot(
             "Eval09RuleAndRemedy",
             "Eval 09 pairs at equal k now, so its rule must (a) render an all-refused comparison as NOT COMPARABLE "
@@ -3364,7 +3407,10 @@ public static class NegativeControls
           + "trivially true at 0/0; (d) keep the W/L/T and the p-value out of the PANEL as well, on the verdicts "
           + "that fire before the NOT-COMPARABLE branch; (e) print an ArmNotLive remedy DERIVED from the run's own "
           + "ledger — no timeout fix on a run with 0 cancelled calls, and the timeout fix still offered on one with "
-          + "6; and (f) rest on a cut that is a prefix, so cutting to k can only lower recall.",
+          + "6; (f) rest on a cut that is a prefix, so cutting to k can only lower recall; and (g) meter clause 2 "
+          + "with a ledger that treats HALF a usage block as neither a complete reading nor an absent one — folding "
+          + "the missing side in as a zero left UsageComplete true and computed the ratio from a lower bound, the "
+          + "same defect §60.2 fixed in the agent's ChatSpend and did not fix here.",
             problems.Count == 0
                 ? $"12 refused → NOT COMPARABLE (clause 1 names the refusal) · 4/6/2 p=0.7539 → NoDifferenceDetected · "
                 + $"11/1/0 p=0.0063 → WorkflowWins · an all-refused rubber stamp FAILS the load-bearing test and voids "
@@ -3372,7 +3418,10 @@ public static class NegativeControls
                 + $"0/0/0 and no p on an undecidable primary, and still prints 4/5/3 p=0.7539 on a comparable one · "
                 + $"remedy at 120/120/0 names parsing and NOT the timeout, at 7/1/6 names the timeout, and the two "
                 + $"texts differ · cutting 8 → {CoverageArms.DeclaredK} moved recall "
-                + $"{atEight:F3} → {atFive:F3} (never up)"
+                + $"{atEight:F3} → {atFive:F3} (never up) · ledger: whole block complete=True, half block "
+                + $"complete={half.UsageComplete} partial={half.PartialUsage} no-usage={half.ReturnedWithoutUsage} "
+                + $"and its gap says LOWER BOUND, absent block no-usage={absent.ReturnedWithoutUsage} partial="
+                + $"{absent.PartialUsage} — three states, three readings"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

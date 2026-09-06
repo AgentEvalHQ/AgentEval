@@ -6742,6 +6742,14 @@ the old label asserted — the phrase *"arithmetic of the empty set"* — not th
 
 ### 46.6 What §46 does NOT claim
 
+> ✅ **THE FIRST TWO BULLETS ARE SUPERSEDED — the judged run was made on 2026-09-06 and 8.16 #5 is
+> CLOSED. `MEASUREMENT_STATUS` §61.** They are kept because what they refused to claim is exactly
+> what the run then measured. **The measured answer: the floor arm's criterion-4 rate moved
+> `1.000 → 0.000`, and it is the ONLY floor cell of six that moved** — the other five reproduced to
+> the digit on a byte-identical answer, which is what makes this a single-cause claim rather than a
+> coincidence. **A real judge does honour the existential.** Both live arms stayed at 0.000, so the
+> row is now readable and hard rather than uninterpretable, and it still separates no architecture.
+
 - **No judged run was made and no judged number was re-measured.** Criterion 4's numbers are
   superseded by a text change; criteria 1, 3, 5 and 6 keep the numbers their paid run produced.
 - **The control checks TEXT, not semantics.** It proves the criterion now demands something present;
@@ -8822,3 +8830,268 @@ dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 ;
 
 # 60.5 — the credential scan: positive control FIRST, then counts only. Commands at 57.4a.
 ```
+
+---
+
+## 61. PLAN ITEM 8.16 #5 — THE JUDGED RUN. The restatement's numbers, and three defects the run found (2026-09-06)
+
+**One cohort bought, two one-persona probes, USD 34.63 in total, every figure from the provider's own
+usage blocks.** The item asked for the criterion-4 numbers under the restated rubric. It got them,
+and the restatement is confirmed — **on the one cell that can be attributed to it and to nothing
+else.** Everything else this run moved, it moved for other reasons, and §61.5 keeps those apart.
+
+### 61.1 Eval 09 had no stage-2 form, and that is why this item stayed open
+
+`RUN_PROTOCOL` stage 2 says a full run is never the first live thing you do, and `--only` exists on
+Evals 02, 02b and 02c to make that possible. **Eval 09 did not have it.** Its stage 2 *was* the
+cohort — 12 personas × 4 arms × 2 live reps, the most expensive command in the suite — so the only
+judged run purchasable was the one nobody wanted to buy twice. 8.16 #5 has been filed as *"needs a
+judged run"* through four waves, and the missing thing was never the money: it was **a unit small
+enough to spend it on**.
+
+`-- 9 --only <persona-id>` now runs one persona, writes to `eval09_hypothesis_ab_probe` and never to
+the cohort key, and refuses an unknown id with **exit 2** (the refusal names every scored id). The
+rival set for the cross-persona forced choice stays the WHOLE analysis set, exactly as Eval 02 does
+it — a probe that narrowed the rivals would flatter itself and 1/N would read 1/1.
+
+**MEASURED, `-- 9 --quick --only USR-MI-02`, foreground, exit 0:** 22 round-trips (12 agent · 6
+workflow · 4 judge), 0 cancelled / 0 failed / 0 usage-less on all three ledgers, **USD 1.4725**.
+That is about a twentieth of the cohort, **and it already carried the item's headline finding**
+(§61.3).
+
+### 61.2 Stage 1 passed, and it was STRUCTURALLY BLIND to what this item asks
+
+`-- 9 --dry-run` exits **0**, and its judge panel renders criterion 4 with the restated text at
+`position-matched 0` — so the text match, the caveat crossing, the floor definition and the delta
+arithmetic all execute on the new wording. **None of that is evidence about the item.** The dry
+run's judge is `Eval09ScriptedJudgeClient`, which decides by HASHING the answer, so its criterion-4
+floor of 0.750 is a hash, not a reading. Whether a real judge HONOURS the existential is unreachable
+under a stub by construction. **Stage 1 is recorded as PASSED for the plumbing and NOT PASSED for
+the semantics** — the check `RUN_PROTOCOL` asks for before stage 1 is trusted.
+
+### 61.3 Stage 2 — one persona, and it answered the headline before the cohort was bought
+
+`USR-MI-02` (Marco, `it`) was chosen because criterion 4 is about the customer's own language and
+§17 had already observed Demo 02's cards for Marco carrying English reason text — the discriminating
+persona, picked for an input-side reason before the run.
+
+| criterion 4 | 2026-09-05 (superseded wording) | probe, n = 1 |
+|---|---|---|
+| agent | 0.000 | 0.000 |
+| workflow | 0.000 | 0.000 |
+| **FLOOR — contentless answer** | **1.000 ⚠ "vacuous"** | **0.000** |
+
+**The floor lost the row**, which is exactly what the restatement was for.
+
+### 61.4 Stage 3 — the cohort, per criterion, both arms, with the floor's standing stated
+
+`-- 9`, 12 personas × 4 arms, 2 reps per live arm, **104 minutes**, exit **1**, run through a wrapper
+that wrote the exit code beside the log. **461 model round-trips** — agent 268, workflow 121, judge
+72 — against a prediction of 430–520 stated before it was launched.
+
+| # | criterion (text unchanged unless marked) | agent 09-05 → 09-06 | workflow 09-05 → 09-06 | FLOOR 09-05 → 09-06 | p 09-05 → 09-06 |
+|---|---|---|---|---|---|
+| 1 | names a past purchase by id | 0.000 → **0.000** | 0.083 → **0.083** | 0.000 → **0.000** | 0.5000 → **0.5000** |
+| 2 | covering note says what was NOT recommended | 0.875 → **0.833** | 0.208 → **0.208** | 0.000 → **0.000** | 0.0117 → **0.0020** |
+| 3 | no price / stock / delivery figure | 1.000 → **1.000** | 0.500 → **0.625** | 1.000 → **1.000** | 0.0039 → **0.0156** |
+| **4** | **RESTATED** — a reason must be PRESENT and in the customer's language | 0.000 → **0.000** | 0.000 → **0.000** | **1.000 → 0.000** | 1.0000 → **1.0000** |
+| 5 | says plainly it only recommends | 1.000 → **0.917** | 0.000 → **0.000** | 1.000 → **1.000** | 0.0005 → **0.0005** |
+| 6 | says so where unsure | 0.333 → **0.750** | 0.500 → **0.333** | 0.000 → **0.000** | 1.0000 → **0.1094** |
+
+**The floor arm's standing, stated explicitly because the item asks for it:** the floor is
+`ContentlessFloorArm`, whose answer is a **compile-time constant**, identical on all twelve personas.
+It presents nothing and volunteers the reassurances criteria 3 and 5 ask for, by design. Its rates
+this run are **0.000, 0.000, 1.000, 0.000, 1.000, 0.000** — criteria 3 and 5 it **EARNS** (the panel
+says so in those words), criteria 1 and 6 are declared vacuous by logic and the judge **disagrees**
+(0.000 on both), and criterion 4 has moved from *above both live arms* to *level with them*.
+
+**⭐ THE ATTRIBUTION, AND IT IS THE POINT OF THE TABLE: exactly one floor cell moved, and it is the
+restated criterion's.** Five of six floor rates reproduced **to the digit** across the two runs, on a
+byte-identical answer, twelve gradings each. The judge prompt template has not changed since
+2026-06-29 and the only edit to the rubric since the paid run is criterion 4's wording (`7b4ed9b7`).
+**That makes the criterion-4 floor movement a single-cause claim.** No other number in this table is,
+and §61.5 says so.
+
+**What criterion 4's row now says.** It is `0.000 / 0.000 / 0.000` — and that is a *different* kind of
+nothing from the one 8.16 #5 was filed against. Before, the row was **uninterpretable**: a floor that
+could not lose sat above both entrants. Now it is **readable and hard**: nothing on this corpus meets
+it, the floor included. ⚠ **It still separates no architecture**, and the fix was never going to make
+it do so — what the fix removed was a false reassurance, not a tie.
+
+**Everything else on the run**, reported and NOT attributed to the rubric: mean latent coverage agent
+**0.788** / workflow **0.705** / rubber stamp **0.542** / floor **0.000** (n = 12 each); the primary
+endpoint reached **p = 0.0156 with the workflow BEHIND 0/7** over 9 pairs at equal k, 3 personas
+refused as not comparable; spend ratio **4.86×** against the 1.50× limit; **3 of 24 live-workflow
+cells VOIDED**, on three *different* stages (`CoverageReviewer`, `InterestMapper`, `Ranker`);
+verdict **NO WIN — `ArmNotLive`**; 69 decidable judged cells, 3 undecidable.
+
+### 61.5 Did a VERDICT move, or only numbers? — three different objects, answered separately
+
+A rubric change that moves scores and no verdicts is a different result from one that moves a
+verdict. This eval has THREE things a reader could call a verdict, and they do not move together.
+
+| what | can the rubric move it? | established how |
+|---|---|---|
+| **the eval's VERDICT** (`Eval09Outcome`) | ❌ **NO, structurally** | `Eval09PreRegistration.Decide` takes `(primary, versusRubberStamp, budget, silentCells, voidedCells)` and **no judged input at all**; `PrintVerdict` receives the judged report and reads only `judged.CriterionCount`. A criterion's text cannot reach the verdict by any path |
+| **the eval's EXIT CODE** | ⚠️ **YES — through GATE 4 only, and through DECIDABILITY, never through a score** | the code is `pairingComplete && spendMeasured && loopIsLoadBearing && judgeFloorDefined`, and the last is `judged.FloorIsDefined`. **It moved in that direction and did not arrive**: cells matched by POSITION rather than by criterion text went **0 → 3 of 69**. The restated criterion is three times longer and the judge paraphrased it on three cells. GATE 4 still ✅ |
+| **a judged ROW's reading** (Bonferroni crossing, caveat class) | ✅ **YES — two crossings moved, neither of them the restated row** | at the 0.00833 threshold, 09-05 cleared **rows 3 and 5**; 09-06 clears **rows 2 and 5**. Criterion 2 crossed IN (0.0117 → 0.0020) and criterion 3 crossed OUT (0.0039 → 0.0156), **on unchanged text** |
+
+🔴 **That last line is the run's most useful warning, and it is not about criterion 4: a judged row's
+significance verdict is not reproducible across two runs of the same rubric.** Two of six rows changed
+which side of the Bonferroni threshold they sit on, with their wording untouched. Anyone quoting
+*"criterion 3 separates the architectures at p < 0.00833"* is quoting one draw.
+
+**And one gate verdict moved that has nothing to do with the judge at all: GATE 3 went ✅ → ❌.**
+Against a reviewer that rubber-stamps round 1, the live workflow went **6/2/4 (the workflow led)** on
+2026-09-05 and **3/5/1 (the rubber stamp LED)** today. *"The second round bought nothing"* is this
+run's reading; it is a fact about the architecture, not about the rubric, and it is the first time
+this control has fired.
+
+**Caveat class**, for completeness: criterion 4's row printed `⚠ vacuous` on 09-05 and prints **no
+caveat at all** today (`JudgedRowCaveat.None` — not declared vacuous, floor 0.000). ⚠️ **That move is
+NOT attributable to the restatement alone**: the text AND the caveat mechanism both changed in
+`7b4ed9b7` (§46.4). The floor met rate is the clean single-cause claim; the label is not.
+
+### 61.6 The judge's re-grade spread, measured on a FIXED answer — and it is NOT §18.1's number
+
+The floor arm's answer is a constant, so its twelve cells are twelve gradings of one answer whose
+input differs only in the customer id inside the session frame. Free, and already paid for.
+
+| | |
+|---|---|
+| holistic score, n = 12 | **25, 30, 25, 30, 30, 25, 30, 30, 25, 25, 30, 25** — exactly two distinct values, min 25, max 30, **spread 5 points**, mean 27.5, sd 2.50 |
+| criteria met, n = 12 | **2 of 6 on every single cell**, and the same two every time (3 and 5) |
+| strict replicate — same persona, same answer, three separate runs | `USR-MI-02`: **25, 30, 30** |
+
+⚠️ **This does NOT supersede §18.1's 25-point spread and must not be quoted as if it did.** They are
+different quantities on different inputs: §18.1 re-graded a REAL agent answer five times; this
+re-grades a **contentless** one twelve times, and a degenerate answer is plausibly easier to grade
+consistently. **5 points is a lower bound on this judge's variability, not a replacement estimate.**
+What it does establish, and nothing in this repository established before, is that the per-criterion
+**MET FLAGS were perfectly stable** across twelve gradings while the holistic score was not — which
+is the reason the judged panel reads met rates and not scores.
+
+### 61.7 🔴 The meter under clause 2 folded HALF a usage block in as a zero
+
+`Eval09TokenLedger.RecordReturned` guarded with `InputTokenCount is null **AND** OutputTokenCount is
+null`, so a response carrying one side and not the other fell through to `?? 0` on both:
+`ReturnedWithoutUsage` stayed 0, **`UsageComplete` stayed true**, GATE 2 passed, and **clause 2 — the
+precondition that decides whether this eval may name a winner at all — computed its ratio from a
+half-measured total and printed it as a measurement.** Direction: **FLATTERING**; a lower bound
+rendered as a spend.
+
+**It is the identical defect §60.2 found and fixed in the agent's `ChatSpend` earlier the same day —
+not fixed here, in the eval whose entire equal-budget clause rests on it.** Both of
+`MeteredChatClient`'s paths reach it, and the streaming path even *builds* a one-sided `UsageDetails`
+before handing it over.
+
+Fixed: a third state (`PartialUsage`), a `half` column in the budget panel, `UsageComplete` false, a
+gap line calling the total a **LOWER BOUND**, and clause (g) added to the existing gating row
+`Eval09RuleAndRemedy` — **no new panel row, a clause**.
+
+| ablation | result |
+|---|---|
+| C — delete the `_partialUsage++` line, restoring the folded zero | ❌ RED, `-- 3` exit **1**, 3 faults: *"a ledger fed HALF a usage block still reads COMPLETE, so clause 2's ratio is computed from a total with a hole in it and GATE 2 passes on an unmeasured budget"* |
+| restored | ✅ green, `-- 3` and `-- 3 --real-vectors` exit **0** |
+
+⚠️ **BOUNDED HONESTLY: the cohort run was made by the binary that PREDATES this fix**, so its
+`no-use = 0` cannot exclude a half-block — the ledger that produced that zero could not see one. A
+one-persona live probe on the *fixed* ledger, same deployment, minutes later, read **half = 0 on all
+three ledgers over 14 live calls**. That is evidence about this deployment, not proof about that run.
+
+### 61.8 🔴 Five dry-run checks read applicability out of the RESULT
+
+Building `--only` exposed it. Five of Eval 09's plumbing checks assert properties of an injection that
+lands on **one named persona** — the cancelled `InterestMapper` on `USR-MB-13`, the instructed silence
+on `USR-JV-08`. Under `--only` those personas need not be in the run, and on the first
+`-- 9 --dry-run --only USR-MI-02` **all five printed ❌ and the plumbing check returned false: five
+red ticks for injections that were never issued.**
+
+**A red tick for an absent subject is the same defect as a green one.** They now print
+`⏭ NOT APPLICABLE`, which is deliberately not a tick, and the conjuncts are **dropped** from the
+verdict rather than assumed true; the dry-run banner and the closing paragraph also stop describing
+events a probe never produces.
+
+| ablation | result |
+|---|---|
+| D — fold the five conjuncts back in unconditionally and suppress the N/A lines | ❌ exit **1** on `-- 9 --dry-run --only USR-MI-02`, five ❌ ticks — byte-for-byte the shape that found it |
+| restored | ✅ exit **0** with two `⏭ NOT APPLICABLE` lines; `--only USR-JV-08` exit **0** with the second-turn check APPLYING and passing; `--only USR-MB-13` exit **1**, honestly — at n = 1 on the cancelled persona the workflow arm has no surviving cell at all |
+
+### 61.9 🟡 Three smaller things the run found
+
+1. **The evals project's own warning set is EIGHT, not six.** `MASTER_PLAN` §0.1 published *"3
+   warnings"*, corrected it to *"SIX, over THREE files"* at `5a6125fa`, and that replacement omits
+   `Graders/PairedCoverageReport.cs(428)` **× 2 CS8629**. Established by `git stash`-ing this wave's
+   source files and rebuilding `--no-incremental` at HEAD, so it is not this wave's doing. **Third
+   vintage, third time short, third time in the flattering direction.** The invariant that does not
+   decay is **0 errors**.
+2. **§46.5's ablation B does not re-derive its digit.** Re-executed at stage 0: the direction
+   reproduces (RED, `-- 3` exit 1) but the fault count came back **7**, not the published **5**. The
+   control body is byte-identical at `7b4ed9b7` and at HEAD (20 `problems.Add` sites at both), so the
+   difference is the **ablation body, which was never recorded**. A fault count is a property of the
+   ablation, and stage 0's *"write it down with the command that produces it"* is exactly the rule
+   that was not followed. **§46.5 ablation A reproduces in full.**
+3. **Eval 09 printed no money at all**, in the suite's most expensive command — the published
+   `USD 29.49` for the 2026-09-05 run has **no printer behind it** in this tree. Added: `PrintMoney`,
+   tokens from the ledgers and the rate from `ModelPricing`'s row **named on the line**,
+   `LOWER BOUND` where a ledger has a hole, `COST: UNKNOWN` (never `0.0000`) where no rate matches.
+   ⚠️ **It carries no gating row, and that is declared rather than hidden** — it is verified by
+   execution in both branches (dry run → `COST: NONE`; live probe → `USD 0.7753` with the rate on the
+   line above it).
+
+### 61.10 What §61 does NOT claim
+
+* **The live arms' judged numbers are NOT attributable to the restatement.** They are fresh draws
+  from a stochastic agent, graded by a stochastic judge, on a tree that has changed since 09-05.
+  Only the **floor** row is a controlled comparison, because only the floor's answer is a constant.
+* **No claim that the judge now reads criterion 4 *correctly*** — only that an answer with no
+  recommendation reasons no longer passes it. Whether the live arms' 0.000 is right is a calibration
+  question, and this repository still has no gold set for these criteria.
+* **The cohort's `no-use = 0` was measured by the pre-fix ledger** (§61.7). Bounded, not waved away.
+* **`USD 32.3855` for the cohort is DERIVED, not printed**: its tokens are the provider's, its rate is
+  `ModelPricing["gpt-5.5"]`, and the run predates the printer that would have shown it. The one
+  independent check available agrees exactly — the harness's own cost column reports the agent arm at
+  `¤17.7974`, and the same arithmetic over that arm's ledger gives `USD 17.7974`.
+* **Nothing here re-measures Eval 02b or Eval 02c.** The two headline claims in `MASTER_PLAN` §0.2 did
+  not move and were not touched.
+
+### 61.11 How to re-derive §61
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+
+# Stage 0 — the two published ablations this run is built on, RE-EXECUTED.
+#   A: put the SUPERSEDED criterion-4 wording back in GalaxusEvalCriteria (with its `true`), then
+dotnet run --project $E -- 3 ; echo $?     # -> 1, "the SUPERSEDED criterion-4 wording is still in the shipped rubric"
+#   B: make Eval09PreRegistration.CaveatFor ignore `declaredVacuous` (floor >= 0.999 => vacuous)
+dotnet run --project $E -- 3 ; echo $?     # -> 1. The FAULT COUNT depends on the ablation body — 61.9 item 2.
+
+# Stage 1 — free, and blind to the semantics on purpose.
+dotnet run --project $E -- 9 --dry-run ; echo $?                    # -> 0
+dotnet run --project $E -- 9 --dry-run --only USR-MI-02 ; echo $?   # -> 0, two NOT APPLICABLE lines
+dotnet run --project $E -- 9 --dry-run --only USR-JV-08 ; echo $?   # -> 0, the SECOND TURN check applies
+dotnet run --project $E -- 9 --dry-run --only USR-MB-13 ; echo $?   # -> 1, honestly: no workflow cell survives
+dotnet run --project $E -- 9 --dry-run --only NOPE      ; echo $?   # -> 2, the refusal names every scored id
+
+# Stage 2 — ONE persona, live, foreground.
+dotnet run --project $E -- 9 --quick --only USR-MI-02 ; echo $?
+
+# Stage 3 — the cohort. ~104 min; capture the exit code beside the log, never derive it.
+dotnet run --project $E -- 9 > e9.log 2>&1 ; echo "EXIT=$?" > e9.exit
+
+# The snapshot, by KEY — never by file count:
+ls .agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/ \
+  | sed 's/\.[0-9]\{8\}T[0-9]\{6\}Z\.json$//;s/\.json$//' | sort -u
+#   -> 14 keys. eval09_hypothesis_ab (cohort, rewritten, the 09-05 record archived as
+#      .20260905T202613Z.json) and eval09_hypothesis_ab_probe (new). A probe NEVER touches the cohort key.
+
+# 61.7's ablation — delete the `_partialUsage++` line in Eval09TokenLedger.RecordReturned:
+dotnet run --project $E --no-build -- 3 2>&1 | grep -A20 "NOT CAUGHT  Eval09RuleAndRemedy"
+
+# 61.8's ablation — fold the five conjuncts back into DryRunPlumbingHeld's return unconditionally:
+dotnet run --project $E --no-build -- 9 --dry-run --only USR-MI-02 ; echo $?   # -> 1, five ❌
+```
+
+⚠️ **Restore an ablation from a COPY, never with `git checkout --`.** This wave lost every working
+change to `Eval09_HypothesisComparison.cs` to exactly that command, because the file carried the
+wave's edits as well as the ablation. Both ablations above were then re-run against a backup copy.

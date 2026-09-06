@@ -186,6 +186,15 @@ public static class Eval09_HypothesisComparison
     /// <summary>Snapshot key. Deliberately distinct from Eval 02's, which Eval 03 reads.</summary>
     public const string SnapshotKey = "eval09_hypothesis_ab";
 
+    /// <summary>The key a one-persona probe writes to. NEVER the full-cohort key.</summary>
+    /// <remarks>
+    /// Same rule Evals 02, 02b and 02c already apply: a stage-two probe is n = 1 and must not be
+    /// readable later as the cohort record. Eval 09 had no probe form at all until 2026-09-06 —
+    /// which made it the ONE eval in this suite whose stage 2 was the whole cohort, at the suite's
+    /// highest price. That is a hole in the run protocol's coverage, not a property of this eval.
+    /// </remarks>
+    public const string ProbeSnapshotKey = SnapshotKey + "_probe";
+
     /// <summary>
     /// Runs the eval.
     /// </summary>
@@ -196,16 +205,37 @@ public static class Eval09_HypothesisComparison
     /// judge plumbing, the token meter, the sign test, every panel and the gate, and writes no
     /// snapshot. It CAN FAIL — see <see cref="DryRunPlumbingHeld"/>.
     /// </param>
+    /// <param name="onlyPersona">
+    /// Restrict the run to ONE persona id — the one-item real run that is stage two of the
+    /// three-stage protocol. The snapshot then goes to <see cref="ProbeSnapshotKey"/> and never to
+    /// the full-cohort key. ⚠ At n = 1 nothing on the page is a cohort number: no sign test can
+    /// reach a result, each judged met rate is one cell, and the forced-choice floor is still
+    /// derived from the WHOLE analysis set (a probe that narrowed the rival set would flatter
+    /// itself). Not honoured under <c>--ci</c> — the chain never passes it.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>
     /// 0 when every gate passed (or, on a dry run, when the plumbing held), 1 when a gate failed,
+    /// 2 when <paramref name="onlyPersona"/> matches no scored persona,
     /// 3 when credentials are missing and nothing was measured. ⚠ The <c>ci</c> parameter is GONE —
     /// see <see cref="CredentialGuard"/>.
     /// </returns>
     public static async Task<int> RunAsync(
-        bool quick = false, bool dryRun = false, CancellationToken ct = default)
+        bool quick = false, bool dryRun = false, string? onlyPersona = null, CancellationToken ct = default)
     {
         PrintHeader();
+
+        IReadOnlyList<CoveragePersona> personas = onlyPersona is null
+            ? CoveragePersonas.All
+            : [.. CoveragePersonas.All.Where(p => string.Equals(p.Id, onlyPersona, StringComparison.OrdinalIgnoreCase))];
+
+        if (personas.Count == 0)
+        {
+            EvalPrinter.PrintRefusal(
+                $"--only {onlyPersona} matches no scored persona.",
+                "Scored ids: " + string.Join(", ", CoveragePersonas.All.Select(p => p.Id)) + ".");
+            return 2;
+        }
 
         // ⚠ THE HONESTY GUARD, and it comes before anything that could print a number.
         //
@@ -227,7 +257,19 @@ public static class Eval09_HypothesisComparison
         }
 
         int reps = dryRun ? 1 : quick ? QuickReps : Reps;
-        Eval09PreRegistration.Print(CoveragePersonas.AnalysedCount, reps, dryRun);
+        Eval09PreRegistration.Print(personas.Count, reps, dryRun);
+
+        if (onlyPersona is not null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  🔬 ONE-PERSONA PROBE — {personas[0].Id} only. Stage two of the three-stage protocol.");
+            Console.WriteLine("     n = 1: NO number below is a cohort result. The sign test cannot reach one (the");
+            Console.WriteLine($"     smallest attainable two-sided p at 1 pair is {Eval09PreRegistration.TheoreticalMinimumTwoSidedP(1):F4}), each judged met rate is");
+            Console.WriteLine($"     ONE cell, and the snapshot goes to '{ProbeSnapshotKey}' — the full-cohort");
+            Console.WriteLine($"     record at '{SnapshotKey}' is untouched.");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
 
         if (dryRun)
         {
@@ -242,6 +284,17 @@ public static class Eval09_HypothesisComparison
             Console.WriteLine("     come out VOIDED, its cancelled attempts must reach the ledger, and the equal-budget");
             Console.WriteLine("     guard must call the run CONFOUNDED for that reason. Usage on returned stub calls is");
             Console.WriteLine("     SYNTHETIC (characters / 4) so the only hole in the usage data is the injected one.");
+
+            // ⚠ Both injections land on ONE named persona each. Under --only they may not be in the
+            //   run, and the sentences above would then describe events this run never produces.
+            if (onlyPersona is not null)
+            {
+                bool cancelIn = personas.Any(x => string.Equals(x.Id, Eval09DryRun.CancelledPersonaId, StringComparison.Ordinal));
+                bool silenceIn = personas.Any(x => string.Equals(x.Id, Personas.JonasUserId, StringComparison.Ordinal));
+                Console.WriteLine($"     ⏭ ON THIS PROBE the cancellation is {(cancelIn ? "ISSUED" : "NOT issued")} and the instructed");
+                Console.WriteLine($"       silence is {(silenceIn ? "ISSUED" : "NOT issued")} — each injection lands on one persona only. Every");
+                Console.WriteLine("       check below whose subject is absent prints NOT APPLICABLE, never a tick.");
+            }
             Console.ResetColor();
             Console.WriteLine();
         }
@@ -357,13 +410,17 @@ public static class Eval09_HypothesisComparison
         // second turn did. Reported cell by cell — a turn-1 silence is a harness fact.
         var secondTurns = new List<(string Cell, ClarifyingTurnOutcome Outcome)>();
 
+        // ⚠ Derived over the WHOLE analysis set even under --only, exactly as Eval 02 does it: the
+        //   cross-persona forced choice grades one answer against every customer's gold, so a probe
+        //   that narrowed the rival set would flatter itself, and the 1/N chance rate below would be
+        //   1/1. The persona LOOP narrows; the rival set never does.
         var goldByPersona = CoveragePersonas.All.ToDictionary(
             p => p.Id, p => InterestMapGold.Derive(p.Id), StringComparer.Ordinal);
 
         int scorablePersonas = goldByPersona.Count(kv => !kv.Value.LatentIsEmpty);
         double forcedChoiceFloor = InterestCoverageGrader.ForcedChoiceFloor(scorablePersonas);
 
-        foreach (CoveragePersona persona in CoveragePersonas.All)
+        foreach (CoveragePersona persona in personas)
         {
             GoldInterestMap gold = goldByPersona[persona.Id];
 
@@ -753,9 +810,20 @@ public static class Eval09_HypothesisComparison
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("  📁 Snapshot NOT written — a dry run must not leave a result behind.");
-            Console.WriteLine("     The GATES above ran in their DRY-RUN form. GATE 1 is EXPECTED to fail here: one");
-            Console.WriteLine($"     workflow cell ({Eval09DryRun.CancelledPersonaId}) had its InterestMapper call cancelled on");
-            Console.WriteLine("     purpose and was VOIDED, so the pairing has the hole the rule cuts. Gate 2 is");
+            Console.WriteLine("     The GATES above ran in their DRY-RUN form.");
+            if (personas.Any(x => string.Equals(x.Id, Eval09DryRun.CancelledPersonaId, StringComparison.Ordinal)))
+            {
+                Console.WriteLine($"     GATE 1 is EXPECTED to fail here: one workflow cell ({Eval09DryRun.CancelledPersonaId}) had its");
+                Console.WriteLine("     InterestMapper call cancelled on purpose and was VOIDED, so the pairing has the");
+                Console.WriteLine("     hole the rule cuts.");
+            }
+            else
+            {
+                Console.WriteLine("     GATE 1's EXPECTED dry-run failure is OUT OF SCOPE on this probe: the cancellation");
+                Console.WriteLine($"     lands on {Eval09DryRun.CancelledPersonaId} and this run does not include it, so GATE 1's verdict");
+                Console.WriteLine("     here says nothing about the VOID rule either way.");
+            }
+            Console.WriteLine("     Gate 2 is");
             Console.WriteLine("     downgraded to \"the meter is wired under both arms\". NOTHING above is a result");
             Console.WriteLine("     about either architecture. What a stub CAN establish is the plumbing, and that is");
             Console.WriteLine("     what is checked below — including that this stage can fail at all.");
@@ -764,7 +832,8 @@ public static class Eval09_HypothesisComparison
             return DryRunPlumbingHeld(
                 report, judged, agentTokens, workflowTokens, judgeTokens,
                 primary, workflowRunsObserved, armsThatThrew,
-                new Eval09DryRunEvidence(voidedCells, secondTurns, budget, verdict)) ? 0 : 1;
+                new Eval09DryRunEvidence(voidedCells, secondTurns, budget, verdict),
+                [.. personas.Select(x => x.Id)]) ? 0 : 1;
         }
 
         // ⚠ The label is the CALLER's, not the method's. This snapshot went to disk reading
@@ -773,11 +842,16 @@ public static class Eval09_HypothesisComparison
         // another eval's name. The own-k cells are saved, and the declared-k cut beside them —
         // the pairing reads the second, so a record that kept only the first could not be
         // re-checked against the verdict it produced.
-        EvalResultStore.SaveCoverage(SnapshotKey, report.ToSnapshot(
+        string snapshotKey = onlyPersona is null ? SnapshotKey : ProbeSnapshotKey;
+        EvalResultStore.SaveCoverage(snapshotKey, report.ToSnapshot(
             floors, declaredK, GalaxusEvalPrompt.CoverageCanonical, atK,
-            "Eval 09 — Single agent vs discovery workflow"));
+            onlyPersona is null
+                ? "Eval 09 — Single agent vs discovery workflow"
+                : $"Eval 09 PROBE (n = 1, {personas[0].Id}) — Single agent vs discovery workflow"));
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"  📁 Coverage snapshot saved → {EvalResultStore.StorageLocation}\\{SnapshotKey}.json");
+        Console.WriteLine($"  📁 Coverage snapshot saved → {EvalResultStore.StorageLocation}\\{snapshotKey}.json");
+        if (onlyPersona is not null)
+            Console.WriteLine($"     (probe key '{ProbeSnapshotKey}' — the full-cohort record at '{SnapshotKey}' is untouched.)");
         Console.WriteLine("     ⚠ The JUDGED panel and the TOKEN LEDGER are printed, not snapshotted. CoverageSnapshot");
         Console.WriteLine("       has no slot for either, and adding one means editing a file three other evals read.");
         Console.ResetColor();
@@ -1056,6 +1130,17 @@ public static class Eval09_HypothesisComparison
     /// <param name="workflowRunsObserved">How many live workflow runs reported telemetry.</param>
     /// <param name="armsThatThrew">How many arm runs threw.</param>
     /// <param name="evidence">What the injected cancellation and the second turn produced.</param>
+    /// <param name="personasInRun">
+    /// The persona ids this run actually looped over. ⚠ <b>APPLICABILITY COMES FROM THIS, NOT FROM
+    /// THE RESULT.</b> Five of the checks below assert properties of an injection that lands on ONE
+    /// named persona — the cancelled InterestMapper on <see cref="Eval09DryRun.CancelledPersonaId"/>
+    /// and the instructed silence on <c>Personas.JonasUserId</c>. Under <c>--only</c> those personas
+    /// may not be in the run at all, and a check whose subject never ran must say so rather than
+    /// print a verdict. MEASURED 2026-09-06, on the first <c>-- 9 --dry-run --only USR-MI-02</c>:
+    /// all five printed <b>❌</b> and the plumbing check returned false — five red ticks for
+    /// injections that were never issued. <b>A red tick for an absent subject is the same defect as
+    /// a green one</b>; both read applicability out of the outcome.
+    /// </param>
     private static bool DryRunPlumbingHeld(
         PairedCoverageReport report,
         Eval09JudgedReport judged,
@@ -1065,8 +1150,15 @@ public static class Eval09_HypothesisComparison
         SignTestOutcome primary,
         int workflowRunsObserved,
         int armsThatThrew,
-        Eval09DryRunEvidence evidence)
+        Eval09DryRunEvidence evidence,
+        IReadOnlyCollection<string> personasInRun)
     {
+        ArgumentNullException.ThrowIfNull(personasInRun);
+
+        // The two injections' subjects, asked of the INPUT.
+        bool cancellationWasIssued = personasInRun.Contains(Eval09DryRun.CancelledPersonaId, StringComparer.Ordinal);
+        bool silencePersonaRan = personasInRun.Contains(Personas.JonasUserId, StringComparer.Ordinal);
+
         bool agentMeasured = !double.IsNaN(report.MeanLatent(ArmSingleAgent));
         bool workflowMeasured = !double.IsNaN(report.MeanLatent(ArmWorkflow));
         bool bothMetered = agentTokens.Calls > 0 && workflowTokens.Calls > 0;
@@ -1167,29 +1259,46 @@ public static class Eval09_HypothesisComparison
         Line(pComputable, "the primary sign test computed a defined attainable p from the non-tied pair count.");
         Line(noneThrew, noneThrew ? "no arm threw." : $"{armsThatThrew} arm run(s) threw.");
 
-        Line(voidFiredOnCancelled && voidFiredOnlyThere, voidFiredOnCancelled && voidFiredOnlyThere
-            ? $"a DEGRADED stage VOIDS its cell, and only its cell: {cancelled}'s workflow cell (InterestMapper cancelled on both "
-              + $"attempts, fell back to the code-derived map) is MISSING from the report — not zero, not averaged — and the "
-              + $"other {report.Personas.Count - 1} workflow cell(s), whose stages all returned, are present. Voided: "
-              + string.Join("; ", evidence.VoidedCells)
-            : $"the VOID rule did not fire where it should ({cancelled} present: {report.ScoreOf(cancelled, ArmWorkflow) is not null}; "
-              + $"voided cells: {evidence.VoidedCells.Count}) or fired where it should not. A degraded 'live' cell would be "
-              + "back in the mean.");
-        Line(cancelledRecorded, cancelledRecorded
-            ? $"a CANCELLED attempt reaches the ledger: workflow {workflowTokens.Accounting}; agent {agentTokens.Accounting}. "
-              + "The meter no longer forgets a call that never returned."
-            : $"the cancelled attempts did NOT reach the right ledger: workflow {workflowTokens.Accounting}; agent "
-              + $"{agentTokens.Accounting}.");
-        Line(guardDiscriminates, guardDiscriminates
-            ? "the equal-budget guard treats MISSING usage as CONFOUNDED and DISCRIMINATES: the agent ledger is usage-complete "
-              + "and is not flagged; the workflow ledger has a cancelled call and is — reasons: "
-              + string.Join(" | ", evidence.Budget.Reasons)
-            : $"the guard did not discriminate: agent complete={agentTokens.UsageComplete}, workflow complete="
-              + $"{workflowTokens.UsageComplete}, confounded={evidence.Budget.Confounded}, reasons: "
-              + string.Join(" | ", evidence.Budget.Reasons));
-        Line(verdictVoided, verdictVoided
-            ? $"the verdict read clause 5 first and named NO winner: {evidence.Verdict.Outcome}."
-            : $"the verdict was {evidence.Verdict.Outcome}; a run with a voided live cell must not get past clause 5.");
+        if (!cancellationWasIssued)
+        {
+            NotApplicable($"the VOID rule, the cancelled-attempt ledger and clause 5's precedence are NOT CHECKED on "
+                        + $"this run: the injection lands on {cancelled}, which is not in it. No cancellation was "
+                        + "issued, so there is nothing here to fire or to fail — this is not a passed check.");
+        }
+        else
+        {
+            Line(voidFiredOnCancelled && voidFiredOnlyThere, voidFiredOnCancelled && voidFiredOnlyThere
+                ? $"a DEGRADED stage VOIDS its cell, and only its cell: {cancelled}'s workflow cell (InterestMapper cancelled on both "
+                  + $"attempts, fell back to the code-derived map) is MISSING from the report — not zero, not averaged — and the "
+                  + $"other {report.Personas.Count - 1} workflow cell(s), whose stages all returned, are present. Voided: "
+                  + string.Join("; ", evidence.VoidedCells)
+                : $"the VOID rule did not fire where it should ({cancelled} present: {report.ScoreOf(cancelled, ArmWorkflow) is not null}; "
+                  + $"voided cells: {evidence.VoidedCells.Count}) or fired where it should not. A degraded 'live' cell would be "
+                  + "back in the mean.");
+            Line(cancelledRecorded, cancelledRecorded
+                ? $"a CANCELLED attempt reaches the ledger: workflow {workflowTokens.Accounting}; agent {agentTokens.Accounting}. "
+                  + "The meter no longer forgets a call that never returned."
+                : $"the cancelled attempts did NOT reach the right ledger: workflow {workflowTokens.Accounting}; agent "
+                  + $"{agentTokens.Accounting}.");
+            Line(guardDiscriminates, guardDiscriminates
+                ? "the equal-budget guard treats MISSING usage as CONFOUNDED and DISCRIMINATES: the agent ledger is usage-complete "
+                  + "and is not flagged; the workflow ledger has a cancelled call and is — reasons: "
+                  + string.Join(" | ", evidence.Budget.Reasons)
+                : $"the guard did not discriminate: agent complete={agentTokens.UsageComplete}, workflow complete="
+                  + $"{workflowTokens.UsageComplete}, confounded={evidence.Budget.Confounded}, reasons: "
+                  + string.Join(" | ", evidence.Budget.Reasons));
+            Line(verdictVoided, verdictVoided
+                ? $"the verdict read clause 5 first and named NO winner: {evidence.Verdict.Outcome}."
+                : $"the verdict was {evidence.Verdict.Outcome}; a run with a voided live cell must not get past clause 5.");
+        }
+
+        if (!silencePersonaRan)
+        {
+            NotApplicable($"the harness's SECOND TURN is NOT CHECKED on this run: the agent stub asks first only on "
+                        + $"{Personas.JonasUserId}, which is not in it. Nothing asked, so nothing could answer — this "
+                        + "is not a passed check.");
+        }
+        else
         Line(secondTurnWired.Count > 0, secondTurnWired.Count > 0
             ? "the harness's SECOND TURN is wired on the single-agent arm: "
               + string.Join(", ", secondTurnWired.Select(t => $"{t.Cell} (k {t.Outcome.PresentedAfterFirstTurn}→{t.Outcome.PresentedAfterSecondTurn})"))
@@ -1197,15 +1306,28 @@ public static class Eval09_HypothesisComparison
             : "the harness's SECOND TURN did NOT fire on the single-agent arm, or carried no turn-2 presentation into the "
               + "graded trace. Jonas's instructed silence would still void clause 4.");
 
+        // ⚠ The injection-dependent conjuncts are folded in ONLY when their injection was issued.
+        //   This is not "assume they passed" — the whole clause is dropped, and the printed
+        //   NOT APPLICABLE line above says which claim this run is therefore NOT making.
         return agentMeasured && workflowMeasured && bothMetered && graphRan
             && judgeReachable && floorDefined && judgedDeltasExercised && pComputable && noneThrew
-            && voidFiredOnCancelled && voidFiredOnlyThere && cancelledRecorded && guardDiscriminates
-            && verdictVoided && secondTurnWired.Count > 0;
+            && (!cancellationWasIssued
+                || (voidFiredOnCancelled && voidFiredOnlyThere && cancelledRecorded && guardDiscriminates && verdictVoided))
+            && (!silencePersonaRan || secondTurnWired.Count > 0);
 
         static void Line(bool ok, string text)
         {
             Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
             foreach (string wrapped in Wrap($"  {(ok ? "✅" : "❌")} {text}", 96)) Console.WriteLine(wrapped);
+            Console.ResetColor();
+        }
+
+        // ⚠ Deliberately NOT a ✅. A check whose subject never ran has established nothing, and a
+        //   green tick beside it is the false-✅ this file already carries a paragraph about.
+        static void NotApplicable(string text)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            foreach (string wrapped in Wrap($"  ⏭ NOT APPLICABLE — {text}", 96)) Console.WriteLine(wrapped);
             Console.ResetColor();
         }
     }
@@ -1261,12 +1383,12 @@ public static class Eval09_HypothesisComparison
         // returned calls reported. A reader can see from this row alone when a "live" arm was not
         // live — the 2026-09-04 Demo 2 run would have printed attempted 7 · returned 1 · cancelled 6.
         Console.ForegroundColor = ConsoleColor.White;
-        Row($"  {"ledger",-22} {"attempt",7} {"return",6} {"cancel",6} {"fail",4} {"no-use",6} {"prompt",8} {"compl",7} {"tok/turn",8}");
+        Row($"  {"ledger",-20} {"attempt",7} {"ret",4} {"canc",4} {"fail",4} {"no-use",6} {"half",4} {"prompt",8} {"compl",7} {"tok/turn",8}");
         Divider();
         foreach (Eval09TokenLedger ledger in new[] { agentTokens, workflowTokens, judgeTokens })
         {
-            Row($"  {Fit(ledger.Name, 22)} {ledger.Calls,7} {ledger.Returned,6} {ledger.Cancelled,6} {ledger.Failed,4} "
-              + $"{ledger.ReturnedWithoutUsage,6} {ledger.PromptTokens,8} {ledger.CompletionTokens,7} "
+            Row($"  {Fit(ledger.Name, 20)} {ledger.Calls,7} {ledger.Returned,4} {ledger.Cancelled,4} {ledger.Failed,4} "
+              + $"{ledger.ReturnedWithoutUsage,6} {ledger.PartialUsage,4} {ledger.PromptTokens,8} {ledger.CompletionTokens,7} "
               + $"{(ledger.Turns == 0 || !ledger.UsageComplete ? "n/a" : ledger.TokensPerTurn.ToString("F0", CultureInfo.InvariantCulture)),8}");
         }
         Console.ResetColor();
@@ -1274,7 +1396,22 @@ public static class Eval09_HypothesisComparison
         [
             "  tok/turn prints n/a for a ledger with ANY cancelled, failed or usage-less call on it: a total with a hole "
           + "in it is a lower bound, and dividing a lower bound by turns reports an arm as cheaper the less of it ran.",
+            "  ⚠ 'half' counts calls that returned a usage block with ONE side missing. Until 2026-09-06 there was no "
+          + "such column and no such state: the missing half was folded in as a ZERO, the ledger still read complete, "
+          + "and clause 2's ratio was computed from it. An absent number is not a zero — at either level.",
         ]);
+
+        // ⚠ THE MONEY, AND WHY IT IS PRINTED HERE AND NOT ONLY IN TOKENS.
+        //
+        // This is the most expensive command in the suite and until 2026-09-06 it printed no
+        // currency figure at all: the published "USD 29.49" for the 2026-09-05 run has no printer
+        // behind it in this tree, so a reader could not check it and the next run could not
+        // reproduce it. The TOKENS are the provider's own; the RATE is ModelPricing's declared row,
+        // named on the line so nobody has to guess which table it came from. Where a ledger is
+        // incomplete the figure is labelled a LOWER BOUND rather than suppressed or, worse,
+        // rendered as though it were whole.
+        Divider();
+        PrintMoney(agentTokens, workflowTokens, judgeTokens, dryRun);
 
         Divider();
         if (!budget.BothArmsRan)
@@ -1332,6 +1469,69 @@ public static class Eval09_HypothesisComparison
         Console.WriteLine();
     }
 
+    /// <summary>
+    /// Prints what the run cost in money, from the ledgers' MEASURED tokens at a NAMED rate.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Tokens are measured; the rate is declared.</b> Every token in the figure came out of a
+    /// provider usage block — that is what the ledgers count — and the price per thousand comes from
+    /// <see cref="ModelPricing"/>'s row for the resolved deployment. The row and its numbers are
+    /// printed beside the total, because a currency figure whose rate a reader cannot see is a
+    /// figure they cannot check.
+    /// </para>
+    /// <para>
+    /// <b>UNKNOWN is never rendered as zero.</b> If no rate matches the deployment the panel says so
+    /// and reports tokens only; if a ledger is incomplete — a cancelled call, a failed call, an
+    /// absent usage block or HALF a usage block — its money is labelled a LOWER BOUND.
+    /// </para>
+    /// </remarks>
+    /// <param name="agentTokens">The single agent's ledger.</param>
+    /// <param name="workflowTokens">The workflow's ledger.</param>
+    /// <param name="judgeTokens">The judge's ledger.</param>
+    /// <param name="dryRun">True on a dry run, where the tokens are synthetic and there is no bill.</param>
+    private static void PrintMoney(
+        Eval09TokenLedger agentTokens, Eval09TokenLedger workflowTokens, Eval09TokenLedger judgeTokens, bool dryRun)
+    {
+        string model = dryRun ? "(stub — dry run)" : Config.Model;
+        var rate = ModelPricing.GetPricing(model);
+
+        if (rate is null)
+        {
+            Yellow(
+            [
+                dryRun
+                    ? "  💵 COST: NONE — a dry run spends nothing, and the tokens in the panel above are SYNTHETIC "
+                    + "(characters / 4). No rate is looked up, because there is no bill to price."
+                    : $"  💵 COST: UNKNOWN — no ModelPricing row matches the deployment '{model}', so this run reports "
+                    + "TOKENS ONLY. An unpriced run is not a free one, and printing 0.0000 here would say it was.",
+            ]);
+            return;
+        }
+
+        (decimal inPer1K, decimal outPer1K, _, _) = rate.Value;
+        decimal total = 0m;
+        var lines = new List<string>
+        {
+            $"  💵 COST — tokens are the provider's own; the rate is ModelPricing['{model}'] = "
+          + $"{inPer1K:F5}/1K prompt, {outPer1K:F5}/1K completion (USD).",
+        };
+
+        foreach (Eval09TokenLedger ledger in new[] { agentTokens, workflowTokens, judgeTokens })
+        {
+            decimal money = (ledger.PromptTokens / 1000m * inPer1K) + (ledger.CompletionTokens / 1000m * outPer1K);
+            total += money;
+            lines.Add($"      {Fit(ledger.Name, 24),-24} USD {money,9:F4}"
+                    + (ledger.UsageComplete ? "" : $"   ⚠ LOWER BOUND — {ledger.UsageGap}"));
+        }
+
+        bool allComplete = agentTokens.UsageComplete && workflowTokens.UsageComplete && judgeTokens.UsageComplete;
+        lines.Add($"      {"TOTAL",-24} USD {total,9:F4}"
+                + (allComplete ? "" : "   ⚠ LOWER BOUND — at least one ledger has a hole in it"));
+
+        if (allComplete) Grey(lines); else Yellow(lines);
+    }
+
     private static void PrintJudgePanel(Eval09JudgedReport judged, bool dryRun)
     {
         Console.WriteLine();
@@ -1354,6 +1554,22 @@ public static class Eval09_HypothesisComparison
             Yellow(["  🧪 DRY RUN — the verdicts below came from a scripted judge that decides by hashing the answer "
                   + "text. They prove the parse and the delta arithmetic, and nothing else."]);
         }
+        Divider();
+
+        // ⚠ THE DENOMINATORS, PRINTED ONCE AND UP FRONT. Every rate in the table below is a mean
+        //   over the personas that arm was decidable on, and that is NOT the same set for the two
+        //   arms: a VOIDED workflow cell, a silent live cell and an undecidable judge verdict each
+        //   remove a persona from one column and not the other. A rate without its n is a
+        //   decoration, and 0.000 over nine personas and 0.000 over twelve used to print identically.
+        Grey(
+        [
+            $"  Personas with at least one decidable cell — {EvalPrinter.ShortArm(ArmSingleAgent)}: "
+          + $"{judged.DecidedPersonaCount(ArmSingleAgent)} · {EvalPrinter.ShortArm(ArmWorkflow)}: "
+          + $"{judged.DecidedPersonaCount(ArmWorkflow)} · {EvalPrinter.ShortArm(ArmRubberStamp)}: "
+          + $"{judged.DecidedPersonaCount(ArmRubberStamp)} · {EvalPrinter.ShortArm(ArmJudgeFloor)}: "
+          + $"{judged.DecidedPersonaCount(ArmJudgeFloor)}. The two live columns are NOT necessarily over the "
+          + "same personas, and the W/L/T counts pair only where BOTH were decidable.",
+        ]);
         Divider();
 
         Console.ForegroundColor = ConsoleColor.White;
@@ -2563,6 +2779,7 @@ public sealed class Eval09TokenLedger
     private int _cancelled;
     private int _failed;
     private int _returnedWithoutUsage;
+    private int _partialUsage;
     private long _prompt;
     private long _completion;
     private int _turns;
@@ -2597,6 +2814,13 @@ public sealed class Eval09TokenLedger
     /// <summary>Attempts that returned but carried NO usage from the provider.</summary>
     public int ReturnedWithoutUsage { get { lock (_gate) return _returnedWithoutUsage; } }
 
+    /// <summary>
+    /// Calls that returned a usage block with ONE of its two halves missing. Counted separately from
+    /// <see cref="ReturnedWithoutUsage"/> on purpose: an absent block and a half-block are different
+    /// facts, and folding the missing half in as a zero is how a lower bound gets printed as a spend.
+    /// </summary>
+    public int PartialUsage { get { lock (_gate) return _partialUsage; } }
+
     /// <summary>Prompt tokens the provider reported, summed over the calls that reported any.</summary>
     public long PromptTokens { get { lock (_gate) return _prompt; } }
 
@@ -2623,7 +2847,8 @@ public sealed class Eval09TokenLedger
         get
         {
             lock (_gate)
-                return _attempted > 0 && _cancelled == 0 && _failed == 0 && _returnedWithoutUsage == 0;
+                return _attempted > 0 && _cancelled == 0 && _failed == 0 && _returnedWithoutUsage == 0
+                    && _partialUsage == 0;
         }
     }
 
@@ -2639,6 +2864,9 @@ public sealed class Eval09TokenLedger
                 if (_cancelled > 0) parts.Add($"{_cancelled} cancelled");
                 if (_failed > 0) parts.Add($"{_failed} failed");
                 if (_returnedWithoutUsage > 0) parts.Add($"{_returnedWithoutUsage} returned without usage");
+                if (_partialUsage > 0)
+                    parts.Add($"{_partialUsage} returned HALF a usage block (one of prompt/completion missing) — the "
+                            + "total is a LOWER BOUND, not a spend");
                 return parts.Count == 0
                     ? null
                     : $"{string.Join(", ", parts)} of {_attempted} attempted call(s) — the spend on those is unknown";
@@ -2653,7 +2881,7 @@ public sealed class Eval09TokenLedger
         {
             lock (_gate)
                 return $"attempted {_attempted} · returned {_returned} · cancelled {_cancelled} · failed {_failed} · "
-                     + $"returned without usage {_returnedWithoutUsage}";
+                     + $"returned without usage {_returnedWithoutUsage} · half a usage block {_partialUsage}";
         }
     }
 
@@ -2686,6 +2914,22 @@ public sealed class Eval09TokenLedger
                 _returnedWithoutUsage++;
                 return;
             }
+
+            // ⚠ "AN ABSENCE IS NOT A ZERO" APPLIES TO EACH HALF, NOT ONLY TO THE BLOCK.
+            //
+            // This method used to fall straight through to `?? 0` on both sides, so a response
+            // carrying an input count and no output count was recorded as a COMPLETE reading with a
+            // completion of zero. `ReturnedWithoutUsage` stayed 0, `UsageComplete` stayed true, and
+            // the equal-budget clause — the precondition that decides whether this eval may name a
+            // winner at all — computed its ratio from a half-measured total and printed it as a
+            // measurement. Direction: FLATTERING. It renders a lower bound as a spend.
+            //
+            // The identical defect was found and fixed in the agent's own meter on 2026-09-06
+            // (`ChatSpend.Record`, MEASUREMENT_STATUS §60.2) and was NOT fixed here — in the eval
+            // whose entire clause 2 rests on it. A half-block is now its own third state: neither a
+            // complete reading nor an absent one.
+            if (usage.InputTokenCount is null || usage.OutputTokenCount is null) _partialUsage++;
+
             _prompt += usage.InputTokenCount ?? 0;
             _completion += usage.OutputTokenCount ?? 0;
         }
@@ -3166,6 +3410,21 @@ public sealed class Eval09JudgedReport
 
         return values.Count == 0 ? double.NaN : values.Average();
     }
+
+    /// <summary>
+    /// How many PERSONAS contributed at least one decidable cell for this arm — the denominator
+    /// behind every met rate printed for it.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ It is not the same number for every arm and it is not the cohort size. A live-workflow cell
+    /// that was VOIDED, an arm that presented nothing, and a judge that returned no usable verdict
+    /// each remove a persona from ONE arm's denominator and not the other's. A met rate of 0.000
+    /// over nine personas and one over twelve are different statements, and the panel used to print
+    /// them identically.
+    /// </remarks>
+    /// <param name="arm">The arm.</param>
+    public int DecidedPersonaCount(string arm) =>
+        _cells.Count(kv => string.Equals(kv.Key.Arm, arm, StringComparison.Ordinal) && kv.Value.Count > 0);
 
     /// <summary>
     /// True when the floor arm produced a defined met rate for EVERY criterion — the precondition for

@@ -18,8 +18,32 @@ prove the thing works against a real model. Both are required, in this order.
 | 2 | **One real unit, live** | one turn | the wiring reaches a real model and comes back usable: the tool channel was used rather than prose, usage is reported, the result is not empty or degenerate. **If this is wrong, STOP — do not proceed to stage 3.** |
 | 3 | **The full run** | the rest | the measurement itself. |
 
-`--only <id>` exists on Evals 02, 02b and 02c precisely to make stage 2 possible; it addresses a probe
-snapshot key, never the cohort key, and is ignored under `--ci`.
+`--only <id>` exists on Evals 02, 02b, 02c **and, from 2026-09-06, 09** precisely to make stage 2
+possible; it addresses a probe snapshot key, never the cohort key, and is ignored under `--ci`.
+
+> ✅ **EXTENDED 2026-09-06 — and the eval it was missing from was the one that needed it most**
+> (`MEASUREMENT_STATUS` §61.1). **Eval 09 had no probe form at all**: its stage 2 *was* the cohort —
+> 12 personas × 4 arms, 2 live reps, the most expensive command in the suite. **A stage that can only
+> be run at full price is a stage that will be skipped**, and it was: plan item 8.16 #5 sat open on
+> *"confirming the new numbers needs a judged run"* while the only judged run purchasable was the
+> whole thing. `-- 9 --only <persona-id>` now runs one persona to the probe key
+> `eval09_hypothesis_ab_probe`, and the full-cohort record is untouched — **verified by KEY and by
+> the cohort file's mtime, not by a file count**.
+>
+> **MEASURED, on `-- 9 --quick --only USR-MI-02`, foreground, exit 0:** 22 model round-trips
+> (12 agent · 6 workflow · 4 judge), **0 cancelled, 0 failed, 0 usage-less on all three ledgers**,
+> **USD 1.4725** — tokens from the provider's own usage blocks, priced at
+> `ModelPricing["gpt-5.5"]`. That is roughly a twentieth of the cohort, and it was enough to
+> establish the item's headline finding before the cohort was bought.
+>
+> ⚠️ **And building it exposed a defect of the recurring shape, in the dry run's own checks.** Five
+> of Eval 09's plumbing checks assert properties of an injection that lands on ONE named persona —
+> the cancelled `InterestMapper` on `USR-MB-13`, the instructed silence on `USR-JV-08`. Under
+> `--only` those personas need not be in the run, and all five printed **❌** on the first
+> `-- 9 --dry-run --only USR-MI-02`: five red ticks for injections that were never issued.
+> **Applicability was being read out of the RESULT.** They now print `⏭ NOT APPLICABLE`, which is
+> deliberately not a tick, and the conjuncts are dropped from the verdict rather than assumed true.
+> **A red tick for an absent subject is the same defect as a green one.**
 
 ## Stage 0 — RE-EXECUTE the ablation you are about to build on
 

@@ -74,8 +74,8 @@ if (parsed is null)
     Console.Error.WriteLine("               call no model, so --ci --dry-run runs all three FOR REAL and they DO persist");
     Console.Error.WriteLine("               — the closing banner names every snapshot the run actually wrote. `-- 7");
     Console.Error.WriteLine("               --dry-run` by hand is a one-case PLUMBING check and is not the eval.");
-    Console.Error.WriteLine("  --only <id>  Evals 02, 02b and 02c: run ONE case (stage two of the run protocol). 02 takes a");
-    Console.Error.WriteLine("               persona id, 02b a case id (SN-01…), 02c a customer id (USR-NB-01…). The snapshot");
+    Console.Error.WriteLine("  --only <id>  Evals 02, 02b, 02c and 09: run ONE case (stage two of the run protocol). 02 and");
+    Console.Error.WriteLine("               09 take a persona id, 02b a case id (SN-01…), 02c a customer id (USR-NB-01…). The snapshot");
     Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record. NOT honoured under");
     Console.Error.WriteLine("               --ci for 02b/02c — a CI chain must never be silently narrowed to one case.");
     Console.Error.WriteLine("  --concept-vectors  score in the authored 24-dimension concept space. THE DEFAULT —");
@@ -122,7 +122,8 @@ try
             "7" => await Eval07_WorkflowTopology.RunAsync(dryRun: parsed.DryRun),
             "8" => await Eval08_StochasticStability.RunAsync(
                        runs: null, quick: parsed.Quick, dryRun: parsed.DryRun),
-            "9" => await Eval09_HypothesisComparison.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
+            "9" => await Eval09_HypothesisComparison.RunAsync(
+                       quick: parsed.Quick, dryRun: parsed.DryRun, onlyPersona: parsed.OnlyPersona),
             _ => Unknown(parsed.Eval),
         };
     }
@@ -489,7 +490,8 @@ static async Task<int> ShowMenuAsync(ParsedArgs parsed)
             '7' => await Eval07_WorkflowTopology.RunAsync(dryRun: parsed.DryRun),
             '8' => await Eval08_StochasticStability.RunAsync(
                        runs: null, quick: parsed.Quick, dryRun: parsed.DryRun),
-            '9' => await Eval09_HypothesisComparison.RunAsync(quick: parsed.Quick, dryRun: parsed.DryRun),
+            '9' => await Eval09_HypothesisComparison.RunAsync(
+                       quick: parsed.Quick, dryRun: parsed.DryRun, onlyPersona: parsed.OnlyPersona),
             'q' or 'Q' => -1,
             _ => 0,
         };

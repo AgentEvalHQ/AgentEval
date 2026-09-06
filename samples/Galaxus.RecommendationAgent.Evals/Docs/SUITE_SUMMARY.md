@@ -66,6 +66,10 @@ reason it cannot carry weight.
 > but its two instrument gates now pass. **Measured spend for the 2026-09-06 run: USD 41.3215 over 66 live
 > turns**, which is a separate figure from the USD 80.33 below and must never be added to it — they are two
 > readings of overlapping evals, not two disjoint bills.
+>
+> ➕ **AND A THIRD READING OF EVAL 09 ONLY — 2026-09-06, USD 34.6333 (§26).** Same rule: it is a
+> re-reading of one eval, **never an addend**. It supersedes §19.1's criterion-4 row and nothing else
+> in this document; every other row above is still the 2026-09-05 measurement.
 
 A **case** here is the smallest unit an eval prints a verdict for. Counted that way:
 
@@ -865,6 +869,14 @@ text.**
 > now DECLARED per criterion (`JudgedCriterion.VacuousOnAnAnswerWithNoRecommendations`) rather than
 > inferred from the floor, held by Eval 03's gating row `VacuityIsDeclaredNotInferred`.
 > `MEASUREMENT_STATUS` §46.
+>
+> ✅ **THE JUDGED RUN WAS MADE — 2026-09-06. Criterion 4 now reads `0.000 / 0.000 / 0.000`: the FLOOR
+> moved `1.000 → 0.000` and both live arms stayed put.** See **§26** and `MEASUREMENT_STATUS` §61.
+> ⚠️ **Do not read the whole table above as re-measured.** Only the floor row is a controlled
+> comparison — the floor arm's answer is a compile-time constant and five of its six rates reproduced
+> to the digit, which is what makes criterion 4's movement attributable to the restatement. The
+> **agent and workflow columns are fresh stochastic draws** and two of them changed which side of the
+> Bonferroni threshold they sit on **with their wording untouched** (criterion 2 in, criterion 3 out).
 
 Two rows are worth naming and neither is a gate:
 
@@ -877,6 +889,9 @@ Two rows are worth naming and neither is a gate:
   marked vacuous because the floor arm meets it. **Do not read it as "the agent does not speak the customer's
   language."** What *is* directly observed is narrower and real: Demo 02's cards for Marco (`it`) carry
   English reason text (§17).
+  ✅ **HALF SUPERSEDED 2026-09-06:** *"where an empty answer scores 1.000"* is no longer true — the
+  restated criterion scores the empty answer **0.000**, measured (§26). *"Both arms score 0.000"*
+  still is, on a second live cohort. The warning in the last two sentences stands unchanged.
 
 ⚠ **The workflow is 3× slower in wall clock while being 4× cheaper in tokens**: 3798.8 s over 24 runs against
 the agent's 1267.3 s over 24. Both are reported, neither is gated, and this is a shared demo quota.
@@ -1639,3 +1654,102 @@ dry run of a model-backed eval has no result to record.
   stopped being wrong.
 * **`-- 7` and `--ci --dry-run` exiting 1 is not a regression.** It is the suite's only red gate,
   deferred by decision, saying the same thing in two places.
+
+---
+
+## 26. The 8.16 #5 JUDGED RUN — 2026-09-06 · Eval 09 bought again, and this time a rubric was under test
+
+**The first agent-side purchase since 2026-09-05.** One cohort (`-- 9`, 104 minutes, exit **1**, 461
+model round-trips) plus two one-persona probes. **USD 34.6333 in total**, every token from the
+provider's own usage blocks, priced at `ModelPricing["gpt-5.5"]` ($0.005/1K prompt, $0.03/1K
+completion). Full write-up: `MEASUREMENT_STATUS` **§61**.
+
+⚠️ **This section supersedes §19.1's criterion-4 row and NOTHING ELSE in §§1–21 or §23.** Evals 01,
+02, 02b, 02c, 05, 06, 07 and 08 were not run.
+
+### 26.1 The item's answer, in one table
+
+| criterion 4 — *"at least one recommendation reason is PRESENT, and every reason is in the customer's own language"* | 2026-09-05 (superseded wording) | 2026-09-06 (restated) |
+|---|---|---|
+| LIVE single agent — Robin | 0.000 | **0.000** |
+| LIVE workflow — discovery loop | 0.000 | **0.000** |
+| **FLOOR — contentless answer** | **1.000 ⚠ "vacuous"** | **0.000** |
+
+**The floor lost the row, and that was the whole point of the restatement.** 8.16 #5 was filed
+because a criterion whose floor sits above both entrants measures nothing about either. It no longer
+does. ⚠️ **The row still separates no architecture** — it is now `0.000 / 0.000 / 0.000`, a bar
+nothing on this corpus clears, which is a *readable* result where the old row was an *unreadable*
+one.
+
+### 26.2 The full judged panel, and which half of it is a controlled comparison
+
+| # | criterion | agent | workflow | Δ | W/L/T | p | FLOOR |
+|---|---|---|---|---|---|---|---|
+| 1 | names a past purchase by id | 0.000 | 0.083 | +0.083 | 2/0/10 | 0.5000 | 0.000 ⚠ declared vacuous, judge disagrees |
+| 2 | covering note says what was NOT recommended | **0.833** | 0.208 | −0.625 | 0/10/2 | **0.0020** | 0.000 |
+| 3 | no price / stock / delivery figure | 1.000 | 0.625 | −0.375 | 0/7/5 | 0.0156 | **1.000 — the floor EARNS it** |
+| 4 | **RESTATED** — a reason present, in the customer's language | 0.000 | 0.000 | 0.000 | 0/0/12 | 1.0000 | **0.000** |
+| 5 | says plainly it only recommends | **0.917** | 0.000 | −0.917 | 0/12/0 | **0.0005** | **1.000 — the floor EARNS it** |
+| 6 | says so where unsure | 0.750 | 0.333 | −0.417 | 2/8/2 | 0.1094 | 0.000 ⚠ declared vacuous, judge disagrees |
+
+**69 of 72 judged cells decidable; 3 undecidable** (the three VOIDED workflow cells). **3 cells were
+matched by POSITION** rather than by criterion text — it was **0** on 2026-09-05, and the restated
+criterion is three times longer.
+
+🔴 **ONLY THE FLOOR COLUMN IS A CONTROLLED COMPARISON.** `ContentlessFloorArm.Answer` is a
+compile-time constant and the judge prompt template has not changed since 2026-06-29, so its twelve
+cells are twelve gradings of one fixed answer. **Five of its six rates reproduced to the digit across
+the two runs; the sixth is the restated criterion.** The agent and workflow columns are fresh
+stochastic draws on a tree that has moved, and nothing in them is attributable to the rubric.
+
+🔴 **AND A JUDGED ROW'S SIGNIFICANCE VERDICT IS NOT REPRODUCIBLE.** At the Bonferroni threshold of
+0.00833, the 2026-09-05 run cleared **rows 3 and 5**; this one clears **rows 2 and 5**. Criterion 2
+crossed IN (0.0117 → 0.0020) and criterion 3 crossed OUT (0.0039 → 0.0156), **with their wording
+untouched.** Quote one of these rows and you are quoting one draw.
+
+### 26.3 What else the cohort said — none of it about the rubric
+
+| | 2026-09-05 | 2026-09-06 |
+|---|---|---|
+| mean latent coverage — agent / workflow / rubber stamp / floor | 0.750 / 0.701 / 0.542 / 0.000 | **0.788 / 0.705 / 0.542 / 0.000** |
+| primary endpoint | k-blind; NOT COMPARABLE under the equal-k rule | **p = 0.0156, the workflow BEHIND 0/7** over 9 pairs at equal k, 3 personas refused |
+| spend ratio vs the 1.50× limit | 4.29× | **4.86×** |
+| voided live-workflow cells | 3 of 24 | **3 of 24**, on three *different* stages (`CoverageReviewer`, `InterestMapper`, `Ranker`) |
+| GATE 3 — the loop is load-bearing | ✅ workflow 6/2/4 | ❌ **3/5/1 — the rubber stamp LED** |
+| verdict / exit | NO WIN / 1 | **NO WIN — `ArmNotLive` / 1** |
+
+🔴 **GATE 3 FAILING IS THE RUN'S OTHER FINDING, and it is about the architecture, not the judge.**
+A reviewer that approves on round 1 every time out-covered the live discovery loop 5 to 3. The
+eval's own words: *"the second round bought nothing."* It is the first time this control has fired,
+it is a single run, and it is exactly the outcome the control exists to make visible.
+
+⚠️ **The primary endpoint reaching p = 0.0156 is NOT a result about the architectures either.** It is
+inside a run whose clause 2 is confounded at 4.86× and whose clause 5 voided three live cells; the
+verdict refuses to name a winner for both reasons, in that order, by design.
+
+### 26.4 The judge's own spread, measured on a fixed answer
+
+The floor arm's twelve cells: holistic **25, 30, 25, 30, 30, 25, 30, 30, 25, 25, 30, 25** — two
+distinct values, **spread 5 points**, mean 27.5, sd 2.50 — and **2 of 6 criteria met on every single
+cell, the same two each time**. A strict replicate (`USR-MI-02`, same answer, three separate runs)
+read **25, 30, 30**.
+
+⚠️ **This is NOT §18.1's 25-point spread and does not replace it.** §18.1 re-graded a REAL agent
+answer five times; this re-grades a contentless one twelve times, and a degenerate answer is
+plausibly easier to grade consistently. **5 points is a lower bound.** What is new is that the
+per-criterion MET FLAGS were perfectly stable while the holistic score was not.
+
+### 26.5 What this run does NOT let a reader conclude
+
+* **No claim that the agent or the workflow improved or regressed.** Two draws of a stochastic
+  system, and the only comparison held constant across them is the contentless floor's.
+* **No claim about criterion 4's calibration.** The restated criterion is now unmeetable by an empty
+  answer — that is all. Whether both live arms *deserve* 0.000 is a question this repository still
+  has no gold set to answer.
+* **`USD 32.3855` for the cohort is DERIVED, not printed** — Eval 09 had no money printer when the
+  run was made (it has one now). Its tokens are the provider's; its rate is named. The independent
+  check agrees exactly: the harness's own cost column reports the agent arm at `¤17.7974` and the
+  same arithmetic over that arm's ledger gives `USD 17.7974`.
+* **The cohort's `no-use = 0` was measured by a ledger that could not see a HALF usage block**
+  (`MEASUREMENT_STATUS` §61.7). Fixed after the run; a live probe on the fixed ledger read
+  `half = 0` over 14 calls on the same deployment, which is evidence and not proof.
