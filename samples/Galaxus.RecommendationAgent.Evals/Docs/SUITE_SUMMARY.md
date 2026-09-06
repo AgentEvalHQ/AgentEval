@@ -546,9 +546,22 @@ all his interests. Per the eval's own wording, a direction mismatch is "EITHER a
 corpus change that moved a customer across the boundary", and the witnesses say it is the second.
 
 ⚠ **This contradicts the standing claim that every eval exits 0 at this commit.** Eval 07 is deterministic and
-model-free, so the failure is stable and reproducible in 1.5 s. **Whether it regressed at `f5874915` or was
+model-free, so the failure is stable and reproducible in 1.5 s. ~~**Whether it regressed at `f5874915` or was
 already failing earlier is NOT ESTABLISHED** — settling it needs a checkout of an earlier commit, which I did
-not do.
+not do.~~
+
+> ✅ **CORRECTED 2026-09-06 (Wave 3, `MEASUREMENT_STATUS` §28). The claim that this needs a checkout is
+> wrong, and the mechanism is now on screen every run.** The loop-back edge reads `OpenGaps.Count > 0`, and
+> on this corpus **not one of the four non-abstention cases has ever had a gap written against a MAPPER
+> interest** — every round says `0 gap(s) with a concrete next query`. What opens the gap is an accepted
+> mid-run interest **proposed from review text**; ablating the proposer to `null` makes **every** case stop
+> at round 1 and takes GATE B from 4 of 5 pins to **2 of 5**. Renzo's single proposal is refused because all
+> four of its terms are out of vocabulary (`vierundzwanzig · hundertfünf · deckt · strasse`, off a German
+> review of a lens his contentless utterance retrieved), and the selector that chose that snippet ranks on a
+> criterion **anti-correlated** with the one the acceptor admits on. ⚠️ **The remedy was built, run and
+> REFUSED**: it puts Renzo back on his pin exactly and then flips **Nadia**, so GATE B is still ❌, the
+> corpus's non-looping direction collapses to one case, and the edge becomes effectively unconditional. The
+> table above is unchanged; what changed is that the row now says *why*.
 
 Also printed, advisory and correctly not gated: `round-limit-reached` is **not reachable** on this corpus —
 it is only ever forced by the demo lane's `DiscoveryTerminationProbe` with a scripted reviewer, which is a

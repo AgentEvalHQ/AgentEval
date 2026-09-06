@@ -4338,3 +4338,103 @@ dotnet run --project $A -- 2 --user USR-LF-04 --real-vectors  # live workflow, u
 ```
 
 Logs, one file per command: `Docs/runs/2026-09-06_wave2-verify-f6f54d27/` (gitignored, 8.24's rule).
+
+---
+
+## 28. WAVE 3 — Eval 07 GATE B: the origin is ESTABLISHED, and the remedy is REFUSED (2026-09-06)
+
+**`SUITE_SUMMARY` §13 says the Renzo pin mismatch's origin "is NOT ESTABLISHED" and that settling it
+"needs a checkout of an earlier commit". It does not.** The mechanism is observable on the tree as it
+stands, in 1.5 s, with no model call and no credentials, and this section settles it by ablation in both
+directions. Nothing about the corpus, the pins or the thresholds changed to do it.
+
+### 28.1 What the loop-back edge actually reads — measured, per case
+
+The edge predicate is `OpenGaps.Count > 0`. **Two different things write an open gap**, and until now
+only one of them was ever named in the eval's own prose:
+
+1. a MAPPER interest the reviewer could not serve, with a concrete runnable next query; or
+2. a mid-run interest **proposed from review text and ACCEPTED** — nobody has searched it, so
+   `CoverageVerdictProjection.Project`'s second structural veto refuses to approve over it.
+
+Measured on the shipped deterministic corpus (`-- 7`, concept space), from the new **advisory** row
+`… · what opened the gap the loop-back edge read`:
+
+| case | loop-back | MAPPER interests ever given a gap reason | mid-run proposals accepted / made |
+|---|---|---|---|
+| `USR-RB-10` Renzo | **False** | **0** | **0 of 1** — refused: every proposed term out of vocabulary |
+| `USR-MI-02` Marco | True | **0** | 1 of 2 |
+| `USR-MB-13` Mirjam | True | **0** | 1 of 3 |
+| `USR-NB-01` Nadia | False | **0** | **0 of 1** — refused: every proposed term out of vocabulary |
+| `USR-LF-04` Luca | False | 1 (the pre-gate's, unrunnable) | 0 of 0 |
+
+**Zero of the four non-abstention cases has ever had a mapper-interest gap**, and every round's own
+assessment line says `0 gap(s) with a concrete next query`. So on this arm
+the discriminator between a looping and a non-looping customer is **whether one review-snippet proposal
+survived `QueryVocabulary`** — not whether coverage was incomplete.
+
+**Ablation, executed, both directions.** Forcing `ReviewSnippetInterestProposer.Propose` to return
+`null` and re-running `-- 7`: **not one case loops**, and GATE B goes from **4 of 5 pins matching to 2 of
+5** — Renzo, Marco *and* Mirjam all fail. Restored, the run returns to 4 of 5 exactly. The advisory row
+moves with it (`0 accepted of 0` on every case), so the row is wired to the mechanism and not to a label.
+
+### 28.2 The root cause of the Renzo mismatch, and why the obvious fix is REFUSED
+
+`ReviewSnippetInterestProposer.Propose` ranks the round's snippets by the count of tokens **novel to the
+interest map**, and `CoverageVerdictProjection.TryAcceptProposal` admits on a **disjoint** criterion —
+every token in `QueryVocabulary`. The two are not merely different, they are **anti-correlated**: a token
+absent from the interest map is more likely to be absent from the catalogue's vocabulary too, and
+foreign-language review prose maximises both at once. So the selector reliably picks the one snippet in
+the round whose proposal cannot survive, spends the round's single proposal slot on it, and never
+considers a runnable one sitting in the same pool. Renzo's winner is a German review of a lens his
+contentless session utterance retrieved: `vierundzwanzig · hundertfünf · deckt · strasse`, all four
+refused. **This is correction ④'s shape one layer up — a producer told to draw from a set the consumer
+rejects — and this time in the deterministic reviewer rather than the live ranker.**
+
+**The remedy was built, run and measured, and it is NOT SHIPPED.** Ranking on the terms that will
+actually be sent (the first `MaxProposedTerms` novel tokens) by how many the vocabulary would admit,
+tie-broken by the raw novel count — selection only, payload unchanged, so the D-3 drop ledger still
+records every injected term:
+
+| | baseline (shipped) | with the remedy |
+|---|---|---|
+| `USR-RB-10` Renzo | 1 round · `coverage-sufficient` · 9 items · **pin ❌** | **3 rounds · 2 loop-backs · `coverage-sufficient` · 12 items · pin ✅** — *exactly what the pin's own text describes* |
+| `USR-MI-02` Marco | 2 rounds · `no-progress` (DEGRADED) | 2 rounds · **`coverage-sufficient` (APPROVED)** · 11 items |
+| `USR-MB-13` Mirjam | 3 rounds · `gaps-unresolvable` | 3 rounds · **`round-limit-reached`** · 11 items |
+| `USR-NB-01` Nadia | 1 round · does not loop · **pin ✅** | **2 rounds · loops · pin ❌** |
+| `USR-LF-04` Luca | pre-gate · `gaps-unresolvable` · 0 items | unchanged |
+| **GATE B** | ❌ on Renzo, 4 of 5 | ❌ **on Nadia**, 4 of 5 |
+| **exit** | **1** | **1** |
+
+**Three reasons it is refused, and the first is sufficient.** (a) It does not fix the gate — it moves the
+failure from Renzo to Nadia. (b) It **weakens the control it was meant to serve**: after it, 4 of 5 cases
+loop and the only non-looping case is Luca, whose non-loop comes from the pre-gate, a different
+mechanism — so the corpus's negative direction collapses from two cells to one and the loop-back edge
+becomes effectively unconditional, which is the exact failure GATE B exists to detect. (c) It would have
+**silently retired a printed advisory finding**: `round-limit-reached` is currently reported as *not
+reachable on this corpus*, and after the remedy Mirjam reaches it.
+
+**Re-pinning Nadia to match is not on the table.** That is the corpus supplying the bar for the change
+being tested (§7 rule 1), and it would delete the ⭐ negative direction the eval is built on.
+
+### 28.3 What shipped instead
+
+- **The advisory row above**, printed per case on every run, so the next reader of a GATE B failure does
+  not re-derive this. It is `Gating: false` on purpose: the pins carry the direction, and gating the
+  mechanism would pin the eval to whichever mechanism is load-bearing this month.
+- **The eval's own prose corrected.** The loop-back row's expectation said a looping customer "leaves
+  round 1 with gaps the reviewer can still act on"; measured, that is false on 3 of 3 looping cases. It
+  now says **OPEN GAP**, and the class remarks carry §28.1 and §28.2 with the ablation.
+- **GATE B stays RED and `-- 7` still exits 1.** It is a true finding about the corpus, it is now
+  explained on screen, and nothing was moved to make it green.
+
+### 28.4 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet run --project $E -- 7                       # exit 1 — GATE B ❌ on USR-RB-10; the advisory row is new
+dotnet run --project $E -- 3                       # exit 0
+dotnet run --project $E -- --ci --dry-run          # exit 0
+dotnet run --project $A -- 2 --offline --user USR-RB-10   # 1 round, 0 accepted of 1 proposal
+```

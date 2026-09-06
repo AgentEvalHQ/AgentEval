@@ -108,6 +108,40 @@ namespace Galaxus.RecommendationAgent.Evals;
 /// degraded". Renzo loops twice and still exits APPROVED; Luca never loops and still exits PARTIAL.
 /// </para>
 ///
+/// <para><b>═══ ⚠ WHAT MAKES THE EDGE FIRE, MEASURED 2026-09-06 (Wave 3) ═══</b></para>
+///
+/// <para>
+/// The rows below used to tell a reader that a looping customer "leaves round 1 with gaps the
+/// reviewer can still act on". <b>On the shipped deterministic corpus that is false for every one
+/// of them.</b> Measured, per case, by the advisory row <c>what opened the gap the loop-back edge
+/// read</c>: <b>0 of 4</b> non-abstention cases ever had a gap written against a MAPPER interest,
+/// and each round's own assessment says <c>0 gap(s) with a concrete next query</c>. The gap the
+/// edge predicate reads is written by ACCEPTING a mid-run interest proposed from review text —
+/// nobody has searched it yet, so <c>CoverageVerdictProjection.Project</c>'s second structural veto
+/// refuses to approve over it, and the run goes round again.
+/// </para>
+/// <para>
+/// Proven in both directions by ablation, not inferred: forcing
+/// <c>ReviewSnippetInterestProposer.Propose</c> to return null makes <b>every</b> case stop at
+/// round 1 and takes GATE B from 4 of 5 pins matching to <b>2 of 5</b> (Renzo, Marco AND Mirjam
+/// all fail). So on this arm the loop-back's discriminator is not coverage completeness — it is
+/// whether one review-snippet proposal survived <c>QueryVocabulary</c>. That is reported and never
+/// gated; the pins still carry the direction, and gating the mechanism would pin the eval to
+/// whichever mechanism happens to be load-bearing this month.
+/// </para>
+/// <para>
+/// ⚠ <b>GATE B's live failure (<c>USR-RB-10</c>) is downstream of exactly this.</b> Renzo's one
+/// proposal is refused because every one of its four terms is out of vocabulary
+/// (<c>vierundzwanzig · hundertfünf · deckt · strasse</c>, off a German review of a lens his
+/// contentless session utterance retrieved). <b>The prescribed remedy was built and measured and
+/// it is REFUSED</b> — see <c>MEASUREMENT_STATUS</c> §28: making the proposer rank snippets by
+/// terms the vocabulary would admit puts Renzo back on his pin exactly (loops twice, exits
+/// APPROVED) and then flips <b>Nadia</b>, the ⭐ negative-direction case, so GATE B still fails,
+/// the corpus's non-looping direction collapses from two cases to one, and the loop-back edge
+/// becomes effectively unconditional. A fix that leaves the gate red and weakens the control it
+/// was meant to serve is not a fix.
+/// </para>
+///
 /// <para><b>═══ WHAT THIS EVAL DOES NOT PROVE ═══</b></para>
 ///
 /// <list type="bullet">
@@ -605,6 +639,13 @@ public static class Eval07_WorkflowTopology
             Approved = run.State.CoverageApproved,
             PartialAnswer = run.State.IsPartialAnswer,
             PresentedCount = run.State.Presented.Count,
+            ProposalsMade = run.State.Proposals.Count,
+            ProposalsAccepted = run.State.Proposals.Count(p => p.Accepted),
+            ProposalRefusals = [.. run.State.Proposals.Where(p => !p.Accepted && p.Refusal is not null)
+                                                     .Select(p => p.Refusal!)],
+            MapperGapsAtAnyRound = run.State.Interests
+                .Where(i => !i.IsReviewerInferred)
+                .Count(i => !string.IsNullOrWhiteSpace(run.State.CoverageFor(i.Id).LastGapReason)),
             ModelCalls = run.State.ModelCalls,
             LoopElapsed = run.Elapsed,
             TurnElapsed = turn.Performance?.TotalDuration ?? TimeSpan.Zero,
@@ -812,7 +853,7 @@ public static class Eval07_WorkflowTopology
                 $"{o.Case.PersonaId} · loop-back {(o.Case.ExpectsLoopBack ? "FIRES" : "does NOT fire")}",
                 o.Case.ExpectsLoopBack
                     ? "HaveTraversedEdge(CoverageReviewer → Discovery) must VALIDATE — this customer leaves "
-                    + "round 1 with gaps the reviewer can still act on"
+                    + "round 1 with an OPEN GAP the reviewer can still act on"
                     : "the SAME assertion must FAIL — this customer leaves round 1 with nothing the reviewer "
                     + "can send back for, so a conditional edge must not fire",
                 $"traversed = {o.LoopBackTraversed}; {o.LoopBacksInTrace} loop-back(s) in the route trace, "
@@ -837,6 +878,39 @@ public static class Eval07_WorkflowTopology
                 ? $"rejected on all {observations.Count} case(s)"
                 : "AT LEAST ONE CASE ACCEPTED AN EDGE THAT DOES NOT EXIST",
             Tripped: negativeCapable));
+
+        // ── ADVISORY — what actually opened the gap the loop-back edge reads ─────────────────
+        //
+        // ⚠ MEASURED 2026-09-06 (Wave 3), because the eval's own prose named a mechanism the run
+        // refutes. The loop-back edge fires on `OpenGaps.Count > 0`, and on the shipped
+        // deterministic corpus NOT ONE of those gaps came from a mapper interest the reviewer
+        // could not serve: every mapper interest is COVERED at the end of round 1 on all four
+        // non-abstention cases, and each round's assessment says "0 gap(s) with a concrete next
+        // query". The gap that makes the edge fire is written by ACCEPTING a mid-run interest
+        // proposed from review text — a newly-added interest nobody has searched, which
+        // `CoverageVerdictProjection.Project`'s second structural veto refuses to approve over.
+        //
+        // So the discriminator between a looping and a non-looping customer, TODAY, is whether
+        // that proposal survived QueryVocabulary — not whether coverage was incomplete. That is
+        // reported and NEVER gated: gating it would pin the eval to the mechanism that happens to
+        // be load-bearing this month, and the pins already carry the direction. It is printed so
+        // that the next reader of a GATE B failure does not have to re-derive it, as this wave did.
+        foreach (Observation o in observations)
+        {
+            rows.Add(new ControlRowSnapshot(
+                $"{o.Case.PersonaId} · what opened the gap the loop-back edge read",
+                "the edge's predicate is OpenGaps.Count > 0. Two different things write a gap: a mapper "
+              + "interest the reviewer could not serve, and a mid-run interest proposed from review text "
+              + "and ACCEPTED (which nobody has searched yet, so approval is vetoed in code). This row "
+              + "says which one, per case — it does not judge either",
+                $"loop-back traversed = {o.LoopBackTraversed} · mapper interest(s) ever given a gap reason = "
+              + $"{o.MapperGapsAtAnyRound} · mid-run proposals {o.ProposalsAccepted} accepted of {o.ProposalsMade}"
+              + (o.ProposalRefusals.Count == 0
+                    ? string.Empty
+                    : " · refused: " + string.Join(" | ", o.ProposalRefusals.Select(Flatten))),
+                Tripped: true,
+                Gating: false));
+        }
 
         rows.Add(new ControlRowSnapshot(
             "the corpus contains both directions",
@@ -1383,6 +1457,15 @@ public static class Eval07_WorkflowTopology
         public bool Approved { get; init; }
         public bool PartialAnswer { get; init; }
         public int PresentedCount { get; init; }
+
+        // ── What actually opened the gap the loop-back edge reads (Wave 3, 2026-09-06) ──────
+        //
+        // Recorded because the eval's own per-case prose used to name a mechanism the run
+        // refutes. See the advisory row `what opened the gap the loop-back edge read`.
+        public int ProposalsMade { get; init; }
+        public int ProposalsAccepted { get; init; }
+        public IReadOnlyList<string> ProposalRefusals { get; init; } = [];
+        public int MapperGapsAtAnyRound { get; init; }
 
         public int ModelCalls { get; init; }
         public TimeSpan LoopElapsed { get; init; }
