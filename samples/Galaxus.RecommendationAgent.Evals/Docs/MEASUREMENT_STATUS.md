@@ -8628,3 +8628,197 @@ member of the CI chain.
 * **The write ledger is unchanged:** `--ci --dry-run` still names exactly `eval03_controls`,
   `eval04_injection`, `eval07_topology`. Snapshots written from `311e3889` onward carry **one extra
   top-level member** (`Provenance`) and **no changed one**.
+
+---
+
+## 60. WAVE 7's INDEPENDENT REVIEW PASS — all eighteen ablations re-executed, four defects (2026-09-06)
+
+**Every ablation §§55–59 publish was RE-EXECUTED, not re-read (`RUN_PROTOCOL` stage 0), in the space
+the section claims for it. All eighteen reproduced**, several verbatim down to the fault text. Four
+defects were found anyway, and **three of them are in the flattering direction**. Two are in the
+spend meter, which is what this pass was asked to distrust most.
+
+### 60.1 What reproduced — the ledger, so a reader can see nothing was skipped
+
+| § | ablation | reproduced? | observed |
+|---|---|---|---|
+| 55.6 A | drop `state.Spend.Record(response.Usage)` | ✅ **concept AND real** | `-- 3` **1**, row ❌, `ARunThatSaysItSpendsSaysHowMuch` **✅ green** in both |
+| 55.6 B | fold a missing block in as a measured zero | ✅ | verbatim: *"a provider-reported ZERO and a MISSING usage block render identically (\"1 model call(s) · 0 prompt + 0 completion = 0 token(s)…\")"* |
+| 55.6 C | remove Demo 02's `PrintChatSpend` | ✅ | `-- 3` **1**, sibling green |
+| 55.6 D | drop `InvariantCulture` | ✅ | verbatim, including `1’234` — the Swiss apostrophe |
+| 56.4 A | `IsSilentWipeout` → `d.Degraded` | ✅ **concept AND real** | concept census 0 of 42; **real census 1 → 0, the finding disappears**, gating row ❌ |
+| 56.4 B | `IssuedQueries()` empty | ✅ | `NO SPECIMEN` ❌ + census ❌ **VACUOUS, 0 of 0** |
+| 56.4 C | specimen hard-coded `"zzzz qqqq"` | ✅ | verbatim: *"degraded=true, kept=0, cut=0 — the detector DID NOT FIRE"* |
+| 56.4 D | negative direction removed | ✅ | *"STILL FIRED, so it is not reading the floor"* |
+| 57.4 A–D | Attach dropped · requested-not-resolved deployment · endpoint host planted · note blanked | ✅ all four | B verbatim (*"file says 'gpt-5-mini'"*); **C printed `credentials in the document: ❌ PRESENT`, so the clause is PROVEN able to hit on this machine** — and see §57.4a |
+| 59.1 | restore `$"{key}: {value}"` | ✅ | **578**, `-- 3` **1**, the same `GLX-1001 "context:landscape: context:landscape"` example |
+| 59.2 A | pins mis-set | ✅ | `HELD: 0 of 6`, positive control 6 of 6 |
+| 59.2 B | **the asset file itself rotated on disk** | ✅ | `GLX-1001·GLX-1002` **0.4600** ≠ pinned 0.6438, **while ARM B on the same run still read `0 of 99`** |
+| 59.3 | restore the bare `continue` | ✅ | `NOT COMPARABLE (0): —` plus both direction messages; and `-- 9 --dry-run` moved **12 → 11**, **2 → 1**, its own sentence **12 → 11** — the published movement, reproduced in reverse |
+| 59.4 | delete the printer's block | ✅ | *"the gate panel does not name assertion faults at all — the aggregate is dead again"* |
+
+**Also re-measured independently:** concept **0 of 42** and real **1 of 50** (`"getting started"`, 24
+cut) · `GLX-1001·GLX-1002 = 0.6438` · `118 query call(s) for 118 distinct text(s) … 297 from the
+committed index … 1248 prompt token(s)`, which is §56.5's zero-additional-spend argument arrived at
+from the run's own meter · three TFM totals **identical** to §54.3 · panel **36 gating (0 NOT CAUGHT)
++ 7 advisory** in both spaces, with the space-dependent advisory set confirmed (concept 2, real 3).
+
+### 60.2 🔴 THE METER APPLIED ITS OWN RULE TO THE BLOCK AND NOT TO THE HALVES
+
+`ChatSpend.Record` tested *"neither count present"* and then wrote `usage.InputTokenCount ?? 0` and
+`usage.OutputTokenCount ?? 0`. **A response carrying a prompt count and NO completion count was
+therefore recorded as `1,234 prompt + 0 completion = 1,234 token(s), read from the provider's own
+usage blocks`** — an absence rendered in the exact words reserved for a measurement, which is the
+sentence check 2 of `TheChatLaneSaysWhatItSpent` exists to forbid. One level down from where the
+check was looking.
+
+**Worse downstream, and this is the flattering half:** `Complete` stayed **true**, so
+`Eval08LiveWorkflowArm` would have handed that half-measured total to the harness with
+`TokensAreEstimated = false` — publishing a partial figure as a measured whole, which that arm's own
+comment names as the flattering direction.
+
+**Fixed:** a half-populated block is now `CallsWithPartialUsage`. The half the provider did send is
+still summed (it is a provider figure), the half it did not adds nothing, `Describe` carries a LOWER
+BOUND line, `Complete` is false, and Eval 08's panel names the count. Two new clauses on the row,
+driven through the real `DiscoveryModelCall` seam like the rest.
+
+| ablation | `-- 3` | observed |
+|---|---|---|
+| restore the `?? 0` folding | **1** | *"(1 complete, 0 partial, 1234 prompt, 0 completion, Complete=True; expected 0 / 1 / 1234 / 0 / False)"* plus the rendered line quoted back |
+| restored | **0** concept · **0** real | — |
+
+### 60.3 🔴 A THIRD CHAT LANE SPENT AND SAID NOTHING — and it is the one a customer meets
+
+**§55.1 says *"Two consuming lanes, one missing line."* There are three.**
+`Demo01_RecommendationAgent.RunAgentAsync` makes a live `AIAgent.RunAsync` against the **same
+deployment** and reads `response.Messages` for the tool trace and **never `response.Usage`**. It
+printed a tool-call COUNT and elapsed seconds — and, a few lines below,
+`EmbeddingSpace.PrintLiveSpend()`, the EMBEDDING lane's fraction of a cent. **Established by
+execution rather than by reading the file:** `grep -rn "\.Usage" samples/Galaxus.RecommendationAgent
+--include=*.cs` returned the embedding source and the discovery loop and no third site.
+
+**So the review's own sharpest question — *can a spend control pass on a run that spent real money and
+reported nothing?* — answers YES, and it answered yes on this tree**, on `agent -- 1 --user <id>`,
+with both spend rows green.
+
+**Direction: flattering, and it is §55.4's own lesson repeated by the row written to fix it.** §55.4
+found that `ARunThatSaysItSpendsSaysHowMuch` reads as a general rule and covers one lane; Wave 7 then
+shipped `TheChatLaneSaysWhatItSpent`, whose name says *the chat lane* and whose body reached
+`DiscoveryModelCall` alone. **A row's NAME is not its subject — count the lanes its body reaches.**
+
+**Fixed:** Demo 01 meters every exit path (a call that threw is `RecordNoResponse`, never a free one),
+prints tokens with `cost: UNKNOWN IN THIS PROCESS`, and clause 4 of the row now names **three** lanes.
+
+**`RUN_PROTOCOL` stages on the new lane.** Stage 1: `agent -- 0`, `-- 1 --offline`, `-- 2 --offline`
+exit **0**, and the offline arm prints **no** meter — no call was made, and a "0 calls" line there
+would invite someone to quote it about a path that never ran. Stage 2, live, **foreground, `$?`
+captured** — `agent -- 1 --user USR-NB-01` exit **0**:
+
+```
+💸 Chat: 1 model call(s) · 50,537 prompt + 2,835 completion = 53,372 token(s),
+         read from the provider's own usage blocks.
+```
+
+⚠ **"1 model call" is one agent TURN, not one HTTP round trip** — MAF aggregates the 22-tool loop into
+one `AgentResponse` with one usage block. ⚠ **Do not quote the digits.** What is quotable:
+`CallsWithoutUsage = 0`, and that prompt is **94.7 %** of tokens here — the tool loop's shape,
+independently corroborating `RUN_PROTOCOL`'s 96 % and standing against the workflow lane's **56 %
+completion** (§55.2). **Two lanes, opposite cost shapes, now both measured on the same deployment.**
+
+### 60.4 🔴 CLAUSE 4 WAS SATISFIED BY A COMMENTED-OUT CALL — found by ablating it, not by reading it
+
+While ablating §60.3's fix by **commenting out** Demo 01's `Record` call, `-- 3` stayed **exit 0 and
+the row stayed green**. Clause 4 was a plain `File.ReadAllText(path).Contains(needle)`, so the needle
+was still sitting in the comment.
+
+**That is the exact trap the row's own remarks cite twice** — §34.4's latch asserted by its own dead
+field, and §55.5's *"a source-text assertion that `Usage` is mentioned would be satisfied by the
+comment that explains it"*. §55.6's ablation C missed it **only because it deleted the line instead of
+commenting it out**, which is the less natural of the two ways to disable a call.
+
+**Fixed:** needles are matched against the source with whole-line comments stripped
+(`WithoutCommentLines`). **Ablated in both directions:** commenting out Demo 01's `Record` → red;
+commenting out Demo 02's *shipped* `PrintChatSpend(result.State)` **in place** → red, where before the
+hardening it was green.
+
+### 60.5 🔴 THE PLANTED CREDENTIAL CONTROL WROTE THE REAL ENDPOINT HOST TO DISK — see §57.4a
+
+Re-executing §57.4's ablation C put the endpoint host into `eval03_controls.json`, and the
+archive-first rule would have copied it into a permanent dated archive on the restore run. A
+count-only scan of `.agenteval/` found **two** files: this review's, **and the Wave-7 authoring run's
+own, stamped `20260906T110852Z`**. Both deleted, canonical regenerated clean, scan back to **0**.
+`.agenteval/` is gitignored so nothing reached the repository. The full account, the mandatory cleanup
+and the general rule are at **§57.4a**, plus `RUN_PROTOCOL` **stage 0c**.
+
+### 60.6 Recorded, NOT changed — one gate self-examination limit worth naming
+
+`EverySnapshotSaysWhatProducedIt`'s `namesChat` clause compares the file's `ChatDeploymentConfigured`
+against **`Config.Model`**, and `SnapshotProvenance.OfThisProcess` **writes `Config.Model`**. Both
+sides are the same expression, so that clause cannot see a wrong `Config.Model` — a mild instance of
+the co-derived-key shape (§20.11 item 7). It is **not** vacuous: ablation B (write
+`Config.PreferredDeployment` instead) does discriminate, and that requested-vs-resolved distinction is
+the one that matters here; the **space** clause is genuinely independent, because the control reads
+`EmbeddingSpace.Resolve` while the writer reads `.Current`. Stated rather than fixed, because the
+honest source of truth for *"what deployment is this process configured with"* is that property.
+
+### 60.7 What this review did NOT do
+
+* **It bought exactly one live unit** — `agent -- 1 --user USR-NB-01`, the stage-2 probe for the lane
+  it metered. No cohort run, no judged verdict, no Eval 08 live arm and no `SUITE_SUMMARY` figure was
+  re-taken. §55.9's exclusions all still stand.
+* **It did not re-measure the two headline claims.** Eval 02b's 0.889 / 1.000 and Eval 02c's 0.385 are
+  untouched, and no file either eval reads was modified.
+* **The 94.7 % prompt share is ONE turn of ONE persona on ONE lane.** It is offered as corroboration
+  of a documented shape, never as a rate.
+* **§60.3 does not claim Demo 01 was previously mis-measured.** Nothing was measured there at all —
+  that is the defect.
+
+### 60.8 Nothing moved, and the whole state was re-taken
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1/2/2b/2c/5/6/8/9 --dry-run` | **0** | `-- 8 --dry-run` **0** |
+| `-- 3` · `-- 4` | **0** · **0** | **0** · **0** |
+| `-- 7` | **1** | **1** |
+| `--ci --dry-run` | **1** — eleven steps, **ten `passed`, Eval 07 the only FAILED** | — |
+| `agent -- 0`, `agent -- 1 --offline`, `agent -- 2 --offline` | **0** | — |
+| `agent -- 1 --user USR-NB-01` **(live, paid)** | **0** | — |
+
+* **Build:** `AgentEval.sln` **0 errors**. No warning count is quoted (§54.2).
+* **Tests**, after a full solution build, `--no-build` per TFM: net10 **9,699 / 0 / 2 of 9,701** ·
+  net9 and net8 **9,481 / 0 / 1 of 9,482** — identical to §54.3 and §59.9. **Zero files under
+  `tests/` or `src/` were touched by this review either.**
+* **Panel: 36 gating + 7 advisory = 43 in BOTH spaces, `❌ NOT CAUGHT` = 0.** This review added **no
+  rows** — it added clauses to an existing one — so the count is unchanged; concept trips two advisory
+  rows, real trips three.
+* **Write ledger unchanged:** `eval03_controls`, `eval04_injection`, `eval07_topology`.
+* **Credentials:** the scanner was **proven able to hit first** (two planted files, two hits), then
+  **0** in `.agenteval/samples`, **0** in `samples/`, **0** in `docs/` and **0** in `strategy/Galaxus`
+  — counts only, no value printed. ⚠ Two files under `.agenteval/gatekeeper/certs/` carry the endpoint
+  host, one **in its filename**; they are dated 2026-07-11 and 2026-07-17, predate all of this work,
+  and are named here so the next scanner does not attribute them to this wave.
+
+### 60.9 How to re-derive §60
+
+```bash
+# The two new clauses, green, in both spaces (0 / 0):
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 ; echo $?
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors ; echo $?
+
+# 60.2 — restore the `?? 0` folding in ChatSpend.Record and watch the row go red. Replace
+#   if (input is null || output is null) { CallsWithPartialUsage++; } else { CallsWithUsage++; }
+# with a bare CallsWithUsage++; then:
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 2>&1 \
+  | tr -d '\r' | grep -A6 "NOT CAUGHT  TheChatLaneSaysWhatItSpent"
+
+# 60.3 — the third lane, established without spending anything:
+grep -rn "\.Usage" samples/Galaxus.RecommendationAgent --include=*.cs
+#   -> AzureEmbeddingSource (embedding) + ModelDiscoveryNodes (discovery loop) + ChatSpend's own
+#      remarks + Demo01's new Record. Before this review, Demo01 was NOT in that list.
+
+# 60.4 — the needle hardening, ablated the way that found it: COMMENT the call out, do not delete it.
+#   Demo02_InterestMapWorkflow.cs:   // PrintChatSpend(result.State);
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 ; echo $?   # -> 1
+
+# 60.5 — the credential scan: positive control FIRST, then counts only. Commands at 57.4a.
+```
