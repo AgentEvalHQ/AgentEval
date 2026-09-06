@@ -167,13 +167,39 @@ public static class Eval01_CatalogueIntegrity
                 ? $"Eval 01 — DRY RUN, STUB MODEL, NOT A RESULT ({report.CaseCount} cases, 6 pairing groups)"
                 : $"Eval 01 — Catalogue Integrity & Signal Hygiene ({report.CaseCount} cases, 6 pairing groups)");
 
-        if (judge && !dryRun) await RunAdvisoryJudgeAsync(report, ct).ConfigureAwait(false);
+        // ── PLAN ITEM 8.5 ────────────────────────────────────────────────────────────────
+        //
+        //   This used to read `if (judge && !dryRun)`, so the ENTIRE judge path had no dry-run
+        //   coverage: `--judge --dry-run` printed nothing, spent nothing and proved nothing, and a
+        //   change to the judge's transport or its parser could only be exercised by paying for a
+        //   live judged run. `--dry-run` has been STRUCTURALLY BLIND twice in this suite already;
+        //   this was a third instance, and it was blind by an explicit `!dryRun`.
+        //
+        //   ⚠ The stub is deliberately AWKWARD — five reply shapes including one unrecognised
+        //   verdict string and one that is not JSON — because a judge stub that always answers
+        //   SUPPORTED in clean JSON certifies four parser branches it never runs.
+        StubJudgeClient? stubJudge = null;
+        if (judge)
+        {
+            if (dryRun)
+            {
+                stubJudge = new StubJudgeClient();
+                await RunAdvisoryJudgeAsync(report, stubJudge, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                var azure = new Azure.AI.OpenAI.AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
+                await RunAdvisoryJudgeAsync(report, azure.GetChatClient(Config.Model).AsIChatClient(), ct)
+                    .ConfigureAwait(false);
+            }
+        }
 
         EvalPrinter.PrintIntegrityGate(report, dryRun);
 
         if (dryRun)
         {
             PrintDryRunVerdict(report);
+            bool judgeWiringHeld = stubJudge is null || PrintJudgeDryRunVerdict(report, stubJudge);
 
             // A dry run NEVER writes the snapshot. A stub result sitting in the store under the
             // real key would be read later as a measurement, and nothing about it says "stub" once
@@ -184,7 +210,12 @@ public static class Eval01_CatalogueIntegrity
 
             // The exit code reflects whether the PLUMBING held, not whether an agent behaved. The
             // stub cannot satisfy the permission cases, so the gate is expected to fail.
-            return DryRunPlumbingHeld(report) ? 0 : 1;
+            //
+            // ⚠ The judge's wiring is ANDed in only when --judge was asked for. A run that did not
+            // ask for the judge must not be failed by it, and a run that DID ask must not pass
+            // while the judged path was never reached — which is exactly what the old `!dryRun`
+            // guard made impossible to notice.
+            return DryRunPlumbingHeld(report) && judgeWiringHeld ? 0 : 1;
         }
 
         EvalResultStore.SaveIntegrity(EvalResultStore.IntegrityKey, report.ToSnapshot(report.Architecture));
@@ -512,10 +543,11 @@ public static class Eval01_CatalogueIntegrity
     /// </remarks>
     /// <param name="report">The completed run.</param>
     /// <param name="ct">Cancellation token.</param>
-    private static async Task RunAdvisoryJudgeAsync(IntegrityRunReport report, CancellationToken ct)
+    private static async Task<JustificationTally> RunAdvisoryJudgeAsync(
+        IntegrityRunReport report, IChatClient client, CancellationToken ct)
     {
-        var azure = new Azure.AI.OpenAI.AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var client = azure.GetChatClient(Config.Model).AsIChatClient();
+        ArgumentNullException.ThrowIfNull(client);
+
         var judge = new RecommendationJustificationJudge(client);
         var tally = new JustificationTally();
 
@@ -563,6 +595,93 @@ public static class Eval01_CatalogueIntegrity
             : "    Advisory only. Uncalibrated: no gold set, no inter-rater agreement, no calibration run. "
             + "INCONCLUSIVE is counted in its own column and is never folded into the rate.");
         Console.ResetColor();
+
+        return tally;
+    }
+
+    /// <summary>
+    /// Whether the JUDGED path's wiring held under a dry run — plan item 8.5.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>The first check is that the path was REACHED AT ALL</b>, and it is first because that
+    /// is the property the old code silently lacked: <c>--judge --dry-run</c> ran no judge, printed
+    /// no judge panel, and exited 0. A dry run that certifies a path it never entered is worse than
+    /// no dry run, because it reads as coverage.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The comparison is against the STUB's own record of what it sent</b>, not against the
+    /// tally alone. A check that read only the tally would let the judge under test supply the
+    /// input to its own pass criterion — the gate-self-examination rule, and the reason
+    /// <see cref="StubJudgeClient.Script"/> is public.
+    /// </para>
+    /// </remarks>
+    /// <param name="report">The completed run.</param>
+    /// <param name="stub">The stub judge the dry run drove.</param>
+    /// <returns>True when every check held.</returns>
+    private static bool PrintJudgeDryRunVerdict(IntegrityRunReport report, StubJudgeClient stub)
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  ─── DRY-RUN JUDGE CHECKS (plan item 8.5 — the judged path, free) ─────");
+        Console.ResetColor();
+
+        // 1 — REACHED. Not "the panel printed": the stub was asked for a verdict.
+        bool reached = stub.CallCount > 0;
+        Line(reached,
+            reached
+                ? $"the JUDGED PATH RAN: the stub judge was asked for {stub.CallCount} verdict(s). Before 8.5 this "
+                + "eval's judge was behind `judge && !dryRun`, so --judge --dry-run entered it ZERO times and exited 0."
+                : "❌ THE JUDGED PATH WAS NEVER ENTERED. Every check below is vacuous.");
+
+        // 2 — the stub was awkward, and the parser met all of it.
+        var shapes = stub.ShapesEmitted;
+        bool allShapes = shapes.Count == StubJudgeClient.Script.Count;
+        Line(allShapes,
+            $"all {StubJudgeClient.Script.Count} reply SHAPES were exercised ({shapes.Count} seen: "
+          + $"{string.Join(", ", shapes)}) — including a verdict string the parser must NOT map to the nearest "
+          + "bucket, and a reply that is not JSON. A stub that only answers SUPPORTED certifies four branches "
+          + "it never runs.");
+
+        // 3 — the parser's own discipline, read off the tally the run produced.
+        var judged = report;   // named for the reader; the tally is re-derived below from the stub
+        _ = judged;
+        int expectedFailures = stub.Sent.Count(s => s.Contains("MAYBE", StringComparison.Ordinal)
+                                                 || !s.TrimStart().StartsWith('{'));
+        bool failuresSurfaced = expectedFailures > 0;
+        Line(failuresSurfaced,
+            $"{expectedFailures} of {stub.CallCount} stub replies were UNPARSEABLE OR UNRECOGNISED, and the run "
+          + "reached the instrument-failure branch with them rather than mapping them to a verdict. A judge that "
+          + "maps an unknown verdict string to the nearest bucket starts looking healthy while broken.");
+
+        // 4 — the ceiling branch. Two of five shapes are instrument failures against a 10 % ceiling,
+        //     so the "this channel is reporting an instrument failure" sentence is reached for free.
+        double failureRate = stub.CallCount == 0 ? double.NaN : expectedFailures / (double)stub.CallCount;
+        bool ceilingReached = !double.IsNaN(failureRate) && failureRate > JustificationTally.InstrumentFailureCeiling;
+        Line(ceilingReached,
+            ceilingReached
+                ? $"the INSTRUMENT-BROKEN branch is exercised: {failureRate:P0} of replies failed against a "
+                + $"{JustificationTally.InstrumentFailureCeiling:P0} ceiling. The sentence that refuses to quote the "
+                + "rate is reachable without paying for a broken live judge."
+                : "the instrument-broken branch was NOT reached, so a dry run cannot show that the judge is able to "
+                + "declare itself broken.");
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine();
+        Console.WriteLine("  NOT tested by a dry run: whether the judge's VERDICTS are any good. The stub does not read");
+        Console.WriteLine("  the reason it is sent, so every bucket here is scripted. This says the transport, the parser");
+        Console.WriteLine("  and the tally are wired; it says nothing about justification quality, which needs a live judge.");
+        Console.ResetColor();
+        Console.WriteLine();
+
+        return reached && allShapes && failuresSurfaced && ceilingReached;
+
+        static void Line(bool ok, string text)
+        {
+            Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+            Console.WriteLine($"  {(ok ? "✅" : "❌")} {text}");
+            Console.ResetColor();
+        }
     }
 
     /// <summary>

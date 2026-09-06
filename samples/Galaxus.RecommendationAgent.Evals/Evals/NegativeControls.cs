@@ -130,6 +130,7 @@ public static class NegativeControls
         rows.Add(Guarded("AssertionFaultsAreNamedAndNotGated", CheckAssertionFaultsAreNamedAndNotGated));
         rows.Add(Guarded("CostRowsSayWhichZeroTheyMean", CheckCostRowsSayWhichZeroTheyMean));
         rows.Add(Guarded("RepSpreadNeverInventsAZero", CheckRepSpreadNeverInventsAZero));
+        rows.Add(await GuardedAsync("TheJudgedPathIsReachableWithoutPaying", CheckTheJudgedPathIsReachableWithoutPayingAsync).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -4785,6 +4786,40 @@ public static class NegativeControls
         return null;
     }
 
+    /// <summary>
+    /// Strips double-quoted string literals so a scan reads code, not the sentences the code
+    /// PRINTS.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Fourth sighting of the <c>baca28e4</c> shape.</b> A control that forbids a source
+    /// pattern will describe that pattern in its own printed prose, and the description then
+    /// satisfies the scan. It has now happened to a grep count (<c>baca28e4</c>), to the CI recap's
+    /// <i>"Eval 07: passed"</i> (twice) and to plan item 8.5's own dry-run check, whose printed
+    /// explanation quotes the <c>judge &amp;&amp; !dryRun</c> it exists to forbid. Comment-stripping
+    /// alone does not help: a string literal is code.
+    /// </remarks>
+    /// <param name="body">Source text, ideally already comment-stripped.</param>
+    private static string StripStringLiterals(string body)
+    {
+        var sb = new System.Text.StringBuilder(body.Length);
+        bool inString = false;
+        for (int i = 0; i < body.Length; i++)
+        {
+            char c = body[i];
+            if (inString)
+            {
+                if (c == '\\') { i++; continue; }              // an escape consumes the next char
+                if (c == '"') inString = false;
+                continue;
+            }
+
+            if (c == '"') { inString = true; continue; }
+            sb.Append(c);
+        }
+
+        return sb.ToString();
+    }
+
     /// <summary>Strips line comments so a scan reads code, not the prose that explains it.</summary>
     private static string StripComments(string body)
     {
@@ -6915,6 +6950,146 @@ public static class NegativeControls
                 + "at the SATURATING end (widest 1.000, the metric's own maximum) the inside/outside verdict "
                 + "cannot discriminate 0.05 from 0.90 and the CELL COUNT still does, 9 / 6 / 3 of 12 · "
                 + "'no spread recorded' and 'no delta' print DIFFERENT sentences"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 46 — the judge must be exercisable for nothing (plan item 8.5). ═══════════
+    //
+    /// <summary>
+    /// Eval 01's advisory judge must be reachable under <c>--dry-run</c>, and its parser must map
+    /// every reply shape a real judge can produce — including the two that are not verdicts.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect 8.5 names was an explicit <c>!dryRun</c>.</b> Eval 01 read
+    /// <c>if (judge &amp;&amp; !dryRun) await RunAdvisoryJudgeAsync(...)</c>, so
+    /// <c>-- 1 --dry-run --judge</c> entered the judged path ZERO times, printed no judge panel and
+    /// exited 0. A dry run that certifies a path it never enters is worse than no dry run, because
+    /// it reads as coverage. That is the THIRD structural blindness in this suite's dry runs.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Two independent legs, because either alone is weak.</b> The BEHAVIOURAL leg drives the
+    /// real <c>RecommendationJustificationJudge</c> against the real
+    /// <see cref="StubJudgeClient"/> and reads the verdicts, so the parser's discipline is measured
+    /// rather than asserted. The SOURCE leg reads Eval 01's own dispatch, comment-stripped, and
+    /// fails if the judge is put back behind <c>!dryRun</c> — because the behavioural leg cannot
+    /// see that: removing the wiring removes the checks with it, and the eval goes back to exiting
+    /// 0 in silence. §60.4's lesson is honoured — the needle is matched against COMMENT-STRIPPED
+    /// source, so commenting the call out does not satisfy it.
+    /// </para>
+    /// </remarks>
+    private static async Task<ControlRowSnapshot> CheckTheJudgedPathIsReachableWithoutPayingAsync()
+    {
+        var problems = new List<string>();
+
+        // ── LEG 1 — behaviour. The real judge, the real parser, the awkward stub. ──
+        var stub = new StubJudgeClient();
+        var judge = new RecommendationJustificationJudge(stub);
+        var verdicts = new List<JustificationVerdict>();
+
+        // A SKU that is in the catalogue and a non-empty reason, so neither code short-circuit
+        // fires and every call actually reaches the transport. Five calls = one full script cycle.
+        string sku = Catalogue.Default.All[0].Id;
+        for (int i = 0; i < StubJudgeClient.Script.Count; i++)
+        {
+            var call = new PresentedCall(sku, "a reason that is not empty", "", false, i + 1, null, true, true);
+            verdicts.Add((await judge.JudgeAsync(call, Personas.NadiaUserId).ConfigureAwait(false)).Verdict);
+        }
+
+        if (stub.CallCount != StubJudgeClient.Script.Count)
+            problems.Add($"the transport was reached {stub.CallCount} time(s) for {StubJudgeClient.Script.Count} "
+                       + "judgement(s) — a short-circuit fired and this leg is not testing the parser.");
+
+        JustificationVerdict[] expected =
+        [
+            JustificationVerdict.Supported,
+            JustificationVerdict.Unsupported,
+            JustificationVerdict.Inconclusive,
+            JustificationVerdict.InstrumentFailure,   // "MAYBE" — an unknown verdict, NOT the nearest bucket
+            JustificationVerdict.InstrumentFailure,   // not JSON at all
+        ];
+        for (int i = 0; i < expected.Length; i++)
+        {
+            if (verdicts[i] != expected[i])
+                problems.Add($"reply shape '{StubJudgeClient.Script[i]}' parsed to {verdicts[i]}, expected {expected[i]}.");
+        }
+
+        if (stub.ShapesEmitted.Count != StubJudgeClient.Script.Count)
+        {
+            problems.Add($"the stub reports {stub.ShapesEmitted.Count} of {StubJudgeClient.Script.Count} shapes "
+                       + "emitted — it is no longer awkward enough to exercise the parser's failure branches.");
+        }
+
+        // The two SHORT-CIRCUITS must still fire without a model call, and they are the two places
+        // silence could be scored as a pass.
+        int before = stub.CallCount;
+        var empty = await judge.JudgeAsync(new PresentedCall(sku, "   ", "", false, 1, null, true, true),
+                                           Personas.NadiaUserId).ConfigureAwait(false);
+        var unknownSku = await judge.JudgeAsync(new PresentedCall("GLX-NOT-A-SKU", "a reason", "", false, 1, null, true, true),
+                                                Personas.NadiaUserId).ConfigureAwait(false);
+        if (empty.Verdict != JustificationVerdict.Unsupported)
+            problems.Add("an EMPTY reason did not short-circuit to Unsupported — silence would be judgeable.");
+        if (unknownSku.Verdict != JustificationVerdict.Unsupported)
+            problems.Add("a SKU absent from the catalogue did not short-circuit to Unsupported.");
+        if (stub.CallCount != before)
+            problems.Add($"the short-circuits made {stub.CallCount - before} model call(s); they exist precisely so "
+                       + "that no model can be persuaded to call an empty reason supported.");
+
+        // ── LEG 2 — the wiring, read off Eval 01's own dispatch. ──
+        //
+        // Needed because leg 1 survives the regression: put the judge back behind `!dryRun` and the
+        // dry-run checks vanish along with it, so nothing goes red.
+        string evalPath = Path.Combine(SampleSourceRoot(), "Evals", "Eval01_CatalogueIntegrity.cs");
+        if (!File.Exists(evalPath))
+        {
+            problems.Add("Eval01_CatalogueIntegrity.cs was not found — this leg cannot say anything about a file it did not open.");
+        }
+        else
+        {
+            // ⚠ COMMENTS *AND* STRING LITERALS. This row's own printed explanation quotes the
+            // pattern it forbids, and Eval 01's dry-run check prints it too — so a comment-stripped
+            // scan finds the needle in the sentence that describes it and reports the defect
+            // restored. Fourth sighting of the `baca28e4` shape; see StripStringLiterals.
+            string code = StripStringLiterals(StripComments(File.ReadAllText(evalPath)));
+            if (code.Contains("judge && !dryRun", StringComparison.Ordinal))
+            {
+                problems.Add("Eval 01 dispatches the judge behind `judge && !dryRun` again — --judge --dry-run enters "
+                           + "the judged path ZERO times and exits 0, which is 8.5's defect restored.");
+            }
+            if (!code.Contains("StubJudgeClient", StringComparison.Ordinal))
+                problems.Add("Eval 01 no longer references StubJudgeClient — there is no free judge to run.");
+            if (!code.Contains("PrintJudgeDryRunVerdict", StringComparison.Ordinal))
+                problems.Add("Eval 01 no longer prints the judged dry-run checks, so a judged dry run asserts nothing.");
+            // ⚠ The CONJUNCTION, not the identifier. Ablating this by writing
+            // `_ = judgeWiringHeld; return DryRunPlumbingHeld(report) ? 0 : 1;` left the name in
+            // the file and the row GREEN — a needle satisfied by a use that discards the value.
+            // Measured: that ablation exited 0 on `-- 3` before this line was tightened.
+            // ⚠ DECLARED LIMITATION: this is a text match on one spelling. A semantically identical
+            // rewrite would trip it falsely, which is the price of checking a wiring the control
+            // cannot execute — Eval 03 does not run Eval 01's fifteen stub turns.
+            if (!code.Contains("DryRunPlumbingHeld(report) && judgeWiringHeld", StringComparison.Ordinal))
+            {
+                problems.Add("the judged dry run's verdict no longer reaches the exit code as a conjunct — the checks "
+                           + "would print red and the command would still exit 0.");
+            }
+        }
+
+        return new ControlRowSnapshot(
+            "TheJudgedPathIsReachableWithoutPaying",
+            "Eval 01's advisory judge must be exercisable under --dry-run, and its parser must handle every reply "
+          + "shape a real judge produces. It used to be dispatched behind `judge && !dryRun`, so --judge --dry-run "
+          + "entered the judged path ZERO times, printed nothing and exited 0 — the third structural blindness in "
+          + "this suite's dry runs, and the only one that was blind by an explicit flag. This row drives the REAL "
+          + "judge against the awkward stub and reads the verdicts, then reads Eval 01's own dispatch, "
+          + "comment-stripped, because removing the wiring would remove the dry-run checks with it and nothing "
+          + "would go red.",
+            problems.Count == 0
+                ? $"{StubJudgeClient.Script.Count} reply shapes drive the real parser to Supported · Unsupported · "
+                + "Inconclusive · InstrumentFailure (unknown verdict string, NOT the nearest bucket) · "
+                + "InstrumentFailure (not JSON) · both code short-circuits fire with ZERO model calls, so silence "
+                + "and an unknown SKU can never be judged supported · Eval 01 dispatches the stub judge under "
+                + "--dry-run, prints its checks and feeds them into the exit code"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
