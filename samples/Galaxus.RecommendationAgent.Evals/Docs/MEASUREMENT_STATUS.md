@@ -10501,3 +10501,210 @@ for f in strategy/Galaxus/MASTER_PLAN.md $E/Docs/MEASUREMENT_STATUS.md; do
 ```
 
 ---
+
+# §67. THE WAVE-8 FIX — 2026-09-06. Clearing category (d), and finding that two of its members were not in it
+
+**Commission:** empty the plan's *"genuinely buildable, no decision, no purchase"* list, or report exactly
+why a member cannot be emptied. **Result: five members built, one member RECLASSIFIED to "a user
+decision", one member built but its "free" premise REFUTED, and two members framed for the user rather
+than decided.** Every figure below carries the command that produces it.
+
+## §67.1 What shipped, with shas
+
+| item | what | sha |
+|---|---|---|
+| **7.5's REAL prerequisite** | A run now carries ADR-031 V1's five non-stimulus comparability facts — eval key, version, effective bar, chance floor, judge fingerprint — derived from the `EvalResult` the runner already holds. `compare` itself is NOT built and its acceptance stays refuted | `03242a1d` |
+| **7.6 (a) + (b)** | `BaselinePromotion` refuses an unpromotable run in **all three** stores; `doctor` checks baselines **at rest** — schema, promotion rule, and the `runId` resolving to a run that still exists — including the PINNED ones | `e53edc15` |
+| **7.6 (d)** | `EvaluatorCardRegistry` moved from `AgentEval.MissionControl` to `AgentEval.Core` | `d003ce97` |
+| **8.11 / D-v** | The 12 closable dead phrases authored into the concept lexicon | `fc352481` |
+
+## §67.2 🔴 6.1 – 6.4 ARE NOT CATEGORY (d). The record contradicted itself and the measurement settles it
+
+The plan's Phase-6 rows said Phase 6 is *"Blocked by: Phase 4, **by rule**, not by dependency"*. The
+Wave-7 close-out's category table said 6.1–6.4 are *"marked DEFERRED in ADR-030 §8, but **deferred is
+not blocked**: no decision and no purchase stands in front of them"*. **The Phase-6 rows are right.**
+
+**The prohibition, kept verbatim in the plan's §2.4 and called there "the loudest rule in the
+programme":**
+
+> **The one thing that must not happen: AE-04 before AE-06.** *"Wiring 82 `IEval` implementations into
+> the primary agent-evaluation entry point **while none of them has a chance floor** takes a contained
+> problem and makes it the product's front door."*
+
+All four Phase-6 rows are AE-04: 6.1 and 6.2 cite it directly, 6.3 is the harness bridge itself, and
+6.4's own row says it *"folds into AE-04"* and *"has no independent path"*. AE-06 is *"no chance-floor,
+negative-control or significance machinery anywhere in `src/`"* and its register row points at **Phase 4
+= ADR-030 Slice 2**. Slice **2.6 — the stop rule — is not built**, and ADR-030 §8's own Slice-2 banner
+says why: *"its acceptance criterion is 'the retrofit deletes the hand-rolled sign test and the
+per-persona floor loop outright'. Whether that deletion happens **is Q6**, and Q6 is a preference
+question marked as the user's."* Q6 is in the plan's §0.6.
+
+⚠️ **And the prohibition's own condition is not merely cited here — it is MEASURED TRUE on this tree,
+which makes Phase 6 prohibited on the merits rather than by citation:**
+
+```bash
+# files in src/ declaring a class or record that implements IEval
+grep -rEl "^\s*(public|internal)\s+(sealed\s+|abstract\s+|partial\s+)*(class|record)\s+[A-Za-z0-9_<>]+\s*:[^;{]*\bIEval\b" \
+     --include=*.cs src/ | wc -l                                   # -> 74
+# files in src/ that mention ChanceFloor at all
+grep -rc "ChanceFloor" --include=*.cs src/ | grep -v ":0$"          # -> 4, and all four are
+#   Abstractions/Evals/Meta/ChanceFloor.cs · Abstractions/Evals/Meta/ExactTests.cs
+#   Abstractions/Output/ComparabilityFacts.cs · Core/Evals/EvalResultPersistence.cs
+# the intersection
+for f in $(grep -rEl "...IEval..." --include=*.cs src/); do grep -q ChanceFloor "$f" && echo "$f"; done
+#   -> NOTHING. ZERO of the 74 has a chance floor.
+```
+
+**6.3 carries a SECOND, independent gate.** ADR-030 §8 puts `MAFEvaluationHarnessOptions` and
+`EvaluationOptions.Evals` in the *"Deferred until a second team asks"* bucket. *"A second team asks"* is
+a condition outside this repository; an agent cannot satisfy it either.
+
+**Direction of the Wave-7 error: FLATTERING.** It moved four items out of *"waiting on the user"* and
+into *"buildable now"*, which overstates how much of the plan any agent can close without §0.6 being
+answered. It is **wrong by omission** — it answered ADR-030 §8's deferral and never mentioned §2.4's
+prohibition at all. Corrected at its origin in the plan's §0.5 category table, both cells.
+
+**Not built, and named so nobody re-derives it:** 6.1 `AgentEvalBuilder.AddEval`, 6.2
+`TestResult → EvalInput`, 6.3 `MAFEvaluationHarnessOptions` + `EvaluationOptions.Evals`, 6.4 AE-02
+`ExpectedTools` enforcement. ⚠️ 6.3 would also have moved
+`NuGetConsumer.Tests/ResponseValidationTests.cs:53`, which asserts `Score >= 70`; under this branch's
+library rules that assertion may not be weakened, so 6.3 was a STOP-AND-REPORT even if the prohibition
+had not settled it first.
+
+## §67.3 7.6's four `doctor` checks are not four open items — measured
+
+| # | check | state on the tree |
+|---|---|---|
+| 1 | summary schema | ✅ **ALREADY SHIPPED, and not by this branch.** `git show main:src/AgentEval.Cli/Commands/DoctorCommand.cs | grep -c 'summary.schema.json'` → **1**. 7.6's row is stale by one item |
+| 2 | ledger ↔ verdict | ⛔ **NOT ACTIONABLE.** `grep -rn "controlLedger\|WitnessLedger\|INegativeControl\|ControlSuite" --include=*.cs src/` → **0**. The ledger is ADR-031 S4, gated on Q5. There is nothing to reconcile a verdict against |
+| 3 | baseline audit chain | ✅ **BUILT** (`e53edc15`) |
+| 4 | PACK EDITED SINCE RUN | ⛔ **NOT ACTIONABLE.** `pack.contentHash` → **0** hits; `AgentEval.Packs` does not exist in `src/`; `pack.json` is Stage 2 and explicitly NOT SCHEDULED. A check for a hash nothing writes can only ever pass |
+
+**Direction of the stale row: it OVERSTATED the remaining work** — 1 of 4 was already done and 2 of 4
+are blocked on a question and a format that are not this wave's.
+
+## §67.4 🔴 8.11 / D-v — the item filed as FREE is not free, and the mechanism is not the one on file
+
+**Built. And three things came out of running it that were not on the record.**
+
+**(i) The measurement, both spaces, no model called.** D-v: **18 dead phrases → 6**, latent-GOLD dead
+**10 → 0**, closable **12 → 0**. ARM C (`AuthoredQueryPhraseRetrievability`, space-invariant by design):
+**18 of 56 → 6 of 56**, latent-gold **10 → 0**. ARM D (the queries actually issued): **8 of 50 → 6 of
+50**. Exit codes re-observed in both spaces afterwards: `-- 3` **0** · `-- 3 --real-vectors` **0** ·
+`-- 4` **0** · `-- 7` **1** · `-- 7 --real-vectors` **1** · `--ci --dry-run` **1**, `NOT CAUGHT` **0**
+everywhere.
+
+**(ii) It cost the corpus its only live `no-progress` cell.** `USR-MI-02` (Marco Iten) exited on that
+stop reason in the concept space and now exits satisfied. The advisory row *"every frozen stop reason is
+reachable on this corpus"* now lists `no-progress` beside `round-limit-reached` as **forced-only**, by
+the demo lane's scripted probe — a different claim from *"a real customer reaches it"*. **That is a
+coverage LOSS bought with a retrieval gain, and it is the corpus owner's to accept or refuse.**
+
+**(iii) The cause is NOT the persona's own vocabulary, and the row's own prose describes the wrong
+mechanism.** The row says *"a lexicon entry maps a QUERY token to a concept"*. Bisected over six
+ablation runs, each restored from a file copy:
+
+| removed | Marco's concept exit |
+|---|---|
+| cycling four `{ride, all-day, commute, training}` | still moved |
+| `{enthusiast}` | still moved |
+| trekking three `{self-supported, ascent, steep}` | still moved |
+| `{card, laptop, socket}` | still moved |
+| gaming/audio `{sofa, session, two-channel}` | still moved |
+| **coffee three `{weigh, dose, yield}`** | **REVERTS** |
+
+Marco is the **gift-trap** persona — a console and a game, no coffee anything. Espresso vocabulary
+reaches him because **in the concept space the same lexicon embeds PRODUCT documents**
+(`concept.Embed(EmbeddingDocument.ForProduct(p))`), and the catalogue's own text carries `dose` (6
+occurrences), `weigh`/`weighing` (6) and `yield` (1). **Closing a query-side gap re-embeds the catalogue
+and moves every cosine, for personas with nothing to do with the added words.** The control that caught
+it — `TopologyCaseProseMatchesTheRun` — worked exactly as built, and Marco's case prose and the eval's
+two stale doc-comment claims are corrected at their origins.
+
+**Still unverified, and what it would cost:** every Eval 02 coverage cell for the affected interests is
+now derived from a different dense ranking and has **not** been re-measured. That is an Eval 02 cohort —
+the last one was 36 live turns at **¤27.1208** — and it was not approved for this wave. Until it is
+bought, **no Eval 02 coverage number published before `fc352481` describes this tree.** The remaining
+**six** dead phrases are a CORPUS gap (no product carries their token at all), so no query-side
+authoring closes them; changing the corpus moves every dense score, which makes it a decision.
+
+## §67.5 THE TWO DECISIONS — framed, priced, NOT taken
+
+### 8.2 — gate `AuthoredQueryPhrasesRetrieve`, or make it a field on `CoverageSnapshot`?
+
+🔴 **The premise on file is REFUTED by `fc352481`, in the direction that makes the decision easier.**
+The filed reason not to gate was *"gating it turns `-- 3` red in both spaces immediately: ARM C reads
+**18 of 56** and is space-invariant by design"*. **ARM C now reads 6 of 56, with 0 latent-GOLD.** So:
+
+| option | what it costs | what breaks |
+|---|---|---|
+| **A — gate on "no authored phrase is unanswerable"** | `-- 3` goes **red in both spaces** (6 > 0) and stays red until the corpus grows products for six tokens no product carries. That is gating on a fact about the CORPUS, which the row's own text warns *"would create an incentive to tune the corpus until it passed"* | `-- 3`, `--ci --dry-run`, and every reader of the exit code |
+| **B — gate on "no LATENT-GOLD phrase is unanswerable"** | ✅ **GREEN today** — the latent-gold count is **0**. It gates the thing that actually costs a coverage cell (a phrase whose gold the dense leg cannot reach) and leaves the six corpus gaps advisory | Nothing today. It becomes a live gate the moment a gold interest goes unreachable again — which is the point |
+| **C — a field on `CoverageSnapshot`** | Nothing gates; the number becomes queryable and can go stale undetected. ADR-031 finding **V7** cuts a field that *"gates nothing and cannot go stale detectably"* | Nothing, and it buys correspondingly little |
+
+**Recommendation: B.** It is the only option that is green on this tree *and* able to fail, and it
+survives the gate-self-examination rule — the bar is not supplied by the artifact under test, because
+the latent-gold set is derived from `InterestMapGold`, not from the retrieval leg being measured.
+⚠️ **B is still a contract change and wants declaring in a release note.** **Not taken here.**
+
+### 8.10 — the sample's exit **3** against the core CLI's exit **11**
+
+**Measured.** `src/AgentEval.Cli/ExitCodes.cs` documents **3 = `RuntimeError`** (*"connection failure,
+file not found"*) and **11 = `GateIndeterminate`**. The sample uses **3** to mean *"something was NOT
+MEASURED and nothing else failed"* (`Program.cs:315`) — which is **exactly what 11 exists for**. A CI
+reader that branches on 3 gets *"the environment broke"* from the CLI and *"nothing was measured"* from
+the sample.
+
+**Blast radius, measured:** `grep -rln Galaxus .github/workflows/` → **nothing**. The sample's exit code
+reaches **no pipeline in this repository**, so the break is to external readers and to the documentation
+only.
+
+| option | what it costs | what breaks |
+|---|---|---|
+| **A — sample adopts 11** | One constant and the six `Program.cs` sentences that name "exit 3". Aligns the two contracts | Any external CI branching on 3 from this sample. Nothing in-repo |
+| **B — sample keeps 3, documents the divergence** | A paragraph | Nothing — and the collision stays, so the next reader re-derives it |
+| **C — core adopts 3 for indeterminate** | ⛔ Refused: BUG-22 split 2 into 9/10/11 *precisely* to stop one code carrying three meanings, and this would re-merge two |
+
+**Recommendation: A, sequenced with ADR-031 S5's exit 13 in one release note**, since both are
+CI-reader contract changes and shipping them separately spends the reader's attention twice.
+**Not taken here.**
+
+⚠️ **8.10's other half, N-17 — an Eval 06 measured control over the five trajectory cases — was NOT
+built and is not framed here.** It is a control-authoring item, not a contract decision, and it was out
+of this wave's budget. Saying so rather than folding it into the N-18 recommendation.
+
+## §67.6 7.6 (e) `IEvalRegistry` — NOT BUILT, and the spec is wrong as written
+
+**Measured.** ADR-031 **C1** specifies `IEvalRegistry` as *"`Key → IEval`, `[ModuleInitializer]`
+self-registration … First deliverable is **deleting** the 40-entry hand-authored dictionary at
+`BenchAgenticCalibrateCommand.cs:267`"*.
+
+🔴 **`Key → IEval` cannot hold those 40 entries.** Counted:
+`sed -n '267,400p' … | grep -cE '^\s+\["'` → **40**, and **every one of them is constructed as**
+`new XEval(judge, judgeModel: judgeModelName)` — a **factory over a runtime judge**, not a singleton. A
+registry of instances has nothing to register at module-initialisation time, because the judge does not
+exist yet. The pattern C1 says to *"copy verbatim"*, `BenchmarkFamilyRegistry`, is itself a factory
+registry — `Func<string, IEvaluator?, CompositeEval>? CompositeFactory` (`BenchmarkFamilyRegistry.cs:144`)
+— so the ADR's own model contradicts the signature it prescribes.
+
+The correct shape is `Key → Func<IEvaluator?, string?, IEval>`, populated by a `[ModuleInitializer]` in
+`AgentEval.Evals.Agentic` and consumed by `CalibrationRunner`'s existing
+`Func<string, IEval?>` (`CalibrationRunner.cs:45`). That is buildable and is **not** blocked by §2.4 —
+a calibration command is not the primary agent-evaluation entry point — but it is a larger refactor
+than a one-line follow-on row implies, and shipping it half-done would leave two registries. **Left
+open, with the corrected specification recorded here so the next wave does not re-derive it.**
+
+## §67.7 What this wave does NOT claim
+
+* **Nothing agent-side was re-measured and nothing was purchased.** Every eval touched here ran
+  model-free; the only live path in the sweep is query embedding on `--real-vectors`.
+* **`agenteval compare` is not built.** Its acceptance stays refuted until two runs carrying
+  `comparability` exist to compare.
+* **`JudgeSubjectRelation` reads `Unknown` on every run this repository can currently produce.** The
+  three composite runners thread `EvalInput.SubjectModel` through, so the relation is real the moment a
+  caller declares one — but no shipped caller declares one. That is a detector with a wired path and no
+  declarant, not a working self-examination check.
+* **The VOID clause of the baseline guard has no live trip.** `summary.schema.json` constrains
+  `verdict` to `PASS | FAIL | WARN | PENDING`; the two clauses doing work today are "measured nothing"
+  and "everything skipped".
+* **No Eval 02 coverage cell was re-derived after the lexicon change.** See §67.4.
