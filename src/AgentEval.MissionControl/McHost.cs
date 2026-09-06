@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals;
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
@@ -37,7 +38,13 @@ public static class McHost
         // Evaluator-card registry: loads all EvaluatorCard JSON files at startup
         // from AgentEval.Evals.Agentic's embedded resources. Drives
         // Query.evaluators(...). Plan-08 MC1.5.3.
-        builder.Services.AddSingleton<EvaluatorCardRegistry>();
+        //
+        // ADR-031 C3: the registry itself now lives in AgentEval.Core and takes the assemblies to
+        // scan. It cannot name AgentEval.Evals.Agentic itself — Agentic references Core, so a
+        // hard-coded source there would close a project-reference cycle — so the SOURCE is named
+        // here, by the host that knows which evaluator packs it is serving.
+        builder.Services.AddSingleton(
+            _ => new EvaluatorCardRegistry(typeof(AgentEval.Benchmarks.AgenticBenchmark).Assembly));
         builder.Services.TryAddSingleton<
             ISecurityGraphReportSource,
             UnconfiguredSecurityGraphReportSource>();
