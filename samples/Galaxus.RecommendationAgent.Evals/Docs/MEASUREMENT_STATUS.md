@@ -5450,3 +5450,131 @@ text names gaps-unresolvable and the run ends in no-progress`, `-- 3` exits **1*
 caught`, exit **0**. `-- 7` is unchanged at exit 1 in both directions, which is the point.
 
 **Numbers that moved:** Eval 03 **33 → 34 rows** (28 gating + 6 advisory). Nothing else.
+
+---
+
+## 38. WAVE 4 — 8.21's code half: precondition 1 CLEARED, 2 DECIDED, 3 re-measured — and §31.1's own cost table is WRONG (2026-09-06)
+
+§31.3 recorded the decision (**gate on attribution: YES**) and deferred the code on three named
+preconditions. This section works all three. **Two are cleared. The third changed shape entirely,
+because the gate turns out to do something §31 did not measure.**
+
+### 38.1 ⚠️ FIRST: §31.1's ablation table does not reproduce, and its error is FLATTERING
+
+§31.1 published the cost of the attribution gate. Re-run at this commit, same one-line ablation in
+`ClassifyCoverage`, `-- 7` in the concept space:
+
+| | §31.1 published | **measured here** |
+|---|---|---|
+| GATE B pins matching, with the gate | **4 of 5** — *"Renzo ❌, Nadia ❌, Marco ✅ recovered"* | **3 of 5** — Renzo ❌, Nadia ❌ |
+| Marco | *"✅ recovered"* | **was already ✅ at baseline**; nothing recovered |
+| GATE C | ✅ passes | ✅ passes — **holds** |
+| the corpus keeps an APPROVED exit | yes (Renzo) | yes (Renzo, `coverage-sufficient`, 9 items) — **holds** |
+| `-- 7` exit | 1 | 1 — **holds** |
+| `-- 3` exit | 1 (the fixture) | 1 (the fixture) — **holds** |
+
+*"4 of 5"* and *"Marco recovered"* cannot both be true beside a baseline column that says only Renzo
+fails, and the arithmetic is the tell: two failures out of five is three matching. **Direction of the
+error: flattering to the gate** — it made the change look free at GATE B when it costs a pin. §31.1
+was itself a correction of a stale cost the plan had been quoting for two waves; **the correction
+needed correcting, on the same arithmetic, in the same table.**
+
+### 38.2 Precondition 1 — CLEARED. The positive specimen is a real ingest row
+
+`ContentlessRequestIsNotCovered`'s positive direction was
+`Row(vocabularyEmpty: false, candidates: 5, bestScore: 1.0)` — a hand-made `InterestCoverage` with
+`CandidateProductIds` populated and `AttributableProductIds` **empty**, which no real ingest can
+produce because `CatalogueDiscoverySearch` fills both in the same loop.
+
+It is now the first coverage row the shipped loop actually produces for an interest that names
+something and got attributable candidates back: **`USR-NB-01/I-1` — 15 candidates, 12 attributable,
+best score 0.0288.** The row fails if no such specimen exists anywhere in the cohort, so a scan that
+found nothing cannot read as a scan that found no problem. The **negative** direction stays hand-made
+on purpose: 5 candidates at score 1.000 is richer than anything this corpus produces, so it is the
+harder test in the direction that matters, and it says so in code.
+
+The second hand-made positive — a `namingState` built to prove `Starved` does not veto everything — is
+**deleted**; the real specimen is now asserted through `CoverageVerdictProjection.Starved`, which is
+the path the reviewer's veto actually takes.
+
+**Both directions proven, both executed:**
+
+| ablation | result |
+|---|---|
+| **A — apply the 8.21 attribution gate** (the precondition's whole point) | `ContentlessRequestIsNotCovered` **✅ caught**, `-- 3` exit **0**. With the old fixture the same gate gave *"1 fault: an interest that DOES name something was not Covered"* and exit **1** |
+| **B — make `ClassifyCoverage` refuse everything** | **❌ NOT CAUGHT** — *"a REAL ingest row that names something and has 12 attributable candidate(s) was not Covered (`USR-NB-01/I-1`…) — the gate refuses everything"*, `-- 3` exit **1** |
+| restored | ✅ caught, `-- 3` exit 0, `-- 7` exit 1 |
+
+### 38.3 Precondition 2 — DECIDED: both sites, in one change
+
+> **`Starved` and `ClassifyCoverage` gate on attribution TOGETHER.** They already share their other
+> three clauses verbatim — `AttributionVocabularyEmpty`, an empty candidate set, and
+> `BestScore < MinCandidateScore` — because they are one question asked in two places: the cheap
+> pre-model gate and the classification the reviewer reads. Adding the fourth clause to only one of
+> them would leave the pre-gate answering *"does the INTEREST name anything"* while the classifier
+> answers *"do the CANDIDATES carry anything it names"*, and a run could then be starved-but-covered
+> or covered-but-starved depending on which question fired. The ablations in §31.1, §38.1 and §38.4
+> were all run with the clause in `ClassifyCoverage` only; **the shipped change must carry both**,
+> and its own measurement must be taken with both.
+
+### 38.4 Precondition 3 — the gate REVIVES the loop-back's designed mechanism, which §31 never measured
+
+§28.1 established that **zero of the four non-abstention Eval 07 cases has ever had a mapper-interest
+gap** — so the loop-back edge has never once fired for the reason it was designed for, and every
+loop-back on this corpus is driven by an accepted review-snippet proposal. Measured under the gate,
+from Eval 07's own advisory row:
+
+| case | mapper gap reasons, baseline | **with the gate** | proposals accepted (gated) | loop-back (gated) |
+|---|---|---|---|---|
+| `USR-RB-10` Renzo | 0 | **0** | 0 of 1 | False |
+| `USR-MI-02` Marco | 0 | **1** | 1 of 2 | True |
+| `USR-MB-13` Mirjam | 0 | **0** | 1 of 3 | True |
+| `USR-NB-01` Nadia | 0 | **2** | **0 of 2** | **True** |
+| `USR-LF-04` Luca | 1 (pre-gate, unrunnable) | 1 | 0 of 0 | False |
+
+**Nadia's loop-back under the gate is driven entirely by coverage — two mapper interests with a
+runnable next query and not one accepted proposal.** That is the loop-back edge firing for its
+designed reason for the first time in this corpus's history, and §36.4 named exactly this as the
+thing that would unblock GATE B.
+
+**So precondition 3 is not what §31.3 thought it was.** It said *"the 2×2 has to be re-established
+from a customer who genuinely does not loop"*, and §36.2 measured that no such customer exists **under
+today's mechanism**. Under the gate the mechanism is different: a customer whose coverage is genuinely
+complete genuinely does not loop, and 7 of 14 do not. **Nadia's pin would still have to change — but
+the reason would be a fact about the INPUT** (she owns the only headlamp in the catalogue, so `I-3
+Headlamps` cannot be covered by anything, and the honest behaviour is to go round, fail to fix it and
+say so) **rather than a fact about the run**, which is the distinction §7 rule 1 turns on.
+
+⚠️ **That is a route, not a completed argument, and it is deliberately left as one.** Re-pinning Nadia
+and choosing a replacement ⭐ negative cell is corpus authoring; both pins must be written down with
+their input-side reasons and predicted **before** the run that checks them, or this becomes the corpus
+supplying its own bar by a longer path. **Precondition 3 is therefore RE-STATED rather than cleared:**
+*author the two pins from customer facts, in the same change that ships the gate to both sites, and
+record the prediction before running.*
+
+### 38.5 What the gate buys, cohort-wide — the number nobody had
+
+From `LoopBackNegativeDirectionCensus`, all fourteen customers, `COVERED` rows carrying **nothing the
+interest names**:
+
+| | shipped | with the gate |
+|---|---|---|
+| such rows, whole cohort | **7**, across **4** customers (`USR-NB-01` 2 · `USR-MI-02` 1 · `USR-EW-05` 2 · `USR-PB-11` 2) | **0**, across **0** |
+| customers that loop | 4 of 14 | 7 of 14 |
+
+⚠️ **Two of those four customers — `USR-EW-05` and `USR-PB-11` — are not Eval 07 cases and appear in
+no eval's per-case table.** The published account of 8.21 has always been three rows on two customers
+(§24.6); measured across the authored cohort it is **seven rows on four**, and more than half of it is
+invisible to every gate in the suite.
+
+### 38.6 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3      # exit 0 — the rebuilt fixture names its real specimen
+dotnet run --project $E -- 7      # exit 1 — GATE B, unchanged
+# the ablation, for anyone re-deriving 38.1 / 38.4 / 38.5 — add to ClassifyCoverage:
+#   if (coverage.AttributableProductIds.Count == 0) return CoverageStatus.Uncovered;
+#   -> `-- 7` GATE B 3 of 5 (Renzo, Nadia), GATE C passes, exit 1
+#   -> `-- 3` exit 0 (it was 1 before 38.2), census 7 loop / 7 not, false-coverage rows 7 -> 0
+```

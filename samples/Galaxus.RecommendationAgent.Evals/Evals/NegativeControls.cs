@@ -104,7 +104,7 @@ public static class NegativeControls
         rows.Add(Guarded("OwnKRereadAtVaryingK", CheckOwnKRereadAtVaryingK));
         rows.Add(Guarded("Eval09RuleAndRemedy", CheckEval09RuleAndRemedy));
         rows.Add(Guarded("JudgeEchoJoins", CheckJudgeEchoJoins));
-        rows.Add(Guarded("ContentlessRequestIsNotCovered", CheckContentlessRequestIsNotCovered));
+        rows.Add(await GuardedAsync("ContentlessRequestIsNotCovered", () => CheckContentlessRequestIsNotCoveredAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("UnnameableInterestPresentsNothing", CheckUnnameableInterestPresentsNothing));
         rows.Add(await GuardedAsync("RefusalDetectorsSeeTheRealShape", CheckRefusalDetectorsSeeTheRealShapeAsync).ConfigureAwait(false));
         rows.Add(Guarded("RefusalCodesDoNotAnswerForEachOther", CheckRefusalCodesDoNotAnswerForEachOther));
@@ -2583,7 +2583,9 @@ public static class NegativeControls
     /// is the failure this row exists to make visible.
     /// </para>
     /// </remarks>
-    private static ControlRowSnapshot CheckContentlessRequestIsNotCovered()
+    private static async Task<ControlRowSnapshot> CheckContentlessRequestIsNotCoveredAsync(
+        IProductRetriever retriever,
+        CancellationToken ct)
     {
         var problems = new List<string>();
 
@@ -2645,13 +2647,84 @@ public static class NegativeControls
         if (!namesNothing.IsStarved)
             problems.Add("an interest that names NOTHING does not report IsStarved.");
 
-        // And the same row for an interest that DOES name something must come out Covered, or this
-        // is a gate that refuses everything — which would look identical on the row above.
-        var namesSomething = Row(vocabularyEmpty: false, candidates: 5, bestScore: 1.0);
-        if (CatalogueDiscoverySearch.ClassifyCoverage(namesSomething) != CoverageStatus.Covered)
-            problems.Add("an interest that DOES name something was not Covered on the same row — the gate refuses everything.");
-        if (namesSomething.IsStarved)
-            problems.Add("an interest that DOES name something reports IsStarved on 5 candidates.");
+        // ── THE POSITIVE DIRECTION, FROM A REAL INGEST (plan item 8.21, precondition 1). ──
+        //
+        // ⚠ It used to be `Row(vocabularyEmpty: false, candidates: 5, bestScore: 1.0)` — a hand-made
+        //   InterestCoverage with CandidateProductIds populated and AttributableProductIds EMPTY,
+        //   which NO real ingest produces: CatalogueDiscoverySearch fills both in the same loop.
+        //   MEASURED (MEASUREMENT_STATUS §31.2): under the attribution gate that plan item 8.21
+        //   decides to ship, that hand-made object is refused and this row reports "the gate refuses
+        //   everything", which is false. That is the control-fixture hazard the 8.14 arc named, in
+        //   its mirror image — there the fixture was KINDER than reality and the control was blind;
+        //   here it is POORER than reality and the control cries wolf. Either way, a control whose
+        //   specimen is hand-made is not testing the path it claims to.
+        //
+        //   The specimen is now the first coverage row the shipped loop actually produces for an
+        //   interest that names something and got attributable candidates back. The NEGATIVE
+        //   direction above stays hand-made on purpose: 5 candidates at score 1.000 is RICHER than
+        //   anything this corpus produces, so it is the harder test in the direction that matters.
+        DiscoveryState? realState = null;
+        Interest? realInterest = null;
+        InterestCoverage? realRow = null;
+
+        foreach (string personaId in Personas.AllPersonaIds)
+        {
+            var loopOptions = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
+                Offline: true,
+                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(personaId)),
+                Retriever: retriever,
+                Progress: null,
+                Nodes: null);
+
+            var loopRun = await GalaxusDiscoveryLoop.RunAsync(personaId, loopOptions, ct).ConfigureAwait(false);
+
+            foreach (var candidateInterest in loopRun.State.Interests)
+            {
+                var row = loopRun.State.CoverageFor(candidateInterest.Id);
+                if (row.QueriesRun.Count == 0) continue;
+                if (row.AttributionVocabularyEmpty) continue;
+                if (row.AttributableProductIds.Count == 0) continue;
+                if (row.CandidateProductIds.Count < DiscoveryState.MinCandidatesForCoverage) continue;
+
+                realState = loopRun.State;
+                realInterest = candidateInterest;
+                realRow = row;
+                break;
+            }
+
+            if (realRow is not null) break;
+        }
+
+        string specimen = "NONE";
+        if (realRow is null || realInterest is null || realState is null)
+        {
+            problems.Add("no coverage row anywhere in the authored cohort names something AND came back with an "
+                       + "attributable candidate — this row's positive direction has no real specimen, so it cannot "
+                       + "distinguish a working gate from one that refuses everything.");
+        }
+        else
+        {
+            specimen = $"{realState.CustomerId}/{realInterest.Id} ({realRow.CandidateProductIds.Count} candidate(s), "
+                     + $"{realRow.AttributableProductIds.Count} attributable, best {realRow.BestScore:0.0000})";
+
+            if (CatalogueDiscoverySearch.ClassifyCoverage(realRow) != CoverageStatus.Covered)
+            {
+                problems.Add("a REAL ingest row that names something and has "
+                           + $"{realRow.AttributableProductIds.Count} attributable candidate(s) was not Covered "
+                           + $"({specimen}) — the gate refuses everything.");
+            }
+
+            if (realRow.IsStarved)
+                problems.Add($"a REAL ingest row that names something reports IsStarved ({specimen}).");
+
+            // …and through the path the reviewer's veto actually takes, not a convenience property.
+            if (CoverageVerdictProjection.Starved(realState)
+                    .Any(i => string.Equals(i.Id, realInterest.Id, StringComparison.Ordinal)))
+            {
+                problems.Add("CoverageVerdictProjection.Starved vetoed a REAL ingest row that names something "
+                           + $"({specimen}) — the veto refuses everything and the negative row above proves nothing.");
+            }
+        }
 
         // ── No materially different query exists for it, so the loop must not go round again. ──
         var state = new DiscoveryState { CustomerId = Personas.LucaUserId, Market = "CH", Language = "fr", SessionRequest = GalaxusDemoPrompts.LucaThinSignal };
@@ -2679,18 +2752,6 @@ public static class NegativeControls
                        + $"actually take — did NOT list an interest that names nothing, on {live.CandidateProductIds.Count} "
                        + $"candidate(s) at best score {live.BestScore:0.000}. The gate is still reading the ranking there.");
         }
-
-        // …and it must not veto an interest that DOES name something, or the veto is a refusal of
-        // everything and the row above proves nothing.
-        var namingState = new DiscoveryState { CustomerId = Personas.LucaUserId, Market = "CH", Language = "fr" };
-        var naming = SessionRequest("I need a 58 mm espresso tamper and a scale");
-        namingState.Interests.Add(naming);
-        var namingCoverage = namingState.CoverageFor(naming.Id);
-        namingCoverage.QueriesRun.Add("58 mm espresso tamper");
-        namingCoverage.CandidateProductIds.Add("GLX-3004");
-        namingCoverage.BestScore = 1.0;
-        if (CoverageVerdictProjection.Starved(namingState).Any(i => string.Equals(i.Id, naming.Id, StringComparison.Ordinal)))
-            problems.Add("CoverageVerdictProjection.Starved vetoed an interest that DOES name something — it refuses everything.");
 
         // ── And the line the pre-gate PRINTS must name the reason it actually fired. ──
         //
@@ -2743,9 +2804,10 @@ public static class NegativeControls
           + "read their derived values: fixing this by moving a calibrated threshold is the failure, not the fix.",
             problems.Count == 0
                 ? $"the contentless request names NOTHING (vocabulary empty, and our own '"
-                + $"{DiscoveryInterestMapping.SessionRequestLabelPrefix.Trim()}' prefix is excluded from it) · 5 "
-                + "candidates at score 1.000 → UNCOVERED and STARVED · the same row for an interest that names "
-                + "something → COVERED · no next query is written, with the reason recorded · MinCandidateScore "
+                + $"{DiscoveryInterestMapping.SessionRequestLabelPrefix.Trim()}' prefix is excluded from it) "
+                + "· 5 candidates at score 1.000 → UNCOVERED and STARVED · the POSITIVE direction is a REAL "
+                + $"ingest specimen, {specimen} → COVERED and not vetoed · no next query is written, with "
+                + "the reason recorded · MinCandidateScore "
                 + $"still {DiscoveryState.MinCandidateScore:0.000}, dense floor still "
                 + $"{HybridRetriever.DefaultDenseScoreFloor:0.000}. ⚠ SPACE-INDEPENDENT: this proves the MECHANISM, "
                 + "not that a --real-vectors run abstains again. That needs a paid run."
