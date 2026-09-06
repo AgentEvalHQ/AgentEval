@@ -21,6 +21,33 @@ prove the thing works against a real model. Both are required, in this order.
 `--only <id>` exists on Evals 02, 02b and 02c precisely to make stage 2 possible; it addresses a probe
 snapshot key, never the cohort key, and is ignored under `--ci`.
 
+## Stage 0 — RE-EXECUTE the ablation you are about to build on
+
+**Added 2026-09-06 (Wave 4). It sits before stage 1 because it is cheaper than stage 1 and it caught
+three things in one wave.**
+
+> **A published ablation is a claim, not a measurement you already have.** Before you cite one — to
+> justify an item, to price a change, or to defer something — re-run it. Not re-read it: run it.
+
+Wave 4 worked five items and re-executed the ablations behind three of them. **All three did not
+reproduce**, and two were in text written specifically to correct an earlier stale claim:
+
+| the published claim | what re-running it gave |
+|---|---|
+| `MEASUREMENT_STATUS` §31.1: the attribution gate leaves **GATE B at 4 of 5**, *"Renzo ❌, Nadia ❌, Marco ✅ recovered"* | **3 of 5.** Two failures out of five is three matching, and Marco was ✅ at baseline, so nothing recovered. **Flattering to the gate.** §31.1 was itself the correction of a stale cost quoted for two waves |
+| `MASTER_PLAN` §0.6: widening the schema makes **two** named test files fail by design | **One.** The second file's facts assert only that no field is WRITTEN, which the widening does not touch |
+| `MASTER_PLAN` 8.21: **3 of 16** COVERED rows carry nothing the interest names, on two customers | **7 rows on 4 customers** across the authored cohort — and two of those customers appear in no eval's per-case table |
+
+**Why re-reading does not substitute.** Every one of these was internally plausible, correctly
+formatted, and had survived at least one review pass. The first is arithmetically self-contradicting
+on its own line and three waves of readers went past it. What separated the claim from the fact was
+not attention; it was **execution**.
+
+**The cheap form of this rule:** an ablation that is worth writing down is worth writing down *with
+the command that produces it*, so re-running it is one paste. Every §-section in
+`MEASUREMENT_STATUS.md` that records an ablation now ends with that command block, and the ones that
+did not are the ones that went stale.
+
 ## Why stage 2 exists — the evidence from this repository
 
 Every one of these passed a dry run and was still broken:

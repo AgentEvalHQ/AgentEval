@@ -1606,6 +1606,37 @@ rule.**
 > the deletion is achievable rather than aspirational. **Answering YES costs nothing today and is
 > expensive to renege on later; that asymmetry is the decision, and it is the user's to take.**
 
+> ### ⬜ Q6 — the remaining half's PRICE, measured 2026-09-06 (Wave 4). Still the user's; still not answered here.
+> Wave 3 said the deletion looks *"achievable rather than aspirational"* and offered no number. Here is
+> the number. **`grep` over `samples/`, excluding build output: 22 references to `AboveOwnFloor` /
+> `AbovePrecisionFloor` / `EveryPersonaAboveOwnFloor`, across six files**, and they are not 22 of the
+> same thing:
+>
+> | what the site is | how many | where |
+> |---|---|---|
+> | the two computed predicates themselves (`rate > floor`, null when either side is undefined) | **2** | `Graders/CoverageScore.cs:118,125` |
+> | the per-persona loop and its companion "which personas were below" list | **2** | `Graders/PairedCoverageReport.cs:332,352` |
+> | **a GATE** — the only one | **1** | `Eval02_LatentInterestCoverage.cs:563` |
+> | reporting (Eval 09's below-own list) | **1** | `Eval09_HypothesisComparison.cs:953` |
+> | ▲/▼/? markers in printed panels | **8** | `EvalPrinter.cs` |
+> | comments and control text naming them | **8** | `ExactBinomial.cs`, `NegativeControls.cs`, `EvalPrinter.cs:859` |
+>
+> **So "delete the per-persona floor loop" is mechanically: two properties, one loop, one list helper,
+> one gate call and one report call — six members — plus eight rendering markers that need a
+> replacement symbol.** It is not a rewrite of the eval.
+>
+> **And the replacement already ships.** `ExactBinomial.AboveChance(successes, trials, chance)` exists
+> (plan item 1.4), is already the decision for three other ▲ sites, and is held by Eval 03's gating
+> row `AboveChanceIsAnExactTest`. `CoverageScore` already carries the exact operands it needs —
+> `LatentServed` / `LatentTotal` / `LatentFloor` — so the substitution is expressible today.
+>
+> ⚠️ **What this does NOT establish, and it is the half that matters for a stop rule.** Nobody has
+> measured how many ▲ markers *survive* an exact test at α = 0.05, and Eval 02's **GATE 1 verdict may
+> move** — §4.0h ranks that as its own item, and it explicitly requires a *declared* GATE 1 movement.
+> **A cheap deletion whose verdict effect is unknown is not the same as a cheap deletion.** The price
+> of the mechanics is now measured; the price of the *answer changing* is not, and Q6 should not be
+> answered on the first without the second.
+
 > ### ⬜ Q5 and Q6 are the only two questions in §9 still open (2026-09-06, Wave 3)
 > Q1, Q3 and Q7 closed at `4d1f1bbc`; **Q2, Q4 and Q8 are answered above.** Q5 and Q6 are left open
 > **on purpose**: both are marked in this document as the user's call, one of them explicitly
