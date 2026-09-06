@@ -10708,3 +10708,216 @@ open, with the corrected specification recorded here so the next wave does not r
   `verdict` to `PASS | FAIL | WARN | PENDING`; the two clauses doing work today are "measured nothing"
   and "everything skipped".
 * **No Eval 02 coverage cell was re-derived after the lexicon change.** See §67.4.
+
+---
+
+# §68. THE WAVE-8 REVIEW — 2026-09-06. Three defects, one of them a published ablation that gives a different number
+
+**Commission:** review Wave 8 adversarially, re-EXECUTING every ablation rather than re-reading it.
+**Result: 13 of 14 published ablations reproduced to the digit; ONE did not, and its non-reproduction
+is a real coverage hole rather than a transcription slip. Two further defects found, one on the
+credential surface in `src/`. Three fixed; one recorded and not fixed.** Every figure below was
+produced this session from a clean tree, none is quoted from Wave 8's report.
+
+## §68.0 What shipped, with shas
+
+| # | what | sha |
+|---|---|---|
+| 1 | The multi-source scan in `EvaluatorCardRegistry` gets a test that can fail | `20fc87cc` |
+| 2 | `JudgeFingerprint.RubricDigest` — the type's second string — is guarded against the endpoint shape | `e58d3173` |
+| 3 | D-v's superseded figures corrected at four more origins | `b52bbac3` |
+
+## §68.1 🔴 DEFECT 1 — ablation N does not reproduce. Published 3 red; it is **0**
+
+`d003ce97` published *"N — only the first source assembly is scanned → 3 red"*. Re-executed on net8,
+each edit applied to a **file copy** and restored **from the copy**:
+
+| the ablation | published | measured |
+|---|---|---|
+| `foreach (var asm in sources.Take(1))` in `LoadAll` — the sentence, literally | 3 red | **0 red — 9 of 9 GREEN** |
+| `.Distinct().Take(1)` in the constructor — the other placement, which also truncates `ScannedAssemblies` | — | **0 red — 9 of 9 GREEN** |
+| `cardResources.Take(1)` — only the first RESOURCE, a **different** claim | — | 1 red |
+
+**No reading of the published sentence produces 3.**
+
+**Why it was uncovered, and why that is not a tidiness point.** All nine tests built the registry over
+exactly ONE distinct assembly: `(Agentic, Agentic)` de-duplicates to one and every other case names a
+single source, so the `foreach` was never driven past its first element by anything that could go red,
+and `ScannedAssemblies` never held two entries in any assertion. **That loop is the entire
+justification `d003ce97` gives for changing the signature** — naming `AgentEval.Evals.Agentic` inside
+Core closes a project-reference cycle, and *"a registry that names one assembly can only ever describe
+one assembly's evaluators"*. The loop **is** the argument; an untested loop is that argument unmade,
+and the published `3 red` read as evidence that it had been made. **Direction: FLATTERING.**
+
+**Fixed in `20fc87cc`** with the card-carrying assembly in the **second** position behind a cardless
+one — first position stays green under the ablation, second cannot. Both readings now go red
+(1 each); restored green 10 of 10.
+
+## §68.2 🔴 DEFECT 2 — the judge fingerprint refused an endpoint on ONE of its two strings, and claimed both
+
+`JudgeFingerprint`'s own headline read *"THIS TYPE MUST NEVER CARRY A CREDENTIAL OR AN ENDPOINT, AND IT
+REFUSES ONE AT CONSTRUCTION"*. It has two strings; **one was guarded.** `RubricDigest` accepted
+anything, a URL and a bare cloud host included — and it is written into the same scenario file that is
+the whole reason the guard exists on `ModelId`.
+
+**The exemption itself was RIGHT and it stays.** A digest IS 64 hex characters, so the model-name rules
+would refuse every real one — the failure that makes a guard look strict and be useless. What was wrong
+is that *"not the model-name rules"* had been implemented as *"no rules"*. A digest can never
+legitimately contain `://` or a cloud host, so the **endpoint half** applies to it and only the
+key/length half does not.
+
+⚠️ **Scope, stated rather than implied: no producer in this repository can trip this today.**
+`RubricDigest` is fed from `EvalProvenance.PromptHash`, and `PromptHash` is written non-null nowhere in
+`src/` — every construction site passes `PromptHash: null`. The field was closed **before** it has a
+producer, which is the only time closing it is free.
+
+**Fixed in `e58d3173`.** Four ablations, both directions on both fields: the digest guard removed
+→ **5 red**; the MODEL-NAME rules applied to the digest → **3 red** (the direction that looks like
+diligence — it takes out the sha256 positive controls); `ModelId` guard removed → 8 red; `ModelId`
+guard made total → 17 red. Restored green 53 of 53. A reflection test now requires a refusal case for
+**every** `string` property, so a third one added later fails until somebody decides what guards it.
+
+## §68.3 🔴 DEFECT 3 — D-v's blast radius reached four more files than "corrected at origin" covered
+
+§67.4 says *"Marco's case prose and the eval's two stale doc-comment claims are corrected at their
+origins"*. Both corrections landed — in `Eval07_WorkflowTopology.cs`, and nowhere else — and §67.7's
+"does NOT claim" list does not mention the rest. `fc352481` moved six published figures; four more
+files kept the superseded readings **in the present tense**.
+
+| origin | the superseded claim | direction |
+|---|---|---|
+| `NegativeControls.cs` §4 of the D-v row | *"MEASURED: 18 dead phrases split 12 closable / 0 unclosable / 6 no-products"* — inside the row whose own output on the same run prints **6 / 0 / 0 / 6** | 🔴 **FLATTERING.** That comment is the ARGUMENT for the five synthetic classifier cases under it (*"a bucket with no member is a branch nobody has run"*). Closing D-v emptied the CLOSABLE bucket too, so **two** of three buckets are unreachable from the corpus, not one — the comment understated how much of that classifier is exercised only synthetically |
+| `NegativeControls.cs` ARM D | *"and 8 of 50 do"*, present tense | stale; now 6 of 50 |
+| `NegativeControls.cs` `TopologyCaseProseMatchesTheRun` | *"Measured in the default concept space: Marco is 1 loop-back / 2 rounds / no-progress"* — the same claim `Eval07` marked SUPERSEDED, left standing in the sibling file | stale. Loop-backs and rounds did **not** move |
+| `EmbeddingSpace.cs` | *"0 of 50 … against 38 of 50 before and **8 of 50** in the concept space"* | stale on the concept half only |
+| `README.md`, 4 sites | *"18 of 56 … 10 of those are latent-gold"* **with all ten phrase names enumerated — every one closed by `fc352481`** — plus "8 of 50", the restated advisory, and gap-table row 1 *"10 dead query phrases, STILL OPEN"* | stale, and it is the document a reader meets first |
+
+**Re-derived model-free, both spaces, before any of it was written down:** ARM A/C **6 of 56, 0 latent
+GOLD** (identical under `--real-vectors` — space-invariant, as designed) · ARM D concept **6 of 50** ·
+closability **0 closable / 0 unclosable / 6 no-products**.
+
+**What was deliberately NOT rewritten.** `SUITE_SUMMARY.md` §§1–21 are the frozen record of the
+2026-09-05 live run at `f5874915`, and the document says so in its own header. Rewriting a run report's
+numbers would claim a run produced figures it did not; §10.1 gets a **supersession banner** and the two
+cells citing it get a pointer. Same treatment for the clearly past-tense B-21 narrative in
+`NegativeControls.cs` — it is anchored to a named prior state. **Fixed in `b52bbac3`.**
+
+## §68.4 ⚠️ DEFECT 4 — RECORDED, NOT FIXED: `ToScenarioResult` grew a **second** new throw and declared one
+
+`03242a1d` carries *"⚠ DECLARED BEHAVIOUR CHANGE: `ToScenarioResult` was total and now throws if the
+result's `JudgeModel` has that shape"*. It also now throws `ArgumentException` when
+`result.Metric.Key` or `result.Metric.Version` is blank — via `ComparabilityFacts`'s `Require` — and
+**`Metric` is a field the method did not read at all before this commit**. That is undeclared.
+
+**Reachability, measured:** `EvalMetadata` is a plain record with no validation
+(`EvalMetadata.cs:8`); 16 `new EvalMetadata(` sites in `src/`, **none** with a blank argument;
+`EvalResult.Skipped` derives all four from `IEval`, whose `Version` an out-of-repo implementation could
+return blank. **So it is unreachable from any producer in this repository and reachable from a
+third-party `IEval`.** Not fixed because the fail-closed behaviour is defensible and changing it is a
+design call, not a review call — recorded so the next release note carries both throws and not one.
+
+## §68.5 WHAT REPRODUCED — 13 of 14 ablations, exactly, and every headline number
+
+**All executed from a clean tree at `c5235a81`, each edit on a file copy, each restore FROM the copy.**
+
+| ablation | published | measured |
+|---|---|---|
+| A `From` reads `ComparisonBar` unconditionally | 2 | **2** |
+| B an undefined floor records 0.0 | 2 | **2** |
+| C "nobody said" reads as `DifferentModel` | 3 | **3** |
+| D endpoint/credential guard removed | 7 | **7** |
+| E guard made total | 12 | **12** |
+| F a bare dimension promoted to a bar | 1 | **1** |
+| G FileSystem store stops calling the guard | 2 | **2** |
+| H `RefusalFor` never refuses | 12 | **12** |
+| I `RefusalFor` refuses everything | 18 | **18** |
+| J doctor reads only the unpinned baseline | 2 | **2** |
+| K doctor stops resolving the `runId` | 1 | **1** |
+| L an empty source list is accepted | 1 | **1** |
+| M duplicate sources not de-duplicated | 1 | **1** |
+| **N only the first source assembly is scanned** | **3** | 🔴 **0 — see §68.1** |
+
+Green baselines that make those denominators readable: `ComparabilityFactsTests` 44 ·
+`BaselinePromotionTests` 17 + `DoctorBaselineChainTests` 7 = 24 · `EvaluatorCardRegistryTests` 9.
+**44 + 24 + 9 = 77**, which is the wave's claimed `+77` and it is now derived rather than quoted.
+
+**Also reproduced, run not read:** build **0 errors** (`--no-incremental`) · tests at `c5235a81`
+net10 **9,843/0/2 of 9,845**, net9 and net8 **9,625/0/1 of 9,626** · exit codes both spaces
+`-- 3` **0** · `-- 3 --real-vectors` **0** · `-- 4` **0** · `-- 7` **1** · `-- 7 --real-vectors` **1**
+· `--ci --dry-run` **1** · panel **42 gating by distinct row name, `NOT CAUGHT` 0**, both spaces ·
+`git log main..HEAD -- strategy/` **empty** · `git diff --numstat main..HEAD -- tests/` deletion column
+**0 for every path**, and no existing test file is touched by Wave 8 at all.
+
+**After all three fixes:** build 0 errors · net10 **9,853/0/2 of 9,855** · net9 and net8
+**9,635/0/1 of 9,636** (+10 over `c5235a81`) · every exit code and the panel unmoved.
+
+## §68.6 §67.2's RULING IS UPHELD, INDEPENDENTLY — and the pointer everyone will reach for is wrong
+
+Phase 6 (6.1–6.4) is **BLOCKED, not deferred.** Re-derived rather than accepted:
+
+* ⚠️ **The prohibition is NOT in ADR-030 §2.4.** `grep -c "AE-04"` over that ADR → **0**; its §2.4 is
+  the nine-framework ecosystem survey. The rule lives in the **plan's** §2.4 (from
+  `AgentEval_Core_Fixes_Tracker.md` §2.4). §67.2 attributes it correctly — *"kept verbatim in the
+  plan's §2.4"* — so this is a defect in the pointer a reader is handed, not in the ruling.
+* **Its condition is measured TRUE on this tree, re-derived here:** `src/` holds **74** files declaring
+  an `IEval` implementation; `ChanceFloor` appears in exactly **4** files; the intersection is
+  **ZERO**. Not one of the 74 has a chance floor. Phase 6 is prohibited **on the merits**.
+* AE-06 = Phase 4 = ADR-030 Slice **2.6**, and §8's own Slice-2 banner says it is unbuilt and gated on
+  **Q6**, which §9 lists as still open and §0.6 marks as the user's.
+* 6.3's second, independent gate is real: ADR-030 §8's *"Deferred until a second team asks"* bucket
+  names `MAFEvaluationHarnessOptions` **and** `EvaluationOptions.Evals` verbatim.
+* 6.3's stop-and-report is real: `samples/AgentEval.NuGetConsumer.Tests/ResponseValidationTests.cs:53`
+  is `Assert.True(result.Score >= 70, …)`, which this branch's library rules forbid weakening.
+
+## §68.7 VACUITY SWEEP — can any new control pass on an empty set?
+
+| control | the empty case | verdict |
+|---|---|---|
+| `BaselinePromotion.RefusalFor` | `Stats.Total == 0` is the shape it **exists to refuse**, and `Skipped >= Total` the one above it | ✅ not vacuous; positive controls present (`AHealthyRunIsPromotable`, `EveryVerdictTheSchemaAllowsIsPromotable`) |
+| `doctor`'s baseline block | no baselines ⇒ loop body never runs | ✅ intentional and pinned twice — `Doctor_NoBaselineAtAll_IsClean` for the intent, `EnumerateBaselineFiles_AssertsItsOwnInput` for the enumerator's own empty case |
+| `EvaluatorCardRegistry` | an empty source list **throws**; an honest zero is separable via `ScannedAssemblies` | ✅, and §68.1's new test adds `Count > 0` so the union assertion is not `0 == 0` |
+| `ComparabilityOf` | always returns a record; a null `ChanceFloor` and a record with a null `Bar` are different facts | ✅ not the silent-`{}` shape |
+| the persisted-bytes tests | `WriteOneScenarioAsync` ends in `Assert.Single(files)` | ✅ "no file carried the key" and "no file was written" are separated |
+
+**Residual limitation, named rather than fixed:** `EveryShippedOutputStoreCallsTheGuard` scans one
+directory (`src/AgentEval.DataLoaders/Output`). All three `IOutputStore` implementations live there
+today — verified — so it is complete now, but a fourth store in a different project would not be seen.
+
+## §68.8 What this review does NOT claim
+
+* **No Eval 02 coverage cell was re-derived.** §67.4's unverified half stays unverified; this review
+  bought nothing.
+* **`-- 3 --real-vectors` embedded queries live** (credentials were present), as §67.7 says that arm
+  does. Nothing else in the sweep reached a model.
+* **The `compare` command is still not built** and its acceptance stays refuted.
+* **`SubjectRelation` still reads `Unknown` on every run this repository can produce.** Wave 8 says so;
+  it is confirmed here and not improved.
+* **Defect 4 is recorded, not fixed.**
+
+```bash
+# 68.1 - the ablation that does not reproduce. cp FIRST; restore FROM THE COPY.
+cp src/AgentEval.Core/Evals/EvaluatorCardRegistry.cs "$SCRATCH/ECR.BASELINE"
+sed -i 's/foreach (var asm in sources)/foreach (var asm in sources.Take(1))/' \
+    src/AgentEval.Core/Evals/EvaluatorCardRegistry.cs
+dotnet build tests/AgentEval.Tests -f net8.0 && dotnet test tests/AgentEval.Tests -f net8.0 \
+    --no-build --filter "FullyQualifiedName~EvaluatorCardRegistryTests"   # -> 0 red BEFORE 20fc87cc
+cp "$SCRATCH/ECR.BASELINE" src/AgentEval.Core/Evals/EvaluatorCardRegistry.cs
+
+# 68.2 - the credential surface. SYNTHETIC values only; never echo the real ones.
+grep -n "RubricDigest" src/AgentEval.Abstractions/Output/ComparabilityFacts.cs   # -> guarded since e58d3173
+grep -rn "PromptHash" --include=*.cs src/ | grep -v "PromptHash: null"           # -> 1, the READ site only
+
+# 68.3 - re-derive D-v rather than reading it, in BOTH spaces.
+dotnet run --project $E --no-build -- 3                | grep -E "of 56|of 50"   # -> 6 / 6
+dotnet run --project $E --no-build -- 3 --real-vectors | grep -E "of 56|of 50"   # -> ARM C still 6 of 56
+
+# 68.6 - the prohibition's own condition, re-derived.
+grep -c "AE-04" docs/adr/030-meta-evaluation-is-the-lane.md                      # -> 0. Wrong pointer.
+grep -rEl "^[[:space:]]*(public|internal)[[:space:]]+(sealed[[:space:]]+|abstract[[:space:]]+|partial[[:space:]]+)*(class|record)[[:space:]]+[A-Za-z0-9_<>]+[[:space:]]*:[^;{]*\bIEval\b" \
+     --include=*.cs src/ | wc -l                                                 # -> 74
+grep -rl "ChanceFloor" --include=*.cs src/ | wc -l                               # -> 4, intersection 0
+
+# 68.5 - the invariants, derived in the same breath as they are quoted.
+git log main..HEAD --oneline -- strategy/ | wc -l                                # -> 0
+git diff --numstat main..HEAD -- tests/ | awk '{print $2}' | sort -u             # -> 0
+```
