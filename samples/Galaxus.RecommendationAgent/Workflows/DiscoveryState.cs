@@ -293,11 +293,24 @@ public sealed class DiscoveryState
     /// What those calls COST, in tokens the provider reported — never in tokens we counted.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <see cref="ModelCalls"/> answers "how many", which is the number this eval suite has been
     /// quoting in place of a bill because it was the only one available. This answers "how much",
-    /// and it answers UNKNOWN rather than zero when the provider did not say. Every increment of
-    /// <see cref="ModelCalls"/> is paired with exactly one <see cref="ChatSpend"/> record in
-    /// <c>DiscoveryModelCall.RunAsync</c>, on every exit path including the timeout one.
+    /// and it answers UNKNOWN rather than zero when the provider did not say.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The pairing rule, stated with its ONE exception, because the first version of this
+    /// remark stated it without.</b> It read <i>"every increment of <see cref="ModelCalls"/> is
+    /// paired with exactly one <see cref="ChatSpend"/> record … on every exit path"</i>. That is
+    /// false on the CALLER-cancellation path: <c>DiscoveryModelCall.RunAsync</c>'s
+    /// <c>when (cancellationToken.IsCancellationRequested)</c> filter rethrows without recording,
+    /// and the counter may already have been incremented. It is deliberate — the caller cancelling
+    /// is the answer, not a degradation — and it is harmless in practice because the throw
+    /// propagates past every printer, so no meter line is rendered for that turn. But a reader
+    /// checking <c>Calls == ModelCalls</c> as an invariant would be checking something the code
+    /// does not hold. Direction of the original claim: flattering. On every OTHER exit path —
+    /// success, timeout, and any other throw after the counter moved — the pairing does hold.
+    /// </para>
     /// </remarks>
     public ChatSpend Spend { get; } = new();
 
