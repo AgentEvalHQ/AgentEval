@@ -267,6 +267,19 @@ public sealed class IntegrityRunReport
     public IReadOnlyList<IntegrityRow> AssertionFailures =>
         [.. _rows.Where(r => r.AssertionFailure is { Length: > 0 })];
 
+    /// <summary>
+    /// Cases whose ANSWER TEXT named a special-category term the customer never raised — plan item
+    /// 8.6 / N-11a. <b>Reported, never gated.</b>
+    /// </summary>
+    /// <remarks>
+    /// Same reason as <see cref="AssertionFailures"/> (plan item 8.8, <c>903d0e1b</c>):
+    /// <c>SuppressedSignalLeak</c> is zero-tolerance, so folding this in would move verdicts on a
+    /// paid record that the change adding it cannot re-take. Promoting it is a decision plus a
+    /// purchase, in that order.
+    /// </remarks>
+    public IReadOnlyList<IntegrityRow> AnswerTextLeaks =>
+        [.. _rows.Where(r => r.Verdict.AnswerLeaks.Count > 0)];
+
     /// <summary>Total estimated cost across the run, when the harness reported any.</summary>
     public decimal EstimatedCost => _rows.Sum(r => r.EstimatedCost ?? 0m);
 

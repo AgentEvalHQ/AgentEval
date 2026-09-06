@@ -334,7 +334,11 @@ public static class Eval01_CatalogueIntegrity
         }
 
         bool? backstop = testCase.SimulateOptOut ? DetectOptOutBackstop(result.ToolUsage) : null;
-        IntegrityVerdict verdict = CatalogueIntegrityGrader.Grade(testCase, result.ToolUsage, backstop);
+        // N-11a: the composed ANSWER goes to the grader too, so the customer-facing surface is
+        // screened by the same rule as the tool argument. `ActualOutput` is what the harness
+        // recorded the agent saying; a null one is reported NOT SCREENED, never clean.
+        IntegrityVerdict verdict = CatalogueIntegrityGrader.Grade(
+            testCase, result.ToolUsage, backstop, result.ActualOutput);
         var presented = PresentedCall.FromToolUsage(result.ToolUsage);
 
         string? assertionFailure = RunFluentAssertions(testCase, result.ToolUsage);

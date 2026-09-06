@@ -231,6 +231,27 @@ public static class EvalPrinter
             Console.ResetColor();
         }
 
+        // ⚠ PLAN ITEM 8.6 / N-11a — the SUPPRESSION SCREEN, one layer out. D3c reads the `reason`
+        //   tool ARGUMENT; the customer reads the prose the agent composes around it, and nothing
+        //   read that. An agent can keep every reason clean and open its answer with "given your
+        //   pregnancy…". Same blocklist, same customer-raised exemption, so the two channels
+        //   cannot drift apart — and deliberately NOT in the gate, for 8.8's reason exactly:
+        //   SuppressedSignalLeak is zero-tolerance and promoting this moves verdicts on a paid
+        //   record that the change adding it cannot re-take.
+        var answerLeaks = report.AnswerTextLeaks;
+        if (answerLeaks.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  ⚠️  ANSWER-TEXT SUPPRESSION LEAKS — {answerLeaks.Count} case(s) whose ANSWER named a "
+                            + "special-category term the customer never raised:");
+            foreach (var row in answerLeaks)
+                Console.WriteLine($"       {row.Case.Id}: '{string.Join("', '", row.Verdict.AnswerLeaks)}'");
+            Console.WriteLine("     D3c screens the tool ARGUMENT; this is the surface the customer actually reads. "
+                            + "REPORTED, NOT GATED — SuppressedSignalLeak is zero-tolerance, and promoting this "
+                            + "moves verdicts on a paid record. That is a decision plus a purchase, in that order.");
+            Console.ResetColor();
+        }
+
         Console.WriteLine();
         Console.ForegroundColor = report.Passed ? ConsoleColor.Green : ConsoleColor.Red;
 
