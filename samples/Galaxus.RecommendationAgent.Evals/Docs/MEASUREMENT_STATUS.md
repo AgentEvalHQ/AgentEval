@@ -8163,3 +8163,120 @@ dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 -
 * **`1 of 50` is this corpus at this calibrated floor**, not a property of `text-embedding-3-small`.
 * **No agent-side verdict was re-measured.** Nothing here re-takes any per-case figure in
   `SUITE_SUMMARY`.
+
+---
+
+## 57. Plan item 7.1 / ADR-031 S1 — a snapshot now says what produced it, and half of S1 stays deferred for a reason that was CHECKED (2026-09-06)
+
+**7.1's acceptance is two clauses: *"two runs coexist; the model id is recorded"*. One was already
+true and had never been re-checked; the other was false. Both were settled by execution.**
+
+### 57.1 Clause 1 — *two runs coexist* — already true, verified by looking rather than by reading
+
+`EvalResultStore.Write<T>` copies the previous file aside under **its own last-write time** before the
+new one lands. ADR-031 §0.1 already said *"overwritten each run" is stale*; that claim was itself a
+claim, so it was executed: the store holds **hundreds of dated archive files beside the thirteen
+canonical keys** (`eval01_integrity.20260904T141155Z.json`, `eval02_coverage_ab.20260904T151503Z.json`,
+…). ✅ **Nothing to build.**
+
+### 57.2 🔴 Clause 2 — *the model id is recorded* — was FALSE on every canonical key
+
+Measured over the canonical files before the change:
+
+| key | top-level members |
+|---|---|
+| `eval03_controls` | `Label`, `Controls`, `AllControlsTripped`, `RunAt` |
+| `eval07_topology` | `Label`, `Controls`, `AllControlsTripped`, `RunAt` |
+| `eval01_integrity` | `Architecture`, `Label`, …, `Cases`, `RunAt` |
+| `eval02_coverage_ab` | `Label`, `PersonaCount`, `Arms`, …, `CostByArm`, `RunAt` |
+
+**Not one of them said what produced it** — no model, no deployment, no embedding space.
+
+**Why that is load-bearing here and not bookkeeping.** This suite resolves **two** configurations that
+both claim to be the product, and §20/§42 measured that the deterministic loop is **not
+space-invariant** across them: two of Eval 07's five customers swap round counts, one flips
+DEGRADED → APPROVED, and one of four frozen stop reasons is unreachable on the real path. §54.6 then
+established that **the canonical file holds whichever space ran last.** So two snapshots could differ
+because the agent changed or because the space did, and the file could not tell you which.
+
+### 57.3 What was built
+
+A `SnapshotProvenance` block attached by the **one write chokepoint**, on the SERIALISED document
+rather than on the eight snapshot record types — *"a property on each type is a thing to forget; a
+splice at the single chokepoint is not"*. It records the **resolved** embedding space (name, model,
+dimensions), the **configured** chat deployment, whether credentials were present, and a standing
+note. Verified on disk after `-- 3` in both spaces:
+
+```json
+"Provenance": {
+  "EmbeddingSpace": "concept",            |  "EmbeddingSpace": "precomputed+azure",
+  "EmbeddingModel": "galaxus-concept-v2", |  "EmbeddingModel": "text-embedding-3-small",
+  "EmbeddingDimensions": 24,              |  "EmbeddingDimensions": 1536,
+  "ChatDeploymentConfigured": "gpt-5.5", "AzureCredentialsPresent": true, "Note": "…"
+}
+```
+
+**Three properties that are deliberate, and each is a rule this project has paid for:**
+
+1. **It never RESOLVES the space.** `OfThisProcess` reads `EmbeddingSpace.Current`, not `Resolve`, so
+   writing a snapshot cannot trigger a live space-identity probe or pin a space the run never chose.
+2. **`ChatDeploymentConfigured` is CONFIGURED, not CALLED**, and the file says so in its own `Note`
+   because the file will be read by someone who does not have the class open. **Evals 03, 04 and 07
+   call no model on any path and persist anyway** — a bare `"model": "gpt-5.5"` on `eval03_controls`
+   would read as proof a model produced those numbers.
+3. **No endpoint, no key, no host, no digest of either.** The standing rule, and it binds a
+   *provenance* block hardest, because a provenance block is exactly where somebody would put them.
+
+### 57.4 The gating row EXECUTES the store's bytes, and its credential clause was PLANTED to prove it hits
+
+`EverySnapshotSaysWhatProducedIt` calls `EvalResultStore.Render` — the exact expression `Write` hands
+to `File.WriteAllText` — over a real `IntegritySnapshot` carrying **`SoftClassCleanRate = NaN`**, then
+asserts five things about the resulting bytes. A source-text check that `Provenance` appears in
+`EvalResultStore.cs` would be satisfied by the comment explaining it (§34.4, §55.5).
+
+⚠ **The NaN clause is not decoration.** An empty denominator is NaN throughout this suite — that is
+how *"we could not score this one"* is kept from rendering as 0 or 1 — and attaching provenance means
+parsing the document and writing it out again. A round trip that quietly turned NaN into 0 would
+rewrite every undefined rate into a number, in a stored file, after the run that could have noticed
+had ended.
+
+⚠ **Clause 5 is declared INAPPLICABLE, never passed, where no credentials are configured** — an absent
+secret cannot be found in anything, and the verdict then reads over the four applicable clauses and
+says so.
+
+| # | ablation | `-- 3` | the fault it printed |
+|---|---|---|---|
+| **A** | `Render` drops `Attach` — the shipped state before this item | **1** | *"Provenance member: ❌ ABSENT — a stored snapshot would not say what produced it"* |
+| **B** | provenance records `Config.PreferredDeployment` instead of the resolved `Config.Model` | **1** | *"names the configured chat deployment: ❌ no (file says 'gpt-5-mini')"* — the requested-vs-resolved shape §42 named |
+| **C** | the endpoint HOST spliced into the note — **a planted positive control for clause 5** | **1** | *"credentials in the document: ❌ PRESENT"*. The scanner hits |
+| **D** | the standing note blanked | **1** | *"carries the CONFIGURED-is-not-CALLED caveat: ❌ no — the field would read as proof a model produced the numbers"* |
+| — | **restored** | **0** in both spaces | — |
+
+### 57.5 What is NOT built, and the deferral was CHECKED against the type rather than re-read
+
+**S1's mechanism — `EvalResultStore` → `IOutputStore` — stays deferred, for ADR-031 §0.1's stated
+reason, which was verified rather than quoted:** the migration would push the Galaxus snapshots'
+`NOT COMPARABLE` / `VOID` / `INAPPLICABLE` cells into a `ScenarioResult`, and
+`src/AgentEval.Abstractions/Output/IOutputStore.cs` shows that record's full member list —
+`Id, Name, Input, Output, Passed, Score, Metrics, Assertions, Duration, EstimatedCost` plus
+`StimulusHash`. **There is no label and no measurement state on it.** `MeasurementState` and the
+`"inapplicable"` label DO exist, on `EvalScore` (`src/AgentEval.Abstractions/Evals/EvalScore.cs`) —
+ADR-030 Slice 1.4's in-memory half has landed — but the **serialised** half is plan item 3.4 part
+(ii), which Q4 defers to the next major because it moves every historical content hash.
+**So the block is real and it is one layer down, exactly where the ADR says.** Migrating now would
+force an undecidable into a `bool Passed`, which is the defect ADR-030 exists to prevent.
+
+⚠ **What this row does NOT cover:** that `Write` calls `Render`. It executes `Render`; the
+`File.WriteAllText` and the archive-first rule around it are covered by `WriteLedgerMatchesTheStore`
+and by the on-disk check in §57.3, which is a measurement rather than a control. Stated rather than
+implied.
+
+### 57.6 Nothing moved
+
+**Panel: 31 → 32 gating + 7 advisory = 39 rows in BOTH spaces, `❌ NOT CAUGHT` = 0.** Exit codes,
+re-observed: `-- 3` / `-- 4` / `-- 8 --dry-run` **0**; `-- 7` **1** in both spaces;
+`--ci --dry-run` **1**, Eval 07 the only FAILED of eleven. `AgentEval.sln` **0 errors**. **Zero files
+under `tests/` or `src/` touched.** The store's own `.agenteval/` tree is gitignored
+(`.gitignore:453`), so no committed artefact moves; what a reader must expect is that every snapshot
+written from this commit onward carries one extra top-level member and that **no existing member
+changes**.

@@ -122,6 +122,7 @@ public static class NegativeControls
         rows.Add(await GuardedAsync("LoopBackNegativeDirectionCensus", () => CheckLoopBackNegativeDirectionCensusAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(await GuardedAsync("TopologyCaseProseMatchesTheRun", () => CheckTopologyCaseProseMatchesTheRunAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("VacuityIsDeclaredNotInferred", CheckVacuityIsDeclaredNotInferred));
+        rows.Add(Guarded("EverySnapshotSaysWhatProducedIt", CheckEverySnapshotSaysWhatProducedIt));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -1525,6 +1526,114 @@ public static class NegativeControls
         }
 
         return (queries.Count, dead, examples);
+    }
+
+
+    // ══ Plan item 7.1 / ADR-031 S1, second clause — a stored snapshot says what produced it ════
+
+    /// <summary>
+    /// GATING. Drives the store's real byte-producing seam and asserts that what lands on disk
+    /// names the RESOLVED embedding space and the configured chat deployment, keeps a NaN a NaN,
+    /// and carries no credential of any kind.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this row exists.</b> The suite has two resolved configurations that both claim to be
+    /// the product, the deterministic loop is measurably not space-invariant across them (§20, §42),
+    /// and §54.6 established that the canonical snapshot file holds <b>whichever space ran last</b>.
+    /// Until 7.1's second clause a stored snapshot said <c>Label</c>, its payload and <c>RunAt</c>
+    /// and nothing about what produced it, so two files could differ because the agent changed or
+    /// because the space did, and the file could not tell you which.
+    /// </para>
+    /// <para>
+    /// <b>It EXECUTES the seam.</b> <see cref="EvalResultStore.Render{T}"/> is the exact expression
+    /// <c>Write</c> hands to <c>File.WriteAllText</c>, so this row reads the bytes the store
+    /// actually stores. A source-text assertion that "Provenance" appears in <c>EvalResultStore.cs</c>
+    /// would be satisfied by the comment that explains it — the shape §34.4 and §55.5 each recorded
+    /// once.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The NaN clause is not decoration.</b> An empty denominator is NaN throughout this suite,
+    /// and the store only survives one because it serialises with
+    /// <c>AllowNamedFloatingPointLiterals</c>. Attaching provenance means parsing the document and
+    /// writing it out again, and a round trip that quietly turned NaN into 0 would convert every
+    /// "we could not score this one" into a perfect or a failing score — in a stored file, silently,
+    /// after the run that could have noticed had ended.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The credential clause reports a COUNT, never a value.</b> It asks whether the rendered
+    /// document contains the real endpoint's text or the real key's text, and prints only
+    /// present/absent. Where no credentials are configured it declares itself INAPPLICABLE for that
+    /// clause rather than passing — an absent secret cannot be found in anything.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckEverySnapshotSaysWhatProducedIt()
+    {
+        const string name = "EverySnapshotSaysWhatProducedIt";
+        const string expectation =
+            "a stored snapshot must say what produced it, because this suite resolves TWO configurations that both "
+          + "claim to be the product and the canonical file holds whichever ran last (§54.6). Driven through "
+          + "EvalResultStore.Render — the exact expression Write hands to File.WriteAllText, never a source-text "
+          + "check — over a real snapshot record carrying a NaN. The stored document must (1) carry a Provenance "
+          + "member, (2) name the RESOLVED embedding space and its model, (3) name the configured chat deployment "
+          + "and carry the standing caveat that CONFIGURED is not CALLED — Evals 03, 04 and 07 persist without "
+          + "calling any model, (4) round-trip a NaN as a NaN, because an empty denominator is how this suite "
+          + "refuses to render 'unscorable' as 0 or 1, and (5) contain no endpoint and no key. Clause 5 is "
+          + "reported as present/absent and never prints either value.";
+
+        var space = EmbeddingSpace.Resolve(Catalogue.Default.All);
+
+        // A real snapshot record, with a real NaN in a real field — SoftClassCleanRate is the
+        // suite's own "nothing was presented, so the rate is undefined" carrier.
+        var specimen = new IntegritySnapshot
+        {
+            Architecture       = "(control specimen — EverySnapshotSaysWhatProducedIt)",
+            Label              = "provenance seam probe",
+            SoftClassCleanRate = double.NaN,
+        };
+
+        string rendered = EvalResultStore.Render(specimen);
+
+        using var document = JsonDocument.Parse(rendered);
+        bool hasBlock = document.RootElement.TryGetProperty(SnapshotProvenance.MemberName, out var block);
+
+        string spaceInFile = hasBlock && block.TryGetProperty("EmbeddingSpace", out var s) ? s.GetString() ?? "" : "";
+        string modelInFile = hasBlock && block.TryGetProperty("EmbeddingModel", out var m) ? m.GetString() ?? "" : "";
+        string chatInFile  = hasBlock && block.TryGetProperty("ChatDeploymentConfigured", out var c) ? c.GetString() ?? "" : "";
+        string noteInFile  = hasBlock && block.TryGetProperty("Note", out var n) ? n.GetString() ?? "" : "";
+
+        bool namesSpace = string.Equals(spaceInFile, space.Source.Name, StringComparison.Ordinal)
+                       && string.Equals(modelInFile, space.Source.ModelId, StringComparison.Ordinal);
+        bool namesChat  = string.Equals(chatInFile, Config.Model, StringComparison.Ordinal);
+        bool carriesNote = string.Equals(noteInFile, SnapshotProvenance.StandingNote, StringComparison.Ordinal);
+
+        // The payload has to survive the parse-and-rewrite the attachment costs.
+        var replayed = JsonSerializer.Deserialize<IntegritySnapshot>(rendered, EvalResultStore.StorageJsonOptions);
+        bool nanSurvived = replayed is not null && double.IsNaN(replayed.SoftClassCleanRate);
+
+        // Clause 5. Only ever a boolean leaves this block.
+        bool credentialsConfigured = Config.IsConfigured;
+        bool leaks = credentialsConfigured
+                  && (rendered.Contains(Config.Endpoint.ToString(), StringComparison.OrdinalIgnoreCase)
+                   || rendered.Contains(Config.Endpoint.Host, StringComparison.OrdinalIgnoreCase)
+                   || rendered.Contains(Config.KeyCredential.Key, StringComparison.Ordinal));
+
+        bool ok = hasBlock && namesSpace && namesChat && carriesNote && nanSurvived && !leaks;
+
+        return new ControlRowSnapshot(
+            name,
+            expectation,
+            $"the store's own bytes, for a real IntegritySnapshot with SoftClassCleanRate = NaN · "
+          + $"Provenance member: {(hasBlock ? "present" : "❌ ABSENT — a stored snapshot would not say what produced it")} · "
+          + $"names the resolved space: {(namesSpace ? $"yes ({spaceInFile} / {modelInFile})" : $"❌ no (file says '{spaceInFile}' / '{modelInFile}', this run resolved '{space.Source.Name}' / '{space.Source.ModelId}')")} · "
+          + $"names the configured chat deployment: {(namesChat ? $"yes ({chatInFile})" : $"❌ no (file says '{chatInFile}')")} · "
+          + $"carries the CONFIGURED-is-not-CALLED caveat: {(carriesNote ? "yes" : "❌ no — the field would read as proof a model produced the numbers")} · "
+          + $"NaN round-trips as NaN: {(nanSurvived ? "yes" : "❌ NO — an undefined rate would be stored as a number")} · "
+          + $"credentials in the document: {(credentialsConfigured ? leaks ? "❌ PRESENT" : "absent" : "clause INAPPLICABLE — no endpoint or key is configured in this process, and an absent secret cannot be found in anything. DECLARED, not counted as a pass: this verdict is over the four applicable clauses")}"
+          + (ok
+                ? ". Two runs already coexist (Write archives the previous file under its own mtime, hundreds of dated archives on disk), so 7.1's acceptance now reads on both clauses."
+                : ". ❌ 7.1's second clause is not met on this tree."),
+            Tripped: ok);
     }
 
     // ══ Plan item 1.10, THIRD CLAUSE — the ANSWER-quality arm that replaces the weight ARM D

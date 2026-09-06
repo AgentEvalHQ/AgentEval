@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using System.Text.Json;
@@ -188,9 +188,37 @@ public static class EvalResultStore
             if (!File.Exists(archive)) File.Copy(path, archive);
         }
 
-        File.WriteAllText(path, JsonSerializer.Serialize(snapshot, JsonOpts));
+        File.WriteAllText(path, Render(snapshot));
         RecordWrite(key);
     }
+
+    /// <summary>
+    /// The exact bytes <see cref="Write{T}"/> puts on disk, minus the file handle. Plan item 7.1 /
+    /// ADR-031 S1's second clause attaches the run's provenance here, at the single chokepoint, so
+    /// that no eval and no future snapshot record type has to remember to carry it.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Internal so a control can EXECUTE the byte-producing seam rather than assert about its
+    /// source text.</b> §55.5 is the record of why: a source-text check that <c>Provenance</c> is
+    /// "mentioned" would be satisfied by the comment explaining it. The only thing outside this
+    /// method that <c>Write</c> does is the <c>File.WriteAllText</c>, and the archive-first rule
+    /// above it.
+    /// </remarks>
+    /// <typeparam name="T">The snapshot record type.</typeparam>
+    /// <param name="snapshot">The snapshot.</param>
+    internal static string Render<T>(T snapshot) =>
+        SnapshotProvenance.OfThisProcess().Attach(JsonSerializer.Serialize(snapshot, JsonOpts), JsonOpts);
+
+    /// <summary>
+    /// The store's own serialiser options, so a control can replay a stored document with the
+    /// settings that wrote it instead of a hand-built copy of them.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ A hand-built copy is the bar-supplied shape the Wave 2 review found in ADR-031 S2's own
+    /// test: it stays green when the real settings change. The NaN clause of
+    /// <c>EverySnapshotSaysWhatProducedIt</c> is only meaningful because it reads THIS object.
+    /// </remarks>
+    internal static JsonSerializerOptions StorageJsonOptions => JsonOpts;
 
     private static T? Read<T>(string key) where T : class
     {
