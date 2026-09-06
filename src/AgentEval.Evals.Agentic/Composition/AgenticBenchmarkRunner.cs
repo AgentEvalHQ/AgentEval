@@ -59,7 +59,12 @@ public sealed class AgenticBenchmarkRunner
         // Persist each leaf scenario result.
         foreach (var (scenarioId, leafResult) in EnumerateAtomicLeaves(result))
         {
-            var sr = EvalResultPersistence.ToScenarioResult(leafResult, scenarioId, leafResult.Metric.Name);
+            // ADR-031 S2: record WHAT WAS ASKED and a digest of it. Every leaf of one composite
+            // was given the same stimulus, so the composite's own input is the right value — and
+            // it is the first real producer of a StimulusHash, which keeps the field from being
+            // the dead-data-by-construction shape ADR-031 finding V7 cuts.
+            var sr = EvalResultPersistence.ToScenarioResult(
+                leafResult, scenarioId, leafResult.Metric.Name, input: input.Query);
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
 

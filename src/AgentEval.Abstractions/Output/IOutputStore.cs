@@ -114,7 +114,37 @@ public sealed record ScenarioResult(
     IReadOnlyDictionary<string, double> Metrics,
     IReadOnlyList<AssertionResult> Assertions,
     TimeSpan Duration,
-    double EstimatedCost);
+    double EstimatedCost)
+{
+    /// <summary>
+    /// A stable digest of the stimulus in <see cref="Input"/>, or <see langword="null"/> when the
+    /// producer did not supply one. See <see cref="StimulusHash"/> for the rule.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ADR-031 S2.</b> The point is to be able to SHOW that two runs were given the same
+    /// stimulus, rather than to assume it because two files sit in the same tree. It is a
+    /// prerequisite for S5 (<c>agenteval compare</c>, which must refuse to emit deltas across runs
+    /// that were not asked the same thing) — and V1's finding is that the comparability data belongs
+    /// on the RUN, computable without any manifest, which is why it lives here.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It is a NON-POSITIONAL member on purpose.</b> Adding an eleventh positional parameter
+    /// would break every construction site in and outside this repository. As an init-only property
+    /// defaulting to <see langword="null"/>, and with the store's
+    /// <c>DefaultIgnoreCondition = WhenWritingNull</c>, a producer that does not set it writes
+    /// <b>byte-identical</b> scenario files — so no stored content hash moves. Verified by the full
+    /// suite, not asserted.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Null is "nobody computed one", never "the inputs differ".</b> A consumer comparing two
+    /// runs must treat a null on either side as NOT COMPARABLE and say so — reading it as "no
+    /// difference" is the silent-<c>{}</c> shape ADR-030 §4.2 rejects, and it fails in the
+    /// flattering direction.
+    /// </para>
+    /// </remarks>
+    public string? StimulusHash { get; init; }
+}
 
 // AssertionResult moved to AssertionResult.cs (same namespace and assembly, so this is not an
 // API change) when it grew a three-valued Outcome and factory methods — see AE-01.

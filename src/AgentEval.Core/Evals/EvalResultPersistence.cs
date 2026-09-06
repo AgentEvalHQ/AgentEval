@@ -33,11 +33,22 @@ public static class EvalResultPersistence
     /// with no extra wiring. Pass an empty list to persist none. (AE-01: before this, the field was
     /// hard-coded empty and assertion outcomes reached no artifact AgentEval writes.)
     /// </param>
+    /// <param name="input">
+    /// The stimulus the agent was given, when the caller knows it. ADR-031 S2: an <c>EvalResult</c>
+    /// does not carry its own input, so this cannot be derived here and the caller must pass it.
+    /// <para>
+    /// ⚠ <b>It defaults to the empty string, which is what this method hard-coded before.</b> A
+    /// caller that does not pass one produces a <b>byte-identical</b> <c>ScenarioResult</c>:
+    /// <c>Input</c> is unchanged and <c>StimulusHash</c> stays null, which the store omits. No
+    /// stored content hash moves because of this parameter existing.
+    /// </para>
+    /// </param>
     public static ScenarioResult ToScenarioResult(
         EvalResult result,
         string scenarioId,
         string scenarioName,
-        IReadOnlyList<AssertionResult>? assertions = null)
+        IReadOnlyList<AssertionResult>? assertions = null,
+        string? input = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioId);
@@ -76,7 +87,7 @@ public static class EvalResultPersistence
         return new ScenarioResult(
             Id: scenarioId,
             Name: scenarioName,
-            Input: "",
+            Input: input ?? "",
             Output: json,
             Passed: result.Score.Passed,
             Score: result.Score.Value,
@@ -85,7 +96,13 @@ public static class EvalResultPersistence
                 ?? AgentEval.Assertions.AgentEvalScope.Current?.Results
                 ?? Array.Empty<AssertionResult>(),
             Duration: TimeSpan.Zero,
-            EstimatedCost: result.Provenance.EstimatedCost);
+            EstimatedCost: result.Provenance.EstimatedCost)
+        {
+            // Null when no input was supplied — and null must be read as "nobody computed one",
+            // never as "the inputs match". StimulusHash.SameStimulus refuses a null on either side
+            // for exactly that reason.
+            StimulusHash = StimulusHash.Of(input),
+        };
     }
 
     /// <summary>Restores an EvalResult from a ScenarioResult previously produced by <see cref="ToScenarioResult"/>.</summary>
