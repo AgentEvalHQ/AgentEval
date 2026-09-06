@@ -1202,9 +1202,18 @@ public static class NegativeControls
         }
 
         int ceiling = measured.Count == 0 ? -1 : measured.Max(m => m.Clean);
-        int refuser = measured.FirstOrDefault(m => m.Name.EndsWith("NeverPresents", StringComparison.Ordinal)).Clean;
+
+        // Presence is a clause of its own — the same reason spelled out on the Eval 06 twin below.
+        // This row survives the shape only by luck: its claimed RefuserScore is 5, so an absent
+        // policy's default 0 happens to be caught. A pinned 0 would have made it silent.
+        int refuserCount = measured.Count(m => m.Name.EndsWith("NeverPresents", StringComparison.Ordinal));
+        bool refuserPresent = refuserCount == 1;
+        int refuser = refuserPresent
+            ? measured.First(m => m.Name.EndsWith("NeverPresents", StringComparison.Ordinal)).Clean
+            : -1;
 
         bool tripped = ceiling == ConstantPolicies.MeasuredCeiling
+                    && refuserPresent
                     && refuser == ConstantPolicies.RefuserScore
                     && ceiling < IntegrityCases.All.Count;
 
@@ -1216,7 +1225,8 @@ public static class NegativeControls
           + "requires. This row exists because both numbers were typed by hand and both were wrong.",
             string.Join(" · ", measured.Select(m => $"{m.Name} {m.Clean}/{IntegrityCases.All.Count}"))
           + $" · ceiling {ceiling} (claimed {ConstantPolicies.MeasuredCeiling})"
-          + $" · refuser {refuser} (claimed {ConstantPolicies.RefuserScore})",
+          + $" · refuser {refuser} (claimed {ConstantPolicies.RefuserScore}, "
+          + $"{(refuserPresent ? "policy PRESENT" : $"policy ABSENT — {refuserCount} matched, nothing was measured")})",
             tripped);
     }
 
@@ -1260,6 +1270,17 @@ public static class NegativeControls
     /// checked explicitly: every policy must have produced a verdict on every case, and the policy
     /// count must be non-zero.
     /// </para>
+    /// <para>
+    /// ⚠ <b>Vacuity, third shape — found by the Wave-9 REVIEW, not by this row's own author.</b>
+    /// The refuser clause originally read <c>FirstOrDefault(…).Passed</c>, and the tuple default for
+    /// an ABSENT policy is <c>0</c> — byte-identical to the value this row claims to have measured.
+    /// Ablation B6 deleted the refuser policy outright: the row stayed <b>green</b>, exit 0, still
+    /// printing <i>"the refuser exactly 0"</i>. The count check did not save it either, because
+    /// <c>expectedVerdicts</c> co-moves with the policy count. Presence is now its own clause, read
+    /// off the INPUT. ⚠ The same expression is in this file's Eval 03 twin
+    /// (<c>CheckConstantPolicyCeilingAsync</c>) and is safe there only because its claimed refuser
+    /// score is 5, not 0; it has been given the same clause rather than left on that luck.
+    /// </para>
     /// </remarks>
     private static async Task<ControlRowSnapshot> CheckEval06ConstantPolicyCeilingAsync(
         MAFEvaluationHarness harness, EvaluationOptions options, CancellationToken ct)
@@ -1296,8 +1317,19 @@ public static class NegativeControls
         }
 
         int ceiling = measured.Count == 0 ? -1 : measured.Max(m => m.Passed);
-        int refuser = measured
-            .FirstOrDefault(m => m.Name.EndsWith("CallsNothing", StringComparison.Ordinal)).Passed;
+
+        // ⚠ The refuser is located by IDENTITY and its PRESENCE is a separate clause. Reading it
+        // with FirstOrDefault(...).Passed alone is the silent-{} shape: an ABSENT policy yields the
+        // tuple default, Passed = 0, which is byte-identical to the value this row claims to have
+        // MEASURED. The review's ablation B6 deleted the refuser policy outright and the row stayed
+        // GREEN while still printing "the refuser exactly 0" — a claim nothing had measured, in the
+        // flattering direction. Applicability must come from the INPUT (is there a refuser?), never
+        // from the RESULT. -1 is used for "absent" because it is not a reachable score.
+        int refuserCount = measured.Count(m => m.Name.EndsWith("CallsNothing", StringComparison.Ordinal));
+        bool refuserPresent = refuserCount == 1;
+        int refuser = refuserPresent
+            ? measured.First(m => m.Name.EndsWith("CallsNothing", StringComparison.Ordinal)).Passed
+            : -1;
 
         // Only the strict PAIRS carry the argument; a single-case group has no pair ceiling.
         var pairedGroups = TrajectoryCases.All
@@ -1316,7 +1348,8 @@ public static class NegativeControls
             && ceiling < caseCount                                              // THE claim: floor 0.000
             && ceiling == ConstantTrajectoryPolicies.MeasuredCeiling
             && worstPair == ConstantTrajectoryPolicies.MeasuredPairCeiling
-            && refuser == ConstantTrajectoryPolicies.RefuserScore;
+            && refuserPresent                                                   // the refuser EXISTS…
+            && refuser == ConstantTrajectoryPolicies.RefuserScore;              // …and scored what is claimed
 
         return new ControlRowSnapshot(
             "Eval06ConstantPolicyCeiling",
@@ -1331,7 +1364,8 @@ public static class NegativeControls
               + (m.PassedIds.Count == 0 ? string.Empty : $" [{string.Join(",", m.PassedIds)}]")))
           + $" · ceiling {ceiling} (claimed {ConstantTrajectoryPolicies.MeasuredCeiling}, gate needs {caseCount})"
           + $" · worst pair {worstPair} (claimed {ConstantTrajectoryPolicies.MeasuredPairCeiling})"
-          + $" · refuser {refuser} (claimed {ConstantTrajectoryPolicies.RefuserScore})"
+          + $" · refuser {refuser} (claimed {ConstantTrajectoryPolicies.RefuserScore}, "
+          + $"{(refuserPresent ? "policy PRESENT" : $"policy ABSENT — {refuserCount} matched, nothing was measured")})"
           + $" · {verdicts} of {expectedVerdicts} case verdicts produced",
             tripped);
     }
