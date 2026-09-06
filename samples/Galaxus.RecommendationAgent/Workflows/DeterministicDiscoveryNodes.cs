@@ -341,9 +341,15 @@ public sealed class DeterministicRanker(Catalogue catalogue, IDiscoveryProgressS
 
         // RRF scores are small positive numbers with no upper bound of interest; squashing keeps
         // the second operand inside 0..1 without pretending it is a probability.
+        //
+        // ⚠ THE CONSTANT BELOW IS THE SHAPE PARAMETER, NEVER THE COVERAGE CUT. They were one
+        //   constant until 2026-09-06 and they still carry the same value, which is why the split
+        //   moved no number — but a cut has an admit rate and a half-saturation constant does not,
+        //   so calibrating one through the other was a silent coupling into `ConfidenceBands`.
+        //   Eval 03's gating row `CoverageCutIsNotTheConfidenceShapeParameter` holds them apart.
         double retrieval = candidate.SearchScore <= 0
             ? 0.0
-            : candidate.SearchScore / (candidate.SearchScore + DiscoveryState.MinCandidateScore);
+            : candidate.SearchScore / (candidate.SearchScore + DiscoveryState.RetrievalConfidenceHalfSaturation);
 
         return Math.Clamp((interest.Confidence + retrieval) / 2.0, 0.0, 1.0);
     }

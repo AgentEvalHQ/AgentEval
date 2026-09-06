@@ -5186,3 +5186,103 @@ dotnet run --project $A -- 2 --offline --real-vectors       # exit 0; 10 query c
 # PAID — stage 2, and the only paid thing this wave needed:
 dotnet run --project $E -- 2 --only USR-NB-01               # ~2 to 3 CHF, 3 reps. CAPTURE THE EXIT CODE.
 ```
+
+---
+
+## 35. WAVE 4 — 2.11's PRECONDITION: one constant, two jobs, split at equal value (2026-09-06)
+
+**§29.3 filed a blocker and named the fix: *"derive nothing until the cut and the shape parameter are
+separate constants."* This section is that fix, and the whole of its interest is that it moves NO
+number** — the split is arithmetically inert by construction, which is exactly what makes it safe to
+do before anybody derives anything.
+
+### 35.1 What was one constant, and what it did
+
+`DiscoveryState.MinCandidateScore = 0.012` had three readers and two jobs:
+
+| site | job | has an admit rate? |
+|---|---|---|
+| `CatalogueDiscoverySearch.ClassifyCoverage:267` | **cut** — a candidate below it does not count toward coverage | yes (measured 1.000, §29.1) |
+| `CoverageVerdictProjection.Starved:53` | **cut** — the same clause, in the cheap pre-gate | yes, the same one |
+| `DeterministicRanker.Confidence:346` | **half-saturation constant** of `s / (s + k)` | **no — it is not a threshold** |
+
+`ConfidenceBands` routes the primary and secondary trays on the number the third row produces, and
+those bands were derived on the same held-out split as the four cuts in `f5874915`. So re-deriving
+`MinCandidateScore` as a cut — which is what plan item 2.11 asks for — would have moved a second
+calibrated quantity through a coupling neither derivation can see.
+
+### 35.2 The split
+
+`DiscoveryState.RetrievalConfidenceHalfSaturation = 0.012` is new; `DeterministicRanker.Confidence`
+reads it; the two coverage sites keep reading `MinCandidateScore`, unchanged at `0.012`. **The two
+constants carry the same value on purpose**, so that the change which removes the coupling is the
+change that moves nothing, and the next change — whichever half it touches — is the only thing a
+reader has to reason about.
+
+### 35.3 The measurement: nothing moved, and it was checked rather than argued
+
+| command | before the split | after |
+|---|---|---|
+| `-- 7` | exit **1**, GATE A ✅ / **GATE B ❌** / GATE C ✅, 427 lines | exit **1**, identical — `diff` over the whole log is **five hunks, all of them clocks** (`loop 150 ms → 140 ms`, `TotalDuration`, three more timings) |
+| `Agent -- 2 --offline --user USR-NB-01` | exit 0 | exit 0; `diff` is **44 lines, every one a `verified …UTC` stamp** — every `low_confidence` line still reads 0.62 / 0.69 / 0.69 / 0.55 / 0.54 / 0.54 / 0.54, to the printed digit |
+| `-- 3` | exit 0, 31 rows | exit 0, **32 rows** (one added, below) |
+| `--ci --dry-run` | exit 1 | exit 1 |
+
+The confidence comparison is the load-bearing one, and it was taken by **stashing the two source
+edits, rebuilding, running, restoring** — not by reasoning from the equality of the constants.
+
+### 35.4 The control, and its ablation
+
+New **gating** row `CoverageCutIsNotTheConfidenceShapeParameter` (Eval 03). It scans the three method
+bodies in the agent project and asserts the separation **in both directions**: `Confidence` must name
+the shape parameter and must not name the cut; `ClassifyCoverage` and `Starved` must name the cut and
+must not name the shape parameter.
+
+⚠️ **It reads SOURCE, and the reason is the same fact that makes the split safe.** Both constants are
+`0.012`, so no runtime observation can distinguish a ranker reading one from a ranker reading the
+other. A value-based check here would be a control that cannot fail — the shape §4.0h's third lesson
+named. The discriminator has to be *which symbol the site spells*.
+
+It asserts its own input (files found, all three bodies located by signature, both constants present
+and `IsLiteral`, a partial scan is a fault), it strips `//` comments before matching so the prose that
+*explains* the split cannot trip it, and it prints both values so a future divergence is visible
+rather than merely permitted.
+
+**Ablation, executed, both directions.** Reverting `Confidence` to read `MinCandidateScore`, rebuilding
+and re-running: the row reports **❌ NOT CAUGHT — 2 fault(s)** and `-- 3` exits **1**. Restored: `✅
+caught`, exit **0**.
+
+### 35.5 What this does NOT do
+
+**It does not make the cut calibratable.** §29.2's finding is untouched and independent: the admit rate
+at the anchor is 1.000, so equal-tail transport has no tail to match and the derivation is degenerate.
+What the split changes is that this is now the *only* reason left — before it, there were two, and one
+of them (the coupling) would have applied even on a corpus where the cut did decide things.
+
+**And the two halves are now closed for different reasons, which is the point of separating them:**
+
+- **the cut** — degenerate under equal-tail transport on this corpus, headroom 1.4×, re-measurable
+  every run by the advisory row `MinCandidateScoreDecidesNothing`;
+- **the shape parameter** — equal-tail transport does not apply to it *at all*. It admits nothing, so
+  it has no admit rate to match; asking that machinery for a value here would be a category error, not
+  an unfavourable fit. Calibrating it needs an OUTCOME the confidence is supposed to predict, and this
+  sample has none — `DeterministicRanker.Confidence`'s own remarks already say the number is
+  uncalibrated and routes between two trays, and that statement stands.
+
+⚠️ **One claim went stale in the same commit and was corrected in place**: the advisory row
+`MinCandidateScoreDecidesNothing` ended its observed line with *"and the SAME constant is the
+half-saturation term of `DeterministicRanker.Confidence`'s s/(s+k), which ConfidenceBands then routes
+on."* After the split that sentence is false. It now names the separate constant and its value.
+
+### 35.6 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet run --project $E -- 3                              # exit 0 — 32 rows, the new one ✅ caught
+dotnet run --project $E -- 7                              # exit 1 — GATE B, unchanged
+dotnet run --project $E -- --ci --dry-run                 # exit 1 — unchanged
+dotnet run --project $A -- 2 --offline --user USR-NB-01   # exit 0 — every confidence unchanged
+# the ablation: in DeterministicDiscoveryNodes.Confidence, read MinCandidateScore again
+#   -> `-- 3` exits 1, the row reports 2 fault(s)
+```

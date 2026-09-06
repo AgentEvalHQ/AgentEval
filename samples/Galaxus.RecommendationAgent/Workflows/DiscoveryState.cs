@@ -73,18 +73,49 @@ public sealed class DiscoveryState
     /// able to move by ablation (at 0.030 it decides 27 of 52 and the admit rate is 0.481).
     /// </para>
     /// <para>
-    /// ⚠ <b>And this ONE constant does TWO structurally different jobs.</b> Here and in
-    /// <c>CoverageVerdictProjection.Starved</c> it is a <i>cut</i>. In
-    /// <c>DeterministicRanker.Confidence</c> it is the <i>half-saturation constant</i> of the
-    /// squashing transform <c>s / (s + k)</c> — the score at which the retrieval term equals 0.5 —
-    /// which is not a threshold and has no admit rate. Moving it as a cut therefore moves every
-    /// workflow-arm confidence, and confidence is the quantity <c>ConfidenceBands</c> routes trays
-    /// on — bands derived on the same held-out split, which never looked at this constant.
-    /// <b>Calibrating this value without splitting it in two would move one calibrated quantity
-    /// through another, silently.</b> Splitting it is a behaviour change and is not done here.
+    /// ✅ <b>SPLIT 2026-09-06 (Wave 4) — 2.11's recorded precondition is CLEARED.</b> Until this
+    /// commit this ONE constant did TWO structurally different jobs: a <i>cut</i> here and in
+    /// <c>CoverageVerdictProjection.Starved</c>, and the <i>half-saturation constant</i> of
+    /// <c>DeterministicRanker.Confidence</c>'s squashing transform <c>s / (s + k)</c>. Re-deriving
+    /// it as a cut would therefore have moved every workflow-arm confidence, and confidence is the
+    /// quantity <c>ConfidenceBands</c> routes trays on — bands derived on the same held-out split,
+    /// which never looked at this constant. That coupling is GONE: the shape parameter is now
+    /// <see cref="RetrievalConfidenceHalfSaturation"/>, declared separately and at the same value,
+    /// so the split is arithmetically inert and every printed number is unchanged.
+    /// <b>What the split does NOT do is make this cut calibratable</b> — the admit rate above is
+    /// still 1.000, which is a fact about the corpus and not about the coupling. Both halves of
+    /// 2.11 are now closed for stated reasons, and they are DIFFERENT reasons: the cut is
+    /// degenerate under equal-tail transport, the shape parameter is not a threshold at all and
+    /// that rule does not apply to it. Held apart by Eval 03's gating row
+    /// <c>CoverageCutIsNotTheConfidenceShapeParameter</c>.
     /// </para>
     /// </remarks>
     public const double MinCandidateScore = 0.012;
+
+    /// <summary>
+    /// The half-saturation constant of <see cref="DeterministicRanker.Confidence"/>'s squashing
+    /// transform <c>s / (s + k)</c> — the search score at which the retrieval term equals exactly
+    /// 0.5. <b>Not a threshold. Not a cut. It admits nothing and refuses nothing.</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>It carries the same value as <see cref="MinCandidateScore"/> and that is a coincidence
+    /// of history, not a relationship.</b> The two were one constant until 2026-09-06; splitting
+    /// them at equal value is deliberately arithmetically inert, so that the change that removes
+    /// the coupling moves no number and the next change — whichever of the two it touches — is the
+    /// only thing a reader has to reason about.
+    /// </para>
+    /// <para>
+    /// <b>Equal-tail transport does not apply to this number, in either direction.</b> The rule in
+    /// <c>ThresholdCalibration</c> derives a cut by matching the fraction of a fit population an
+    /// anchor admits; a shape parameter has no admit rate to match, so asking that machinery for a
+    /// value here would not be unfavourable, it would be a category error. If this number is ever
+    /// calibrated it has to be against an OUTCOME the confidence is supposed to predict, and this
+    /// sample has no such outcome — <c>DeterministicRanker.Confidence</c>'s own remarks say the
+    /// number is uncalibrated and routes between two trays, and that statement stands.
+    /// </para>
+    /// </remarks>
+    public const double RetrievalConfidenceHalfSaturation = 0.012;
 
     /// <summary>How many candidates an interest needs before the deterministic reviewer calls it covered.</summary>
     public const int MinCandidatesForCoverage = 2;

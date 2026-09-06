@@ -115,6 +115,7 @@ public static class NegativeControls
         rows.Add(Guarded("CiChainRunsModelFreeEvalsForReal", CheckCiChainRunsModelFreeEvalsForReal));
         rows.Add(Guarded("ARunThatSaysItSpendsSaysHowMuch", CheckARunThatSaysItSpendsSaysHowMuch));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
+        rows.Add(Guarded("CoverageCutIsNotTheConfidenceShapeParameter", CheckCoverageCutIsNotTheConfidenceShapeParameter));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -3030,8 +3031,11 @@ public static class NegativeControls
           + $" · lowest observed BestScore {min:0.0000} ({headroom} the cut), median {median:0.0000}"
           + $" · for comparison the OTHER two clauses decided {decidedByNamesNothing} (names nothing) and "
           + $"{emptyCandidateSets} (no candidate at all)"
-          + $" · MinCandidateScore = {DiscoveryState.MinCandidateScore:0.000}, and the SAME constant is the "
-          + "half-saturation term of DeterministicRanker.Confidence's s/(s+k), which ConfidenceBands then routes on";
+          + $" · MinCandidateScore = {DiscoveryState.MinCandidateScore:0.000}; the half-saturation term of "
+          + $"DeterministicRanker.Confidence's s/(s+k) is now the SEPARATE constant "
+          + $"RetrievalConfidenceHalfSaturation = {DiscoveryState.RetrievalConfidenceHalfSaturation:0.000} "
+          + "(split 2026-09-06 at equal value, so nothing moved), and the row above no longer has to be read "
+          + "as a statement about ConfidenceBands as well";
 
         return new ControlRowSnapshot(
             "MinCandidateScoreDecidesNothing",
@@ -3044,6 +3048,200 @@ public static class NegativeControls
             observed,
             Tripped: true,
             Gating: false);
+    }
+
+    // == 2.11's PRECONDITION -- one constant, two jobs, and the coupling that hid between them. ==
+    //
+    /// <summary>
+    /// The coverage CUT and the confidence SHAPE PARAMETER must be two separate constants, and each
+    /// site must read the one that belongs to it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect this row exists for.</b> <c>DiscoveryState.MinCandidateScore</c> was a
+    /// <i>cut</i> in <c>CatalogueDiscoverySearch.ClassifyCoverage</c> and
+    /// <c>CoverageVerdictProjection.Starved</c> AND the <i>half-saturation constant</i> of
+    /// <c>DeterministicRanker.Confidence</c>'s <c>s / (s + k)</c>. Plan item 2.11 asks for the cut
+    /// to be derived on the held-out split that derived the other four; doing that would have moved
+    /// every workflow-arm confidence, and confidence is what <c>ConfidenceBands</c> — itself derived
+    /// on that same split — routes trays on. <b>One calibrated quantity would have moved through
+    /// another, through a coupling neither derivation can see.</b> The two constants are now
+    /// separate and carry the same value, so the split moved no number; what it removed is the
+    /// coupling, and this row is what stops it coming back.
+    /// </para>
+    /// <para>
+    /// <b>Why it reads source rather than values.</b> Both constants are <c>const double 0.012</c>
+    /// today, so <i>no runtime observation can distinguish</i> a ranker that reads the shape
+    /// parameter from one that reads the cut — that is precisely what makes the split inert and
+    /// also what makes a value-based check vacuous here. The discriminator has to be which symbol
+    /// each site names, so this row scans the three call sites and asserts the separation in BOTH
+    /// directions: the ranker's squash must name the shape parameter and must not name the cut, and
+    /// the two coverage sites must name the cut and must not name the shape parameter.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It asserts its own INPUT.</b> A source scan that finds no offender is indistinguishable
+    /// from one that opened the wrong file — the silent-<c>{}</c> shape this repository has a
+    /// standing rule about. This row fails if a file is missing, if a method body is not located,
+    /// if either constant is absent from <c>DiscoveryState</c>, or if the reflected field is not a
+    /// compile-time literal. It also prints both values, so a future divergence is visible rather
+    /// than merely permitted.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckCoverageCutIsNotTheConfidenceShapeParameter()
+    {
+        const string Cut = "MinCandidateScore";
+        const string Shape = "RetrievalConfidenceHalfSaturation";
+
+        var problems = new List<string>();
+
+        // ── 1. Both constants must EXIST, as literals, on the type the sites read them from. ──
+        var cutField = typeof(DiscoveryState).GetField(Cut);
+        var shapeField = typeof(DiscoveryState).GetField(Shape);
+
+        if (cutField is null || !cutField.IsLiteral)
+            problems.Add($"DiscoveryState.{Cut} is missing or is not a compile-time constant.");
+        if (shapeField is null || !shapeField.IsLiteral)
+        {
+            problems.Add($"DiscoveryState.{Shape} is missing or is not a compile-time constant — without it there is "
+                       + "nothing for the ranker to read and the two jobs are one constant again.");
+        }
+
+        // ── 2. The three call sites, each scoped to the method that owns it. ──────────────
+        //      (file, method signature to scope to, symbol required, symbol forbidden)
+        (string File, string Method, string Required, string Forbidden)[] sites =
+        [
+            (Path.Combine("Workflows", "DeterministicDiscoveryNodes.cs"),
+             "public static double Confidence(", Shape, Cut),
+            (Path.Combine("Workflows", "CatalogueDiscoverySearch.cs"),
+             "static CoverageStatus ClassifyCoverage(", Cut, Shape),
+            (Path.Combine("Workflows", "CoverageReview.cs"),
+             "public static IReadOnlyList<Interest> Starved(", Cut, Shape),
+        ];
+
+        int bodiesRead = 0;
+
+        foreach (var (file, method, required, forbidden) in sites)
+        {
+            string path = Path.Combine(AgentSourceRoot(), file);
+            if (!File.Exists(path))
+            {
+                problems.Add($"{file} was not found — this scan cannot say anything about a file it did not open.");
+                continue;
+            }
+
+            string source = File.ReadAllText(path);
+            string? body = MethodBody(source, method);
+            if (body is null)
+            {
+                problems.Add($"{method}…) was not located in {file} — the signature moved, so the scan is reading "
+                           + "something other than the site it names.");
+                continue;
+            }
+
+            bodiesRead++;
+
+            // Comments in these bodies deliberately NAME the other constant to explain the split,
+            // so the scan reads code only. Anything else would forbid the explanation.
+            string code = StripComments(body);
+
+            if (!code.Contains(required, StringComparison.Ordinal))
+                problems.Add($"{method}…) in {file} does not read {required} — the site is not wired to the constant that belongs to it.");
+            if (code.Contains(forbidden, StringComparison.Ordinal))
+            {
+                problems.Add($"{method}…) in {file} reads {forbidden} — that is the coupling 2.11's precondition "
+                           + "removed: a cut and a half-saturation constant cannot be calibrated as one number.");
+            }
+        }
+
+        if (bodiesRead != sites.Length)
+            problems.Add($"only {bodiesRead} of {sites.Length} method bodies were read — a partial scan is not a verdict.");
+
+        double cutValue = DiscoveryState.MinCandidateScore;
+        double shapeValue = DiscoveryState.RetrievalConfidenceHalfSaturation;
+
+        return new ControlRowSnapshot(
+            "CoverageCutIsNotTheConfidenceShapeParameter",
+            "plan item 2.11's recorded PRECONDITION. MinCandidateScore was one constant doing two structurally "
+          + "different jobs — a cut in ClassifyCoverage and Starved, and the half-saturation constant of "
+          + "DeterministicRanker.Confidence's s/(s+k), which ConfidenceBands routes trays on. Re-deriving it as a "
+          + "cut would have moved a second calibrated quantity through a coupling neither derivation can see. The "
+          + "two are now separate constants AT THE SAME VALUE, so the split is arithmetically inert and no printed "
+          + "number moved; this row asserts, in both directions and per method body, that each site reads the "
+          + "constant that belongs to it. ⚠ It reads SOURCE because no runtime observation can tell the two apart "
+          + "while they carry equal values — which is the same fact that makes the split safe",
+            problems.Count == 0
+                ? $"{bodiesRead} of {sites.Length} method bodies scanned · Confidence reads {Shape} and not {Cut} · "
+                + $"ClassifyCoverage and Starved read {Cut} and not {Shape} · both constants are compile-time "
+                + $"literals · {Cut} = {cutValue:0.0000}, {Shape} = {shapeValue:0.0000}"
+                + (Math.Abs(cutValue - shapeValue) < double.Epsilon
+                    ? " — equal, which is why nothing moved; they are no longer required to stay equal"
+                    : " — ⚠ THEY HAVE DIVERGED, so every confidence and every tray routing has moved since the split")
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    /// <summary>
+    /// The brace-matched body of the first method in <paramref name="source"/> whose text starts
+    /// with <paramref name="signature"/>, or null when the signature is not there.
+    /// </summary>
+    /// <remarks>
+    /// Scoping to a body is the whole point: <c>DeterministicDiscoveryNodes.cs</c> legitimately
+    /// names the cut elsewhere in the file (the pre-gate prints it), so a file-level grep would
+    /// report a coupling that is not there.
+    /// </remarks>
+    private static string? MethodBody(string source, string signature)
+    {
+        int at = source.IndexOf(signature, StringComparison.Ordinal);
+        if (at < 0) return null;
+
+        int open = source.IndexOf('{', at);
+        if (open < 0) return null;
+
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{') depth++;
+            else if (source[i] == '}' && --depth == 0) return source[open..(i + 1)];
+        }
+
+        return null;
+    }
+
+    /// <summary>Strips line comments so a scan reads code, not the prose that explains it.</summary>
+    private static string StripComments(string body)
+    {
+        var kept = new List<string>();
+        foreach (string line in body.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            int slashes = line.IndexOf("//", StringComparison.Ordinal);
+            kept.Add(slashes < 0 ? line : line[..slashes]);
+        }
+
+        return string.Join('\n', kept);
+    }
+
+    /// <summary>
+    /// The <c>samples/Galaxus.RecommendationAgent</c> source directory — the AGENT project, not the
+    /// evals project <see cref="SampleSourceRoot"/> returns.
+    /// </summary>
+    /// <remarks>Throws rather than returning a path whose files are absent, for the reason stated on
+    /// <see cref="SampleSourceRoot"/>: a scan that opened nothing must not read as a scan that found
+    /// nothing.</remarks>
+    private static string AgentSourceRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (dir.GetFiles("AgentEval.sln").Length > 0)
+            {
+                string root = Path.Combine(dir.FullName, "samples", "Galaxus.RecommendationAgent");
+                if (File.Exists(Path.Combine(root, "Workflows", "DiscoveryState.cs"))) return root;
+            }
+            dir = dir.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "the agent project's source directory was not found from " + AppContext.BaseDirectory);
     }
 
     // == 1.4 / N-4 -- "above chance" must be a TEST, not a comparison. ====================
