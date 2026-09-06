@@ -11594,7 +11594,7 @@ output. The standing rule is *never printed*.
 | net9.0 · net8.0 | **9,710 / 0 / 1** of 9,711, both |
 | `git diff --numstat main..HEAD -- tests/` | **36** paths, **0** with any deletion |
 | `git log --oneline main..HEAD -- strategy/` | **0** |
-| `git log --oneline main..HEAD -- src/` | **15** (was 13 at §69 — d-1 and d-3) |
+| `git log --oneline main..HEAD -- src/` | **16** at the wave's final commit (was 13 at §69). 🔴 **This cell said 15 and was WRONG WITHIN ONE COMMIT OF BEING WRITTEN** — the §70 commit itself touched `src/` to remove the CS1734, which is the fourth time this number has needed a bump (six → nine → thirteen → fifteen → sixteen). §69 already said it: **the count is not the invariant, the rule is** — *`src/` is touched only by the library commits* — and a document cannot hold a count that its own writing changes. Derive it in the same breath you quote it. |
 | `-- 3` · `-- 3 --real-vectors` | **0** · **0** |
 | `-- 4` · `-- 4 --real-vectors` | **0** · **0** |
 | `-- 7` · `-- 7 --real-vectors` | **1** · **1** (GATE B, deferred by decision) |
@@ -11677,7 +11677,7 @@ dotnet build AgentEval.sln --no-incremental 2>&1 \
 for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
 git diff --numstat main..HEAD -- tests/ | awk '$2!=0' | wc -l                      # -> 0
 git log --oneline main..HEAD -- strategy/ | wc -l                                  # -> 0
-git log --oneline main..HEAD -- src/ | wc -l                                       # -> 15, NOT 13
+git log --oneline main..HEAD -- src/ | wc -l                                       # -> 16 at the final commit
 
 # 70.4 / 70.5 - credentials. COUNTS ONLY, and never echo a matched line.
 HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed -E 's#^https?://##; s#/.*$##')
