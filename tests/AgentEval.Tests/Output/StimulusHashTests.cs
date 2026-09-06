@@ -125,12 +125,74 @@ public class StimulusHashTests
         // ⚠ THE NON-BREAKING CLAIM, ASSERTED RATHER THAN ANNOUNCED. Adding a member to a record
         // that 46 stored content hashes cover is only safe if a producer that does not set it emits
         // the same bytes. Under the store's own options (WhenWritingNull) it does.
+        //
+        // ⚠ THIS IS THE UNIT-LEVEL HALF, AND ON ITS OWN IT WOULD BE A GATE FED BY ITS OWN BAR:
+        //   s_storeLike is a COPY of the store's settings, so it would stay green if the real
+        //   store's DefaultIgnoreCondition ever changed and every scenario file on disk silently
+        //   grew a "stimulusHash": null. The claim is therefore ALSO asserted against a file the
+        //   real FileSystemOutputStore wrote — see ScenarioFileOnDisk_* below.
         var before = Scenario(stimulusHash: null);
 
         string json = JsonSerializer.Serialize(before, s_storeLike);
 
         Assert.DoesNotContain("stimulusHash", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(10, JsonDocument.Parse(json).RootElement.EnumerateObject().Count());
+    }
+
+    [Fact]
+    public async Task ScenarioFileOnDisk_HasNoStimulusHashKey_WhenNoProducerSetOne()
+    {
+        // The same claim, made against the bytes the SHIPPED store actually writes. The unit test
+        // above serialises under a hand-built copy of the store's options; this one asks the store.
+        using var temp = TempWorkspace.Create("StimulusHashNone");
+        string file = await WriteOneScenarioAsync(temp, Scenario(stimulusHash: null));
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(file));
+
+        Assert.False(doc.RootElement.TryGetProperty("stimulusHash", out _));
+        Assert.Equal(10, doc.RootElement.EnumerateObject().Count());
+    }
+
+    [Fact]
+    public async Task ScenarioFileOnDisk_CarriesTheDigest_WhenAProducerSetsOne()
+    {
+        // …and the negative direction is not vacuous: the store DOES write the field when it is set.
+        // Without this, a store that dropped the member entirely would pass the test above.
+        using var temp = TempWorkspace.Create("StimulusHashSet");
+        string expected = StimulusHash.Of("the question")!;
+        string file = await WriteOneScenarioAsync(temp, Scenario(stimulusHash: expected));
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(file));
+
+        Assert.True(doc.RootElement.TryGetProperty("stimulusHash", out var value));
+        Assert.Equal(expected, value.GetString());
+        Assert.Equal(11, doc.RootElement.EnumerateObject().Count());
+    }
+
+    /// <summary>
+    /// Writes one scenario through the real <see cref="FileSystemOutputStore"/> and returns the
+    /// path of the file it produced.
+    /// </summary>
+    /// <remarks>
+    /// It asserts its own input — exactly one scenario file has to exist — because "no file carried
+    /// the key" and "no file was written" are indistinguishable otherwise.
+    /// </remarks>
+    private static async Task<string> WriteOneScenarioAsync(TempWorkspace temp, ScenarioResult scenario)
+    {
+        var store = new FileSystemOutputStore(temp.Path);
+        var subject = new SubjectIdentity(SubjectKind.Agent, "StimulusHashSubject");
+        await store.EnsureSubjectAsync(subject);
+        var manifest = await store.StartRunAsync(
+            subject, new RunContext("Evals", ".", "TestHarness", null, null, "eval"));
+
+        await store.WriteScenarioResultAsync(manifest.Run.RunId, scenario);
+
+        string[] files = Directory
+            .GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(Path.GetDirectoryName(f)!).Equals("scenarios", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return Assert.Single(files);
     }
 
     [Fact]
