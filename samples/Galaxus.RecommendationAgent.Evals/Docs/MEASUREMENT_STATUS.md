@@ -5286,3 +5286,120 @@ dotnet run --project $A -- 2 --offline --user USR-NB-01   # exit 0 — every con
 # the ablation: in DeterministicDiscoveryNodes.Confidence, read MinCandidateScore again
 #   -> `-- 3` exits 1, the row reports 2 fault(s)
 ```
+
+---
+
+## 36. WAVE 4 — Eval 07 GATE B: the refusal is now MEASURED, cohort-wide, and it is DEFERRED BY DECISION (2026-09-06)
+
+**§28.2 refused the prescribed remedy on an argument drawn from five cases. This section re-asks the
+question over all fourteen authored customers, policy-independently, and the refusal gets stronger
+rather than weaker.** Nothing was re-pinned, no threshold moved, and GATE B is still ❌ on
+`USR-RB-10`.
+
+### 36.1 The question that was never asked as a measurement
+
+Both §28.2 (GATE B's remedy) and §31.3 precondition 3 (8.21's code half) are blocked on the same
+corpus fact, and *neither had measured it*: each change flips `USR-NB-01`, the ⭐ negative direction,
+and each was refused because *"the 2×2 has to be re-established from a customer who genuinely does not
+loop."* **Nobody had looked to see whether such a customer exists.**
+
+New **advisory** row `LoopBackNegativeDirectionCensus` (Eval 03). It runs the shipped deterministic
+loop for all fourteen customers and reports, per customer:
+
+- whether the loop-back edge fired, and at which round;
+- the **admissible snippet pool** — how many of the run's observed review snippets carry at least one
+  novel token `QueryVocabulary` would admit;
+- how many rows are `COVERED` with **nothing the interest names** (8.21's bite).
+
+**Why the pool, rather than a simulation of the remedy.** §28.1 established that on this corpus the
+only thing that opens a gap for a non-abstaining customer is a mid-run proposal the vocabulary
+admitted. So a customer whose admissible pool is **zero cannot be made to loop by ANY re-ranking of
+that pool** — there is nothing in it to promote. That is a statement about the corpus rather than
+about one candidate fix, and it avoids the hazard of a row that certifies a re-implementation of the
+remedy and nothing else. Novelty is measured against the **mapper-origin** map, which is the larger-
+pool and therefore *unflattering* choice; for a non-looping customer there was only ever one round, so
+the figure is exact rather than an over-count.
+
+### 36.2 The census — shipped tree
+
+| | value |
+|---|---|
+| customers | **14** |
+| loop | **4** (`USR-MI-02`, `USR-AR-06`, `USR-JV-08`, `USR-MB-13`) |
+| do not loop | **10** |
+| non-looping customers with an **empty** admissible pool | **1 — `USR-LF-04`** |
+| …and it is the one already in the corpus, whose non-loop comes from the **pre-gate**, a different mechanism |
+
+**So the answer is NO: the loop-back edge's negative direction cannot be re-established from this
+corpus.** Nine of the ten non-looping customers have a non-empty admissible pool (9 to 21 snippets);
+the tenth is Luca, and Luca never reaches the reviewer at all.
+
+⚠️ **And the census produces a second number nobody had:** of the **13** customers with a non-empty
+pool, the shipped selector finds an admissible snippet for **4**. The producer/consumer mismatch
+§28.2 diagnosed on Renzo's German lens review is not a Renzo-shaped accident — **it costs the loop 9
+of 13 opportunities across the whole cohort.**
+
+### 36.3 The remedy, run over fourteen customers — and this is why it is still refused
+
+The refused remedy applied as an ablation (`Propose` ranks by admissible-term count, novel count as
+the tie-break), rebuilt, and the whole census re-run:
+
+| | shipped | with the remedy |
+|---|---|---|
+| customers that loop | **4 of 14** | **11 of 14** |
+| customers that do NOT loop | 10 | **3** — `USR-SK-03`, `USR-LF-04`, `USR-EW-05` |
+| customers reaching **round 3, the cap** | 1 (`USR-MB-13`) | **8** |
+| Eval 07 GATE B | ❌ on Renzo, 4 of 5 | ❌ **on Nadia**, 4 of 5 |
+| `-- 7` exit | 1 | 1 |
+| `USR-MB-13` stop reason | `gaps-unresolvable` | **`round-limit-reached`** |
+
+**Every one of §28.2's three reasons reproduces, and the second one is now a measurement.**
+
+1. **It does not fix the gate.** The failure moves from Renzo to Nadia. 4 of 5 either way, exit 1
+   either way.
+2. **It weakens the control it was meant to serve — and the cohort says how much.** The edge fires for
+   **11 of 14** customers and **8 of 14** run to the round cap. An edge that fires for 79 % of the
+   corpus and spends its whole budget for 57 % of it is not behaving as a conditional edge; it is
+   behaving as a loop with a counter. **That is the exact failure GATE B exists to detect**, and
+   trading a red gate for a green one that no longer discriminates is a worse instrument, not a better
+   system.
+3. **It silently retires a printed advisory finding.** `round-limit-reached` is currently reported as
+   not reachable on this corpus; after the remedy Mirjam reaches it. Confirmed on the ablation run.
+
+⚠️ **Two customers do survive the remedy without an empty pool** — `USR-SK-03` (pool 20) and
+`USR-EW-05` (pool 18) do not loop under it. **They are not a way out, and saying why matters more than
+the observation.** Their non-loop is an *outcome of the run*, not a property of the input: nothing
+establishes why their proposals were refused, so pinning either as the ⭐ negative direction would be
+authoring a pin from the artifact's own behaviour under the change being tested — §7 rule 1, and the
+move §28.2 refused for Renzo and §31.3 refused for Nadia. **A cell whose reason nobody can state is
+decorative.**
+
+### 36.4 THE DECISION
+
+> **Eval 07 GATE B — DEFERRED BY DECISION, not open as a defect.** GATE B is a **true finding about
+> the corpus**: `USR-RB-10`'s pin says the reviewer sends him back for more discovery and it does not
+> happen, because the proposer's ranking and the acceptance filter are anti-correlated. The origin is
+> established (§28.1–28.2), the mechanism is printed per case on every run, and the only remedy anyone
+> has proposed trades a red gate for an edge that fires 11 times in 14. **`-- 7` and `--ci --dry-run`
+> stay at exit 1, and that is the honest state of the instrument.**
+>
+> **What would change this, stated so it is checkable.** Not a better ranking. The loop-back's
+> *designed* reason — a mapper interest the reviewer could not serve, with a runnable next query — has
+> **never once fired on this corpus** (§28.1, 0 of 4 non-abstention cases). While that stays true, the
+> edge's condition is decided entirely by an accident of review-text vocabulary, and every candidate
+> fix is a choice about how often that accident goes the loop's way. **The item to fund is the one
+> that makes mechanism 1 reachable** — and plan item 8.21's attribution gate is the only change on the
+> table that plausibly does it, because it is the only one that makes an interest genuinely uncovered.
+> That is a reason to sequence 8.21 *before* GATE B, not a reason to keep re-litigating the ranking.
+
+### 36.5 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3      # exit 0 — the census row, advisory
+dotnet run --project $E -- 7      # exit 1 — GATE B ❌ on USR-RB-10, unchanged
+# the ablation, for anyone re-deriving 36.3: in ReviewSnippetInterestProposer.Propose, rank the
+# round's snippets by QueryVocabulary.Build(catalogue, state.Interests, state.SessionRequest)
+#   .Filter(novel.Take(MaxProposedTerms), …).Count, tie-broken by novel.Count
+#   -> census 4 loop -> 11 loop; `-- 7` still exit 1, GATE B ❌ on USR-NB-01
+```

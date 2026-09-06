@@ -116,6 +116,7 @@ public static class NegativeControls
         rows.Add(Guarded("ARunThatSaysItSpendsSaysHowMuch", CheckARunThatSaysItSpendsSaysHowMuch));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("CoverageCutIsNotTheConfidenceShapeParameter", CheckCoverageCutIsNotTheConfidenceShapeParameter));
+        rows.Add(await GuardedAsync("LoopBackNegativeDirectionCensus", () => CheckLoopBackNegativeDirectionCensusAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -3045,6 +3046,155 @@ public static class NegativeControls
           + "score says no. Reported with the lowest score the corpus actually produces, so the headroom is "
           + "visible rather than assumed, and with the count the other two clauses decide, so the cut is not "
           + "credited with their work",
+            observed,
+            Tripped: true,
+            Gating: false);
+    }
+
+    // == Eval 07 GATE B + 8.21 precondition 3 -- can the NEGATIVE direction be re-established? ==
+    //
+    /// <summary>
+    /// Over all fourteen authored customers: who does NOT traverse the loop-back edge, and whose
+    /// non-loop would SURVIVE both changes that are currently blocked on it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this row exists.</b> Two open items are blocked on the same corpus fact and neither
+    /// had measured it. Eval 07's GATE B fails on <c>USR-RB-10</c>; the prescribed remedy (rank
+    /// review-snippet proposals by the terms the vocabulary will actually admit) re-pins Renzo and
+    /// then <b>flips Nadia</b>, the ⭐ negative-direction case — §28.2 refused it for that reason.
+    /// Plan item 8.21's decision (gate coverage on attribution: YES) <b>also flips Nadia</b> —
+    /// §31.3 precondition 3. So the corpus's only loop-back negative cell is fragile in two
+    /// independent directions at once, and the question underneath both is one question:
+    /// <i>is there a customer whose non-loop survives?</i>
+    /// </para>
+    /// <para>
+    /// <b>What is measured, and why it is POLICY-INDEPENDENT.</b> The loop-back edge reads
+    /// <c>OpenGaps.Count > 0</c>. On this corpus, measured in §28.1, the only thing that opens a
+    /// gap for a non-abstaining customer is a mid-run proposal that <c>TryAcceptProposal</c>
+    /// admitted, and admission needs at least one proposed term inside
+    /// <see cref="QueryVocabulary"/>. So rather than simulate one remedy — which would certify a
+    /// re-implementation of it and nothing else — this row measures the <b>pool the remedy would
+    /// draw from</b>: how many of the run's observed review snippets carry at least one novel token
+    /// the vocabulary would admit. <b>A customer whose admissible pool is zero cannot be made to
+    /// loop by ANY re-ranking of that pool</b>, because there is nothing in it to promote. That is
+    /// a statement about the corpus, not about a candidate fix.
+    /// </para>
+    /// <para>
+    /// <b>Novelty is measured against the MAPPER-origin map</b> — the known-token set the reviewer
+    /// starts round 1 with — because that set only grows as reviewer-inferred interests are added.
+    /// Measuring against the final map would shrink the novel set and shrink the pool, i.e. it
+    /// would make "this customer cannot loop" easier to say, which is the flattering direction.
+    /// ⚠ For a customer that DID loop, the pool figure is an over-count (it includes snippets from
+    /// rounds that only exist because it looped) and is labelled as such; for a customer that did
+    /// NOT loop there was only ever one round, so the figure is exact — and those are precisely
+    /// the customers this row is about.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Advisory, and it must stay advisory.</b> It reports a property of the corpus. Gating on
+    /// it would create an incentive to author a customer until the cell exists, which is the corpus
+    /// supplying the bar for the change under test — the move §28.2 and §31.3 both refused.
+    /// </para>
+    /// </remarks>
+    /// <param name="retriever">The bound retriever; the loop searches for real.</param>
+    /// <param name="ct">Cancellation.</param>
+    private static async Task<ControlRowSnapshot> CheckLoopBackNegativeDirectionCensusAsync(
+        IProductRetriever retriever,
+        CancellationToken ct)
+    {
+        var catalogue = Catalogue.Default;
+
+        var doesNotLoop = new List<string>();
+        var durable = new List<string>();
+        var perCustomer = new List<string>();
+        int looping = 0;
+
+        foreach (string personaId in Personas.AllPersonaIds)
+        {
+            var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
+                Offline: true,
+                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(personaId)),
+                Retriever: retriever,
+                Progress: null,
+                Nodes: null);
+
+            var run = await GalaxusDiscoveryLoop.RunAsync(personaId, options, ct).ConfigureAwait(false);
+            var state = run.State;
+
+            // ── The round-1 known set: the mapper's own interests, nothing the reviewer added. ──
+            var mapperInterests = state.Interests.Where(i => i.Origin == InterestOrigin.Mapper).ToList();
+            var known = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var interest in mapperInterests)
+            {
+                foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(interest.Label)) known.Add(token);
+                foreach (string term in interest.QueryTerms)
+                    foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(term)) known.Add(token);
+            }
+
+            var vocabulary = Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Build(catalogue, mapperInterests, state.SessionRequest);
+
+            // ── The pool: snippets carrying at least one novel token the vocabulary admits. ──
+            int admissiblePool = 0;
+            foreach (var signal in state.ObservedSignals)
+            {
+                var novel = new List<string>();
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(signal.Snippet))
+                {
+                    if (token.Length < 4) continue;
+                    if (known.Contains(token)) continue;
+                    if (Galaxus.RecommendationAgent.Workflows.QueryVocabulary.NeutralTokens.Contains(token)) continue;
+                    if (!seen.Add(token)) continue;
+                    novel.Add(token);
+                }
+
+                if (novel.Count == 0) continue;
+
+                // The SAME filter TryAcceptProposal applies, on the same terms it would be handed.
+                var scratch = new List<DroppedQueryTerm>();
+                if (vocabulary.Filter(novel.Take(ReviewSnippetInterestProposer.MaxProposedTerms), "census", scratch).Count > 0)
+                    admissiblePool++;
+            }
+
+            // ── 8.21's bite: rows the attribution gate would move out of COVERED. ──
+            int coveredWithNothingItNames = 0;
+            foreach (var interest in state.Interests)
+            {
+                var coverage = state.CoverageFor(interest.Id);
+                if (coverage.QueriesRun.Count == 0) continue;
+                if (CatalogueDiscoverySearch.ClassifyCoverage(coverage) != CoverageStatus.Covered) continue;
+                if (coverage.AttributableProductIds.Count == 0) coveredWithNothingItNames++;
+            }
+
+            if (run.Looped) looping++;
+            else doesNotLoop.Add(personaId);
+
+            bool survivesBoth = !run.Looped && admissiblePool == 0 && coveredWithNothingItNames == 0;
+            if (survivesBoth) durable.Add(personaId);
+
+            perCustomer.Add(
+                $"{personaId} {(run.Looped ? "loops" : "does NOT loop")} at round {state.DiscoveryRound}"
+              + $" · admissible snippet pool {admissiblePool}{(run.Looped ? " (over-count)" : string.Empty)}"
+              + $" · COVERED-with-nothing-it-names {coveredWithNothingItNames}"
+              + (survivesBoth ? " · ⭐ SURVIVES BOTH" : string.Empty));
+        }
+
+        string observed =
+            $"{Personas.AllPersonaIds.Count} customer(s): {looping} loop, {doesNotLoop.Count} do not "
+          + $"({string.Join(", ", doesNotLoop)}) · of the non-looping ones, "
+          + $"{durable.Count} would still not loop under ANY proposal-selection policy AND are untouched by the "
+          + $"attribution gate: {(durable.Count == 0 ? "NONE" : string.Join(", ", durable))} · "
+          + string.Join(" | ", perCustomer);
+
+        return new ControlRowSnapshot(
+            "LoopBackNegativeDirectionCensus",
+            "Eval 07 GATE B and plan item 8.21's third precondition are blocked on the SAME corpus fact, and "
+          + "neither had measured it: the corpus's only loop-back negative cell (USR-NB-01) is flipped by the "
+          + "GATE B remedy (§28.2) and independently by the attribution gate (§31.3). This row asks whether a "
+          + "replacement cell exists, and it asks it POLICY-INDEPENDENTLY: a customer whose pool of review "
+          + "snippets contains not one novel token the vocabulary would admit cannot be made to loop by any "
+          + "RE-RANKING of that pool, because there is nothing in it to promote. Novelty is measured against the "
+          + "MAPPER-origin map, the larger-pool and therefore unflattering choice",
             observed,
             Tripped: true,
             Gating: false);
