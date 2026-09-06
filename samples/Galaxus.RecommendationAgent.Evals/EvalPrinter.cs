@@ -212,6 +212,25 @@ public static class EvalPrinter
             Console.ResetColor();
         }
 
+        // ⚠ PLAN ITEM 8.8. IntegrityRunReport.AssertionFailures was a DEAD property: its only
+        //   reference was its own declaration, which is the third state §8.1 refuses to leave
+        //   standing — neither deleted nor read, so a later reader trusts a number nothing
+        //   computes on. It is now READ, here, and what it says is deliberately narrow: a fluent
+        //   assertion that THREW is an INSTRUMENT fault, not a defect of the agent, so it is
+        //   printed as its own line and is explicitly NOT part of Passed. A run with an assertion
+        //   failure has a row whose grade was computed while one of its checks did not complete,
+        //   and a reader has to be told that in one number rather than by scanning per-row prose.
+        var assertionFailures = report.AssertionFailures;
+        if (assertionFailures.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  ⚠️  ASSERTION FAULTS — {assertionFailures.Count} case(s) had a fluent assertion THROW: "
+                            + string.Join(", ", assertionFailures.Select(r => r.Case.Id)));
+            Console.WriteLine("     That is an INSTRUMENT fault, not an agent defect, and it is NOT in the gate. "
+                            + "The grades below were computed while one of those cases' checks did not complete.");
+            Console.ResetColor();
+        }
+
         Console.WriteLine();
         Console.ForegroundColor = report.Passed ? ConsoleColor.Green : ConsoleColor.Red;
 

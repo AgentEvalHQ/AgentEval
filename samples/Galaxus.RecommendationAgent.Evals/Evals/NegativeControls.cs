@@ -127,6 +127,7 @@ public static class NegativeControls
         rows.Add(Guarded("CatalogueEvidenceLineCarriesAFact", CheckCatalogueEvidenceLineCarriesAFact));
         rows.Add(Guarded("CommittedVectorsAreTheRightNumbers", CheckCommittedVectorsAreTheRightNumbers));
         rows.Add(Guarded("APersonaInOneArmOnlyIsDeclared", CheckAPersonaInOneArmOnlyIsDeclared));
+        rows.Add(Guarded("AssertionFaultsAreNamedAndNotGated", CheckAssertionFaultsAreNamedAndNotGated));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -1535,6 +1536,109 @@ public static class NegativeControls
 
 
 
+
+
+    // ══ Plan item 8.8 — a dead property, and what it was dead ABOUT ══════════════════════════
+
+    /// <summary>
+    /// GATING. A case whose fluent assertion THREW must be named on Eval 01's gate panel, and must
+    /// not change the gate. Driven by capturing the real printer's own output.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>8.8's defect was that <c>IntegrityRunReport.AssertionFailures</c> had exactly one
+    /// reference: its own declaration.</b> That is the third state §8.1 refuses to leave standing —
+    /// neither deleted nor read — and it is worse than either, because a later reader takes a
+    /// declared aggregate as one somebody consumes.
+    /// </para>
+    /// <para>
+    /// <b>What it was dead about matters more than that it was dead.</b> A fluent assertion that
+    /// threw means a case was graded while one of its own checks did not complete. That is an
+    /// INSTRUMENT fault, and until now it appeared only as per-row prose that a reader had to
+    /// scan for. It is now one line on the gate panel — and it is deliberately **not** in
+    /// <c>Passed</c>: promoting it to the gate would move verdicts on a paid path this change
+    /// cannot test, so it is made loud rather than made decisive, and the panel says which.
+    /// </para>
+    /// <para>
+    /// ⚠ It captures <c>Console.Out</c> and calls the REAL <c>EvalPrinter.PrintIntegrityGate</c>.
+    /// A check that the property is "referenced somewhere" would be satisfied by this comment.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckAssertionFaultsAreNamedAndNotGated()
+    {
+        var problems = new List<string>();
+
+        var clean = new IntegrityRunReport();
+        var faulted = new IntegrityRunReport();
+
+        var specimen = IntegrityCases.All.FirstOrDefault();
+        if (specimen is null)
+        {
+            return new ControlRowSnapshot(
+                "AssertionFaultsAreNamedAndNotGated",
+                "a case whose fluent assertion THREW must be named on Eval 01's gate panel and must not change the gate.",
+                "❌ VACUOUS: Eval 01 declares no cases, so there was no specimen to build a row from. NOT a pass.",
+                Tripped: false);
+        }
+
+        var verdict = new IntegrityVerdict(specimen.Id, [], 0, 0, 0, [], null);
+        clean.Add(new IntegrityRow(specimen, verdict, [], 0, null, null, null, AssertionFailure: null));
+        faulted.Add(new IntegrityRow(specimen, verdict, [], 0, null, null, null,
+                                     AssertionFailure: "the fluent assertion threw: control specimen"));
+
+        if (clean.AssertionFailures.Count != 0)
+            problems.Add($"a row with NO assertion failure is counted as one ({clean.AssertionFailures.Count}).");
+        if (faulted.AssertionFailures.Count != 1)
+            problems.Add($"a row WITH an assertion failure is counted {faulted.AssertionFailures.Count} time(s), expected 1.");
+        if (clean.Passed != faulted.Passed)
+            problems.Add("an assertion fault CHANGED the gate — it is an instrument fault and must be reported, not gated.");
+
+        string printed = CaptureIntegrityGate(faulted);
+        string printedClean = CaptureIntegrityGate(clean);
+
+        if (!printed.Contains("ASSERTION FAULTS", StringComparison.Ordinal))
+            problems.Add("the gate panel does not name assertion faults at all — the aggregate is dead again.");
+        if (!printed.Contains(specimen.Id, StringComparison.Ordinal))
+            problems.Add($"the gate panel reports a count without naming the case ({specimen.Id}); a count nobody can follow up is not a report.");
+        if (printedClean.Contains("ASSERTION FAULTS", StringComparison.Ordinal))
+            problems.Add("a run with NO assertion fault still prints the fault line — a line that always prints says nothing.");
+
+        return new ControlRowSnapshot(
+            "AssertionFaultsAreNamedAndNotGated",
+            "IntegrityRunReport.AssertionFailures had exactly ONE reference — its own declaration. That is the third "
+          + "state §8.1 refuses to leave standing, and it is worse than deleting or reading it, because a later "
+          + "reader takes a declared aggregate as one somebody consumes. What it was dead ABOUT matters more: a "
+          + "fluent assertion that THREW means a case was graded while one of its own checks did not complete — an "
+          + "INSTRUMENT fault, previously visible only as per-row prose. It must now be NAMED on the gate panel, "
+          + "with the case id, and must NOT move the gate: promoting it to Passed would move verdicts on a paid "
+          + "path this change cannot test. Driven by capturing the REAL EvalPrinter.PrintIntegrityGate output.",
+            $"specimen case {specimen.Id} · rows with an assertion fault counted: clean {clean.AssertionFailures.Count}, "
+          + $"faulted {faulted.AssertionFailures.Count} · gate unchanged by the fault: "
+          + $"{(clean.Passed == faulted.Passed ? $"yes (both {clean.Passed})" : "❌ NO")} · the panel names it: "
+          + $"{(printed.Contains("ASSERTION FAULTS", StringComparison.Ordinal) ? "yes" : "❌ no")} · a clean run stays "
+          + $"silent about it: {(printedClean.Contains("ASSERTION FAULTS", StringComparison.Ordinal) ? "❌ no" : "yes")}"
+          + (problems.Count == 0 ? "." : " · ❌ " + string.Join(" ❌ ", problems)),
+            problems.Count == 0);
+    }
+
+    /// <summary>Runs the real gate printer with stdout captured, and returns what it wrote.</summary>
+    /// <param name="report">The report to print.</param>
+    private static string CaptureIntegrityGate(IntegrityRunReport report)
+    {
+        var previous = Console.Out;
+        var buffer = new StringWriter();
+        try
+        {
+            Console.SetOut(buffer);
+            EvalPrinter.PrintIntegrityGate(report);
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+
+        return buffer.ToString();
+    }
 
     // ══ Plan item 8.22 — a persona present in one arm and absent from the other ══════════════
 

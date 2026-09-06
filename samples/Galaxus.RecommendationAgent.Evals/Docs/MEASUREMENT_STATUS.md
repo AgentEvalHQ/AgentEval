@@ -8461,3 +8461,88 @@ A-ONLY (A: scored vs B: NO CELL)`, and the two-armed absence correctly absent.
 |---|---|---|---|
 | **A** | the shipped bare `continue` restored | **1** | `NOT COMPARABLE (0): —` plus *"a persona the CHALLENGER scored and the reference did not is still dropped silently"* and the same for the reference |
 | — | **restored** | **0** in both spaces | `NOT COMPARABLE (2)`, both named |
+
+### 59.4 ✅ 8.8 — a dead property, and what it was dead ABOUT
+
+`IntegrityRunReport.AssertionFailures` had **exactly one reference: its own declaration** (verified,
+`grep -rn "AssertionFailures" --include=*.cs .` → one hit). That is the third state §8.1 refuses to
+leave standing, and it is worse than either deleting it or reading it, because a later reader takes a
+declared aggregate as one somebody consumes.
+
+**What it was dead about matters more than that it was dead.** A fluent assertion that *threw* means
+a case was **graded while one of its own checks did not complete** — an instrument fault. Until now
+that appeared only as per-row prose a reader had to scan for.
+
+**Read, not deleted.** Eval 01's gate panel now prints one line naming the count and the case ids, and
+says in the same breath that it is an instrument fault and **not** in `Passed`. ⚠ **Promoting it to
+the gate was deliberately NOT done**: it would move verdicts on a paid path this change cannot test.
+Made loud rather than made decisive, and the panel says which.
+
+**Gating row `AssertionFaultsAreNamedAndNotGated`**, driven by capturing the REAL
+`EvalPrinter.PrintIntegrityGate` output. Measured: `specimen case C-01 · rows with an assertion fault
+counted: clean 0, faulted 1 · gate unchanged by the fault: yes (both False) · the panel names it: yes
+· a clean run stays silent about it: yes`. The last clause matters — **a line that always prints says
+nothing.**
+
+| # | ablation | `-- 3` | what it printed |
+|---|---|---|---|
+| **A** | the printer's new block deleted (the shipped state) | **1** | *"the gate panel does not name assertion faults at all — the aggregate is dead again"* and *"reports a count without naming the case (C-01); a count nobody can follow up is not a report"* |
+| — | **restored** | **0** in both spaces | — |
+
+### 59.5 ✅ 8.12 — CLOSED already, verified by execution rather than by reading the row
+
+8.12 says *"Nothing meters spend outside Demo 01 … a `--real-vectors --ci` run spends and does not say
+how much."* Re-executed on this tree, `-- 3 --real-vectors` prints:
+
+```
+💸 Live embedding: 118 query call(s) for 118 distinct text(s) + 1 space-identity probe
+   · 329 request(s) served from the per-run memo and 297 from the committed index, at no cost
+   · 1248 prompt token(s) in total.
+```
+
+The shared meter §34.4 built (`EmbeddingSpace.PrintLiveSpend`, called from both entry points in a
+`finally`, print-once per process) and §55's chat meter together close it, and Eval 03's
+`ARunThatSaysItSpendsSaysHowMuch` holds the embedding lane there while `TheChatLaneSaysWhatItSpent`
+holds the other. **Recorded as closed rather than left open**; the row is stale, not wrong.
+
+### 59.6 ⛔ 8.7 — NOT ACTIONABLE as filed: its stated defect no longer exists
+
+8.7 files `DetectOptOutBackstop` as *"the only reader of a tool result; no unit test, no control,
+brittle `is string`"*. Read on this tree, `Eval01_CatalogueIntegrity.cs:502` is:
+
+```csharp
+private static bool DetectOptOutBackstop(ToolUsageReport? tools) =>
+    ToolResultText.AnyResultHasRefusalCode(tools, ToolRefusalCodes.PersonalizationDisabled);
+```
+
+— a **structured refusal-code match**, not a substring test, and `NegativeControls` exercises that
+path in three places including a check that the detectors call
+`ToolResultText.AnyResultHasRefusalCode` at all. `RefusalCodesDoNotAnswerForEachOther` (`4d35aaa2`)
+and `RefusalDetectorsSeeTheRealShape` are the controls the row says do not exist.
+
+**What survives of 8.7 is one clause and it needs a paid run:** the backstop was *"reported never
+exercised on a turn where the tool must have refused"*. That is a statement about a LIVE trace, and
+no model-free arm can settle it. Left open with that scope, rather than closed on the strength of the
+half that is fixed.
+
+### 59.7 ⛔ 8.2, 8.9, 8.10, 8.14, 8.25 — each needs a DECISION or moves a verdict, and none is mine
+
+| item | why it is not worked here |
+|---|---|
+| **8.2** — gate `AuthoredQueryPhraseRetrievability` | Gating it turns `-- 3` **red in both spaces immediately**: ARM C reads 18 of 56 and ARM C is space-invariant by design. That is not a fix, it is a decision to ship a red suite, and it belongs with 8.11's D-v (closing ARM C moves every coverage cell) |
+| **8.9** — split `P1_ShapeViolation` from `P0_PolicyOmission` | The row says it **moves verdicts**, under a zero-tolerance gate, on the paid Eval 01 record. A verdict-moving reclassification needs the run that re-takes the verdict |
+| **8.10** — sample exit **3** vs core exit **11** | A **CI-reader contract change**. The same class as ADR-031 S5's exit 13, and the same reason to sequence it deliberately rather than slip it in |
+| **8.14** — the personalization opt-out is half honoured | The fix is *"a structural gate on the tool surface"*, and the row says so. It changes what the agent is ABLE to call, on the path a customer meets. Worth doing; not worth doing as a long-tail item between two other commits |
+| **8.25** — nine products for one order line | Its own acceptance is *"a decision recorded"*, and §0.6 keeps decisions with the user. Same design question as 8.21 one layer up |
+
+### 59.8 ⛔ 8.1, 8.3, 8.4, 8.5, 8.6, 8.11, 8.23 — not worked, with the reason for each
+
+| item | reason |
+|---|---|
+| **8.1** — min/max/SD over Eval 02's three reps | Genuinely actionable and cheap, and **not done for time**. It is the strongest remaining candidate in this list |
+| **8.3** — `PrintCostComparison` → `—` when there is no model | ⚠ **Wrong as specified.** `ArmCostSnapshot` carries no model id, so the printer cannot tell a deterministic arm that genuinely spent nothing from a model arm whose usage never arrived — and those are exactly the two §55 says must never render alike. Rendering `—` on zero tokens would relabel a true zero as unknown; rendering `$0.0000` labels an unknown as zero. **The fix is to plumb the arm's model id, which is not "rendering only"** |
+| **8.4** — `§4a`'s re-derivations | It asks for a **stored number** to be pasted into a document. §7's standing rule — *a quantity that changes when you re-run the thing is not a measurement* — has bitten three documents, and this row is written in the shape that bit them. It needs restating as an invariant or a command block first |
+| **8.5** — `--judge` under `--dry-run` against the stub | Actionable, medium, not done for time |
+| **8.6** — screen `AgentResponse.Text` for D3c | Paired with 1.7's N-11b, which closed at `62a76b81`; the pairing needs re-reading against what 1.7 actually shipped before the remaining half is scoped |
+| **8.11** — D-v, the 10 dead concept phrases | Explicitly **LOWERED** by §4.0a, and closing it *"moves every coverage cell"*, so doing it before 2.8/2.9 run live pays for those runs twice |
+| **8.23** — `ChatClientEvaluator.cs:46` renders the ordinal | The only `src/` item. It is under the library rules and its blast radius is *"the shape of `CriteriaResults` for every consumer in the repository"*. Six waves have run without modifying an existing file under `src/`; breaking that for a change whose release note must carry a byte-level prediction is a wave of its own, not a long-tail entry |
