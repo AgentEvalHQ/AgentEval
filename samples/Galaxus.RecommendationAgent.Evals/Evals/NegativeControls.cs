@@ -3266,10 +3266,32 @@ public static class NegativeControls
     /// a statement about the corpus, not about a candidate fix.
     /// </para>
     /// <para>
+    /// ⚠ <b>A POOL OF ZERO OUT OF ZERO IS NOT A MEASURED ZERO — corrected 2026-09-06 by review.</b>
+    /// This row's first revision printed the pool as a bare count and reported exactly one survivor,
+    /// <c>USR-LF-04</c>, whose pool is <b>0 of 0 snippets</b>: it is the ABSTENTION persona, its
+    /// discovery round returns nothing, and there is no pool for the metric to be about. Every other
+    /// customer's denominator is 13–27. So the one figure the conclusion rested on was the one place
+    /// the instrument degenerates — applicability read off the RESULT instead of the INPUT, which is
+    /// the shape this panel has a standing rule about. The denominator is now printed, a survivor
+    /// with an empty denominator is labelled <c>SURVIVES VACUOUSLY</c> rather than <c>⭐ SURVIVES
+    /// BOTH</c>, and the two are counted separately. <b>A vacuous survivor is not a replacement
+    /// cell</b>: Nadia's ⭐ is worth something because the reviewer ran on a customer with a full
+    /// tray and chose not to loop, and the row now prints each survivor's existing Eval 07 pins so
+    /// that a survivor already pinned <c>PresentsAnswerText: false</c> cannot be read as one.
+    /// </para>
+    /// <para>
     /// <b>Novelty is measured against the MAPPER-origin map</b> — the known-token set the reviewer
-    /// starts round 1 with — because that set only grows as reviewer-inferred interests are added.
-    /// Measuring against the final map would shrink the novel set and shrink the pool, i.e. it
-    /// would make "this customer cannot loop" easier to say, which is the flattering direction.
+    /// starts round 1 with — because that set only grows as reviewer-inferred interests are added,
+    /// so it is the larger novel set and the larger pool. ⚠ <b>The direction label that used to sit
+    /// here was inverted, and is corrected.</b> It called the larger pool "the unflattering choice";
+    /// a larger pool makes FEWER customers durable, which makes <i>"no replacement cell exists"</i>
+    /// — the conclusion §28.2 and §31.3 draw from this row to justify a deferral — <b>easier</b> to
+    /// say, not harder. The choice is conservative about each per-customer durability claim and
+    /// anti-conservative about the aggregate the row is actually used for. Rather than argue the
+    /// adjective, the row now <b>computes both</b> and reports whether the durable set moves:
+    /// measured 2026-09-06, the two pools are identical on all ten non-looping customers and differ
+    /// only on looping ones, whose figure is an unused over-count. The methodological choice is
+    /// therefore a measured no-op rather than an unexaminable preference.
     /// ⚠ For a customer that DID loop, the pool figure is an over-count (it includes snippets from
     /// rounds that only exist because it looped) and is labelled as such; for a customer that did
     /// NOT loop there was only ever one round, so the figure is exact — and those are precisely
@@ -3291,35 +3313,19 @@ public static class NegativeControls
 
         var doesNotLoop = new List<string>();
         var durable = new List<string>();
+        var vacuous = new List<string>();
+        var mapChoiceMoved = new List<string>();
         var perCustomer = new List<string>();
         int looping = 0;
 
-        foreach (string personaId in Personas.AllPersonaIds)
+        // The pool, as a function of the known-token set and the vocabulary built from it, so the
+        // MAPPER-map and FINAL-map variants are the SAME code on two inputs rather than two copies.
+        static int Pool(
+            DiscoveryState state,
+            HashSet<string> known,
+            Galaxus.RecommendationAgent.Workflows.QueryVocabulary vocabulary)
         {
-            var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
-                Offline: true,
-                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(personaId)),
-                Retriever: retriever,
-                Progress: null,
-                Nodes: null);
-
-            var run = await GalaxusDiscoveryLoop.RunAsync(personaId, options, ct).ConfigureAwait(false);
-            var state = run.State;
-
-            // ── The round-1 known set: the mapper's own interests, nothing the reviewer added. ──
-            var mapperInterests = state.Interests.Where(i => i.Origin == InterestOrigin.Mapper).ToList();
-            var known = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var interest in mapperInterests)
-            {
-                foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(interest.Label)) known.Add(token);
-                foreach (string term in interest.QueryTerms)
-                    foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(term)) known.Add(token);
-            }
-
-            var vocabulary = Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Build(catalogue, mapperInterests, state.SessionRequest);
-
-            // ── The pool: snippets carrying at least one novel token the vocabulary admits. ──
-            int admissiblePool = 0;
+            int pool = 0;
             foreach (var signal in state.ObservedSignals)
             {
                 var novel = new List<string>();
@@ -3338,8 +3344,59 @@ public static class NegativeControls
                 // The SAME filter TryAcceptProposal applies, on the same terms it would be handed.
                 var scratch = new List<DroppedQueryTerm>();
                 if (vocabulary.Filter(novel.Take(ReviewSnippetInterestProposer.MaxProposedTerms), "census", scratch).Count > 0)
-                    admissiblePool++;
+                    pool++;
             }
+
+            return pool;
+        }
+
+        static HashSet<string> KnownTokens(IEnumerable<Interest> interests)
+        {
+            var known = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var interest in interests)
+            {
+                foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(interest.Label)) known.Add(token);
+                foreach (string term in interest.QueryTerms)
+                    foreach (string token in Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Tokenize(term)) known.Add(token);
+            }
+
+            return known;
+        }
+
+        foreach (string personaId in Personas.AllPersonaIds)
+        {
+            var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
+                Offline: true,
+                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(personaId)),
+                Retriever: retriever,
+                Progress: null,
+                Nodes: null);
+
+            var run = await GalaxusDiscoveryLoop.RunAsync(personaId, options, ct).ConfigureAwait(false);
+            var state = run.State;
+
+            // ── The pool, under BOTH maps. ──
+            //
+            // MAPPER-origin: the known-token set the reviewer starts round 1 with. FINAL: everything
+            // the map ended up holding. The mapper map is the SMALLER known set, so it leaves the
+            // LARGER novel set and the LARGER pool.
+            //
+            // ⚠ Both are computed because the choice between them is not self-evidently safe: a
+            //   larger pool makes fewer customers durable, which makes "no replacement cell exists"
+            //   — the conclusion this row is quoted for — EASIER to say. Reporting whether the
+            //   durable set actually moves retires that question with a number instead of an
+            //   adjective. The mapper figure stays the one the verdict uses.
+            var mapperInterests = state.Interests.Where(i => i.Origin == InterestOrigin.Mapper).ToList();
+
+            int admissiblePool = Pool(
+                state,
+                KnownTokens(mapperInterests),
+                Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Build(catalogue, mapperInterests, state.SessionRequest));
+
+            int admissiblePoolFinalMap = Pool(
+                state,
+                KnownTokens(state.Interests),
+                Galaxus.RecommendationAgent.Workflows.QueryVocabulary.Build(catalogue, state.Interests, state.SessionRequest));
 
             // ── 8.21's bite: rows the attribution gate would move out of COVERED. ──
             int coveredWithNothingItNames = 0;
@@ -3354,22 +3411,54 @@ public static class NegativeControls
             if (run.Looped) looping++;
             else doesNotLoop.Add(personaId);
 
+            // ⚠ The MAP CHOICE, made checkable. If the two pools ever disagree on a customer that
+            //   does NOT loop, the verdict below depends on which map was picked and the row must
+            //   say so out loud rather than let the docstring's adjective settle it.
+            if (!run.Looped && admissiblePool != admissiblePoolFinalMap)
+                mapChoiceMoved.Add($"{personaId} (mapper {admissiblePool} vs final {admissiblePoolFinalMap})");
+
             bool survivesBoth = !run.Looped && admissiblePool == 0 && coveredWithNothingItNames == 0;
-            if (survivesBoth) durable.Add(personaId);
+
+            // ⚠ 0 OF 0 IS NOT A MEASURED 0. A survivor whose run produced no review snippets at all
+            //   survives because the metric has no denominator there, not because a pool was
+            //   examined and found barren. Counted apart, and never given the ⭐.
+            bool vacuousSurvivor = survivesBoth && state.ObservedSignals.Count == 0;
+
+            if (survivesBoth)
+            {
+                durable.Add(personaId);
+                if (vacuousSurvivor) vacuous.Add(personaId);
+            }
 
             perCustomer.Add(
                 $"{personaId} {(run.Looped ? "loops" : "does NOT loop")} at round {state.DiscoveryRound}"
-              + $" · admissible snippet pool {admissiblePool}{(run.Looped ? " (over-count)" : string.Empty)}"
+              + $" · admissible snippet pool {admissiblePool} of {state.ObservedSignals.Count} snippet(s)"
+              + $" (final-map {admissiblePoolFinalMap}){(run.Looped ? " · over-count" : string.Empty)}"
               + $" · COVERED-with-nothing-it-names {coveredWithNothingItNames}"
-              + (survivesBoth ? " · ⭐ SURVIVES BOTH" : string.Empty));
+              + (survivesBoth
+                  ? vacuousSurvivor
+                      ? $" · ⚠ SURVIVES VACUOUSLY — 0 of 0, there is no pool here to re-rank{Eval07Pins(personaId)}"
+                      : $" · ⭐ SURVIVES BOTH{Eval07Pins(personaId)}"
+                  : string.Empty));
         }
+
+        int examined = durable.Count - vacuous.Count;
 
         string observed =
             $"{Personas.AllPersonaIds.Count} customer(s): {looping} loop, {doesNotLoop.Count} do not "
           + $"({string.Join(", ", doesNotLoop)}) · of the non-looping ones, "
           + $"{durable.Count} would still not loop under ANY proposal-selection policy AND are untouched by the "
-          + $"attribution gate: {(durable.Count == 0 ? "NONE" : string.Join(", ", durable))} · "
-          + string.Join(" | ", perCustomer);
+          + $"attribution gate: {(durable.Count == 0 ? "NONE" : string.Join(", ", durable))} — "
+          + $"but {examined} of those {durable.Count} was reached by EXAMINING a pool; "
+          + (vacuous.Count == 0
+              ? "none is vacuous"
+              : $"{vacuous.Count} survives on 0 of 0 snippets ({string.Join(", ", vacuous)}), which is the "
+              + "arithmetic of an empty set and not a measured barren pool")
+          + $" · MAP CHOICE: {(mapChoiceMoved.Count == 0
+              ? "the mapper-origin and final maps give the SAME pool on every non-looping customer, so the "
+              + "verdict does not depend on which was chosen"
+              : $"⚠ the two maps DISAGREE on {string.Join(", ", mapChoiceMoved)} — the verdict depends on the choice")}"
+          + " · " + string.Join(" | ", perCustomer);
 
         return new ControlRowSnapshot(
             "LoopBackNegativeDirectionCensus",
@@ -3378,11 +3467,42 @@ public static class NegativeControls
           + "GATE B remedy (§28.2) and independently by the attribution gate (§31.3). This row asks whether a "
           + "replacement cell exists, and it asks it POLICY-INDEPENDENTLY: a customer whose pool of review "
           + "snippets contains not one novel token the vocabulary would admit cannot be made to loop by any "
-          + "RE-RANKING of that pool, because there is nothing in it to promote. Novelty is measured against the "
-          + "MAPPER-origin map, the larger-pool and therefore unflattering choice",
+          + "RE-RANKING of that pool, because there is nothing in it to promote. ⚠ CORRECTED 2026-09-06 by "
+          + "review, twice. (1) A pool of 0 OF 0 is not a measured zero — the row's only survivor is the "
+          + "abstention persona, whose run produces no snippets at all while every other customer's "
+          + "denominator is 13-27, so the one figure the conclusion rested on was the one place the metric "
+          + "degenerates. The denominator is printed, a 0-of-0 survivor is labelled VACUOUS not ⭐, and each "
+          + "survivor's existing Eval 07 pins are printed so a cell already pinned PresentsAnswerText:false "
+          + "cannot be read as a replacement for Nadia's. (2) The mapper-origin map was called the "
+          + "'unflattering' choice; a LARGER pool makes FEWER customers durable and so makes 'no replacement "
+          + "exists' EASIER to say, which is the flattering direction for the deferral this row is quoted "
+          + "for. Both maps are now computed and the row reports whether the durable set moves",
             observed,
             Tripped: true,
             Gating: false);
+    }
+
+    /// <summary>
+    /// The Eval 07 pins already carried by <paramref name="personaId"/>, or a note that it is not an
+    /// Eval 07 case — derived from <see cref="Eval07_WorkflowTopology.Cases"/>, never re-typed.
+    /// </summary>
+    /// <remarks>
+    /// A census survivor is only interesting as a REPLACEMENT for the ⭐ negative-direction cell, and
+    /// a customer already pinned <c>PresentsAnswerText: false</c> is the abstention cell rather than
+    /// a customer whose reviewer ran on a full tray and chose not to loop. Printing the pins is what
+    /// stops "SURVIVES" being read as "is a replacement".
+    /// </remarks>
+    /// <param name="personaId">The customer.</param>
+    private static string Eval07Pins(string personaId)
+    {
+        var existing = Eval07_WorkflowTopology.Cases
+            .FirstOrDefault(c => string.Equals(c.PersonaId, personaId, StringComparison.Ordinal));
+
+        return existing is null
+            ? " (not an Eval 07 case today)"
+            : $" (ALREADY an Eval 07 case: ExpectsLoopBack={existing.ExpectsLoopBack}, "
+            + $"PresentsAnswerText={existing.PresentsAnswerText}"
+            + (existing.PresentsAnswerText ? ")" : " — the ABSTENTION cell, not a replacement for the ⭐)");
     }
 
     // == 2.11's PRECONDITION -- one constant, two jobs, and the coupling that hid between them. ==
