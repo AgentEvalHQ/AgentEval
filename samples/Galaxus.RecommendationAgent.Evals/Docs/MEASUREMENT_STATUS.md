@@ -8248,9 +8248,56 @@ says so.
 |---|---|---|---|
 | **A** | `Render` drops `Attach` — the shipped state before this item | **1** | *"Provenance member: ❌ ABSENT — a stored snapshot would not say what produced it"* |
 | **B** | provenance records `Config.PreferredDeployment` instead of the resolved `Config.Model` | **1** | *"names the configured chat deployment: ❌ no (file says 'gpt-5-mini')"* — the requested-vs-resolved shape §42 named |
-| **C** | the endpoint HOST spliced into the note — **a planted positive control for clause 5** | **1** | *"credentials in the document: ❌ PRESENT"*. The scanner hits |
+| **C** | the endpoint HOST spliced into the note — **a planted positive control for clause 5**. 🔴 **WRITES THE HOST TO DISK — see §57.4a for the mandatory cleanup before you run it** | **1** | *"credentials in the document: ❌ PRESENT"*. The scanner hits |
 | **D** | the standing note blanked | **1** | *"carries the CONFIGURED-is-not-CALLED caveat: ❌ no — the field would read as proof a model produced the numbers"* |
 | — | **restored** | **0** in both spaces | — |
+
+#### 🔴 57.4a ABLATION C WRITES THE REAL ENDPOINT HOST TO DISK, and as published it leaves a copy behind
+
+**Found by the review pass of 2026-09-06 by re-executing C, which is the only way it could be found:
+running the ablation *is* the leak.** `-- 3` persists `eval03_controls.json`, so the spliced host
+lands in a stored snapshot; and `EvalResultStore.Write` archives the previous file under its own
+mtime, so the **next** run — the restore run — copies the polluted document into a dated archive that
+nothing ever overwrites. The standing rule is that the endpoint is never printed, logged **or
+written**, and the section that added a *credential* clause is the one that wrote a credential to
+disk.
+
+**This is not hypothetical and it is not only the reviewer's doing.** A scan of `.agenteval/` for the
+literal endpoint host, reported as a count and never as a value, found **two** Galaxus snapshot files:
+the canonical one this review's own C run wrote, **and an archive stamped `20260906T110852Z` — the
+Wave-7 authoring run's own ablation C**, which had been sitting on disk since. Both were deleted and
+the canonical regenerated from a clean run; the scan then returned **0**. ⚠ Two files under
+`.agenteval/gatekeeper/certs/` also contain the host, one of them **in its filename**; they are dated
+2026-07-11 and 2026-07-17, predate all of this work, and are out of scope here — recorded so the next
+scanner does not read them as this wave's.
+
+**`.agenteval/` is gitignored (`.gitignore:453`), so nothing reached the repository.** The exposure is
+the working tree, which is exactly where a credential scan of the repo would not look.
+
+**The clause is worth keeping — a positive control that cannot hit is decoration — so the ABLATION
+gains a mandatory procedure rather than being removed:**
+
+```bash
+# BEFORE the restore run, delete the polluted canonical so the archive-first rule
+# has nothing to copy. Restoring the code first and re-running is NOT enough.
+rm -f .agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/eval03_controls.json
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 ; echo $?
+
+# Then PROVE the store is clean, by count only — never print the value.
+python - <<'SCAN'
+import os, urllib.parse, pathlib
+host = urllib.parse.urlparse(os.environ.get('AZURE_OPENAI_ENDPOINT','')).hostname or ''
+key  = os.environ.get('AZURE_OPENAI_API_KEY','')
+hits = [p for p in pathlib.Path('.agenteval/samples').rglob('*') if p.is_file()
+        and any(v and v in p.read_text(encoding='utf-8', errors='ignore') for v in (host, key))]
+print("store files containing the host or the key:", len(hits))   # must be 0
+SCAN
+```
+
+⚠ **The general rule this instance establishes, because it is not about this ablation:** *an ablation
+that plants a real secret must name its cleanup in the same table row as the plant.* Any control whose
+subject is a credential will be ablated by planting one, and every eval in this suite that persists
+does so at the end of the run that the ablation is executed by.
 
 ### 57.5 What is NOT built, and the deferral was CHECKED against the type rather than re-read
 

@@ -48,6 +48,29 @@ the command that produces it*, so re-running it is one paste. Every §-section i
 `MEASUREMENT_STATUS.md` that records an ablation now ends with that command block, and the ones that
 did not are the ones that went stale.
 
+### Stage 0c — an ablation that plants a REAL SECRET must name its cleanup in the same breath
+
+**Added 2026-09-06 (Wave 7's review pass, `MEASUREMENT_STATUS` §57.4a). It is stage 0 applied to what
+the ablation LEAVES BEHIND.**
+
+> **Running an ablation is not free of side effects, and the ones that matter most are the ones the
+> standing rules forbid.** A control whose subject is a credential will be ablated by planting a real
+> one. Every eval in this suite that persists does so at the END of the run the ablation is executed
+> by — so the plant lands in a stored snapshot — and `EvalResultStore.Write` archives the previous
+> file before writing the new one, so the *restore* run copies the polluted document into a dated
+> archive that nothing ever overwrites. **Restoring the code is not restoring the tree.**
+
+Measured, not imagined: `EverySnapshotSaysWhatProducedIt`'s ablation C splices the endpoint host into
+the provenance note. Re-executing it as published put the host into `eval03_controls.json`; a scan of
+`.agenteval/` then found **the review's own file and an archive from the authoring run four hours
+earlier**. `.agenteval/` is gitignored, so nothing reached the repository — the exposure is the
+working tree, which is precisely where a repo credential scan does not look.
+
+**The rule:** delete the canonical snapshot BEFORE the restore run (so the archive-first rule has
+nothing to copy), then prove the store is clean with a scan that reports a COUNT and never a value.
+The commands are in `MEASUREMENT_STATUS` §57.4a. **A published ablation that plants a secret and does
+not publish its cleanup is a defect in the ablation, not in whoever ran it.**
+
 ### Stage 0b — RE-EXECUTE IN **BOTH SPACES**, and that includes the control you just wrote
 
 **Added 2026-09-06 (Wave-4 verification run, `MEASUREMENT_STATUS` §42). It is stage 0 applied to your
