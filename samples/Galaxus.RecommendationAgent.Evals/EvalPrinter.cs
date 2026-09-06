@@ -814,6 +814,8 @@ public static class EvalPrinter
         //   1/12 floor the old rule printed ▲ over 2 of 12 (p = 0.264) and 3 of 12 (p = 0.070).
         //   The decision routes through ExactBinomial.AboveChance so the control row can test THIS
         //   code path rather than a paraphrase of it.
+        int tested = 0;
+
         foreach (string arm in report.Arms)
         {
             double rate = report.ForcedChoiceRate(arm);
@@ -826,8 +828,16 @@ public static class EvalPrinter
             int wins = double.IsNaN(rate) ? 0 : (int)Math.Floor((rate * n) + 1e-9);
             var (above, p) = ExactBinomial.AboveChance(wins, n, floor);
 
-            Console.ForegroundColor = above ? ConsoleColor.Green : ConsoleColor.Yellow;
-            ContentRow($"  {(above ? "▲" : "▼")} {Fit(arm, 26)} {Format(rate)}  "
+            // ⚠ An arm with no trials is UNDECIDABLE, and ▼ would say it LOST. Same convention as
+            //   CoverageScore.AboveOwnFloor: "?" for a comparison neither side can make. It is also
+            //   not counted into the multiplicity family below — a test that never ran cannot
+            //   inflate a family-wise error rate.
+            bool decidable = !double.IsNaN(p);
+            if (decidable) tested++;
+
+            Console.ForegroundColor = above ? ConsoleColor.Green
+                                    : decidable ? ConsoleColor.Yellow : ConsoleColor.DarkGray;
+            ContentRow($"  {(above ? "▲" : decidable ? "▼" : "?")} {Fit(arm, 26)} {Format(rate)}  "
                      + $"({wins} of {n})  chance {Format(floor)}  {ExactBinomial.FormatP(p)}");
             Console.ResetColor();
         }
@@ -835,8 +845,18 @@ public static class EvalPrinter
         Divider();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         ContentRow("  ▲ means an EXACT one-sided binomial upper tail at or below 0.05, not rate > chance.");
-        ContentRow("  No multiplicity correction is applied across the arms in this panel — with five");
-        ContentRow("  arms at 0.05 the family-wise error rate is ≈ 0.23, so read one ▲ accordingly.");
+        ContentRow("  ? means the comparison is undecidable — no trials — never that the arm lost.");
+
+        // ⚠ COMPUTED from the arms this run actually tested, never a constant. The first revision
+        //   printed "with five arms … ≈ 0.23" beneath a six-arm panel, whose rate is 0.265. A
+        //   hard-coded family size can only understate the rate as the panel grows, and a smaller
+        //   stated error rate makes a lone ▲ look safer than the panel it came from.
+        double fwer = ExactBinomial.FamilyWiseErrorRate(tested);
+        ContentRow(double.IsNaN(fwer)
+            ? $"  No multiplicity correction is applied — {tested} arm(s) tested, so there is no family."
+            : $"  No multiplicity correction is applied across the arms in this panel — with {tested}");
+        if (!double.IsNaN(fwer))
+            ContentRow($"  arms at {ExactBinomial.Alpha:0.00} the family-wise error rate is ≈ {fwer:0.000}, so read one ▲ accordingly.");
         Console.ResetColor();
 
         BottomBorder();

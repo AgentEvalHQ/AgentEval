@@ -11,7 +11,7 @@ Reproduce all of it, spending nothing:
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- --ci --dry-run   # exit 0, ~9 s, all nine
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3                # exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4                # exit 0
-dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 7                # exit 0
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 7                # exit 1 — GATE B ❌, see §28
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 2 --dry-run      # exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 1 --dry-run      # exit 0
 ```
@@ -4562,9 +4562,24 @@ and the agent is *behind* on cross-persona forced choice, 0.556 vs 0.583.
 ### 30.2 · 1.4 — "above chance" is now a TEST
 
 `EvalPrinter.cs`'s `bool above = … rate > floor` is replaced by an exact one-sided binomial upper tail
-at α = 0.05, in **one** method — `ExactBinomial.AboveChance` — that all three decision sites call:
-`PrintForcedChoice`, `InstrumentCaveat`, and Eval 03's `LatentCoveragePersonaDiscrimination`. Two copies
-of the rule is how `rate > floor` survived in four places at once.
+at α = 0.05, in **one** method — `ExactBinomial.AboveChance` — that all three **forced-choice** decision
+sites call: `PrintForcedChoice`, `InstrumentCaveat`, and Eval 03's
+`LatentCoveragePersonaDiscrimination`. Two copies of the rule is how `rate > floor` survived in four
+places at once.
+
+> 🔴 **CORRECTED 2026-09-06 by the Wave 3 review — the scope above was stated as if it were the whole
+> suite, and it is not.** Four other ▲ producers are still `rate > floor` and this change did not touch
+> them: `CoverageScore.AboveOwnFloor` and `CoverageScore.AbovePrecisionFloor` — which drive the
+> latent-coverage, recall@k, precision@k and k_live panels **and Eval 02's GATE 1**, through
+> `PairedCoverageReport.EveryPersonaAboveOwnFloor` — and Eval 02b's two per-case markers
+> (`Eval02b_StatedNeedSatisfaction.cs:416` and `:689`, against `ConstraintSatisfactionGrader.UniformDrawFloor`).
+> **So GATE 1 is still decided by `rate > floor`.** The omission is not oversight and the conversion is
+> not free: latent coverage is a mean over gold tokens whose random-draw floor is the mean of *per-token*
+> hit probabilities, so its null is **Poisson-binomial, not binomial**, and `ExactBinomial` would answer
+> a question it was not asked. Converting it needs the right test *and* a declared GATE 1 movement, which
+> is a behaviour change and its own plan item. Until then **a ▲ outside the forced-choice panel means
+> `rate > floor` and nothing more** — and the control row and `ExactBinomial`'s own remark now say so
+> instead of claiming universality.
 
 **At n = 12 against the shipped 1/12 forced-choice floor** (reference values computed independently, and
 pinned in the control to 1e-6):
@@ -4585,19 +4600,46 @@ chance (p = 0.2640)"*, *"3 of 12 … (p = 0.0720)"*) and `-- 3` to **exit 1**. R
 
 **Three things declared, because two of them are unflattering.**
 
-1. ⚠️ **No shipped number moves today.** The plan's acceptance names 2/12 and 3/12, and **no arm on the
-   current corpus sits at either** — the paid run's forced choice is 0.556 (agent) and 0.583 (control)
-   over 12, both far above chance under either rule. **The fix is preventive**, and the control is what
-   demonstrates it, not a moved verdict. What *does* change in printed output: every forced-choice row
-   now carries its p-value, and the panel carries the multiplicity caveat below.
-2. ⚠️ **No multiplicity correction is applied.** Five arms tested against one floor at α = 0.05 is a
-   family-wise error rate of ≈ **0.23**. It is printed under the panel rather than corrected, because
-   the correction belongs with ADR-030 Slice 2.3's `ExactTests` and not in a printer.
+1. 🔴 **~~No shipped number moves today.~~ CORRECTED 2026-09-06 by the Wave 3 review — a verdict DOES
+   move, and it is the workflow's.** The original text read *"the plan's acceptance names 2/12 and 3/12,
+   and no arm on the current corpus sits at either — the paid run's forced choice is 0.556 (agent) and
+   0.583 (control)"*. That looked at **two** of the panel's **six** arms. §27.4's own line reads
+   *"Single Agent 0.556 · single shot 0.583 · popularity 0.000 · tag join 1.000 · rubber stamp 0.333 ·
+   **deterministic arm 0.250**"*, and 0.250 over 12 is **exactly 3 of 12** — the observation the plan's
+   acceptance names. Under `rate > floor` it printed **▲** (0.250 > 0.083); under the exact test it is
+   **▼** at p = 0.0720.
+   - **Direction: UNFLATTERING, and to the architecture under evaluation.** The arm that loses its ▲ is
+     Demo 2's discovery workflow. A declaration that "nothing moves" suppressed the one movement the
+     suite's own subject would have wanted suppressed. Re-verified by execution: `-- 2 --dry-run` prints
+     `▼ Discovery Workflow (Demo … 0.250 (3 of 12) chance 0.083 p = 0.0720` — the deterministic arm is
+     not stubbed, so this is the same number the paid run produces.
+   - **And the rubber-stamp control now sits ON the boundary**: 0.333 = 4 of 12, p = 0.0138, the smallest
+     observation this floor admits. It keeps its ▲ by one persona, and it is a *degenerate* control.
+2. ⚠️ **No multiplicity correction is applied**, and 🔴 **the figure first published here was the wrong
+   family.** The original text said *"five arms … ≈ 0.23"*; the shipped panel tests **six**, whose rate
+   is **0.265** (1 − 0.95⁶). Understating a family size can only understate the error rate as a panel
+   grows, which makes a lone ▲ look safer than the panel it came from. It is now **computed from the
+   arms the run actually tested** — `ExactBinomial.FamilyWiseErrorRate`, pinned in the control against
+   1 − 0.95ᵐ at m = 5 and m = 6 — and printed, not corrected: the correction belongs with ADR-030 Slice
+   2.3's `ExactTests` and not in a printer.
 3. ⚠️ **A second defect was found on the way in and fixed with it.** The success count fed to the test
    was `(int)Math.Round(rate * n)`, and a forced-choice outcome can be **fractional** — the stub panel
    shows an arm at 0.042 = 0.5/12. Banker's rounding sent 0.5 **down** and would have sent 1.5 **up**,
    so half a win could have become a whole one on the way into a significance test. It is now
    `Math.Floor`, which is the conservative direction and is stated at the call site.
+4. 🔴 **Two more, found by the Wave 3 review and fixed with the corrections above.**
+   - **An arm with no trials printed ▼.** `AboveChance` returns `(false, NaN)` on an empty denominator
+     and the panel rendered every `false` as ▼ — telling a reader an arm **lost** when it was never
+     asked. That is the element-missing shape, and the suite already had the right convention:
+     `CoverageScore.AboveOwnFloor` renders an undefined comparison as `?`. The panel now does too, and
+     an undecidable arm is **not counted into the multiplicity family** — a test that never ran cannot
+     inflate a family-wise error rate.
+   - **An impossible observation printed the panel's most confident ▲.** `P(X ≥ 13 | n = 12)` is 0, so
+     `successes > trials` — a broken caller, never a strong result — came back `Above = true` at `p = 0`.
+     `AboveChance` now refuses it as undecidable. Both are pinned in `AboveChanceIsAnExactTest`, and both
+     are proven failing-then-passing by ablation: removing the guard and hard-coding the family rate back
+     to `0.23` turns the row red with **5 faults**, naming `13 of 12 came back ABOVE chance` and both
+     family-wise references, and takes `-- 3` to **exit 1**. Restored: **exit 0**.
 
 **Migration target named, not assumed:** `ExactBinomial` is deleted when ADR-030 Slice 2.3 lands and its
 callers move to the library's `ExactTests` — the same arrangement `CalibratedThresholds` already declares
@@ -4611,6 +4653,16 @@ dotnet run --project $E -- 3              # exit 0 · 23 gating all caught + 5 a
 dotnet run --project $E -- 2 --dry-run    # exit 0 · the forced-choice panel now prints p per arm
 dotnet run --project $E -- --ci --dry-run # exit 0
 dotnet run --project $E -- 7              # exit 1 (GATE B, §28) — unchanged
+```
+
+Re-executed by the Wave 3 review after the corrections above, all four unchanged, plus the panel line a
+reader can check the §30.2 correction against:
+
+```
+▲ Loop control — rubber sta…  0.333  (4 of 12)  chance 0.083  p = 0.0138
+▼ Discovery Workflow (Demo …  0.250  (3 of 12)  chance 0.083  p = 0.0720
+No multiplicity correction is applied across the arms in this panel — with 6
+arms at 0.05 the family-wise error rate is ≈ 0.265, so read one ▲ accordingly.
 ```
 
 ---
@@ -4756,3 +4808,119 @@ report now says so on its face.
 ```bash
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3   # exit 0
 ```
+
+> 🔴 **CORRECTED 2026-09-06 by the Wave 3 review — `presented > 0` is not what closes this hole, and
+> §32.2 credited it with work the per-persona bar was already doing.** Measured by ablation, executed:
+> forcing `Broken04_PopularityAgent` to present nothing takes `-- 3` to **exit 1** with the row reading
+> `⚠ CLEARS ITS FLOOR ON: USR-NB-01 0.000 ≥ 0.000, USR-MI-02 0.000 ≥ 0.000, …`. A persona with nothing
+> presented is scored against `RandomDrawFloor(gold, k = 0)`, and `ChanceFloors.AtLeastOneHit` returns
+> **0.0** for `k <= 0` — so the pair is 0.000 vs 0.000, `Score >= Floor` is **true**, and the persona is
+> counted as *clearing* its floor. **The degenerate floor at k = 0 is the screen.** `presented` is a
+> **cohort total** and cannot see a per-persona absence: an arm silent on eleven of twelve customers
+> still satisfies it. It is kept as a second, coarser witness — the one a reader can check by eye — and
+> the row's own text now says which of the two does the work.
+
+---
+
+## 33. WAVE 3 REVIEW — what the review found in Wave 3's own six commits (2026-09-06)
+
+Six items were reviewed for wiring and correctness. Five defects were found and fixed; two are reported
+for a later wave. **Every one of the five is in the flattering direction**, which is the rate the brief
+predicted and the reason this pass exists.
+
+### 33.1 🔴 The 1.4 fix does not reach the ▲ that Eval 02's GATE 1 reads
+
+`ExactBinomial` routes the three **forced-choice** sites. It does not route
+`CoverageScore.AboveOwnFloor` or `CoverageScore.AbovePrecisionFloor`, which are still literally
+`Latent > LatentFloor` / `PrecisionAtK > PrecisionFloor` and which drive the latent-coverage, recall@k,
+precision@k and k_live panels **and Eval 02's GATE 1** through
+`PairedCoverageReport.EveryPersonaAboveOwnFloor`; nor Eval 02b's two per-case markers against
+`ConstraintSatisfactionGrader.UniformDrawFloor`. §30.2 said *"`rate > floor` survived in four places at
+once"* and never named the ones left standing, and the control row asserted in shipped text that
+**every** ▲ in the suite comes from the exact test.
+
+**Not converted, and the reason is not oversight.** Latent coverage is a mean over gold tokens whose
+random-draw floor is the mean of *per-token* hit probabilities — a **Poisson-binomial** null, not a
+binomial one. `ExactBinomial` would answer a question it was not asked. Converting it needs the right
+test *and* a declared GATE 1 movement, which is a behaviour change and **its own plan item**. What is
+fixed here is the claim: the control row, `ExactBinomial`'s class remark and §30.2 now name the four
+markers still on `rate > floor` and say that a ▲ outside the forced-choice panel means `rate > floor`
+and nothing more.
+
+### 33.2 🔴 "No shipped number moves today" is false, and the number that moves is the workflow's
+
+§30.2 declared the fix purely preventive on the grounds that *"no arm on the current corpus sits at
+2/12 or 3/12"*. It looked at two of the panel's six arms. §27.4's own line lists **deterministic arm
+0.250**, which is exactly **3 of 12**. Re-executed: `-- 2 --dry-run` prints
+
+```
+▲ Loop control — rubber sta…  0.333  (4 of 12)  chance 0.083  p = 0.0138
+▼ Discovery Workflow (Demo …  0.250  (3 of 12)  chance 0.083  p = 0.0720
+```
+
+The Demo 2 arm is deterministic and not stubbed, so this is the paid number. It goes **▲ → ▼**. The arm
+that loses its tick is the architecture under evaluation, so the declaration suppressed the one movement
+its subject would have wanted suppressed. Corrected in §30.2, and the rubber-stamp control is now noted
+as sitting **on** the boundary at 4 of 12.
+
+### 33.3 🔴 The multiplicity caveat hard-coded the wrong family
+
+The panel printed *"with five arms at 0.05 the family-wise error rate is ≈ 0.23"* beneath **six** tested
+arms, whose rate is **0.265**. A hard-coded family size can only understate the rate as a panel grows,
+and a smaller stated error rate makes a lone ▲ look safer than the panel it came from. It is now
+`ExactBinomial.FamilyWiseErrorRate(tested)`, computed from the arms the run actually tested and pinned
+in the control against 1 − 0.95^m at m = 5 (0.22621906) and m = 6 (0.26490811).
+
+### 33.4 🔴 Two element-missing shapes in the new panel
+
+- **An arm with no trials printed ▼** — telling a reader it LOST when it was never asked. The suite
+  already had the right convention (`AboveOwnFloor` renders an undefined comparison as `?`); the panel
+  now does too, and an undecidable arm is not counted into the multiplicity family.
+- **An impossible observation printed the most confident ▲.** `P(X ≥ 13 | n = 12)` is 0, so
+  `successes > trials` came back `Above = true` at `p = 0`. `AboveChance` now refuses it.
+
+**Both proven failing-then-passing.** Removing the `successes > trials` guard and hard-coding the family
+rate back to `0.23` turns `AboveChanceIsAnExactTest` red with **5 faults** — naming `13 of 12 came back
+ABOVE chance` and both family-wise references — and takes `-- 3` to **exit 1**. Restored: **exit 0**.
+
+### 33.5 🔴 `513dc887` orphaned Control 22's documentation and introduced a compiler warning
+
+The 2.11 method was inserted **between** Control 22's `/// </remarks>` and
+`CheckRefusalDetectorsSeeTheRealShapeAsync`, so the doc block describing the `JsonElement` marshalling
+defect — Wave 2's headline lesson — attached to nothing. The build emitted **CS1587** and the control
+that proves the 8.14 finding had no documentation at all. The block is moved back onto its method;
+project warnings **4 → 3**.
+
+### 33.6 Stale exit codes and a mis-numbered item, all published and all flattering
+
+| where | said | measured 2026-09-06 |
+|---|---|---|
+| `MEASUREMENT_STATUS` §0 reproduce block | `-- 7  # exit 0` | **exit 1** — GATE B ❌, and §28 of this same file says so |
+| `README.md` "Offline / deterministic" | `Evals -- 7` — *exit 0. GATE A + GATE B + GATE C all ✅* | **exit 1**, GATE B ❌ on `USR-RB-10`, 4 of 5 pins |
+| `README.md` same table | `Evals -- 3` — *12 of 12 gating, 4 advisory* | **23 of 23** gating, **5** advisory |
+| `README.md` §10 row | *True on 3 looping and False on 2 non-looping* | pinned 3/2, **measured 2/3** |
+| `README.md` banner | *"the offline, dry-run and Eval 07 figures were re-run against the current tree"* | the currency claim was itself stale |
+| ADR-030 Q4 box | *"**1.4** is blocked by a process rule"* | means ADR-030 **Slice 1.4**; the delivery plan's **item 1.4** shipped the same day (`9407cfbd`), so a bare "1.4" read as *"the thing that shipped is blocked"* |
+
+### 33.7 Reported, NOT fixed — for a later wave
+
+1. **`AboveOwnFloor` / `AbovePrecisionFloor` / Eval 02b need the right test, not this one.** See §33.1.
+   The item must carry a declared GATE 1 movement and a Poisson-binomial (or exact permutation) null.
+2. **8.21 / 8.25's ablation figures (§31) were not re-executed by this review.** The decision is
+   recorded and the code half is deferred, so nothing ships on them; they are quotable only from the
+   wave that measured them.
+
+### 33.8 Verified unchanged — non-breaking, by execution
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet build AgentEval.sln                    # 0 errors, 3 warnings (was 4 — CS1587 gone)
+dotnet test tests/AgentEval.Tests -f net10.0  # 9,648 passed · 0 failed · 2 skipped of 9,650
+dotnet run --project $E -- 3                  # exit 0 · 23 gating all caught + 5 advisory
+dotnet run --project $E -- 4                  # exit 0
+dotnet run --project $E -- 7                  # exit 1 (GATE B, unchanged)
+dotnet run --project $E -- 2 --dry-run        # exit 0
+dotnet run --project $E -- --ci --dry-run     # exit 0
+```
+
+No existing test file was modified; no threshold moved; no model call; nothing spent.

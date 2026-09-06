@@ -134,7 +134,7 @@ The order below is the order to record. Everything above the divider is free.
 | 7 | `Agent -- 0` | Six probes, each with an `expected`, an `actual` and a `discriminant` line; `6 of 6 probes passed` | Each of the three stop conditions is **forced and discriminated from the other two**, the loop-back is checked in *both* directions (fires / does not fire), and so is the injection vocabulary filter. |
 | 8 | `Evals -- 3` | Sixteen rows in one box under the banner `A CONTROL THAT PASSES IS A WIRING FAULT, NOT A GOOD AGENT`: twelve `✅ caught` gating rows, four advisory instrument rows, two of which are `⚠️ FINDING` | The evals **can fail.** A hallucinating recommender scores 0/14, a persona-blind popularity arm scores 0.000, and the suite says so. |
 | 9 | `Evals -- 4` | Four arms: unconstrained probe `INJECTED`, constrained probe `CONTAINED`, rubber stamp `INAPPLICABLE`, Demo 2's arm `CONTAINED` — five checks each, with the chance floor of each printed | Marketplace review text is a live injection channel, the structural vocabulary constraint contains it, and **GATE A proves the case can go red** before GATE B is worth reading. |
-| 10 | `Evals -- 7` | Per-customer route traces drawn edge by edge with `⭐ THE LOOP-BACK → round 2`, then `HaveTraversedEdge(CoverageReviewer → Discovery)` asserted **True on 3 looping customers and False on 2 non-looping ones**, plus three agreeing witnesses per case (`loop-backs = rounds−1`, `super-steps = 2·rounds+3`) | The loop-back is witnessed against **edges MAF itself declares**, not against the workflow's own console trace — and the corpus contains both directions, so no constant answer can pass. |
+| 10 | `Evals -- 7` | Per-customer route traces drawn edge by edge with `⭐ THE LOOP-BACK → round 2`, then `HaveTraversedEdge(CoverageReviewer → Discovery)` asserted per customer — ⚠️ **pinned 3 looping / 2 non-looping, but MEASURED 2 / 3 on the current tree: `USR-RB-10` is pinned to loop and does not, which is why GATE B is ❌ and `-- 7` exits 1** (`MEASUREMENT_STATUS` §28), plus three agreeing witnesses per case (`loop-backs = rounds−1`, `super-steps = 2·rounds+3`) | The loop-back is witnessed against **edges MAF itself declares**, not against the workflow's own console trace — and the corpus contains both directions, so no constant answer can pass. |
 | 11 | `Evals -- 1 --dry-run` | The gate fails (as designed — the stub presents the same two SKUs every case) and three plumbing checks pass, including *"an APPROVAL-GATED `PlaceOrder` call is visible in the trace on all 2 commit-surface case(s)"* | The harness reads what the agent actually did; a gated call is not invisible to the trace extractor. |
 | 12 | `Evals -- 2 --dry-run` | The full 12-persona × 6-arm coverage matrix with every deterministic arm real, the live arm replaced by the stub, and five plumbing checks | Every arm, floor and grader is wired — for free, in about 1.5 s. |
 | --- | *— everything below spends money —* | | |
@@ -558,8 +558,11 @@ is not here.
 > built at **15:35 on 2026-09-04**, containing Evals 01–04 only. Evals 05, 06,
 > 08 and 09 landed on disk **later that afternoon** and are in none of the
 > measured binaries — which is also why no number for them appears anywhere in
-> this file. The offline, dry-run and Eval 07 figures were re-run against the
-> current tree.
+> this file. ⚠️ **The claim that "the offline, dry-run and Eval 07 figures were
+> re-run against the current tree" was itself stale by 2026-09-06** — the `Evals -- 3`
+> and `Evals -- 7` rows below had both moved and are corrected in place. A currency
+> claim ages exactly like the figures it vouches for; re-run the four free commands
+> before trusting any row here.
 
 ### Offline / deterministic — no model call, no credentials
 
@@ -569,12 +572,13 @@ is not here.
 | `Agent -- 1 --offline` (Nadia) | 3 searches → 6 presentations; ledger `6 in → 6 out · 0 dropped · 2 demoted`; channel audit `6 presented → 6 shown`; **3 guardrail arms report `arm_inapplicable`** |
 | `Agent -- 2 --offline --user USR-NB-01` (Nadia) | rounds **1 of 3**, `CoverageSufficient`, 0 model calls, 7 searches, 22 discovered, 11 recommended, **loop-back did not fire**, super-steps **5**, `✓ SKU containment 11/11` |
 | `Agent -- 2 --offline` (Marco — the DEFAULT persona for Demo 02) | rounds **3 of 3**, `GapsUnresolvable`, 10 searches, 17 discovered, 12 recommended, **loop-back FIRED**, super-steps **9**, `✓ SKU containment 12/12` |
-| `Evals -- 3` | **12 of 12** gating controls caught; **4 advisory rows, 2 tripping** |
+| `Evals -- 3` | ⚠️ **STALE — corrected 2026-09-06.** This row said *"12 of 12 gating controls caught; 4 advisory rows, 2 tripping"*. Re-measured on the current tree: **23 of 23** gating controls caught, **5 advisory rows, 2 tripping**. Exit 0 |
 | `Evals -- 4` | GATE A ✅ (unconstrained probe `INJECTED`, k=40, avoidance floor 0.596) · GATE B ✅ (constrained probe `CONTAINED` k=32 floor 0.677; Demo 2's arm `CONTAINED` k=24 floor 0.758; rubber stamp `INAPPLICABLE`) |
-| `Evals -- 7` | exit 0. GATE A + GATE B + GATE C all ✅ over **5 cases** — 3 looping, 2 non-looping; `HaveTraversedEdge` correct in both directions and the non-existent edge rejected on all 5; 2 approved / 3 degraded exits; stop reasons observed `coverage-sufficient`, `gaps-unresolvable`, `no-progress`. **170 ms** of turn time, 0 model calls, USD 0.0000. One instrument finding: `round-limit-reached` is **not** reachable on a real customer in this corpus |
+| `Evals -- 7` | 🔴 **WRONG AS PUBLISHED — corrected 2026-09-06 by review, and the direction was flattering.** This row claimed *"exit 0. GATE A + GATE B + GATE C all ✅ over 5 cases — 3 looping, 2 non-looping"*. Measured on the current tree: **exit 1**. GATE A ✅ · **GATE B ❌** (`direction matches pin : False` — `USR-RB-10` is pinned to loop and does not) · GATE C ✅. **4 of 5** pins match, so the corpus runs **2 looping, 3 non-looping**, not 3/2. Still 0 model calls and USD 0.0000. The mechanism is established and the prescribed remedy is REFUSED — `MEASUREMENT_STATUS` §28. One instrument finding: `round-limit-reached` is **not** reachable on a real customer in this corpus |
 
-**Eval 03's four advisory findings, in full, because they bound everything
-else:**
+**Eval 03's advisory findings, in full, because they bound everything else** (four
+when this was written, **five** on the current tree — `MinCandidateScoreDecidesNothing`
+joined them in Wave 3)**:**
 
 - **`LatentCoverageDiscrimination` — ok.** Worst per-persona random-draw floor
   (at the default k = 5) **0.154** against a 0.50 ceiling. Per persona: 0.154,

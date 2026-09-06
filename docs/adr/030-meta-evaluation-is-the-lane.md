@@ -1546,7 +1546,7 @@ byte-level prediction either way.**
 > bumps, they are the tests that have to change on purpose."* Re-derive with `MEASUREMENT_STATUS.md`
 > §25.3(c).
 >
-> ✅ **ANSWERED 2026-09-06 (Wave 3), and the answer is that Q4 is no longer what blocks 1.4.**
+> ✅ **ANSWERED 2026-09-06 (Wave 3), and the answer is that Q4 is no longer what blocks Slice 1.4.**
 > On the merits, with the measurement above in hand: **(i) is APPROVED — do the widening now.** It is
 > free, reversible, regresses **0 of 949** documents on disk, moves no stored content hash, and the
 > defect it fixes (an honest inapplicable artifact being *rejected* by our own schema) is live.
@@ -1561,8 +1561,11 @@ byte-level prediction either way.**
 > `tests/AgentEval.Tests/Evals/InapplicableSchemaBoundaryTests.cs` and
 > `EvalScoreMeasurementWithExpressionTests.cs` fail **by design** — they exist to pin what v1 refuses
 > — and every wave since Wave 2 has run under a standing rule that no existing test file may be
-> edited. So **1.4 is blocked by a process rule, not by an open question**, and it will stay blocked
-> for as long as that rule holds, no matter how Q4 is answered. Whoever funds 1.4 must fund the edit
+> edited. So **Slice 1.4 is blocked by a process rule, not by an open question**, and it will stay
+> blocked for as long as that rule holds, no matter how Q4 is answered. ⚠ Written as a bare "1.4" in
+> the first revision and corrected 2026-09-06 by review: the delivery plan's **item 1.4** is a different
+> thing entirely and it SHIPPED the same day (`9407cfbd`, the exact binomial), so an unqualified "1.4"
+> here read as "the thing that shipped is blocked". Whoever funds Slice 1.4 must fund the edit
 > to those two files *in the same change* and say so up front; that is the whole remaining cost, and
 > it is about twenty lines. Recording this is the point: an item parked under the wrong blocker never
 > comes up for the decision that would actually release it.

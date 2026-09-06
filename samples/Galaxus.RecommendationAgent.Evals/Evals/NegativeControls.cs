@@ -759,13 +759,26 @@ public static class NegativeControls
         var scorable = perPersona.Where(p => !double.IsNaN(p.Score) && !double.IsNaN(p.Floor)).ToList();
         var clears   = scorable.Where(p => p.Score >= p.Floor).ToList();
 
-        // ⚠ AND THE ARM MUST HAVE PRESENTED SOMETHING. Found while doing 1.8: this row asserted only
-        //   that the arm scores LOW, and an arm that presents nothing scores 0.000 on every persona
-        //   and passes that bar vacuously — the element-missing shape. 0.000 on 12 of 12 is an
+        // ⚠ AND THE ARM MUST HAVE PRESENTED SOMETHING. Found while doing 1.8: the MEAN form of this
+        //   row asserted only that the arm scores LOW, and an arm that presents nothing means 0.000
+        //   and passed that bar vacuously — the element-missing shape. 0.000 on 12 of 12 is an
         //   extreme value, and §7 rule 6 says an extreme value is a wiring fault until shown
         //   otherwise. `CheckSingleShotAsync` already asserts this of its comparator; this row did
         //   not, and it is the row whose arm is SUPPOSED to score zero — which is exactly why the
         //   distinction between "scored zero" and "was never asked" has to be made here.
+        //
+        // ⚠ CORRECTED 2026-09-06 by review — say what this clause does and does NOT add, because
+        //   the first revision claimed more for it than it earns:
+        //   (a) The PER-PERSONA bar above already refuses a silent arm on its own. A persona with
+        //       nothing presented is scored against `RandomDrawFloor(gold, k = 0)`, and
+        //       `ChanceFloors.AtLeastOneHit` returns 0.0 for k <= 0 — so the pair is 0.000 vs 0.000,
+        //       `Score >= Floor` is TRUE, the persona is counted as CLEARING its floor and the row
+        //       goes red. The mean form had no such degenerate-floor pairing, which is where the
+        //       vacuous pass actually lived.
+        //   (b) `presented` is a COHORT TOTAL, so this clause cannot see a per-persona absence — an
+        //       arm silent on eleven of twelve customers still satisfies it. It is a second,
+        //       coarser witness, kept because it is the one a reader can check by eye, not the
+        //       screen that does the work.
         bool tripped = scorable.Count > 0 && clears.Count == 0 && presented > 0;
 
         return new ControlRowSnapshot(
@@ -778,8 +791,9 @@ public static class NegativeControls
           + "NOTE: the design pre-registers 0.00 for this arm, but that belongs to an authored bestseller "
           + "list; this catalogue's is derived, so the value is MEASURED. Selection: "
           + $"{string.Join(", ", Broken04_PopularityAgent.Selection)}.",
-            $"{presented} recommendation(s) presented across the cohort — an arm that presented NOTHING would "
-          + $"score 0.000 everywhere and pass this bar for the wrong reason · "
+            $"{presented} recommendation(s) presented across the cohort (a COHORT total — it cannot see a "
+          + "per-persona absence; the degenerate floor at k = 0 is what refuses a silent arm customer by "
+          + "customer) · "
           + $"{scorable.Count - clears.Count} of {scorable.Count} persona(s) below their own floor"
           + (clears.Count == 0
                 ? string.Empty
@@ -2921,38 +2935,6 @@ public static class NegativeControls
             problems.Count == 0);
     }
 
-    // ══ Control 22 — the refusal detectors could not fire on the live shape (plan items 8.14/8.7). ══
-    //
-    /// <summary>
-    /// The tool-layer refusal detectors must read the shape the LIVE harness records, not the shape
-    /// a hand-built control produces.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>The defect.</b> <c>Eval01.DetectOptOutBackstop</c> and <c>Eval06.HasBudgetRefusal</c> both
-    /// tested <c>call.Result is string json</c>. <c>AIFunctionFactory.Create</c> marshals a
-    /// <c>Task&lt;string&gt;</c> tool's return value through <c>JsonSerializer</c>, so the object
-    /// that reaches <c>FunctionResultContent.Result</c> — and from there
-    /// <c>ToolCallRecord.Result</c> — is a <c>JsonElement</c>. Neither detector could return true on
-    /// a live turn, ever. Eval 01 printed <i>"the tool-layer backstop was never exercised this
-    /// turn"</i> on the 2026-09-05 opt-out case and <c>SUITE_SUMMARY</c> §4 left it open as
-    /// <i>"either a containment hole or a blind detector"</i>. This row settles it as the blind
-    /// detector, and it settles it by RUNNING the marshalling rather than by reasoning about it.
-    /// </para>
-    /// <para>
-    /// ⚠ <b>This is why the row invokes the real AIFunction.</b> Every scripted control in this
-    /// panel builds its <c>FunctionResultContent</c> by hand, and a hand-built result is a
-    /// <c>string</c> — so the stub was kinder than the model in exactly the sense
-    /// <c>RUN_PROTOCOL.md</c> names, and no control built that way could have caught this. It costs
-    /// nothing: the tool is deterministic, reads the in-memory catalogue and calls no model.
-    /// </para>
-    /// <para>
-    /// <b>Both directions.</b> The refusal must be FOUND in the marshalled shape, an ordinary
-    /// successful result must NOT be mistaken for a refusal, and the detector must not fall back to
-    /// matching the ARGUMENTS — a refusal code echoed into a query is not the architecture refusing
-    /// anything.
-    /// </para>
-    /// </remarks>
     // == 2.11 -- is MinCandidateScore a THRESHOLD at all? ==================================
     //
     /// <summary>
@@ -3087,6 +3069,16 @@ public static class NegativeControls
     /// p-values are checked to 1e-4 against values computed independently from the binomial upper
     /// tail (R: <c>binom.test(x, 12, 1/12, alternative = "greater")</c>).
     /// </para>
+    /// <para>
+    /// ⚠ <b>SCOPE, corrected 2026-09-06 by review.</b> This row's first revision claimed that
+    /// <i>every</i> ▲ in the suite comes from this test. It does not, and the row never checked it:
+    /// <c>CoverageScore.AboveOwnFloor</c>, <c>CoverageScore.AbovePrecisionFloor</c> and Eval 02b's
+    /// two per-case markers are still <c>rate &gt; floor</c>, and the first of those is what Eval
+    /// 02's GATE 1 reads through <c>PairedCoverageReport.EveryPersonaAboveOwnFloor</c>. Their null
+    /// is Poisson-binomial rather than binomial, so this class is the wrong instrument for them and
+    /// converting them is a separate item with a declared GATE 1 movement. What this row certifies
+    /// is the FORCED-CHOICE decision and the three sites that share it.
+    /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckAboveChanceIsAnExactTest()
     {
@@ -3133,26 +3125,89 @@ public static class NegativeControls
         if (ExactBinomial.UpperTailP(3, 12, floor) > ExactBinomial.UpperTailP(2, 12, floor))
             problems.Add("the upper tail grew with the observation — the test is inverted.");
 
+        // ── an IMPOSSIBLE observation must not become the panel's most confident tick ──
+        //
+        // P(X >= 13 | n = 12) is 0, so a caller that produced more wins than trials would have been
+        // handed p = 0 and the greenest ▲ on screen. That is a broken caller, not a strong result.
+        if (ExactBinomial.AboveChance(13, 12, floor).Above)
+            problems.Add("13 of 12 came back ABOVE chance — an impossible observation printed the most confident verdict in the panel.");
+
+        // ── the MULTIPLICITY family is computed from the run, not quoted from a constant ──
+        //
+        // Pinned against 1 - 0.95^m, computed independently. The shipped panel tests SIX arms
+        // (0.265), and the first revision printed the five-arm figure (0.226) underneath it — an
+        // understatement, which is the flattering direction for a lone ▲.
+        double fwer5 = ExactBinomial.FamilyWiseErrorRate(5);
+        double fwer6 = ExactBinomial.FamilyWiseErrorRate(6);
+        if (Math.Abs(fwer5 - 0.22621906) > 1e-6)
+            problems.Add($"the family-wise error rate over 5 tests is {fwer5:0.00000000}, reference 0.22621906.");
+        if (Math.Abs(fwer6 - 0.26490811) > 1e-6)
+            problems.Add($"the family-wise error rate over 6 tests is {fwer6:0.00000000}, reference 0.26490811.");
+        if (!double.IsNaN(ExactBinomial.FamilyWiseErrorRate(1)))
+            problems.Add("a single test reported a FAMILY-wise error rate — one test is not a family.");
+        if (fwer6 <= fwer5)
+            problems.Add("the family-wise error rate did not grow with the family — a bigger panel cannot be safer.");
+
         bool oldRuleSaysYesToAll = (2.0 / 12.0 > floor) && (3.0 / 12.0 > floor) && (7.0 / 12.0 > floor);
 
         return new ControlRowSnapshot(
             "AboveChanceIsAnExactTest",
-            "every \u25b2 in this suite must come from an EXACT one-sided binomial upper tail at p \u2264 "
+            "every FORCED-CHOICE \u25b2 must come from an EXACT one-sided binomial upper tail at p \u2264 "
           + $"{ExactBinomial.Alpha:0.00}, through the one method the printer calls. At n = 12 against a 1/12 "
           + "floor that must REFUSE 2 of 12 and 3 of 12 and ACCEPT 7 of 12 \u2014 a rule that refuses everything "
-          + "passes a one-sided check and measures nothing. The three p-values are pinned against an "
-          + "independent reference, and zero trials must give NaN rather than a verdict",
+          + "passes a one-sided check and measures nothing. The p-values are pinned against an "
+          + "independent reference; zero trials must give NaN rather than a verdict; an IMPOSSIBLE observation "
+          + "must not print the panel's most confident tick; and the multiplicity family must be COMPUTED from "
+          + "the arms a run tested, since a hard-coded family size can only understate the error rate. "
+          + "\u26a0 SCOPE: this is the forced-choice decision and the three sites that share it, NOT every \u25b2 "
+          + "in the suite \u2014 AboveOwnFloor, AbovePrecisionFloor and Eval 02b's two markers are still "
+          + "rate > floor, and the first of those is what Eval 02's GATE 1 reads",
             problems.Count == 0
                 ? $"2 of 12 {ExactBinomial.FormatP(two.P)} \u25bc \u00b7 3 of 12 {ExactBinomial.FormatP(three.P)} \u25bc \u00b7 "
                 + $"4 of 12 {ExactBinomial.FormatP(four.P)} \u25b2 (the boundary) \u00b7 "
                 + $"7 of 12 {ExactBinomial.FormatP(seven.P)} \u25b2 \u00b7 0 trials \u2192 NaN \u00b7 0 of 12 \u25bc \u00b7 "
+                + "13 of 12 \u2192 refused \u00b7 "
                 + $"the OLD rule (rate > floor) said \u25b2 to all three: {oldRuleSaysYesToAll} \u2014 so this change "
-                + "removes exactly two unearned ticks and keeps the earned one. \u26a0 No multiplicity correction: "
-                + "five arms at 0.05 is a family-wise error rate of \u2248 0.23"
+                + "removes exactly two unearned ticks and keeps the earned one. \u26a0 The paid \u00a727.4 panel HAS "
+                + "an arm at 3 of 12 (Demo 2's deterministic arm, 0.250), so a verdict DOES move: \u25b2 \u2192 \u25bc. "
+                + $"\u26a0 No multiplicity correction: 5 tests {ExactBinomial.FamilyWiseErrorRate(5):0.000}, "
+                + $"6 tests {ExactBinomial.FamilyWiseErrorRate(6):0.000} \u2014 the shipped panel tests SIX"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
 
+    // ══ Control 22 — the refusal detectors could not fire on the live shape (plan items 8.14/8.7). ══
+    //
+    /// <summary>
+    /// The tool-layer refusal detectors must read the shape the LIVE harness records, not the shape
+    /// a hand-built control produces.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> <c>Eval01.DetectOptOutBackstop</c> and <c>Eval06.HasBudgetRefusal</c> both
+    /// tested <c>call.Result is string json</c>. <c>AIFunctionFactory.Create</c> marshals a
+    /// <c>Task&lt;string&gt;</c> tool's return value through <c>JsonSerializer</c>, so the object
+    /// that reaches <c>FunctionResultContent.Result</c> — and from there
+    /// <c>ToolCallRecord.Result</c> — is a <c>JsonElement</c>. Neither detector could return true on
+    /// a live turn, ever. Eval 01 printed <i>"the tool-layer backstop was never exercised this
+    /// turn"</i> on the 2026-09-05 opt-out case and <c>SUITE_SUMMARY</c> §4 left it open as
+    /// <i>"either a containment hole or a blind detector"</i>. This row settles it as the blind
+    /// detector, and it settles it by RUNNING the marshalling rather than by reasoning about it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This is why the row invokes the real AIFunction.</b> Every scripted control in this
+    /// panel builds its <c>FunctionResultContent</c> by hand, and a hand-built result is a
+    /// <c>string</c> — so the stub was kinder than the model in exactly the sense
+    /// <c>RUN_PROTOCOL.md</c> names, and no control built that way could have caught this. It costs
+    /// nothing: the tool is deterministic, reads the in-memory catalogue and calls no model.
+    /// </para>
+    /// <para>
+    /// <b>Both directions.</b> The refusal must be FOUND in the marshalled shape, an ordinary
+    /// successful result must NOT be mistaken for a refusal, and the detector must not fall back to
+    /// matching the ARGUMENTS — a refusal code echoed into a query is not the architecture refusing
+    /// anything.
+    /// </para>
+    /// </remarks>
     private static async Task<ControlRowSnapshot> CheckRefusalDetectorsSeeTheRealShapeAsync()
     {
         var problems = new List<string>();
