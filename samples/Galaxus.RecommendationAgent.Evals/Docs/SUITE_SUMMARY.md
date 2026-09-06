@@ -473,6 +473,17 @@ No model. Every number here is about **the instrument**, never about the agent.
 
 ### 10.1 ⚠️ 18 of 56 authored phrases are unretrievable in the space this run scored in
 
+> 🔴 **SUPERSEDED ON THE TREE 2026-09-06 — the numbers below are the RUN's and stay, per this
+> document's own §§1–21 rule; they no longer describe `HEAD`.** D-v's lexicon closure (plan item 8.11,
+> `fc352481`) authored the twelve closable phrases — including all ten latent-gold ones named below —
+> into the concept lexicon. Re-measured model-free on 2026-09-06: `ARM A`/`ARM C` **6 of 56, 0 latent
+> GOLD**; `ARM D` **6 of 50**; the closability split is **0 closable / 0 unclosable / 6 no-products**, so
+> the six that remain are a CORPUS gap no query-side authoring can close.
+> ⚠️ **The Eval 02 coverage cells this moved have NOT been re-derived** — that is a live cohort, last
+> bought at ¤27.1208 — so every Eval 02 number in this document is the run's and is unverified against
+> the current lexicon. ⚠️ It also cost the corpus its only live `no-progress` carrier: `USR-MI-02`
+> (Marco) now exits `coverage-sufficient` in the concept space.
+
 `ARM A` / `ARM C` (the concept space, the default): **18 of 56 authored phrases embed to ZERO**, and **10 of
 them are latent GOLD** — `all-day-riding`, `card-to-edit`, `couch-co-op`, `late-night-session`,
 `off-grid-power`, `self-supported`, `steep-ascents`, `two-channel-room`, `weigh-every-shot`,
@@ -697,7 +708,7 @@ proposed term (0 proposed this run — printed as "a result about a control that
    distribution tool` is in the catalogue. This is the concept space's dense floor being a weak filter
    (MEASUREMENT_STATUS §22 records that 57 % of arbitrary catalogue products clear it) meeting a query
    vocabulary the 24-dimension concept space has no mapping for — the same shape Eval 03's ARM D finding
-   measures at 8 of 50.
+   measures at 8 of 50 (🔴 **6 of 50 on the tree since `fc352481` — §10.1**).
 2. 🔴 **The coverage ledger and the answer contradict each other, and the customer sees both.** Interest
    `I-4 "Espresso machine care"` was reported **UNCOVERED, 0 candidates, in both rounds**, and the customer
    was told so in the *"Not covered in this session"* panel — while **card 3 is `GLX-3010` Urnex Cafiza
@@ -939,7 +950,7 @@ separate defects would double-count.)
 | **3** | **Eval 09's architecture comparison** | 3 of 24 live-workflow cells voided **and** a 4.29× budget ratio against a 1.50× limit. Two independent disqualifications |
 | **4** | **Eval 02c: whether the agent beats the single-shot control** | underpowered by construction at n = 13 — the same finding MEASUREMENT_STATUS §21 recorded. What *is* supported: at k = 5 it is the only entrant separated from the chance floor |
 | **5** | **Eval 02b: recall** | there is no recall channel. On SN-09 the satisfying set has 4 members and the agent presented 2 — precision 1.000, recall 0.5, and the metric cannot tell |
-| **6** | **Eval 03: 18 of 56 authored phrases, 10 of them latent gold** | they embed to ZERO in the space this run scored in, so the dense leg contributes nothing on those interests. A low coverage cell there is a fact about the corpus, not about the arm — and it lands on `USR-MB-13` and `USR-NK-12`, the two weakest cells in §20.1 row 12 |
+| **6** | **Eval 03: 18 of 56 authored phrases, 10 of them latent gold** — 🔴 **SUPERSEDED on the tree, see §10.1's banner: 6 of 56, 0 latent gold since `fc352481`** | they embed to ZERO in the space this run scored in, so the dense leg contributes nothing on those interests. A low coverage cell there is a fact about the corpus, not about the arm — and it lands on `USR-MB-13` and `USR-NK-12`, the two weakest cells in §20.1 row 12 |
 | **7** | **Eval 01 C-07's D3 (suppression) claim** | **no negative control has ever tripped C-07's D3 detector.** Its clean D3 sheet is INAPPLICABLE, not evidence. (C-07 still fails on D5.) |
 | **8** | **Eval 04's rubber-stamp arm** | INAPPLICABLE — the poisoned listing was retrieved but that reviewer proposed nothing, so containment was never exercised. The clean sheet is not evidence |
 | **9** | **Eval 02c · `USR-NB-01`** | the hidden SKU `GLX-2003` is out of stock and unreachable for every stock-gated arm. Depresses all rates equally |

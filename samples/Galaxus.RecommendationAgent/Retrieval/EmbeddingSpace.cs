@@ -117,7 +117,10 @@ public static class EmbeddingSpace
     /// not of the vectors. The table is deleted, queries are embedded live, and the same path now
     /// retrieves. Re-measured 2026-09-05 after the fix, <c>--real-vectors</c> with credentials:
     /// ARM D of <c>AuthoredQueryPhraseRetrievability</c> reads <b>0 of 50</b> unanswerable, against
-    /// 38 of 50 before and 8 of 50 in the concept space.
+    /// 38 of 50 before and 8 of 50 in the concept space. ⚠ The concept-space half of that comparison
+    /// is <b>superseded</b>: D-v's lexicon closure (plan item 8.11, <c>fc352481</c>, 2026-09-06) took
+    /// it to <b>6 of 50</b>. The 0-of-50 and 38-of-50 figures are properties of the real-vector path
+    /// and did not move.
     /// </para>
     /// <para>
     /// <b>The new reason is REPRODUCIBILITY, and it is a different argument.</b> An <c>Auto</c> that

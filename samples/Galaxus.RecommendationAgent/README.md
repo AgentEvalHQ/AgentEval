@@ -596,14 +596,25 @@ joined them in Wave 3)**:**
   is the check that decides whether the metric carries *any* information about
   personalisation, and it does.
 - **`AuthoredQueryPhraseRetrievability` — ⚠️ FINDING.** **Arm A (the path
-  everything runs on): 18 of 56** authored query phrases embed to the **zero
-  vector** under the offline concept retriever, and **10 of those are latent-gold
-  tokens for a scored persona**: `all-day-riding`, `card-to-edit`, `couch-co-op`,
-  `late-night-session`, `off-grid-power`, `self-supported`, `steep-ascents`,
-  `two-channel-room`, `weigh-every-shot`, `winter-base-miles`. On those interests
-  the dense leg contributes nothing, so a low coverage cell there is **not**
-  evidence the arm failed to reason. Read every Eval 02 number with this in front
-  of it. **Arm B (the committed real vectors, added by B-6): 0 of 56 dead** — 170
+  everything runs on): 6 of 56** authored query phrases embed to the **zero
+  vector** under the offline concept retriever, and **0 of those are latent-gold
+  tokens for a scored persona**.
+
+  > 🔴 **SUPERSEDED 2026-09-06, and the superseded reading is kept because it is
+  > what most of this document was written against.** Until D-v's lexicon closure
+  > (plan item 8.11, `fc352481`) this read **18 of 56, 10 of them latent gold**:
+  > `all-day-riding`, `card-to-edit`, `couch-co-op`, `late-night-session`,
+  > `off-grid-power`, `self-supported`, `steep-ascents`, `two-channel-room`,
+  > `weigh-every-shot`, `winter-base-miles`. Those twelve closable phrases are now
+  > authored into the concept lexicon; the **six** that remain are a **corpus** gap
+  > — no product carries their token at all — so no query-side authoring closes
+  > them. ⚠️ **The Eval 02 coverage cells this moved have NOT been re-derived**
+  > (that is a live cohort, last bought at ¤27.1208), so no Eval 02 number
+  > published before `fc352481` describes the current tree.
+
+  On the remaining interests the dense leg contributes nothing, so a low coverage
+  cell there is **not** evidence the arm failed to reason. **Arm B (the committed
+  real vectors, added by B-6): 0 of 56 dead** — 170
   `text-embedding-3-small` vectors at 1536 dims load from the embedded assets with
   no key and no live call. Arm B's zero test is near-vacuous on its own — a real
   model cannot return a zero vector — so what it verifies is asset presence and
@@ -614,7 +625,8 @@ joined them in Wave 3)**:**
   B-6's acceptance is met. The row is still a FINDING, and the reason is the new
   **arm D: the queries the arms actually issue** — joins of phrases, companion
   classes, category names, none of which is an authored phrase. Arm D reads
-  **8 of 50** dead on the default concept path. Arm C reports the concept space
+  **6 of 50** dead on the default concept path (**8 of 50** before `fc352481`;
+  see the supersession note above). Arm C reports the concept space
   unconditionally, so the row always carries one number that cannot co-move with the
   selector. Without arm D this row would have gone green on the change that broke
   retrieval. `MEASUREMENT_STATUS.md` §17.
@@ -857,10 +869,15 @@ exactly 1/12.
   reported "the tool-layer backstop was never exercised" on a turn where the
   tool must have refused. Those two statements cannot both be true.
 
-**The instrument's own advisory findings, restated:** 18 of 56 authored query
-phrases embed to the zero vector and 10 of them are latent gold (`steep-ascents`
-returns nothing from the lexical leg either — it is unaskable by any arm); the
-worst discrimination floor is 0.154 against a 0.50 ceiling.
+**The instrument's own advisory findings, restated:** 6 of 56 authored query
+phrases embed to the zero vector and 0 of them are latent gold; the
+worst discrimination floor is 0.154 against a 0.50 ceiling. ⚠️ **This paragraph
+described the run this section reports, and that run read 18 of 56 with 10 latent
+gold** (`steep-ascents` returned nothing from the lexical leg either — it was
+unaskable by any arm). `fc352481` closed the twelve closable phrases on
+2026-09-06; the coverage cells it moved are **not** re-derived, so the numbers
+elsewhere in this section are the ones the run produced, not the ones the tree
+would produce now.
 
 **Two more facts about the corpus that bound generalisation:** 36 of the 38 gold
 tokens are exactly *2 owned + 2–3 reachable* carriers — total conformance to an
@@ -917,7 +934,7 @@ silently repaired.
 
 | # | Gap | Why it was not fixed |
 |---|---|---|
-| 1 | **10 dead query phrases, STILL OPEN after B-6 and B-7.** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero in the concept space (`AuthoredQueryPhraseRetrievability`, arm C — and arm A whenever that space is the resolved one, which is the default) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 closed the row's *arm B*; B-7 made arm A measure the resolved path and added arms C and D. Neither touched the lexicon. B-7 also found the **larger** version of this defect: **8 of the 50 queries the arms actually issue** are dead in the concept space too. **B-21 closed the real-vector half** (live query embedding → arm D 38 of 50 → **0 of 50**) and put arm C **into the verdict**, so the row can no longer go green by passing `--real-vectors`. The concept-space lexicon is untouched and the row stays RED on both paths |
+| 1 | **~~10~~ dead query phrases — the LATENT-GOLD half is CLOSED, six corpus gaps remain.** ⚠️ SUPERSEDED 2026-09-06 by `fc352481`: the ten named below embedded to zero when this row was written; the twelve closable phrases (those ten included) are now authored into the concept lexicon and the row reads **6 of 56, 0 latent gold**. The six that remain carry a token no product in the catalogue carries, so they are a **corpus** gap and no query-side authoring closes them. The Eval 02 coverage cells this moved are NOT re-derived. Historical text follows. **STILL OPEN after B-6 and B-7 (as it then read).** `InterestMapBuilder.ComposeConjunctionLabel` turns each tag suffix into the string that *is* the query every searching arm issues; ten of them embed to zero in the concept space (`AuthoredQueryPhraseRetrievability`, arm C — and arm A whenever that space is the resolved one, which is the default) | Choosing which concept dimension a phrase maps onto decides which products come back for which customer — a direct lever on **every** coverage cell. B-6 closed the row's *arm B*; B-7 made arm A measure the resolved path and added arms C and D. Neither touched the lexicon. B-7 also found the **larger** version of this defect: **8 of the 50 queries the arms actually issue** are dead in the concept space too. **B-21 closed the real-vector half** (live query embedding → arm D 38 of 50 → **0 of 50**) and put arm C **into the verdict**, so the row can no longer go green by passing `--real-vectors`. The concept-space lexicon is untouched and the row stays RED on both paths |
 | 2 | **`"wahl"` in the political-opinion term set** | Changing a screening term changes what the eval measures. Same precedent as #1 |
 | 3 | **Demo 2's 60 s model timeout** vs `gpt-5.5`'s latency on the three JSON-envelope stages | A threshold decision, not a verification one. `--model-timeout` exists precisely to change it, and the 60 s value is documented as measured (without it a stalled deployment queues ~40 min) |
 | 4 | **`DetectOptOutBackstop` is unverified and uncovered** — the only reader of the tool-result channel | Localising it (extractor vs. detector) needs one instrumented live turn |

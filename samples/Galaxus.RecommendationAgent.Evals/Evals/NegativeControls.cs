@@ -1354,7 +1354,9 @@ public static class NegativeControls
         //
         //    On the DEFAULT concept path it is a real measurement of a real hole: a query that
         //    embeds to zero in a 24-dimension hand-built space gives the dense leg nothing, and
-        //    8 of 50 do.
+        //    6 of 50 do. ⚠ SUPERSEDED 2026-09-06: this line read `8 of 50` until D-v's lexicon
+        //    closure (plan item 8.11, `fc352481`) authored the closable half of the dead phrases.
+        //    The number is re-derived from the row's own output, not edited by arithmetic.
         //
         //    On --real-vectors it is a REACHABILITY probe wearing a measurement's clothes. Since
         //    B-21 the query is embedded LIVE, and a live embedder returns a non-zero vector for any
@@ -4139,8 +4141,13 @@ public static class NegativeControls
     /// <para>
     /// <b>The defect this row was built for.</b> Marco's case text said <i>"Two loop-backs, three
     /// rounds … gaps-unresolvable, not the round cap"</i> and Mirjam's said <i>"LOOPS ONCE and exits
-    /// DEGRADED on no-progress"</i>. Measured in the default concept space: Marco is 1 loop-back / 2
-    /// rounds / <c>no-progress</c>, Mirjam is 2 / 3 / <c>gaps-unresolvable</c>. The two descriptions
+    /// DEGRADED on no-progress"</i>. Measured in the default concept space <b>at the time</b>: Marco
+    /// was 1 loop-back / 2 rounds / <c>no-progress</c>, Mirjam 2 / 3 / <c>gaps-unresolvable</c>.
+    /// ⚠ <b>Marco's cell moved on 2026-09-06</b> — D-v's lexicon closure (plan item 8.11,
+    /// <c>fc352481</c>) took him to <c>coverage-sufficient</c> in that space, so he is no longer the
+    /// corpus's live carrier of <c>no-progress</c>; the loop-back and round counts are unchanged.
+    /// The sentence is kept in the past tense because it is the record of the defect this row was
+    /// built for, not a description of the run. The two descriptions
     /// were each other's. <b>No pin and no verdict was affected</b> — the pins are
     /// <c>ExpectsLoopBack</c> and <c>PresentsAnswerText</c>, identical for both — which is exactly why
     /// nothing caught it for the eval's whole life: the wrong sentence was in the one field nothing
@@ -7581,9 +7588,15 @@ public static class NegativeControls
         if (closable.Count + unclosable.Count + noProducts.Count != dead.Count)
             problems.Add("the three closability buckets do not partition the dead phrases.");
 
-        // ── 4. THE UNCLOSABLE BUCKET IS EMPTY ON THIS CORPUS, so nothing here exercises it.
-        //       MEASURED: 18 dead phrases split 12 closable / 0 unclosable / 6 no-products. A
-        //       bucket with no member is a branch nobody has run, and "0 phrases are unclosable" is
+        // ── 4. TWO OF THE THREE BUCKETS ARE EMPTY ON THIS CORPUS, so nothing here exercises them.
+        //       MEASURED 2026-09-06, after D-v's lexicon closure (`fc352481`): 6 dead phrases split
+        //       0 closable / 0 unclosable / 6 no-products.
+        //       ⚠ SUPERSEDED: this comment read "18 dead phrases split 12 closable / 0 unclosable /
+        //       6 no-products" and was written when only ONE bucket was empty. Closing D-v emptied
+        //       the closable bucket too, so the synthetic cases below now carry TWO branches that
+        //       no corpus input reaches, not one — the argument for them got stronger, and a stale
+        //       comment was understating how much of this classifier is exercised synthetically.
+        //       A bucket with no member is a branch nobody has run, and "0 phrases are unclosable" is
         //       then indistinguishable from "the unclosable test is broken" — the empty-set shape.
         //       ⚠ THE PREVIOUS VERSION OF THIS BLOCK CLAIMED TO CLOSE THAT AND DID NOT. Its comment
         //       read "a phrase whose products are all forced dead must land in the unclosable
