@@ -35,13 +35,38 @@ public class ObservationAdapterTests
             typeof(EvalResult), typeof(MetricResult), typeof(MeaiEvaluationResult),
         ];
 
+        // ⚠ THE ASSEMBLY SET IS THE WHOLE TEST, and the first version of it named two types that
+        // live in the SAME assembly. `Observation` and `EvalResult` are both in
+        // AgentEval.Abstractions; `ObservationAdapters` — the only thing 2.2 is about — is in
+        // AgentEval.Core, so the scan never reached a single adapter. Demonstrated by ablation: a
+        // literal `public static EvalResult AblationBackToResult(Observation o)` added to
+        // ObservationAdapters left this test GREEN. Anchor on the ADAPTER type, and on `Observation`
+        // for the meta lane, and de-duplicate rather than assuming the two differ.
+        var assemblies = new[] { typeof(Observation).Assembly, typeof(ObservationAdapters).Assembly }
+            .Distinct()
+            .ToList();
+
         var offenders = new List<string>();
         var scanned = 0;
+        var forwardAdaptersSeen = 0;
+        var adapterTypeEnumerated = false;
 
-        foreach (var assembly in new[] { typeof(Observation).Assembly, typeof(EvalResult).Assembly })
+        foreach (var assembly in assemblies)
         {
             foreach (var type in assembly.GetTypes())
             {
+                // The POSITIVE CONTROL for reach: the adapters do not CONSUME an Observation (they
+                // produce one), so the offender scan below can never touch them by construction.
+                // What has to be proven instead is that the enumeration reached the adapter type at
+                // all — which is exactly what the two-same-assembly bug prevented.
+                if (type == typeof(ObservationAdapters))
+                {
+                    adapterTypeEnumerated = true;
+                    forwardAdaptersSeen = type
+                        .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                        .Count(m => m.ReturnType == typeof(Observation));
+                }
+
                 foreach (var method in type.GetMethods(
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
                     | BindingFlags.Instance | BindingFlags.DeclaredOnly))
@@ -63,7 +88,27 @@ public class ObservationAdapterTests
         // NON-VACUITY. Assert.Empty over a scan that matched nothing is indistinguishable from a
         // scan that found nothing wrong, and it fails in the flattering direction. Prove the scan
         // actually reached methods taking an Observation before believing the empty list.
+        //
+        // ⚠ AND `scanned > 0` ALONE IS NOT THAT PROOF — it was satisfied by RepCollapse and
+        // PairedEvalComparer, which live in the meta assembly and are not adapters, so it stayed
+        // green while the adapter assembly went unread. A denominator that can be filled by
+        // something other than the artifact under test is a diluted denominator. Assert on the
+        // ADAPTER type specifically, and on the assembly set being genuinely two.
         Assert.True(scanned > 0, "the reflection scan matched no Observation-consuming method at all");
+        Assert.True(
+            assemblies.Count == 2,
+            $"the one-way scan must cover BOTH the meta assembly and the adapter assembly; it "
+            + $"resolved to {assemblies.Count} distinct assembly/assemblies: "
+            + string.Join(", ", assemblies.Select(a => a.GetName().Name)));
+        Assert.True(
+            adapterTypeEnumerated,
+            "the scan never enumerated ObservationAdapters — the type Slice 2.2 is ABOUT. An empty "
+            + "offender list means nothing until the assembly holding the adapters is actually read.");
+        Assert.True(
+            forwardAdaptersSeen == 3,
+            $"Slice 2.2 ships exactly three forward projections (EvalResult, MetricResult, "
+            + $"M.E.AI EvaluationResult); the scan found {forwardAdaptersSeen}. A count that is not "
+            + "three means the scan is reading a different type than the one under test.");
         Assert.Empty(offenders);
     }
 

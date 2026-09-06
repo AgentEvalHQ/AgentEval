@@ -6572,6 +6572,52 @@ returning a finite p at n = 4,000 where the naive form returns NaN, and it is fo
 magnitude below any α anybody compares against. It is on the page because a test loosened without a
 reason is a test somebody loosened until it passed.
 
+### 45.6b 🔴 CORRECTION (Wave-5 REVIEW) — `Adapters_AreOneWay()` could not see the adapters
+
+ADR-030 Slice **2.2**'s acceptance criterion is a single named test: *"`Adapters_AreOneWay()`
+(reflection: no `Observation → EvalResult`)"*. As shipped in `d28e9500` **that test never read the
+assembly the adapters are in**, so 2.2's acceptance was recorded as met by a scan that could not have
+failed.
+
+The scan enumerated `new[] { typeof(Observation).Assembly, typeof(EvalResult).Assembly }`. **Both are
+`AgentEval.Abstractions`** — `Observation` at `src/AgentEval.Abstractions/Evals/Meta/Observation.cs`,
+`EvalResult` at `src/AgentEval.Abstractions/Evals/EvalResult.cs`. `ObservationAdapters` is in
+**`AgentEval.Core`** (§45.1's own table says so), which was never enumerated.
+
+**ABLATION, the exact violation the criterion names.** Adding to `ObservationAdapters`:
+
+```csharp
+public static EvalResult AblationBackToResult(Observation o) => null!;
+```
+
+| form | verdict |
+|---|---|
+| as shipped at `d28e9500` | ✅ **PASSED** — 10 of 10 in `ObservationAdapterTests` |
+| with the assembly set corrected | ❌ FAILED — `AgentEval.Evals.ObservationAdapters.AblationBackToResult -> EvalResult` |
+
+**Why the existing non-vacuity guard did not catch it.** The test already carried
+`Assert.True(scanned > 0, "the reflection scan matched no Observation-consuming method at all")`. That
+guard was satisfied — by `RepCollapse` and `PairedEvalComparer`, which live in the meta assembly and
+are **not adapters**. A denominator anything can fill is a diluted denominator, and this is the
+**`silent-{}`** shape: applicability read out of the RESULT (the list came back empty) instead of the
+INPUT (was the artifact under test ever reached?).
+
+**Direction: flattering.** It reported the one-way rule enforced over a projection lane it had not
+opened.
+
+**FIXED.** The set anchors on `typeof(ObservationAdapters).Assembly`, `.Distinct()`, and three guards
+that fail on the input rather than the result: the resolved assembly set must be **two** (this alone
+turns the shipped form red — *"resolved to 1 distinct assembly/assemblies: AgentEval.Abstractions"*),
+`ObservationAdapters` must have been **enumerated**, and exactly **three** forward projections must be
+seen — Slice 2.2's own count. ⚠️ The reach guard cannot be *"an adapter method was scanned"*: adapters
+**produce** an `Observation` and never consume one, so the offender scan cannot touch them by
+construction. That was the first fix attempted and it was wrong; it is recorded because the shape —
+a non-vacuity guard asserting something the design forbids — reads plausible.
+
+Only `tests/AgentEval.Tests/Evals/Meta/ObservationAdapterTests.cs` changed, a file `d28e9500` itself
+created. No `src/` file moved and no shipped behaviour changed. Test totals are unmoved on all three
+TFMs; the meta filter is still 67.
+
 ### 45.7 What §45 does NOT claim
 
 - **Nothing in the Galaxus sample was migrated onto these types.** That is Slice 2.6 (Eval 02) and
