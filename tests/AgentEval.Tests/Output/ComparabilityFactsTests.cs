@@ -219,6 +219,78 @@ public class ComparabilityFactsTests
         Assert.StartsWith("sha256:", fingerprint.RubricDigest, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("https://synthetic-resource.openai.azure.com/", "a URL")]
+    [InlineData("synthetic-resource.openai.azure.com", "an endpoint host")]
+    [InlineData("sha256:https://synthetic-resource.openai.azure.com/rubric", "a URL smuggled behind a digest prefix")]
+    public void JudgeFingerprint_RefusesAnEndpointInTheRUBRICDIGESTToo(string value, string why)
+    {
+        // 🔴 THE GAP THE WAVE-8 REVIEW FOUND (`MEASUREMENT_STATUS` §68.2). The type's own headline
+        // said it "MUST NEVER CARRY A CREDENTIAL OR AN ENDPOINT, AND IT REFUSES ONE AT
+        // CONSTRUCTION", and exactly one of its two strings was guarded. `RubricDigest` took
+        // anything — including the endpoint — and it is written into run files that get committed
+        // and pasted into chat, which is the whole reason the guard exists on the other field.
+        var ex = Assert.Throws<ArgumentException>(() => new JudgeFingerprint("gpt-5.5", RubricDigest: value));
+
+        Assert.DoesNotContain(value, ex.Message, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(why));
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]  // bare sha256
+    [InlineData("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("rubric-v3")]
+    [InlineData(null)]
+    public void JudgeFingerprint_AcceptsARealRubricDigest(string? digest)
+    {
+        // THE POSITIVE CONTROL, and it is the one that matters here: a digest IS 64 hex characters,
+        // so applying the MODEL-NAME rules to this field would refuse every real one and the guard
+        // would fail in the direction that looks like diligence. Only the endpoint half applies.
+        var fingerprint = new JudgeFingerprint("gpt-5.5", RubricDigest: digest);
+
+        Assert.Equal(digest, fingerprint.RubricDigest);
+    }
+
+    [Fact]
+    public void JudgeFingerprint_RefusesAnEndpointOnACopyOfTheDigestToo()
+    {
+        var fingerprint = new JudgeFingerprint("gpt-5.5", RubricDigest: "sha256:abc");
+
+        Assert.Throws<ArgumentException>(
+            () => fingerprint with { RubricDigest = "https://synthetic-resource.openai.azure.com/" });
+    }
+
+    [Fact]
+    public void EveryStringOnTheFingerprintRefusesAnEndpoint_NotJustTheModelName()
+    {
+        // The structural form of the same claim. `JudgeFingerprint_HasNoFieldAnEndpointCouldLiveIn`
+        // pins WHICH members exist; this pins that each string one REFUSES an endpoint — so a third
+        // string member added later fails here until somebody decides what guards it.
+        const string Url = "https://synthetic-resource.openai.azure.com/";
+
+        var guarded = new Dictionary<string, Action>(StringComparer.Ordinal)
+        {
+            ["ModelId"] = () => _ = new JudgeFingerprint(Url),
+            ["RubricDigest"] = () => _ = new JudgeFingerprint("gpt-5.5", RubricDigest: Url),
+        };
+
+        string[] strings = typeof(JudgeFingerprint)
+            .GetProperties()
+            .Where(p => p.PropertyType == typeof(string))
+            .Select(p => p.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(guarded.Keys.Order(StringComparer.Ordinal).ToArray(), strings);
+
+        foreach (var (name, construct) in guarded)
+        {
+            var ex = Assert.Throws<ArgumentException>(construct);
+            Assert.DoesNotContain(Url, ex.Message, StringComparison.Ordinal);
+            Assert.False(string.IsNullOrWhiteSpace(name));
+        }
+    }
+
     // ── judgeIsSubjectModel: three states, because a bool answers "nobody said" with "no" ────
 
     [Fact]

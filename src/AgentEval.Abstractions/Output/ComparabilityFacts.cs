@@ -173,18 +173,32 @@ public enum JudgeSubjectRelation
 /// <param name="RubricDigest">
 /// A digest of the rubric the judge was given, or <see langword="null"/> when the producer recorded
 /// none. Two runs judged by the same model against different rubrics are not comparable, and the
-/// model id alone cannot say so.
+/// model id alone cannot say so. ⚠ Guarded against the ENDPOINT shape only — see the type's remarks
+/// for why the model-name rules cannot be applied to a digest.
 /// </param>
 /// <param name="SubjectRelation">Whether this judge is the subject's own model.</param>
 /// <remarks>
 /// <para>
 /// 🔴 <b>THIS TYPE MUST NEVER CARRY A CREDENTIAL OR AN ENDPOINT, AND IT REFUSES ONE AT
-/// CONSTRUCTION.</b> It is written into run files that get committed, attached to issues and pasted
-/// into chat. There is no field an endpoint belongs in, and <see cref="ModelId"/> — the one field a
-/// careless producer would reach for, because a deployment "name" and a deployment URL come off the
-/// same configuration object — is guarded: a URL, a known cloud host suffix, an <c>sk-</c> prefix, a
-/// long hex run or a long opaque token is <b>refused</b>, not redacted. Redaction would leave a
-/// producer believing it had recorded something.
+/// CONSTRUCTION — ON EVERY STRING IT HAS, NOT JUST ON THE OBVIOUS ONE.</b> It is written into run
+/// files that get committed, attached to issues and pasted into chat. There is no field an endpoint
+/// belongs in.
+/// </para>
+/// <para>
+/// ⚠ <b>The two strings are guarded to DIFFERENT depths, and the difference is deliberate.</b>
+/// <see cref="ModelId"/> — the field a careless producer would reach for, because a deployment
+/// "name" and a deployment URL come off the same configuration object — gets the full check: a URL,
+/// a known cloud host suffix, an <c>sk-</c> prefix, a long hex run or a long opaque token.
+/// <see cref="RubricDigest"/> gets the <b>endpoint half only</b> (a URL or a known host suffix),
+/// because a digest <i>is</i> 64 hex characters and the key/length rules would refuse every real
+/// one — the failure that would make the guard look strict and be useless. What no digest can
+/// legitimately contain is <c>://</c> or a cloud host, so those are refused there too. A type whose
+/// stated job is "carries no endpoint" with one unguarded string on it states the claim for the
+/// half that was easy.
+/// </para>
+/// <para>
+/// ⚠ Both are <b>refused</b>, not redacted. Redaction would leave a producer believing it had
+/// recorded something.
 /// </para>
 /// <para>
 /// ⚠ <b>The guard is deliberately narrow and it is not a secret scanner.</b> It refuses the shapes a
@@ -198,12 +212,20 @@ public sealed record JudgeFingerprint(
     JudgeSubjectRelation SubjectRelation = JudgeSubjectRelation.Unknown)
 {
     private readonly string _modelId = EnsureNotASecret(ModelId, nameof(ModelId));
+    private readonly string? _rubricDigest = EnsureNoEndpoint(RubricDigest, nameof(RubricDigest));
 
     /// <inheritdoc cref="JudgeFingerprint" />
     public string ModelId
     {
         get => _modelId;
         init => _modelId = EnsureNotASecret(value, nameof(ModelId));
+    }
+
+    /// <inheritdoc cref="JudgeFingerprint" />
+    public string? RubricDigest
+    {
+        get => _rubricDigest;
+        init => _rubricDigest = EnsureNoEndpoint(value, nameof(RubricDigest));
     }
 
     /// <summary>
@@ -274,18 +296,57 @@ public sealed record JudgeFingerprint(
         return trimmed;
     }
 
-    /// <summary>Names the credential/endpoint shape a value has, or null when it has none.</summary>
-    /// <param name="value">A trimmed candidate.</param>
-    /// <returns>A short phrase for the exception, or <see langword="null"/>.</returns>
-    internal static string? ShapeOfASecret(string value)
+    /// <summary>
+    /// Refuses a value that has the shape of an ENDPOINT. The half of the guard that applies to
+    /// every string on this type, the rubric digest included.
+    /// </summary>
+    /// <param name="value">The candidate, or <see langword="null"/>.</param>
+    /// <param name="name">The parameter name, for the exception.</param>
+    /// <returns><paramref name="value"/> when it carries no endpoint.</returns>
+    /// <exception cref="ArgumentException">The value looks like a URL or a cloud host.</exception>
+    /// <remarks>
+    /// ⚠ Deliberately <b>not</b> the full <see cref="ShapeOfASecret"/> check. A rubric digest is 64
+    /// hex characters, so the key/length rules would refuse every real one; a digest can, however,
+    /// never legitimately contain <c>://</c> or a cloud host, and those are the two shapes an
+    /// endpoint actually takes.
+    /// </remarks>
+    internal static string? EnsureNoEndpoint(string? value, string name)
     {
-        if (value.Length > 128) return "far too long for a model name";
+        if (value is null) return null;
+
+        if (ShapeOfAnEndpoint(value) is { } reason)
+        {
+            // ⚠ The offending value is NOT echoed — same rule as EnsureNotASecret.
+            throw new ArgumentException(
+                string.Create(CultureInfo.InvariantCulture, $"{name} looks like {reason}, so it was REFUSED rather than recorded. Nothing on a judge fingerprint may carry an endpoint — not the model name and not the rubric digest. The value is not repeated here on purpose."),
+                name);
+        }
+
+        return value;
+    }
+
+    /// <summary>Names the ENDPOINT shape a value has, or null when it has none.</summary>
+    /// <param name="value">A candidate.</param>
+    /// <returns>A short phrase for the exception, or <see langword="null"/>.</returns>
+    internal static string? ShapeOfAnEndpoint(string value)
+    {
         if (value.Contains("://", StringComparison.Ordinal)) return "a URL";
 
         foreach (string suffix in s_endpointSuffixes)
         {
             if (value.Contains(suffix, StringComparison.OrdinalIgnoreCase)) return "an endpoint host";
         }
+
+        return null;
+    }
+
+    /// <summary>Names the credential/endpoint shape a value has, or null when it has none.</summary>
+    /// <param name="value">A trimmed candidate.</param>
+    /// <returns>A short phrase for the exception, or <see langword="null"/>.</returns>
+    internal static string? ShapeOfASecret(string value)
+    {
+        if (value.Length > 128) return "far too long for a model name";
+        if (ShapeOfAnEndpoint(value) is { } endpoint) return endpoint;
 
         if (value.StartsWith("sk-", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("sk_", StringComparison.OrdinalIgnoreCase))
