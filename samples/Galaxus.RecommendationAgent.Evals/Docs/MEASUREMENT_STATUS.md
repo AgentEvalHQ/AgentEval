@@ -6073,30 +6073,67 @@ protocol asks for something the code does not print. That is 8.17's real cost, a
 "a missing figure": it makes a stage of the standing protocol unpassable by construction on the one
 lane that spends the most.
 
-### 42.9 Persistence — 36 files, and the ledger matches disk
+### 42.9 Persistence — the key set, the mechanism, and the ledger matching disk
 
 Every eval run this session wrote to
 `.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. ⚠️ **The FILE COUNT is not the
 measurement and it goes stale the moment anyone runs an eval again** — it was 36 at the end of the
 sweep, 42 at `e3d5f626` and **46** after the final confirmation pass at HEAD, and all three are
 correct for the moment they were taken. **The measurement is WHICH KEYS were written**, and that is
-stable: **exactly three** — `eval03_controls` (23 files), `eval04_injection` (10),
-`eval07_topology` (13) — the store growing 619 → **662**.
+stable: **exactly three** — `eval03_controls`, `eval04_injection`, `eval07_topology`. The per-key file
+counts (23 / 10 / 13) and the store total (619 → 662) were correct at the confirmation pass and are
+**already wrong**: the verification pass took the directory to **674**. See the superseded → corrected
+block below, which is this same lesson learned a second time on the bytes.
 
-The three canonical keys, as they stand at `5478a7fa` — the final confirmation pass at HEAD, in the
-concept space:
+#### The bytes are NOT the measurement either — and this correction is the proof
 
-| key | bytes | written (UTC) |
-|---|---|---|
-| `eval03_controls.json` | 44,995 | 2026-09-06 07:06:54 |
-| `eval04_injection.json` | 4,664 | 2026-09-06 07:06:23 |
-| `eval07_topology.json` | 16,895 | 2026-09-06 07:06:25 |
+🔴 **SUPERSEDED → CORRECTED (2026-09-06, verification pass at `a83aeab5`).** This section
+previously carried a three-row table of canonical byte counts and write times *"as they stand at
+`5478a7fa`"*. Every one of those digits had already moved by the time the commit landed, because the
+close-out's own re-confirmation pass ran after the table was written, and an independent verification
+pass moved them again:
 
-At the end of the 30-command sweep, before that confirmation pass, the same three keys stood at
-44,995 / 4,664 / **16,772** B at 06:53:16–06:53:19 UTC — the last writer there was the **real-vector**
-`--ci --dry-run`. ⚠️ **`eval07_topology.json` is 123 bytes shorter on the real path**, and that is not
-noise: it is §42.2's space-dependence reaching the persisted record. **A reader comparing two Eval 07
-snapshots must check which space produced each**, exactly as they must for the case prose.
+| key | §42.9 as published | at `a83aeab5`, 07:12 UTC | after the verification pass, 07:20 UTC |
+|---|---|---|---|
+| `eval03_controls.json` | 44,995 B @ 07:06:54 | 44,996 B @ 07:12:24 | **44,996 B @ 07:20:21** |
+| `eval04_injection.json` | 4,664 B @ 07:06:23 | 4,664 B @ 07:06:23 | **4,664 B @ 07:20:22** |
+| `eval07_topology.json` | 16,895 B @ 07:06:25 | **16,772 B** @ 07:12:30 | **16,772 B @ 07:20:24** |
+
+**Direction of the error: none, and that is the point.** No claim was flattering, none was refuted —
+the table was *true when taken* and decayed anyway. **Blast radius: the table itself**; no verdict, exit
+code or gate ever read these numbers. ⚠️ But the failure mode is the one this section had already
+named one paragraph above for the FILE COUNT and then committed anyway for the BYTES. **A quantity that
+changes when you re-run the thing does not become stable by being written down with a sha next to it.**
+
+⚠️ **The `eval07_topology.json` on disk is the REAL-space snapshot** (16,772 B), while the published
+table documented the CONCEPT-space one (16,895 B) — in the very section that tells readers *"a reader
+comparing two Eval 07 snapshots must check which space produced each"*. The doc did not follow its own
+instruction. The 123-byte gap is §42.2's space-dependence reaching the persisted record, and it is
+**reproducible**: it appeared identically in the sweep, at HEAD, and in the verification pass.
+
+#### What IS stable, and is therefore the measurement
+
+1. **The key set: exactly three** — `eval03_controls`, `eval04_injection`, `eval07_topology`. Verified
+   again at 07:20 UTC. The directory holds **13** keys in total; the other ten are older sessions.
+2. **The write-ledger banner names those three and no others**, in both spaces, and disk agrees.
+3. ✅ **The other half of the rule, verified by absence:** `eval01_integrity`, `eval02*`, `eval05`,
+   `eval06`, `eval08` and `eval09` wrote **nothing** — every one ran under `--dry-run`, and a dry run of
+   a **model-backed** eval has no result to record. Zero files with those keys carry a timestamp from
+   this run. (They *exist* in the directory from earlier sessions — the claim is about timestamps, not
+   about the key being absent.)
+
+#### The archive mechanism, recorded so a later reader does not file it as a defect
+
+The store keeps a canonical `<key>.json` plus timestamped `<key>.<stamp>Z.json` copies, and the
+timestamp in an archive's **filename equals the `RunAt` inside it** (checked on four consecutive Eval 07
+archives). The rotation is **archive-on-next-write**: a run overwrites the canonical, and the *previous*
+canonical is preserved under its own run's stamp.
+
+⚠️ **Consequence, which looks like a bug and is not:** the most recent run for a key has **no archive
+copy** — it lives only in the canonical file until the next run rotates it out. At `a83aeab5` neither
+`eval03` (RunAt 07:12:24) nor `eval07` (RunAt 07:12:30) had one, and that is the mechanism working. A
+reader who greps for an archive matching the newest `RunAt` will not find one, and should not go looking
+for a lost write.
 
 **The write-ledger banner matches the disk**, in both spaces:
 
@@ -6168,3 +6205,80 @@ dotnet run --project $E -- 7 --real-vectors  | grep "termination"
 # PAID — stage 2, the only paid thing this run needed (3 model calls, no usage block: 8.17):
 dotnet run --project $A -- 2 --user USR-NB-01       # exit 0. FOREGROUND. Capture the code.
 ```
+
+---
+
+## 43. INDEPENDENT VERIFICATION at `a83aeab5` — every headline number re-taken by a party that did not produce it (2026-09-06)
+
+Wave 4 reported its own state. This section is that state **re-measured from the outside**, before the
+branch was pushed, by re-running rather than re-reading — the Stage 0 rule the wave itself added, applied
+to the wave itself.
+
+### 43.1 What reproduced EXACTLY
+
+| claim | reported by Wave 4 | independently observed | ✓ |
+|---|---|---|---|
+| solution build | 0 errors | **0 errors**, 221 warnings (forced) | ✅ |
+| evals project, incremental | 0 warnings | **0 warnings, 0 errors** | ✅ |
+| tests net10 | 9,648 / 0 / 2 of 9,650 | **9,648 / 0 / 2 of 9,650** | ✅ |
+| tests net9 | 9,430 / 0 / 1 of 9,431 | **9,430 / 0 / 1 of 9,431** | ✅ |
+| tests net8 | 9,430 / 0 / 1 of 9,431 | **9,430 / 0 / 1 of 9,431** | ✅ |
+| every quoted sha resolves | 24 checked | **10 spot-checked, all resolve** (`git rev-parse ^{commit}`) | ✅ |
+
+⚠️ The three test totals were taken with `--no-build` **after** a full solution build, so no target framework
+could have run a stale binary — the multi-TFM trap that has bitten this repository before.
+
+### 43.2 Exit codes — OBSERVED, both spaces, `$?` captured per command
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 3` controls | **0** | **0** |
+| `-- 4` injection | **0** | **0** |
+| `-- 7` topology | **1** | **1** |
+| `--ci --dry-run` | **1** | **1** |
+
+Matches Wave 4's corrected figures on every cell, **including the one that was wrong before `8af63683`**:
+`-- 3 --real-vectors` was **1** at `4da0556b` and is **0** here. The fix holds outside the session that
+wrote it.
+
+✅ **The real-vector space genuinely resolved** — this is not a silent fallback to concept. The banner
+reports `space probe 1.0000` (floor 0.98) against the committed vector for `GLX-1001`, and the run declares
+that it embeds queries live and spends. **A `--real-vectors` run that could not authenticate would have
+fallen back**, and §42.4's row reads the RESOLVED space precisely because of that.
+
+⚠️ **An unrelated live warning worth keeping:** `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` resolves to
+`text-embedding-ada-002` on this machine, which was **NOT used** — the committed index names
+`text-embedding-3-small`, and two embedding models are two spaces. The run says so loudly instead of
+retrieving quietly against the wrong one. That is the degrade-loudly contract doing its job on a real
+misconfiguration, not a hypothetical.
+
+### 43.3 `--ci` fails for exactly one reason
+
+Of eleven evals in the chain: **Eval 07 FAILED, the other ten passed.** Exit 1. That is GATE B, deferred by
+decision — the chain is not red for a second, unnoticed reason hiding behind the known one.
+
+### 43.4 Credentials — clean
+
+**25,846 lines** across the eight verification logs scanned for `sk-…` tokens, `*.openai.azure.com`
+endpoints, `api[_-]?key` assignments and any 32+ character alphanumeric run.
+
+- `sk-` tokens: **0** · endpoint hostnames: **0** · key assignments: **0**
+- The 40+ character alphanumeric runs are **four C# identifiers** (`CoverageCutIsNotTheConfidenceShapeParameter`,
+  `Broken02AssertionOperandsLoadBearing`, `RefusalCodesDoNotAnswerForEachOther`, `LatentCoveragePersonaDiscrimination`).
+
+⚠️ Note the shape of that check: a **loose** pattern was run first and every hit was then classified, rather
+than a tight pattern being run and reported as zero. A scan that finds nothing proves nothing until you have
+shown it *can* hit.
+
+### 43.5 What this pass CHANGED
+
+One finding, in §42.9: the published byte/time table had already decayed twice. Corrected in place with the
+superseded → corrected block, and the section reorganised around what does **not** move — the key set, the
+ledger-vs-disk agreement, and the archive-on-next-write mechanism.
+
+### 43.6 What this pass did NOT check
+
+- **No live model call was made.** Stage 2's live unit (`agent -- 2 --user USR-NB-01`, exit 0) is Wave 4's
+  observation, not re-taken here; zero code files changed between it and `a83aeab5`.
+- Eval 05/06/08/09 ran only in their `--dry-run` form inside `--ci`, so **no judged verdict was re-taken**.
+- The four gates' internal reasoning was not re-derived — only their exit codes and the CI pass/fail split.
