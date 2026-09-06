@@ -6906,13 +6906,24 @@ grep -n "wahl" samples/Galaxus.RecommendationAgent/Guardrails/SensitiveInference
 
 # 47.1 items 3-5 — the refuted real-vector figures, re-executed
 E=samples/Galaxus.RecommendationAgent.Evals
-dotnet run --project $E -- 3 --real-vectors            # arm A 0/56, arm C 18/56, arm D 0/50, exit 0
+dotnet run --project $E -- 3 --real-vectors            # arm A 0/56, arm C 18/56, exit 0
+#   ⚠️ CORRECTED in the Wave-5 review: this line also read "arm D 0/50". It no longer exists.
+#   960f3282 — a LATER commit of THIS SAME WAVE — replaced arm D's count on the real path with
+#   REACHABLE / UNREACHABLE precisely because `0 of 50` could not fail there (§52). The comment
+#   was refuted by its own wave before the wave ended.
 dotnet run --project $E -- 4 --real-vectors            # exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline --real-vectors   # 6 in -> 5 out
 
 # 47.1 item 6 — the count, read off the panel rather than off a document
-dotnet run --project $E -- 3 | grep -cE "(caught|NOT CAUGHT) +[A-Za-z0-9_]+"   # 29 gating
-dotnet run --project $E -- 3 | grep -c "advisory — never gates"                # 6 advisory
+# ⚠️ CORRECTED in the Wave-5 review. The first version of the gating line was
+#     grep -cE "(caught|NOT CAUGHT) +[A-Za-z0-9_]+"   # 29 gating
+#   and it prints 30, not 29: ` +` matches a single space, so it also catches the prose
+#   "caught it." inside RefusalDetectorsSeeTheRealShape's own observed text. The row separator
+#   is TWO spaces and the marker carries its glyph — anchor on both.
+dotnet run --project $E -- 3 | grep -cE "(✅ caught|❌ NOT CAUGHT)  [A-Za-z0-9_]"   # 29 gating
+dotnet run --project $E -- 3 | grep -c "advisory — never gates"                     # 6 advisory
+#   29 + 6 = 35 rows, and that is the arithmetic to check — a panel total that does not
+#   decompose into the two greps means one of them is matching something that is not a row.
 ```
 
 ---
