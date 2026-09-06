@@ -6996,3 +6996,78 @@ dotnet run --project $E -- 3 --real-vectors                        # 0
 #   with SoftOk PER CASE  -> ❌ SOFT CLASSES, "1 case(s) BELOW — C-07"
 #   with SoftOk POOLED    -> ✅ SOFT CLASSES at 95.8% of 24        ← the false green
 ```
+
+---
+
+## 50. WAVE 5 — plan item 1.5 (N-3): Eval 02's GATE 2 gated on a DIRECTION, so a coin flip failed CI (2026-09-06)
+
+### 50.1 🔴 THIS CHANGE CAN ONLY LOOSEN A GATE. Flagged hardest, per the standing rule.
+
+`controlSane` read `!controlLeadsAnywhere`, and `controlLeadsAnywhere` was
+`SignTestOutcome.ChallengerLeads` — `Wins > Losses`. That property's own docstring, in this
+repository, says: *"A DIRECTION, not a result."* ADR-030 §4.5 says the same thing about its
+equivalent and adds *"Must never gate a build."*
+
+**Gating on it means a 6/5 split at p = 1.0000 — a coin — fails CI**, and `-- 2`'s exit code is
+`aboveFloor && controlSane && thisRun is not null ? 0 : 1`, so that is a real exit code on a paid run.
+
+**And it contradicts a sentence printed eight lines below it in the same panel:**
+
+> *"NOT GATED, on purpose: whether any arm 'won'. Gating on that creates an incentive to tune the
+> eval until it does — the same shape as letting the artifact under test supply its own pass
+> criterion."*
+
+A gate that fails on an honest null result creates exactly that incentive, pointed at the control
+instead of at the agent.
+
+### 50.2 The fix, and the two things it does NOT touch
+
+GATE 2 now fails on a control lead **the exact test supports** — `p ≤ 0.05` and not underpowered by
+construction. A lead the test does not support is printed as a **FINDING**, every run, and does not
+decide the exit code.
+
+**Unchanged, and both still fail closed:**
+
+* an **ABSENT** control still fails the gate (`primaryControl is not null`);
+* an **UNDECIDABLE** comparison still fails it (`gate2Decidable`) — a comparison that could not be
+  made is not a comparison anybody won.
+
+⚠️ **An underpowered comparison cannot clear the gate by being underpowered.** A design whose
+minimum attainable p exceeds α can never produce a supported lead, so every lead it produces is
+"not supported" — those are counted and named in the finding rather than silently absorbed into a
+pass.
+
+### 50.3 The ablation — three runs, and the middle one is the point
+
+| # | injected control lead | rule | GATE 2 |
+|---|---|---|---|
+| A | **6/5, p = 1.0000** | with the fix | ✅ **plus a printed FINDING** |
+| B | **11/1, p = 0.0063** | with the fix | ❌ — a supported lead still fails |
+| C | **6/5, p = 1.0000** | the shipped rule | ❌ — the honest null failing CI |
+
+A and C see the identical comparison. B proves the loosening did not disarm the gate.
+
+⚠️ The runs above are `-- 2 --dry-run`, whose exit code is decided by the plumbing checks and stays
+**0** throughout; what moved is the GATE 2 verdict. On a **paid** run that verdict is the exit code.
+
+### 50.4 What does NOT move
+
+Today's comparison is **W/L/T 4/5/3, p = 1.0000 — the control does not lead at all**, so GATE 2 is ✅
+under both rules and no finding prints. `-- 2 --dry-run` exits 0 in both spaces. **No published
+number moves**; what changes is what the next paid run does with a null result.
+
+### 50.5 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 2 --dry-run                | grep -A3 "GATE 2"   # ✅, control does not lead
+dotnet run --project $E -- 2 --dry-run --real-vectors | grep -A3 "GATE 2"   # identical
+
+# 50.3 ablation — append one synthetic outcome to gate2Reads, above `bool gate2Decidable`:
+#   gate2Reads.Add(("ABLATION panel", new SignTestOutcome(ArmLive, CoverageArms.PrimaryControl!.Label,
+#       W, L, 1, P, -0.01, double.NaN, double.NaN, 0.0005, "recall", null, 5)));
+#   A  W=6  L=5  P=1.0     with the fix               -> ✅ GATE 2 + "GATE 2 FINDING, NOT A GATE FAILURE"
+#   B  W=11 L=1  P=0.0063  with the fix               -> ❌ GATE 2
+#   C  W=6  L=5  P=1.0     controlLeadsAnywhere =
+#                          controlLeads.Count > 0     -> ❌ GATE 2      ← the honest null failing CI
+```

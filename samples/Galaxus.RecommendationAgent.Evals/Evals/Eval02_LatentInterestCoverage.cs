@@ -623,8 +623,55 @@ public static class Eval02_LatentInterestCoverage
         }
 
         bool gate2Decidable = gate2Reads.Any(r => !r.Outcome.Undecidable);
-        bool controlLeadsAnywhere = gate2Reads.Any(r => !r.Outcome.Undecidable && r.Outcome.ChallengerLeads);
+
+        // ⚠ PLAN ITEM 1.5 / N-3, and this change can only LOOSEN a gate, so it is flagged hardest.
+        //
+        //   `controlLeadsAnywhere` was `ChallengerLeads` — Wins > Losses — and this file's own
+        //   record calls that "a DIRECTION, not a result". Gating on it means a 6/5 split at
+        //   p = 1.0000, which is a coin, FAILS CI. That contradicts the sentence printed eight
+        //   lines below in this same panel: "NOT GATED, on purpose: whether any arm 'won'. Gating
+        //   on that creates an incentive to tune the eval until it does." A gate that fails on an
+        //   honest null result creates exactly that incentive, pointed at the control instead of
+        //   at the agent.
+        //
+        //   The gate now reads a control lead that the exact test SUPPORTS. A lead the test does
+        //   not support is printed as a FINDING and does not decide the exit code.
+        //
+        //   ⚠ It does NOT weaken the two things GATE 2 exists for, and both are asserted above:
+        //   an ABSENT control still fails (`primaryControl is not null`) and an UNDECIDABLE
+        //   comparison still fails (`gate2Decidable`). What changed is only the reading of a
+        //   comparison that WAS made and came out inside the noise.
+        //
+        //   ⚠ And an UNDERPOWERED comparison cannot clear it by being underpowered: a design whose
+        //   minimum attainable p exceeds alpha can never produce a supported lead, so its leads
+        //   would all be "not supported". Those are counted separately and reported, never silently
+        //   absorbed into the pass.
+        var controlLeads = gate2Reads
+            .Where(r => !r.Outcome.Undecidable && r.Outcome.ChallengerLeads)
+            .ToList();
+        var supportedLeads = controlLeads
+            .Where(r => r.Outcome.PValue <= ExactBinomial.Alpha && !r.Outcome.UnderpoweredByConstruction)
+            .ToList();
+        var unsupportedLeads = controlLeads.Except(supportedLeads).ToList();
+
+        bool controlLeadsAnywhere = supportedLeads.Count > 0;
         bool controlSane = primaryControl is not null && gate2Decidable && !controlLeadsAnywhere;
+
+        if (unsupportedLeads.Count > 0)
+        {
+            notes.Add($"⚠️ GATE 2 FINDING, NOT A GATE FAILURE — the primary control LED on "
+                    + $"{unsupportedLeads.Count} panel(s) and the exact test does not support the lead: "
+                    + string.Join(" · ", unsupportedLeads.Select(r =>
+                          $"{r.Panel} W/L/T {r.Outcome.Wins}/{r.Outcome.Losses}/{r.Outcome.Ties}, p = {r.Outcome.PValue:F4}"
+                        + (r.Outcome.UnderpoweredByConstruction
+                            ? $", UNDERPOWERED BY CONSTRUCTION (min attainable p {r.Outcome.MinimumAttainableP:F4})"
+                            : string.Empty)))
+                    + ". Wins > Losses is a DIRECTION and this panel says so everywhere else; gating on it would "
+                    + "fail CI on a coin flip and create an incentive to tune the eval until the direction came "
+                    + "out right — the same incentive the NOT-GATED note below refuses. Read it as a finding. "
+                    + "⚠️ It is reported EVERY run, so a lead that keeps reappearing is visible even though no "
+                    + "single run's exit code turns on it.");
+        }
 
         // ⚠ B-11. The gate's RESULT is a bool; what the printer needs is the observed STATE, because
         // "the control did not lead", "there was nothing to lead on" and "no control was run" are
