@@ -370,6 +370,24 @@ public static class Eval02_LatentInterestCoverage
                         Console.ResetColor();
                     }
 
+                    // ── PLAN ITEM 1.3 / V-3 ─────────────────────────────────────────────────
+                    //
+                    //   A loop arm that LOST AN EXECUTOR still returns a response, so `scored` is
+                    //   non-null and the cell used to enter the mean as a coverage number. It is
+                    //   not one: a run missing a node presents whatever the surviving nodes
+                    //   assembled, and 0.4 from a half-run is not a measurement of the loop. It is
+                    //   EXCLUDED, exactly as a throw is — never scored zero, which would be a
+                    //   different and equally wrong claim.
+                    if (agent is IDiscoveryLoopArm { LastRun: { Failed: true } failedRun })
+                    {
+                        armsThatThrew++;
+                        notes.Add($"{persona.Id} · {arm.Label} · {repLabel}: {failedRun.ExecutorFailures.Count} "
+                                + $"executor(s) FAILED ({string.Join(" · ", failedRun.ExecutorFailures)}) and the rep "
+                                + "was EXCLUDED from the mean. A run that lost a node did not measure the loop, and "
+                                + "the number it still produces is the surviving nodes' output, not the arm's.");
+                        continue;
+                    }
+
                     if (scored is null)
                     {
                         armsThatThrew++;

@@ -7071,3 +7071,77 @@ dotnet run --project $E -- 2 --dry-run --real-vectors | grep -A3 "GATE 2"   # id
 #   C  W=6  L=5  P=1.0     controlLeadsAnywhere =
 #                          controlLeads.Count > 0     -> ❌ GATE 2      ← the honest null failing CI
 ```
+
+---
+
+## 51. WAVE 5 — plan item 1.3 (V-3): a partially-failed workflow run was SCORED (2026-09-06)
+
+### 51.1 The defect
+
+`DiscoveryRunResult.ExecutorFailures` has existed since **correction ⑦** — the arc where a thrown
+executor node reached exit code 0 while the demo printed a full tray built from a state the reviewer
+never contributed to. §14.4's closing paragraph declared the fix **demo-surface only**, and 1.3 has
+been open on that sentence ever since.
+
+Measured on the tree: `.Failed` / `.ExecutorFailures` were read by **`Demo02_InterestMapWorkflow`'s
+printer and Eval 09, and by nothing else**. Eval 02's Demo 2 arm and Eval 07 read
+`DiscoveryLoopTelemetry`, **which did not carry the field at all** — so a run that lost an executor
+still produced a response, a route trace and a stop reason, and every gate graded it.
+
+**The flattering direction, twice over:** a node that never ran took no wrong edge, and a loop that
+died early cannot exceed a round cap. A partial run is *structurally cleaner* than a complete one.
+
+### 51.2 The fix
+
+| where | change |
+|---|---|
+| `DiscoveryLoopTelemetry` | gains `ExecutorFailures` (non-required, empty default — every existing construction keeps compiling and keeps meaning "none recorded") and `Failed` |
+| `RealDiscoveryLoopArm` | populates it from `DiscoveryRunResult.ExecutorFailures` |
+| **Eval 07** | `run.Failed` ⇒ `Observation.Refused`, naming the failed executors — the eval's existing refusal channel, so nothing new decides anything |
+| **Eval 02** | a loop rep whose run failed is **EXCLUDED from the mean**, exactly as a thrown rep is, with the count and the failure names in the note. **Never scored zero** — that is a different and equally wrong claim |
+
+### 51.3 The ablation — one forced executor failure, both directions
+
+`RealDiscoveryLoopArm`: `result = result with { ExecutorFailures = ["ABLATION: CoverageReviewer threw"] };`
+
+| | with the 1.3 guards | with the guards removed (what shipped) |
+|---|---|---|
+| **Eval 07** | the case is **REFUSED** — *"1 executor(s) FAILED in this run: ABLATION: CoverageReviewer threw … a node that never ran took no wrong edge"* | the case is **GRADED** on the partial trace; no failure line is printed anywhere |
+| **`-- 2 --dry-run`** | **exit 1** — the Demo 2 arm contributes nothing and the dry-run plumbing check *"every deterministic arm presented at least one item"* fails, correctly | **exit 0** — the cell entered the mean as a coverage number |
+
+⚠️ **Eval 07 exits 1 under BOTH**, because GATE B is independently red on `USR-RB-10` (§0.3). The exit
+code is not the discriminator there and saying it was would be reading a movement off a number that
+did not move; **the refusal line is.**
+
+### 51.4 What does NOT move
+
+No shipped number. No arm in this corpus fails an executor today — measured, `-- 7`, `-- 7
+--real-vectors`, `-- 2 --dry-run` in both spaces and `-- 4` all print zero failure lines — so the
+change is **preventive**, and the ablation is the only place the state has been observed. Exit codes
+after the change: `-- 7` **1** (both spaces, GATE B) · `-- 2 --dry-run` **0** (both) · `-- 3` **0**
+(both) · `-- 4` **0** (both) · `-- 9 --dry-run` **0** · `--ci --dry-run` **1**.
+
+### 51.5 What 1.3 does NOT close
+
+- **Eval 04 was not changed.** Its arms run the same loop, and a failed run there would still be
+  graded. It has its own applicability channel (`InjectionOutcome.Inapplicable`, tightened in §48)
+  and wiring the failure into it is a separate edit with its own ablation. Named, not done.
+- **The live agent's arm has no equivalent.** `IEvaluableAgent` carries no executor-failure channel;
+  this is about the workflow lane only.
+- **Nothing asserts `result.Failed == false` in a CONTROL row.** The guards are in the evals; a
+  gating row that proves them able to fire would have to construct a failing run, and the ablation
+  above is currently that proof rather than a check that runs every time.
+
+### 51.6 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 7                  # 1 (GATE B), no failure line
+dotnet run --project $E -- 2 --dry-run        # 0, no failure line
+
+# 51.3 ablation — RealDiscoveryLoopArm, above `LastResult = result;`:
+#   result = result with { ExecutorFailures = ["ABLATION: CoverageReviewer threw"] };
+#     with the guards  -> Eval 07 REFUSES the case · `-- 2 --dry-run` exit 1
+#     guards disabled  -> Eval 07 GRADES the partial trace · `-- 2 --dry-run` exit 0
+#     (disable with `if (false)` in Eval07 and `false &&` on Eval02's IDiscoveryLoopArm pattern)
+```

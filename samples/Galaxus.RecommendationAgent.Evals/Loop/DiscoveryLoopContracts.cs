@@ -171,6 +171,30 @@ public sealed record DiscoveryLoopTelemetry
     /// <summary>Untrusted review snippets the reviewer was shown, newest first.</summary>
     public required IReadOnlyList<ReviewSnippet> SnippetsSeen { get; init; }
 
+    /// <summary>
+    /// Executor failures the run recorded. Empty on a clean run.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 1.3 / V-3.</b> <c>DiscoveryRunResult.ExecutorFailures</c> has existed since
+    /// correction ⑦ — a thrown executor node reaching exit code 0 while the demo printed a full
+    /// tray — but until 2026-09-06 it was read by the DEMO surface and by Eval 09 alone. Eval 02's
+    /// Demo 2 arm and Eval 07 read this telemetry record, which did not carry it, so a
+    /// PARTIALLY-FAILED workflow run was scored as a number: a coverage cell from a loop that lost
+    /// an executor, and a topology verdict from a trace that is missing whatever the failed node
+    /// would have contributed.
+    /// </para>
+    /// <para>
+    /// Non-required with an empty default on purpose: every existing construction of this record —
+    /// the probes, the controls, the empty-telemetry fallback — keeps compiling and keeps meaning
+    /// "no failure recorded", which is what they all mean.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> ExecutorFailures { get; init; } = [];
+
+    /// <summary>True when at least one executor failed. A run that lost a node did not measure the loop.</summary>
+    public bool Failed => ExecutorFailures.Count > 0;
+
     /// <summary>True when the loop took more than one round.</summary>
     public bool Looped => RoundsTaken > 1;
 

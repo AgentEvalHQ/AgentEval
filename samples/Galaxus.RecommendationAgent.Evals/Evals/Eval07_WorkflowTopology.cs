@@ -489,6 +489,24 @@ public static class Eval07_WorkflowTopology
               + "That is the handle this eval exists to consume; without it there is nothing to measure.");
         }
 
+        // ── PLAN ITEM 1.3 / V-3: a run that LOST AN EXECUTOR did not measure the topology ────
+        //
+        //   DiscoveryRunResult.ExecutorFailures has existed since correction ⑦ and, until
+        //   2026-09-06, was read by the demo surface and Eval 09 alone. A partially-failed run
+        //   still produced a Workflow, a route trace and a stop reason — so every gate below
+        //   graded it, on a trace missing whatever the failed node would have contributed. That is
+        //   the flattering direction twice over: a node that never ran took no wrong edge, and a
+        //   loop that died early cannot exceed a round cap.
+        if (run.Failed)
+        {
+            return Observation.Refused(topologyCase,
+                $"{run.ExecutorFailures.Count} executor(s) FAILED in this run: "
+              + string.Join(" · ", run.ExecutorFailures)
+              + ". The workflow still produced a trace, and grading it would score a graph that is missing "
+              + "whatever the failed node would have contributed — a node that never ran took no wrong edge, "
+              + "and a loop that died early cannot exceed a round cap. Refused, not scored.");
+        }
+
         // ── the persona wiring check, in the direction that hurts ────────────────────────────
         //
         // RealDiscoveryLoopArm reads the customer out of the PROMPT and falls back to Nadia when it

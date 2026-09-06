@@ -148,7 +148,7 @@ public sealed class RealDiscoveryLoopArm : IDiscoveryLoopArm
             .ConfigureAwait(false);
 
         LastResult = result;
-        LastRun = ProjectTelemetry(result.State, catalogue);
+        LastRun = ProjectTelemetry(result.State, catalogue) with { ExecutorFailures = result.ExecutorFailures };
 
         return Replay(result.State);
     }
