@@ -1382,7 +1382,7 @@ not restated here. What follows is what this run measured and what moved.
 **Logs:** `Docs/runs/2026-09-06_wave3-verify-1a56bf02/` (gitignored, 8.24's rule), with
 `STAGE1_EXITCODES.txt` and `FINAL_EXITCODES.txt`.
 **Spend, from usage blocks:** **¤4.3991** over **6 live agent turns** (786,212 tokens), plus
-**8,364 embedding prompt tokens** across the real-vector half. Nothing was detached; every exit code
+**8,550 embedding prompt tokens** across the real-vector half. Nothing was detached; every exit code
 below was observed by the shell that ran it.
 
 ### 24.1 Totals — commands, not cases

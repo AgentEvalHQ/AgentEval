@@ -4939,7 +4939,7 @@ No existing test file was modified; no threshold moved; no model call; nothing s
 **Logs:** `Docs/runs/2026-09-06_wave3-verify-1a56bf02/` — one file per command, plus
 `STAGE1_EXITCODES.txt` and `FINAL_EXITCODES.txt`. Gitignored, per 8.24.
 **Spend, from the provider's own usage blocks, never estimated:** **¤4.3991** over **6 live agent
-turns** (786,212 tokens) in two one-persona probes, plus **8,364 embedding prompt tokens** over the
+turns** (786,212 tokens) in two one-persona probes, plus **8,550 embedding prompt tokens** over the
 `--real-vectors` half of the sweep. **No cohort run was bought** — §4.0g ranks the paid remainder
 last, and nothing in this wave needed one.
 
@@ -5122,8 +5122,15 @@ non-zero codes and both are GATE B.
 | 14 | `agent -- 1 --offline` | 0 | 0 | 178 |
 | 15 | `agent -- 2 --offline` | 0 | 0 | 213 |
 
-**Total embedding prompt tokens over the real-vector half: 8,364**, every one read from a usage
-block. Concept-space half: **zero calls, zero tokens, zero spend** — it is offline by construction.
+**Total embedding prompt tokens over the real-vector half: 8,550**, every one read from a usage
+block, summed from the 14 logs that report one. Concept-space half: **zero calls, zero tokens, zero
+spend** — it is offline by construction.
+
+> ⚠️ **CORRECTED WITHIN THE HOUR, and it is worth leaving visible.** The first revision of this
+> section wrote **8,364** — a figure typed from the column rather than summed from it. The column was
+> right and the total was not. **The same class of defect this section documents three of**, in the
+> document that documents them; the difference is only that it was caught before anyone quoted it.
+> Re-derive: `grep -h "prompt token(s) in total" Docs/runs/…/F_*.log` and add the 14 numbers.
 
 ### 34.6 What moved, and what did not
 
