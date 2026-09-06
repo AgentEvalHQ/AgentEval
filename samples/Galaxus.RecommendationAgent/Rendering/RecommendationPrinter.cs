@@ -442,12 +442,55 @@ public static class RecommendationPrinter
         // PRODUCT side — printed as the CATALOGUE holds it, not as the model wrote it.
         var evidenceText = item.Evidence.ReviewId is { Length: > 0 } reviewId
             ? $"customer review {reviewId}"
-            : $"{item.Evidence.ProductAttributeKey}: {item.Evidence.ProductAttributeValue}";
+            : FormatAttributeEvidence(item.Evidence.ProductAttributeKey, item.Evidence.ProductAttributeValue);
         Console.WriteLine($"{Detail}▸ Catalogue · {Wrap(evidenceText, Detail.Length + 13)}   [{item.Evidence.Citation}]");
         Console.ResetColor();
 
         PrintVerifiedLine(item.ProductId, verified);
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Renders the PRODUCT side of an evidence line: the catalogue's own fact about the product.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.15.</b> This line used to be built as <c>$"{key}: {value}"</c>, and the
+    /// catalogue's tag-style attributes make key and value the SAME STRING —
+    /// <see cref="Domain.Product.TryGetAttributeValue"/> returns the tag itself when the whole tag
+    /// matches the cited key. So a card rendered <c>Catalogue · compat:backpack-strap:
+    /// compat:backpack-strap</c>. <b>The line exists to carry the catalogue's own fact; when key
+    /// equals value it carries none</b>, and it carries none in the most confident-looking form
+    /// available — a colon-separated pair, which reads like a measurement.
+    /// </para>
+    /// <para>
+    /// A tag is a real fact — the catalogue asserts the product HAS it — so the fix is to say that,
+    /// not to drop the line. A spec pair keeps its <c>key: value</c> shape, which is what carries
+    /// the fact there.
+    /// </para>
+    /// <para>
+    /// ⚠ Public so a control can EXECUTE it. A source-text check on the interpolation above would
+    /// be satisfied by this comment (§34.4, §55.5).
+    /// </para>
+    /// </remarks>
+    /// <param name="attributeKey">The cited attribute key, as the model wrote it.</param>
+    /// <param name="attributeValue">The value the CATALOGUE holds for it, never the model's.</param>
+    public static string FormatAttributeEvidence(string? attributeKey, string? attributeValue)
+    {
+        string key   = attributeKey   ?? string.Empty;
+        string value = attributeValue ?? string.Empty;
+
+        if (key.Length == 0 && value.Length == 0)
+        {
+            return "the catalogue record carries no attribute for this";
+        }
+
+        if (value.Length == 0)             return $"carries the tag \"{key}\"";
+        if (key.Length == 0)               return value;
+
+        return string.Equals(key, value, StringComparison.Ordinal)
+            ? $"carries the tag \"{key}\""
+            : $"{key}: {value}";
     }
 
     /// <summary>

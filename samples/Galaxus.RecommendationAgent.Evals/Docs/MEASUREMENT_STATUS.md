@@ -8339,3 +8339,45 @@ the command would have exactly one reachable outcome.
   recording them is a different item from the one that was scheduled.
 * **Not a verdict on any other run directory.** One real run was inspected, plus the two schema
   records that define the shape of all of them.
+
+---
+
+## 59. PHASE 8 LONG TAIL — worked item by item, each with its own ablation (2026-09-06)
+
+Every subsection below is either **DONE with an ablation** or **NOT ACTIONABLE with the measurement
+that says so**. Nothing is listed as done that was not executed.
+
+### 59.1 ✅ 8.15 — the product-side evidence line degenerated to a tautology
+
+**The defect, unchanged since it was filed.** The card's catalogue line was built as
+`$"{key}: {value}"`, and `Product.TryGetAttributeValue` returns **the tag itself** when the cited key
+is a whole tag. So the line rendered `Catalogue · compat:backpack-strap: compat:backpack-strap`. The
+line exists to carry the catalogue's own fact about the product; **when key equals value it carries
+none — and it carries none in the most confident-looking form the renderer has**, a colon-separated
+pair that reads like a measurement.
+
+**Fixed at the renderer**, in `RecommendationPrinter.FormatAttributeEvidence`: a tag renders as
+`carries the tag "compat:backpack-strap"` — the catalogue really does assert the product has it, so
+the fix is to say that rather than to drop the line — and a genuine spec pair keeps `key: value`,
+which is what carries the fact there.
+
+**Gating row `CatalogueEvidenceLineCarriesAFact`**, driven over **every** tag-style attribute the real
+catalogue holds — never an authored specimen — and asserting both directions, because a "fix" that
+swallowed the informative case would satisfy the first clause completely.
+
+| | measured |
+|---|---|
+| tag-style attributes that resolve across the catalogue | **578** |
+| products holding at least one tag whose value IS its key | **99** — every product in the catalogue |
+| rendered as a key-is-its-own-value pair, after | **0** |
+| **ablation** — restore `$"{key}: {value}"` | **578**, `-- 3` exit **1**, e.g. `GLX-1001 "context:landscape: context:landscape"` |
+| a real spec pair still renders as a pair | yes — `"Sensor: 35 mm full-frame CMOS"` |
+
+⚠ 🔴 **The filed exposure figure did not reproduce, and the layer matters.** 8.15 was filed as
+*"1 of 4 Demo 1 cards, 4 of 8 Demo 2 cards"*. Re-executed: `agent -- 1 --offline` and
+`agent -- 2 --offline`, concept space, both exit **0** — **zero** tag-style evidence lines in either;
+every card's catalogue line is a spec pair or a review id. **What was NOT tested is the LIVE path,
+and that is the path where the MODEL picks the citation**, so this does not refute the filed figure —
+it says the two commands named do not currently produce it and that the deterministic arm cites specs.
+What *is* measured is the **latent** exposure: 578 tag-style attributes on **99 of 99** products, so
+the shape is one model citation away on every product in the catalogue.

@@ -8,6 +8,7 @@ using AgentEval.MAF;
 using Microsoft.Extensions.AI;                 // AIFunctionFactory — the REAL marshalling path, control 22
 using Galaxus.RecommendationAgent.Guardrails;  // ToolSurfaceInvariant.BehaviouralHistoryToolNames
 using Galaxus.RecommendationAgent.Retrieval;   // EmbeddingSpace — the ONE place the space is chosen
+using Galaxus.RecommendationAgent.Rendering;    // RecommendationPrinter — item 8.15 drives the real renderer
 using Galaxus.RecommendationAgent.Signals;     // InterestMapBuilder.ContextPhrases
 using Galaxus.RecommendationAgent.Tools;       // GalaxusTools, ToolRefusalCodes — control 22 invokes the real tool
 using Galaxus.RecommendationAgent.Workflows;   // DiscoveryInterestMapping.QueryTermsFor — arm D's input
@@ -123,6 +124,7 @@ public static class NegativeControls
         rows.Add(await GuardedAsync("TopologyCaseProseMatchesTheRun", () => CheckTopologyCaseProseMatchesTheRunAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("VacuityIsDeclaredNotInferred", CheckVacuityIsDeclaredNotInferred));
         rows.Add(Guarded("EverySnapshotSaysWhatProducedIt", CheckEverySnapshotSaysWhatProducedIt));
+        rows.Add(Guarded("CatalogueEvidenceLineCarriesAFact", CheckCatalogueEvidenceLineCarriesAFact));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -1528,6 +1530,95 @@ public static class NegativeControls
         return (queries.Count, dead, examples);
     }
 
+
+
+    // ══ Plan item 8.15 — the product-side evidence line degenerated to a tautology ════════════
+
+    /// <summary>
+    /// GATING. The catalogue side of an evidence line must carry a catalogue FACT. Driven over
+    /// every tag-style attribute the real catalogue holds, through the real renderer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The line was built as <c>$"{key}: {value}"</c>, and <c>Product.TryGetAttributeValue</c>
+    /// returns the TAG ITSELF when the cited key is a whole tag — so a card rendered
+    /// <c>Catalogue · compat:backpack-strap: compat:backpack-strap</c>. That line exists to carry
+    /// the catalogue's own fact about the product; when key equals value it carries none, and it
+    /// carries none in the most confident-looking form the renderer has, a colon-separated pair
+    /// that reads like a measurement.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The specimens are the catalogue's, not authored.</b> Every tag on every product is put
+    /// through the real <see cref="RecommendationPrinter.FormatAttributeEvidence"/>, so the row
+    /// cannot pass by testing a shape the corpus does not contain. It also asserts the OTHER
+    /// direction — a genuine spec pair must still render <c>key: value</c> — because a "fix" that
+    /// swallowed the informative case would satisfy the first clause completely.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckCatalogueEvidenceLineCarriesAFact()
+    {
+        int tautologies = 0, productsAffected = 0, tagsChecked = 0;
+        var examples = new List<string>();
+
+        foreach (var product in Catalogue.Default.All)
+        {
+            bool affected = false;
+
+            foreach (var tag in product.Tags)
+            {
+                // The key a model would cite for a tag IS the tag; this is the lookup the
+                // evidence filter performs before the printer ever sees it.
+                if (!product.TryGetAttributeValue(tag, out var value)) continue;
+
+                tagsChecked++;
+                if (!string.Equals(tag, value, StringComparison.Ordinal)) continue;
+
+                affected = true;
+                string rendered = RecommendationPrinter.FormatAttributeEvidence(tag, value);
+
+                if (rendered.Contains($"{tag}: {value}", StringComparison.Ordinal))
+                {
+                    tautologies++;
+                    if (examples.Count < 3) examples.Add($"{product.Id} \"{Shorten(rendered, 44)}\"");
+                }
+            }
+
+            if (affected) productsAffected++;
+        }
+
+        // The other direction: a real spec pair must keep the shape that carries its fact.
+        var withSpec = Catalogue.Default.All.FirstOrDefault(p => p.Specs.Count > 0);
+        var spec = withSpec?.Specs.First();
+        string specRendered = spec is null
+            ? ""
+            : RecommendationPrinter.FormatAttributeEvidence(spec.Value.Key, spec.Value.Value);
+        bool specKeepsItsPair = spec is not null
+            && string.Equals(specRendered, $"{spec.Value.Key}: {spec.Value.Value}", StringComparison.Ordinal);
+
+        bool measured = tagsChecked > 0 && spec is not null;
+        bool ok = measured && tautologies == 0 && specKeepsItsPair;
+
+        return new ControlRowSnapshot(
+            "CatalogueEvidenceLineCarriesAFact",
+            "the CATALOGUE side of an evidence line must carry a catalogue fact. It was built as \"{key}: {value}\", "
+          + "and Product.TryGetAttributeValue returns the TAG ITSELF when the cited key is a whole tag, so a card "
+          + "rendered \"compat:backpack-strap: compat:backpack-strap\" — no fact, in the most confident-looking "
+          + "form the renderer has. Driven over EVERY tag-style attribute the real catalogue holds, through the "
+          + "real RecommendationPrinter.FormatAttributeEvidence, never over an authored specimen. It asserts BOTH "
+          + "directions: no rendered line repeats the key as its own value, AND a genuine spec pair still renders "
+          + "\"key: value\" — a fix that swallowed the informative case would satisfy the first clause completely.",
+            $"{tagsChecked} tag-style attribute(s) resolve across the catalogue · {productsAffected} product(s) hold "
+          + $"at least one tag whose value IS its key — the shape that produced the tautology · rendered as a "
+          + $"key-is-its-own-value pair: {tautologies}"
+          + (tautologies == 0 ? "." : $" — e.g. {string.Join(" | ", examples)}.")
+          + $" · a real spec pair still renders as a pair: {(specKeepsItsPair ? $"yes (\"{Shorten(specRendered, 40)}\")" : "❌ NO — the fix ate the informative case, which is worse than the defect")}"
+          + (measured
+                ? ok ? " The line carries a fact or says the catalogue holds none."
+                     : " ❌ 8.15 is open on this tree."
+                : " ❌ VACUOUS: the catalogue produced no tag-style attribute and/or no spec pair, so neither clause "
+                + "was exercised. NOT reported as a pass."),
+            Tripped: ok);
+    }
 
     // ══ Plan item 7.1 / ADR-031 S1, second clause — a stored snapshot says what produced it ════
 
