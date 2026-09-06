@@ -182,6 +182,27 @@ public sealed class PairedCoverageReport
             // forbids rendering those alike. Count the turns here so the printer can tell them
             // apart later.
             cost.ModelFreeRuns++;
+
+            // ⚠ AND CHECK THE DECLARATION AGAINST THE EVIDENCE. `reachesAModel` is a
+            // DECLARATION, and until this line nothing checked it. Measured by the review pass of
+            // 2026-09-06: flipping the live arm's `ReachesAModel: true` to false made Eval 02 print
+            // "NO MODEL — all 24 turn(s) ran without reaching one, as the arm registry declares.
+            // This zero is measured, not missing." over 2,952 recorded stub tokens — and `-- 3`
+            // still exited 0, 42 gating rows, NOT CAUGHT = 0. The parameter DEFAULTS to false, so a
+            // new model-backed arm inherits that sentence by OMISSION, in the direction that
+            // under-reports spend. A turn that reported usage is EVIDENCE, and evidence outranks a
+            // declaration: the arm goes to CONTRADICTED, where no number is printed at all.
+            //
+            // ⚠ EVIDENCE MEANS THE PROVIDER'S OWN USAGE BLOCK. MAFEvaluationHarness:145 ESTIMATES
+            // token counts from text whenever the response carries no TokenUsage, and stamps
+            // TokensAreEstimated = true. Every deterministic arm therefore arrives here carrying a
+            // non-zero token count invented from its own output, so a check written against the
+            // numbers alone fires on all five of them. A guess is not evidence of a model.
+            if (metrics is not null && !metrics.TokensAreEstimated
+                && (metrics.PromptTokens > 0 || metrics.CompletionTokens > 0))
+            {
+                cost.ModelFreeRunsThatReportedUsage++;
+            }
         }
         else if (metrics is null)
         {
@@ -203,6 +224,13 @@ public sealed class PairedCoverageReport
             // §60.2's lesson applied at the point of accumulation: "an absence is not a zero"
             // is about the HALVES of a usage block as well as the block. A response that reported
             // a prompt count and no completion count is a LOWER BOUND, not a total.
+            // ⚠ AN ESTIMATE IS NOT A USAGE BLOCK, and this meter was the one place in the suite
+            // that did not say so. SpendLedger, Eval 07, Eval 08 and Eval 09 all read
+            // PerformanceMetrics.TokensAreEstimated; RecordCost did not, so a count the harness
+            // computed from the output's own text was folded into the totals and the row then said
+            // "token counts are complete". Under --dry-run that is EVERY model turn.
+            if (metrics.TokensAreEstimated) cost.RunsWithEstimatedTokens++;
+
             bool hasPrompt = metrics.PromptTokens is not null;
             bool hasCompletion = metrics.CompletionTokens is not null;
             if (!hasPrompt && !hasCompletion) cost.RunsWithoutUsage++;
@@ -660,7 +688,9 @@ public sealed class PairedCoverageReport
                                          CostOf(a).ModelFreeRuns, CostOf(a).ModelRuns,
                                          CostOf(a).RunsWithoutUsage, CostOf(a).RunsWithPartialUsage,
                                          CostOf(a).RunsWithoutCost, CostOf(a).RunsWithoutModelId,
-                                         CostOf(a).ModelIds),
+                                         CostOf(a).ModelIds,
+                                         CostOf(a).ModelFreeRunsThatReportedUsage,
+                                         CostOf(a).RunsWithEstimatedTokens),
                 StringComparer.Ordinal),
         };
 
@@ -710,6 +740,19 @@ public sealed class PairedCoverageReport
         NotRun,
 
         /// <summary>
+        /// The arm registry DECLARES this arm reaches no model, and at least one of its turns
+        /// reported token usage anyway.
+        /// </summary>
+        /// <remarks>
+        /// ⚠ <b>Neither number may be printed.</b> The declaration and the evidence disagree and
+        /// picking either is inventing a fact. This state exists because <c>ReachesAModel</c> was a
+        /// declaration nothing checked: mis-declaring the live arm made Eval 02 assert a MEASURED
+        /// zero over 2,952 recorded tokens while the whole 42-row control panel stayed green, and
+        /// the parameter's default is the mis-declaring value.
+        /// </remarks>
+        Contradicted,
+
+        /// <summary>
         /// Every run was recorded with NO metrics object — the caller's way of saying "this arm has
         /// no model". A genuine zero, and the only state in which zero may be printed as a number.
         /// </summary>
@@ -748,6 +791,13 @@ public sealed class PairedCoverageReport
         /// <summary>Turns this arm ran WITHOUT reaching a model — a deterministic arm's turns.</summary>
         public int ModelFreeRuns { get; set; }
 
+        /// <summary>
+        /// Turns on an arm DECLARED model-free that reported token usage anyway — the
+        /// declaration contradicted by its own evidence. Non-zero puts the arm on
+        /// <see cref="ArmCostState.Contradicted"/>.
+        /// </summary>
+        public int ModelFreeRunsThatReportedUsage { get; set; }
+
         /// <summary>Turns this arm ran that DID reach a model, whatever the response reported.</summary>
         public int ModelRuns { get; set; }
 
@@ -756,6 +806,12 @@ public sealed class PairedCoverageReport
 
         /// <summary>Model runs whose metrics carried exactly ONE of the two token counts (§60.2).</summary>
         public int RunsWithPartialUsage { get; set; }
+
+        /// <summary>
+        /// Model runs whose token counts the HARNESS estimated from text rather than reading off a
+        /// provider usage block (<c>PerformanceMetrics.TokensAreEstimated</c>).
+        /// </summary>
+        public int RunsWithEstimatedTokens { get; set; }
 
         /// <summary>Model runs whose metrics carried no <c>EstimatedCost</c>.</summary>
         public int RunsWithoutCost { get; set; }
@@ -780,6 +836,7 @@ public sealed class PairedCoverageReport
         /// </summary>
         public ArmCostState State =>
             Runs == 0                                              ? ArmCostState.NotRun
+            : ModelFreeRunsThatReportedUsage > 0                   ? ArmCostState.Contradicted
             : ModelRuns == 0                                       ? ArmCostState.NoModel
             : RunsWithoutUsage > 0 || RunsWithPartialUsage > 0     ? ArmCostState.LowerBound
                                                                    : ArmCostState.Measured;

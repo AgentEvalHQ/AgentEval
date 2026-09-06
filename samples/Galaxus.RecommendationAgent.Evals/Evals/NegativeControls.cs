@@ -6706,6 +6706,20 @@ public static class NegativeControls
                 ModelUsed = model,
             };
 
+        // The same object the harness produces when a response carried NO usage block: a count it
+        // computed from the text, stamped as an estimate. MAFEvaluationHarness:145.
+        static PerformanceMetrics EstimatedMetrics(int prompt, int completion) =>
+            new()
+            {
+                StartTime = DateTimeOffset.UnixEpoch,
+                EndTime = DateTimeOffset.UnixEpoch.AddSeconds(2),
+                PromptTokens = prompt,
+                CompletionTokens = completion,
+                EstimatedCost = null,
+                ModelUsed = null,
+                TokensAreEstimated = true,
+            };
+
         var report = new PairedCoverageReport();
         // Two ways to be model-free, and BOTH must land on the same state: no metrics object at
         // all, and a metrics object from an arm the registry declares reaches no model. The second
@@ -6796,6 +6810,72 @@ public static class NegativeControls
         if (anonymous.CostOf("anonymous").RunsWithoutModelId != 1)
             problems.Add("a metrics object with no ModelUsed was not counted as one.");
 
+        // ── 4b. THE DECLARATION IS CHECKED AGAINST ITS EVIDENCE, and an ESTIMATE is not evidence.
+        //        `CoverageArm.ReachesAModel` is a declaration and nothing checked it: the review
+        //        pass of 2026-09-06 flipped the live arm's to false and Eval 02 printed
+        //        "NO MODEL — all 24 turn(s) ran without reaching one … This zero is measured, not
+        //        missing." over 2,952 recorded tokens, with `-- 3` still exit 0 and NOT CAUGHT = 0.
+        //        The parameter DEFAULTS to false, so that is also the mis-declaration you get by
+        //        forgetting. Both halves are asserted here because either alone is useless:
+        //        provider usage on a declared-free arm must CONTRADICT, and a harness estimate on
+        //        one must NOT (MAFEvaluationHarness:145 invents a count from text for every
+        //        deterministic arm, so a check on the numbers alone fires on all five of them).
+        var contradiction = new PairedCoverageReport();
+        contradiction.RecordCost("declared-free", Metrics(500, 100, null, "gpt-5.5"), reachesAModel: false);
+        var contradicted = contradiction.CostOf("declared-free");
+        if (contradicted.State != PairedCoverageReport.ArmCostState.Contradicted)
+        {
+            problems.Add($"an arm DECLARED model-free that reported a provider usage block reads "
+                       + $"{contradicted.State}, not Contradicted — the declaration outranks its own "
+                       + "evidence and a mis-declared live arm keeps printing a measured zero.");
+        }
+        var (contRow, contNote) = EvalPrinter.CostRow("declared-free", contradicted);
+        if (contRow.Contains("500", StringComparison.Ordinal) || contRow.Contains("600", StringComparison.Ordinal)
+            || contNote is null || !contNote.Contains("CONTRADICTED", StringComparison.Ordinal))
+        {
+            problems.Add("a contradicted arm still prints a number — a declaration and its evidence "
+                       + "disagreeing is not a smaller measurement, it is no measurement.");
+        }
+
+        var estimated = new PairedCoverageReport();
+        estimated.RecordCost("declared-free", EstimatedMetrics(500, 100), reachesAModel: false);
+        if (estimated.CostOf("declared-free").State != PairedCoverageReport.ArmCostState.NoModel)
+        {
+            problems.Add("a HARNESS-ESTIMATED token count on a declared model-free arm reads as a "
+                       + "contradiction — every deterministic arm carries one, so this would fire on all "
+                       + "of them and the check would have to be removed rather than trusted.");
+        }
+
+        // ── 4c. AND THE ESTIMATE IS NAMED WHEREVER IT IS COUNTED. A count the harness computed
+        //        from the output's own text is not a provider measurement, and the row said "token
+        //        counts are complete" over 24 of them.
+        var guessed = new PairedCoverageReport();
+        guessed.RecordCost("guessed", EstimatedMetrics(500, 100), reachesAModel: true);
+        var (guessRow, guessNote) = EvalPrinter.CostRow("guessed", guessed.CostOf("guessed"));
+        if (!guessRow.Contains('≈') || guessNote is null
+            || !guessNote.Contains("ESTIMATED FROM TEXT", StringComparison.Ordinal)
+            || guessNote.Contains("token counts are complete", StringComparison.Ordinal))
+        {
+            problems.Add("a token count the HARNESS estimated from text renders as a provider "
+                       + "measurement — SpendLedger and Evals 07-09 all read TokensAreEstimated and this "
+                       + "panel did not.");
+        }
+
+        // ── 4d. THE SHIPPED REGISTRY, cross-checked against a field declared for another purpose.
+        //        Kind decides repetition and the sign test; ReachesAModel decides the money. A
+        //        mis-declaration now has to be made twice, consistently, to pass.
+        foreach (var registered in CoverageArms.All)
+        {
+            bool live = registered.Kind == CoverageArmKind.Live;
+            if (live != registered.ReachesAModel)
+            {
+                problems.Add($"arm '{registered.Label}' is Kind={registered.Kind} and declares "
+                           + $"ReachesAModel={registered.ReachesAModel}. The two fields are declared "
+                           + "independently and for different consumers; disagreeing means one of them "
+                           + "is wrong and the cost panel is reading the one that decides the money.");
+            }
+        }
+
         // ── 5. It reaches the STORED record too, and a pre-8.3 document says it cannot answer. ──
         var snapshot = new ArmCostSnapshot(2, 4_000, 200, 40, 0.0062m, 0, 2, 0, 0, 0, 0, ["gpt-5.5"]);
         if (!snapshot.StateIsRecorded || snapshot.ModelIds is null || snapshot.ModelIds.Count != 1)
@@ -6819,7 +6899,11 @@ public static class NegativeControls
                 + "the deterministic arm and the silent model arm carry IDENTICAL totals and render differently · the "
                 + "measured zero prints as $0.0000 and says so · a missing usage block prints ≥ and LOWER BOUND · a "
                 + "HALF block is named separately · an unnamed model reads 'model NOT NAMED' · a pre-8.3 snapshot "
-                + "reports that it cannot answer instead of defaulting to NoModel"
+                + "reports that it cannot answer instead of defaulting to NoModel · a declared-model-free arm that "
+                + "reported a PROVIDER usage block reads CONTRADICTED and prints no number, while a HARNESS-ESTIMATED "
+                + "count on the same arm does NOT · an estimated count renders ≈ and says it is a guess rather than "
+                + $"'token counts are complete' · and all {CoverageArms.All.Count} registered arms agree with their "
+                + "own Kind about whether they reach a model"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

@@ -456,7 +456,9 @@ public sealed record ArmCostSnapshot(
     int RunsWithPartialUsage = 0,
     int RunsWithoutCost = 0,
     int RunsWithoutModelId = 0,
-    IReadOnlyList<string>? ModelIds = null)
+    IReadOnlyList<string>? ModelIds = null,
+    int ModelFreeRunsThatReportedUsage = 0,
+    int RunsWithEstimatedTokens = 0)
 {
     /// <summary>
     /// False for a document written before plan item 8.3, where the run-state members are absent and

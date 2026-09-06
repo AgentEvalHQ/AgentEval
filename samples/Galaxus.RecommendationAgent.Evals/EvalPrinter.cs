@@ -1448,6 +1448,17 @@ public static class EvalPrinter
             // The ONLY state in which a zero may be printed as a number, and it is printed as a
             // number precisely because it is a measurement: every turn was recorded with no metrics
             // object, which is the caller saying this arm reaches no model.
+            // The registry says this arm reaches no model and its own turns reported tokens.
+            // BOTH numbers are withheld: a contradiction is not a smaller measurement, and
+            // printing either side of it would pick a winner between a declaration and its
+            // evidence.
+            Graders.PairedCoverageReport.ArmCostState.Contradicted =>
+                ("⚠", "⚠",
+                 $"{arm}: CONTRADICTED. The arm registry declares this arm reaches no model, and "
+               + $"{cost.ModelFreeRunsThatReportedUsage} of {cost.Runs} turn(s) reported token usage "
+               + "anyway. No cost is reported for it: the declaration and the evidence disagree, and "
+               + "CoverageArm.ReachesAModel is the input the rest of this panel trusts."),
+
             Graders.PairedCoverageReport.ArmCostState.NoModel =>
                 ("0", money,
                  $"{arm}: NO MODEL — all {cost.Runs} turn(s) ran without reaching one, as the arm "
@@ -1458,11 +1469,15 @@ public static class EvalPrinter
                  $"{arm}: LOWER BOUND. {Describe(cost)} A turn that reported no usage is not a turn "
                + "that cost nothing, so these totals are a floor and the true figure is higher."),
 
-            _ => (tokens.ToString(CultureInfo.InvariantCulture), money,
-                  cost.RunsWithoutCost > 0
-                    ? $"{arm}: token counts are complete; {cost.RunsWithoutCost} of {cost.ModelRuns} "
-                    + "model turn(s) carried no cost estimate, so the money column is a LOWER BOUND."
-                    : null),
+            // ⚠ "Complete" has to mean the PROVIDER said so. MAFEvaluationHarness:145 estimates
+            // token counts from text when a response carries no usage block, so a count can be
+            // present, non-zero and entirely invented; SpendLedger and Evals 07-09 all read
+            // TokensAreEstimated and this panel did not.
+            _ => (cost.RunsWithEstimatedTokens > 0
+                    ? "≈" + tokens.ToString(CultureInfo.InvariantCulture)
+                    : tokens.ToString(CultureInfo.InvariantCulture),
+                  money,
+                  Caveats(arm, cost)),
         };
 
         string models = cost.ModelIds.Count switch
@@ -1475,6 +1490,32 @@ public static class EvalPrinter
 
         string row = $"  {Fit(arm, 30)} {cost.Runs,5} {seconds,9} {tokenCell,9} {costCell,12}{models}";
         return (row, footnote);
+
+        // The caveats a fully-recorded arm still owes the reader: estimated token counts, and a
+        // money column with no cost estimate behind it. Either one alone used to print nothing at
+        // all, and the second used to print "token counts are complete" over estimates.
+        static string? Caveats(string arm, Graders.PairedCoverageReport.ArmCost c)
+        {
+            var parts = new List<string>();
+            if (c.RunsWithEstimatedTokens > 0)
+            {
+                parts.Add($"{c.RunsWithEstimatedTokens} of {c.ModelRuns} model turn(s) had their token "
+                        + "counts ESTIMATED FROM TEXT by the harness rather than read off a provider "
+                        + "usage block, so the token column is a guess and not a measurement");
+            }
+            else
+            {
+                parts.Add("token counts are complete");
+            }
+
+            if (c.RunsWithoutCost > 0)
+            {
+                parts.Add($"{c.RunsWithoutCost} of {c.ModelRuns} model turn(s) carried no cost estimate, "
+                        + "so the money column is a LOWER BOUND");
+            }
+
+            return parts.Count == 1 && c.RunsWithEstimatedTokens == 0 ? null : $"{arm}: {string.Join("; ", parts)}.";
+        }
 
         static string Describe(Graders.PairedCoverageReport.ArmCost c)
         {
