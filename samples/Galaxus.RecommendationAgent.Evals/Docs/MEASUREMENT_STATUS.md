@@ -8280,3 +8280,62 @@ under `tests/` or `src/` touched.** The store's own `.agenteval/` tree is gitign
 (`.gitignore:453`), so no committed artefact moves; what a reader must expect is that every snapshot
 written from this commit onward carries one extra top-level member and that **no existing member
 changes**.
+
+---
+
+## 58. Plan item 7.5 / ADR-031 S5 — `agenteval compare` is NOT actionable as specified, and the reason is a measurement (2026-09-06)
+
+**`MASTER_PLAN` §0.5 rank 7 lists S1 and S5 as blocked on "Nothing". ADR-031 §0.1 says the opposite
+about S5 in the same tree, and the ADR is the one carrying evidence.** This section settles it by
+execution rather than by preferring one document to the other.
+
+### 58.1 The acceptance is buildable; the thing it would build is not usable, and saying so is the finding
+
+7.5's acceptance is *"two incomparable runs refuse to emit deltas and exit 13 — never a warning"*.
+ADR-031 §0.1's note on S5 reads: finding **V1** lists **five** facts a run must carry for `compare` to
+be a pure function of two run directories — the eval's **key**, its **version**, the effective
+**bar**, the **floor** and the **judge fingerprint** — plus the **stimulus**, which S2 landed at
+`71bc44c3`. *"A `compare` that refused on one of five would be refusing on a partial view and would
+report **comparable** for pairs that differ in the other four, which is the flattering direction."*
+
+**Re-executed against a real run directory on disk rather than re-read** —
+`.agenteval/subjects/agents/AgenticSampleAgent/runs/2026-05-18_10-07-05_cc672600`:
+
+| file | members it actually carries |
+|---|---|
+| `scenarios/0000-tool_selection.json` | `id, name, input, output, passed, score, metrics, assertions, duration, estimatedCost` |
+| `summary.json` | `schemaVersion, runId, verdict, stats, metrics` |
+| `manifest.json` | `schemaVersion, solution, subject, run, git, agentEval, environment, contentHash` |
+
+**Five of the six comparability facts are absent from a real run**, and the sixth — `stimulusHash` —
+is absent from this run too, because it predates `71bc44c3` and is written only by the three
+producers that set it.
+
+**So a `compare` built to 7.5's acceptance today would exit 13 on every pair of runs in this
+repository, unconditionally.** That is not a reason to build it wrong; it is the reason the ADR calls
+S5 *"unblocked by one fifth, not unblocked"*. The success path would never execute on real data, so
+the command's only observable behaviour would be its refusal — a verdict with no discriminating
+power, which is the exact shape 1.10 was opened for on the other side of the suite.
+
+### 58.2 What would make it actionable, stated so the next reader does not re-derive it
+
+1. **Record the other four facts on a run**, per V1's own sentence — *"all of which the runner knows
+   at execution time"*. That is the work, and it is not `compare`'s work.
+2. Then `compare` is a pure function of two run directories, and 13 means something: **absent is
+   NOT COMPARABLE, never equal** — the rule `StimulusHash.SameStimulus` already implements by
+   returning false when either side is null (ADR-031 §0.1), and the silent-`{}` shape ADR-030 §4.2
+   rejects.
+
+⚠ **One constraint that is NOT the reason for this verdict, and is recorded so it is not mistaken for
+one:** `ExitCodes.cs` is in `src/AgentEval.Cli`, and six waves have run without modifying any existing
+file under `src/` or `tests/`. Adding `Incomparable = 13` is additive and small. **That is a
+sequencing question, not a blocker, and it is not what stopped this slice.** What stopped it is that
+the command would have exactly one reachable outcome.
+
+### 58.3 What this section does NOT claim
+
+* **Not that S5 is wrong.** V1's design is sound and the refusal semantics are right.
+* **Not that the four facts are hard to record.** They are not; they are simply not recorded, and
+  recording them is a different item from the one that was scheduled.
+* **Not a verdict on any other run directory.** One real run was inspected, plus the two schema
+  records that define the shape of all of them.
