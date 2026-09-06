@@ -1589,10 +1589,14 @@ the pre-run baseline.
 
 ### 25.5 Persistence
 
-**36 snapshot files** written; the store went **619 → 652**. Three canonical keys —
+**42 snapshot files** written; the store went **619 → 658**. Three canonical keys —
 `eval03_controls.json` (44,995 B), `eval04_injection.json` (4,664 B), `eval07_topology.json`
-(16,772 B) — all at 2026-09-06 06:53:16–06:53:19 UTC. **The write-ledger banner names exactly those
+(16,895 B) — at 2026-09-06 07:06:23–07:06:54 UTC. **The write-ledger banner names exactly those
 three, in both spaces, and they are the three most recent files on disk.**
+
+⚠️ **`eval07_topology.json` is 123 bytes shorter when the real-vector run wrote it last** (16,772 vs
+16,895). That is §25.1's space-dependence reaching the persisted record: two Eval 07 snapshots are not
+comparable unless you know which space produced each.
 
 ✅ **The rule's other half was verified by absence**: `eval01`, `eval02*`, `eval05`, `eval06`,
 `eval08` and `eval09` wrote **nothing** across 30 commands, because each ran under `--dry-run` and a

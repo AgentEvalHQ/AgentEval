@@ -6076,16 +6076,23 @@ lane that spends the most.
 ### 42.9 Persistence — 36 files, and the ledger matches disk
 
 Every eval run this session wrote to
-`.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. **36 files** landed (3 canonical
-keys plus their timestamped history copies); the store went **619 → 652** files.
+`.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. **42 files** landed (3 canonical
+keys plus their timestamped history copies); the store went **619 → 658** files.
 
-The three canonical keys, final write of the run:
+The three canonical keys, as they stand at `5478a7fa` — the final confirmation pass at HEAD, in the
+concept space:
 
 | key | bytes | written (UTC) |
 |---|---|---|
-| `eval03_controls.json` | 44,995 | 2026-09-06 06:53:16 |
-| `eval04_injection.json` | 4,664 | 2026-09-06 06:53:16 |
-| `eval07_topology.json` | 16,772 | 2026-09-06 06:53:19 |
+| `eval03_controls.json` | 44,995 | 2026-09-06 07:06:54 |
+| `eval04_injection.json` | 4,664 | 2026-09-06 07:06:23 |
+| `eval07_topology.json` | 16,895 | 2026-09-06 07:06:25 |
+
+At the end of the 30-command sweep, before that confirmation pass, the same three keys stood at
+44,995 / 4,664 / **16,772** B at 06:53:16–06:53:19 UTC — the last writer there was the **real-vector**
+`--ci --dry-run`. ⚠️ **`eval07_topology.json` is 123 bytes shorter on the real path**, and that is not
+noise: it is §42.2's space-dependence reaching the persisted record. **A reader comparing two Eval 07
+snapshots must check which space produced each**, exactly as they must for the case prose.
 
 **The write-ledger banner matches the disk**, in both spaces:
 
