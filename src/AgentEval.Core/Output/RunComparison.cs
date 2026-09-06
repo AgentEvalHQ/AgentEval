@@ -113,7 +113,7 @@ public sealed record ScenarioComparison(
 /// <c>compare</c> written to Phase 7.5's acceptance would have exited 13 on every pair of runs in
 /// existence. That is why the axis model below has THREE states and not two. An axis NEITHER run
 /// recorded is <see cref="ComparabilityAxisState.Unpinned"/>: a declared blind spot, counted and
-/// printed, and blocking only under <paramref name="strict"/>. Treating it as a match would be the
+/// printed, and blocking only under <see cref="Strict"/>. Treating it as a match would be the
 /// silent-<c>{}</c> collapse ADR-030 §4.2 rejects; treating it as a mismatch would restore the
 /// one-outcome defect. Both are refused, and the third state is the honest reading.
 /// </para>
