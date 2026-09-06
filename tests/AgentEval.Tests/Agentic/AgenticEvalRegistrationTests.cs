@@ -145,6 +145,13 @@ public class AgenticEvalRegistrationTests
     public void EveryRegistration_NamesItsOwningAssembly()
     {
         var registry = Populated();
+
+        // Vacuity guard, added by the Wave-9 review. Assert.All passes on an EMPTY collection, so
+        // without this line the only row in this file that a "RegisterInto registers nothing"
+        // ablation left GREEN was this one — measured: ablation A4 turned five of the six rows red
+        // and this one stayed green while asserting a property of no registrations at all.
+        Assert.Equal(AgenticEvalRegistration.DispatchedEvaluatorCount, registry.All.Count);
+
         Assert.All(registry.All, e => Assert.Equal("AgentEval.Evals.Agentic", e.OwningAssemblyName));
     }
 
