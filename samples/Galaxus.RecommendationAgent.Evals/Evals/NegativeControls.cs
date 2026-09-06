@@ -117,6 +117,7 @@ public static class NegativeControls
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("CoverageCutIsNotTheConfidenceShapeParameter", CheckCoverageCutIsNotTheConfidenceShapeParameter));
         rows.Add(await GuardedAsync("LoopBackNegativeDirectionCensus", () => CheckLoopBackNegativeDirectionCensusAsync(retriever, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("TopologyCaseProseMatchesTheRun", () => CheckTopologyCaseProseMatchesTheRunAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -3049,6 +3050,128 @@ public static class NegativeControls
             observed,
             Tripped: true,
             Gating: false);
+    }
+
+    // == The prose a reader meets FIRST must describe the case it is attached to. ================
+    //
+    /// <summary>
+    /// Where an Eval 07 topology case's own <c>Why</c> text NAMES a frozen stop reason, that must be
+    /// the stop reason the run produces for that customer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> Marco's case text said <i>"Two loop-backs, three rounds … gaps-unresolvable,
+    /// not the round cap"</i> and Mirjam's said <i>"LOOPS ONCE and exits DEGRADED on no-progress"</i>.
+    /// Measured: Marco is 1 loop-back / 2 rounds / <c>no-progress</c>, Mirjam is 2 / 3 /
+    /// <c>gaps-unresolvable</c>. The two descriptions were each other's. <b>No pin and no verdict was
+    /// affected</b> — the pins are <c>ExpectsLoopBack</c> and <c>PresentsAnswerText</c>, identical for
+    /// both — which is exactly why nothing caught it for the eval's whole life: the wrong sentence
+    /// was in the one field nothing reads mechanically, in the eval whose GATE B is red and whose
+    /// prose is therefore the first thing a diagnosing reader believes.
+    /// </para>
+    /// <para>
+    /// <b>The join is derived, not hand-written.</b> The eval lane's stop-reason strings and the
+    /// workflow's <c>DiscoveryStopReason</c> enum are deliberately separate types
+    /// (<c>RealDiscoveryLoopArm.MapStopReason</c>'s remarks say why), and re-typing that table here
+    /// would let this row certify a copy of it. Instead the enum member name is kebab-cased
+    /// mechanically, and the row FAILS unless the resulting set is exactly
+    /// <see cref="DiscoveryStopReasons.All"/> — so a rename on either side is a red row rather than a
+    /// silently-skipped comparison.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It asserts its own input.</b> A prose scan that finds no named reason is indistinguishable
+    /// from a prose scan that read no cases. The row fails if fewer than two cases name a reason, and
+    /// it names which ones it checked.
+    /// </para>
+    /// </remarks>
+    /// <param name="retriever">The bound retriever; each case runs the real deterministic loop.</param>
+    /// <param name="ct">Cancellation.</param>
+    private static async Task<ControlRowSnapshot> CheckTopologyCaseProseMatchesTheRunAsync(
+        IProductRetriever retriever,
+        CancellationToken ct)
+    {
+        var problems = new List<string>();
+
+        // ── The join, derived from the enum's own member names and then CHECKED. ──
+        var kebab = new Dictionary<DiscoveryStopReason, string>();
+        foreach (DiscoveryStopReason value in Enum.GetValues<DiscoveryStopReason>())
+        {
+            string name = value.ToString();
+            var sb = new System.Text.StringBuilder(name.Length + 4);
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(name[i])) sb.Append('-');
+                sb.Append(char.ToLowerInvariant(name[i]));
+            }
+
+            kebab[value] = sb.ToString();
+        }
+
+        var derived = new HashSet<string>(kebab.Values, StringComparer.Ordinal);
+        foreach (string canonical in DiscoveryStopReasons.All)
+        {
+            if (!derived.Contains(canonical))
+            {
+                problems.Add($"'{canonical}' is not produced by kebab-casing any DiscoveryStopReason member — the "
+                           + "two lanes' names have diverged, so this row cannot join them and must not pretend to.");
+            }
+        }
+
+        int casesNamingAReason = 0;
+        var checkedCases = new List<string>();
+
+        foreach (var topologyCase in Eval07_WorkflowTopology.Cases)
+        {
+            var named = DiscoveryStopReasons.All
+                .Where(r => topologyCase.Why.Contains(r, StringComparison.Ordinal))
+                .ToList();
+
+            if (named.Count == 0) continue;
+            casesNamingAReason++;
+
+            var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
+                Offline: true,
+                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(topologyCase.PersonaId)),
+                Retriever: retriever,
+                Progress: null,
+                Nodes: null);
+
+            var run = await GalaxusDiscoveryLoop.RunAsync(topologyCase.PersonaId, options, ct).ConfigureAwait(false);
+            string observedReason = kebab[run.State.StopReason];
+
+            checkedCases.Add($"{topologyCase.PersonaId} says [{string.Join(", ", named)}], runs {observedReason}");
+
+            // ⚠ EVERY named reason must be the observed one, not merely one of them. Accepting a
+            //   match anywhere in the list would let a text that named all four satisfy this row on
+            //   any run — a control an indiscriminate artefact can satisfy is not a control.
+            foreach (string claim in named.Where(r => !string.Equals(r, observedReason, StringComparison.Ordinal)))
+            {
+                problems.Add($"{topologyCase.PersonaId}'s case text names {claim} and the run ends in "
+                           + $"{observedReason} — the sentence a reader meets first describes a different case.");
+            }
+        }
+
+        if (casesNamingAReason < 2)
+        {
+            problems.Add($"only {casesNamingAReason} case text(s) name a stop reason at all — a scan that compared "
+                       + "almost nothing is not a verdict, and this row was written because TWO of them did.");
+        }
+
+        return new ControlRowSnapshot(
+            "TopologyCaseProseMatchesTheRun",
+            "an Eval 07 case's Why text is the first thing a reader diagnosing a GATE B failure believes, and "
+          + "nothing reads it mechanically. MEASURED before the fix: Marco's text described Mirjam's run (two "
+          + "loop-backs, three rounds, gaps-unresolvable) and Mirjam's described Marco's (loops once, "
+          + "no-progress) — the descriptions were each other's, and no pin or verdict was affected, which is why "
+          + "it survived. Where a case names one of the four frozen stop reasons, the run must produce it. The "
+          + "eval-lane string and the workflow enum are deliberately separate types, so the join is derived by "
+          + "kebab-casing the enum member and is REFUSED unless the derived set equals DiscoveryStopReasons.All",
+            problems.Count == 0
+                ? $"{casesNamingAReason} of {Eval07_WorkflowTopology.Cases.Count} case(s) name a stop reason and "
+                + $"every one matches the run · {string.Join(" · ", checkedCases)} · the derived join covers all "
+                + $"{DiscoveryStopReasons.All.Count} frozen reasons"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
     }
 
     // == Eval 07 GATE B + 8.21 precondition 3 -- can the NEGATIVE direction be re-established? ==

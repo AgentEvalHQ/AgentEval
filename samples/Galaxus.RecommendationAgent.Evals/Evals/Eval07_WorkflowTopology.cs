@@ -302,6 +302,19 @@ public static class Eval07_WorkflowTopology
     /// outcome, because the alternative is an eval that quietly stops testing the direction it was
     /// built for.
     /// </para>
+    /// <para>
+    /// ⚠ <b>CORRECTED 2026-09-06 (Wave 4): Marco's and Mirjam's descriptions were each other's.</b>
+    /// Marco's said <i>"Two loop-backs, three rounds … gaps-unresolvable, not the round cap"</i> and
+    /// Mirjam's said <i>"LOOPS ONCE and exits DEGRADED on no-progress"</i>. Measured on every run
+    /// this eval has ever printed: Marco is <b>1 loop-back, 2 rounds, `no-progress`, 11 items</b> and
+    /// Mirjam is <b>2 loop-backs, 3 rounds, `gaps-unresolvable`, 8 items</b>. Both cells exist and
+    /// both are the ones the design wanted; they were attached to the wrong customer. <b>No pin
+    /// moved and no verdict moved</b> — <c>ExpectsLoopBack</c> and <c>PresentsAnswerText</c> are
+    /// identical for both, and both cases passed GATE B before and after. What was wrong is the
+    /// sentence a reader diagnosing a GATE B failure meets first, in the eval that is currently
+    /// red. Held by Eval 03's gating row <c>TopologyCaseProseMatchesTheRun</c>, which compares the
+    /// stop reason a case's own prose NAMES against the one the run produces.
+    /// </para>
     /// </remarks>
     public static IReadOnlyList<TopologyCase> Cases { get; } =
     [
@@ -311,14 +324,17 @@ public static class Eval07_WorkflowTopology
           + "approves. If this case ever exits at round 1, the loop-back has died."),
 
         new(Personas.MarcoUserId, "Marco Iten", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS and exits DEGRADED. Two loop-backs, three rounds, and then the reviewer has no materially "
-          + "different query left — gaps-unresolvable, not the round cap. The PARTIAL answer still reaches "
-          + "the Presenter through the same exit edge, which is the property the graph is built for."),
+            "LOOPS ONCE and exits DEGRADED on no-progress. One loop-back, two rounds, and the stop reason "
+          + "that only exists because dedup is identity-level at ingest: a round that re-finds what it "
+          + "already had adds zero NEW ids, and the loop stops instead of spending the rest of its budget. "
+          + "The PARTIAL answer still reaches the Presenter through the same exit edge, which is the "
+          + "property the graph is built for."),
 
         new(Personas.MirjamUserId, "Mirjam Bosshard", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS ONCE and exits DEGRADED on no-progress. A third distinct stop reason, and the one that "
-          + "only exists because dedup is identity-level at ingest: a round that re-finds what it already "
-          + "had adds zero NEW ids, and the loop stops instead of spending the rest of its budget."),
+            "LOOPS TWICE and exits DEGRADED. Two loop-backs, three rounds, and then the reviewer has no "
+          + "materially different query left — gaps-unresolvable, not the round cap. A third distinct stop "
+          + "reason, reached the expensive way: the loop spends its whole budget and still stops on the "
+          + "reviewer's judgement rather than on the counter."),
 
         new(Personas.NadiaUserId, "Nadia Brunner", ExpectsLoopBack: false, PresentsAnswerText: true,
             "⭐ THE NEGATIVE DIRECTION. Coverage is satisfied in round 1, so the loop-back edge must NOT "

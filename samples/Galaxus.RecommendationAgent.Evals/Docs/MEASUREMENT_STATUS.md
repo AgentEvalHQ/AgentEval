@@ -5403,3 +5403,50 @@ dotnet run --project $E -- 7      # exit 1 — GATE B ❌ on USR-RB-10, unchange
 #   .Filter(novel.Take(MaxProposedTerms), …).Count, tie-broken by novel.Count
 #   -> census 4 loop -> 11 loop; `-- 7` still exit 1, GATE B ❌ on USR-NB-01
 ```
+
+---
+
+## 37. WAVE 4 — Eval 07's Marco and Mirjam descriptions were each other's (2026-09-06)
+
+Found while re-measuring §31.1's ablation. **No pin moved, no verdict moved, no exit code moved — and
+that is precisely why it survived the eval's whole life.**
+
+### 37.1 Measured, on the shipped tree, every run this eval has ever printed
+
+| case | the `Why` text said | the run does |
+|---|---|---|
+| `USR-MI-02` Marco | *"Two loop-backs, three rounds … **gaps-unresolvable**, not the round cap"* | **1 loop-back · 2 rounds · `no-progress` · 11 items** |
+| `USR-MB-13` Mirjam | *"**LOOPS ONCE** and exits DEGRADED on **no-progress**"* | **2 loop-backs · 3 rounds · `gaps-unresolvable` · 8 items** |
+
+Both cells exist and both are the ones the design wanted. **They were attached to the wrong
+customer.** §28.2's own table already carried the correct pairing, so the disagreement was on the
+tree, in two documents, for at least three waves.
+
+**Why nothing caught it.** The pins are `ExpectsLoopBack` and `PresentsAnswerText`, and they are
+identical for the two cases — both `true`/`true` — so every gate, every witness check and every exit
+code is invariant under the swap. The wrong sentence was in the one field nothing reads mechanically,
+in the eval whose GATE B is red, which makes it the first thing a diagnosing reader believes.
+
+### 37.2 The fix, and the control that holds it
+
+The two descriptions are swapped back onto the customers that exhibit them, and the case remarks
+record the correction and its direction.
+
+New **gating** row `TopologyCaseProseMatchesTheRun` (Eval 03). Where a case's own `Why` names one of
+the four frozen stop reasons, the run for that customer must produce it — **every** named reason, not
+merely one of them, because a text that named all four would otherwise satisfy the row on any run.
+
+⚠️ **The join is derived, not re-typed.** The eval lane's stop-reason strings and the workflow's
+`DiscoveryStopReason` enum are deliberately separate types (`RealDiscoveryLoopArm.MapStopReason`'s
+remarks say why: *"a shared enum would make a rename in one lane a silent semantic change in the
+other"*). Copying that table into the control would let the row certify a copy of the join. Instead
+the enum member name is kebab-cased mechanically and the row is **refused** unless the derived set
+equals `DiscoveryStopReasons.All` — so a rename on either side is a red row, not a skipped comparison.
+It also fails if fewer than two cases name a reason at all, because a scan that compared almost
+nothing is not a verdict.
+
+**Ablation, executed.** Putting Marco's text back the way it was: `❌ NOT CAUGHT — USR-MI-02's case
+text names gaps-unresolvable and the run ends in no-progress`, `-- 3` exits **1**. Restored: `✅
+caught`, exit **0**. `-- 7` is unchanged at exit 1 in both directions, which is the point.
+
+**Numbers that moved:** Eval 03 **33 → 34 rows** (28 gating + 6 advisory). Nothing else.
