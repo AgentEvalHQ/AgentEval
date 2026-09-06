@@ -6562,3 +6562,126 @@ E=samples/Galaxus.RecommendationAgent.Evals
 dotnet run --project $E -- 3                 # 0
 dotnet run --project $E -- 3 --real-vectors  # 0
 ```
+
+---
+
+## 46. WAVE 5 — 8.16 #5: the criterion was restated, and the VACUITY LABEL was wrong on two rows out of three (2026-09-06)
+
+Plan item 8.16 #5 was filed as *"Eval 09's judged criterion 4 scores 0.000 for both live arms where
+an empty answer scores 1.000"*, sharpened in Wave 4 to *"criterion 4 is a universally quantified
+negative, so an empty answer satisfies it vacuously; a floor arm that cannot lose makes both live
+arms' 0.000 uninterpretable rather than harsh"*. The restatement needs no paid run. This is it —
+plus a defect the restatement uncovered that is larger than the item filed.
+
+### 46.1 The restatement
+
+| | |
+|---|---|
+| **superseded** | *"The answer is written in the customer's own language, and the reasoning does not depend on which language the question arrived in."* |
+| **shipped** | *"At least one recommendation reason is present, and every recommendation reason is written in the customer's own language; an answer that gives no recommendation reasons does NOT meet this criterion. The reasoning must also not depend on which language the question arrived in."* |
+
+The change is an **existential**. The old conjunction's second half quantified over "the reasoning",
+so an answer with none met it by the arithmetic of the empty set — the same shape this eval already
+excludes an empty live cell for.
+
+⚠️ **THE NUMBERS ARE SUPERSEDED, NOT CORRECTED.** The text sent to the judge changed, so the paid
+run's criterion-4 row (agent 0.000, workflow 0.000, floor 1.000) describes a **different rubric**.
+Confirming the new numbers needs a judged run, and none was made. `SUITE_SUMMARY` §19.1 says so at
+the row.
+
+### 46.2 🔴 The bigger defect: vacuity was read out of the RESULT, and it was wrong on two rows of three
+
+The panel's rule was `floor met rate ≥ 0.999 ⇒ "VACUOUS — an answer that recommends nothing
+satisfies it"`. That is applicability inferred from the outcome instead of from the input — the
+recurring shape — and on the 2026-09-05 paid run it fired on three rows:
+
+| # | old label | what is true, from `ContentlessFloorArm.Answer` |
+|---|---|---|
+| 3 | ⚠ vacuous | **EARNED** — the floor answer says *"I have not quoted any price, discount, stock level or delivery date"*, deliberately |
+| 4 | ⚠ vacuous | **CORRECT** — nothing to quantify over |
+| 5 | ⚠ vacuous | **EARNED** — the floor answer says *"I only ever recommend — you are the one who decides"* |
+
+**The printed sentence was FALSE on two of the three rows it appeared on**, and the direction is not
+neutral. Criterion 5 reads *agent 1.000, workflow **0.000**, p = 0.0005* — against a floor that
+earned its 1.000 by saying the words. Calling that row vacuous told a reader nothing on it separates
+the architectures, when what it shows is **the workflow failing a bar a contentless paragraph
+clears**. ⚠️ **Flattering to the workflow.**
+
+### 46.3 ⚠️ And Eval 09's own class remark named the wrong criteria and the wrong count
+
+It read: *"The two criteria that quantify over recommendations ('every recommendation names a past
+purchase', 'the covering note says what was NOT recommended') are expected to come back VACUOUSLY
+MET on an empty answer."*
+
+Wrong twice. The covering-note criterion is an **existential over the covering note** and is not
+vacuous at all. The criteria that actually quantify over presented recommendations are **1 and 6**
+(and 4 before the restatement) — **three, not two, and not the pair named.** Direction: it understated
+how much of the rubric an empty answer passes, which is the flattering direction for the instrument.
+Corrected at its origin.
+
+### 46.4 What shipped instead
+
+`JudgedCriterion(string Text, bool VacuousOnAnAnswerWithNoRecommendations)` — vacuity is **declared
+per criterion**, an INPUT-side fact, and `Eval09PreRegistration.CaveatFor` crosses it with the floor
+arm's measured met rate:
+
+| declared vacuous | floor | reading |
+|---|---|---|
+| yes | 1.000 | `VacuousAndUninterpretable` — the row carries no information about either arm |
+| yes | < 1.000 | `DeclaredVacuousButFloorDisagrees` — **a fact about the JUDGE**, not about either arm |
+| yes | NaN | `DeclaredVacuousFloorUnmeasured` — absent is not zero |
+| no | 1.000 | `FloorEarnsItEveryTime` — the row is HARD, and a live arm below it is a finding |
+| no | 0 < f < 1 | `FloorEarnsItSometimes` |
+| no | 0.000 | `None` |
+
+The disagreement row is new information nobody had: criteria 1 and 6 are vacuous **by logic** and
+the paid run's floor came back **0.000** on both, so the judge did not read them vacuously. That is
+a calibration observation the old rule could not state, because the old rule had no input side.
+
+⚠️ **Criteria 1 and 6 were NOT restated.** They are declared, printed, and left alone: restating them
+moves two more shipped numbers with nothing measured behind the new ones. The item filed criterion 4.
+
+### 46.5 The gating control, and the ablations — both directions, three of them
+
+New Eval 03 gating row **`VacuityIsDeclaredNotInferred`**. Panel: **29 gating (all caught) + 6
+advisory = 35 rows** — was 28 + 6 = 34. `-- 3` and `-- 3 --real-vectors` both exit **0**.
+
+| # | ablation | result |
+|---|---|---|
+| A | restore the superseded criterion-4 wording (and its `true` declaration) | ❌ RED, `-- 3` exit 1 — *"the SUPERSEDED criterion-4 wording is still in the shipped rubric"* |
+| B | `CaveatFor` ignores the declaration and returns to `floor ≥ 0.999 ⇒ vacuous` | ❌ RED, exit 1, **5 faults** — *"a criterion DECLARED vacuous and one the floor arm EARNS read the same"* |
+| C | declare all six criteria vacuous | ❌ RED, exit 1 — *"6 of 6 declared vacuous — an all-or-nothing ledger is a ledger nobody filled in"* |
+
+⚠️ **And the control caught a defect in its own first revision, which is the reason to write the
+ablation before believing the row.** The check for "the earned caveat must not call the row vacuous"
+was written as a search for the word *vacuous*; the corrected caveat says *"the row is HARD, **not
+vacuous**"*, so the control went red on the fix it exists to protect. It now matches the **mechanism**
+the old label asserted — the phrase *"arithmetic of the empty set"* — not the word.
+
+### 46.6 What §46 does NOT claim
+
+- **No judged run was made and no judged number was re-measured.** Criterion 4's numbers are
+  superseded by a text change; criteria 1, 3, 5 and 6 keep the numbers their paid run produced.
+- **The control checks TEXT, not semantics.** It proves the criterion now demands something present;
+  it cannot prove a judge honours the demand. **8.16 #5 stays open for exactly that half**, and its
+  blocker is unchanged: a judged run.
+- **The floor arm's answer was not changed.** It still volunteers the reassurances criteria 3 and 5
+  ask for, by design — that is what makes those rows hard rather than empty.
+- **Nothing here re-scores the workflow.** Criterion 5's `0.000` was always in the table; what changed
+  is that it is no longer discounted by a label that was false.
+
+### 46.7 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3                | grep -A6 VacuityIsDeclaredNotInferred    # ✅, exit 0
+dotnet run --project $E -- 3 --real-vectors | grep -A6 VacuityIsDeclaredNotInferred    # ✅, exit 0
+dotnet run --project $E -- 9 --dry-run                                                  # exit 0
+dotnet run --project $E -- --ci --dry-run                                               # exit 1 — Eval 07 only
+
+# 46.5 ablations, all `-- 3` exit 1:
+#   A  GalaxusEvalCriteria: criterion 4 back to SupersededLanguageCriterion, declared true
+#   B  Eval09PreRegistration.CaveatFor: `if (floorMeetsItAlways) return VacuousAndUninterpretable;`
+#      placed BEFORE the declaration branch — the old rule
+#   C  GalaxusEvalCriteria: every `", false),` -> `", true),`
+```

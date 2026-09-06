@@ -109,11 +109,18 @@ namespace Galaxus.RecommendationAgent.Evals;
 ///   <item><description><b>Every judged criterion</b> — NOT quoted, MEASURED, by
 ///   <see cref="ContentlessFloorArm"/>: a fluent, contentless answer that recommends nothing and
 ///   volunteers the reassurances several criteria ask for. Whatever share of criteria it is scored
-///   as meeting IS the floor for those criteria on this judge, this model and this corpus. The two
-///   criteria that quantify over recommendations ("every recommendation names a past purchase",
-///   "the covering note says what was NOT recommended") are expected to come back VACUOUSLY MET on
-///   an empty answer, and that expectation is exactly why the floor is run rather than
-///   assumed.</description></item>
+///   as meeting IS the floor for those criteria on this judge, this model and this corpus.
+///   ⚠ <b>CORRECTED 2026-09-06 — this sentence used to name the wrong criteria and the wrong count.</b>
+///   It read <i>"the two criteria that quantify over recommendations ('every recommendation names a
+///   past purchase', 'the covering note says what was NOT recommended')"</i>. The second of those is
+///   an EXISTENTIAL over the covering note and is not vacuous at all; the criteria that actually
+///   quantify over presented recommendations are numbers 1 and 6 (and number 4 before its
+///   2026-09-06 restatement), which is <b>three, not two, and not the pair named</b>. Each criterion
+///   now DECLARES its own vacuity in
+///   <see cref="JudgedCriterion.VacuousOnAnAnswerWithNoRecommendations"/> rather than having it
+///   inferred from the floor's met rate. Direction of the old error: it understated how much of the
+///   rubric an empty answer passes, which is the flattering direction for the
+///   instrument.</description></item>
 /// </list>
 ///
 /// <para>
@@ -1374,24 +1381,19 @@ public static class Eval09_HypothesisComparison
             foreach (string line in Wrap("       " + Eval09PreRegistration.JudgedCriteria[i], InnerWidth))
                 Row(line);
 
-            // ⚠ A criterion the FLOOR arm also "meets" is a criterion an answer with no
-            //   recommendations in it passes. Whatever the two entrants score on that row, the row
-            //   carries no information about either of them.
-            if (!double.IsNaN(floor) && floor >= 0.999)
+            // ⚠ The criterion's DECLARED vacuity crossed with the floor arm's MEASURED met rate.
+            //   These are two different facts and the panel used to print one label for both — see
+            //   Eval09PreRegistration.CaveatFor, which carries the measured reason.
+            var caveat = Eval09PreRegistration.CaveatFor(
+                GalaxusEvalCriteria.AdvisoryCriteria[i].VacuousOnAnAnswerWithNoRecommendations, floor);
+            string caveatText = Eval09PreRegistration.CaveatText(caveat, floor);
+
+            if (caveatText.Length > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                foreach (string line in Wrap(
-                    "       ⚠️ VACUOUS — the contentless floor arm meets this criterion on every persona. An "
-                  + "answer that recommends nothing satisfies it, so nothing on this row separates the two "
-                  + "architectures.", InnerWidth))
-                    Row(line);
-            }
-            else if (!double.IsNaN(floor) && floor > 0)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                foreach (string line in Wrap(
-                    $"       ⚠️ the contentless floor arm meets this criterion {floor:P0} of the time. Read every "
-                  + "number on this row against that, not against zero.", InnerWidth))
+                Console.ForegroundColor = caveat is JudgedRowCaveat.VacuousAndUninterpretable
+                    ? ConsoleColor.Yellow
+                    : ConsoleColor.DarkYellow;
+                foreach (string line in Wrap("       " + caveatText, InnerWidth))
                     Row(line);
             }
             Console.ResetColor();
@@ -2156,6 +2158,35 @@ public sealed record Eval09Budget(
 /// meaning no result was reachable at all. The ceiling is never the number a run reports.
 /// </para>
 /// </remarks>
+/// <summary>
+/// What a judged criterion's row must be read against: the criterion's DECLARED vacuity crossed with
+/// the contentless floor arm's MEASURED met rate.
+/// </summary>
+/// <remarks>
+/// A high floor and a vacuous criterion are two different facts, and this suite printed one label for
+/// both until 2026-09-06. See <see cref="Eval09PreRegistration.CaveatFor"/> for the measured reason.
+/// </remarks>
+public enum JudgedRowCaveat
+{
+    /// <summary>Nothing to caveat: the criterion is not vacuous and the floor arm never met it.</summary>
+    None = 0,
+
+    /// <summary>Declared vacuous AND the floor met it every time. The row carries no information.</summary>
+    VacuousAndUninterpretable = 1,
+
+    /// <summary>Declared vacuous but the floor did not exploit it. A fact about the JUDGE.</summary>
+    DeclaredVacuousButFloorDisagrees = 2,
+
+    /// <summary>Declared vacuous and the floor is NOT MEASURED. Absent is not zero.</summary>
+    DeclaredVacuousFloorUnmeasured = 3,
+
+    /// <summary>Not vacuous, and the floor arm EARNS it every time. The row is hard, not empty.</summary>
+    FloorEarnsItEveryTime = 4,
+
+    /// <summary>Not vacuous, and the floor arm earns it some of the time.</summary>
+    FloorEarnsItSometimes = 5,
+}
+
 public static class Eval09PreRegistration
 {
     /// <summary>The significance level for the single primary test.</summary>
@@ -2194,6 +2225,80 @@ public static class Eval09PreRegistration
 
     /// <summary>The Bonferroni-corrected threshold for the judged criteria, which are six tests.</summary>
     public static double BonferroniThreshold => PrimaryAlpha / Math.Max(1, JudgedCriteria.Count);
+
+    /// <summary>
+    /// What a judged row's caveat is: the criterion's DECLARED vacuity crossed with the floor arm's
+    /// MEASURED met rate.
+    /// </summary>
+    /// <param name="declaredVacuous">
+    /// Whether the criterion quantifies over presented recommendations —
+    /// <see cref="JudgedCriterion.VacuousOnAnAnswerWithNoRecommendations"/>. An INPUT-side fact.
+    /// </param>
+    /// <param name="floorMetRate">The contentless floor arm's measured met rate. A RESULT-side fact.</param>
+    /// <returns>The caveat this row carries, or <see cref="JudgedRowCaveat.None"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>This exists because the panel used to read vacuity out of the RESULT.</b> The rule was
+    /// <c>floorMetRate ≥ 0.999 ⇒ "VACUOUS — an answer that recommends nothing satisfies it"</c>, and
+    /// on the 2026-09-05 paid run it fired on three rows and was <b>wrong on two of them</b>:
+    /// criteria 3 and 5 were met by the floor arm because <see cref="ContentlessFloorArm.Answer"/>
+    /// says those things in so many words, deliberately. The printed sentence asserted a mechanism
+    /// that was false, and its effect was to discount criterion 5 — where the workflow scored 0.000
+    /// against a floor that had EARNED 1.000, at p = 0.0005 — as carrying no information.
+    /// </para>
+    /// <para>
+    /// The two facts are now crossed rather than conflated, and the DISAGREEMENT cases are the ones
+    /// worth reading: a criterion declared vacuous whose floor came back low says the judge did not
+    /// read it vacuously, which is a calibration observation this suite had no way to state.
+    /// </para>
+    /// </remarks>
+    public static JudgedRowCaveat CaveatFor(bool declaredVacuous, double floorMetRate)
+    {
+        if (double.IsNaN(floorMetRate))
+            return declaredVacuous ? JudgedRowCaveat.DeclaredVacuousFloorUnmeasured : JudgedRowCaveat.None;
+
+        bool floorMeetsItAlways = floorMetRate >= 0.999;
+
+        if (declaredVacuous)
+            return floorMeetsItAlways ? JudgedRowCaveat.VacuousAndUninterpretable : JudgedRowCaveat.DeclaredVacuousButFloorDisagrees;
+
+        if (floorMeetsItAlways) return JudgedRowCaveat.FloorEarnsItEveryTime;
+        return floorMetRate > 0 ? JudgedRowCaveat.FloorEarnsItSometimes : JudgedRowCaveat.None;
+    }
+
+    /// <summary>The sentence a caveat prints, or empty when there is none.</summary>
+    /// <param name="caveat">The caveat.</param>
+    /// <param name="floorMetRate">The floor arm's met rate, for the rates that quote one.</param>
+    /// <returns>The caveat sentence. Empty for <see cref="JudgedRowCaveat.None"/>.</returns>
+    public static string CaveatText(JudgedRowCaveat caveat, double floorMetRate) => caveat switch
+    {
+        JudgedRowCaveat.VacuousAndUninterpretable =>
+            "⚠️ UNINTERPRETABLE — this criterion quantifies over the recommendations an answer presents, so an "
+          + "answer that presents none meets it by the arithmetic of the empty set, and the contentless floor "
+          + "arm did meet it on every persona. A floor that cannot lose does not make a live arm's score harsh; "
+          + "it makes it unreadable. Nothing on this row separates the two architectures.",
+
+        JudgedRowCaveat.DeclaredVacuousButFloorDisagrees =>
+            $"⚠️ DECLARED VACUOUS, but the floor arm met it only {floorMetRate:P0} of the time. The criterion "
+          + "quantifies over presented recommendations, so an empty answer satisfies it logically — and the judge "
+          + "did NOT read it that way. That disagreement is a fact about the JUDGE, not about either arm, and it "
+          + "is the reason the declaration is not inferred from this number.",
+
+        JudgedRowCaveat.DeclaredVacuousFloorUnmeasured =>
+            "⚠️ DECLARED VACUOUS and the floor is NOT MEASURED on this run, so there is nothing to read this row "
+          + "against. Absent is not zero.",
+
+        JudgedRowCaveat.FloorEarnsItEveryTime =>
+            "⚠️ the contentless floor arm meets this criterion on every persona — and it EARNS it: the criterion "
+          + "does not quantify over recommendations, so the floor arm's answer satisfies it by saying so. The row "
+          + "is HARD, not vacuous, and a live arm below the floor here is a finding rather than an artefact.",
+
+        JudgedRowCaveat.FloorEarnsItSometimes =>
+            $"⚠️ the contentless floor arm meets this criterion {floorMetRate:P0} of the time. Read every number "
+          + "on this row against that, not against zero.",
+
+        _ => string.Empty,
+    };
 
     /// <summary>
     /// The smallest two-sided p an exact sign test could reach at <paramref name="pairs"/> non-tied

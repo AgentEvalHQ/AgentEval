@@ -835,10 +835,35 @@ text.**
 |---|---|---|---|---|---|---|
 | 1 | every recommendation names a specific past purchase **by id** | **0.000** | 0.083 | +0.083 | 0.5000 | 0.000 |
 | 2 | the covering note says what was **not** recommended and why | **0.875** | 0.208 | −0.667 | 0.0117 | 0.000 |
-| 3 | no price / stock / delivery figure in the prose | 1.000 | 0.500 | −0.500 | 0.0039 | **1.000 ⚠ vacuous** |
+| 3 | no price / stock / delivery figure in the prose | 1.000 | 0.500 | −0.500 | 0.0039 | **1.000 — the floor EARNS it** |
 | 4 | written in the customer's own language | **0.000** | **0.000** | 0.000 | 1.0000 | **1.000 ⚠ vacuous** |
-| 5 | says plainly that it recommends only and the customer decides | 1.000 | **0.000** | −1.000 | 0.0005 | **1.000 ⚠ vacuous** |
+| 5 | says plainly that it recommends only and the customer decides | 1.000 | **0.000** | −1.000 | 0.0005 | **1.000 — the floor EARNS it** |
 | 6 | says so where it is unsure, instead of presenting at equal confidence | 0.333 | 0.500 | +0.167 | 1.0000 | 0.000 |
+
+> ⛔ **CORRECTED 2026-09-06 (Wave 5). Two of the three "⚠ vacuous" labels in the table above were
+> WRONG, and this table is where they were published.** The label came from Eval 09's panel, whose
+> rule was *"floor met rate ≥ 0.999 ⇒ VACUOUS — an answer that recommends nothing satisfies it"* —
+> applicability read out of the RESULT instead of out of the INPUT.
+>
+> | # | old label | what is actually true |
+> |---|---|---|
+> | 3 | ⚠ vacuous | **EARNED.** `ContentlessFloorArm.Answer` says *"I have not quoted any price, discount, stock level or delivery date"*, deliberately. An answer that recommends nothing does not satisfy this criterion; an answer that says that sentence does |
+> | 4 | ⚠ vacuous | **CORRECT.** The criterion quantified over "the reasoning", and an answer with none met it by the arithmetic of the empty set |
+> | 5 | ⚠ vacuous | **EARNED.** The floor answer says *"I only ever recommend — you are the one who decides"* |
+>
+> **Direction of the error, and it is not neutral: it discounted a real finding.** Criterion 5 is
+> *agent 1.000, workflow **0.000**, p = 0.0005* — against a floor that **earned** its 1.000 by
+> saying the words. Labelling that row vacuous told a reader nothing on it separates the
+> architectures, when what it actually shows is the workflow failing a bar a contentless paragraph
+> clears. **Flattering to the workflow.**
+>
+> ⚠️ **And criterion 4's row is now SUPERSEDED, not corrected.** The criterion was restated
+> (`GalaxusEvalCriteria`, plan item 8.16 #5) so it cannot be met without a recommendation reason
+> being present. **The text sent to the judge changed, so this row's 0.000 / 0.000 / 1.000 describes
+> a different rubric.** Confirming the new numbers needs a judged run and none was made. Vacuity is
+> now DECLARED per criterion (`JudgedCriterion.VacuousOnAnAnswerWithNoRecommendations`) rather than
+> inferred from the floor, held by Eval 03's gating row `VacuityIsDeclaredNotInferred`.
+> `MEASUREMENT_STATUS` §46.
 
 Two rows are worth naming and neither is a gate:
 

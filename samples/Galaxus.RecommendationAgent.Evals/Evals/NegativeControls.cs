@@ -118,6 +118,7 @@ public static class NegativeControls
         rows.Add(Guarded("CoverageCutIsNotTheConfidenceShapeParameter", CheckCoverageCutIsNotTheConfidenceShapeParameter));
         rows.Add(await GuardedAsync("LoopBackNegativeDirectionCensus", () => CheckLoopBackNegativeDirectionCensusAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(await GuardedAsync("TopologyCaseProseMatchesTheRun", () => CheckTopologyCaseProseMatchesTheRunAsync(retriever, ct)).ConfigureAwait(false));
+        rows.Add(Guarded("VacuityIsDeclaredNotInferred", CheckVacuityIsDeclaredNotInferred));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -5160,6 +5161,141 @@ public static class NegativeControls
     // Four decimals where three would round a ±0.01 band to a digit that cannot show which side of it a number fell.
     private static string F4(double value) =>
         double.IsNaN(value) ? "n/a" : value.ToString("F4", System.Globalization.CultureInfo.InvariantCulture);
+
+
+    // ══ VACUITY IS DECLARED, NOT INFERRED ═══════════════════════════════════════════════════
+    //
+    /// <summary>
+    /// Eval 09's judged panel must read a criterion's vacuity off the CRITERION, never off the floor
+    /// arm's met rate.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.16 #5.</b> The panel used to print <i>"VACUOUS — an answer that recommends
+    /// nothing satisfies it"</i> whenever the contentless floor arm's met rate reached 1.000. That is
+    /// applicability read out of the RESULT rather than out of the INPUT, and measured on the
+    /// 2026-09-05 paid run it was <b>wrong on two of the three rows it fired on</b>: criteria 3 and 5
+    /// were met by the floor arm because <c>ContentlessFloorArm.Answer</c> says those things in so
+    /// many words, deliberately. The label's effect was to discount criterion 5 — where the workflow
+    /// scored 0.000 against a floor that had EARNED 1.000, at p = 0.0005 — as carrying no information.
+    /// </para>
+    /// <para>
+    /// This row checks three things, and the third is what makes the first two worth anything:
+    /// </para>
+    /// <list type="number">
+    ///   <item><description>the crossing function is exercised on all six combinations of (declared,
+    ///   floor) and each returns a DIFFERENT reading — a classifier that answers the same thing for
+    ///   a vacuous criterion and an earned one is the label being replaced;</description></item>
+    ///   <item><description>the declaration ledger is not extreme — <b>at least one criterion
+    ///   declared vacuous and at least one not</b>. An all-false ledger is a ledger nothing writes
+    ///   to, and it reads exactly like a rubric with no vacuity problem;</description></item>
+    ///   <item><description><b>the restated criterion 4 is rejected in its SUPERSEDED form.</b> The
+    ///   old wording is frozen in <c>GalaxusEvalCriteria.SupersededLanguageCriterion</c> — it is what
+    ///   the paid run actually sent to the judge, not a fixture written today — and the row asserts
+    ///   that the shipped rubric no longer contains it and that the replacement carries an explicit
+    ///   existential the old one lacked. Without this the first two checks would pass over a rubric
+    ///   that had never been fixed.</description></item>
+    /// </list>
+    /// <para>
+    /// ⚠ <b>Scope, declared.</b> Check 3 compares TEXT. It proves the criterion now demands something
+    /// present; it cannot prove a judge will honour the demand. That is a judged run, and 8.16 #5
+    /// stays open for exactly that half.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckVacuityIsDeclaredNotInferred()
+    {
+        var problems = new List<string>();
+
+        // ── 1. The crossing function separates facts the old rule conflated. ──
+        //
+        //   The old rule was `floor >= 0.999 => VACUOUS`. Under it, rows (a) and (c) below are
+        //   indistinguishable, and (c) is the shape that discounted criterion 5.
+        var vacuousAndHighFloor = Eval09PreRegistration.CaveatFor(declaredVacuous: true, floorMetRate: 1.0);
+        var vacuousAndLowFloor = Eval09PreRegistration.CaveatFor(declaredVacuous: true, floorMetRate: 0.0);
+        var vacuousAndNoFloor = Eval09PreRegistration.CaveatFor(declaredVacuous: true, floorMetRate: double.NaN);
+        var earnedEveryTime = Eval09PreRegistration.CaveatFor(declaredVacuous: false, floorMetRate: 1.0);
+        var earnedSometimes = Eval09PreRegistration.CaveatFor(declaredVacuous: false, floorMetRate: 0.5);
+        var nothingToSay = Eval09PreRegistration.CaveatFor(declaredVacuous: false, floorMetRate: 0.0);
+
+        if (vacuousAndHighFloor == earnedEveryTime)
+            problems.Add("a criterion DECLARED vacuous and one the floor arm EARNS every time read the same — the label the panel prints cannot tell an empty-set artefact from a hard row, which is the defect this row exists for.");
+        if (vacuousAndHighFloor != JudgedRowCaveat.VacuousAndUninterpretable)
+            problems.Add($"declared-vacuous with a floor of 1.000 read {vacuousAndHighFloor} — the one combination that makes a row unreadable is not being named.");
+        if (vacuousAndLowFloor != JudgedRowCaveat.DeclaredVacuousButFloorDisagrees)
+            problems.Add($"declared-vacuous with a floor of 0.000 read {vacuousAndLowFloor} — the judge disagreeing with the criterion's own logic is a calibration fact and it is being dropped.");
+        if (vacuousAndNoFloor != JudgedRowCaveat.DeclaredVacuousFloorUnmeasured)
+            problems.Add($"declared-vacuous with an UNMEASURED floor read {vacuousAndNoFloor} — an absent floor is not a zero floor.");
+        if (earnedEveryTime != JudgedRowCaveat.FloorEarnsItEveryTime || earnedSometimes != JudgedRowCaveat.FloorEarnsItSometimes)
+            problems.Add("a floor the contentless arm EARNS is not reported as earned, so a live arm below it still reads as an artefact rather than as a finding.");
+        if (nothingToSay != JudgedRowCaveat.None)
+            problems.Add("a criterion that is neither vacuous nor met by the floor still prints a caveat — a warning on every row is a warning on none.");
+
+        // …and the prose must actually differ, not just the enum. The old defect was a SENTENCE that
+        // asserted a false mechanism; an enum nobody renders differently would reproduce it.
+        string vacuousText = Eval09PreRegistration.CaveatText(vacuousAndHighFloor, 1.0);
+        string earnedText = Eval09PreRegistration.CaveatText(earnedEveryTime, 1.0);
+        if (string.Equals(vacuousText, earnedText, StringComparison.Ordinal))
+            problems.Add("the printed caveat is IDENTICAL for a vacuous criterion and an earned one — the crossing exists in the enum and not on the page.");
+        // ⚠ Matched on the MECHANISM the old label asserted, not on the word "vacuous". The first
+        //   revision of this check looked for the word and went red on the corrected text, which
+        //   says "the row is HARD, not vacuous" — a control that fires on its own fix.
+        const string EmptySetMechanism = "arithmetic of the empty set";
+        if (earnedText.Contains(EmptySetMechanism, StringComparison.OrdinalIgnoreCase))
+            problems.Add("the caveat for a criterion the floor arm EARNS still asserts the empty-set mechanism — that is the false sentence the old label printed, in new words.");
+        if (!earnedText.Contains("EARNS", StringComparison.Ordinal))
+            problems.Add("the caveat for a criterion the floor arm EARNS does not say it was earned, so a live arm below that floor still reads as an artefact.");
+        if (!vacuousText.Contains(EmptySetMechanism, StringComparison.OrdinalIgnoreCase))
+            problems.Add("the caveat for a genuinely vacuous criterion no longer names the empty-set mechanism, so a reader cannot tell why the row is unreadable.");
+        if (Eval09PreRegistration.CaveatText(JudgedRowCaveat.None, 0.0).Length != 0)
+            problems.Add("a row with no caveat still prints one.");
+
+        // ── 2. The declaration ledger must not be extreme in either direction. ──
+        var declared = GalaxusEvalCriteria.AdvisoryCriteria;
+        int vacuousCount = declared.Count(c => c.VacuousOnAnAnswerWithNoRecommendations);
+
+        if (declared.Count == 0)
+            problems.Add("the advisory rubric is empty, so this row is asserting nothing.");
+        else if (vacuousCount == 0 || vacuousCount == declared.Count)
+            problems.Add($"{vacuousCount} of {declared.Count} criteria are declared vacuous — an all-or-nothing ledger is a ledger nobody filled in, and it reads exactly like a rubric with no vacuity problem.");
+
+        if (declared.Any(c => string.IsNullOrWhiteSpace(c.Text)))
+            problems.Add("a criterion carries no text.");
+        if (!declared.Select(c => c.Text).SequenceEqual(GalaxusEvalCriteria.Advisory, StringComparer.Ordinal))
+            problems.Add("GalaxusEvalCriteria.Advisory is no longer the projection of AdvisoryCriteria — a rubric with two copies acquires two vintages.");
+        if (!GalaxusEvalCriteria.Advisory.SequenceEqual(Eval09PreRegistration.JudgedCriteria, StringComparer.Ordinal))
+            problems.Add("Eval 09 judges a different list from the one whose vacuity is declared here.");
+
+        // ── 3. THE POSITIVE SPECIMEN — the wording that actually shipped must be REJECTED. ──
+        //
+        //   Checks 1 and 2 would both pass over a rubric that had never been restated. This is the
+        //   half that proves it was.
+        const string ExistentialMarker = "does NOT meet this criterion";
+
+        if (GalaxusEvalCriteria.Advisory.Any(c => c.Contains(GalaxusEvalCriteria.SupersededLanguageCriterion, StringComparison.Ordinal)))
+            problems.Add("the SUPERSEDED criterion-4 wording is still in the shipped rubric — an answer with no reasoning meets it by the arithmetic of the empty set, and the floor arm scored 1.000 on it while both live arms scored 0.000.");
+        if (GalaxusEvalCriteria.SupersededLanguageCriterion.Contains(ExistentialMarker, StringComparison.Ordinal))
+            problems.Add("the frozen superseded wording already contains the existential marker, so it is no longer a specimen this check can fail on — the positive control has gone vacuous itself.");
+
+        var languageCriteria = GalaxusEvalCriteria.Advisory
+            .Where(c => c.Contains("own language", StringComparison.Ordinal)).ToList();
+        if (languageCriteria.Count == 0)
+            problems.Add("no criterion mentions the customer's own language any more — the restatement deleted the criterion instead of repairing it.");
+        else if (!languageCriteria.All(c => c.Contains(ExistentialMarker, StringComparison.Ordinal)))
+            problems.Add("the language criterion does not say what an answer with no recommendation reasons scores, so it is still satisfiable by an answer that reasons about nothing.");
+
+        return new ControlRowSnapshot(
+            "VacuityIsDeclaredNotInferred",
+            "a judged criterion's vacuity is a property of the CRITERION, declared per criterion, never inferred "
+          + "from the floor arm's met rate — and the superseded criterion-4 wording, which an empty answer met by "
+          + "the arithmetic of the empty set, is refused",
+            problems.Count == 0
+                ? $"{vacuousCount} of {declared.Count} criteria declared vacuous · all six (declared × floor) "
+                + "combinations read differently and print different prose · the superseded language criterion is "
+                + "absent from the shipped rubric and lacks the existential its replacement carries "
+                + "⚠ TEXT ONLY — that a judge HONOURS the existential needs a judged run (8.16 #5)"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
 
     private static void PrintHeader()
     {
