@@ -221,9 +221,15 @@ public class CalibratedEvaluator : IEvaluator
         foreach (var criterion in criteriaList)
         {
             // Collect all judge verdicts for this criterion, keeping judge name paired
+            // ⚠ NOT an ordinal string.Equals. A judge that echoes the rubric back the way
+            // ChatClientEvaluator RENDERS it — "1. Is accurate" — used to match nothing here, and
+            // the criterion was then aggregated as Met = false with "No judges returned a result
+            // for this criterion.". A met criterion silently became an unmet one. CriterionText
+            // discounts one leading enumeration marker and nothing else, so this can only recover a
+            // join our own rendering broke; a criterion the judge invented still matches nothing.
             var judgements = results
                 .Select(r => (r.Name, Criterion: r.Result.CriteriaResults
-                    .FirstOrDefault(c => string.Equals(c.Criterion, criterion, StringComparison.OrdinalIgnoreCase))))
+                    .FirstOrDefault(c => CriterionText.AreSameCriterion(c.Criterion, criterion))))
                 .Where(j => j.Criterion != null)
                 .ToList();
 
