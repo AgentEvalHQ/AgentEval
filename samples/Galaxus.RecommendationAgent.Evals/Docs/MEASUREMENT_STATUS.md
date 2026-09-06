@@ -6282,3 +6282,158 @@ ledger-vs-disk agreement, and the archive-on-next-write mechanism.
   observation, not re-taken here; zero code files changed between it and `a83aeab5`.
 - Eval 05/06/08/09 ran only in their `--dry-run` form inside `--ci`, so **no judged verdict was re-taken**.
 - The four gates' internal reasoning was not re-derived — only their exit codes and the CI pass/fail split.
+
+---
+
+## 44. WAVE 5 — ADR-030 §9 Q6's second half: GATE 1's verdict MOVES, and under every replacement test (2026-09-06)
+
+Wave 4 measured the *mechanical* price of the Q6 deletion (six members, eight rendering markers) and
+recorded that the half that decides the question — **does Eval 02's GATE 1 verdict actually move?** —
+was unmeasured. This section is that measurement. **It is not an answer to Q6**; Q6 is a preference
+question and stays the user's (`MASTER_PLAN` §0.6, ADR-030 §9).
+
+### 44.1 ⚠️ FIRST: the obvious way to run this measurement is DEGENERATE, and it fails silently
+
+GATE 1 reads `ownK` — **this run's** report. Under `--dry-run` the live arm of that report is the stub,
+which presents the same two products to every persona and cannot clear a random draw. Measured on the
+shipped tree: `-- 2 --dry-run` prints **❌ GATE 1 — 9 of 12 scorable personas are BELOW their OWN floor.**
+
+So the gate is already ❌ before anything is ablated, and the Q6 substitution is monotone in the
+un-flattering direction (`ExactBinomial`'s own remarks: nothing it does can turn a ▼ into a ▲). An
+ablation run this way leaves ❌ at ❌ and reports **no movement** — which is exactly what "nobody ran
+it" also reports. **A verdict that cannot move is not evidence that a change does not move verdicts.**
+
+Measured, for the record, so the trap is on the page rather than in a paragraph: under the ablation the
+stub-fed gate goes from *9 of 12 below* to *11 of 12 below* — the count moves, the **verdict** cannot.
+
+### 44.2 The instrument: GATE 1 REPLAY, on the persisted paid run
+
+The persisted live cells are the only cells on which GATE 1 has ever been ✅, and the own-k re-read
+already loads them (`OwnKReread.FromSnapshot`, from `eval02_coverage_ab.json`, the run of
+**2026-09-06 02:56:46Z** — 36 live turns, ¤27.12078). Eval 02 now prints a **GATE 1 REPLAY** note: the
+same predicate `CoverageScore.AboveOwnFloor`, through the same loop
+`PairedCoverageReport.EveryPersonaAboveOwnFloor`, over those cells.
+
+⚠️ **ADVISORY. It gates nothing and it must not.** A snapshot on disk is historical and is rewritten by
+any later paid run; a gate reading it would let a stale artifact decide a clean tree's exit code. It is
+reported, and only reported. `-- 2 --dry-run` still exits on the plumbing checks alone.
+
+### 44.3 The movement, OBSERVED — both spaces, one command each
+
+| reading | verdict | above their own floor |
+|---|---|---|
+| **shipped** `Latent > LatentFloor` | ✅ **PASS** | **12 of 12** |
+| ablated to `ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)` | ❌ **FAIL** | **8 of 12** |
+
+Below under the ablation: `USR-MI-02`, `USR-LM-09`, `USR-PB-11`, `USR-NK-12`. **Identical in the
+default and `--real-vectors` spaces** — the live cells come from the snapshot, so only the predicate
+differs (stage 0b satisfied).
+
+**The positive control, because an unmoved gate proves nothing on its own.** Ablating the same
+predicate the *other* way — `Latent >= 0.0`, true whenever defined — takes the **stub-fed, exit-code
+bearing** GATE 1 from ❌ (9 of 12 below) to ✅ (12 of 12 above). The gating path is live and movable in
+both directions; the ❌ observed under the real ablation is not a stuck value.
+
+### 44.4 The right test, SIMULATED — because the substitution 2.6 names is the wrong one
+
+`ExactBinomial`'s own class remark already says why `AboveChance` does not answer this question: latent
+coverage is a mean over gold tokens, whose null is a mean of *per-token* hit probabilities, not a
+binomial. And `CoverageScore.Mean` sets `LatentServed = Math.Round(mean over reps)`, so the substitution
+tests a **rounded rep-mean** as if it were a success count.
+
+So the correct null was simulated: **200,000 uniform draws of k distinct products without replacement**
+from each persona's actual eligible pool (`Catalogue.Default.All` minus the persona's owned leaf
+categories — the same pool `ChanceFloors.RandomDrawFloor` derives the floor from), scored with the same
+`InterestMapGold.EligibleTokens` hit rule, at the k the persona actually received. Seed **20260906**.
+
+| persona | served/total | floor | observed | binomial p | sim p, 1 draw | sim p, mean of 3 | pool | k |
+|---|---|---|---|---|---|---|---|---|
+| USR-NB-01 | 3/3 | 0.1544 | 0.8889 | 0.003678 | 0.001980 | 0.000000 | 93 | 5 |
+| USR-MI-02 | 2/3 | 0.1544 | 0.6667 | **0.064121** | **0.055435** | 0.000355 | 93 | 5 |
+| USR-SK-03 | 3/3 | 0.1528 | 0.8889 | 0.003567 | 0.001895 | 0.000000 | 94 | 5 |
+| USR-AR-06 | 3/3 | 0.1512 | 0.8889 | 0.003460 | 0.001845 | 0.000005 | 95 | 5 |
+| USR-TS-07 | 3/3 | 0.1203 | 1.0000 | 0.001742 | 0.004735 | 0.000000 | 94 | 5 |
+| USR-JV-08 | 2/3 | 0.1041 | 0.6667 | 0.030252 | 0.024805 | 0.000055 | 94 | 5 |
+| USR-LM-09 | 1/4 | 0.1271 | 0.3333 | **0.419521** | **0.125300** | **0.083680** | 95 | 5 |
+| USR-RB-10 | 3/3 | 0.1512 | 1.0000 | 0.003460 | 0.010805 | 0.000000 | 95 | 5 |
+| USR-PB-11 | 2/3 | 0.1528 | 0.7778 | **0.062897** | 0.001905 | 0.000015 | 94 | 5 |
+| USR-NK-12 | 1/4 | 0.1035 | 0.2500 | **0.354167** | **0.244470** | **0.206850** | 94 | 5 |
+| USR-MB-13 | 2/3 | 0.1352 | 0.5556 | 0.049876 | 0.041910 | 0.002245 | 95 | 5 |
+| USR-DF-14 | 3/3 | 0.1512 | 1.0000 | 0.003460 | 0.010965 | 0.000000 | 95 | 5 |
+
+| test | above at α = 0.05 | GATE 1 |
+|---|---|---|
+| shipped `rate > floor` | 12 of 12 | ✅ |
+| exact binomial on `served/total` | 8 of 12 | ❌ |
+| simulated null, one k-draw | 9 of 12 | ❌ |
+| simulated null, mean of 3 draws — **the estimator the cell actually is** | **10 of 12** | ❌ |
+
+**Every candidate replacement fails GATE 1**, and `USR-LM-09` and `USR-NK-12` are below under all
+three. **The verdict movement does not depend on getting the test right first.**
+
+### 44.5 ⚠️ A reasoning error, found by measuring, and its direction was FLATTERING to the argument
+
+The expectation written down before simulating was that the binomial would be **anti-conservative** —
+token hits are positively correlated because one product carries several tokens, so the true upper tail
+should be fatter — and that a correct test would therefore admit **fewer** than 8.
+
+**Measured: it admits MORE.** 9 under a single draw, **10** once the rep-averaging is modelled, because
+averaging three draws shrinks the null's spread far more than the correlation fattens it. The
+correlation effect is real and visible in the table (`USR-RB-10` and `USR-DF-14`: binomial p 0.00346
+against a simulated 0.01081/0.01097, understated ~3×) — it is simply not the dominant term.
+
+**Direction: the number derivable from the argument alone was wrong in the direction that made the
+argument stronger.** Had "the correct test admits fewer than 8" been published, it would have made the
+case for the deletion look better than the measurement supports, and nothing in the argument was
+checkable without running it.
+
+### 44.6 ⚠️ And the substitution 2.6 names would ship a defect this repo already fixed once
+
+`LatentServed` is `Math.Round` of the rep-mean, so `AboveChance(LatentServed, LatentTotal, …)`
+integerises the statistic before testing it — the same shape as the forced-choice panel's
+`Math.Floor(rate × personas)`, corrected at `9407cfbd` (§30.2). Not a rounding nicety: on `USR-PB-11`
+the binomial reads **p = 0.0629, not above**, while the simulation reads **p = 0.0019, well above** —
+a per-persona verdict flip caused entirely by 0.7778 being tested as 2 of 3.
+
+**If ADR-030 Slice 2.6's retrofit ships `AboveChance` as written, it ships that defect into GATE 1.**
+
+### 44.7 What this section does NOT claim
+
+- **No paid run was made and no shipped number moved.** The ablations were applied on a scratch basis
+  and reverted; `CoverageScore.AboveOwnFloor` is byte-identical to `0263141d` on the tree, and GATE 1
+  still reads `rate > floor`.
+- **The replay is not a re-measurement of the agent.** It re-runs a *predicate* over cells the paid run
+  of 2026-09-06 02:56:46Z already produced. Every caveat on those cells still applies — including that
+  the persisted run recorded no item lists, so its precision is NOT RECORDED.
+- **Q6 is not answered.** The evidence is sharpened; the preference is the user's.
+- **`AbovePrecisionFloor` and Eval 02b's two markers were NOT measured here.** They carry the same
+  `rate > floor` shape and no gate movement has been derived for either. Named, not measured.
+- **The simulation is a Monte-Carlo, not an exact enumeration.** At 200,000 draws the standard error on
+  a p near 0.05 is ≈ 0.0005; the two personas that decide the robustness claim sit at 0.084 and 0.207,
+  far outside that. It is not an argument for shipping the simulated test — that is a design decision
+  with its own tests, and it is downstream of Q6, not upstream of it.
+
+### 44.8 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 2 --dry-run                | grep -A4 "GATE 1 REPLAY"   # PASS — 12 of 12
+dotnet run --project $E -- 2 --dry-run --real-vectors | grep -A4 "GATE 1 REPLAY"   # identical
+dotnet run --project $E -- 2 --dry-run                | grep    "GATE 1 —"         # 9 of 12 below (the STUB)
+
+# 44.3 ablation — Graders/CoverageScore.cs, AboveOwnFloor:
+#   double.IsNaN(Latent) || double.IsNaN(LatentFloor) || LatentTotal <= 0 ? null
+#   : ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor).Above;
+#   -> REPLAY FAIL 8 of 12 (both spaces); stub-fed GATE 1 9-of-12-below -> 11-of-12-below
+#
+# 44.3 POSITIVE CONTROL — same line:
+#   ... ? null : Latent >= 0.0;
+#   -> stub-fed GATE 1 red -> green, 12 of 12. The gating path is movable; the red above is not stuck.
+#
+# 44.4 simulation — a scratch block in Eval02 over rereadReport's live cells, reverted after the run:
+#   pool  = Catalogue.Default.All.Where(p => !gold.OwnedCategories.Contains(p.LeafCategory))
+#   draw  = k distinct pool members, partial Fisher-Yates, new Random(20260906)
+#   hit   = InterestMapGold.EligibleTokens(product).Contains(token)
+#   stat  = hits / gold.Latent.Count ; p = P(stat >= observed) over 200,000 trials
+#           and the same for the mean of three independent draws
+```

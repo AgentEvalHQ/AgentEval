@@ -1637,6 +1637,103 @@ rule.**
 > of the mechanics is now measured; the price of the *answer changing* is not, and Q6 should not be
 > answered on the first without the second.
 
+> ### ⬜ Q6 — THE SECOND HALF, MEASURED 2026-09-06 (Wave 5). **The verdict MOVES. Still the user's; still not answered here.**
+>
+> Wave 4 left the deciding fact open: *"nobody has measured how many ▲ markers survive an exact test,
+> and Eval 02's GATE 1 verdict may move."* It was measured, by **executing**, and the answer is not
+> ambiguous.
+>
+> **YES. GATE 1 goes ✅ → ❌, on the only cells on which it has ever been ✅.**
+>
+> | GATE 1, on the persisted live run of 2026-09-06 02:56 UTC | verdict | personas above their own floor |
+> |---|---|---|
+> | **shipped rule** — `Latent > LatentFloor`, per persona | ✅ **PASS** | **12 of 12** |
+> | replaced by `ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)` | ❌ **FAIL** | **8 of 12** — below: `USR-MI-02`, `USR-LM-09`, `USR-PB-11`, `USR-NK-12` |
+>
+> **How it was run, and why it did not cost $27.** The gate's own live arm is a stub under
+> `--dry-run`, and a stub is ❌ before anything is changed — so ablating the floor rule there moves
+> nothing and *"no movement"* would be indistinguishable from *"nobody ran it"*. Eval 02 therefore
+> now prints a **GATE 1 REPLAY** line: the same predicate, through the same
+> `PairedCoverageReport.EveryPersonaAboveOwnFloor` loop, over the live cells the own-k re-read already
+> loads from the persisted paid run. **Advisory — it gates nothing**, because a snapshot on disk must
+> never decide today's exit code. Both readings above come out of `dotnet run … -- 2 --dry-run`, free,
+> and reproduce **identically in both embedding spaces** (the live cells are the snapshot's; only the
+> predicate changed).
+>
+> **The movement is ROBUST to the choice of test — which is the part that actually decides Q6.** The
+> obvious objection to the table above is that `AboveChance` is the *wrong* test here: this file's
+> own `ExactBinomial` remarks say so (latent coverage is a mean over gold tokens whose null is not
+> binomial), and `LatentServed` is a **rounded rep-mean**, not a count of Bernoulli successes. So the
+> correct null was **simulated** instead — 200,000 uniform k-draws without replacement from each
+> persona's actual eligible pool (the same pool `ChanceFloors.RandomDrawFloor` derives its floor
+> from), scored by the same token-hit rule, at the k the persona actually received:
+>
+> | test | personas above at α = 0.05 | GATE 1 |
+> |---|---|---|
+> | shipped `rate > floor` | 12 of 12 | ✅ |
+> | exact binomial on `served/total` | 8 of 12 | ❌ |
+> | simulated null, one k-draw | 9 of 12 | ❌ |
+> | simulated null, **mean of 3 draws** (the estimator the cell actually is) | **10 of 12** | ❌ |
+>
+> **Every candidate replacement fails the gate**, and two personas — `USR-LM-09` (1 of 4 interests
+> covered, p ≥ 0.08 under every test) and `USR-NK-12` (1 of 4, p ≥ 0.21) — are below under **all
+> three**. So the answer to *"does the verdict move?"* does not depend on getting the test right
+> first: it moves under the naive substitution, under a better one, and under the best one available.
+>
+> ⚠️ **One reasoning error found by measuring, and its direction was flattering to the argument being
+> made.** Before simulating, the expectation written down was that the binomial would be
+> *anti-conservative* (token hits are positively correlated, one product carries several tokens, so
+> the true tail is fatter) and that the correct test would therefore admit **fewer** than 8. Measured:
+> it admits **more** — 9, and 10 once the rep-averaging is modelled, because averaging three draws
+> shrinks the null's spread far more than the correlation fattens it. The correlation effect is real
+> and visible (`USR-RB-10`, `USR-DF-14`: binomial p 0.0035 against a simulated 0.0110, understated 3×)
+> — it is simply not the dominant term. **The number that would have been published from the argument
+> alone was wrong in the direction that made the argument stronger.**
+>
+> ⚠️ **And the naive substitution carries a defect this repository has already fixed once.**
+> `LatentServed` is `Math.Round` of the rep-mean, so feeding it to a binomial test integerises the
+> statistic before testing it — the same shape as the forced-choice panel's `Math.Floor(rate × n)`,
+> corrected at `9407cfbd`. It is not a rounding nicety: on `USR-PB-11` the binomial reads
+> **p = 0.0629 (not above)** where the simulation reads **p = 0.0019 (well above)**, a verdict flip on
+> one persona caused entirely by 0.7778 being tested as 2 of 3. **If 2.6's retrofit ships the
+> `AboveChance` substitution as written, it ships that defect into GATE 1.**
+>
+> **What this means for the stop rule, stated without answering it.** 2.6's acceptance is *"the
+> retrofit deletes the hand-rolled per-persona floor loop"*. That deletion is now known to be
+> **cheap mechanically** (Wave 4: six members plus eight rendering markers) and **expensive in
+> verdicts**: it turns this repository's headline Eval-02 gate from green to red, on the paid run, and
+> it does so under every replacement test considered. The two facts point opposite ways, and which one
+> governs is exactly the preference Q6 asks about:
+>
+> * **Answering YES** (the programme stops if the deletion does not happen) now costs a visible ❌ on
+>   the only Eval 02 run anyone has paid for. It is the honest reading — 12 of 12 was `rate > floor`
+>   on 3-token and 4-token denominators — but it is not free any more.
+> * **Answering NO** keeps 12 of 12 and keeps a gate whose bar is *"beat a point estimate"*, on a
+>   metric whose own oracle scores 1.000 with zero model calls.
+>
+> ⚠️ **Nothing here is a recommendation and nothing here changes a shipped number.** The replacement
+> was applied on a **scratch basis and reverted**; `CoverageScore.AboveOwnFloor` is untouched on the
+> tree, GATE 1 still reads `rate > floor`, and the only committed change is the advisory replay line
+> that makes the measurement re-runnable. Re-derive:
+>
+> ```bash
+> E=samples/Galaxus.RecommendationAgent.Evals
+> dotnet run --project $E -- 2 --dry-run | grep -A4 "GATE 1 REPLAY"     # PASS — 12 of 12
+> dotnet run --project $E -- 2 --dry-run --real-vectors | grep -A4 "GATE 1 REPLAY"   # identical
+>
+> # the ablation — Graders/CoverageScore.cs, AboveOwnFloor:
+> #   double.IsNaN(Latent) || double.IsNaN(LatentFloor) || LatentTotal <= 0 ? null
+> #   : ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor).Above;
+> #   -> GATE 1 REPLAY: FAIL — 8 of 12; below USR-MI-02, USR-LM-09, USR-PB-11, USR-NK-12 (both spaces)
+> #
+> # the POSITIVE CONTROL, because an unmoved gate proves nothing on its own:
+> #   ... ? null : Latent >= 0.0;
+> #   -> the STUB-fed GATE 1 (the one that gates the exit code) goes ❌ 9-of-12-below -> ✅ 12 of 12.
+> #      The gating path is live and movable; the ❌ under the ablation is not a stuck value.
+> ```
+>
+> `MEASUREMENT_STATUS` §44 carries the per-persona table, the simulated p-values and the seed.
+
 > ### ⬜ Q5 and Q6 are the only two questions in §9 still open (2026-09-06, Wave 3)
 > Q1, Q3 and Q7 closed at `4d1f1bbc`; **Q2, Q4 and Q8 are answered above.** Q5 and Q6 are left open
 > **on purpose**: both are marked in this document as the user's call, one of them explicitly

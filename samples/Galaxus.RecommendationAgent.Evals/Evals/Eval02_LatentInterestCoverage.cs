@@ -563,6 +563,48 @@ public static class Eval02_LatentInterestCoverage
         bool aboveFloor = ownK.EveryPersonaAboveOwnFloor(ArmLive);
         var below = ownK.PersonasBelowOwnFloor(ArmLive);
 
+        // ── GATE 1, REPLAYED on the PERSISTED live run. ADVISORY — it decides nothing. ──────
+        //
+        // ⚠ WHY THIS EXISTS, and it is a measurement rule rather than a feature. GATE 1 reads
+        // `ownK`, whose live arm in a dry run is the STUB — two products for every persona, which
+        // cannot clear a random draw. So the gate is ❌ *before* anything is changed, and any
+        // ablation of the floor predicate leaves it ❌. **A verdict that cannot move is not
+        // evidence that a change does not move verdicts**: "no movement" and "nobody ran it" are
+        // the same output. The persisted live cells are the only cells on which GATE 1 has ever
+        // been ✅, so they are the only cells on which its verdict can be shown to move — and the
+        // own-k re-read already carries them, scored by the SAME production predicate
+        // (`CoverageScore.AboveOwnFloor`) through the SAME production loop
+        // (`PairedCoverageReport.EveryPersonaAboveOwnFloor`). Replaying it costs nothing and makes
+        // ADR-030 §9 Q6's open half — *does GATE 1's verdict move if the per-persona floor loop is
+        // replaced?* — answerable from a free command instead of a $27 run.
+        //
+        // ⚠ NOT GATED, deliberately. A snapshot on disk must never decide today's exit code: the
+        // file is historical, it is rewritten by any later run, and a gate reading it would let a
+        // stale artifact fail a clean tree. It is reported, and only reported.
+        if (rereadReport is not null)
+        {
+            bool replayAbove = rereadReport.EveryPersonaAboveOwnFloor(ArmLive);
+            var replayBelow = rereadReport.PersonasBelowOwnFloor(ArmLive);
+            int replayRead = rereadReport.Personas
+                .Count(p => rereadReport.ScoreOf(p, ArmLive) is { IsScorable: true });
+
+            notes.Add($"GATE 1 REPLAY (ADVISORY — decides nothing, gates nothing) · the SAME predicate and the SAME "
+                    + $"run over {rereadProvenance.Split(';')[0].Trim()}: "
+                    + (replayRead == 0
+                        ? "NO scorable live persona — the replay is VOID, not a pass."
+                        : (replayAbove ? "PASS" : "FAIL")
+                          + $" — {replayRead - replayBelow.Count} of {replayRead} scorable persona(s) above their OWN floor"
+                          + (replayBelow.Count > 0 ? $"; below: {string.Join(", ", replayBelow)}" : ""))
+                    + ". Read it when you want to know what GATE 1 says about the AGENT: in a dry run the gate above "
+                    + "reads a stub and is ❌ by construction, so it cannot show a floor-rule change moving a verdict "
+                    + "and an unmoved ❌ there proves nothing. ADR-030 §9 Q6.");
+        }
+        else
+        {
+            notes.Add("GATE 1 REPLAY · NOT AVAILABLE — no persisted live run was re-read, so there are no live cells "
+                    + "to replay the per-persona floor loop over. This is an absence, not a pass. ADR-030 §9 Q6.");
+        }
+
         // ⚠ GATE 2 reads EVERY equal-k recall comparison against the primary control — the
         // declared-k one (fair for arms that were GIVEN the budget) and the own-k re-read (fair
         // for a live arm that was not). The control leading on EITHER fails the gate; neither
