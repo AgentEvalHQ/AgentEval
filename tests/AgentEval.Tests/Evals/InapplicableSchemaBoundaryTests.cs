@@ -29,6 +29,16 @@ namespace AgentEval.Tests.Evals;
 /// so nobody has to take "1.4 is deferred" on trust — and so the day the schema bumps, they are the
 /// tests that have to change on purpose rather than the ones that break by surprise.
 /// </para>
+/// <para>
+/// ⚠ <b>THAT DAY WAS 2026-09-06, and this file changed on purpose — the sentence above is the
+/// authorisation, not an exception to it.</b> Q4's answer splits 1.4 in two: <b>(i)</b> widen the
+/// schema now — the READ side — and <b>(ii)</b> defer writing the field and the <c>$id</c> bump to
+/// the next major. Part (i) is here. The two facts that were <c>StillRejects</c> are now
+/// <c>NowAccepts</c>, each carrying the negative direction that makes it a WIDENING rather than an
+/// OPENING; <see cref="SchemaV1_Id_IsStillV1"/> and
+/// <see cref="EveryResultTheLibraryProducesOnItsOwn_StillValidates"/> are untouched and still green,
+/// which is what says part (ii) has not been smuggled in with part (i).
+/// </para>
 /// </summary>
 public class InapplicableSchemaBoundaryTests
 {
@@ -63,19 +73,35 @@ public class InapplicableSchemaBoundaryTests
         """;
 
     [Fact]
-    public void SchemaV1_StillRejects_TheInapplicableLabel()
+    public void SchemaV1_NowAccepts_TheInapplicableLabel_AndStillRejectsAnythingElse()
     {
-        // The label enum is closed: {pass, fail, warn, skipped, error}. Slice 1.4 adds "inapplicable".
-        Assert.False(Validates(Result("""{ "value": 0.0, "label": "inapplicable", "passed": false, "severity": "none" }""")));
+        // ⚠ WIDENED 2026-09-06 — Slice 1.4 part (i), Q4's answer: the READ side of applicability
+        //   lands now, the WRITE side and the `$id` bump wait for the next major. The label enum is
+        //   {pass, fail, warn, skipped, error, inapplicable}.
+        Assert.True(Validates(Result("""{ "value": 0.0, "label": "inapplicable", "passed": false, "severity": "none" }""")));
         Assert.True(Validates(Result("""{ "value": 0.0, "label": "skipped", "passed": false, "severity": "none" }""")));
+
+        // …and it is still an ENUM. Widening a closed set to a larger closed set is the change; a
+        // schema that accepts any label would accept a typo as a verdict.
+        Assert.False(Validates(Result("""{ "value": 0.0, "label": "inapplicible", "passed": false, "severity": "none" }""")));
     }
 
     [Fact]
-    public void SchemaV1_StillRejects_AMeasurementField()
+    public void SchemaV1_NowAccepts_AMeasurementField_ByNamingIt_NotByOpeningTheObject()
     {
-        // additionalProperties: false on `score`. Slice 1.4 adds `score.measurement`.
-        Assert.False(Validates(Result(
+        Assert.True(Validates(Result(
             """{ "value": 0.0, "label": "skipped", "passed": false, "severity": "none", "measurement": "notApplicable" }""")));
+
+        // ⚠ THE TWO DIRECTIONS THAT MAKE THAT A WIDENING RATHER THAN AN OPENING.
+        //   (a) `measurement` is an enum of the three MeasurementState members, so an unknown state
+        //       is refused rather than round-tripped as a string nobody defined.
+        Assert.False(Validates(Result(
+            """{ "value": 0.0, "label": "skipped", "passed": false, "severity": "none", "measurement": "probably" }""")));
+
+        //   (b) `additionalProperties: false` on `score` is UNTOUCHED. If this passed, the field
+        //       would have been admitted by opening the object, and every future typo with it.
+        Assert.False(Validates(Result(
+            """{ "value": 0.0, "label": "skipped", "passed": false, "severity": "none", "measurment": "notApplicable" }""")));
     }
 
     [Fact]
@@ -93,34 +119,35 @@ public class InapplicableSchemaBoundaryTests
     }
 
     [Fact]
-    public void AnInapplicableScore_IsConstructableInMemory_ButItsDocumentDoesNotValidateYet()
+    public void AnInapplicableScore_NowRoundTripsThroughADocumentTheSchemaAccepts()
     {
-        // The honest statement of what Slice 1.1 ships without Slice 1.4, and the reason it is safe:
-        // NOTHING in src/ produces an inapplicable score. It exists only when an author calls the
-        // factory, and that author is opting in to a document schema v1 will not accept. Every result
-        // the library produces on its own is unaffected — which is why 9,354 existing tests pass
-        // unchanged and every historical content hash is untouched.
+        // ⚠ THIS TEST IS THE ONE THAT MOVED, AND IT MOVED ON PURPOSE. Its previous name ended
+        //   "…ButItsDocumentDoesNotValidateYet", and it recorded the deferral: an inapplicable score
+        //   was constructable in memory and its document was out of schema. Part (i) closes that
+        //   half. What has NOT changed is that nothing in src/ PRODUCES an inapplicable score — it
+        //   still exists only when an author calls the factory.
         var na = EvalScore.NotApplicable();
         var json = JsonSerializer.Serialize(na, s_persistenceLike);
 
         // WhenWritingDefault withholds `measurement` only while it IS the default. An actually
-        // inapplicable score emits BOTH halves — the field and the out-of-enum label — and neither
-        // can be suppressed without lying about the score. So the document is out of schema until
-        // 1.4. Recorded, not hidden: the guarantee this slice makes is about the scores the library
-        // PRODUCES, not about every score it can REPRESENT.
+        // inapplicable score emits BOTH halves — the field and the label — and neither can be
+        // suppressed without lying about the score. Both are now in schema.
         Assert.Contains("\"measurement\":\"notApplicable\"", json, StringComparison.Ordinal);
         Assert.Contains("\"label\":\"inapplicable\"", json, StringComparison.Ordinal);
         Assert.Equal(MeasurementState.NotApplicable, na.Measurement);
-        Assert.False(Validates(Result(json)));
+        Assert.True(Validates(Result(json)));
     }
 
     [Fact]
-    public void TheNonBreakingGuarantee_IsAboutWhatTheLibraryProduces()
+    public void TheNonBreakingGuarantee_IsThatNoPRODUCEDDOCUMENTCHANGEDABYTE()
     {
-        // Stated as a pair so the boundary is not mistaken for a wider claim than it is:
-        //   a Measured score  -> no `measurement` field, in-enum label, validates. Every existing
-        //                        producer is in this class, which is why nothing broke.
-        //   an n/a score      -> both halves present, does not validate. Reachable ONLY by calling
+        // Stated as a pair, because widening a schema is only free if the write path did not move:
+        //   a Measured score  -> STILL no `measurement` field, in-enum label, validates. Every
+        //                        existing producer is in this class, so no document the library
+        //                        writes changed and no historical content hash moved. That is the
+        //                        byte-level prediction part (i) makes, checked here rather than
+        //                        promised in a release note.
+        //   an n/a score      -> both halves present, and NOW validates. Reachable only by calling
         //                        EvalScore.NotApplicable() by hand, i.e. by opting in.
         var measured = new EvalScore(0.9, null, "pass", true, null, "none", null);
         var measuredJson = JsonSerializer.Serialize(measured, s_persistenceLike);
@@ -128,7 +155,7 @@ public class InapplicableSchemaBoundaryTests
         Assert.DoesNotContain("measurement", measuredJson, StringComparison.OrdinalIgnoreCase);
         Assert.True(Validates(Result(measuredJson)));
 
-        Assert.False(Validates(Result(JsonSerializer.Serialize(EvalScore.NotApplicable(), s_persistenceLike))));
+        Assert.True(Validates(Result(JsonSerializer.Serialize(EvalScore.NotApplicable(), s_persistenceLike))));
     }
 
     [Fact]

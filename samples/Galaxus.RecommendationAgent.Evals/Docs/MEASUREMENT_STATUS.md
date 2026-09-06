@@ -5578,3 +5578,101 @@ dotnet run --project $E -- 7      # exit 1 — GATE B, unchanged
 #   -> `-- 7` GATE B 3 of 5 (Renzo, Nadia), GATE C passes, exit 1
 #   -> `-- 3` exit 0 (it was 1 before 38.2), census 7 loop / 7 not, false-coverage rows 7 -> 0
 ```
+
+---
+
+## 39. WAVE 4 — plan item 3.4 part (i): the schema is widened, and the process rule is ADJUDICATED (2026-09-06)
+
+**3.4 was the last open item in Phase 3 and §0.6 recorded that it was blocked by a PROCESS rule rather
+than by Q4:** *"widening makes `InapplicableSchemaBoundaryTests.cs` and
+`EvalScoreMeasurementWithExpressionTests.cs` fail by design, and every wave since Wave 2 runs under
+'no existing test file may be edited'."* This section adjudicates that rule, acts on the ruling, and
+corrects the claim.
+
+### 39.1 THE RULING
+
+> **The no-edit rule holds, and this is the case it explicitly makes room for.** The rule exists to
+> stop a wave turning a red test green by editing the test. `InapplicableSchemaBoundaryTests`'s own
+> class docstring says: *"These tests are the checkable form of the deferral … the day the schema
+> bumps, they are the tests that have to change on purpose rather than the ones that break by
+> surprise."* **The test file is the deferral's receipt, and it authorises its own amendment by the
+> change that discharges the deferral.** Editing it here is not an exception to the rule; it is the
+> case the rule was written to distinguish from.
+>
+> **Two conditions make the edit legitimate rather than convenient, and both are met.** (a) Each
+> flipped assertion keeps a NEGATIVE direction, so the schema is shown to have been *widened* rather
+> than *opened*. (b) The tests that pin what part (i) must NOT do — the `$id`, and every result the
+> library produces on its own — are untouched and stayed green, which is the evidence that part (ii)
+> was not smuggled in with part (i).
+
+### 39.2 ⚠️ And §0.6's claim is half wrong: only ONE file failed
+
+Measured by reverting the widening and re-running:
+
+| file | §0.6 said | measured |
+|---|---|---|
+| `InapplicableSchemaBoundaryTests.cs` | fails by design | **fails — 4 of its 6 facts** |
+| `EvalScoreMeasurementWithExpressionTests.cs` | fails by design | **does not fail. Both of its schema-adjacent facts assert only that no `measurement` field is WRITTEN**, and part (i) does not touch the write path |
+
+The second file's *comments* went stale — one said the reason nothing is written is
+`additionalProperties: false`, which after part (i) is no longer the reason — so they are corrected in
+place. **That is a comment-only edit: no assertion in that file changed, and both facts were green
+before and after the widening.**
+
+### 39.3 What part (i) changes
+
+`src/AgentEval.DataLoaders/Output/Schema/v1/eval-result.schema.json`, two lines:
+
+- `score.label` enum `{pass, fail, warn, skipped, error}` → **`+ "inapplicable"`**;
+- `score.measurement` **named** as `{measured, notApplicable, notMeasured}`, optional.
+
+**`additionalProperties: false` on `score` is untouched**, and a test asserts it: a document carrying
+`"measurment"` (typo) is still refused, and so is `"measurement": "probably"`. Widening a closed set
+to a larger closed set is the change; a schema that accepted any label would accept a typo as a
+verdict.
+
+**Not in part (i), and each has a test still green that says so:** the `$id` stays
+`…/schemas/v1/eval-result.schema.json`; nothing in `src/` writes the field, because
+`JsonIgnore(WhenWritingDefault)` is unchanged and no shipped producer makes `Measurement` non-default.
+
+### 39.4 The byte-level prediction, checked rather than promised
+
+**Prediction: no document the library produces changes by a single byte, and no historical content
+hash moves.** Checked three ways:
+
+1. `TheNonBreakingGuarantee_IsThatNoPRODUCEDDOCUMENTCHANGEDABYTE` — a `Measured` score still
+   serialises with **no** `measurement` field and an in-enum label, and validates.
+2. `ContentHasher`'s hash domain is the run's `manifest.json`, `summary.json`, `scenarios/*.json` and
+   `traces/*.json`. **The schema is not in the domain**, so widening it cannot move a hash.
+3. The whole suite, all three target frameworks, including the golden-tree tests:
+
+| | before | after |
+|---|---|---|
+| net10.0 | 9,648 / 0 / 2 of 9,650 | **9,648 / 0 / 2 of 9,650** |
+| net9.0 | — | **9,430 / 0 / 1 of 9,431** |
+| net8.0 | — | **9,430 / 0 / 1 of 9,431** |
+
+⚠️ **The test COUNT did not move, and that is deliberate**: the two `StillRejects` facts were rewritten
+into `NowAccepts` facts in place rather than added beside them. A `StillRejects` fact kept alongside
+its own negation would be a contradiction shipped as coverage.
+
+### 39.5 The ablation
+
+Reverting the two schema lines and re-running `InapplicableSchemaBoundaryTests`:
+**`Failed: 4, Passed: 2, Total: 6`.** Restored: **6 of 6**, and the full suite as tabulated above.
+
+### 39.6 What is still open in 3.4
+
+**Part (ii): write the field, bump the `$id`, and the `ContentHasher` canonical converter.** That is
+the half that moves every historical content hash, and Q4's answer defers it to the next major with
+the byte-level prediction in the release note. Phase 5's serialised half stays blocked on it; Phase
+5's in-memory half was already unblocked.
+
+### 39.7 Commands
+
+```bash
+dotnet test tests/AgentEval.Tests                       # 9,648/0/2 net10 · 9,430/0/1 net9 · 9,430/0/1 net8
+dotnet test tests/AgentEval.Tests -f net10.0 --filter "FullyQualifiedName~InapplicableSchemaBoundary"
+# the ablation: drop "inapplicable" from the label enum and the "measurement" line
+#   -> Failed: 4, Passed: 2, Total: 6
+```

@@ -205,11 +205,17 @@ public class EvalScoreMeasurementWithExpressionTests
     [Fact]
     public void MeasuredScore_DoesNotEmitAMeasurementField()
     {
-        // Schema v1 declares `additionalProperties: false` on `score`. Emitting `measurement`
-        // unconditionally would invalidate every document the library writes and change every
-        // historical ScenarioResult content hash. Persisting it is Slice 1.4, which ADR-030 §9 Q4
-        // still gates — so until then the field is written only when it is NOT the default, which
-        // no shipped producer can currently make it.
+        // Emitting `measurement` unconditionally would change every document the library writes and
+        // therefore every historical ScenarioResult content hash. Persisting it is Slice 1.4 PART
+        // (ii), still deferred to the next major — so the field is written only when it is NOT the
+        // default, which no shipped producer can currently make it.
+        //
+        // ⚠ COMMENT CORRECTED 2026-09-06, behaviour untouched. This used to say the reason was that
+        //   "schema v1 declares additionalProperties: false on score". Part (i) widened the schema to
+        //   NAME `measurement` (and `"inapplicable"`), so the schema is no longer what stops it being
+        //   written; the byte-for-byte stability of every produced document is. The two asserts below
+        //   are unchanged and were green across the widening — which is what says part (i) did not
+        //   smuggle in part (ii).
         var persisted = JsonSerializer.Serialize(MeasuredPass(), s_persistenceLike);
         Assert.DoesNotContain("measurement", persisted, StringComparison.OrdinalIgnoreCase);
 
@@ -229,9 +235,10 @@ public class EvalScoreMeasurementWithExpressionTests
     public void SkippedResult_StillWritesNoMeasurementField()
     {
         // The canonical mapping table says skipped/error SHOULD carry NotMeasured. It cannot until
-        // Slice 1.4 lands, for the schema reason above; the census reads the label meanwhile, so
-        // nothing downstream misclassifies it. Pinned so the day 1.4 lands, this test is the one
-        // that has to change on purpose.
+        // Slice 1.4 PART (ii) lands — the schema accepts it as of part (i), but writing it would move
+        // every produced document; the census reads the label meanwhile, so nothing downstream
+        // misclassifies it. Pinned so the day part (ii) lands, this test is the one that has to
+        // change on purpose.
         var skipped = EvalResult.Skipped(new StubEval(), "no tool definitions were supplied");
 
         var json = JsonSerializer.Serialize(skipped.Score, s_persistenceLike);
