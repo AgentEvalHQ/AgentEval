@@ -5986,8 +5986,25 @@ ablation comes back green for the wrong reason.
 
 ### 42.6 The full sweep — 30 commands, both spaces, every exit code OBSERVED
 
-Nothing was detached. `--no-build` after one `dotnet build AgentEval.sln` (0 errors, 3 warnings, all
-pre-existing in the evals project).
+Nothing was detached. `--no-build` after one `dotnet build AgentEval.sln` — **0 errors**.
+
+⚠️ **A word about the warning count, because "3 warnings" was ambiguous and this document does not get
+to leave an ambiguous number standing.** The **3** figure this plan has carried is the count *owned by
+the evals project*, and it is unchanged by this run — verified by listing them rather than counting
+them:
+
+```
+dotnet build samples/Galaxus.RecommendationAgent.Evals --no-incremental 2>&1   | grep "warning CS" | grep "RecommendationAgent.Evals" | sed 's/ \[.*//' | sort -u
+#   Eval02c_HeldOutNextPurchase.cs(704,97): CS8602
+#   Eval02c_HeldOutNextPurchase.cs(705,88): CS8602
+#   NegativeControls.cs(2058,51):           CS0162
+```
+
+**The SOLUTION-wide number is not 3.** A forced `dotnet build AgentEval.sln --no-incremental` emits
+**221** warnings across every project and TFM (CS8602 146, CS1574 54, CS1573 40, CS8604 18, …), and an
+*incremental* build with nothing to compile prints **0**. All three numbers are true of different
+commands, which is exactly why the command belongs beside the figure. **Errors are 0 under all
+three.**
 
 | # | command | concept | `--real-vectors` | embedding prompt tokens (real) |
 |---|---|---|---|---|
@@ -6117,7 +6134,8 @@ correction of a stale claim left another copy of the stale claim alive somewhere
 ```bash
 E=samples/Galaxus.RecommendationAgent.Evals
 A=samples/Galaxus.RecommendationAgent
-dotnet build AgentEval.sln                          # 0 errors, 3 warnings (pre-existing)
+dotnet build AgentEval.sln                          # 0 errors. Warnings: 0 incremental, 221 forced
+#   the '3' this plan quotes is the EVALS PROJECT's own set — list it, do not count the solution's
 dotnet run --project $E -- 3                        # 0 — 28 gating caught, 6 advisory
 dotnet run --project $E -- 3 --real-vectors         # 0 — was 1 at 4da0556b
 dotnet run --project $E -- 7                        # 1 (GATE B), both spaces
