@@ -10174,3 +10174,330 @@ git log --oneline main..HEAD -- strategy/   # -> empty
 ```
 
 ---
+
+## 66. THE WAVE-7 CLOSE-OUT RUN — the whole state re-taken, nothing purchased (2026-09-06)
+
+**This is a state re-take, not a build and not a review.** No code changed in it: `git status
+--porcelain` was empty at the start and at the end, and the only writes it made were the three
+snapshot keys a model-free sweep always writes. Every figure below was produced by the command
+printed beside it, in this pass, on this tree. Nothing is copied from §62, §64 or §65 — where a
+published figure is quoted for comparison it is named as published and *not* re-derived.
+
+**What it did re-execute** (RUN_PROTOCOL stage 0 — never cite an ablation you have not run):
+§65.10's three filtered test counts and §65.3's ablation, the one whose defect was flattering.
+
+### 66.1 Build — 0 errors, and the warning TOTAL is stable on this tree while the RULE is not
+
+```
+dotnet build AgentEval.sln --no-incremental   ->  0 Error(s), 231 Warning(s)   [invocation 1]
+dotnet build AgentEval.sln --no-incremental   ->  0 Error(s), 231 Warning(s)   [invocation 2]
+```
+
+⚠️ **The two invocations agreeing does NOT restore the total as a quotable quantity.** §54.2 read
+0 / 62 / 224 on the plain command and §62.1 read **226 then 229 on a byte-identical tree** with the
+forced one. Two agreeing readings are evidence about *this* tree and this pair of runs, not about
+the command. **The durable form is unchanged: the set of distinct `file(line,col): warning CODE`
+identities, which is 70 here and `diff`s to nothing between the two builds.**
+
+⚠️ §65.8 also published **70**, and §64.1 published 68 and §62.1 65. **The 70 here is re-derived and
+happens to equal §65.8's; that is agreement between two takings on the same tree, not a carried
+number.** The trees behind 68 and 65 differ and those two must not be quoted beside this one.
+
+### 66.2 Three TFM totals, after a full solution build, `--no-build` per TFM
+
+| TFM | passed / failed / skipped | of |
+|---|---|---|
+| net10.0 | **9,766 / 0 / 2** | 9,768 |
+| net9.0 | **9,548 / 0 / 1** | 9,549 |
+| net8.0 | **9,548 / 0 / 1** | 9,549 |
+
+**Identical to §65.8 on all three, which is the expected result of a pass that changed no code** —
+and it is the arbiter that says so, because a close-out that had accidentally edited a source file
+would show here first. `dotnet test tests/AgentEval.Tests -f <tfm> --no-build`, run after
+`dotnet build AgentEval.sln --no-incremental`, so the multi-TFM stale-binary trap is closed.
+
+**No existing assertion has been weakened anywhere on this branch.** `git diff --numstat main..HEAD
+-- tests/` returns 28 paths and **every one of them is `N  0`** — additions with zero deletions.
+
+### 66.3 Exit codes — 26 commands, both spaces, every one OBSERVED with `$?`
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 1 --dry-run --judge` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | 0 | 0 |
+| `-- 4` | 0 | 0 |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| **`-- 7`** | **1** | **1** |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| **`--ci --dry-run`** | **1** | **1** |
+
+**NOTHING MOVED.** Eval 07 GATE B is still the only red gate in the suite and still the only thing
+between this repo and a green CI command. The CI chain is **10 `passed`** on the tight grep
+`^ *· Eval [0-9a-c]+: passed\.$` in both spaces, with **`Eval 07: FAILED`** the only failure named.
+⚠️ The loose `grep -c ": passed"` returns **11** in both spaces — the known false positive, a
+control's own prose quoting *"Eval 07: passed."* This is the `baca28e4` shape and it is now on its
+sixth sighting; the tight form is the one to use.
+
+**Both spaces genuinely resolved — read off the banner, never inferred from the flag:**
+
+* concept — `Embedding space: concept (galaxus-concept-v2, 24 dims) · queries embedded offline · --concept-vectors`
+* real — `Embedding space: precomputed+azure (text-embedding-3-small, 1536 dims) · 99 committed product vectors · queries embedded LIVE against 'text-embedding-3-small' · space probe 1.0000 · --real-vectors`
+
+⚠️ **`--real-vectors` did NOT silently fall back.** The word "fallback" and its neighbours match
+**four** lines in the real-space `-- 3` log and all four were read and classified: two are the
+scripted-agent banner (*"no model calls · no credentials needed"*, and Eval 03's own *"makes NO
+model call"*), and two are control prose inside box-drawn rows (`UNAVAILABLE` in a dense-leg
+expectation, *"every asset-load fallback"* in a committed-vectors expectation). **None is a
+fallback event.**
+
+### 66.4 The control panel — 42 gating + 7 advisory, verified BY NAME in both spaces
+
+```
+grep -oE "^║ +(✅ caught|❌ NOT CAUGHT) +[A-Za-z0-9_]+" <log> | awk '{print $NF}' | sort -u
+```
+
+| | concept | `--real-vectors` |
+|---|---|---|
+| gating rows, by distinct NAME | **42** | **42** |
+| `❌ NOT CAUGHT` | **0** | **0** |
+| advisory rows, by distinct NAME | **7** | **7** |
+| advisory rows TRIPPING | **2** | **3** |
+
+**The gating name sets `diff` to nothing across the two spaces. So do the advisory name sets.**
+The source-side arbiter agrees: `grep -c '^        rows.Add(' NegativeControls.cs` gives **49 = 42 + 7**.
+
+⚠️ **The tripping ADVISORY set still differs by space and any sentence about it must name one.**
+Concept trips `AuthoredQueryPhraseRetrievability` and `SuppressionDetectorExercised`;
+`--real-vectors` trips those two **plus `DenseLegSaysWhenItRankedNothing`**. Both spaces' five
+non-tripping advisory rows are the same five.
+
+### 66.5 Persistence — the KEY SET, and the ledger against the disk
+
+**14 canonical keys**, derived by stripping the `.YYYYMMDDTHHMMSSZ` archive infix rather than by
+counting files:
+
+```
+eval01_integrity            eval02_coverage_ab          eval02_coverage_ab_probe
+eval02b_stated_need         eval02b_stated_need_probe   eval02c_held_out
+eval02c_held_out_probe      eval03_controls             eval04_injection
+eval05_quality              eval06_trajectory           eval07_topology
+eval09_hypothesis_ab        eval09_hypothesis_ab_probe
+```
+
+**Unchanged across the whole sweep** — the pre-sweep and post-sweep key lists `diff` to nothing. No
+new key, no key lost.
+
+**Ledger against disk, and they agree.** The `--ci --dry-run` run's own write ledger prints
+`Snapshot saved` exactly **three** times in each space, positioned after Eval 03, Eval 04 and
+Eval 07. The disk says the same thing independently: of the fourteen canonical files, **exactly
+three carry an mtime from this sweep** —
+
+| key | before | after |
+|---|---|---|
+| `eval03_controls` | 2026-09-06T18:47:08Z | **2026-09-06T18:54:53Z** |
+| `eval04_injection` | 2026-09-06T18:39:55Z | **2026-09-06T18:54:54Z** |
+| `eval07_topology` | 2026-09-06T18:47:09Z | **2026-09-06T18:54:56Z** |
+
+— and **the other eleven are unchanged to the second**, including all six model-backed keys and both
+headline records. ⚠️ **No file count and no byte size is recorded here**; §42.9 was corrected twice
+for doing that, and the key set plus the mtime window is the form that survives.
+
+⚠️ **The canonical `eval07_topology` and `eval03_controls` hold the REAL-space run**, because the
+sweep ran concept then real and this close-out deliberately re-ran `-- 3 --real-vectors` last after
+its ablation, to leave the store in the sweep's end state rather than the ablation's. The
+space-dependence of the persisted record (§54.6) is unchanged: the two halves differ in `Controls`,
+not only in `RunAt`.
+
+### 66.6 Credentials — 0, over every log this pass produced, with a SYNTHETIC positive control
+
+**31 log files, 38,100 lines**, all produced by this pass.
+
+| # | pattern | hits | classification |
+|---|---|---|---|
+| P1 | `[A-Za-z0-9_]{32,}` (loose, run first) | **29 distinct** | **all 29 classified**: 28 are C# identifiers — control-row names, test-method names, exception and class names — and the 29th is `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, an environment-variable **NAME**, not a value |
+| P2 | `[A-Za-z0-9]{40,}` | **2 distinct** | `ApplicableFractionDoesNotPoolTwoAbsences`, `CoverageCutIsNotTheConfidenceShapeParameter` — both control-row names |
+| P3 | literal `grep -F` endpoint HOST | **0** | — |
+| P4 | literal `grep -F` full endpoint URL | **0** | — |
+| P5 | literal `grep -F` `AZURE_OPENAI_API_KEY` value | **0** | — |
+| P5b | literal `grep -F` `OPENAI_API_KEY` value | **0** | — |
+| P6 | `[A-Za-z0-9_-]+\.openai\.azure\.com` | **0 distinct** | — |
+
+**Reported as a COUNT and never as a value.** ✅ **A SYNTHETIC positive control was planted outside
+the repository and all six patterns fired** (1 · 1 · 2 · 1 · 1 · 2) on a made-up host and a made-up
+48-character key; the file was deleted in the same command and its path re-scanned to **0**. Nothing
+real was ever written, so `RUN_PROTOCOL` stage 0c has nothing to clean up — its stronger form,
+honoured by construction.
+
+✅ **§57.4a's cleanup still HOLDS.** `.agenteval/` carries the endpoint host in exactly **2** files
+and both are the pre-existing `gatekeeper/certs/` pair, dated **2026-07-17** and **2026-07-11** — so
+no run of this pass, and no run of the fourteen unpushed commits, wrote either. The API key: **0
+files**. The three keys this sweep wrote carry host **0** and key **0** apiece.
+
+### 66.7 Stage 0 — the four things this close-out re-EXECUTED rather than re-read
+
+| what §65 published | re-executed here |
+|---|---|
+| `CriterionTextTests` **58 / 0** | **58 / 0** ✅ |
+| `CalibratedEvaluatorTests` **29 / 0** | **29 / 0** ✅ |
+| `ObservationCensusDenominatorTests` (7.6's *"9 new tests"*) | **9 / 0** ✅ |
+| §65.3's ablation: `CoverageArms.cs` Live arm `ReachesAModel: true` → `false` gives `-- 3` **exit 1** | **exit 1**, `NOT CAUGHT CostRowsSayWhichZeroTheyMean`, **1** NOT-CAUGHT row ✅ |
+
+**The ablation is the one worth re-running, because its defect was flattering**: before `d0ee4f4c`
+the same mutation left `-- 3` at exit 0 while Eval 02 printed *"This zero is measured, not missing"*
+over 2,952 recorded tokens. It now gates.
+
+⚠️ **The restore was made FROM A COPY taken before the mutation, never with `git checkout --`** —
+`cp` to the scratchpad first, `cp` back after. Wave 6 lost a whole item's work to the other order
+(§61.11). After the restore, `git diff` on that path is empty, `git status --porcelain` is empty,
+and `-- 3` is back to **exit 0 · 42 gating rows · 0 NOT CAUGHT**.
+
+### 66.8 The two headline claims — did they move? **NO**, and measured two ways
+
+The fourteen unpushed commits (`fa95f214..HEAD`, `a0e23518` first, `e3a11d2f` last) changed **21
+paths**. Neither instrument is among them:
+
+```
+git diff --name-only fa95f214..HEAD | grep -c "Eval02b_StatedNeedSatisfaction\|Eval02c_HeldOutNextPurchase"   # -> 0
+```
+
+And neither instrument's stored record moved — read from the JSON's own `RunAt`, not from an mtime:
+
+* `eval02b_stated_need` — `"RunAt": "2026-09-05T17:53:19.8608498Z"`
+* `eval02c_held_out` — `"RunAt": "2026-09-05T18:20:12.5118072Z"`
+
+Both stamped **2026-09-05**, before the first of the fourteen commits (`a0e23518`,
+`2026-09-06T18:08:36+02:00`). **The 0.889 / 1.000 at equal mean k, the 0.949, the 0.385, W/L/T
+3/1/9, p = 0.6250 and the 0.125 attainable floor all stand exactly as §21 and §23 left them.**
+
+### 66.9 🟡 ADR-030 / ADR-031 adoption by the Galaxus sample, measured BY NAMESPACE — and the namespace grep everyone would reach for is WRONG here
+
+**This was measured wrongly once already** (a symbol grep counted strings and concluded Slice 2 was
+in use), so it was measured by namespace this time. **The obvious namespace measurement is also
+wrong, in the opposite direction:**
+
+```
+grep -rn "using AgentEval.Evals.Meta" samples/Galaxus.RecommendationAgent.Evals samples/Galaxus.RecommendationAgent --include=*.cs
+```
+
+returns **exactly one hit, and it is a doc comment saying there is no such using** — the
+`baca28e4` shape yet again, this time inside `NegativeControls.cs:7366`. Taken at face value it
+reads as one adoption; taken as "no `using` exists" it reads as zero. **Both readings are false.**
+
+**The correct measurement is the fully-qualified reference**, because the sample adopts the type
+without importing the namespace:
+
+| | measured |
+|---|---|
+| `using AgentEval.Evals.Meta` in the sample | **0** (the single grep hit is prose) |
+| `AgentEval.Evals.Meta.<Type>` fully-qualified construction sites | **4**, all `ObservationCensus`, all in `NegativeControls.cs` (`:7375`, `:7412`, `:7429`, `:7433`) |
+| distinct ADR-030 Slice 2 types the sample uses | **1 — `ObservationCensus`** |
+| ADR-031 types the sample uses | **0**, and it could not be otherwise: `AgentEval.Packs` does not exist in `src/` at all, and none of ADR-031's eleven named types (`PackIdentity`, `PackRef`, `PackLayout`, `RunManifest`, `ICorpusInvariant`, `CorpusDrift`, `PackBaseline`, `FloorLedgerEntry`, `FloorLedger`, `RunStats`, `IPackHost`) appears anywhere in the sample |
+
+⚠️ **The sample's own `Observation`, `ChanceFloors` and `ExactBinomial` are LOCAL types and remain
+so** — `Eval07_WorkflowTopology.cs:1523` (`private sealed record Observation`),
+`Graders/ChanceFloors.cs:24`, `Evals/ExactBinomial.cs:79`. A bare-name grep on those three returns
+26 + 24 + 34 hits and **not one of them is a library type**. That is the mistake this row exists to
+prevent.
+
+⚠️ **And one more symbol that looks adopted and is not:** `EvaluatorCardRegistry` has **6 hits in
+`src/`** — all in `AgentEval.MissionControl`, which is where 7.6's follow-on says it should *stop*
+being. The follow-on is *"relocate `EvaluatorCardRegistry` to Core"*; a hit count says it exists,
+not that anything was done.
+
+### 66.10 What this close-out does NOT claim
+
+* **Nothing was purchased and no agent-side verdict was re-measured.** Every model-backed eval ran
+  under `--dry-run` or against a stub. The one live thing touched was the embedding query path,
+  which the real-space banner reports and which spends embedding tokens only.
+* **It re-executed FOUR of §65's thirty-one ablations, not thirty-one.** §65 is the pass that
+  re-executed all of them; this one re-ran the three published test counts and the single ablation
+  whose defect was in the flattering direction. **The other 27 are cited here on §65's authority,
+  not re-taken.**
+* **No judged verdict and no gate's internal reasoning was re-taken** — the same exclusion §0.1's
+  "independently re-taken" row has carried since §43.
+* **The 231 warning total is not offered as a property of the command.** Two invocations agreeing
+  is one more observation than §62.1 had when it read 226 then 229; it is not a refutation of that.
+* **The sha sweep uses a narrower pattern than §65's, and a sweep of a document you are ABOUT TO
+  EDIT is stale the moment you paste it.** Backtick-delimited 8-hex only. Swept **before** this
+  section was appended and before §0 was edited: `MASTER_PLAN` **102** distinct,
+  `MEASUREMENT_STATUS` **73**. Swept **after** both edits: `MEASUREMENT_STATUS` **74** and
+  `MASTER_PLAN` **110**. §66 introduces exactly one sha this document did not already carry —
+  `e3a11d2f`, the HEAD it was written at — and the §0 rewrite introduces **eight** into the plan,
+  the nine `src/`-touching library commits minus the six it already named. **The published figures
+  are the 74 and the 110**; the pre-edit pair is named only so the +1 and the +8 are accounted for
+  rather than looking like drift. ⚠️ **A sha sweep of a document you are about to edit is stale the
+  moment you paste it, and both counts here were re-taken after the last edit.** **1 unresolved in
+  each**, and it is
+  `b41262e2` in both — §47.4's known false positive, quoted inside its own correction. §65 reported
+  86 for this document under a looser pattern; **the counts differ because the patterns do, and
+  neither is the other's refutation.**
+
+### 66.11 How to re-derive §66 — every command, spending nothing
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+
+# 66.1 - build. Report the command with the number or neither.
+dotnet build AgentEval.sln --no-incremental 2>&1 | tail -3                      # 0 Error(s)
+dotnet build AgentEval.sln --no-incremental 2>&1 \
+  | grep -oE "[A-Za-z0-9_\.]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+" | sort -u | wc -l   # -> 70
+
+# 66.2 - tests, after the full build above.
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
+git diff --numstat main..HEAD -- tests/    # 28 rows, every one "N  0"
+
+# 66.3 - 26 exit codes, both spaces, $? on each.
+for s in "" "--real-vectors"; do for c in "1 --dry-run" "1 --dry-run --judge" "2 --dry-run" \
+  "2b --dry-run" "2c --dry-run" 3 4 "5 --dry-run" "6 --dry-run" 7 "8 --dry-run" "9 --dry-run" \
+  "--ci --dry-run"; do dotnet run --project $E --no-build -- $c $s >/dev/null 2>&1
+  echo "$c $s -> $?"; done; done
+grep -cE "^ *. Eval [0-9a-c]+: passed\.$" ci.log     # -> 10   (loose ": passed" -> 11, false +1)
+grep -iE "Embedding space:" three.log                # the banner. NEVER infer from the flag.
+
+# 66.4 - the panel, by NAME, both spaces, then diff the two name sets.
+grep -oE "^. +(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+" three.log | awk '{print $NF}' | sort -u
+grep -oE "^. +(. finding ok|.  FINDING) +[A-Za-z0-9_]+ +\(advisory" three.log | sort -u
+grep -c '^        rows.Add(' $E/Evals/NegativeControls.cs                        # -> 49 = 42 + 7
+
+# 66.5 - persistence. Key set and mtime window. NEVER a file count, NEVER a byte size.
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+ls $S | grep -vE "\.[0-9]{8}T[0-9]{6}Z\.json$" | sed 's/\.json$//' | sort      # -> 14 keys
+grep -c "Snapshot saved" ci.log                                                # -> 3, both spaces
+
+# 66.6 - credentials. Loose first, classify every hit, then literals as COUNTS ONLY.
+grep -rhoE "[A-Za-z0-9_]{32,}" *.log | sort -u        # -> 29, all identifiers or one env-var NAME
+HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed -E 's#^https?://##; s#/.*$##')
+grep -rF -c "$HOST" *.log ; grep -rF -c "$AZURE_OPENAI_API_KEY" *.log          # -> 0 and 0
+#   the positive control is SYNTHETIC - a made-up host and a made-up 48-char key, planted
+#   outside the repo, all six patterns fired, deleted in the same command, path re-scanned to 0.
+
+# 66.7 - stage 0. cp the file FIRST; restore FROM THE COPY, never `git checkout --`.
+cp $E/Evals/CoverageArms.cs "$SCRATCH/CoverageArms.BASELINE"
+sed -i 's/ReachesAModel: true)/ReachesAModel: false)/' $E/Evals/CoverageArms.cs
+dotnet build $E -f net10.0 && dotnet run --project $E --no-build -f net10.0 -- 3 ; echo $?   # -> 1
+cp "$SCRATCH/CoverageArms.BASELINE" $E/Evals/CoverageArms.cs                    # then rebuild -> 0
+
+# 66.8 - the two headline claims, both arbiters.
+git diff --name-only fa95f214..HEAD | grep -c "Eval02b_StatedNeed\|Eval02c_HeldOut"     # -> 0
+grep -oE '"RunAt"[^,]+' $S/eval02b_stated_need.json $S/eval02c_held_out.json            # -> 09-05
+
+# 66.9 - adoption BY NAMESPACE. The `using` grep is a false positive; the FQN grep is the answer.
+grep -rn "using AgentEval.Evals.Meta" $E samples/Galaxus.RecommendationAgent --include=*.cs
+                                                       # -> 1 hit, and it is a doc comment
+grep -rn "AgentEval\.Evals\.Meta\." $E --include=*.cs   # -> 4, all ObservationCensus
+grep -rn "namespace AgentEval.Packs" src/               # -> nothing; ADR-031 has no surface
+
+# 66.10 - the sha sweep, with the pattern named beside the count.
+for f in strategy/Galaxus/MASTER_PLAN.md $E/Docs/MEASUREMENT_STATUS.md; do
+  grep -ohE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u | while read s; do
+    git cat-file -e "$s^{commit}" 2>/dev/null || echo "UNRESOLVED $s in $f"; done; done
+                                                       # -> b41262e2 in both, and nothing else
+```
+
+---
