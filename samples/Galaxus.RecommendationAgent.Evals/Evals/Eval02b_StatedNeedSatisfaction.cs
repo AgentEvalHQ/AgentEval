@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval02b_stated_need — the suite's only non-circular precision record
 
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Agents;

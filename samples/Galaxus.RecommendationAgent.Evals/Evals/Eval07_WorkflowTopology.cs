@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval07_topology — the topology record, byte-compared across waves
 
 using System.Runtime.CompilerServices;
 using AgentEval.Assertions;

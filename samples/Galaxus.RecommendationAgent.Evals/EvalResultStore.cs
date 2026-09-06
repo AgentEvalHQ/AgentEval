@@ -52,6 +52,12 @@ public static class EvalResultStore
     /// <summary>Snapshot key for the negative-control run.</summary>
     public const string ControlsKey = "eval03_controls";
 
+    /// <summary>Snapshot key for Eval 05.</summary>
+    public const string QualityKey = "eval05_quality";
+
+    /// <summary>Snapshot key for Eval 06.</summary>
+    public const string TrajectoryKey = "eval06_trajectory";
+
     private static readonly List<string> WrittenKeys = [];
 
     /// <summary>
@@ -145,6 +151,24 @@ public static class EvalResultStore
     /// <summary>Loads the negative-control snapshot, or null when it has never been written.</summary>
     /// <param name="key">Storage key.</param>
     public static ControlSnapshot? LoadControls(string key) => Read<ControlSnapshot>(key);
+
+    /// <summary>Saves the Eval 05 judged-quality snapshot.</summary>
+    /// <param name="key">Storage key, normally <see cref="QualityKey"/>.</param>
+    /// <param name="snapshot">The snapshot.</param>
+    public static void SaveQuality(string key, QualitySnapshot snapshot) => Write(key, snapshot);
+
+    /// <summary>Loads the Eval 05 snapshot, or null when it has never been written.</summary>
+    /// <param name="key">Storage key.</param>
+    public static QualitySnapshot? LoadQuality(string key) => Read<QualitySnapshot>(key);
+
+    /// <summary>Saves the Eval 06 tool-trajectory snapshot.</summary>
+    /// <param name="key">Storage key, normally <see cref="TrajectoryKey"/>.</param>
+    /// <param name="snapshot">The snapshot.</param>
+    public static void SaveTrajectory(string key, TrajectorySnapshot snapshot) => Write(key, snapshot);
+
+    /// <summary>Loads the Eval 06 snapshot, or null when it has never been written.</summary>
+    /// <param name="key">Storage key.</param>
+    public static TrajectorySnapshot? LoadTrajectory(string key) => Read<TrajectorySnapshot>(key);
 
     private static void Write<T>(string key, T snapshot)
     {
@@ -415,3 +439,129 @@ public sealed record ControlRowSnapshot(
     string Observed,
     bool Tripped,
     bool Gating = true);
+
+/// <summary>
+/// One judged-quality cell from Eval 05 — one persona, one arm.
+/// </summary>
+/// <remarks>
+/// ⚠ <b>The weighted score and the instrument flag travel together, and neither is quotable
+/// alone.</b> <c>InstrumentFailed</c> is true when the judge returned no verdict for a declared
+/// criterion, and the weighted score then contains a zero that is an artefact of the instrument
+/// rather than a fact about the answer. A stored score with no flag beside it is exactly how
+/// correction ⑫ happened.
+/// </remarks>
+/// <param name="CaseId">The persona/case.</param>
+/// <param name="Arm">"agent" or "popularity".</param>
+/// <param name="WeightedScore">0-100 over the DECLARED rubric, never over the criteria that came back.</param>
+/// <param name="HolisticScore">The harness's own overall score. Reported for contrast, never used in a gate.</param>
+/// <param name="InstrumentFailed">True when a declared criterion came back without a verdict.</param>
+/// <param name="Presentations">How many products the arm presented.</param>
+/// <param name="EvidenceResolved">How many presentations carried resolvable evidence.</param>
+/// <param name="ExtraCriteriaCount">Criteria the judge returned that did not join to the rubric.</param>
+/// <param name="CostUsd">Agent-turn cost. The judge call is NOT in this figure.</param>
+/// <param name="Error">A harness-level exception, when the turn threw.</param>
+public sealed record QualityCellSnapshot(
+    string CaseId,
+    string Arm,
+    double WeightedScore,
+    int HolisticScore,
+    bool InstrumentFailed,
+    int Presentations,
+    int EvidenceResolved,
+    int ExtraCriteriaCount,
+    decimal? CostUsd,
+    string? Error);
+
+/// <summary>Serialisable snapshot of one Eval 05 run.</summary>
+/// <remarks>
+/// <para>
+/// <b>Why this exists (plan item 8.20).</b> Eval 05 persisted nothing and said nothing about it,
+/// while being the eval whose own re-grade spread on ONE fixed input is <b>25 points</b>
+/// (45/30/35/55/35, <c>SUITE_SUMMARY</c> §18.1). A judged number with that much spread is the one
+/// number in the suite most in need of a stored baseline, because a single run of it cannot be
+/// distinguished from noise without one.
+/// </para>
+/// <para>
+/// ⚠ It is a RECORD, not a gate. Nothing reads it to decide anything, and the margin between the
+/// arms it stores is smaller than the spread above — so a later reader comparing two of these files
+/// is looking at two draws, not at a change.
+/// </para>
+/// </remarks>
+public sealed record QualitySnapshot
+{
+    /// <summary>Human-readable label.</summary>
+    public string Label { get; init; } = "";
+
+    /// <summary>Every cell, agent and control arms alike.</summary>
+    public List<QualityCellSnapshot> Cells { get; init; } = [];
+
+    /// <summary>True when the eval's gate passed.</summary>
+    public bool GatePassed { get; init; }
+
+    /// <summary>Cells whose judge left a declared criterion unanswered.</summary>
+    public int InstrumentFailures { get; init; }
+
+    /// <summary>The judge deployment, so two files scored by two judges are not compared silently.</summary>
+    public string JudgeModel { get; init; } = "";
+
+    /// <summary>
+    /// The measured re-grade spread on one fixed input, in points, at authoring time.
+    /// </summary>
+    /// <remarks>
+    /// Stored beside the scores on purpose: it is the bound on every number in this file, and a
+    /// reader who has the scores without it will over-read a difference smaller than the noise.
+    /// </remarks>
+    public int JudgeSpreadPoints { get; init; }
+
+    /// <summary>When the run happened.</summary>
+    public DateTime RunAt { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>One Eval 06 trajectory case.</summary>
+/// <param name="CaseId">The case.</param>
+/// <param name="Passed">Every authored claim held.</param>
+/// <param name="FailedClaims">The claims that did not hold, verbatim.</param>
+/// <param name="ToolNames">Tool names in call order — the trajectory itself.</param>
+/// <param name="PresentedCount">Products presented.</param>
+/// <param name="ApprovalRequests">Commit calls that reached the approval gate.</param>
+/// <param name="BudgetUsed">Distinct tool calls charged against the per-turn budget.</param>
+/// <param name="BudgetCap">The cap.</param>
+/// <param name="BudgetOverrun">True when a tool answered with the budget-exhausted refusal.</param>
+/// <param name="CostUsd">Estimated turn cost.</param>
+public sealed record TrajectoryCaseSnapshot(
+    string CaseId,
+    bool Passed,
+    IReadOnlyList<string> FailedClaims,
+    IReadOnlyList<string> ToolNames,
+    int PresentedCount,
+    int ApprovalRequests,
+    int BudgetUsed,
+    int BudgetCap,
+    bool BudgetOverrun,
+    decimal? CostUsd);
+
+/// <summary>Serialisable snapshot of one Eval 06 run.</summary>
+/// <remarks>
+/// <b>Why this exists (plan item 8.20).</b> Eval 06 persisted nothing and said nothing about it.
+/// The ORDER of tool names is the eval's whole subject and it is not recoverable from any other
+/// record in the store — T-02's opt-out violation is visible only as <c>GetInterestMap</c> sitting
+/// at position #6 of a trajectory, and without this file that observation exists solely in a
+/// console log that <c>.gitignore</c> keeps out of the repository.
+/// </remarks>
+public sealed record TrajectorySnapshot
+{
+    /// <summary>Human-readable label.</summary>
+    public string Label { get; init; } = "";
+
+    /// <summary>One row per case, in run order.</summary>
+    public List<TrajectoryCaseSnapshot> Cases { get; init; } = [];
+
+    /// <summary>True when every case's every claim held.</summary>
+    public bool GatePassed { get; init; }
+
+    /// <summary>The agent deployment.</summary>
+    public string Model { get; init; } = "";
+
+    /// <summary>When the run happened.</summary>
+    public DateTime RunAt { get; init; } = DateTime.UtcNow;
+}

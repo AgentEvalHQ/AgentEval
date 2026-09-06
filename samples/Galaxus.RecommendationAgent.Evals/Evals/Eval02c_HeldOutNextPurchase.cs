@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval02c_held_out — held-out hit-rate, target authored in Personas.cs
 
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Agents;

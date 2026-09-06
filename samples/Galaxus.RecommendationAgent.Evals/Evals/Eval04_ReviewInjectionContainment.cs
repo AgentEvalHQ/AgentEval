@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval04_injection — real and model-free, so it persists on a dry run too
 
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Evals.Adapters;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval06_trajectory — the tool ORDER is recoverable from no other record (8.20)
 
 using System.Text.RegularExpressions;
 using AgentEval.Assertions;
@@ -160,7 +162,55 @@ public static class Eval06_ToolTrajectory
         PrintReport(rows, "Eval 06 — Tool Trajectory");
         bool passed = rows.All(r => r.Passed);
         PrintGate(rows, passed, dryRun: false);
+        PersistRun(rows, passed);
         return passed ? 0 : 1;
+    }
+
+    /// <summary>Writes the run's record. Live path only — a dry run has no trajectory to record.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.20.</b> This eval persisted nothing and said nothing about it. What it
+    /// measures — the ORDER of the tool calls — is recoverable from no other record in the store,
+    /// and the suite's headline agent defect is exactly an order fact: with personalization OFF the
+    /// agent called <c>GetInterestMap</c> at <b>position #6</b>, after four category searches. Until
+    /// this file existed that observation survived only in a console log, in a directory
+    /// <c>.gitignore</c> keeps out of the repository.
+    /// </para>
+    /// <para>
+    /// ⚠ A RECORD, not a gate. Nothing reads it, and the claims it stores are the AUTHORED ones —
+    /// re-deriving a contract from a stored trace would let a later run's trajectory become its own
+    /// expectation.
+    /// </para>
+    /// </remarks>
+    /// <param name="rows">The graded cases, in run order.</param>
+    /// <param name="passed">The gate's verdict.</param>
+    private static void PersistRun(IReadOnlyList<TrajectoryRow> rows, bool passed)
+    {
+        EvalResultStore.SaveTrajectory(EvalResultStore.TrajectoryKey, new TrajectorySnapshot
+        {
+            Label = "Eval 06 — Tool Trajectory",
+            Cases =
+            [
+                .. rows.Select(r => new TrajectoryCaseSnapshot(
+                    r.Case.Id,
+                    r.Passed,
+                    [.. r.Failures.Select(f => f.Claim)],
+                    r.ToolNames,
+                    r.PresentedCount,
+                    r.ApprovalRequests,
+                    r.BudgetUsed,
+                    r.BudgetCap,
+                    r.BudgetOverrun,
+                    r.EstimatedCost)),
+            ],
+            GatePassed = passed,
+            Model = Config.Model,
+        });
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"  📁 Snapshot saved → {EvalResultStore.StorageLocation}");
+        Console.WriteLine("     ⚠ a RECORD, not a gate: nothing reads it, and the claims stored are the AUTHORED ones.");
+        Console.ResetColor();
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════════

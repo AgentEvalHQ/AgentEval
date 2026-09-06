@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval09_hypothesis_ab — the A/B record, with its label a required parameter
 
 using System.Globalization;
 using Azure.AI.OpenAI;

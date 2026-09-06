@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: deliberately-none nothing in this suite consumes a stability snapshot, and a number in a shared store that no gate reads is a hazard a later reader can mistake for one that is (Eval08:316-319)
 
 using System.Globalization;
 using AgentEval.Assertions;

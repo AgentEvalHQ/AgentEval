@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
 
 using AgentEval.MAF;
 using Microsoft.Extensions.AI;                 // AIFunctionFactory — the REAL marshalling path, control 22
@@ -105,6 +107,7 @@ public static class NegativeControls
         rows.Add(CheckUnnameableInterestPresentsNothing());
         rows.Add(await CheckRefusalDetectorsSeeTheRealShapeAsync().ConfigureAwait(false));
         rows.Add(CheckWriteLedgerMatchesTheStore());
+        rows.Add(CheckEveryEvalDeclaresItsSnapshotPolicy());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -3043,6 +3046,218 @@ public static class NegativeControls
 
         throw new DirectoryNotFoundException(
             "the eval project's source directory was not found from " + AppContext.BaseDirectory);
+    }
+
+    // ══ Control 24 — silence about persistence is the defect (plan item 8.20). ═══════════
+    //
+    /// <summary>
+    /// Every eval must DECLARE whether it persists a snapshot, and the declaration must match what
+    /// the file actually does.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> Evals 05 and 06 persisted nothing and said nothing about it. Eval 08 also
+    /// persists nothing and states its reason in code — nothing consumes a stability snapshot, and a
+    /// number in a shared store that no gate reads is a hazard. Two silences that look identical
+    /// from outside, one deliberate and two not, and no way to tell which is which without reading
+    /// three files. <b>The silence was the thing to fix, not the absence of a file.</b>
+    /// </para>
+    /// <para>
+    /// <b>Membership must EQUAL behaviour.</b> A control asserting only "every eval declares
+    /// something" would pass on a file declaring <c>writes</c> and writing nothing — which is the
+    /// original defect wearing a comment. The declared policy is compared against whether the file
+    /// actually calls a store, in both directions.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It asserts its own INPUT.</b> A source scan that finds no offenders is
+    /// indistinguishable from a source scan that found no files — the silent-<c>{}</c> shape this
+    /// repository has a standing rule about, and the exact defect <c>8f3e11c7</c> fixed in the
+    /// meta-lane grep gate. This row fails if it scanned too few files, if nothing declares
+    /// <c>writes</c>, or if nothing declares <c>deliberately-none</c>.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckEveryEvalDeclaresItsSnapshotPolicy()
+    {
+        var problems = new List<string>();
+        const string marker = "// SNAPSHOT-POLICY:";
+        const int minimumFilesScanned = 10;
+
+        string evalsDir = Path.Combine(SampleSourceRoot(), "Evals");
+        var files = Directory.GetFiles(evalsDir, "Eval*.cs")
+            .Concat(Directory.GetFiles(evalsDir, "NegativeControls.cs"))
+            .Where(f => !Path.GetFileName(f).Equals("EvalPanel.cs", StringComparison.Ordinal))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+
+        int writes = 0;
+        int none = 0;
+
+        foreach (string file in files)
+        {
+            string name = Path.GetFileName(file);
+            string body = File.ReadAllText(file);
+
+            string? declaration = body.Split('\n')
+                .Select(l => l.Trim())
+                .FirstOrDefault(l => l.StartsWith(marker, StringComparison.Ordinal));
+
+            if (declaration is null)
+            {
+                problems.Add($"{name} declares no SNAPSHOT-POLICY — whether it persists is knowable only by reading it.");
+                continue;
+            }
+
+            string value = declaration[marker.Length..].Trim();
+            bool declaresWrites = value.StartsWith("writes", StringComparison.Ordinal);
+            bool declaresNone = value.StartsWith("deliberately-none", StringComparison.Ordinal);
+
+            if (!declaresWrites && !declaresNone)
+            {
+                problems.Add($"{name}'s SNAPSHOT-POLICY is neither 'writes' nor 'deliberately-none': \"{Shorten(value, 40)}\".");
+                continue;
+            }
+
+            // A "deliberately-none" with no reason after it is the silence again, spelled as a tag.
+            if (declaresNone && value.Length <= "deliberately-none".Length + 20)
+                problems.Add($"{name} declares deliberately-none and gives no reason — that is the silence 8.20 exists to remove.");
+
+            bool actuallyWrites = body.Contains("EvalResultStore.Save", StringComparison.Ordinal)
+                               || body.Contains("OfflineSnapshotStore.Save", StringComparison.Ordinal);
+
+            if (declaresWrites && !actuallyWrites)
+                problems.Add($"{name} declares it writes a snapshot and calls no store — a comment is not a record.");
+            if (declaresNone && actuallyWrites)
+                problems.Add($"{name} declares deliberately-none and calls a store — the declaration is stale.");
+
+            if (declaresWrites) writes++; else none++;
+        }
+
+        // ── The two NEW records must survive the round trip, with the AWKWARD values the live
+        //    path can actually produce. Neither write is reachable from a dry run — both sit on the
+        //    live branch — so RUN_PROTOCOL's stage 1 is structurally blind to them, and a record
+        //    that throws or silently loses a field would first be discovered on a paid run.
+        //
+        //    ⚠ NaN IS THE AWKWARD VALUE HERE, not a null. It is how this suite spells an EMPTY
+        //      DENOMINATOR, EvalResultStore's serialiser is configured for it on purpose, and a
+        //      store that turned it into 0 would turn "we could not score this" into "it scored
+        //      zero" — the flattering direction. A probe carrying only plausible values would be
+        //      the stub-kinder-than-reality shape RUN_PROTOCOL names.
+        const string qualityProbe = "eval05_quality_probe";
+        const string trajectoryProbe = "eval06_trajectory_probe";
+        string qualityPath = Path.Combine(EvalResultStore.StorageLocation, $"{qualityProbe}.json");
+        string trajectoryPath = Path.Combine(EvalResultStore.StorageLocation, $"{trajectoryProbe}.json");
+
+        // ⚠ CONTAINED. A serialiser that refuses one of these values throws, and an uncontained
+        //   throw here unwinds the whole control panel — 23 rows and the snapshot lost to row 24.
+        //   That is correction ⑬ item 6's lesson, in the row that was written after it. The type
+        //   and message are printed verbatim, because "the record did not round-trip" without the
+        //   exception is a finding nobody can act on.
+        try
+        {
+            EvalResultStore.SaveQuality(qualityProbe, new QualitySnapshot
+            {
+                Label = "round-trip probe",
+                Cells =
+                [
+                    new QualityCellSnapshot("USR-XX-99", "agent", double.NaN, 0, true, 0, 0, 3, null, "the turn threw"),
+                    new QualityCellSnapshot("USR-XX-99", "popularity", 42.5, 61, false, 5, 5, 0, 0.1234m, null),
+                ],
+                GatePassed = false,
+                InstrumentFailures = 1,
+                JudgeModel = "probe",
+                JudgeSpreadPoints = Eval05_RecommendationQuality.MeasuredJudgeSpreadPoints,
+            });
+
+            var quality = EvalResultStore.LoadQuality(qualityProbe);
+            if (quality is null)
+            {
+                problems.Add("the Eval 05 record did not read back at all.");
+            }
+            else
+            {
+                if (quality.Cells.Count != 2)
+                    problems.Add($"the Eval 05 record round-tripped {quality.Cells.Count} cell(s) of 2.");
+                else
+                {
+                    if (!double.IsNaN(quality.Cells[0].WeightedScore))
+                        problems.Add($"a NaN weighted score came back as {quality.Cells[0].WeightedScore} — an unscorable cell would read as a scored one.");
+                    if (!quality.Cells[0].InstrumentFailed)
+                        problems.Add("the instrument-failure flag was lost on the round trip — a score with no flag beside it is how correction ⑫ happened.");
+                    if (quality.Cells[1].CostUsd != 0.1234m)
+                        problems.Add($"a decimal cost came back as {quality.Cells[1].CostUsd}.");
+                }
+
+                if (quality.JudgeSpreadPoints != Eval05_RecommendationQuality.MeasuredJudgeSpreadPoints)
+                    problems.Add("the judge spread was lost — the bound on every score in the file is not in the file.");
+            }
+
+            EvalResultStore.SaveTrajectory(trajectoryProbe, new TrajectorySnapshot
+            {
+                Label = "round-trip probe",
+                Cases =
+                [
+                    new TrajectoryCaseSnapshot("T-99", false, ["a claim that did not hold"],
+                        ["GetUserProfile", "SearchProductsByMeaning", "GetInterestMap"], 0, 0, 3, 12, false, null),
+                ],
+                GatePassed = false,
+                Model = "probe",
+            });
+
+            var trajectory = EvalResultStore.LoadTrajectory(trajectoryProbe);
+            if (trajectory is null)
+            {
+                problems.Add("the Eval 06 record did not read back at all.");
+            }
+            else if (trajectory.Cases.Count != 1)
+            {
+                problems.Add($"the Eval 06 record round-tripped {trajectory.Cases.Count} case(s) of 1.");
+            }
+            else
+            {
+                // The ORDER is the whole subject of Eval 06 — an unordered set would lose the only
+                // thing the record carries that no other file in the store does.
+                if (!trajectory.Cases[0].ToolNames.SequenceEqual(["GetUserProfile", "SearchProductsByMeaning", "GetInterestMap"], StringComparer.Ordinal))
+                    problems.Add($"the tool ORDER did not survive: [{string.Join(", ", trajectory.Cases[0].ToolNames)}].");
+                if (trajectory.Cases[0].FailedClaims.Count != 1)
+                    problems.Add("the failed claims were lost on the round trip.");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            problems.Add($"the round trip threw {ex.GetType().Name}: {Shorten(ex.Message, 90)} — a record that cannot "
+                       + "be written is a record the live run will discover on the paid path, which is where this "
+                       + "suite can least afford to find one.");
+        }
+        finally
+        {
+            if (File.Exists(qualityPath)) File.Delete(qualityPath);
+            if (File.Exists(trajectoryPath)) File.Delete(trajectoryPath);
+        }
+
+        // ── The row's own input. Without these three, an empty scan reads as a clean suite. ──
+        if (files.Count < minimumFilesScanned)
+            problems.Add($"only {files.Count} eval file(s) were scanned from '{evalsDir}' — this row is asserting almost nothing.");
+        if (writes == 0)
+            problems.Add("no eval declares that it writes a snapshot — the scan is not reading what it thinks it is.");
+        if (none == 0)
+            problems.Add("no eval declares deliberately-none — the 'declaration must match behaviour' check has only one side to test.");
+
+        return new ControlRowSnapshot(
+            "EveryEvalDeclaresItsSnapshotPolicy",
+            "silence about persistence is the defect. Evals 05 and 06 wrote no snapshot and said nothing about it, "
+          + "while Eval 08 wrote none and stated its reason in code — three identical-looking silences, one "
+          + "deliberate and two accidental, and no way to tell them apart without reading three files. Every eval now "
+          + "carries a SNAPSHOT-POLICY line, 'deliberately-none' must carry a reason, and the declaration is checked "
+          + "AGAINST the file's actual store calls in both directions — a comment is not a record, and a stale "
+          + "declaration is worse than none. The row also asserts its own input, because a source scan that finds no "
+          + "offenders and a source scan that found no files look identical.",
+            problems.Count == 0
+                ? $"{files.Count} eval file(s) scanned · {writes} declare 'writes' and call a store · {none} declare "
+                + "'deliberately-none' with a reason and call none · every declaration matches the file's behaviour · "
+                + "both NEW records round-tripped with the awkward values (NaN weighted score, null cost, null error, "
+                + "the tool ORDER), and their probe files were deleted"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
     }
 
     /// <summary>Collects the DETAIL lines of every published discovery event, so a control can read what a node PRINTED.</summary>

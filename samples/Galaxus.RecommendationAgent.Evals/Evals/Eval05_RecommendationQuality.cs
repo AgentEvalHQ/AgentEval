@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval05_quality — the 25-point judge spread is what makes a stored baseline worth having (8.20)
 
 using System.Globalization;
 using System.Text;
@@ -541,7 +543,73 @@ public static class Eval05_RecommendationQuality
             return held ? 0 : 1;
         }
 
-        return PrintGate(agentRows, controlRows) ? 0 : 1;
+        bool gatePassed = PrintGate(agentRows, controlRows);
+        PersistRun(agentRows, controlRows, gatePassed);
+        return gatePassed ? 0 : 1;
+    }
+
+    /// <summary>
+    /// The measured re-grade spread of this eval's own judge on ONE fixed input, in points.
+    /// </summary>
+    /// <remarks>
+    /// 45/30/35/55/35 on five re-grades of one unchanged answer (<c>SUITE_SUMMARY</c> §18.1). It is
+    /// stored beside every score this eval persists, because it is the bound on all of them: a
+    /// reader holding the numbers without it will over-read a difference smaller than the noise —
+    /// and this eval's own headline margin is +20.
+    /// </remarks>
+    public const int MeasuredJudgeSpreadPoints = 25;
+
+    /// <summary>Writes the run's record. Model-backed, so it never runs on the dry-run path.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.20.</b> This eval persisted nothing and said nothing about it. Eval 08 also
+    /// persists nothing and states its reason in code — nothing consumes a stability snapshot, and
+    /// a number in a shared store that no gate reads is a hazard. That argument does NOT transfer
+    /// here: this is the eval with a 25-point judge spread, so a single run of it cannot be told
+    /// apart from noise without a stored baseline to put beside it.
+    /// </para>
+    /// <para>
+    /// ⚠ It is a RECORD, not a gate, and nothing reads it. The flag that says a judge left a
+    /// declared criterion unanswered travels in the same row as the score, because correction ⑫
+    /// was three cells scoring 0.0 as an artefact of the instrument and nothing on the number
+    /// saying so.
+    /// </para>
+    /// </remarks>
+    /// <param name="agentRows">The agent arm.</param>
+    /// <param name="controlRows">The popularity control arm.</param>
+    /// <param name="gatePassed">The gate's verdict.</param>
+    private static void PersistRun(
+        IReadOnlyList<Row> agentRows, IReadOnlyList<Row> controlRows, bool gatePassed)
+    {
+        static QualityCellSnapshot Cell(Row row) => new(
+            row.Case.PersonaId,
+            row.Arm,
+            row.WeightedScore,
+            row.HolisticScore,
+            row.InstrumentFailed,
+            row.Presentations,
+            row.EvidenceResolved,
+            row.ExtraCriteria.Count,
+            row.CostUsd,
+            row.Error);
+
+        var all = agentRows.Concat(controlRows).ToList();
+
+        EvalResultStore.SaveQuality(EvalResultStore.QualityKey, new QualitySnapshot
+        {
+            Label = "Eval 05 — Judged Recommendation Quality",
+            Cells = [.. all.Select(Cell)],
+            GatePassed = gatePassed,
+            InstrumentFailures = all.Count(r => r.InstrumentFailed),
+            JudgeModel = Config.Model,
+            JudgeSpreadPoints = MeasuredJudgeSpreadPoints,
+        });
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"  📁 Snapshot saved → {EvalResultStore.StorageLocation}");
+        Console.WriteLine($"     ⚠ a RECORD, not a baseline: this judge's re-grade spread on one fixed input is "
+                        + $"{MeasuredJudgeSpreadPoints} points, which bounds every score in the file.");
+        Console.ResetColor();
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════════

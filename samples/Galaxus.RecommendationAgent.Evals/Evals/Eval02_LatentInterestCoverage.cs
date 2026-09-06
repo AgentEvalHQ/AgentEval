@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
+//
+// SNAPSHOT-POLICY: writes            eval02_coverage_ab — the paid record the own-k re-read is built on
 
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Agents;
