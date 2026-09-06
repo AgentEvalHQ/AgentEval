@@ -1583,7 +1583,9 @@ Both were closed. `EmbeddingCacheBuilder.AuthoredInterestPhrases` (54 distinct v
 > RESOLVED path rather than `ConceptEmbeddingSource` unconditionally, and B-6's acceptance IS met
 > under `--real-vectors` (arm A: 0 of 56). The table below is the two-arm state as it stood at
 > `f8005cec`. The row is still RED, for a reason §16 could not see: the new arm D measures the
-> queries the arms actually issue, and on the real-vector path that is 38 of 50 dead.
+> queries the arms actually issue, and on the real-vector path that WAS 38 of 50 dead.
+> ⚠️ **Tense corrected 2026-09-06 (1.9): it is 0 of 50 today** — B-21 removed the cause. The row is
+> still RED, now on arm C alone (18 of 56).
 
 | Arm | Path | Before | After |
 |---|---|---|---|
@@ -1879,6 +1881,16 @@ cache, and the queries this system issues are composed at run time. Making that 
 not make the sample retrieve differently; it would stop the dense leg running on 38 of 50 issued
 queries, empty Demo 01, and fail an injection-containment gate. So:
 
+> ⛔ **CORRECTED 2026-09-06 (Wave 5, plan item 1.9) — the three consequences named in the paragraph
+> above are all REFUTED, and this is where they were published.** B-21 deleted the 71-entry query
+> table and embeds the query live, so the premise went with it. Re-executed: the dense leg is dead on
+> **0 of 50** issued queries, Demo 01 is **not** empty (`6 in → 5 out`), and `-- 4 --real-vectors`
+> **passes** at exit 0. §19.2 recorded this a day later and did not come back to fix it here.
+> **The verdict below still stands and its reasons have all changed**: `Auto = concept` survives on
+> reproducibility and cost, not on retrieval quality. Direction of the old text: it made the key-free
+> default look like the retrieval-quality choice, and nobody had separated the two.
+
+
 * **`Auto` = concept**, as before, and now for a measured reason rather than because several call
   sites happened to name it.
 * **`--real-vectors` is one flag**, needs no key, spends nothing, and is printed in every banner.
@@ -1903,17 +1915,33 @@ queries, empty Demo 01, and fail an injection-containment gate. So:
 5. **The library test suite was not re-run.** Every change is under `samples/`, and
    `tests/AgentEval.Tests` has no `ProjectReference` to either Galaxus project — checked, not
    assumed.
-6. **`--real-vectors` is not in CI** and must not be: it exits 1, correctly, on Eval 04.
+6. **`--real-vectors` is not in CI** and must not be. ⛔ **The REASON given here was refuted by §19 (B-21) on 2026-09-05 and this line kept it until 2026-09-06 (Wave 5, plan item 1.9).** It read *"it exits 1, correctly, on Eval 04"*. Re-executed on the shipped tree: `-- 4 --real-vectors` exits **0**. §18.5 got a superseded banner for the identical sentence a day later; **this one, the origin, did not** — which is 1.9's whole shape. The conclusion survives on a different reason: that path needs credentials and it spends.
 
 ### 17.6 How to re-derive §17
 
+⛔ **THREE OF THE FIVE COMMENTS BELOW PASTED REFUTED NUMBERS UNTIL 2026-09-06 (Wave 5, plan item 1.9).**
+B-21 (`46908e55`, `fa57274f`) deleted the query table and embeds the query live, and §19.2 published the
+correction — **into §19, while this block kept handing the old figures to whoever re-ran it.** That is the
+recurring shape 1.9 exists for: *a correction written into one document while the original stays put, and a
+command block that still pastes the refuted number.* Re-executed on the shipped tree:
+
 ```
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3                    # arms A-D, default space
-dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors     # arm A 0 of 56, arm D 38 of 50
-dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4 --real-vectors     # exits 1: GATE A not injected
-dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline --real-vectors # 0 recommendations
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors     # arm A 0 of 56, arm C 18 of 56, arm D 0 of 50 · exit 0
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4 --real-vectors     # exit 0
+dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline --real-vectors # 6 in -> 5 out · exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --offline --user USR-NB-01 --real-vectors
 ```
+
+| the comment this block used to carry | re-executed 2026-09-06 |
+|---|---|
+| `arm D 38 of 50` | **0 of 50** |
+| `-- 4 --real-vectors exits 1: GATE A not injected` | **exit 0** |
+| `-- 1 --offline --real-vectors → 0 recommendations` | **6 in → 5 out**, 6 `PresentRecommendation` calls |
+
+**Direction: every one of the three made the real-vector path look worse than it is**, which is the
+direction that supported §17.4(e)'s verdict — the section these commands sit under. A command block is the
+one place a stale number is guaranteed to be re-published, because it is the part a reader copies.
 
 Nothing above spends money. The LOUD-fallback direction is re-derived by changing
 `EmbeddingDocument.TemplateVersion` and re-running the second line.
@@ -2689,8 +2717,14 @@ That is why the §19.7 item 1 finding is a **Demo 01** finding, and this is the 
    owed a paid re-run.
 5. **`--real-vectors` still must not enter CI** — it needs credentials, it spends, and a scored run under
    it is not reproducible off the machine that made it. The old reason (it exits 1) stays refuted.
-6. **`strategy/Galaxus/Galaxus_RecommendationAgent_Design.md` §8.1 is still not updated** — gitignored,
-   local-only. `strategy/Galaxus/Galaxus_Retrieval_Explained.html` **was** rewritten against §19 + §20 in
+6. ✅ **CLOSED 2026-09-06 (Wave 5, plan item 1.9).** `Galaxus_RecommendationAgent_Design.md` §8.1's
+   **thirteen** stale `OPEN` statuses are re-derived from the tree by measurement (a symbol grep per
+   fix, plus B-1's own acceptance test EXECUTED), §8.4 **D-i** is closed — the `wahl` decision shipped
+   in `8b38b2a2` and the sentence *"the term is still at `SensitiveInferenceBlocklist.cs:140`"* was
+   standing in **four** places — and §8.1 now carries a banner: *statuses are derived from the tree,
+   never quoted from this table*. ⚠️ **The file is gitignored, so nothing in CI will ever catch the
+   next stale status there**; the banner is the whole defence. *Superseded text:*
+   *"§8.1 is still not updated — gitignored, local-only."* `strategy/Galaxus/Galaxus_Retrieval_Explained.html` **was** rewritten against §19 + §20 in
    the same change that added this section. ⚠ **`strategy/Galaxus/MASTER_PLAN.md` is stale too and was
    NOT named here before**: its architecture row still reads *"the embedding assets do not exist —
    `samples/Galaxus.RecommendationAgent/Data/` is absent"* and its phase table still lists generating
@@ -6184,7 +6218,9 @@ E=samples/Galaxus.RecommendationAgent.Evals
 A=samples/Galaxus.RecommendationAgent
 dotnet build AgentEval.sln                          # 0 errors. Warnings: 0 incremental, 221 forced
 #   the '3' this plan quotes is the EVALS PROJECT's own set — list it, do not count the solution's
-dotnet run --project $E -- 3                        # 0 — 28 gating caught, 6 advisory
+dotnet run --project $E -- 3                        # 0 — 28 gating caught, 6 advisory AT 0263141d
+#   ⚠ 29 gating + 6 advisory from Wave 5 onward (VacuityIsDeclaredNotInferred). A row count is a
+#     quantity that changes when anyone adds a control: read the panel, do not paste this number.
 dotnet run --project $E -- 3 --real-vectors         # 0 — was 1 at 4da0556b
 dotnet run --project $E -- 7                        # 1 (GATE B), both spaces
 dotnet run --project $E -- --ci --dry-run           # 1 — Eval 07 FAILED, ledger names 3 snapshots
@@ -6684,4 +6720,119 @@ dotnet run --project $E -- --ci --dry-run                                       
 #   B  Eval09PreRegistration.CaveatFor: `if (floorMeetsItAlways) return VacuousAndUninterpretable;`
 #      placed BEFORE the declaration branch — the old rule
 #   C  GalaxusEvalCriteria: every `", false),` -> `", true),`
+```
+
+---
+
+## 47. WAVE 5 — plan item 1.9, the stale-claim sweep: SIX origins, and a command block was one of them (2026-09-06)
+
+1.9 has grown every wave. Wave 4 found a fourth origin (`SUITE_SUMMARY` §22's Eval 07 table). This
+pass swept for the two shapes 1.9 exists for — **a claim still standing where it was published, and a
+correction written into one document while the original stayed put** — and found six, one of them a
+shape nobody had named: **a re-derivation command block whose comments paste refuted numbers.**
+
+### 47.1 What was found, and what was measured to establish it
+
+| # | where | the claim, standing at its origin | re-executed 2026-09-06 |
+|---|---|---|---|
+| 1 | design `§8.1`, **13 rows** | `OPEN` for B-1, B-2, B-5, B-6a, B-7, B-10, B-11, B-12, B-13, B-15, B-16, B-17, B-19 | **all closed at `a92d8e9b`** — eleven by the symbol each fix introduced, B-1 by its own acceptance test EXECUTED, B-10 by its per-case assertions |
+| 2 | design `§8.4 D-i`, and **three other places** in the same file | *"the term is still at `SensitiveInferenceBlocklist.cs:140`"*, *"the term has deliberately not been edited"*, *"D3 is currently unusable as a measurement until the term decision is made"* | **bare `wahl` is GONE** since `8b38b2a2`; `:140` is now the comment explaining the removal and `:149` holds the political compounds |
+| 3 | `§17.5` item 6 | *"`--real-vectors` is not in CI and must not be: it exits 1, correctly, on Eval 04"* | `-- 4 --real-vectors` exits **0**. §18.5 got a superseded banner for the identical sentence one day later; **the origin did not** |
+| 4 | **`§17.6`, the re-derivation command block** | `# arm D 38 of 50` · `# exits 1: GATE A not injected` · `# 0 recommendations` | **0 of 50** · **exit 0** · **`6 in → 5 out`**, 6 `PresentRecommendation` calls |
+| 5 | `§17.4 (e)` | making real vectors the default *"would stop the dense leg running on 38 of 50 issued queries, empty Demo 01, and fail an injection-containment gate"* | all three refuted by B-21. The verdict (`Auto = concept`) survives; **every one of its reasons changed** |
+| 6 | sample `README.md`, **three rows** | Eval 03's row count, published in **four vintages**: *"sixteen rows … twelve gating"* → *"23 of 23"* → *"26 of 26 · 31 rows"* → and a separate section still reading *"Ten rows. Seven gate."* | **35 rows, 29 gating (all caught), 6 advisory (2 `⚠️ FINDING`)**, both spaces |
+
+### 47.2 🔴 The new shape: a COMMAND BLOCK is the worst place for a stale number
+
+Item 4 is the one worth naming separately. `MEASUREMENT_STATUS` §17.6 is titled *"How to re-derive
+§17"*, and **three of its five comments were refuted on 2026-09-05 by B-21**. The correction was
+published — into §19.2, a section later in the same file — and §17.6 kept handing the old figures to
+anyone who re-ran it.
+
+**A stale sentence is read. A stale command comment is COPIED, run, and then compared against a
+number that no longer holds** — and the reader's first conclusion is that something regressed. Every
+`### How to re-derive` block in this file now carries the state it was measured at, or the number is
+removed.
+
+⚠️ **Direction: all three of §17.6's stale comments made the real-vector path look WORSE than it is**,
+which is the direction that supported §17.4(e)'s verdict — the section those commands sit under. That
+is the failure mode ADR-030's own review names: an artifact supplying evidence for its own conclusion.
+
+### 47.3 ⚠️ Direction of the §8.1 error, and why it survived four waves
+
+**Unflattering.** Thirteen `OPEN` rows made the programme look further behind than it was. A number
+that makes you look worse is believed; a number that makes you look better is checked. That asymmetry
+is the whole reason this sweep exists and it has now produced instances in both directions
+(§0.7's *"understates the local set by one, the unflattering direction, which is why nobody caught
+it"*).
+
+⚠️ **And the design file is gitignored.** No CI run, no control row and no test will ever catch the
+next stale status in it. §8.1 now opens with the rule — *statuses are derived from the tree, never
+quoted from this table* — plus the exact greps, and that banner is the entire defence.
+
+### 47.4 The sha sweep — every eight-hex sha in seven documents, RESOLVED not read
+
+Wave 4 found four pointers naming `b41262e2`, which git cannot resolve. Every distinct sha in seven
+documents was passed through `git rev-parse --verify`:
+
+| document | distinct shas | unresolvable |
+|---|---|---|
+| `MEASUREMENT_STATUS.md` | 38 | 0 |
+| `SUITE_SUMMARY.md` | 15 | 0 |
+| `RUN_PROTOCOL.md` | 6 | 0 |
+| `docs/adr/030-*.md` | 4 | 0 |
+| `docs/adr/031-*.md` | 1 | 0 |
+| `MASTER_PLAN.md` | 71 | **1 — `b41262e2`** |
+| `Galaxus_RecommendationAgent_Design.md` | 11 | 0 |
+
+⚠️ **The one hit is a FALSE POSITIVE and it is recorded so the next sweep does not "fix" it.** The
+`b41262e2` in `MASTER_PLAN` §0.4 is the wrong sha quoted **inside its own correction row**
+(`` `b41262e2` → `b41268e2` ``). A sweep that resolves every sha in a document will always flag a
+document that names a refuted sha in order to retract it. **The check is right and the finding is
+not a defect** — which is itself worth writing down, because the cheapest way to make a sweep look
+clean is to delete the sentence that records the error.
+
+```bash
+for f in <the seven documents>; do
+  for s in $(grep -oE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u); do
+    git rev-parse --verify -q "$s^{commit}" >/dev/null || echo "$f: $s UNRESOLVABLE"
+  done
+done
+```
+
+### 47.5 What 1.9 does NOT close
+
+- **Anything quoted OUTSIDE this repository.** No commit reaches it. That half of 1.9 has never been
+  closeable and still is not.
+- **The `wahl` MOVEMENT is still unmeasured.** The decision shipped; the counterfactual *"correcting
+  only that term moves the agent to 11/14"* is still a counterfactual, because no paid Eval 01 run has
+  been made since `8b38b2a2`.
+- **The design file's remaining `OPEN` rows were not audited beyond §8.1 and §8.4 D-i.** §8.2's rows,
+  the D-ii..D-v decisions and the appendix tables were not re-derived. Named, not measured.
+- **B-18 is genuinely open** and is the only §8.1 row that still says so.
+
+### 47.6 Commands
+
+```bash
+# 47.1 item 1 — the thirteen, by the symbol each fix introduced
+grep -rl "NOT EVALUATED\|UserEvidence\|CandidateContainmentFilter\|CompatibilityFilter\|GiftExcluded" \
+  --include=*.cs samples/Galaxus.RecommendationAgent*
+grep -rl "replenishment_not_discovery\|market_unavailable\|BeforeTool\|CoverageGate2State\|CoverageArmKind" \
+  --include=*.cs samples/Galaxus.RecommendationAgent*
+dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --user USR-LF-04 --offline
+#   -> "Abstention gate fired BEFORE the model was constructed — this turn cost 0 prompt tokens"
+
+# 47.1 item 2
+grep -n "wahl" samples/Galaxus.RecommendationAgent/Guardrails/SensitiveInferenceBlocklist.cs
+#   -> :140 a comment explaining the removal · :149 wahlkampf, bundestagswahl, parteiwahl, …
+
+# 47.1 items 3-5 — the refuted real-vector figures, re-executed
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3 --real-vectors            # arm A 0/56, arm C 18/56, arm D 0/50, exit 0
+dotnet run --project $E -- 4 --real-vectors            # exit 0
+dotnet run --project samples/Galaxus.RecommendationAgent -- 1 --offline --real-vectors   # 6 in -> 5 out
+
+# 47.1 item 6 — the count, read off the panel rather than off a document
+dotnet run --project $E -- 3 | grep -cE "(caught|NOT CAUGHT) +[A-Za-z0-9_]+"   # 29 gating
+dotnet run --project $E -- 3 | grep -c "advisory — never gates"                # 6 advisory
 ```

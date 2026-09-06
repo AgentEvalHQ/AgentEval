@@ -20,7 +20,7 @@ any file.** (MEASUREMENT_STATUS §21.6's `FingerprintKey` observation is closed 
 > **Read newest-first: §25 (2026-09-06, `8af63683`) → §24 (`f3d192cc`) → §23 (Wave 2, paid) →
 > §22 (Wave 1, free) → §§1–21.**
 > Three headings below are stale as counts and are left standing because their run is: **§10 says
-> "16 rows · 12 of 12 gating"** and the panel is now **34 rows · 28 gating + 6 advisory** (§25.3);
+> "16 rows · 12 of 12 gating"** and the panel is now **35 rows · 29 gating + 6 advisory** (§25.3; 34 → 35 at Wave 5's `VacuityIsDeclaredNotInferred`);
 > **§13's "NOT ESTABLISHED"** on the Renzo pin was settled in `MEASUREMENT_STATUS` §28 without any
 > checkout; and every `--ci --dry-run` exit 0 anywhere in this file is now **exit 1**, correctly (§24.4).
 >
@@ -1590,7 +1590,7 @@ fault; all five cases are required. Five ablations, all red.
 
 | eval | cases | measured by | verdict | change |
 |---|---|---|---|---|
-| **03** negative controls | **34 rows** — 28 gating + 6 advisory | real, model-free | ✅ **all 28 gating caught**, exit 0, **both spaces** | real-space exit 1 → 0 |
+| **03** negative controls | **35 rows** — 29 gating + 6 advisory | real, model-free | ✅ **all 28 gating caught**, exit 0, **both spaces** | real-space exit 1 → 0 |
 | **04** review injection | 1 case × 4 arms | real, model-free | ✅ PASSED, exit 0, both spaces | none |
 | **07** workflow topology | 5 cases | real, model-free | ❌ **FAILED**, exit 1, both spaces. GATE A ✅ · **GATE B ❌** · GATE C ✅ | none |
 | **07** per case | `USR-RB-10` ❌ · `USR-MI-02` ✅ · `USR-MB-13` ✅ · `USR-NB-01` ✅ does NOT fire · `USR-LF-04` ✅ does NOT fire | | **4 of 5 pinned**, both spaces | none |
