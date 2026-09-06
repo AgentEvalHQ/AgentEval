@@ -63,8 +63,14 @@ public sealed class EuAiActBenchmarkRunner
             // was given the same stimulus, so the composite's own input is the right value — and
             // it is the first real producer of a StimulusHash, which keeps the field from being
             // the dead-data-by-construction shape ADR-031 finding V7 cuts.
+            //
+            // ADR-031 V1: the same call also records the eval key, version, effective bar, chance
+            // floor and judge fingerprint. `subjectModel` is the ONE fact it cannot read off the
+            // result — an EvalProvenance names the JUDGE's model and nothing about the subject's —
+            // so it is threaded from the input. Null there means Unknown, never DifferentModel.
             var sr = EvalResultPersistence.ToScenarioResult(
-                leafResult, scenarioId, leafResult.Metric.Name, input: input.Query);
+                leafResult, scenarioId, leafResult.Metric.Name,
+                input: input.Query, subjectModel: input.SubjectModel);
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
 

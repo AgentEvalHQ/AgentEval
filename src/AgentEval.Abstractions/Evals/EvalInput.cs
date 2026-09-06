@@ -70,4 +70,25 @@ public sealed record EvalInput(
     /// </para>
     /// </remarks>
     public string? CaseId { get; init; }
+
+    /// <summary>
+    /// The model the SUBJECT ran on, when the producer knows it. Optional, non-positional and
+    /// init-only, so every existing construction site and every deconstruction is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-031 §0.1's <c>judgeIsSubjectModel</c> follow-on. It exists for exactly one question:
+    /// <b>is the judge the same model as the thing it is grading?</b> That is the
+    /// gate-self-examination failure at its purest — the artifact under test supplying the
+    /// measurement — and it cannot be answered from the result alone, because an
+    /// <c>EvalProvenance</c> records the JUDGE's model and nothing about the subject's.
+    /// </para>
+    /// <para>
+    /// ⚠ <see langword="null"/> yields <see cref="AgentEval.Output.JudgeSubjectRelation.Unknown"/>,
+    /// never <c>DifferentModel</c>. "Nobody declared the subject's model" and "the judge is a
+    /// different model" are different facts, and collapsing them answers the self-examination
+    /// question with a reassuring "no" that nobody checked.
+    /// </para>
+    /// </remarks>
+    public string? SubjectModel { get; init; }
 }

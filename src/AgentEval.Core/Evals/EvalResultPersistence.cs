@@ -5,6 +5,7 @@
 namespace AgentEval.Evals;
 
 using System.Text.Json;
+using AgentEval.Evals.Meta;
 using AgentEval.Output;
 
 /// <summary>
@@ -43,12 +44,23 @@ public static class EvalResultPersistence
     /// stored content hash moves because of this parameter existing.
     /// </para>
     /// </param>
+    /// <param name="subjectModel">
+    /// The model the SUBJECT ran on, when the caller knows it. Used for one thing only: deciding
+    /// whether the judge that graded this result is the subject's own model
+    /// (<see cref="JudgeSubjectRelation"/>). ADR-031 §0.1's <c>judgeIsSubjectModel</c> follow-on.
+    /// <para>
+    /// ⚠ <b>Not supplying it yields <see cref="JudgeSubjectRelation.Unknown"/>, never
+    /// <see cref="JudgeSubjectRelation.DifferentModel"/>.</b> A bool here would answer "nobody told
+    /// us" with "the judge is a different model", which is the flattering direction.
+    /// </para>
+    /// </param>
     public static ScenarioResult ToScenarioResult(
         EvalResult result,
         string scenarioId,
         string scenarioName,
         IReadOnlyList<AssertionResult>? assertions = null,
-        string? input = null)
+        string? input = null,
+        string? subjectModel = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioId);
@@ -102,6 +114,85 @@ public static class EvalResultPersistence
             // never as "the inputs match". StimulusHash.SameStimulus refuses a null on either side
             // for exactly that reason.
             StimulusHash = StimulusHash.Of(input),
+
+            // ADR-031 V1's other five facts. Every one is read off `result`, which the runner
+            // already holds — nothing here asks a caller for anything it does not have, which is
+            // V1's whole claim: comparability data belongs on the RUN, not in a manifest.
+            Comparability = ComparabilityOf(result, subjectModel),
+        };
+    }
+
+    /// <summary>
+    /// Reads ADR-031 V1's five non-stimulus comparability facts off an eval result.
+    /// </summary>
+    /// <param name="result">The result being persisted.</param>
+    /// <param name="subjectModel">The subject's model, when the caller knows it.</param>
+    /// <returns>The facts.</returns>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>Every absence here is recorded as an absence.</b> An eval with no threshold gets a null
+    /// <c>EffectiveBar</c>, not 0.0; an eval with no declared floor gets a null
+    /// <c>ChanceFloor</c>, not a zero one; an eval with no judge gets a null <c>Judge</c>, which is
+    /// "deterministic", not "unknown judge". Each of those three collapses is a way of making two
+    /// runs look comparable when nobody checked.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The floor is read from the convention ADR-030 §3.2 rules, not from a field on the
+    /// score.</b> <c>EvalScore.ChanceFloor</c> was CUT: floors live in
+    /// <c>Details.Dimensions["chance_floor"]</c> plus one
+    /// <c>EvalEvidence("chance-floor", kind, derivation)</c>. A dimension with no evidence beside it
+    /// is a number with no derivation, and per ADR-030 that number is unusable — so it is recorded
+    /// as <see cref="FloorState.NotDerivable"/> with the reason, never as a bar.
+    /// </para>
+    /// </remarks>
+    internal static ComparabilityFacts ComparabilityOf(EvalResult result, string? subjectModel)
+    {
+        var evidence = result.Details.Evidence?
+            .FirstOrDefault(e => string.Equals(
+                e.Source, ComparabilityFacts.ChanceFloorEvidenceSource, StringComparison.Ordinal));
+
+        bool hasBar = result.Details.Dimensions is { } dims
+            && dims.TryGetValue(ComparabilityFacts.ChanceFloorDimension, out double bar)
+            && double.IsFinite(bar);
+        double barValue = hasBar
+            ? result.Details.Dimensions![ComparabilityFacts.ChanceFloorDimension]
+            : double.NaN;
+
+        RecordedChanceFloor? floor = (hasBar, evidence) switch
+        {
+            // Both halves of the convention present: a bar with its derivation behind it.
+            (true, { } ev) => new RecordedChanceFloor(ev.Reference, FloorState.Derived, barValue, ev.Message),
+
+            // A bar with no derivation. ADR-030 §3.2: "the number without its derivation is
+            // unusable" — so it is NOT promoted to a bar, and the absence is what gets recorded.
+            (true, null) => new RecordedChanceFloor(
+                AgentEval.Evals.Meta.ChanceFloor.KindNotDerivable,
+                FloorState.NotDerivable,
+                null,
+                $"a '{ComparabilityFacts.ChanceFloorDimension}' dimension was recorded with no "
+                + $"'{ComparabilityFacts.ChanceFloorEvidenceSource}' evidence beside it, so the number has no "
+                + "derivation and cannot be used as a bar"),
+
+            // A derivation saying why no floor exists. This is the state worth carrying: somebody
+            // asked and could not answer, which is not the same as nobody asking.
+            (false, { } ev) => new RecordedChanceFloor(ev.Reference, FloorState.NotDerivable, null, ev.Message),
+
+            // Nobody derived one at all. Null, never a zero floor.
+            (false, null) => null,
+        };
+
+        JudgeFingerprint? judge = string.IsNullOrWhiteSpace(result.Provenance.JudgeModel)
+            ? null
+            : JudgeFingerprint.For(
+                result.Provenance.JudgeModel!,
+                rubricDigest: result.Provenance.PromptHash,
+                subjectModel: subjectModel);
+
+        return new ComparabilityFacts(result.Metric.Key, result.Metric.Version)
+        {
+            EffectiveBar = result.Score.Threshold,
+            ChanceFloor = floor,
+            Judge = judge,
         };
     }
 

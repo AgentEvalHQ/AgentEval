@@ -144,6 +144,35 @@ public sealed record ScenarioResult(
     /// </para>
     /// </remarks>
     public string? StimulusHash { get; init; }
+
+    /// <summary>
+    /// The eval key, version, effective bar, chance floor and judge fingerprint that produced this
+    /// scenario — <see langword="null"/> when the producer recorded none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ADR-031 finding V1, and it is the PREREQUISITE for S5, not S5.</b> V1 lists six facts a
+    /// <c>compare</c> needs to be a pure function of two run directories: the stimulus, the eval's
+    /// key, its version, the effective bar, the floor and the judge fingerprint. S2 landed the
+    /// stimulus above; this lands the other five. Measured before it existed: a real run directory
+    /// carried <b>five of the six nowhere</b>, so a <c>compare</c> written to Phase 7.5's acceptance
+    /// would have exited 13 on every pair of runs in this repository — a command with one reachable
+    /// outcome. Recording the facts is a different item from consuming them, and this is that item.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Non-positional and null-defaulting, for the same reason as
+    /// <see cref="StimulusHash"/>.</b> A producer that does not set it writes a
+    /// <b>byte-identical</b> scenario file under the store's
+    /// <c>DefaultIgnoreCondition = WhenWritingNull</c>, so no stored content hash moves because this
+    /// member exists. Asserted against a file the real <c>FileSystemOutputStore</c> wrote, not
+    /// against a copy of its settings.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Null is "nobody recorded any of it", never "the runs agree".</b> Same rule as
+    /// <see cref="StimulusHash"/>: a consumer reading a null on either side must say NOT COMPARABLE.
+    /// </para>
+    /// </remarks>
+    public ComparabilityFacts? Comparability { get; init; }
 }
 
 // AssertionResult moved to AssertionResult.cs (same namespace and assembly, so this is not an
