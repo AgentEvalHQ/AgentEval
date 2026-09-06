@@ -8546,3 +8546,38 @@ half that is fixed.
 | **8.6** — screen `AgentResponse.Text` for D3c | Paired with 1.7's N-11b, which closed at `62a76b81`; the pairing needs re-reading against what 1.7 actually shipped before the remaining half is scoped |
 | **8.11** — D-v, the 10 dead concept phrases | Explicitly **LOWERED** by §4.0a, and closing it *"moves every coverage cell"*, so doing it before 2.8/2.9 run live pays for those runs twice |
 | **8.23** — `ChatClientEvaluator.cs:46` renders the ordinal | The only `src/` item. It is under the library rules and its blast radius is *"the shape of `CriteriaResults` for every consumer in the repository"*. Six waves have run without modifying an existing file under `src/`; breaking that for a change whose release note must carry a byte-level prediction is a wave of its own, not a long-tail entry |
+
+### 59.9 The close-out sweep for §§56–59 — every exit code OBSERVED with `$?`, in both spaces
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1/2/2b/2c/5/6/8/9 --dry-run` | **0** | `-- 8 --dry-run` **0** |
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 7` | **1** | **1** |
+| `--ci --dry-run` | **1** — eleven steps, **Eval 07 the only FAILED** | — |
+| `agent -- 0`, `agent -- 1 --offline`, `agent -- 2 --offline` | **0** | — |
+
+**Nothing moved.** `-- 7`'s GATE B is still the suite's only red gate and still the only failing
+member of the CI chain.
+
+* **Build:** `AgentEval.sln` **0 errors**. No warning count is quoted — §54.2 established that that
+  command has a warning count *per invocation*, not a warning count.
+* **Tests, after a full solution build, `--no-build` per TFM (the multi-TFM stale-binary trap):**
+  net10 **9,699 / 0 / 2 of 9,701** · net9 and net8 **9,481 / 0 / 1 of 9,482** — identical to the
+  figures §54.3 took. **Zero files under `tests/` or `src/` were touched by §§56–59**; every changed
+  file is under `samples/`, and one is an addition (`SnapshotProvenance.cs`).
+* **Panel: 30 → 36 gating + 6 → 7 advisory = 43 rows in BOTH spaces, `❌ NOT CAUGHT` = 0.** Verified
+  by NAME, which does not decay: the seven rows these sections added —
+  `SilentDenseWipeoutDetectorCanFire`, `DenseLegSaysWhenItRankedNothing`,
+  `EverySnapshotSaysWhatProducedIt`, `CatalogueEvidenceLineCarriesAFact`,
+  `CommittedVectorsAreTheRightNumbers`, `APersonaInOneArmOnlyIsDeclared`,
+  `AssertionFaultsAreNamedAndNotGated` — are each present exactly once in each space.
+* ⚠ **The tripping advisory set is no longer the same in the two spaces.** Concept trips two
+  (`AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised`); real trips **three** — those
+  two plus `DenseLegSaysWhenItRankedNothing`. **That asymmetry is §56's finding, not a defect**, and
+  it is the first advisory row in the suite whose verdict differs between the spaces. Anyone quoting
+  "two advisory findings" must now name the space.
+* **The write ledger is unchanged:** `--ci --dry-run` still names exactly `eval03_controls`,
+  `eval04_injection`, `eval07_topology`. Snapshots written from `311e3889` onward carry **one extra
+  top-level member** (`Provenance`) and **no changed one**.
