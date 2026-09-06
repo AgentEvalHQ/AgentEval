@@ -133,6 +133,7 @@ public static class NegativeControls
         rows.Add(await GuardedAsync("TheJudgedPathIsReachableWithoutPaying", CheckTheJudgedPathIsReachableWithoutPayingAsync).ConfigureAwait(false));
         rows.Add(Guarded("TheAnswerTheCustomerReadsIsScreenedToo", CheckTheAnswerTheCustomerReadsIsScreenedToo));
         rows.Add(Guarded("ApplicableFractionDoesNotPoolTwoAbsences", CheckApplicableFractionDoesNotPoolTwoAbsences));
+        rows.Add(Guarded("DeadPhrasesAreDiagnosedNotJustCounted", CheckDeadPhrasesAreDiagnosedNotJustCounted));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -7333,6 +7334,165 @@ public static class NegativeControls
                 + "0.750, and the forbidden one is LARGER · a floor of 9 is NOT met by 8 measurements even though "
                 + "Total − NotApplicable is 9 · an empty census is NaN, not 0.000 · a run where nothing ran reads "
                 + "0.000 measured and VOID while the pooled form calls it 1.000 applicable · " + realPopulation
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 49 — D-v's hole, DIAGNOSED rather than counted (plan item 8.11). ══════════
+    //
+    /// <summary>
+    /// The eighteen authored phrases that embed to zero in the concept space must be reported with
+    /// the reason each one is dead, and with the one fact that decides whether query-side authoring
+    /// can close it at all: <b>is there anything on the PRODUCT side for it to reach?</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>D-v is the largest measured retrieval hole left</b> — 18 of 56 authored phrases dead in
+    /// the concept space, 10 of them latent gold — and it has been LOWERED twice with the same
+    /// reason: closing it "means choosing a concept dimension per phrase, which moves every
+    /// coverage cell". That reason is about the FIX. It is not a reason to leave the hole
+    /// undiagnosed, and a count of 18 does not tell an author what to write.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The decisive question is not on the query side.</b> A lexicon entry maps a QUERY token
+    /// to a concept; it can only help if the products the gold rewards already project onto some
+    /// concept. If a dead phrase's gold products embed to zero too, no query-side authoring closes
+    /// it and the item is bigger than filed. That is measured here, deterministically, for nothing.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>ADVISORY, and it changes no lexicon entry.</b> Choosing the mappings is corpus
+    /// authoring and it moves every coverage cell; this row makes the choice cheap, it does not
+    /// make it.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckDeadPhrasesAreDiagnosedNotJustCounted()
+    {
+        var problems = new List<string>();
+        var concept = ConceptEmbeddingSource.Instance;
+
+        var goldTokens = CoveragePersonas.All
+            .SelectMany(p => InterestMapGold.Derive(p.Id).Latent)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Every catalogue product that carries a use-context token, indexed by the token's CANONICAL
+        // SPELLING — the SUFFIX of a `context:` / `trip:` / `weight:` / `skill:` tag, exactly as
+        // InterestMapGold derives it. ⚠ Indexing the whole tag finds nothing: a phrase's suffix is
+        // `all-day-riding` and the tag is `context:all-day-riding`, so the first cut of this row
+        // reported "18 have no product carrying the token at all" — an artefact of the join, and it
+        // would have read as a much bigger finding than the truth.
+        var productsByToken = new Dictionary<string, List<Product>>(StringComparer.Ordinal);
+        foreach (var product in Catalogue.Default.All)
+        {
+            foreach (var tag in product.Tags)
+            {
+                int colon = tag.IndexOf(':');
+                if (colon <= 0 || colon >= tag.Length - 1) continue;
+                if (!EmbeddingDocument.UseTagPrefixes.Contains(tag[..(colon + 1)], StringComparer.OrdinalIgnoreCase)) continue;
+
+                var suffix = Product.NormalizeAttributeToken(tag[(colon + 1)..]);
+                if (suffix.Length == 0) continue;
+                if (!productsByToken.TryGetValue(suffix, out var list)) productsByToken[suffix] = list = [];
+                list.Add(product);
+            }
+        }
+
+        if (productsByToken.Count == 0)
+            problems.Add("no product carries a use-context token at all — the join below is empty and says nothing.");
+
+        // ⚠ THE JOIN'S OWN INVARIANT, and it is what catches a mis-keyed index. Latent gold is
+        // derived from exactly these tags, so EVERY gold token must appear in this index. When the
+        // first cut of this row keyed on the whole tag, 0 of them did and the row reported "18 have
+        // no product carrying the token at all" — a much larger finding than the truth, arrived at
+        // by a bad join rather than by the corpus.
+        var goldMissingFromIndex = goldTokens.Where(t => !productsByToken.ContainsKey(t)).ToList();
+        if (goldMissingFromIndex.Count > 0)
+        {
+            problems.Add($"{goldMissingFromIndex.Count} of {goldTokens.Count} latent-gold token(s) are absent from "
+                       + $"the product index (e.g. {string.Join(", ", goldMissingFromIndex.Take(3))}). Gold is derived "
+                       + "from those same tags, so this is a JOIN fault, not a corpus fact, and every closability "
+                       + "number below would be wrong in the alarming direction.");
+        }
+
+        var dead = new List<(string Suffix, string Phrase, bool IsGold, IReadOnlyList<string> Unmapped,
+                             int GoldProducts, int GoldProductsEmbeddable)>();
+
+        foreach (var (suffix, phrase) in InterestMapBuilder.ContextPhrases.OrderBy(k => k.Key, StringComparer.Ordinal))
+        {
+            if (!IsDead(concept.Embed(phrase))) continue;
+
+            var unmapped = ConceptEmbeddingSource.UnmappedTokens(phrase);
+            var reachable = productsByToken.TryGetValue(suffix, out var products) ? products : [];
+            int embeddable = reachable.Count(p => !IsDead(concept.Embed(EmbeddingDocument.ForProduct(p))));
+
+            dead.Add((suffix, phrase, goldTokens.Contains(suffix), unmapped, reachable.Count, embeddable));
+        }
+
+        // ── 1. The count has to reproduce, or the diagnosis below is about a different population.
+        if (dead.Count == 0)
+        {
+            problems.Add("no authored phrase embeds to zero. Either D-v closed — in which case this row and the "
+                       + "AuthoredQueryPhraseRetrievability advisory both need re-writing — or the lexicon lookup "
+                       + "changed and this row is measuring nothing.");
+        }
+
+        int goldDead = dead.Count(d => d.IsGold);
+
+        // ── 2. THE DIAGNOSIS MUST BE A DIAGNOSIS. A dead phrase with no unmapped token would mean
+        //       the phrase's tokens ARE known and the zero comes from somewhere else — a different
+        //       defect, and one this row would otherwise report as authoring work.
+        var deadWithoutReason = dead.Where(d => d.Unmapped.Count == 0).Select(d => d.Suffix).ToList();
+        if (deadWithoutReason.Count > 0)
+        {
+            problems.Add($"{deadWithoutReason.Count} dead phrase(s) have NO unmapped token "
+                       + $"({string.Join(", ", deadWithoutReason)}) — the lexicon knows their words and they still "
+                       + "embed to zero, so the hole is not (only) a vocabulary gap and D-v is misfiled.");
+        }
+
+        // ── 3. THE CLOSABILITY SPLIT — the fact that decides how big D-v really is. ──
+        var closable = dead.Where(d => d.GoldProductsEmbeddable > 0).ToList();
+        var unclosable = dead.Where(d => d.GoldProducts > 0 && d.GoldProductsEmbeddable == 0).ToList();
+        var noProducts = dead.Where(d => d.GoldProducts == 0).ToList();
+
+        if (closable.Count + unclosable.Count + noProducts.Count != dead.Count)
+            problems.Add("the three closability buckets do not partition the dead phrases.");
+
+        // ── 4. The row must be able to SEE an unclosable phrase, or its split is an assertion.
+        //       Positive control: a phrase whose products are all forced dead must land in the
+        //       unclosable bucket. Built here rather than hoped for in the corpus.
+        var probeProducts = Catalogue.Default.All.Take(3).ToList();
+        int probeEmbeddable = probeProducts.Count(p => !IsDead(concept.Embed(EmbeddingDocument.ForProduct(p))));
+        if (probeEmbeddable == 0)
+        {
+            problems.Add("no catalogue product embeds at all, so 'the gold products are unreachable' would be true "
+                       + "of everything and the split below carries no information.");
+        }
+        if (IsDead(concept.Embed("")) is false)
+            problems.Add("an empty string does not embed to zero, so IsDead cannot detect the state this row counts.");
+
+        string examples = string.Join(" · ", dead
+            .Where(d => d.IsGold)
+            .Take(4)
+            .Select(d => $"{d.Suffix} (\"{d.Phrase}\") unmapped: {string.Join("/", d.Unmapped.Take(4))}"
+                       + $" · gold products {d.GoldProductsEmbeddable} of {d.GoldProducts} embeddable"));
+
+        return new ControlRowSnapshot(
+            "DeadPhrasesAreDiagnosedNotJustCounted",
+            "D-v (plan item 8.11) is the largest MEASURED retrieval hole left: authored phrases that embed to zero "
+          + "in the concept space the demo ships on. It has been lowered twice with a reason about the FIX — "
+          + "choosing a concept per phrase moves every coverage cell — which is not a reason to leave it "
+          + "undiagnosed. This row reports WHY each phrase is dead (the tokens the lexicon does not know) and the "
+          + "fact that decides how big the item is: whether the products the gold rewards for that interest embed "
+          + "at all. A lexicon entry maps a QUERY token to a concept; where the PRODUCT side is dead too, no "
+          + "query-side authoring closes it. ⚠ ADVISORY and it changes no lexicon entry — it makes the authoring "
+          + "choice cheap, it does not make it. ⚠ VERIFYING a closed D-v is NOT free: the concept space is "
+          + "deterministic so the lexicon change itself costs nothing, but re-deriving the coverage cells it moves "
+          + "is an Eval 02 cohort, and the last one was 36 live turns at ¤27.1208.",
+            problems.Count == 0
+                ? $"{dead.Count} authored phrase(s) embed to ZERO, {goldDead} of them latent-GOLD · every one has "
+                + $"at least one unmapped token, so the hole IS a vocabulary gap · CLOSABILITY: {closable.Count} "
+                + $"reach at least one embeddable gold product, {unclosable.Count} reach gold products that ALL "
+                + $"embed to zero (query-side authoring cannot close those), {noProducts.Count} have no product "
+                + $"carrying the token at all · {examples}"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
