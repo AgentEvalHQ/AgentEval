@@ -11700,3 +11700,294 @@ HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed -E 's#^https?://##; s#/.*$##')
 git grep -lF "$HOST" | wc -l ; git grep -lF "$AZURE_OPENAI_API_KEY" | wc -l        # -> 0 and 0
 git diff main..HEAD | grep -cF "$HOST"                                             # -> 0
 ```
+
+---
+
+# §71. THE WAVE-9 REVIEW — 2026-09-07, at `ecf89339`. Every ablation re-EXECUTED, and one new control was green on an empty measurement
+
+**Commission:** review Wave 9 adversarially — re-EXECUTE all seventeen published ablations rather
+than re-read them, drive `compare` against runs produced in this session rather than against the ones
+§70.3 describes, and check the flattering direction hardest.
+
+**Result: 17 of 17 published ablations reproduce, and every headline number in §70 reproduces to the
+digit. THREE defects found — one of them a control that passed while measuring nothing. All three
+fixed.** Nothing in this section is quoted from §70; every figure was produced this session.
+
+**Layers under this one:** §70 the Wave-9 build, §69 the Wave-8 close-out, §68 the Wave-8 review.
+
+## §71.0 What shipped, with shas
+
+| # | what | sha |
+|---|---|---|
+| **1** | N-17's refuser clause could not tell *"measured 0"* from *"never measured"* — presence is now its own clause, in the Eval 06 row **and** in the Eval 03 twin it was copied from | `fa0d2c2e` |
+| **2** | §70.1's own golden-key census was off by one in **both** cells — 45 → **46**, 8 → **9** | `d28a42e3` |
+| **3** | A vacuity guard on the one registry test that passed on an empty registration set | `1ec969b6` |
+
+## §71.1 🔴 DEFECT 1 — N-17 stayed GREEN with its refuser policy DELETED, still printing "the refuser exactly 0"
+
+**The review's own ablation, B6, and it is the most valuable thing in this section.** Delete
+`Constant_CallsNothing` from `ConstantTrajectoryPolicies.Build()` — the whole policy, not a number —
+rebuild, run `-- 3`:
+
+| | measured |
+|---|---|
+| exit | **0** |
+| `NOT CAUGHT` rows | **0** |
+| the row | ✅ **caught  Eval06ConstantPolicyCeiling** |
+| what it printed | *"…and the refuser exactly 0"* · `refuser 0 (claimed 0)` · `30 of 30 case verdicts produced` |
+
+**The mechanism.** `int refuser = measured.FirstOrDefault(m => m.Name.EndsWith("CallsNothing")).Passed;`
+— and the tuple default for an **absent** policy is `0`, byte-identical to the value the row claims to
+have MEASURED. This is the shape the standing rule names: **applicability read off the RESULT instead
+of the INPUT**, and it fails in the **flattering** direction.
+
+⚠ **The two clauses a reader would expect to save it do not.** `ConstantTrajectoryPolicies.All.Count > 0`
+is still true with six policies. And `verdicts == expectedVerdicts` cannot help, because
+`expectedVerdicts` is `All.Count * caseCount` — it **co-moves** with the policy count, which is why the
+row cheerfully printed `30 of 30` instead of `35 of 35`. §70.2 called that clause *"vacuity: every case
+ran"*; it is a guard against a THROWN case, not against a missing subject.
+
+**Fixed in `fa0d2c2e`.** Presence is a clause of its own, the refuser is located by identity and
+counted, and an absent one reads `-1`, which is not a reachable score:
+
+| | before the fix | after the fix |
+|---|---|---|
+| B6 — delete the refuser policy | exit **0**, 0 `NOT CAUGHT`, row green | exit **1**, 1 `NOT CAUGHT`, `refuser -1 (claimed 0, policy ABSENT — 0 matched, nothing was measured)` |
+| baseline `-- 3` · `-- 3 --real-vectors` | 0 · 0 | **0 · 0**, both printing `policy PRESENT` |
+
+🟡 **THE SAME EXPRESSION IS IN THE PRE-EXISTING EVAL 03 TWIN, AND IT SURVIVES ONLY ON LUCK.**
+`CheckConstantPolicyCeilingAsync` reads its refuser the same way — but its claimed `RefuserScore` is
+**5**, so an absent policy's default `0` happens to be caught. A pinned `0` would have made it silent
+too. It is given the same clause rather than left on that arithmetic accident: review ablation **B7**
+(delete `ConstantPolicy_NeverPresents`) now exits **1** with `refuser -1 (claimed 5, policy ABSENT)`.
+
+## §71.2 🔴 DEFECT 2 — §70.1's golden-key census was off by one in BOTH cells
+
+Full superseded → corrected disclosure is inline in §70.1. In short: **46** distinct golden
+`evaluatorKey` values, not 45; **9** with no registration, not 8. The dropped key is **`f1_score`** —
+the *deterministic* member of the Path A' carve-out, which §70.8's re-derivation line silently omitted
+by describing the carve-outs as *"multi-turn + trace-dependent"* (5 + 3). **Direction: understated, and
+the claim it supports gets stronger** — *"exactly the Path A' carve-outs"* holds for all nine.
+The 3-key overstatement the paragraph exists for reproduces exactly. Fixed in `d28a42e3`.
+
+## §71.3 🟡 DEFECT 3 — one registry test asserted a property of NO registrations
+
+Ablation **A4** (`RegisterInto` registers nothing) is published as **5 red**, and it is 5 red — but
+this file has **six** rows, and the sixth stayed green. `EveryRegistration_NamesItsOwningAssembly`
+uses `Assert.All`, which **passes on an empty collection**. Fixed by adding a count assertion —
+a pure addition, no existing assertion touched — after which A4 is **6 red** and the baseline is
+unchanged at 35/0. **Sixth confirmed appearance of the "control passes on an empty set" shape.**
+
+## §71.4 EVERY PUBLISHED ABLATION, RE-EXECUTED. 17 of 17 reproduce
+
+Each edit applied to the working file, restored **from a copy taken beforehand** (rule 3), every file
+verified byte-identical by `md5sum` afterwards, `git status --porcelain` empty at each restore.
+
+### d-1 — baseline 35 / 0 (net8.0), RESTORED 35 / 0
+
+| ablation | published | **measured here** | the rows that went red |
+|---|---|---|---|
+| A1 drop one of the 40 entries (`violence`) | 4 red | **4 red** ✅ | key set · resolve-all · idempotence · shared |
+| A2 re-point the `prompt_leak` alias | 1 red | **1 red** ✅ | aliases only — the key-set row stays green, so the alias row earns its place |
+| A3 `Resolve` passes null `judgeModel` | 2 red | **2 red** ✅ | judge threading · per-call freshness |
+| A4 **VACUITY** — register nothing | 5 red | **5 red** ✅ (**6 after §71.3's guard**) | see §71.3 |
+| A5 `ContentEquals` always true | 2 red | **2 red** ✅ | both conflict rows |
+| A6 comparer `Ordinal` not `OrdinalIgnoreCase` | 2 red | **2 red** ✅ | case-insensitive lookup · differing-case conflict |
+
+### d-2 — `-- 3` exit **0** at baseline and after every restore
+
+| ablation | published | **measured here** |
+|---|---|---|
+| B1 drop T-02's two prohibitions | ceiling 4, pair 2 | **ceiling 4 · worst pair 2 · exit 1 · 1 `NOT CAUGHT`** ✅ |
+| B2 collapse BOTH pairs | ceiling 5 = case count | **ceiling 5 · worst pair 2 · exit 1** ✅ — it falsifies the printed claim itself |
+| B3 **VACUITY** zero policies | ceiling −1 | **ceiling −1 · "Measured over 0 policies" · exit 1** ✅ |
+| B4 policies stop being FROZEN | pair 2 | **ceiling 3 · worst pair 2 · exit 1** ✅ |
+| B5 empty trace stops being a failed claim | refuser 1 | **`Constant_CallsNothing 1/5 [T-04]` · refuser 1 (claimed 0) · exit 1** ✅ |
+| 🆕 **B6 delete the refuser policy** | — | **exit 0, row GREEN.** §71.1 |
+| 🆕 **B7 delete `ConstantPolicy_NeverPresents`** (the Eval 03 twin) | — | exit 1 — caught, but by the VALUE clause, not by presence |
+
+### d-3 — baseline 40 / 0 unit, real pairs **0 · 13**; RESTORED 40 / 0 and **0 · 13**
+
+| ablation | published unit | **measured unit** | published real | **measured real** |
+|---|---|---|---|---|
+| C1 unpinned reads as a MATCH | 4 red | **4 red** ✅ | 0 · 13 | **0 · 13** ✅ |
+| C2 one-sided null stimulus passes | 1 red | **1 red** ✅ | 0 · 13 | **0 · 13** ✅ |
+| C3 **VACUITY** empty intersection passes | 1 red | **1 red** ✅ | 0 · 13 | **0 · 13** ✅ |
+| C4 unmatched scenarios ignored | 1 red | **1 red** ✅ | 0 · 13 | **0 · 13** ✅ |
+| **C5 the floor becomes a gating axis** | 13 red | **14 red** ⚠ | **13 · 13** | **13 · 13** ✅ |
+| C6 `Incomparable = 0` | 1 red | **1 red** ✅ | 0 · 0 | **0 · 0** ✅ |
+
+⚠ **C5's unit count differs by one and its LOAD-BEARING half does not.** §70.3 cites C5 for exactly
+one thing — *"`compare` then exits 13 on BOTH real pairs … the one-reachable-outcome command Wave 7
+refuted, reproduced on demand"* — and that reproduces **13 · 13**. The unit figure moved because the
+record does not specify the ablation's code and this review wrote its own (a `chanceFloor` axis whose
+both-absent state is `Mismatch`); a different placement moves the count by one row. **A published
+ablation whose EDIT is not specified can only be reproduced in substance.** Recorded, not fixed —
+fixing it would mean publishing ablation source, which is a change to how the record is written.
+
+## §71.5 `compare` — the runs were PRODUCED again, from scratch, and both outcomes are reachable
+
+**Nothing in §70.3 was taken on trust.** A fresh isolated workspace, an empty `.sln`, `init-workspace`
+(exit **1** without the `.sln`, **0** with it — both observed), and **six** runs made with every
+credential variable unset **in the command**:
+
+| | measured this session |
+|---|---|
+| scenario files across all runs | **86** for the five §70.3 describes (28 · 28 · 28 · 1 · 1) |
+| **summed `estimatedCost`** | **0.0** |
+| `judge.subjectRelation` | **`unknown` on 86 of 86** |
+| scenarios carrying a `chanceFloor` | **0** |
+
+**Every exit code in §70.3's table, re-observed with `$?`:**
+
+| pair | flags | **exit** |
+|---|---|---|
+| GdprA vs GdprB · MitreA vs MitreB · a run vs itself | — | **0 · 0 · 0** |
+| the same two pairs | `--strict` | **13 · 13** |
+| GdprA vs GdprC (different `--input`) | — | **13** |
+| GdprA vs MitreA (no shared scenario id) | — | **13** |
+| a missing path · a directory with no scenario files | — | **2 · 2** |
+
+✅ **The exit-13 path has a positive specimen and the exit-0 path is not an artefact of identical
+inputs.** The refusal on GdprA vs GdprC is an **axis** refusal — *"`gdpr-art17-001 · stimulus`: the two
+runs were asked different things"*, on the same 28 scenario ids — not a scenario-set mismatch. And a
+sixth run, **GdprD**, was made with the same `--input` and a deliberately worse `--response`: it
+compares **COMPARABLE, exit 0**. So "comparable" is not "byte-identical".
+
+⚠ **A LIMIT §70 DOES NOT DECLARE: no pair of PRODUCED runs has ever yielded a non-zero delta.** All six
+runs grade through the declared stub judge, which returns a constant, so GdprD's very different
+response still scores `0.7500` on all 28 and `mean score delta` is exactly `0.0000` with
+`recovered 0 · regressed 0` — on every pair. The delta renderer itself is fine and was shown so:
+scores hand-edited to `0.25` in a copy of a produced run give `-0.5000` per scenario,
+`mean score delta -0.0893`, `regressed 5`. **But `Recovered`, `Regressed` and a signed
+`MeanScoreDelta` join §69.11's list of paths that are wired with no live subject** — a fourth member,
+and the first one on the delta side rather than the comparability side.
+
+## §71.6 Every other §70 claim, re-derived at `1ec969b6`
+
+| | published in §70 | **measured here** |
+|---|---|---|
+| `dotnet build AgentEval.sln --no-incremental` | 0 errors, 70 identities | **0 errors, 231 warnings, 70 identities** ✅ |
+| net10.0 | 9,928 / 0 / 2 of 9,930 | **9,928 / 0 / 2 of 9,930** ✅ |
+| net9.0 · net8.0 | 9,710 / 0 / 1 of 9,711 | **9,710 / 0 / 1 of 9,711**, both ✅ |
+| `-- 3` · `--real-vectors` | 0 · 0 | **0 · 0** ✅ (resolved space `concept` / `precomputed` — no silent fallback) |
+| `-- 4` · `--real-vectors` | 0 · 0 | **0 · 0** ✅ |
+| `-- 7` · `--real-vectors` | 1 · 1 | **1 · 1** ✅ |
+| `-- 6 --dry-run` · `--ci --dry-run` | 0 · 1 | **0 · 1**, Eval 07 the only failing member of eleven ✅ |
+| control panel, both spaces | 43 gating + 7 advisory | **43 + 7**, 0 `NOT CAUGHT`, NAME sets `diff`-empty ✅ |
+| `rows.Add` arbiter | 50 | **50** = 43 + 7 ✅ |
+| snapshot canonical keys · written by `--ci --dry-run` | 14 · 3 | **14 · 3** (`eval03_controls`, `eval04_injection`, `eval07_topology`) ✅ |
+| ARM C | 6 of 56 | **6 of 56** ✅ |
+| `grep -rn IEvalRegistry src/` | 9 | **9** ✅ |
+| the dictionary at `BenchAgenticCalibrateCommand.cs:267` | 0 entries | **0** ✅ |
+| `agenteval --help \| grep -c compare` | 1 | **1** ✅ |
+| `Comparability` in the repo's `.agenteval` | 0 | **0** ✅ |
+| `git diff --numstat main..HEAD -- tests/` | 36 paths, 0 deletions | **36 · 0** ✅ |
+| `git log --oneline main..HEAD -- strategy/` | 0 | **0** ✅ |
+| `git log --oneline main..HEAD -- src/` | 16 | **16** ✅ — none of this review's three commits touches `src/` |
+
+**Did any existing test's output move?** **No.** The three TFM totals are identical before and after
+all three fixes, and the only test file touched gained an assertion inside an existing method: the
+net10 total stays 9,930 because §71.3 added no new `[Fact]`.
+
+⚠ **The warning identity SET moved by one and the count did not** — exactly the phenomenon §70.6
+flagged. A pre-existing `CS0162` in `NegativeControls.cs` **relocated** from `(3130,51)` to
+`(3164,51)` when `fa0d2c2e` inserted lines above it. One out, one in, 70 either way. **A count that
+does not move is not proof that nothing did**, and this is the second consecutive wave in which that
+sentence had to be written about the same warning.
+
+## §71.7 Credentials — 0, needles checked non-empty first, and the cleanup is reported by COUNT
+
+| | |
+|---|---|
+| repo tracked files carrying the endpoint host · the key | **0 · 0** |
+| `git diff main..HEAD` carrying either | **0 · 0** |
+| this review's own three commits (`ecf89339..HEAD`) | **0 · 0** |
+| session artifacts carrying the host, **2026-09-07** | **9 found, all under the session scratchpad, none tracked, all deleted in the same command, re-count 0** |
+
+The 9 were logs written by `bench gdpr` and `init-workspace`, whose own banner names the judge
+endpoint when one is configured — §70.5's channel, found again by looking for it rather than by
+tripping over it. **Reported by count and date; resolving them to paths is a second decision and one
+of the paths would itself carry the host.** `-- 3 --real-vectors` carried **none**: it resolves to the
+`precomputed` space and calls nothing.
+
+## §71.8 What this review does NOT claim
+
+* **Nothing was purchased.** Every run in §71.5 had `AZURE_OPENAI_*` and `OPENAI_API_KEY` unset **in
+  the command**, summed `estimatedCost` is `0.0` over 86 scenario files, and the only flagged live
+  path — `-- 3 --real-vectors` — resolved to `precomputed` and made no call.
+* **No calibration run was executed against the registry.** §70.7 already says this needs a judge and
+  a purchase. What is proven here is that all 40 factories construct and the key set is exactly the
+  dictionary's — the same thing §70 proved, re-executed.
+* **`compare` has still never seen a chance floor, a declared subject model, or a non-zero delta
+  between two produced runs.** The first two are §70.7's declarations; **the third is this review's**
+  (§71.5) and was not declared before.
+* **`SubjectRelation` gates nothing, so its being `Unknown` everywhere makes no clause vacuously
+  true** — checked: `Verdict` does not read it, and both directions of the finding are covered by
+  tests on hand-built facts.
+* **C5's unit count was not reconciled**, only its load-bearing half (§71.4).
+* **No Eval 02 coverage cell was re-derived**, and Eval 07 GATE B is still red by decision
+  (`MASTER_PLAN` §0.3). `-- 7` and `--ci --dry-run` exiting 1 is the honest state of the instrument.
+* **`MASTER_PLAN` §0.5's (d) cell is still stale in the pessimistic direction** and this review did
+  not edit it either, for §70's reason: `strategy/` is gitignored and historyless.
+
+## §71.9 How to re-derive §71
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+S=<a scratch dir>
+
+# 71.1 - DEFECT 1. Delete the refuser policy, rebuild, run. It must now be RED.
+cp $E/Controls/ConstantTrajectoryPolicies.cs $S/p.orig            # rule 3: copy BEFORE editing
+#   remove the whole `Constant_CallsNothing` policies.Add(...) block
+dotnet build $E -v q --nologo && dotnet run --project $E --no-build -- 3; echo $?   # -> 1
+grep -c "NOT CAUGHT" three.log                                    # -> 1
+cp $S/p.orig $E/Controls/ConstantTrajectoryPolicies.cs            # restore FROM THE COPY
+md5sum $E/Controls/ConstantTrajectoryPolicies.cs $S/p.orig        # -> identical
+
+# 71.2 - DEFECT 2. The census, derived not read.
+cat tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl \
+  | grep -oE '"evaluatorKey"[[:space:]]*:[[:space:]]*"[^"]+"' \
+  | sed -E 's/.*"([^"]+)"$/\1/' | sort -u | wc -l                 # -> 46, NOT 45
+#   set-difference against the 40 registered keys -> 9 lines, the last of them f1_score
+
+# 71.3 - DEFECT 3. A4 with the guard.
+#   make Add<TEval> a no-op in AgenticEvalRegistration.RegisterInto, then:
+dotnet test tests/AgentEval.Tests -f net8.0 --no-build \
+  --filter "FullyQualifiedName~EvalRegistryTests|FullyQualifiedName~AgenticEvalRegistrationTests"
+#   -> 6 red (was 5 before the guard); restore -> 35/0
+
+# 71.5 - compare, from scratch, spending NOTHING.
+W=$S/ws; rm -rf $W; mkdir -p $W; printf '' > $W/x.sln
+CLI=src/AgentEval.Cli/bin/Debug/net8.0/AgentEval.Cli.dll
+run () { env -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_DEPLOYMENT \
+             -u AZURE_OPENAI_JUDGE_ENDPOINT -u AZURE_OPENAI_JUDGE_API_KEY \
+             -u AZURE_OPENAI_JUDGE_DEPLOYMENT -u OPENAI_API_KEY \
+             AGENTEVAL_ALLOW_STUB_JUDGE=1 dotnet "$CLI" "$@"; }
+(cd $W && run init-workspace)                                     # -> 0 with the .sln, 1 without
+#   GdprA/GdprB same --input+--response; GdprC a different --input;
+#   GdprD the SAME --input and a worse --response; MitreA/MitreB on the stub agent
+#   THEN sum estimatedCost over every scenario file -> 0.0, and census subjectRelation -> unknown
+dotnet "$CLI" compare --baseline RUN_A --candidate RUN_B ; echo $?           # -> 0
+dotnet "$CLI" compare --baseline RUN_A --candidate RUN_D ; echo $?           # -> 0, deltas ALL 0.0000
+dotnet "$CLI" compare --baseline RUN_A --candidate RUN_C ; echo $?           # -> 13, STIMULUS axis
+#   the delta renderer, proven separately: copy RUN_B, set five scores to 0.25, compare
+#   -> exit 0, -0.5000 each, mean -0.0893, regressed 5
+
+# 71.6 - the tree. Report the identity SET, never the total.
+dotnet build AgentEval.sln --no-incremental 2>&1 \
+  | grep -oE "[^ ]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+" | sort -u | wc -l   # -> 70
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
+#   panel BY NAME, state stripped so a row that flips emits ONE string, never two:
+grep -aE "^. +(. caught|. NOT CAUGHT) " three.log | grep -av "(advisory" \
+  | sed -E 's/^.+(caught|NOT CAUGHT) +//; s/[[:space:]]*.?[[:space:]]*$//' | sort -u
+grep -a "(advisory" three.log \
+  | sed -E 's/^.*(finding ok|FINDING)[[:space:]]+//; s/[[:space:]]+\(advisory.*$//' | sort -u
+#   -> 43 and 7, diff-empty between the two spaces
+
+# 71.7 - credentials. COUNTS ONLY, needle checked non-empty FIRST, never echo a match.
+HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed -E 's#^https?://##; s#/.*$##')
+[ -n "$HOST" ] || echo "EMPTY NEEDLE - the zeros below prove nothing"
+git grep -lF "$HOST" | wc -l ; git diff ecf89339..HEAD | grep -cF "$HOST"    # -> 0 and 0
+grep -rlF "$HOST" $S | wc -l                                                 # then delete, re-count -> 0
+```
