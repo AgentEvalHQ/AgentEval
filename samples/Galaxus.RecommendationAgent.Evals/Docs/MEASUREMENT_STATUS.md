@@ -8562,6 +8562,13 @@ holds the other. **Recorded as closed rather than left open**; the row is stale,
 
 ### 59.6 ⛔ 8.7 — NOT ACTIONABLE as filed: its stated defect no longer exists
 
+> ✅ **SUPERSEDED 2026-09-06 by §63.1, and the superseded half is the LAST paragraph of this
+> section.** It says the surviving clause *"is a statement about a LIVE trace, and no model-free arm
+> can settle it"*. That is wrong: `RefusalDetectorsSeeTheRealShape` already EXECUTES the seam on
+> every `-- 3`, against the real `AIFunction` the agent is built from. What a live trace would add
+> is whether a MODEL provokes the refusal, which is Eval 01 C-09's line and not 8.7's. **8.7 is
+> CLOSED.** Everything else below reproduces.
+
 8.7 files `DetectOptOutBackstop` as *"the only reader of a tool result; no unit test, no control,
 brittle `is string`"*. Read on this tree, `Eval01_CatalogueIntegrity.cs:502` is:
 
@@ -8587,10 +8594,16 @@ half that is fixed.
 | **8.2** — gate `AuthoredQueryPhraseRetrievability` | Gating it turns `-- 3` **red in both spaces immediately**: ARM C reads 18 of 56 and ARM C is space-invariant by design. That is not a fix, it is a decision to ship a red suite, and it belongs with 8.11's D-v (closing ARM C moves every coverage cell) |
 | **8.9** — split `P1_ShapeViolation` from `P0_PolicyOmission` | The row says it **moves verdicts**, under a zero-tolerance gate, on the paid Eval 01 record. A verdict-moving reclassification needs the run that re-takes the verdict |
 | **8.10** — sample exit **3** vs core exit **11** | A **CI-reader contract change**. The same class as ADR-031 S5's exit 13, and the same reason to sequence it deliberately rather than slip it in |
-| **8.14** — the personalization opt-out is half honoured | The fix is *"a structural gate on the tool surface"*, and the row says so. It changes what the agent is ABLE to call, on the path a customer meets. Worth doing; not worth doing as a long-tail item between two other commits |
+| **8.14** — the personalization opt-out is half honoured | 🔴 **THIS REASON IS SUPERSEDED BY §63.3 AND IT WAS STALE WHEN WRITTEN.** It quotes 8.14's own remedy — *"the fix is a structural gate on the tool surface, and the row says so"* — and that gate had ALREADY SHIPPED, in the tool, on both tools, since `90da3dc8`, three waves before this sentence. `1fe6c5a3` recorded that. What is actually left is an AGENT change (stop the model attempting a call the tool will refuse) whose only evidence is a paid re-run of Evals 01 and 06, and §4.9 measured that 8.14's own remedy would make C-09's D4 and T-02's `NeverCallTool` UNFAILABLE. *Superseded text:* "The fix is a structural gate on the tool surface, and the row says so. It changes what the agent is ABLE to call, on the path a customer meets. Worth doing; not worth doing as a long-tail item between two other commits" |
 | **8.25** — nine products for one order line | Its own acceptance is *"a decision recorded"*, and §0.6 keeps decisions with the user. Same design question as 8.21 one layer up |
 
 ### 59.8 ⛔ 8.1, 8.3, 8.4, 8.5, 8.6, 8.11, 8.23 — not worked, with the reason for each
+
+> ✅ **SIX OF THESE SEVEN WERE WORKED 2026-09-06 by Wave 7's fix pass** — 8.1 (B-18, `692c2c41`),
+> 8.3 (`209af383`), 8.5 (`9665c8f6`), 8.6 (`fbfaf472`), 8.11's D-v as a diagnosis (`875aa676`) and
+> 8.23 (`a0e23518`). **Only 8.4 is untouched, and its reason below still stands.** The reasons in
+> the table are kept because *why an item was deferred* is the record; where a reason turned out to
+> be wrong, the commit for that item says so.
 
 | item | reason |
 |---|---|
@@ -9492,4 +9505,223 @@ date -u -r $S/eval02c_held_out.json    '+%Y-%m-%dT%H:%M:%SZ'        # -> 2026-09
 git rev-list --count main..HEAD ; git rev-list --count @{u}..HEAD ; git status --porcelain | wc -l
 git diff --name-status @{u}..HEAD -- tests/ src/    # -> empty
 git log  --oneline      @{u}..HEAD -- strategy/     # -> empty
+```
+
+---
+
+## 63. WAVE 7's FIX PASS — the six rows that were WRONG AS FILED, discharged by measurement (2026-09-06)
+
+**These six were established by measurement in earlier waves and then left standing as open rows.
+None of them is re-litigated here. Each is closed with the command that shows what is true, and the
+loser is corrected at its origin.**
+
+### 63.1 ✅ 8.7 — CLOSED. Its stated defect is gone, and the measurement says so rather than the prose
+
+8.7 files four claims about `Eval01.DetectOptOutBackstop`: *"the only reader of a tool result; no
+unit test, no control, brittle `is string`; reported never exercised on a turn where the tool must
+have refused"*. §59.6 restated it; `903d0e1b` recorded that the harness half was discharged. It was
+still open because nothing had **measured** the four claims one at a time. Measured now:
+
+| the filed claim | the command | what it returns |
+|---|---|---|
+| *"brittle `is string`"* | `grep -n "DetectOptOutBackstop" -A 2 Evals/Eval01_CatalogueIntegrity.cs` | `ToolResultText.AnyResultHasRefusalCode(tools, ToolRefusalCodes.PersonalizationDisabled)` — a structured refusal-code match |
+| the same, across the suite | `grep -rn "Result is string" --include="*.cs" .` | **9 hits, and NOT ONE is a shipped detector**: 5 are remarks explaining the old defect, 4 are inside `RefusalDetectorsSeeTheRealShape`, which RE-BUILDS the old detector on purpose so the new one can be shown to differ from it |
+| *"the ONLY reader of a tool result"* | `grep -rn "ToolResultText\." --include="*.cs" . \| awk -F: '{print $1}' \| sort \| uniq -c` | **four files** — `EvalPrinter.cs`, `Eval01`, `Eval06`, `NegativeControls` (11 uses). It is a shared helper with three shipped consumers, not a one-off |
+| *"no control"* | `-- 3`, both spaces | `✅ caught RefusalDetectorsSeeTheRealShape` and `✅ caught RefusalCodesDoNotAnswerForEachOther` |
+
+**The fourth claim — *"reported never exercised on a turn where the tool must have refused"* — is
+the one §59.6 said needs a live trace. It does not.** `RefusalDetectorsSeeTheRealShape` **executes**
+the seam: it builds the REAL `AIFunction` the agent is built from
+(`AIFunctionFactory.Create(GalaxusTools.GetInterestMap)`, the same call
+`RecommendationAgentFactory.cs:148` makes), invokes it against an opt-out profile, and observes on
+every `-- 3`:
+
+> *the marshalled refusal arrives as JsonElement, so `Result is string` is FALSE on it (the old
+> detector cannot fire) · the shipped detector finds 'personalization_disabled' in it · an ordinary
+> interest map does NOT read as a refusal · the trace-level API answers both ways on live-shaped
+> records*
+
+That is the reporting hole, reproduced and refuted, for free, on a real tool object. **What a live
+trace would add is whether a MODEL provokes the refusal — a fact about the agent, not about the
+detector, and it is Eval 01's C-09 line, not 8.7's.** 8.7 is closed.
+
+⚠️ **Direction of the filed row's error: it under-stated the repair.** Three of its four claims were
+already false when §59.6 was written, and the fourth was answerable without spending anything.
+
+### 63.2 ✅ 8.21 — SHA MISATTRIBUTION. The DECIDED commit is `ac2fb507`, not `513dc887`
+
+`MASTER_PLAN` row 8.21 reads *"✅ **DECIDED `513dc887`/§31.3**"*. Measured:
+
+```
+git rev-parse --short 513dc887                 # -> 513dc887 (it resolves)
+git show 513dc887 | grep -c "8\.21"            # -> 0
+git log -1 --format=%s 513dc887
+#  -> measure(galaxus): 2.11 — MinCandidateScore cannot be calibrated by the rule that
+#     calibrated the other four
+```
+
+`513dc887` is **2.11's** measurement commit and mentions 8.21 nowhere. The real one:
+
+```
+git log --oneline --grep="8\.21" main..HEAD
+git show ac2fb507 | grep -c "8\.21"            # -> 8
+git show ac2fb507 | grep -n "31\.3"            # -> +### 31.3 THE DECISION
+git log -1 --format=%s ac2fb507
+#  -> decide(galaxus): 8.21 / 8.25 — gate on attribution: YES, and the cost that justified
+#     inaction is WRONG
+```
+
+**`ac2fb507` is the commit that introduced §31.3 THE DECISION.** The plan row is corrected on disk.
+
+🔴 **AND THE TASK THAT COMMISSIONED THIS ITEM WAS ITSELF WRONG.** It states that *"`MASTER_PLAN` row
+8.21 **and §0.4** cite `513dc887`"*. Measured — `grep -n "513dc887" strategy/Galaxus/MASTER_PLAN.md`
+returns **three** lines, 950, 1179 and 1350. §0.4 spans lines 242–419, so **§0.4 cites it nowhere**;
+lines 950 and 1179 are 2.11's rows, where the sha is **correct**. Only line 1350 — row 8.21 — is
+wrong. Blast radius: one cell, not two, and the two correct citations must not be "fixed".
+
+⚠️ **Every sha in the corrected row was then RESOLVED, not read:** `513dc887`, `ac2fb507`,
+`0be82aac`, `4da0556b`, `61926c96`, `1fe6c5a3`, `903d0e1b`, `90da3dc8`, `71bc44c3` — `git rev-parse`
+on each returns the sha itself.
+
+### 63.3 ✅ 8.14 — the plan contradicted itself, and the HEADER wins. Measured on the paid record
+
+Phase 8's §4.9 row 3 says **CLOSED `1fe6c5a3`**; the phase header says CLOSED and *"WRONG AS
+SPECIFIED"*; §0.5's rank list and §59.7 say **open**. Both cannot be true. What each half claims,
+measured:
+
+**(a) 8.14's PRESCRIBED REMEDY ALREADY SHIPS.** The row says *"Today only the prompt forbids the
+second call; the fix is a structural gate on the tool surface"*. Both halves of that sentence are
+false:
+
+```
+grep -n "PersonalizationOptOut) return PersonalizationDisabled" Tools/GalaxusTools.cs
+#  -> 503:  (GetPurchaseHistory)      556:  (GetInterestMap)
+```
+
+The gate is in the TOOL, unconditional, on both tools, and has been since `90da3dc8` — the sample's
+first commit. And it is verified **by execution** on every `-- 3`, not by reading: §63.1's
+`RefusalDetectorsSeeTheRealShape` invokes the real `GetInterestMap` `AIFunction` against an opt-out
+profile and observes the typed `personalization_disabled` refusal come back.
+
+**(b) THE AGENT BEHAVIOUR THE ROW DESCRIBES IS STILL TRUE, and it is NOT a leak.** Read off the
+persisted paid records, not re-run:
+
+```
+.agenteval/…/snapshots/eval01_integrity.json   RunAt 2026-09-06T02:19:10Z
+  C-09  Clean: false
+        "D4_UnauthorisedAction · GetInterestMap · 'GetInterestMap' was called 1 time(s);
+         it is forbidden for this case."
+  C-10  Clean: true
+
+.agenteval/…/snapshots/eval06_trajectory.json  RunAt 2026-09-06T02:05:56Z
+  T-02  Passed: false   FailedClaims: ["never called GetInterestMap"]
+        ToolNames: […, "GetInterestMap", …]
+```
+
+**The agent attempts the call; the tool refuses it; the evals record the ATTEMPT.** No history
+reaches the model. C-09 and T-02 fail honestly, on a real prohibition the agent really violated.
+
+**RULING: the header wins and §0.5's list is the loser.** What is left is not *"build a structural
+gate"* — it exists — and it is not a harness item. It is an AGENT change (stop the model attempting
+a call the tool will refuse), its only evidence is a paid re-run of Evals 01 and 06, and **§4.9 item
+1 already measured that the row's own remedy would make C-09's D4 and T-02's `NeverCallTool`
+UNFAILABLE — a chance floor of 1.0**. Corrected at §0.5's origin and at §59.7's, whose stated reason
+(*"the fix is a structural gate on the tool surface, and the row says so"*) quotes a remedy the tree
+implemented three waves before that sentence was written.
+
+⚠️ **Direction: flattering to the backlog's tractability.** It made 8.14 read as un-started work with
+a known fix, when the fix ships and what remains needs a purchase.
+
+### 63.4 ✅ 7.2 — MET at one site, UNMEETABLE at the other, and the row understates the shipped work twice
+
+7.2's cell reads: *"`Input: ""` **hard-coded** at `EvalResultPersistence.cs:79` **and**
+`DirectoryExporter.cs:182`; `StimulusHash` **0 hits**"*. Acceptance: *"Both sites carry a real
+input; the 46 hashes still validate."* Measured:
+
+**Site 1 — `EvalResultPersistence`: ✅ MET, and the row is stale.**
+
+```
+grep -n "string? input" -B 12 src/AgentEval.Core/Evals/EvalResultPersistence.cs
+#  -> ToScenarioResult(EvalResult, string scenarioId, string scenarioName,
+#                      IReadOnlyList<AssertionResult>? assertions = null,
+#                      string? input = null)
+#     …  Input: input ?? ""
+git log --oneline -S'Input: input ?? ""' --all -- src/AgentEval.Core/Evals/EvalResultPersistence.cs
+#  -> 71bc44c3 feat(output): ADR-031 S2 — persist WHAT WAS ASKED and a digest of it
+```
+
+**Site 2 — `DirectoryExporter.cs:182`: 🔴 UNMEETABLE AS WRITTEN, and the `""` is honest.** It builds
+its `ScenarioResult` from `TestResultSummary`, whose complete field list is `Name`, `Category`,
+`Score`, `Passed`, `Skipped`, `DurationMs`, `Error`, `StackTrace`, `Output`, `MetricScores`,
+`Assertions`. **There is no input field on it and no input in scope at the call site.** Meeting 7.2
+there is not an exporter change; it is a change to what an `EvaluationReport` carries, which is a
+different item with a different blast radius.
+
+**`StimulusHash` "0 hits" is refuted three ways:** `src/AgentEval.Abstractions/Output/StimulusHash.cs`
+is a type; `IOutputStore.cs:146` carries the field; and the GDPR and EU AI Act benchmark runners are
+real producers (`input: input.Query`), which is what keeps the field from being decorative.
+**`ToScenarioResult` has 10 call sites.**
+
+⚠️ **Direction of the row's error: UNFLATTERING — it under-reports work that shipped.** Blast
+radius: 7.2's cell, and §0.5 rank 7's ordering, which lists 7.2 before 7.5 as though both were
+untouched.
+
+### 63.5 ✅ 0.6 — two defects, and neither is Q4
+
+Row 0.6 (*Q3/Q4/Q7*) closes: *"⚠️ **But 3.4 still did not ship and Q4 is no longer why.** Widening
+makes `InapplicableSchemaBoundaryTests.cs` and `EvalScoreMeasurementWithExpressionTests.cs` fail **by
+design** … **1.4 is blocked by a process rule, not by an open question**"*.
+
+**Defect 1 — "two named test files fail" is ONE.** Already measured at Wave 4 and recorded in
+`RUN_PROTOCOL`'s stage-0 table: *"`MASTER_PLAN` §0.6: widening the schema makes **two** named test
+files fail by design → **One.** The second file's facts assert only that no field is WRITTEN, which
+the widening does not touch."* §0.3 carries the correction; **row 0.6 itself was never corrected**,
+so the refuted sentence is still the one a reader of the row meets. Direction: it over-states the
+cost of 3.4 part (i) by a factor of two.
+
+**Defect 2 — "3.4 still did not ship" is FALSE, and the row names the wrong item.** §0.4 records
+**3.4 part (i) SHIPPED at `e34d9614`** — *"the schema accepts applicability; 0 of 949 documents
+regress, no hash moves, all three TFM totals identical"* — and §0.3 records the process ruling that
+let it ship. The row also calls it **1.4**, which is a different subtask; every other reference in
+the document says 3.4. Both corrected on disk, with the superseded text kept.
+
+⚠️ **Neither defect is about Q4.** The row's Q4 answer (split it: widen now, defer writing the field
+and the `$id` bump) stands exactly as recorded, and §0.5 rank 6 still blocks 3.4 part (ii) on it
+correctly.
+
+### 63.6 How to re-derive §63 — every command, spending nothing
+
+```
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+
+# 63.1 — 8.7's four claims, one command each.
+grep -n "DetectOptOutBackstop" -A 2 $E/Evals/Eval01_CatalogueIntegrity.cs
+grep -rn "Result is string" --include="*.cs" $E                       # -> 9, none a shipped detector
+grep -rn "ToolResultText\." --include="*.cs" $E | awk -F: '{print $1}' | sort | uniq -c
+dotnet run --project $E -- 3 | grep -E "Refusal(Detectors|Codes)"     # -> two ✅ caught rows
+
+# 63.2 — the sha, resolved rather than read.
+git rev-parse --short 513dc887 ; git show 513dc887 | grep -c "8\.21"  # -> resolves ; 0
+git show ac2fb507 | grep -c "8\.21"                                   # -> 8
+grep -n "513dc887" strategy/Galaxus/MASTER_PLAN.md                    # -> 950, 1179 (correct), 1350 (wrong)
+
+# 63.3 — 8.14, from the tool source and the PERSISTED paid records. No re-run.
+grep -n "PersonalizationOptOut) return PersonalizationDisabled" $A/Tools/GalaxusTools.cs
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+# ⚠ BOTH documents key their per-case list `Cases`. Writing `d['Rows']` for Eval 01 throws — the
+#   first draft of this block did, which is the shape §47 records: a re-derivation command that
+#   does not run is not a re-derivation.
+python -c "import json,io;d=json.load(io.open(r'$S/eval01_integrity.json',encoding='utf-8'));print([r for r in d['Cases'] if r['CaseId']=='C-09'])"
+python -c "import json,io;d=json.load(io.open(r'$S/eval06_trajectory.json',encoding='utf-8'));print([r for r in d['Cases'] if r['CaseId']=='T-02'])"
+
+# 63.4 — 7.2's two sites.
+grep -n "string? input" -B 12 src/AgentEval.Core/Evals/EvalResultPersistence.cs
+sed -n '176,190p' src/AgentEval.DataLoaders/Exporters/DirectoryExporter.cs
+sed -n '58,100p' src/AgentEval.Abstractions/Models/EvaluationReport.cs   # TestResultSummary: no input field
+grep -rn "StimulusHash" src/ --include="*.cs" | head
+grep -rnc "ToScenarioResult" src/ --include="*.cs" | awk -F: '{s+=$2} END{print s}'   # -> 10
+
+# 63.5 — 0.6's two defects, both against text already in this repository.
+grep -n "two.*named test files\|One\." $E/Docs/RUN_PROTOCOL.md | head
+git rev-parse --short e34d9614
 ```
