@@ -1218,6 +1218,138 @@ public static class EvalPrinter
         Console.WriteLine();
     }
 
+    /// <summary>
+    /// Prints one channel's REP-TO-REP spread — design §8.1 row 19 / <b>B-18</b> — and, beside it,
+    /// whether each reported paired delta is bigger than the repeated arm's own noise.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What this panel is for.</b> The comparison panels above it report differences of a few
+    /// hundredths. This one says how far the SAME arm's answers to the SAME question moved between
+    /// repetitions. A delta smaller than that is inside the instrument's own noise, and its
+    /// direction is not a finding — a second, independent reason not to read a row, alongside its
+    /// p-value.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Three reps is a very small n for a spread, and the panel says so rather than letting
+    /// three decimal places imply otherwise.</b> The sample SD's own relative standard error at
+    /// n = 3 is roughly 52 %, so the RANGE is printed first and the SD second.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>A deterministic arm reads NOT REPEATED, never 0.000.</b> One run is that arm's whole
+    /// distribution; printing a zero spread for it would claim "no variation was observed" where
+    /// the truth is "variation was never observable" — the same class of claim as printing a cost
+    /// of zero for a turn that reported no usage.
+    /// </para>
+    /// </remarks>
+    /// <param name="report">The recorded spreads for one channel.</param>
+    /// <param name="repeatedArm">The arm whose noise bounds the deltas — the live arm.</param>
+    /// <param name="outcomes">The paired outcomes printed above this panel.</param>
+    /// <param name="reps">How many repetitions the run asked for.</param>
+    public static void PrintRepSpread(
+        Graders.RepSpreadReport report,
+        string repeatedArm,
+        IReadOnlyList<Graders.SignTestOutcome> outcomes,
+        int reps)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repeatedArm);
+        ArgumentNullException.ThrowIfNull(outcomes);
+
+        Console.WriteLine();
+        TopBorder();
+        TitleRow($"B-18 — rep-to-rep SPREAD of {report.Channel} · reported, never gated");
+        Divider();
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        foreach (var line in Indented(
+            $"The run asked for {reps} rep(s) on the repeated arm. Every cell above is the MEAN of "
+          + "those reps; this panel is what the mean covered up. Read the RANGE first — a sample sd "
+          + $"over {reps} value(s) has about {RelativeSeOfSd(reps)} of relative standard error of its own, "
+          + "so it is not a tight quantity and three decimal places do not make it one.", 2))
+            ContentRow(line);
+        Console.ResetColor();
+        Divider();
+
+        Console.ForegroundColor = ConsoleColor.White;
+        ContentRow($"  {"arm",-34} {"cells",6} {"moved",6} {"widest",8} {"median",8} {"mean sd",8}");
+        Divider();
+        foreach (string arm in report.Arms)
+        {
+            var summary = report.SummaryFor(arm);
+            Console.ForegroundColor = summary.IsReadable ? ConsoleColor.White : ConsoleColor.DarkGray;
+            ContentRow(summary.IsReadable
+                ? $"  {Fit(arm, 34)} {summary.ReadableCells,6} {summary.CellsThatMoved,6} "
+                + $"{summary.WidestRange,8:F3} {summary.MedianRange,8:F3} {summary.MeanSd,8:F3}"
+                : $"  {Fit(arm, 34)} {summary.Cells,6} {"—",6} {"—",8} {"—",8} {"—",8}   NOT REPEATED");
+        }
+        Console.ResetColor();
+
+        // ── The comparison this panel exists to make. ────────────────────────────────────
+        Divider();
+        var bound = report.SummaryFor(repeatedArm);
+        if (!bound.IsReadable)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            foreach (var line in Indented(
+                $"⚠ {repeatedArm} has NO readable spread, so nothing on this panel bounds anything. An arm "
+              + "that ran once cannot say how noisy it is, and answering \"the delta is outside the noise\" "
+              + "from an unmeasured noise level would certify every comparison for free.", 2))
+                ContentRow(line);
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            foreach (var line in Indented(
+                $"Each reported delta against {repeatedArm}'s WIDEST rep-to-rep movement, "
+              + bound.WidestRange.ToString("F3", CultureInfo.InvariantCulture)
+              + $" — not its median ({bound.MedianRange.ToString("F3", CultureInfo.InvariantCulture)}), which is "
+              + $"the flattering statistic here: only {bound.CellsThatMoved} of {bound.ReadableCells} cell(s) "
+              + "moved at all, so a median bound would certify every non-zero delta for free. ⚠ A BOUND ON "
+              + "MAGNITUDE, never a significance test — the p-value above still decides that. What it adds is "
+              + "the case where a delta is unremarkable AND smaller than the arm's own spread, which is two "
+              + "reasons not to read its direction rather than one.", 2))
+                ContentRow(line);
+            Console.ResetColor();
+
+            foreach (var outcome in outcomes)
+            {
+                var comparison = report.CompareToOwnNoise(repeatedArm, outcome.MeanDelta);
+                Console.ForegroundColor = comparison.Verdict switch
+                {
+                    Graders.NoiseVerdict.OutsideNoise => ConsoleColor.White,
+                    Graders.NoiseVerdict.InsideNoise => ConsoleColor.Yellow,
+                    _ => ConsoleColor.DarkGray,
+                };
+                string magnitude = comparison.Verdict == Graders.NoiseVerdict.NoDelta
+                    ? "     —"
+                    : Math.Abs(outcome.MeanDelta).ToString("F3", CultureInfo.InvariantCulture).PadLeft(6);
+                ContentRow($"  {Fit($"{ShortArm(outcome.ArmB)} vs {ShortArm(outcome.ArmA)} ({outcome.Metric})", 40)} "
+                         + $"|Δ| {magnitude}  {comparison.Describe()}");
+                Console.ResetColor();
+            }
+        }
+
+        BottomBorder();
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// The sample standard deviation's own relative standard error at this n, as a percentage —
+    /// approximately 1 / sqrt(2(n − 1)).
+    /// </summary>
+    /// <remarks>
+    /// DERIVED from the rep count the run actually used. It was a hard-coded "three numbers … about
+    /// 52%" for one build of this panel, and the first dry run printed it above a table built from
+    /// TWO reps. A caveat carrying a number that does not describe the run is the shape this
+    /// repository has corrected in three separate documents.
+    /// </remarks>
+    /// <param name="n">The number of values the sd was taken over.</param>
+    private static string RelativeSeOfSd(int n) =>
+        n < 2 ? "an undefined amount"
+              : (100.0 / Math.Sqrt(2.0 * (n - 1))).ToString("F0", CultureInfo.InvariantCulture) + "%";
+
     /// <summary>Prints per-arm cost. Goes on the same panel as any win, never on a different one.</summary>
     /// <param name="report">The paired report.</param>
     public static void PrintCostComparison(PairedCoverageReport report)

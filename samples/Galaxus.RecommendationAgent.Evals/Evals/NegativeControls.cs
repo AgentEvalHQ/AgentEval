@@ -129,6 +129,7 @@ public static class NegativeControls
         rows.Add(Guarded("APersonaInOneArmOnlyIsDeclared", CheckAPersonaInOneArmOnlyIsDeclared));
         rows.Add(Guarded("AssertionFaultsAreNamedAndNotGated", CheckAssertionFaultsAreNamedAndNotGated));
         rows.Add(Guarded("CostRowsSayWhichZeroTheyMean", CheckCostRowsSayWhichZeroTheyMean));
+        rows.Add(Guarded("RepSpreadNeverInventsAZero", CheckRepSpreadNeverInventsAZero));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -6769,6 +6770,151 @@ public static class NegativeControls
                 + "measured zero prints as $0.0000 and says so · a missing usage block prints ≥ and LOWER BOUND · a "
                 + "HALF block is named separately · an unnamed model reads 'model NOT NAMED' · a pre-8.3 snapshot "
                 + "reports that it cannot answer instead of defaulting to NoModel"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 45 — B-18's spread must never invent a zero, and must bound conservatively. ══
+    //
+    /// <summary>
+    /// The rep-to-rep spread panel (design §8.1 row 19 / B-18, plan item 8.1) must report
+    /// <c>NOT REPEATED</c> for an arm that ran once rather than a spread of zero, must use the
+    /// SAMPLE sd, must drop an unscorable rep rather than score it, and must bound a paired delta
+    /// with the arm's WIDEST movement rather than its median.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The flattering direction is the one to guard.</b> Measured on this corpus's own dry run:
+    /// the live arm's answers are identical across reps on 11 of 12 cells and move by 0.250 on the
+    /// twelfth, so the MEDIAN rep-to-rep range is <b>0.000</b>. A median bound would certify every
+    /// non-zero delta in the suite as "outside the instrument's noise" — for free, and in the
+    /// direction that makes the headline look stronger. The check below is a positive control on
+    /// exactly that: a delta the median would pass must read INSIDE the noise.
+    /// </para>
+    /// <para>
+    /// The second half is the recurring <i>absence-is-not-a-zero</i> shape one layer down. A
+    /// single-run arm has no spread; printing 0.000 for it claims "no variation was observed" where
+    /// the truth is "variation was never observable", and 0.000 is the more impressive of the two.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckRepSpreadNeverInventsAZero()
+    {
+        var problems = new List<string>();
+
+        // ── 1. One rep is NOT a spread of zero. ──
+        var single = RepSpread.Of("USR-X", "arm", [0.5]);
+        if (single.ReadableAsSpread || !double.IsNaN(single.Sd) || !double.IsNaN(single.Range))
+            problems.Add("a one-rep cell reports a spread; one run is a whole distribution, and 0.000 for it is a claim.");
+        if (!string.Equals(single.Verdict, "NOT REPEATED", StringComparison.Ordinal))
+            problems.Add($"a one-rep cell reads '{single.Verdict}' rather than NOT REPEATED.");
+
+        // ── 2. Two identical reps ARE a spread, and it is zero. The two zeroes are different. ──
+        var identical = RepSpread.Of("USR-X", "arm", [0.5, 0.5]);
+        if (!identical.ReadableAsSpread || identical.Range != 0 || identical.Sd != 0)
+            problems.Add("two identical reps do not read as a measured zero spread.");
+        if (string.Equals(identical.Verdict, single.Verdict, StringComparison.Ordinal))
+            problems.Add("'ran once' and 'ran twice and did not move' read the same — the pair this row separates.");
+
+        // ── 3. SAMPLE sd, not population. Over [0, 1] the two differ by sqrt(2). ──
+        var twoApart = RepSpread.Of("USR-X", "arm", [0.0, 1.0]);
+        if (Math.Abs(twoApart.Sd - (1.0 / Math.Sqrt(2.0))) > 1e-9)
+            problems.Add($"sd over [0, 1] is {twoApart.Sd:F6}; the SAMPLE sd is 0.707107 and the population sd 0.5.");
+
+        // ── 4. An unscorable rep is DROPPED, not scored. ──
+        var withNaN = RepSpread.Of("USR-X", "arm", [0.4, double.NaN]);
+        if (withNaN.Reps != 1 || withNaN.ReadableAsSpread)
+            problems.Add("an unscorable rep was counted; a NaN rep is an absence and must lower the rep count, "
+                       + "not enter the spread as a value.");
+        var allNaN = RepSpread.Of("USR-X", "arm", [double.NaN, double.NaN]);
+        if (allNaN.Reps != 0 || !string.Equals(allNaN.Verdict, "NO REPS SCORED", StringComparison.Ordinal))
+            problems.Add("a cell where nothing was scorable does not say so.");
+
+        // ── 5. THE POSITIVE CONTROL ON THE FLATTERING DIRECTION. The corpus's own shape: eleven
+        //       cells that did not move and one that moved 0.250. Median 0.000, widest 0.250. ──
+        var report = new RepSpreadReport("control channel");
+        for (int i = 0; i < 11; i++) report.Record(RepSpread.Of($"USR-{i:00}", "live", [0.5, 0.5]));
+        report.Record(RepSpread.Of("USR-11", "live", [0.25, 0.50]));
+        report.Record(RepSpread.Of("USR-00", "deterministic", [0.5]));
+
+        var summary = report.SummaryFor("live");
+        if (summary.MedianRange != 0.0 || Math.Abs(summary.WidestRange - 0.25) > 1e-9 || summary.CellsThatMoved != 1)
+            problems.Add($"the control's own shape did not reproduce (median {summary.MedianRange:F3}, widest "
+                       + $"{summary.WidestRange:F3}, moved {summary.CellsThatMoved}) — the discrimination below is vacuous.");
+
+        var inside = report.CompareToOwnNoise("live", 0.10);
+        if (inside.Verdict != NoiseVerdict.InsideNoise)
+            problems.Add($"a delta of 0.100 reads {inside.Verdict} against a widest movement of 0.250. The MEDIAN "
+                       + "is 0.000 and would have passed it — the bound has slipped to the flattering statistic.");
+        var outside = report.CompareToOwnNoise("live", 0.30);
+        if (outside.Verdict != NoiseVerdict.OutsideNoise)
+            problems.Add("a delta of 0.300 does not read as outside a widest movement of 0.250 — the bound now "
+                       + "refuses everything, which is no more a measurement than accepting everything.");
+
+        // ── 5b. THE VERDICT SATURATES AND THE COUNT MUST NOT. On the persisted paid run the live
+        //        arm's widest movement is exactly 1.000 (a persona went 0.000 → 1.000 on the same
+        //        question), and latent coverage lives in [0, 1] — so NOTHING can read "outside" and
+        //        the verdict stops discriminating. The COUNT of cells that moved more than the
+        //        delta keeps working at the saturating end.
+        var saturated = new RepSpreadReport("saturating channel");
+        double[] ranges = [0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0];
+        for (int i = 0; i < ranges.Length; i++)
+            saturated.Record(RepSpread.Of($"USR-{i:00}", "live", [0.0, ranges[i]]));
+
+        var atFive = saturated.CompareToOwnNoise("live", 0.05);
+        var atThirty = saturated.CompareToOwnNoise("live", 0.30);
+        var atNinety = saturated.CompareToOwnNoise("live", 0.90);
+
+        // The verdict cannot tell these three apart: the bound is the metric's own maximum.
+        if (atFive.Verdict != NoiseVerdict.InsideNoise || atThirty.Verdict != NoiseVerdict.InsideNoise
+            || atNinety.Verdict != NoiseVerdict.InsideNoise)
+        {
+            problems.Add("the saturating fixture did not reproduce (a widest range of 1.000 must swallow every "
+                       + "delta in [0, 1]), so the check below is vacuous.");
+        }
+
+        // The COUNT can, and that is why it is the statistic the panel leads with.
+        if (atFive.CellsMovingMore != 9 || atThirty.CellsMovingMore != 6 || atNinety.CellsMovingMore != 3
+            || atFive.CellsReadable != 12)
+        {
+            problems.Add($"the cell count no longer discriminates at the saturating end: 0.05 → "
+                       + $"{atFive.CellsMovingMore}, 0.30 → {atThirty.CellsMovingMore}, 0.90 → "
+                       + $"{atNinety.CellsMovingMore} of {atFive.CellsReadable}; expected 9, 6, 3 of 12. Without it "
+                       + "the panel has only a verdict that reads INSIDE for everything.");
+        }
+
+        // ── 6. TWO ABSENCES, TWO SENTENCES. One message for both is the defect this suite keeps
+        //       re-finding, and it was live in this panel's own first build. ──
+        var noSpread = report.CompareToOwnNoise("deterministic", 0.10);
+        var noDelta = report.CompareToOwnNoise("live", double.NaN);
+        if (noSpread.Verdict != NoiseVerdict.NoSpreadRecorded)
+            problems.Add("an arm that ran once is not reported as bounding nothing.");
+        if (noDelta.Verdict != NoiseVerdict.NoDelta)
+            problems.Add("a comparison that produced no delta is not reported as such.");
+        if (string.Equals(noSpread.Describe(), noDelta.Describe(), StringComparison.Ordinal))
+            problems.Add("'no spread was recorded' and 'no delta was produced' print the SAME sentence — one "
+                       + "message for two different causes, which is how the first build of this panel blamed a "
+                       + "readable spread for a missing delta.");
+
+        // ── 7. An arm with no rows at all bounds nothing either. ──
+        if (report.CompareToOwnNoise("never-recorded", 0.10).Verdict != NoiseVerdict.NoSpreadRecorded)
+            problems.Add("an arm with no recorded cells does not report that it bounds nothing.");
+
+        return new ControlRowSnapshot(
+            "RepSpreadNeverInventsAZero",
+            "B-18's rep-to-rep spread must not manufacture a number where none was measured, and must bound a "
+          + "paired delta with the arm's WIDEST movement rather than its median. MEASURED on this corpus: the "
+          + "live arm is identical across reps on 11 of 12 cells and moves 0.250 on the twelfth, so the median "
+          + "range is 0.000 — a median bound would certify every non-zero delta in the suite as 'outside the "
+          + "noise', for free and in the flattering direction. The same rule one layer down: an arm that ran "
+          + "ONCE has no spread, and 0.000 is a claim rather than an absence.",
+            problems.Count == 0
+                ? "one rep reads NOT REPEATED with sd and range UNDEFINED · two identical reps read as a MEASURED "
+                + "zero and the two verdicts differ · the sd is the SAMPLE sd (0.707107 over [0, 1], not 0.5) · a "
+                + "NaN rep lowers the rep count instead of entering the spread · a delta of 0.100 reads INSIDE a "
+                + "widest movement of 0.250 that the median 0.000 would have passed · 0.300 reads outside it · "
+                + "at the SATURATING end (widest 1.000, the metric's own maximum) the inside/outside verdict "
+                + "cannot discriminate 0.05 from 0.90 and the CELL COUNT still does, 9 / 6 / 3 of 12 · "
+                + "'no spread recorded' and 'no delta' print DIFFERENT sentences"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

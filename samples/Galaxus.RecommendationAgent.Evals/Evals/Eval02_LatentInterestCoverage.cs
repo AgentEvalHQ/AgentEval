@@ -270,6 +270,16 @@ public static class Eval02_LatentInterestCoverage
         var precisionFloors = new Dictionary<string, double>(StringComparer.Ordinal);
         var notes = new List<string>();
         var roundsByArm = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+
+        // ── B-18 (design §8.1 row 19, plan item 8.1) ───────────────────────────────
+        //
+        //   CoverageScore.Mean collapses an arm's reps into ONE observation per case, which
+        //   is correct — the unit of analysis is the case. What it throws away is how far
+        //   apart the same arm's own answers to the same question were, and that is the only
+        //   free number that says how much of a paired delta could be noise. Recorded per
+        //   cell, at the DECLARED k, from data the run has already collected.
+        var recallSpread = new RepSpreadReport("latent coverage, at the declared k");
+        var precisionSpread = new RepSpreadReport("precision@k, at the declared k");
         int armsThatThrew = 0;
 
         // Every live cell whose first turn presented nothing, with what the second turn did. The
@@ -407,6 +417,11 @@ public static class Eval02_LatentInterestCoverage
                 {
                     ownK.Record(persona.Id, arm.Label, CoverageScore.Mean(ownScores));
                     atK.Record(persona.Id, arm.Label, CoverageScore.Mean(cutScores));
+
+                    // B-18. Recorded from the SAME list the mean is taken from, one line above it,
+                    // so the spread and the number it qualifies can never come from different reps.
+                    recallSpread.Record(RepSpread.Of(persona.Id, arm.Label, [.. cutScores.Select(sc => sc.Latent)]));
+                    precisionSpread.Record(RepSpread.Of(persona.Id, arm.Label, [.. cutScores.Select(sc => sc.PrecisionAtK)]));
                 }
                 else
                 {
@@ -507,6 +522,40 @@ public static class Eval02_LatentInterestCoverage
 
         EvalPrinter.PrintOwnKReread(rereadRows, ArmLive, deterministicArms, rereadProvenance);
 
+        // ── B-18 on the PERSISTED PAID RUN, which is the only place the real spread lives. ──
+        //
+        // The spread panels below are built from THIS run's reps, and on a dry run those reps are
+        // the stub's. The 2026-09-04/09-06 paid run persisted `PresentedSkusByRep` — three SKU
+        // lists per live cell — so the live arm's real rep-to-rep movement is re-gradable for
+        // nothing. That is exactly what plan item 8.1 means by "free from data already collected".
+        //
+        // ⚠ ONLY THE SKU SURVIVES the round trip. Reason and evidence are not persisted, so the
+        // re-graded calls carry empty ones; latent coverage reads the SKU, and the panel says which
+        // channel it is reporting rather than implying the whole score was recovered.
+        RepSpreadReport? persistedSpread = null;
+        if (persisted is not null)
+        {
+            persistedSpread = new RepSpreadReport(
+                $"latent coverage at each rep's OWN k, RE-GRADED from the persisted run of {persisted.RunAt:u}");
+            foreach (var cell in persisted.Cells.Where(c => string.Equals(c.Arm, ArmLive, StringComparison.Ordinal)))
+            {
+                var repLists = cell.PresentedSkusByRep;
+                if (repLists is null || repLists.Count == 0 || !goldByPersona.ContainsKey(cell.PersonaId)) continue;
+
+                var perRep = new List<double>(repLists.Count);
+                foreach (var skus in repLists)
+                {
+                    // A rep that presented nothing is a SILENCE, and silence has no coverage to
+                    // read — NaN, which RepSpread.Of drops from the spread rather than scoring 0.
+                    if (skus is null || skus.Count == 0) { perRep.Add(double.NaN); continue; }
+                    IReadOnlyList<PresentedCall> calls =
+                        [.. skus.Select((sku, i) => new PresentedCall(sku, "", "", false, i + 1, null, true, true))];
+                    perRep.Add(InterestCoverageGrader.GradeAtDeclaredK(cell.PersonaId, goldByPersona, calls, skus.Count).Latent);
+                }
+                persistedSpread.Record(RepSpread.Of(cell.PersonaId, ArmLive, perRep));
+            }
+        }
+
         // ── PANEL 3: every arm at its OWN k — the floors GATE 1 reads. Not a comparison. ──
         EvalPrinter.PrintPairedCoverage(ownK, floors,
             dryRun
@@ -540,6 +589,14 @@ public static class Eval02_LatentInterestCoverage
             $"Paired sign test AT THE DECLARED k = {declaredK} — equal-k pairs only, reported, never gated",
             kindByArm);
 
+        // ── B-18: the same arm's own answers, before they were averaged. ──────────────
+        //
+        // Printed IMMEDIATELY under the sign test whose deltas it bounds, on purpose. A spread
+        // panel three pages away from the comparison it qualifies is a panel nobody reads beside
+        // the number it is about.
+        EvalPrinter.PrintRepSpread(recallSpread, ArmLive, atKRecall, reps);
+        EvalPrinter.PrintRepSpread(precisionSpread, ArmLive, atKPrecision, reps);
+
         // ── The design's pre-registered rule, EVALUATED. ─────────────────────────────────
         //
         // ⚠ B-2. This block used to be a sentence in the pre-registration banner with nothing
@@ -567,6 +624,13 @@ public static class Eval02_LatentInterestCoverage
                 "Paired sign test AT THE LIVE ARM'S OWN k — controls cut to match, reported, never gated",
                 kindByArm);
         }
+
+        // ── B-18 on the PAID run's own reps, printed under the panel whose deltas it bounds. ──
+        //
+        // This is the one spread on the report that describes the SHIPPED AGENT rather than a stub,
+        // and it is bought with nothing: the reps were persisted, the grader is deterministic.
+        if (persistedSpread is not null)
+            EvalPrinter.PrintRepSpread(persistedSpread, ArmLive, rereadRecall, persistedSpread.MaxRepsRecorded);
 
         EvalPrinter.PrintCostComparison(ownK);
 
