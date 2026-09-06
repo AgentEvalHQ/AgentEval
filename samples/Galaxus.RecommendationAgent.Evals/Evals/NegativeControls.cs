@@ -110,6 +110,7 @@ public static class NegativeControls
         rows.Add(Guarded("RefusalCodesDoNotAnswerForEachOther", CheckRefusalCodesDoNotAnswerForEachOther));
         rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
         rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
+        rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -2897,6 +2898,114 @@ public static class NegativeControls
     /// anything.
     /// </para>
     /// </remarks>
+    // == 2.11 -- is MinCandidateScore a THRESHOLD at all? ==================================
+    //
+    /// <summary>
+    /// Measures how often the <c>BestScore &lt; MinCandidateScore</c> clause is what decides a
+    /// coverage verdict, across every authored customer, on the shipped deterministic path.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 2.11 asks for this constant to be calibrated on the same held-out split as the
+    /// other four cuts. Before deriving a number, measure whether the number decides anything.</b>
+    /// That ordering is the point: a cut re-derived on a population it never actually cuts is a
+    /// figure with a provenance and no consequence, and it would be reported as if it had one.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>And the constant is doing TWO structurally different jobs under one name.</b> In
+    /// <c>CatalogueDiscoverySearch.ClassifyCoverage</c> and <c>CoverageVerdictProjection.Starved</c>
+    /// it is a <i>cut</i> on a distribution. In
+    /// <c>DeterministicRanker.Confidence</c> it is the <i>half-saturation constant</i> of the
+    /// squashing transform <c>s / (s + k)</c> — the score at which the retrieval term equals 0.5 —
+    /// which is not a threshold at all. Re-deriving it as a cut therefore moves every workflow-arm
+    /// confidence, and confidence is what <c>ConfidenceBands</c> routes on. Those bands were
+    /// themselves derived on this same held-out split, so calibrating this one constant would
+    /// silently move the quantity another calibrated cut is applied to, and the derivation would
+    /// never have looked at it. That coupling is the finding; it is reported here rather than
+    /// resolved, because splitting one constant into two is a behaviour change and this row is not.
+    /// </para>
+    /// <para>
+    /// <b>Advisory, never gating.</b> It reports a property of the corpus, not a wiring fault. The
+    /// two rows that pin the constant's VALUE at 0.012 stay gating and are untouched.
+    /// </para>
+    /// </remarks>
+    private static async Task<ControlRowSnapshot> CheckMinCandidateScoreDecidesNothingAsync(
+        IProductRetriever retriever,
+        CancellationToken ct)
+    {
+        var scores = new List<double>();
+        int rowsWithCandidates = 0;
+        int decidedByTheCut = 0;
+        int decidedByNamesNothing = 0;
+        int emptyCandidateSets = 0;
+        var deciders = new List<string>();
+
+        foreach (string personaId in Personas.AllPersonaIds)
+        {
+            var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
+                Offline: true,
+                SessionRequest: GalaxusEvalPrompt.UtteranceFrom(Personas.CanonicalPromptFor(personaId)),
+                Retriever: retriever,
+                Progress: null,
+                Nodes: null);
+
+            var run = await GalaxusDiscoveryLoop.RunAsync(personaId, options, ct).ConfigureAwait(false);
+
+            foreach (var interest in run.State.Interests)
+            {
+                var coverage = run.State.CoverageFor(interest.Id);
+                if (coverage.QueriesRun.Count == 0) continue;      // unexplored is not a verdict
+
+                if (coverage.AttributionVocabularyEmpty) { decidedByNamesNothing++; continue; }
+                if (coverage.CandidateProductIds.Count == 0) { emptyCandidateSets++; continue; }
+
+                rowsWithCandidates++;
+                scores.Add(coverage.BestScore);
+
+                // The ONLY rows this constant decides: something came back, it names something,
+                // and the fused score is what refuses it.
+                if (coverage.BestScore < DiscoveryState.MinCandidateScore)
+                {
+                    decidedByTheCut++;
+                    deciders.Add($"{personaId}/{interest.Id} at {coverage.BestScore:0.0000}");
+                }
+            }
+        }
+
+        scores.Sort();
+        double min = scores.Count > 0 ? scores[0] : double.NaN;
+        double median = scores.Count > 0 ? scores[scores.Count / 2] : double.NaN;
+
+        // Headroom, stated as a ratio rather than a difference, because the quantity is an RRF
+        // fusion score with no upper bound of interest and a difference would not travel.
+        string headroom = scores.Count > 0 && DiscoveryState.MinCandidateScore > 0
+            ? $"{min / DiscoveryState.MinCandidateScore:0.0}x"
+            : "n/a";
+
+        string observed =
+            $"{Personas.AllPersonaIds.Count} customer(s) · {rowsWithCandidates} coverage row(s) with candidates that name "
+          + $"something · the cut decided {decidedByTheCut} of them"
+          + (deciders.Count == 0 ? string.Empty : ": " + string.Join(", ", deciders.Take(4)))
+          + $" · so the fit population's ADMIT RATE at the anchor is {(rowsWithCandidates == 0 ? double.NaN : 1.0 - ((double)decidedByTheCut / rowsWithCandidates)):0.000}"
+          + $" · lowest observed BestScore {min:0.0000} ({headroom} the cut), median {median:0.0000}"
+          + $" · for comparison the OTHER two clauses decided {decidedByNamesNothing} (names nothing) and "
+          + $"{emptyCandidateSets} (no candidate at all)"
+          + $" · MinCandidateScore = {DiscoveryState.MinCandidateScore:0.000}, and the SAME constant is the "
+          + "half-saturation term of DeterministicRanker.Confidence's s/(s+k), which ConfidenceBands then routes on";
+
+        return new ControlRowSnapshot(
+            "MinCandidateScoreDecidesNothing",
+            "plan item 2.11 wants this cut calibrated. Before a number is derived, measure what the number "
+          + "decides: how many coverage rows on the whole authored cohort are refused by BestScore < "
+          + "MinCandidateScore ALONE — candidates came back, the interest names something, and only the fused "
+          + "score says no. Reported with the lowest score the corpus actually produces, so the headroom is "
+          + "visible rather than assumed, and with the count the other two clauses decide, so the cut is not "
+          + "credited with their work",
+            observed,
+            Tripped: true,
+            Gating: false);
+    }
+
     private static async Task<ControlRowSnapshot> CheckRefusalDetectorsSeeTheRealShapeAsync()
     {
         var problems = new List<string>();

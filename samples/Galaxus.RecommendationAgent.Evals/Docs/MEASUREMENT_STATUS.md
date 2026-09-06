@@ -4438,3 +4438,79 @@ dotnet run --project $E -- 3                       # exit 0
 dotnet run --project $E -- --ci --dry-run          # exit 0
 dotnet run --project $A -- 2 --offline --user USR-RB-10   # 1 round, 0 accepted of 1 proposal
 ```
+
+---
+
+## 29. WAVE 3 — plan item 2.11: `MinCandidateScore` is NOT CALIBRATABLE by the rule that calibrated the other four (2026-09-06)
+
+**The honest outcome is "no change, and here is why", and the plan explicitly sanctions that outcome —
+but only with evidence.** Here is the evidence. Nothing was tuned, no threshold moved, and the two
+gating control rows that pin `0.012` are untouched.
+
+### 29.1 Measure what the number decides BEFORE deriving a number
+
+Plan item 2.11 asks for `DiscoveryState.MinCandidateScore = 0.012` to be derived on the same named
+held-out split, by the same rule, as the four cuts in `f5874915`. Before deriving, the first question
+is whether the cut cuts anything. New **advisory** row in Eval 03,
+`MinCandidateScoreDecidesNothing` — it runs the shipped deterministic loop for **all fourteen**
+authored customers and counts the coverage rows this clause **alone** refuses (candidates came back,
+the interest names something, and only `BestScore < MinCandidateScore` says no):
+
+| | shipped (`0.012`) | ablation (`0.030`) |
+|---|---|---|
+| coverage rows with candidates that name something | **54** | 52 |
+| rows the cut decided | **0** | **27** |
+| fit population's **admit rate at the anchor** | **1.000** | 0.481 |
+| lowest `BestScore` the corpus produces | **0.0164** (1.4× the cut) | 0.0164 (0.5× the cut) |
+| median `BestScore` | 0.0292 | 0.0294 |
+| the OTHER two clauses decided | 1 (names nothing) · 1 (no candidate) | 1 · 0 |
+| `-- 3` exit | **0** | **1** (the two gating rows pinning 0.012 go red, correctly) |
+
+The ablation is the row's own both-directions proof: it is wired to the real quantity, not printing a
+zero by construction. (The row count moves 54 → 52 because the cut changes the loop's behaviour,
+which is a second, incidental demonstration of the same thing.)
+
+### 29.2 Why the rule cannot derive it — this is the finding, not the zero
+
+**Rule 1 is equal-tail transport: α is the fraction of the concept fit population the pre-calibration
+constant admits, and the derived cut is the smallest score whose admitted right tail is still within
+α.** Measured, **α = 1.000**: this constant admits the entire population. A rule that matches an
+admitted tail has *no tail to match*, so the derivation is **degenerate, not merely unfavourable** —
+it would return "the smallest score the population happens to produce", which is a fact about the
+minimum of 54 samples and carries no operating-point information at all. Reporting `0.012 → 0.016` out
+of that machinery would give a hand-picked number a provenance it does not have, which is the exact
+failure the calibration lane exists to refuse.
+
+⚠️ **The headroom is thin, and that must be said in the same breath.** 0.0164 is only **1.4×** the cut.
+So the correct statement is *"inert on this corpus"*, never *"safely below any corpus"* — one colder
+customer or one retrieval change and this clause starts deciding, at which point it needs a derivation
+and will still not have one.
+
+### 29.3 ⚠️ The blocker nobody had recorded: one constant, two structurally different jobs
+
+`MinCandidateScore` is used as **a cut** in `CatalogueDiscoverySearch.ClassifyCoverage` and
+`CoverageVerdictProjection.Starved`, and as **the half-saturation constant** of
+`DeterministicRanker.Confidence`'s squashing transform `s / (s + k)` — the score at which the
+retrieval term equals 0.5 (`DeterministicDiscoveryNodes.cs:346`). The second use is not a threshold
+and has no admit rate.
+
+**So re-deriving it as a cut would move every workflow-arm confidence** — and confidence is precisely
+the quantity `ConfidenceBands` routes the primary and secondary trays on, bands that were themselves
+derived on **this same held-out split** and never looked at this constant. Calibrating one number
+would move a second calibrated number through a coupling neither derivation can see. That is a real
+blocker on 2.11 as specified, it is independent of the admit-rate result above, and **it would still
+apply on a corpus where the cut did decide things**.
+
+**Splitting the constant in two is the fix and it is a behaviour change, so it is not done here.** It
+is filed as the concrete precondition for 2.11: *derive nothing until the cut and the shape parameter
+are separate constants.*
+
+### 29.4 What shipped
+
+The advisory row, the ablation above, and the finding written into
+`DiscoveryState.MinCandidateScore`'s own remarks so the next reader meets it at the constant. **The
+value is unchanged at 0.012** and both gating rows that assert it are untouched.
+
+```bash
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3   # exit 0; the row is advisory
+```

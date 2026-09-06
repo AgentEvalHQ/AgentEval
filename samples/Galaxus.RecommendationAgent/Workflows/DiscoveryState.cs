@@ -57,6 +57,33 @@ public sealed class DiscoveryState
     /// <b>UNMEASURED</b> — chosen against <c>HybridRetriever</c>'s RRF output, which is not a
     /// probability. It is a floor on a ranking statistic, and it is printed wherever it is used.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>MEASURED 2026-09-06 (Wave 3, plan item 2.11) — as a CUT it currently decides nothing,
+    /// and it cannot be calibrated by the rule the other four cuts were calibrated by.</b> Over all
+    /// fourteen authored customers on the shipped deterministic path there are <b>54</b> coverage
+    /// rows where candidates came back and the interest names something, and this cut refuses
+    /// <b>0</b> of them — so the fit population's admit rate at the anchor is <b>1.000</b>. Equal-tail
+    /// transport derives a cut by matching an admitted right tail; a population with no tail at the
+    /// anchor gives that rule nothing to match, so the derivation is degenerate rather than merely
+    /// unfavourable. The other two clauses of `ClassifyCoverage` decided 1 row each. ⚠ The headroom
+    /// is thin, not vast: the lowest score the corpus produces is <b>0.0164</b>, only 1.4× the cut,
+    /// so this says the cut is inert on THIS corpus, never that it is safely below any corpus.
+    /// Reported every run by Eval 03's advisory row <c>MinCandidateScoreDecidesNothing</c>, proven
+    /// able to move by ablation (at 0.030 it decides 27 of 52 and the admit rate is 0.481).
+    /// </para>
+    /// <para>
+    /// ⚠ <b>And this ONE constant does TWO structurally different jobs.</b> Here and in
+    /// <c>CoverageVerdictProjection.Starved</c> it is a <i>cut</i>. In
+    /// <c>DeterministicRanker.Confidence</c> it is the <i>half-saturation constant</i> of the
+    /// squashing transform <c>s / (s + k)</c> — the score at which the retrieval term equals 0.5 —
+    /// which is not a threshold and has no admit rate. Moving it as a cut therefore moves every
+    /// workflow-arm confidence, and confidence is the quantity <c>ConfidenceBands</c> routes trays
+    /// on — bands derived on the same held-out split, which never looked at this constant.
+    /// <b>Calibrating this value without splitting it in two would move one calibrated quantity
+    /// through another, silently.</b> Splitting it is a behaviour change and is not done here.
+    /// </para>
+    /// </remarks>
     public const double MinCandidateScore = 0.012;
 
     /// <summary>How many candidates an interest needs before the deterministic reviewer calls it covered.</summary>
