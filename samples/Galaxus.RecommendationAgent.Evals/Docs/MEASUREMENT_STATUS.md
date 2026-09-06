@@ -7329,3 +7329,99 @@ dotnet run --project $E -- 3 --real-vectors | grep "ARM C"   # 18 of 56, unchang
 #   -> "UNREACHABLE. 7 issued query/queries came back with no vector …", and
 #      grep -c "of 50 unanswerable" == 0
 ```
+
+---
+
+## 53. WAVE 5 — THE INDEPENDENT REVIEW PASS: every ablation re-executed, four defects (2026-09-06)
+
+Stage 0 of `RUN_PROTOCOL` requires re-EXECUTING any ablation before building on it. This section is
+that pass over Wave 5's own nine commits, run from outside the session that produced them. **Nothing
+was believed from a diff or a report; every number below came out of a command.**
+
+### 53.1 What REPRODUCED — exactly, and therefore is NOT a finding
+
+| § | claim | re-executed |
+|---|---|---|
+| 44.3 | GATE 1 REPLAY ✅ **PASS 12 of 12** shipped → ❌ **FAIL 8 of 12** under `AboveChance`, below: `USR-MI-02`, `USR-LM-09`, `USR-PB-11`, `USR-NK-12` | ✅ identical, **both spaces** |
+| 44.3 | positive control `Latent >= 0.0` takes the **stub-fed, exit-code-bearing** GATE 1 ❌ → ✅ 12 of 12 | ✅ identical |
+| 44.1 | under the ablation the stub-fed gate goes 9-of-12-below → **11 of 12** below | ✅ identical |
+| 44.4 | simulated null: **9 of 12** at one draw, **10 of 12** at the mean of three; `USR-LM-09` and `USR-NK-12` below under all three tests | ✅ **re-derived independently** — a different language, a different RNG and a different seed (Python, seed 424242, against C# seed 20260906). Every per-persona p within Monte-Carlo error; both counts identical |
+| 45.6 | every pinned `ExactTests` reference | ✅ **re-derived in exact rational arithmetic outside the repo** — `TwoSidedSignP` (8,18 / 0,12 / 9,10 / 4,4 / 1,2), all four `BinomialTailP`, and `ClopperPearson(7,14)` by bisection. All exact to the pinned digits |
+| 46.5 A/B/C | criterion-4 wording restored → RED exit 1 · `CaveatFor` back to the floor rule → RED exit 1, **5 faults** · all six declared vacuous → RED exit 1 | ✅ all three, verbatim messages |
+| 48.1 | rubber-stamp forced CONTAINED: **`✅ finding ok`** under the pre-fix rule, **`⚠️ FINDING`** with the fix; and the case deleted on a correct INAPPLICABLE → **`⚠️ FINDING`** | ✅ all three directions |
+| 48.2 | candidate sets forced empty: fix → INAPPLICABLE, ❌ NOT CAUGHT, **exit 1**; pre-fix → ✅ caught, **exit 0** | ✅ identical |
+| 49.3 | one D5 injected on `C-07`: per case → ❌ *"1 case(s) BELOW — C-07"*; pooled → ✅, and the pooled context line reads **95.8 % of 24** | ✅ identical |
+| 50.3 | A 6/5 p=1.0 → ✅ GATE 2 + the FINDING · B 11/1 p=0.0063 → ❌ GATE 2 · C 6/5 under the shipped rule → ❌ GATE 2 | ✅ all three |
+| 51.3 | `ExecutorFailures` injected: guards → `-- 2 --dry-run` **exit 1**, 12 exclusion notes, Eval 07 refuses; guards disabled → **exit 0**, 0 notes | ✅ identical |
+| 52.3 | arm D forced unreachable → *"UNREACHABLE. 7 issued query/queries…"*, `grep -c "of 50 unanswerable"` **0** | ✅ identical |
+| 45.1 | test totals, all three TFMs; `-- 3` and `-- 3 --real-vectors` exit 0 | ✅ net10 **9,699/0/2 of 9,701** · net9 and net8 **9,481/0/1 of 9,482** |
+| 0.1 | 24 commands, both spaces | ✅ only `-- 7` and `--ci --dry-run` exit 1; everything else 0 |
+| 47.4 | `b41262e2` is a false positive quoted inside its own correction | ✅ confirmed at both sites |
+| 8.16 | criteria 3 and 5 are **EARNED** by `ContentlessFloorArm.Answer` | ✅ both sentences found verbatim in the arm's real text — not a fixture |
+| 46.1 | `SupersededLanguageCriterion` is what the paid run sent | ✅ byte-identical to the text at `7b4ed9b7^`, and unchanged since `90da3dc8` (2026-09-04), so the 2026-09-05 run did send it |
+
+### 53.2 🔴 What did NOT reproduce — four defects, one of them a live acceptance test
+
+| # | § | defect | direction |
+|---|---|---|---|
+| **1** | ADR-030 **2.2** | **`Adapters_AreOneWay()` could not see the adapters.** It scanned `typeof(Observation).Assembly` and `typeof(EvalResult).Assembly` — **the same assembly** — while `ObservationAdapters` is in `AgentEval.Core`. A literal `Observation → EvalResult` added to it left the test GREEN. Its `scanned > 0` non-vacuity guard was satisfied by `RepCollapse` / `PairedEvalComparer`, which are not adapters | 🔴 **FLATTERING** — Slice 2.2's acceptance was recorded as met by a scan that could not fail |
+| **2** | 47.4 | **The sha sweep excluded the document it was written into.** Published `MEASUREMENT_STATUS.md 38 / 0`; at the publishing commit `436674e3` the same file reads **40 / 1**, and the 1 is the `b41262e2` §47.4's own prose introduces two lines above the table | 🔴 **FLATTERING** — it certified the document carrying the sweep and flagged only the one it pointed at |
+| **3** | 47.6 | **1.9's own re-derivation command block shipped two refuted figures** — the exact shape §47 was written to name. `grep -cE "(caught\|NOT CAUGHT) +[A-Za-z0-9_]+"` prints **30**, not the 29 pasted beside it (` +` also matches the prose *"caught it."*); and *"arm D 0/50"* was refuted by `960f3282`, **a later commit of the same wave** | neutral on the count — 29 is right, the command is not — and stale on arm D |
+| **4** | 48.2 | **The inertness figure was the other space's.** *"candidate counts on `-- 4` … are 27, 32 and 40"* — 27 is the `--real-vectors` reading; `-- 4` reads **25**. The conclusion (never 0) holds in both spaces | neutral for the claim, which is why it survived |
+
+All four are fixed at their origins: `03e4fc2f`, `3e2a5ced`, `baca28e4`, `a14dace9`.
+
+⚠️ **And the first fix attempted for #1 was itself wrong, recorded because it reads plausible.** The
+reach guard cannot be *"an adapter method was scanned"*: the adapters **produce** an `Observation` and
+never consume one, so the offender scan — which matches on Observation-consuming methods — cannot
+touch them by construction. A non-vacuity guard that asserts something the design forbids fails on
+the correct tree.
+
+### 53.3 ⚠️ What this review did NOT do
+
+- **No paid run, no judged run, no live model call.** Every agent-side verdict stands exactly as its
+  own run measured it. 8.16 #5 and 1.10's third clause are still open on exactly what they were open
+  on.
+- **Q6 is not answered.** Its measurement was re-executed and confirmed; the preference is the user's.
+- **The GATE 1 REPLAY rests on a GITIGNORED artefact.** `.agenteval/` is ignored (`git check-ignore`
+  → `.gitignore:453`), so `eval02_coverage_ab.json` — the paid run of 2026-09-06 02:56:46Z — is
+  local only. On a fresh clone the replay prints **NOT AVAILABLE**, which the code correctly calls
+  *"an absence, not a pass"*. Nobody else can reproduce §44.3 without that file. Named, not repaired.
+- **`UnderpoweredByConstruction` hard-codes `0.05`** (`PairedCoverageReport.cs:55`) rather than
+  reading `ExactBinomial.Alpha`. Today the two agree, so 1.5's `!UnderpoweredByConstruction` conjunct
+  is provably redundant and cannot hide a supported control lead. **If `Alpha` is ever lowered they
+  diverge and it could.** Named, not changed — moving a gate's constant was not this pass's job.
+- **`-- 2 --dry-run` cannot exercise GATE 2's exit code.** The dry run returns on
+  `plumbingHeld && secondTurnWired`; `controlSane` reaches `return` only on a paid run. §50.3's
+  ablation therefore moves the GATE 2 **verdict** and never an exit code, which is what it claims —
+  but stage 1 of the run protocol is structurally blind to that gate.
+- **The meta lane still has no consumer**, as §45.7 already declares.
+
+### 53.4 Commands
+
+```bash
+# 53.1 — the Q6 simulation, RE-DERIVED independently rather than re-run
+#   Dump each persona's eligible pool as a gold-token hit matrix from a scratch block in Eval02,
+#   then simulate in Python: 200k k-draws without replacement, seed 424242, and the mean of three.
+#   -> 9 of 12 (one draw) · 10 of 12 (mean of 3) · below under both: USR-LM-09, USR-NK-12
+
+# 53.2 #1 — the ablation that was green and should not have been
+#   src/AgentEval.Core/Evals/ObservationAdapters.cs:
+#     public static EvalResult AblationBackToResult(Observation o) => null!;
+#   dotnet test tests/AgentEval.Tests -f net10.0 --filter "FullyQualifiedName~Adapters_AreOneWay"
+#     as shipped at d28e9500  -> PASSED      <- the false green
+#     with 03e4fc2f           -> FAILED, "ObservationAdapters.AblationBackToResult -> EvalResult"
+
+# 53.2 #2
+git show 436674e3:samples/Galaxus.RecommendationAgent.Evals/Docs/MEASUREMENT_STATUS.md \
+  | grep -oE '`[0-9a-f]{8}`' | tr -d '`' | sort -u | wc -l      # 40, not the published 38
+
+# 53.2 #3 and #4
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3 | grep -cE "(caught|NOT CAUGHT) +[A-Za-z0-9_]+"        # 30, not 29
+dotnet run --project $E -- 3 | grep -cE "(✅ caught|❌ NOT CAUGHT)  [A-Za-z0-9_]"   # 29
+for sp in "" "--real-vectors"; do
+  dotnet run --project $E -- 4 $sp | grep -oE 'candidate set \(k = [0-9]+' | grep -oE '[0-9]+$' \
+    | sort -n | uniq -c
+done                                                                                # 25… vs 27…
+```
