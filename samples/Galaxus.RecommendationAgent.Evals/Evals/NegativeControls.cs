@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
@@ -87,6 +87,8 @@ public static class NegativeControls
         rows.Add(Guarded("MetricDiscrimination", CheckMetricDiscrimination));
         rows.Add(await GuardedAsync("PersonaDiscrimination", () => CheckPersonaDiscriminationAsync(harness, options, ct)).ConfigureAwait(false));
         rows.Add(Guarded("AuthoredQueryPhrasesRetrieve", CheckAuthoredQueryPhrasesRetrieve));
+        rows.Add(await GuardedAsync("SilentDenseWipeoutDetectorCanFire", () => CheckSilentDenseWipeoutDetectorCanFireAsync(ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("DenseLegSaysWhenItRankedNothing", () => CheckDenseLegSaysWhenItRankedNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(await GuardedAsync("SuppressionDetectorExercised", () => CheckSuppressionDetectorExercisedAsync(harness, options, ct)).ConfigureAwait(false));
 
         rows.Add(await GuardedAsync("Hallucinator", () => CheckHallucinatorAsync(harness, options, ct)).ConfigureAwait(false));
@@ -1428,11 +1430,12 @@ public static class NegativeControls
                 + "moves every coverage cell, so it is reported rather than silently repaired."
                 + (realPath
                     ? " ⚠ ARM D on this path is a REACHABILITY verdict and contributes no count — read ARM C for "
-                    + "the measurement. 🔴 AND NOTHING IN THIS ROW REPLACES THE WEIGHT ARM D USED TO CARRY "
-                    + "HERE: the answer-quality question — of the queries that DO embed, how many have every dense "
-                    + "hit fall under the floor while the run still reports Degraded = false — is plan item 1.10's "
-                    + "third clause and is NOT BUILT. Its absence is declared rather than papered over with a "
-                    + "reachability tick."
+                    + "the measurement. ✅ The weight ARM D lost here is carried by a SEPARATE row, not by another "
+                    + "arm of this one: DenseLegSaysWhenItRankedNothing asks the answer-quality question — of the "
+                    + "queries that DO embed, how many have every dense hit fall under the floor while the run "
+                    + "still reports Degraded = false — and SilentDenseWipeoutDetectorCanFire GATES on that "
+                    + "census being able to fire. It is a separate row because this one is already a FINDING in "
+                    + "both spaces on ARM C alone, so an arm folded in here could never change what a reader sees."
                     : string.Empty)),
             allRetrievable,
             Gating: false);
@@ -1463,8 +1466,11 @@ public static class NegativeControls
     }
 
     /// <summary>
-    /// ARM D: the query strings the scored personas' interest maps actually produce, counted on
-    /// the resolved path.
+    /// The query strings the scored personas' interest maps actually produce, de-duplicated and
+    /// ordinally ordered. The shared input of ARM D and of
+    /// <see cref="CheckDenseLegSaysWhenItRankedNothingAsync"/>, so the ASK arm and the ANSWER arm
+    /// are answering about the same population rather than about two populations that happen to
+    /// look alike.
     /// </summary>
     /// <remarks>
     /// These come from <see cref="DiscoveryInterestMapping.QueryTermsFor"/> — the same method the
@@ -1472,8 +1478,7 @@ public static class NegativeControls
     /// baseline arm passes straight to <c>RetrievalQuery.For</c>. Deterministic: no model, no
     /// credentials, no network.
     /// </remarks>
-    /// <param name="source">The resolved embedding source.</param>
-    private static (int Total, int Dead, List<string> Examples) MeasureIssuedQueries(IEmbeddingSource source)
+    private static SortedSet<string> IssuedQueries()
     {
         var queries = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -1497,6 +1502,17 @@ public static class NegativeControls
             }
         }
 
+        return queries;
+    }
+
+    /// <summary>
+    /// ARM D: how many of <see cref="IssuedQueries"/> the resolved space cannot answer at all.
+    /// </summary>
+    /// <param name="source">The resolved embedding source.</param>
+    private static (int Total, int Dead, List<string> Examples) MeasureIssuedQueries(IEmbeddingSource source)
+    {
+        var queries = IssuedQueries();
+
         int dead = 0;
         var examples = new List<string>();
 
@@ -1509,6 +1525,322 @@ public static class NegativeControls
         }
 
         return (queries.Count, dead, examples);
+    }
+
+    // ══ Plan item 1.10, THIRD CLAUSE — the ANSWER-quality arm that replaces the weight ARM D
+    //    lost on the real path. Two rows, on purpose, because they are two different KINDS of
+    //    fact and §55.4 is the record of what happens when one row's NAME is taken to cover a
+    //    lane its BODY never touches.
+    //
+    //      · CheckSilentDenseWipeoutDetectorCanFireAsync  — GATING. A wiring fact: the census
+    //        below is capable of reporting a non-zero number, and capable of reporting zero.
+    //      · CheckDenseLegSaysWhenItRankedNothingAsync    — ADVISORY. A corpus/threshold fact:
+    //        how many issued queries the shipped floor silently empties.
+    //
+    //    ⚠ The census is NOT folded into AuthoredQueryPhraseRetrievability. That row is already
+    //    ⚠️ FINDING in BOTH spaces because ARM C reads 18 of 56 and ARM C is space-invariant by
+    //    design — so an arm added to it could never change anything a reader sees on the panel.
+    //    A measurement with no discriminating power on the panel is not a replacement for a lost
+    //    one; it is the lost one with extra words.
+
+    /// <summary>
+    /// The floor the wipeout probes push the dense leg past. Above the maximum possible cosine,
+    /// so every hit the index returns must fall under it — the probe is arithmetic, not a guess.
+    /// </summary>
+    private const float ImpossibleDenseFloor = 1.01f;
+
+    /// <summary>
+    /// The floor the negative probe drops the dense leg to. Below the minimum possible cosine,
+    /// so no hit can fall under it.
+    /// </summary>
+    private const float UnreachableDenseFloor = -1.01f;
+
+    /// <summary>
+    /// The non-semantic gates the discovery loop puts on an issued query, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors <c>CatalogueDiscoverySearch.ExecuteAsync</c>'s query on everything that is not a
+    /// PRE-FILTER: market, the stock decision (stock is a render-time fact), and the loop's own
+    /// per-query top-k. ⚠ It deliberately carries <b>no</b> <c>CategoryPathPrefix</c>, <b>no</b>
+    /// attribute <c>HardFilter</c> and <b>no</b> exclusions, so what it isolates is the SCORE
+    /// FLOOR. That is a statement about the floor, not a simulation of a round: round 1 gates the
+    /// first term of each interest by a category hint and by attribute hints, both of which shrink
+    /// the eligible pool, and a smaller pool can push a query either INTO the wipeout class
+    /// (fewer products, all under the floor) or OUT of it (nothing eligible at all, which is a
+    /// different failure and is counted separately). So this count is neither an upper nor a lower
+    /// bound on what the loop meets — it is the floor's own effect on the loop's own query
+    /// strings, and the pre-filters are named as not modelled rather than assumed away.
+    /// </remarks>
+    /// <param name="need">The issued query string.</param>
+    private static RetrievalQuery IssuedQuery(string need) => new()
+    {
+        Need        = need,
+        Market      = RetrievalQuery.DefaultMarket,
+        InStockOnly = false,
+        TopK        = DiscoveryQueryPlanner.TopKPerQuery,
+    };
+
+    /// <summary>
+    /// GATING. Proves the silent-wipeout census can produce a non-zero reading AND a zero one,
+    /// by driving the real <see cref="HybridRetriever"/> at two floors that make the answer
+    /// arithmetic.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A scan that finds nothing proves nothing until it has been shown it can hit</b> — the
+    /// rule §54.8's planted credential wrote down, applied to a detector rather than to a grep.
+    /// <see cref="CheckDenseLegSaysWhenItRankedNothingAsync"/> reads three fields of
+    /// <see cref="RetrievalDiagnostics"/> and reports a count; a count of zero from a predicate
+    /// that can never be true reads exactly like a clean run, which is the failure mode ARM D was
+    /// re-scoped for in the first place (plan item 1.10). So the detector is exercised in BOTH
+    /// directions on a REAL issued query, against the REAL retriever, on the resolved path:
+    /// </para>
+    /// <list type="number">
+    ///   <item>at <see cref="ImpossibleDenseFloor"/> the same query must be reported as a
+    ///         silent wipeout — the dense leg ran, it had hits, and every one was discarded;</item>
+    ///   <item>at <see cref="UnreachableDenseFloor"/> it must not be — nothing can fall under a
+    ///         floor below the minimum cosine, so a detector that still reports a wipeout is
+    ///         reading something other than the floor.</item>
+    /// </list>
+    /// <para>
+    /// ⚠ <b>The specimen is not authored.</b> It is the first query of
+    /// <see cref="IssuedQueries"/>, in ordinal order, that the resolved space can embed at all —
+    /// a real string the loop really issues. A hand-made query would let this row supply its own
+    /// input, and the gate self-examination rule forbids exactly that. If NO issued query embeds,
+    /// the probe has no specimen and this row FAILS rather than passing vacuously.
+    /// </para>
+    /// </remarks>
+    /// <param name="ct">Cancellation.</param>
+    private static async Task<ControlRowSnapshot> CheckSilentDenseWipeoutDetectorCanFireAsync(CancellationToken ct)
+    {
+        const string name = "SilentDenseWipeoutDetectorCanFire";
+        const string expectation =
+            "the silent-dense-wipeout census must be shown able to FIRE and able to stay SILENT before its "
+          + "count means anything. A count of 0 from a predicate that cannot be true reads exactly like a "
+          + "clean run — the same shape ARM D's 0 of 50 had on the real path (plan item 1.10). Driven on the "
+          + "REAL HybridRetriever over a REAL issued query, at two floors that make the answer arithmetic: "
+          + "ABOVE the maximum cosine every dense hit must be discarded and the query must be reported as a "
+          + "wipeout; BELOW the minimum cosine no hit can be discarded and it must not be. The specimen is the "
+          + "first issued query the resolved space can embed, never an authored string — a row may not supply "
+          + "its own input.";
+
+        var space   = EmbeddingSpace.Resolve(Catalogue.Default.All);
+        var probe   = IssuedQueries().FirstOrDefault(q => !IsDead(EmbedThrough(space.Source, q)));
+
+        if (probe is null)
+        {
+            return new ControlRowSnapshot(
+                name,
+                expectation,
+                "NO SPECIMEN: not one of the queries the scored personas' interest maps issue embeds in "
+              + $"'{space.Source.Name}', so the wipeout detector has nothing to be proven on. That is itself a "
+              + "wiring fault — ARM D would be reporting every query dead — and it is NOT reported as a pass.",
+                Tripped: false);
+        }
+
+        var fired  = await ProbeWipeoutAsync(space.Source, probe, ImpossibleDenseFloor,  ct).ConfigureAwait(false);
+        var silent = await ProbeWipeoutAsync(space.Source, probe, UnreachableDenseFloor, ct).ConfigureAwait(false);
+
+        bool ok = fired.Wipeout && !silent.Wipeout;
+
+        return new ControlRowSnapshot(
+            name,
+            expectation,
+            $"SPACE: {space.Source.Name} ({space.Source.ModelId}, {space.Source.Dimensions} dims) · specimen "
+          + $"\"{Shorten(probe, 46)}\" (the first issued query this space can embed, ordinal order) · "
+          + $"floor {ImpossibleDenseFloor.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)} → "
+          + $"{Describe(fired)} — the detector {(fired.Wipeout ? "FIRED" : "DID NOT FIRE, so a 0 from the census means nothing")} · "
+          + $"floor {UnreachableDenseFloor.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)} → "
+          + $"{Describe(silent)} — the detector {(silent.Wipeout ? "STILL FIRED, so it is not reading the floor" : "stayed silent")}"
+          + (ok
+                ? ". Both directions verified, so the census's number is a measurement."
+                : ". ❌ The census below cannot be read as a measurement until this row is green."),
+            Tripped: ok);
+
+        static string Describe((bool Wipeout, RetrievalDiagnostics D) probe) =>
+            $"degraded={probe.D.Degraded.ToString().ToLowerInvariant()}, kept={probe.D.DenseCandidates}, "
+          + $"cut={probe.D.DenseBelowFloor}";
+    }
+
+    /// <summary>
+    /// Runs one issued query through a real <see cref="HybridRetriever"/> built on the resolved
+    /// source at an explicit floor, and says whether the dense leg silently ranked nothing.
+    /// </summary>
+    /// <remarks>
+    /// A silent wipeout is <c>Degraded == false</c> (the leg ran), <c>DenseCandidates == 0</c>
+    /// (it contributed no ranking) and <c>DenseBelowFloor &gt; 0</c> (it HAD hits and the floor
+    /// took all of them). The third clause is what separates it from an empty eligible pool,
+    /// which is a different fact and is counted separately.
+    /// </remarks>
+    /// <param name="source">The resolved embedding source.</param>
+    /// <param name="need">The issued query.</param>
+    /// <param name="floor">The dense score floor to build the retriever at.</param>
+    /// <param name="ct">Cancellation.</param>
+    private static async Task<(bool Wipeout, RetrievalDiagnostics D)> ProbeWipeoutAsync(
+        IEmbeddingSource source,
+        string need,
+        float floor,
+        CancellationToken ct)
+    {
+        var retriever = await HybridRetriever
+            .BuildAsync(
+                Catalogue.Default.All,
+                source,
+                new HybridRetrieverOptions { DenseScoreFloor = floor },
+                cancellationToken: ct)
+            .ConfigureAwait(false);
+
+        var d = (await retriever.SearchAsync(IssuedQuery(need), ct).ConfigureAwait(false)).Retrieval;
+        return (IsSilentWipeout(d), d);
+    }
+
+    /// <summary>
+    /// The one predicate both new rows read, so the gating probe and the advisory census can
+    /// never drift apart on what "the dense leg silently ranked nothing" means.
+    /// </summary>
+    /// <param name="d">The retriever's own diagnostics block.</param>
+    private static bool IsSilentWipeout(RetrievalDiagnostics d)
+        => !d.Degraded && d.DenseCandidates == 0 && d.DenseBelowFloor > 0;
+
+    /// <summary>
+    /// ADVISORY. Plan item 1.10's third clause: of the issued queries the resolved space CAN
+    /// embed, how many have every dense hit discarded by the score floor while the run still
+    /// reports <c>Degraded = false</c>?
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this is the replacement for ARM D's lost weight, and not another ask-ability
+    /// check.</b> ARM D asks whether the system can ASK. On <c>--real-vectors</c> that question
+    /// cannot fail — a live embedder returns a vector for any non-empty text — so ARM D now
+    /// reports REACHABLE / UNREACHABLE there and contributes no count. This row asks the next
+    /// question, which can fail in BOTH spaces: having asked, did the dense leg ANSWER, and if it
+    /// did not, did anything say so? <c>Degraded</c> means <i>the leg had nothing to run on</i>,
+    /// never <i>the leg returned nothing</i>, so a query that embeds fine and has every hit cut by
+    /// the floor is reported as a healthy dense retrieval that simply found the customer nothing.
+    /// The answer is lexical-only in fact and nothing on the diagnostics block says it.
+    /// </para>
+    /// <para>
+    /// <b>Two failures are counted separately, because they have different remedies.</b> A FLOOR
+    /// wipeout (hits existed, the floor took all of them) is a threshold fact and is what this
+    /// row's verdict is about. An EMPTY POOL (the pre-filters or the market gate left nothing for
+    /// the leg to rank) is a corpus/filter fact; it is printed, it is not in the verdict, and
+    /// pooling the two would hide which one a reader has — the aggregate-decomposition rule.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This row is ADVISORY.</b> Its number is a property of a CALIBRATED THRESHOLD
+    /// (<c>CalibratedThresholds</c>, derived per space) meeting an authored corpus. Gating it
+    /// would make the honest response to a red panel "move the floor until the count is zero",
+    /// which is fitting a threshold to the output it judges — the thing this sample's whole
+    /// argument refuses. It is reported loudly instead, exactly as ARM C is.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Its greenness is conditional on
+    /// <see cref="CheckSilentDenseWipeoutDetectorCanFireAsync"/>, which GATES.</b> A zero here
+    /// means "no issued query is silently emptied" only while that row is green; on its own it is
+    /// indistinguishable from a predicate that cannot be true.
+    /// </para>
+    /// <para>
+    /// <b>Spend:</b> none beyond ARM D's. The queries are the same strings ARM D embeds and
+    /// <c>PrecomputedEmbeddingSource</c> memoises the live path per instance on the exact text, so
+    /// on <c>--real-vectors</c> every embedding this row needs is already in the memo. The two
+    /// probe retrievers rebuild the product index, and every product document is answered from the
+    /// committed asset — <b>0 live calls</b>.
+    /// </para>
+    /// </remarks>
+    /// <param name="retriever">The retriever this run bound — the SHIPPED operating point, floor included.</param>
+    /// <param name="ct">Cancellation.</param>
+    private static async Task<ControlRowSnapshot> CheckDenseLegSaysWhenItRankedNothingAsync(
+        IProductRetriever retriever,
+        CancellationToken ct)
+    {
+        var space   = EmbeddingSpace.Resolve(Catalogue.Default.All);
+        var queries = IssuedQueries();
+
+        int embedded = 0, dead = 0, floorWipeouts = 0, emptyPools = 0;
+        double floor = double.NaN;
+        var wipeoutExamples = new List<string>();
+        var emptyExamples   = new List<string>();
+
+        foreach (var query in queries)
+        {
+            if (IsDead(EmbedThrough(space.Source, query))) { dead++; continue; }
+
+            embedded++;
+
+            var d = (await retriever.SearchAsync(IssuedQuery(query), ct).ConfigureAwait(false)).Retrieval;
+            floor = d.DenseScoreFloor;
+
+            // ⚠ The verdict goes through IsSilentWipeout — the SAME predicate the gating probe
+            // proves. Re-typing the three clauses here would let the census and its own proof
+            // drift apart, and then the gating row would be certifying a predicate nothing reads.
+            // That drift was live for one ablation cycle and is what ablation A found.
+            if (IsSilentWipeout(d))
+            {
+                floorWipeouts++;
+                if (wipeoutExamples.Count < 3)
+                {
+                    wipeoutExamples.Add($"\"{Shorten(query, 38)}\" ({d.DenseBelowFloor} cut)");
+                }
+
+                continue;
+            }
+
+            // The other way a dense leg contributes nothing while reporting itself healthy: the
+            // gates left it an empty pool, so there was never anything to discard. Different
+            // fact, different remedy, counted apart.
+            if (!d.Degraded && d.DenseCandidates == 0)
+            {
+                emptyPools++;
+                if (emptyExamples.Count < 2) emptyExamples.Add($"\"{Shorten(query, 38)}\"");
+            }
+        }
+
+        // Non-vacuity is asserted on this row's OWN denominator, not inferred from the result.
+        // An empty embedded set gives the census a floor of exactly zero wipeouts, which is the
+        // element-missing shape: nothing to count, reported as nothing wrong.
+        bool measured = embedded > 0;
+        bool clean    = measured && floorWipeouts == 0;
+
+        return new ControlRowSnapshot(
+            "DenseLegSaysWhenItRankedNothing",
+            "of the queries the scored personas' interest maps ACTUALLY issue and this space CAN embed, none "
+          + "should have every dense hit discarded by the score floor while the run still reports Degraded = "
+          + "false. RetrievalDiagnostics.Degraded means the dense leg had nothing to RUN ON — an absent source, "
+          + "an unembeddable query, a zero vector — and never that the leg returned nothing. So a query that "
+          + "embeds perfectly and has all of its hits cut by the floor produces a lexical-only answer that every "
+          + "diagnostic in the run describes as a healthy hybrid one. ⚠ This is plan item 1.10's THIRD CLAUSE: "
+          + "the ANSWER-quality question that replaces the weight ARM D lost on --real-vectors, where an "
+          + "ask-ability count cannot fail. ⚠ It is ADVISORY because its number is a property of a CALIBRATED "
+          + "THRESHOLD meeting an authored corpus, and gating it would make 'move the floor until the count is "
+          + "zero' the cheapest remedy — fitting a threshold to the output it judges. ⚠ Its zero is only a "
+          + "measurement while SilentDenseWipeoutDetectorCanFire (which GATES) is green. ⚠ It carries no "
+          + "category prefix and no attribute filter, so it isolates the FLOOR and is not a simulation of a "
+          + "discovery round; the pre-filters shrink the pool and can move a query either way, so this is "
+          + "neither an upper nor a lower bound on what the loop meets.",
+            $"SPACE: {space.Source.Name} ({space.Source.ModelId}, {space.Source.Dimensions} dims) · dense score "
+          + $"floor in force: {(double.IsNaN(floor) ? "NONE — no query reached the dense leg" : floor.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture))}"
+          + $" · {embedded} of {queries.Count} issued query/queries embed here"
+          + (dead == 0 ? " (none dead)" : $" ({dead} dead — ARM D counts those)")
+          + $" · SILENTLY EMPTIED BY THE FLOOR: {floorWipeouts} of {embedded}"
+          + (floorWipeouts == 0
+                ? "."
+                : $" — {string.Join(" | ", wipeoutExamples)}. Every one of these ran the dense leg, had hits, "
+                + "lost all of them to the floor, and is reported Degraded = false.")
+          + $" · counted separately, NOT in the verdict: {emptyPools} query/queries reached the dense leg with an "
+          + "EMPTY eligible pool (nothing to rank rather than nothing kept)"
+          + (emptyPools == 0 ? "." : $" — {string.Join(" | ", emptyExamples)}.")
+          + (measured
+                ? clean
+                    ? " No issued query is silently emptied at this space's calibrated floor."
+                    : " READ THIS BEFORE ANY DENSE-RETRIEVAL CLAIM ABOUT THIS SPACE: for the queries named "
+                    + "above the dense leg contributes NOTHING and no diagnostic says so, so their answers are "
+                    + "lexical-only in fact while every field describes a healthy hybrid retrieval. ADVISORY — "
+                    + "the remedy is a re-derived floor on a named held-out slice (plan item 2.7), never a "
+                    + "number chosen until this count reads zero."
+                : " ❌ VACUOUS: not one issued query embeds in this space, so this census counted over an empty "
+                + "set and its zero is arithmetic rather than a finding. NOT reported as a pass."),
+            clean,
+            Gating: false);
     }
 
     /// <summary>

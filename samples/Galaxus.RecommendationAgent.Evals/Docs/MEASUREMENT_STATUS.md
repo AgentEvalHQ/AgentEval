@@ -7986,3 +7986,180 @@ dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 8 --dry-run 2>
 # The live probe. PAID. Foreground, exit code captured, one persona:
 dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --user USR-NB-01 ; echo $?
 ```
+
+---
+
+## 56. Item 1.10's THIRD CLAUSE — the answer-quality replacement, built and then measured (2026-09-06)
+
+**Wave 5 shipped 1.10 as PARTIAL (`960f3282`): arm D reports REACHABLE / UNREACHABLE on the real path
+and keeps its count on concept, and the row said in its own printed text that the third clause was NOT
+BUILT.** This is the third clause. **It was built first and measured second, and that order is the
+point** — see §56.2.
+
+### 56.1 What was built, and why it is TWO ROWS rather than a fifth arm
+
+The clause asks: *of the queries that DO embed, how many have every dense hit fall under the floor
+while the run still reports `Degraded = false`?* `RetrievalDiagnostics.Degraded` means **the dense leg
+had nothing to run ON** — no source, an unembeddable query, a zero vector — and never *the leg
+returned nothing*. So a query can embed perfectly, reach the dense leg, have all of its hits discarded
+by the score floor, and produce a **lexical-only answer that every field in the diagnostics block
+describes as a healthy hybrid retrieval**.
+
+| row | kind | what it is a fact about |
+|---|---|---|
+| `SilentDenseWipeoutDetectorCanFire` | **GATING** | wiring: the census below is able to report a non-zero number, and able to report zero |
+| `DenseLegSaysWhenItRankedNothing` | **ADVISORY** | the corpus meeting a calibrated threshold: how many issued queries the shipped floor silently empties |
+
+**Why not a fifth arm of `AuthoredQueryPhraseRetrievability`, which is where the clause was filed.**
+Measured, not argued: that row is **⚠️ FINDING in BOTH spaces** and has been for every run in this
+document, because ARM C reads 18 of 56 and ARM C is space-invariant **by design**. An arm folded into
+it could therefore never change anything a reader sees on the panel. *A measurement with no
+discriminating power on the panel is not a replacement for a lost one.* The second reason is §55.4's,
+one wave old: a row's **name** is not its subject, and `…QueryPhraseRetrievability` is a name about
+ASKING. The answer question gets its own name.
+
+**Why the detector gates and the census does not.** The census's number is a property of a
+**calibrated threshold** (`CalibratedThresholds`, derived per space by 2.7) meeting an authored
+corpus. Gating it would make *"move the floor until the count is zero"* the cheapest remedy, which is
+fitting a threshold to the output it judges — the move this sample's whole argument refuses. The
+detector's number is a property of the **instrument**, and instrument faults gate. Two kinds, two
+rows, per ADR-028.
+
+**The specimen is not authored.** The gating row's probe query is the **first string in
+`IssuedQueries()`, ordinal order, that the resolved space can embed** — a real query the loop really
+issues (`"Camera batteries"` on concept, `"Active bookshelf"` on real). A hand-made probe would let
+the row supply its own input. If **no** issued query embeds, the row prints `NO SPECIMEN` and **fails**
+rather than passing vacuously; the census asserts non-vacuity on its own denominator the same way.
+
+### 56.2 🔴 THE FILED FIGURE WAS NEVER EXECUTABLE, AND IT IS NOW REFUTED AT BOTH ENDS
+
+1.10's third clause was filed with *"Measured today: **3 on real, 0 on concept**"*. The task that
+commissioned this work flagged it as a **pre-registration hazard** — a number that had never been
+executed being quoted as the expected answer — and forbade letting it reach the code. It did not.
+**Measured after the check existed:**
+
+| | concept | `--real-vectors` |
+|---|---|---|
+| dense score floor in force | **0.280** | **0.223** |
+| issued queries this space can embed | **42 of 50** (8 dead — ARM D's count) | **50 of 50** |
+| **silently emptied by the floor** | **0 of 42** | **1 of 50** — `"getting started"`, 24 hits cut |
+| counted apart, not in the verdict: empty eligible pool | 0 | 0 |
+| the row | ✅ finding ok | ⚠️ FINDING |
+
+**The filed 3 is wrong for two independent reasons, and neither is a mistake anybody made:**
+
+1. **The floor moved underneath it.** The 3 was measured at the un-calibrated **0.28** on the real
+   path. 2.7's per-space derivation put the real floor at **0.223**, and a *lower* floor discards
+   less — so two of the three were un-starved by a change that had already shipped. The figure was
+   stale before it was ever quoted, and only executing it could show that.
+2. **The population is not the same population.** §20.11 item 6's 3-of-53 counted the query strings
+   of **all fourteen** customers. ARM D — and therefore this census, deliberately, so the ASK arm and
+   the ANSWER arm describe one population — counts the **scored** personas' 50.
+
+**Direction: the filed number OVERSTATED the defect by 3×.** That is the *unflattering* direction for
+the system and the flattering one for whoever files it, which is the half of §7 rule 1 that gets
+checked least. Blast radius: the one plan row, and any sentence quoting it. **Falsifiable in one
+command** — §56.6.
+
+### 56.3 🔴 A defect in THIS item's own code, found by running an ablation rather than by reading
+
+`IsSilentWipeout` shipped with an XML remark calling it *"the one predicate both new rows read, so the
+gating probe and the advisory census can never drift apart"*. **The census did not read it.** It
+re-typed the three clauses inline, and ablation A — which breaks the predicate — turned the gating row
+red while the census went on reporting **1 of 50** on the real path, unaffected.
+
+That is precisely the co-derivation shape this repository has now recorded four times (§20.11 item 7's
+co-derived key, §34.4's latch asserted by its own dead field, §53.2's adapter test that scanned the
+wrong assembly, and this): **a proof and the thing it proves, wired to two different expressions.**
+The gating row would have been certifying a predicate nothing consumed. Fixed before the wave closed —
+the census now routes its verdict through `IsSilentWipeout` and keeps the empty-pool branch beside it
+— and the fix is what makes ablation A's real-path movement below possible at all.
+
+### 56.4 Ablations — five executions, four distinct faults, every one turning `-- 3` RED
+
+| # | ablation | `-- 3` | `SilentDenseWipeoutDetectorCanFire` | the census | the fault it printed |
+|---|---|---|---|---|---|
+| **A** | `IsSilentWipeout` → `d.Degraded` — i.e. trust the flag the whole item exists to distrust | **1** | ❌ | 0 of 42 (concept) | *"floor 1.010 → degraded=false, kept=0, cut=24 — the detector DID NOT FIRE, so a 0 from the census means nothing"* |
+| **A (real)** | the same, on `--real-vectors` | **1** | ❌ | **1 → 0 of 50** | the finding **disappears** — the flattering direction, and the reason the detector gates |
+| **B** | `IssuedQueries()` returns empty | **1** | ❌ | ❌ VACUOUS, 0 of 0 | *"NO SPECIMEN: not one of the queries … embeds in 'concept' … it is NOT reported as a pass"* |
+| **C** | the probe specimen hard-coded to `"zzzz qqqq"` instead of a real issued query | **1** | ❌ | 0 of 42 | *"specimen \"zzzz qqqq\" … floor 1.010 → degraded=true, kept=0, cut=0 — the detector DID NOT FIRE"* |
+| **D** | the negative direction removed (`UnreachableDenseFloor` = `ImpossibleDenseFloor`) | **1** | ❌ | 0 of 42 | *"floor 1.010 → … the detector STILL FIRED, so it is not reading the floor"* |
+| — | **restored** | **0** concept · **0** real | ✅ | 0 of 42 · 1 of 50 | — |
+
+⚠ **A, B, C and D were executed in the concept space; A was executed in BOTH.** A is the one whose
+effect is space-dependent — it is the only one that changes a *count* rather than only the probe — and
+it is the one whose direction is flattering, so it is the one that had to be seen on the path where
+the finding lives.
+
+### 56.5 Spend — **zero additional live calls**, derived from the run's own meter rather than asserted
+
+`-- 3 --real-vectors` reports:
+
+```
+💸 Live embedding: 118 query call(s) for 118 distinct text(s) + 1 space-identity probe
+   · 329 request(s) served from the per-run memo and 297 from the committed index, at no cost
+   · 1248 prompt token(s) in total.
+```
+
+**Two facts settle it without a before/after run.** (i) `118 query call(s) for 118 distinct text(s)`:
+no text was embedded twice in the whole process, because `PrecomputedEmbeddingSource` memoises the live
+path per instance on the exact ordinal string — and the census issues **the same strings ARM D already
+embeds**, so it cannot add a distinct text. (ii) `297 … from the committed index` is exactly
+**3 × 99** — the bound retriever plus the gating row's two probe retrievers, each rebuilding the
+product index, **every product document answered from the committed asset**. Before this item that
+figure was 99. The two extra index builds are visible in the meter and cost **nothing**.
+
+### 56.6 Nothing moved, and how to re-derive §56
+
+**Panel: 30 → 31 gating + 6 → 7 advisory = 38 rows in BOTH spaces, `❌ NOT CAUGHT` = 0.**
+⚠ **The tripping advisory rows are no longer the same set in the two spaces** — concept trips two
+(`AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised`), real trips **three** (those two
+plus `DenseLegSaysWhenItRankedNothing`). That asymmetry is the finding, not a defect: it is the first
+advisory row in the suite whose verdict differs between the spaces. Count the rows, do not quote them.
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 7` | **1** | **1** |
+| `-- 8 --dry-run` | **0** | — |
+| `--ci --dry-run` | **1** — 11 steps, **Eval 07 the only FAILED** | — |
+
+`AgentEval.sln`: **0 errors.** No warning count is quoted (§54.2). Zero files under `tests/` or `src/`
+touched by this item.
+
+```bash
+# The two rows, both spaces (exit 0 / 0):
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 ; echo $?
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors ; echo $?
+
+# The measurement the filed figure got wrong, read off the run rather than off this document:
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 --real-vectors 2>&1 \
+  | tr -d '\r' | grep -oE "SILENTLY EMPTIED BY THE FLOOR: [0-9]+ of [0-9]+"
+#   -> 1 of 50   (concept: 0 of 42).  ⚠ The floor is a CALIBRATED per-space value; if
+#      CalibratedThresholds moves, this number moves with it and this table is stale.
+
+# Ablation A — the shipped flag trusted again. ONE row goes red and the finding disappears.
+#   NegativeControls.cs:  private static bool IsSilentWipeout(RetrievalDiagnostics d) => d.Degraded;
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 --real-vectors 2>&1 \
+  | tr -d '\r' | grep -oE "(caught|NOT CAUGHT|FINDING|finding ok) +(SilentDenseWipeoutDetectorCanFire|DenseLegSaysWhenItRankedNothing)"
+
+# The spend argument, from the meter the run prints itself:
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 --real-vectors 2>&1 \
+  | tr -d '\r' | grep -oE "Live embedding:.*"
+```
+
+### 56.7 What §56 does NOT claim
+
+* **It is not a measurement of the discovery loop.** The census carries no `CategoryPathPrefix`, no
+  attribute `HardFilter` and no exclusions, so it isolates the **floor**. Round 1 gates the first term
+  of each interest by a category hint and by attribute hints, both of which shrink the eligible pool —
+  and a smaller pool can move a query **either** into the wipeout class or out of it (into the
+  empty-pool class, which is counted apart). So `1 of 50` is **neither an upper nor a lower bound** on
+  what the loop meets. The pre-filters are named as not modelled, never assumed away.
+* **It says nothing about whether the floor is right.** D9-bis is the user's, and it is untouched here.
+  The remedy for a non-zero census is a re-derived floor on a **named held-out slice** (2.7), never a
+  number chosen until the count reads zero.
+* **`1 of 50` is this corpus at this calibrated floor**, not a property of `text-embedding-3-small`.
+* **No agent-side verdict was re-measured.** Nothing here re-takes any per-case figure in
+  `SUITE_SUMMARY`.
