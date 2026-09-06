@@ -33,9 +33,17 @@ Every one of these passed a dry run and was still broken:
 | Eval 02, `--dry-run` exit 0 | **Crashes on the paid path.** The dry run cannot see the branch that crashes, so two gates and the cost panel never printed. ✅ *Fixed `cef95b6c` — the dry run now runs that branch AND varies the stub's `k`, and says which.* |
 | Eval 05, judged cells | The judge returned **criteria nobody declared**, on 3 of 10 cells. 🔴 *Corrected `a78d05e5`: it did not. It echoed OUR rubric with the ordinal `ChatClientEvaluator.cs:46` prints itself, and our matcher failed to recognise our own text. Same lesson, opposite subject — the live model behaved more faithfully than the stub, which stripped the ordinal.* |
 | Eval 06, `-- 6 --dry-run` exit 0, and the detector had just been REPAIRED | `ToolJson.SearchCapExhausted` carries `status = "budget_exhausted"` beside `code = "search_cap_exhausted"`, so a substring detector charged case T-03 with overrunning a **24-call** budget it had spent **16** of — the DISTINCT-SEARCH cap at 8/8 was what refused. ✅ *Fixed `4d35aaa2`; gating row `RefusalCodesDoNotAnswerForEachOther`.* **A stubbed tool result carries exactly one refusal code, so the two codes never meet in a dry run.** |
+| Eval 02, every dry run green, and a whole review pass over the panel | The forced-choice panel printed **`0.667 (0 of 1)`** — a rate and a count contradicting each other on one line — and, twelve lines above, *"NO arm beats the forced-choice chance rate of **1.000**"* beside a panel whose header said 0.083. A cell is `CoverageScore.Mean`'s average over reps, so it is not a Bernoulli outcome, and the caveat derived 1/N from the personas that RAN rather than the golds competed against. ✅ *Fixed `906d5f1f`; gating row `ForcedChoiceCountIsACountOfPersonas`, `MEASUREMENT_STATUS` §34.1–2.* **Both are INVISIBLE at n = 12 and both fire at n = 1 — the probe size stage 2 mandates. The second was also live on the paid cohort: 6 of 12 printed where the cells say 7.** |
 
 The pattern: a dry run exercises the code the stub reaches. The defects live in the code only a real model
 reaches — different text, different language, different failure modes, different timing.
+
+**And one refinement the 2026-09-06 VERIFICATION run added, which is about stage 2's SIZE.** The last
+row above was not found because the model said something surprising. It was found because
+`--only` runs the panel at **n = 1**, and two of the panel's reductions are degenerate there and
+correct at n = 12. **Stage 2's one-unit shape is not only cheap, it is a different test**: extreme
+values are wiring faults until proven otherwise, and a probe manufactures the extreme values a
+cohort never shows you. Read the probe's panel, do not just check its exit code.
 
 **And one refinement the 2026-09-06 wave added, which is the harder half.** Two of those rows were reachable
 from stage 1 all along; what stopped them was that the **stub behaved better than any real model would**. The
@@ -71,6 +79,19 @@ as far as the next person is concerned.
 > the run actually wrote** instead of asserting there were none. It reports only keys whose file is still on
 > disk, so a reader who is told a snapshot was written can go and look at it. Pinned by Eval 03's gating
 > control `WriteLedgerMatchesTheStore`, proven red by removing either chokepoint's `RecordWrite`.
+
+> ✅ **EXTENDED 2026-09-06 (verification run, `MEASUREMENT_STATUS` §34.3) — and 8.19's decision had a
+> third case nobody had applied it to.** Eval 07 also calls no model on any path, and it *does* have a
+> `dryRun` parameter: by hand, `-- 7 --dry-run` runs ONE of five cases and asserts only the plumbing.
+> The CI chain was passing `parsed.DryRun` into it, so **`--ci --dry-run` printed *"Eval 07: passed"*
+> and exited 0 while `-- 7` exited 1 with GATE B ❌** — the identical free measurement, two opposite
+> answers. `RunCiAsync`'s own header puts Eval 07 in the chain so that *"an eval that is not in the
+> chain has its failures reported nowhere at all"*, and under the recommended invocation they were.
+>
+> **Decided:** the CHAIN passes `dryRun: false` for every model-free eval; `-- 7 --dry-run` by hand is
+> unchanged and still useful. **`--ci --dry-run` now exits 1**, correctly, and the write ledger names
+> **three** snapshots rather than two. Pinned by Eval 03's gating row
+> `CiChainRunsModelFreeEvalsForReal`, which reads `Program.cs` rather than trusting it.
 
 **Which evals persist at all.** Do not read this list off a document again — read it off the code. Every
 eval file carries a `// SNAPSHOT-POLICY:` line on line 4, and Eval 03's gating control
@@ -111,6 +132,21 @@ Report cost from the provider's own usage blocks, never from an estimate. If a r
 `token-estimated > 0` or `unaccounted > 0`, say so — a currency figure derived from a guess is not a
 measurement. Prompt tokens dominate in a tool loop (measured: 96% of the bill), so a per-turn cost is
 driven by context re-sending, not generation.
+
+> ✅ **AND THE SUITE NOW OBEYS IT — 2026-09-06 (`MEASUREMENT_STATUS` §34.4).** Until this run, every
+> `--real-vectors` command printed *"This run EMBEDS QUERIES LIVE … it spends — a fraction of a cent,
+> but not zero"* and then **no figure at all**: `EmbeddingSpace.PrintLiveSpend` was called from Demo
+> 01 and from `cal`, and from no eval. **13 of the 14 commands in the real-vector sweep declared a
+> cost and reported none**, leaving "a fraction of a cent" as the only number a reader had — an
+> assertion nobody measured. **Reporting nothing is not the conservative end of this rule; it is
+> outside it.** Both entry points now call the reporter in a `finally`, it is print-once per process
+> so Demo 01 cannot bill a reader twice, and Eval 03's gating row `ARunThatSaysItSpendsSaysHowMuch`
+> holds it there — including the LOWER BOUND caveat that stops a response with no usage block being
+> reported as free.
+>
+> ⚠️ **§20 item 3 had already FOUND this on 2026-09-05 and deferred it** — *"not fixed here, because
+> the fix is a shared meter and that is its own change."* There was no shared meter: two call sites
+> and a latch. **A deferral's stated cost is a claim like any other, and this one was never checked.**
 
 ## What this protocol does not do
 

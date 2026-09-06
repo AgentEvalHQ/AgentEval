@@ -16,6 +16,12 @@ any file.** (MEASUREMENT_STATUS §21.6's `FingerprintKey` observation is closed 
 > up in **§22**. Where a later section says something is broken, check §22 before quoting it: three of the four
 > are closed, the fourth is half closed, and one number moved. **No agent turn was bought in that run**, so
 > every agent-side figure in §§1–21 stands exactly as measured.
+>
+> **Read newest-first: §24 (2026-09-06, `f3d192cc`) → §23 (Wave 2, paid) → §22 (Wave 1, free) → §§1–21.**
+> Three headings below are stale as counts and are left standing because their run is: **§10 says
+> "16 rows · 12 of 12 gating"** and the panel is now **31 rows · 26 gating + 5 advisory** (§24.2);
+> **§13's "NOT ESTABLISHED"** on the Renzo pin was settled in `MEASUREMENT_STATUS` §28 without any
+> checkout; and every `--ci --dry-run` exit 0 anywhere in this file is now **exit 1**, correctly (§24.4).
 
 ---
 
@@ -1363,3 +1369,119 @@ and stated in code; `grep SNAPSHOT-POLICY` gives **11 files, 10 `writes`, 1 `del
 | 4 | ⚠️ **Eval 02's headline separation is a tie** (agent 0.743 vs single-shot 0.729, p = 1.0000; agent *behind* on forced choice, 0.556 vs 0.583). The eval separates the agent from *popularity* and from nothing else | **OPEN — reported, not a defect** |
 | 5 | ⚠️ **The plan's Eval 02 cost estimate was 46 % low**, and a cohort turn costs ~2× a probe turn | **CLOSED by measurement** |
 | 6 | ⚠️ **The most expensive command's exit code was DERIVED, not observed** — this run detached it | **CLOSED**: `RUN_PROTOCOL.md` now carries the rule |
+
+---
+
+## 24. Wave-3 verification run — 2026-09-06, commit `f3d192cc`
+
+**What this run bought: two one-persona live probes, and nothing else.** No cohort was re-run, so
+**every paid per-case verdict in §§1–21 and §23 stands exactly as its own run measured it** and is
+not restated here. What follows is what this run measured and what moved.
+
+**Space:** both. `--concept-vectors` (the default) and `--real-vectors`, 15 commands each.
+**Logs:** `Docs/runs/2026-09-06_wave3-verify-1a56bf02/` (gitignored, 8.24's rule), with
+`STAGE1_EXITCODES.txt` and `FINAL_EXITCODES.txt`.
+**Spend, from usage blocks:** **¤4.3991** over **6 live agent turns** (786,212 tokens), plus
+**8,364 embedding prompt tokens** across the real-vector half. Nothing was detached; every exit code
+below was observed by the shell that ran it.
+
+### 24.1 Totals — commands, not cases
+
+| | commands | exit 0 | exit 1 | exit 2 | exit 3 |
+|---|---|---|---|---|---|
+| concept space | 15 | 13 | **2** | 0 | 0 |
+| `--real-vectors` | 15 | 13 | **2** | 0 | 0 |
+| **both** | **30** | **26** | **4** | 0 | 0 |
+
+The four non-zero codes are **two commands in two spaces**, and both are the same gate: `-- 7` and
+`--ci --dry-run`, on **Eval 07 GATE B**. `--ci --dry-run` is in that list for the first time, and
+§24.4 is why.
+
+### 24.2 Per-case verdicts this run re-established
+
+| eval | cases | measured by | verdict | change vs §23 |
+|---|---|---|---|---|
+| **03** negative controls | **31 rows** — 26 gating + 5 advisory | real, model-free | ✅ **all 26 gating caught**, exit 0, both spaces | **+3 gating rows** (§24.3–24.5) |
+| **04** review injection | 1 case × 4 arms | real, model-free | ✅ PASSED, exit 0, both spaces | none |
+| **07** workflow topology | 5 cases | real, model-free | ❌ **FAILED**, exit 1, both spaces. GATE A ✅ · **GATE B ❌** · GATE C ✅ | none — same case, `USR-RB-10` |
+| **07** per case | `USR-RB-10` ❌ loop-back FIRES · `USR-MI-02` ✅ · `USR-MB-13` ✅ · `USR-NB-01` ✅ does NOT fire · `USR-LF-04` ✅ does NOT fire | | **4 of 5 pinned** | none |
+| 01, 02, 02b, 02c, 05, 06, 08, 09 | — | **`--dry-run` only** | plumbing exit 0 in both spaces | **NOT a verdict about the agent** |
+| Demo 01, Demo 02, `agent -- 0` | — | offline | exit 0, both spaces | none |
+
+⚠️ **Eval 07's five-case corpus is 3 looping / 2 non-looping as PINNED, and the run reproduces that
+split.** Renzo (`USR-RB-10`) is the failure, for the reason §28 established: the loop-back edge reads
+`OpenGaps.Count > 0`, and the only thing that opens a gap for him is an accepted mid-run interest
+proposed from review text, whose four terms are out of vocabulary.
+
+### 24.3 🔴 Found by STAGE 2 — the forced-choice count was a count of nothing
+
+The live one-persona probe printed `▼ Single Agent (Robin) 0.667 (0 of 1) chance 0.083 p = 1.0000`
+— a rate and a count contradicting each other on one line — because a persona's forced-choice cell is
+a MEAN over reps and the panel integerised the mean of those means. **And it was live on the paid
+cohort too**: re-read off `eval02_coverage_ab.json`'s own cells, the live arm's count is **7 of 12**,
+not the **6 of 12** the panel printed, and **7 of its 12 cells are split across reps**. Full table and
+the reduction rule: `MEASUREMENT_STATUS` §34.1. Fixed; gating row
+`ForcedChoiceCountIsACountOfPersonas`.
+
+### 24.4 🔴 `--ci --dry-run` reported Eval 07 as PASSED while `-- 7` failed
+
+Same tree, same eval, two opposite answers — Eval 07 calls no model, so `--dry-run` had nothing to
+stub and the chain was reading a one-of-five-case plumbing check as the eval. **`--ci --dry-run` now
+exits 1**, which is the correct code for a suite whose GATE B is red, and the write ledger names
+**three** snapshots instead of two. `MEASUREMENT_STATUS` §34.3; gating row
+`CiChainRunsModelFreeEvalsForReal`.
+
+### 24.5 🔴 Thirteen of fourteen `--real-vectors` commands declared a cost and reported none
+
+Every real-vector command warned that it spends; one printed a figure. Both entry points now report
+it, print-once, from the provider's usage blocks. `MEASUREMENT_STATUS` §34.4; gating row
+`ARunThatSaysItSpendsSaysHowMuch`. ⚠️ This had been **found and deferred** on 2026-09-05 (§20 item 3)
+on a cost estimate — "a shared meter" — that turned out to be two call sites and a latch.
+
+### 24.6 Persistence — every snapshot this run wrote, with timestamps
+
+Canonical keys as they stand after the sweep (UTC), and the three the final `--ci --dry-run --real-vectors`
+wrote, which is exactly what its closing banner named:
+
+| key | bytes | written (UTC) | by |
+|---|---|---|---|
+| `eval07_topology.json` | 16,772 | **2026-09-06 05:10:17** | this run — **new: Eval 07 now persists inside a dry run** |
+| `eval04_injection.json` | 4,663 | **2026-09-06 05:10:14** | this run |
+| `eval03_controls.json` | 37,249 | **2026-09-06 05:10:14** | this run |
+| `eval02_coverage_ab_probe.json` | 10,783 | **2026-09-06 04:45:19** | this run — stage 2, the **probe** key |
+| `eval02_coverage_ab.json` | 96,822 | 2026-09-06 02:56:46 | Wave 2's paid cohort — **untouched** |
+| `eval05_quality.json` | 3,257 | 2026-09-06 02:24:53 | Wave 2 |
+| `eval01_integrity.json` | 3,958 | 2026-09-06 02:19:10 | Wave 2 |
+| `eval06_trajectory.json` | 4,137 | 2026-09-06 02:05:56 | Wave 2 |
+| `eval09_hypothesis_ab.json` | 28,741 | 2026-09-05 20:26:13 | earlier |
+| `eval02c_held_out.json` | 26,446 | 2026-09-05 18:20:12 | earlier |
+| `eval02b_stated_need.json` | 25,104 | 2026-09-05 17:53:19 | earlier |
+| `eval02b_stated_need_probe.json` | 3,008 | 2026-09-05 16:20:05 | earlier |
+| `eval02c_held_out_probe.json` | 3,032 | 2026-09-05 14:16:33 | earlier |
+
+**The write-ledger banner matches the disk.** It printed:
+
+```
+3 snapshot(s) WERE written, by the eval(s) that call no model — the
+chain runs them FOR REAL under --dry-run, so these are measurements, not stubs:
+  · eval03_controls.json
+  · eval04_injection.json
+  · eval07_topology.json
+```
+
+and those are the three most recent files on disk, at 05:10:14–05:10:17. Store: **503 files**
+(413 after Wave 2). `grep SNAPSHOT-POLICY` still gives **11 files, 10 `writes`, 1
+`deliberately-none`** — Eval 08, for the reason stated at `Eval08:316-319`.
+
+⚠️ **The banner's own wording was corrected with the fix.** It used to say the writers *"take no
+`--dry-run` parameter"*; Eval 07 has one, for hand use. What is true of all three is that **the chain
+runs them for real**, and that is what it now says.
+
+### 24.7 What a reader must NOT take from this section
+
+* **No agent-side verdict moved**, because no cohort was bought. Evals 01, 02, 02b, 02c, 05, 06, 08
+  and 09 ran under `--dry-run` here; their exit 0 is a statement about plumbing.
+* **The one paid figure that moves (§24.3) moves because it was re-read**, not re-run. The cells were
+  already in the snapshot; only the arithmetic over them changed.
+* **`--ci --dry-run` exiting 1 is not a regression.** The suite says the same thing it said before, in
+  one more place.

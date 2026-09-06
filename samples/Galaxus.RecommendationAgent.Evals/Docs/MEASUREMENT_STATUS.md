@@ -8,13 +8,19 @@ design pre-registers a different number, the measured one is used and the differ
 Reproduce all of it, spending nothing:
 
 ```
-dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- --ci --dry-run   # exit 0, ~9 s, all nine
-dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3                # exit 0
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- --ci --dry-run   # exit 1 — Eval 07's GATE B, §34.3
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3                # exit 0 — 26 gating + 5 advisory
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 4                # exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 7                # exit 1 — GATE B ❌, see §28
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 2 --dry-run      # exit 0
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 1 --dry-run      # exit 0
 ```
+
+> ⚠️ **`--ci --dry-run` exits 1, and that is CORRECT (2026-09-06, §34.3).** It used to exit 0 and
+> print *"Eval 07: passed"* while `-- 7` — the identical, credential-free measurement — exited 1.
+> Eval 07 calls no model, so the chain had been handing `--dry-run` to an eval with nothing to stub
+> and reading a one-case plumbing check as the eval. **Nothing about the system changed when this
+> was fixed**; the chain stopped hiding a gate that was already red and already declared in §28.
 
 **The reproduce block above measures NO agent.** Evals 03, 04 and 07 make no model call at all, and
 `--dry-run` replaces every model with a deliberately implausible stub. What it reproduces is the
@@ -4924,3 +4930,252 @@ dotnet run --project $E -- --ci --dry-run     # exit 0
 ```
 
 No existing test file was modified; no threshold moved; no model call; nothing spent.
+
+---
+
+## 34. WAVE 3 VERIFICATION RUN — the three-stage protocol found three defects the review did not (2026-09-06)
+
+**Commit `f3d192cc`** (branch `joslat/digitec-galaxus`, tree clean, sln 0 errors).
+**Logs:** `Docs/runs/2026-09-06_wave3-verify-1a56bf02/` — one file per command, plus
+`STAGE1_EXITCODES.txt` and `FINAL_EXITCODES.txt`. Gitignored, per 8.24.
+**Spend, from the provider's own usage blocks, never estimated:** **¤4.3991** over **6 live agent
+turns** (786,212 tokens) in two one-persona probes, plus **8,364 embedding prompt tokens** over the
+`--real-vectors` half of the sweep. **No cohort run was bought** — §4.0g ranks the paid remainder
+last, and nothing in this wave needed one.
+
+> ⚠️ **The headline is not the sweep, it is that the sweep found things.** Wave 3 shipped six
+> commits; its review found five more defects and declared the wave clean. **Running the protocol
+> then found three more**, and the first of them was found by *stage 2 itself* — the one-persona
+> live probe the protocol exists to mandate. **Two of the three are in the flattering direction.**
+
+### 34.1 🔴 The forced-choice count was a count of nothing — found by STAGE 2, on the probe
+
+Stage 2 is `-- 2 --only USR-NB-01`, live. It printed:
+
+```
+▼ Single Agent (Robin)       0.667  (0 of 1)  chance 0.083  p = 1.0000
+```
+
+**A rate and a count that contradict each other on one line.** A persona's forced-choice cell is
+`CoverageScore.Mean`'s average over that arm's repetitions (`CoverageScore.cs:164`), so on a 3-rep
+arm it takes values in {0, ⅓, ⅔, 1} and **is not a Bernoulli outcome**. The panel integerised the
+*mean of those means* with `(int)Math.Floor(rate × personas)` and handed the result to
+`ExactBinomial` as a success count. At n = 1 persona, ⅔ became **0**.
+
+**⚠ And it was never probe-only. Re-read off the shipped paid cohort** — `eval02_coverage_ab.json`,
+2026-09-06 02:56:46, the ¤27.12 run — using the per-persona cells the snapshot already holds:
+
+| arm | reps | rate | `Math.Floor` (shipped) | majority tally | cells SPLIT across reps |
+|---|---|---|---|---|---|
+| **Single Agent (Robin)** | 3 | 0.5556 | **6 of 12** | **7 of 12** | **7 of 12** |
+| Control — single shot | 1 | 0.5833 | 7 of 12 | 7 of 12 | 0 |
+| Baseline — popularity | 1 | 0.0000 | 0 of 12 | 0 of 12 | 0 |
+| Baseline — tag join | 1 | 1.0000 | 12 of 12 | 12 of 12 | 0 |
+| Loop control — rubber stamp | 1 | 0.3333 | 4 of 12 | 4 of 12 | 0 |
+| Discovery Workflow (Demo 2) | 1 | 0.2500 | 3 of 12 | 3 of 12 | 0 |
+
+Split personas on the live arm: `USR-NB-01` ⅔ · `USR-MI-02` ⅔ · `USR-SK-03` ⅔ · `USR-LM-09` ⅓ ·
+`USR-RB-10` ⅔ · `USR-PB-11` ⅓ · `USR-MB-13` ⅓.
+
+**So Wave 3's `Math.Floor` change DID move a shipped number — the live agent's own count, 7 → 6,
+p = 0.000015 → 0.000199.** That is the **third** correction to §30.2's *"no shipped number moves
+today"*: §33.2 found the deterministic arm's ▲ → ▼, and this one is the LIVE arm. Direction:
+**unflattering to the agent**, which is exactly why neither pass caught it — both were hunting
+flattering figures. The ▲ marker does not move; the count and the p-value do.
+
+**The fix — `PairedCoverageReport.ForcedChoiceTally`.** A count of personas under a **stated**
+reduction: a persona is a win iff the arm identified it on **more than half** of that persona's
+reps, a rep split down the middle being a LOSS — the same tie rule the forced choice already applies
+within one answer. The panel prints `won W of N`, says in terms that the rate and the count are two
+different reductions, and **names every split cell**.
+
+⚠ **What this must not be "fixed" into.** Counting persona × rep makes every cell integral and
+deletes the problem — and it is pseudo-replication. `CoverageScore.Mean` refuses it in terms
+(*"treating three reps of three personas as nine independent observations … inflates any
+significance claim by a factor of sqrt(3)"*). **The unit stays the persona.**
+
+### 34.2 🔴 A chance floor of 1.000, with a conclusion hanging off it — same probe, same panel
+
+Twelve lines above the panel that said *"Chance is exactly 0.083"*, the instrument caveat said:
+
+```
+NO arm beats the forced-choice chance rate of 1.000 at an exact one-sided p ≤ 0.05.
+Nothing here is evidence about personalisation.
+```
+
+`EvalPrinter.InstrumentCaveat` derived the floor **itself**, as 1 / (personas that RAN). The forced
+choice is decided against **every persona's gold in the corpus** — the panel's own header says *"of
+all 12 personas' gold"* — so on the probe path the two numbers differ by 12×. **A floor of 1.000 is
+unbeatable, so the sentence that hangs off it cannot be false**: the floor-above-attainable shape,
+printed as a finding about the SYSTEM rather than about the instrument.
+
+**Pre-existing, not a Wave 3 regression** — `git show 51864fd4` has the same `report.Personas` count.
+Wave 3 only rewrote the sentence around it, which is how it survived a review. **Invisible on the
+full cohort**, where `report.Personas.Count` and the gold count are both 12.
+
+Fixed by passing the floor the caller already derives (`Eval02:291`, and Eval 09's equivalent). A
+`NaN` floor now **suppresses the sentence** rather than inventing a bar.
+
+**Control:** `ForcedChoiceCountIsACountOfPersonas`, **gating**, testing the shipped methods.
+**Ablation, executed:** revert the tally to `Math.Floor(rate*n)` *and* let the caveat re-derive its
+own floor → row red with **4** named faults, `-- 3` **exit 1**; restored → exit 0.
+
+**Re-smoked LIVE after the fix** (¤1.8406, 3 reps, 12 `SearchProductsByMeaning` calls, exit 0):
+
+```
+▼ Single Agent (Robin)       0.667  (won 1 of 1)  chance 0.083  p = 0.0833
+⚠ 1 cell(s) SPLIT across reps this run, so rate != won/n
+```
+
+### 34.3 🔴 `--ci --dry-run` reported the suite's only red gate as PASSED
+
+Found re-running **stage 1**. Measured at `1a56bf02`, both foreground, both observed:
+
+| command | exit | Eval 07 line |
+|---|---|---|
+| `-- 7` | **1** | GATE B ❌ |
+| `--ci --dry-run` | **0** | `· Eval 07: passed.` |
+
+The same measurement, on the same tree, reported two opposite things. **Eval 07 makes no model call
+on any path** — its own header says so and the CI table declares it `NeedsModel: false` — so
+`--dry-run` had nothing to stub: its dry-run form runs **one of five** cases and calls
+`PlumbingGate` instead of `Report`. The chain passed `parsed.DryRun` straight into it.
+
+**Why that is worse than an ordinary false green.** `RunCiAsync`'s own header justifies putting
+Eval 07 in the chain with the sentence *"an eval that is not in the chain has its failures reported
+nowhere at all"* — and under the invocation the file itself recommends, its failures **were reported
+nowhere at all**. The identical argument had already been settled for the other two model-free evals
+in item **8.19**: 03 and 04 take no `dryRun` parameter, because *"replacing a real, model-free
+measurement with a stubbed copy of itself … would make the cheapest honest measurement in the suite
+worse in order to make a sentence true."* **Eval 07 is the third model-free eval and it was the
+exception nobody had noticed.**
+
+**Fix:** the CHAIN passes `dryRun: false`. `-- 7 --dry-run` by hand is untouched — it is a fast, loud
+plumbing check and its header says what it is.
+
+**NUMBER THAT MOVES, DECLARED:** `--ci --dry-run` **0 → 1**, in both spaces. *Nothing about the
+system changed.* The run stopped hiding a gate that was already red and already declared (§28).
+Eval 07 now also persists `eval07_topology` inside a dry run, exactly as 03 and 04 do, and the write
+ledger names it: **2 snapshots → 3**.
+
+**Control:** `CiChainRunsModelFreeEvalsForReal`, **gating**. It *reads* `Program.cs`, parses the CI
+step table, and fails if any step declared `NeedsModel: false` is driven with a `dryRun` **variable**
+— and also fails if it recognises fewer than 11 steps or fewer than 3 model-free evals, so a regex
+that stops matching cannot pass by seeing nothing. **Ablation, executed:** restore
+`dryRun: parsed.DryRun` → row red, `-- 3` exit 1; restored → exit 0.
+
+### 34.4 🔴 Thirteen of fourteen `--real-vectors` commands declared a cost and reported none
+
+Found collecting this run's spend, which RUN_PROTOCOL requires to come from usage blocks. Every
+real-vector command prints *"This run EMBEDS QUERIES LIVE … it spends — a fraction of a cent, but
+not zero"*, and then printed **no figure at all**. `EmbeddingSpace.PrintLiveSpend` already produces
+the real one and was called from exactly two places, **neither of them an eval**: Demo 01 and
+`ThresholdCalibration`.
+
+⚠ **This was already observed and deferred** — §20 item 3, 2026-09-05: *"not fixed here, because the
+fix is a shared meter and that is its own change."* **The deferral's stated cost was wrong.** No
+shared meter was needed: one call in each entry point's `finally`, plus a latch. Reporting nothing
+is not the conservative end of the cost rule — it leaves *"a fraction of a cent"* as the only figure
+a reader has, and that is an assertion nobody measured.
+
+**⚠ And the latch is part of the fix, not an optimisation.** Demo 01 calls the reporter inside its
+own panel; the `finally` would call it again, so `-- 1 --real-vectors` printed the same total on
+**two** lines and a reader who added them would double the bill. `PrintLiveSpend` is now print-once
+per process.
+
+**⚠ The control's first revision was itself unfalsifiable**, and this is worth recording: it asserted
+the latch by looking for the identifier `_liveSpendPrinted`, which the **field declaration** satisfies
+on its own — ablating the latch left the row green. It now asserts the **assignment**
+`_liveSpendPrinted = true;`, which exists only inside the method. *A control that a dead artefact can
+satisfy is not a control.*
+
+**Control:** `ARunThatSaysItSpendsSaysHowMuch`, **gating**, checking both entry points, that the
+reporter still reads the provider's `PromptTokens` rather than estimating, that its LOWER BOUND
+caveat for responses carrying no usage block survives, and the latch. **Ablations, both executed:**
+remove the agent's call → row red, exit 1; remove the latch → row red, exit 1, **and demo 1 prints
+the embedding total on 2 lines instead of 1**; restored → exit 0 and exactly 1 line.
+
+`agent -- 0 --real-vectors` still prints no figure, and that is **correct**: it resolves no embedding
+space, prints no "it spends" warning and spends nothing. The rule is *a run that says it spends must
+say how much*, not *every run must print a number*.
+
+### 34.5 The full sweep — 30 commands, both spaces, every exit code OBSERVED
+
+Nothing was detached (§27.4's method defect, not repeated). `-- 7` and `--ci --dry-run` are the only
+non-zero codes and both are GATE B.
+
+| # | command | concept | `--real-vectors` | embedding prompt tokens (real) |
+|---|---|---|---|---|
+| 1 | `-- 1 --dry-run` | 0 | 0 | 158 |
+| 2 | `-- 2 --dry-run` | 0 | 0 | 930 |
+| 3 | `-- 2b --dry-run` | 0 | 0 | 1,364 |
+| 4 | `-- 2c --dry-run` | 0 | 0 | 788 |
+| 5 | `-- 3` | 0 | 0 | 1,248 |
+| 6 | `-- 4` | 0 | 0 | 241 |
+| 7 | `-- 5 --dry-run` | 0 | 0 | 158 |
+| 8 | `-- 6 --dry-run` | 0 | 0 | 179 |
+| 9 | `-- 7` | **1** | **1** | 356 |
+| 10 | `-- 8 --dry-run` | 0 | 0 | 248 |
+| 11 | `-- 9 --dry-run` | 0 | 0 | 474 |
+| 12 | `--ci --dry-run` | **1** | **1** | 2,015 |
+| 13 | `agent -- 0` | 0 | 0 | — (no space resolved, nothing spent) |
+| 14 | `agent -- 1 --offline` | 0 | 0 | 178 |
+| 15 | `agent -- 2 --offline` | 0 | 0 | 213 |
+
+**Total embedding prompt tokens over the real-vector half: 8,364**, every one read from a usage
+block. Concept-space half: **zero calls, zero tokens, zero spend** — it is offline by construction.
+
+### 34.6 What moved, and what did not
+
+| | was | now | direction |
+|---|---|---|---|
+| `--ci --dry-run` exit | 0 | **1** | corrects a false green |
+| write ledger under `--ci --dry-run` | 2 snapshots | **3** (`eval07_topology` joins) | more is reported |
+| Eval 03 panel | 23 gating + 5 advisory = 28 | **26 gating + 5 advisory = 31** | three new gating rows |
+| forced-choice count, paid cohort live arm | 6 of 12, p = 0.000199 | **7 of 12, p = 0.000015** | an unflattering figure corrected upward; ▲ either way |
+| instrument caveat floor under `--only` | 1.000 (unbeatable) | **0.083** | removes an unfalsifiable sentence |
+| `--real-vectors` commands reporting spend | 1 of 14 | **every one that spends** | — |
+| build warnings, evals project | 3 | **3** | unchanged |
+| Eval 07 GATE A / B / C | ✅ / ❌ / ✅ | **✅ / ❌ / ✅** | unchanged, both spaces |
+| Eval 07 per-case | 4 of 5 pinned; `USR-RB-10` fails | **4 of 5; `USR-RB-10` fails** | unchanged |
+| every other exit code | 0 | **0** | unchanged |
+
+**Not re-measured, and therefore not restated:** every paid per-case verdict in `SUITE_SUMMARY`
+§§1–21 and §23. This run bought **two one-persona probes** and no cohort, so those numbers stand
+exactly as their own runs measured them. The one paid figure that moves here (34.1) moves because it
+was **re-read off the persisted cells**, not because anything was re-run.
+
+### 34.7 Stage 2, in full — what the live probe actually showed
+
+`-- 2 --only USR-NB-01`, post-fix, exit 0, ¤1.8406, 323,806 tokens, 198 s:
+
+| property the protocol requires | observed |
+|---|---|
+| the **tool channel** was used, not prose | **12** `SearchProductsByMeaning` calls, 4 per rep, with real category filters and topK 5 / 8 / 6 |
+| **usage** was reported | 3 runs · 196.6 s · 323,806 tokens · ¤1.8406, per arm |
+| the result is **not degenerate** | latent 1.000 / 1.000 / 0.667 at own k = 5; recall 1.000 / 1.000 / 0.667; forced choice 1 / 1 / 0 |
+| the snapshot landed | `eval02_coverage_ab_probe.json`, 10,783 B, 04:45:19 UTC — the **probe** key; the cohort record was not touched |
+
+⚠ **The probe also re-confirmed the tag-join oracle at 1.000 with zero model calls**, against the
+live agent's 0.889 at its own k. §0.5 / D-4 holds on one persona as it does on twelve.
+
+⚠ **The two probes are not two independent readings of the same thing.** The pre-fix probe
+(¤2.5585, 3 reps) and the post-fix probe (¤1.8406, 3 reps) are separate draws from a stochastic
+model; the live arm's own-k latent was 0.889 in both, but its per-rep pattern differed (1/0/1 then
+1/1/0). Neither is a measurement of the fix, which is a printing change and cannot move a score.
+
+### 34.8 How to re-derive §34
+
+```
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet build AgentEval.sln                                  # 0 errors
+dotnet run --project $E -- 3                                # 31 rows: 26 gating caught, 5 advisory. exit 0
+dotnet run --project $E -- 7                                # exit 1 (GATE B) — A and C pass
+dotnet run --project $E -- --ci --dry-run                   # exit 1; ledger names 03 + 04 + 07
+dotnet run --project $E -- 3 --real-vectors                 # exit 0; 118 query calls, 1,248 prompt tokens
+dotnet run --project $A -- 2 --offline --real-vectors       # exit 0; 10 query calls, 213 prompt tokens
+
+# PAID — stage 2, and the only paid thing this wave needed:
+dotnet run --project $E -- 2 --only USR-NB-01               # ~2 to 3 CHF, 3 reps. CAPTURE THE EXIT CODE.
+```
