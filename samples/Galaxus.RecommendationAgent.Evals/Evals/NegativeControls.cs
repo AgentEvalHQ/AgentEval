@@ -7567,16 +7567,50 @@ public static class NegativeControls
         }
 
         // ── 3. THE CLOSABILITY SPLIT — the fact that decides how big D-v really is. ──
-        var closable = dead.Where(d => d.GoldProductsEmbeddable > 0).ToList();
-        var unclosable = dead.Where(d => d.GoldProducts > 0 && d.GoldProductsEmbeddable == 0).ToList();
-        var noProducts = dead.Where(d => d.GoldProducts == 0).ToList();
+        //       Written as ONE function of (goldProducts, embeddable) so the bucket a phrase lands
+        //       in can be exercised on inputs this corpus does not happen to contain — see 4.
+        static string Bucket(int goldProducts, int embeddable) =>
+            embeddable > 0 ? "closable"
+            : goldProducts > 0 ? "unclosable"
+            : "no-products";
+
+        var closable = dead.Where(d => Bucket(d.GoldProducts, d.GoldProductsEmbeddable) == "closable").ToList();
+        var unclosable = dead.Where(d => Bucket(d.GoldProducts, d.GoldProductsEmbeddable) == "unclosable").ToList();
+        var noProducts = dead.Where(d => Bucket(d.GoldProducts, d.GoldProductsEmbeddable) == "no-products").ToList();
 
         if (closable.Count + unclosable.Count + noProducts.Count != dead.Count)
             problems.Add("the three closability buckets do not partition the dead phrases.");
 
-        // ── 4. The row must be able to SEE an unclosable phrase, or its split is an assertion.
-        //       Positive control: a phrase whose products are all forced dead must land in the
-        //       unclosable bucket. Built here rather than hoped for in the corpus.
+        // ── 4. THE UNCLOSABLE BUCKET IS EMPTY ON THIS CORPUS, so nothing here exercises it.
+        //       MEASURED: 18 dead phrases split 12 closable / 0 unclosable / 6 no-products. A
+        //       bucket with no member is a branch nobody has run, and "0 phrases are unclosable" is
+        //       then indistinguishable from "the unclosable test is broken" — the empty-set shape.
+        //       ⚠ THE PREVIOUS VERSION OF THIS BLOCK CLAIMED TO CLOSE THAT AND DID NOT. Its comment
+        //       read "a phrase whose products are all forced dead must land in the unclosable
+        //       bucket. Built here rather than hoped for in the corpus", and the code under it
+        //       asserted only that SOME catalogue product embeds. Nothing was built and no phrase
+        //       was ever placed. Both halves are now real: the classifier is driven on inputs of
+        //       each shape, and the corpus check that used to stand in for it is kept as its own
+        //       separate assertion.
+        foreach (var (goldProducts, embeddable, want, why) in new[]
+                 {
+                     (5, 5, "closable", "gold products exist and embed"),
+                     (5, 1, "closable", "ONE embeddable gold product is enough to close by authoring"),
+                     (5, 0, "unclosable", "gold products exist and NONE embeds — no query-side entry reaches them"),
+                     (1, 0, "unclosable", "one dead gold product is still an unclosable phrase"),
+                     (0, 0, "no-products", "no product carries the token at all — a corpus gap, not a lexicon gap"),
+                 })
+        {
+            string got = Bucket(goldProducts, embeddable);
+            if (!string.Equals(got, want, StringComparison.Ordinal))
+                problems.Add($"a phrase with {goldProducts} gold product(s), {embeddable} embeddable, is bucketed "
+                           + $"'{got}' and not '{want}' — {why}.");
+        }
+
+        // The corpus fact the old block asserted, kept because it is worth asserting: if NOTHING
+        // embedded, "the gold products are unreachable" would be true of everything and the split
+        // would carry no information — but it is a fact about the catalogue, not a positive control
+        // on the classifier above.
         var probeProducts = Catalogue.Default.All.Take(3).ToList();
         int probeEmbeddable = probeProducts.Count(p => !IsDead(concept.Embed(EmbeddingDocument.ForProduct(p))));
         if (probeEmbeddable == 0)
@@ -7610,7 +7644,9 @@ public static class NegativeControls
                 + $"at least one unmapped token, so the hole IS a vocabulary gap · CLOSABILITY: {closable.Count} "
                 + $"reach at least one embeddable gold product, {unclosable.Count} reach gold products that ALL "
                 + $"embed to zero (query-side authoring cannot close those), {noProducts.Count} have no product "
-                + $"carrying the token at all · {examples}"
+                + $"carrying the token at all (the UNCLOSABLE bucket is EMPTY on this corpus, so it is "
+                + "exercised on synthetic inputs instead: 5 classifier cases, two of them unclosable) · "
+                + $"{examples}"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
