@@ -6861,6 +6861,28 @@ public static class NegativeControls
                        + "panel did not.");
         }
 
+        // ── 4c-bis. THE MONEY COLUMN OBEYS THE SAME RULE AS THE TOKEN COLUMN. An arm whose turns
+        //            all reported tokens and NONE reported a cost estimate is state Measured, and
+        //            its money cell printed a bare ¤0.0000 — byte-identical to the NO MODEL arm's
+        //            measured zero two rows above it. The footnote said LOWER BOUND; the CELL said
+        //            zero, and a reader scanning a table reads cells. Asserted against the NO MODEL
+        //            arm's own rendering rather than against a literal, so the two cannot converge.
+        var costless = new PairedCoverageReport();
+        costless.RecordCost("tokens-but-no-price", Metrics(100, 20, null, "gpt-5.5"));
+        var costlessArm = costless.CostOf("tokens-but-no-price");
+        if (costlessArm.State != PairedCoverageReport.ArmCostState.Measured)
+            problems.Add($"the money-column case is being reached through {costlessArm.State}, not Measured "
+                       + "— the check below is about a different branch than the one that shipped the defect.");
+        var (costlessRow, _) = EvalPrinter.CostRow("tokens-but-no-price", costlessArm);
+        string moneyCellOfAMeasuredZero = zeroMoney;
+        if (costlessRow.Contains(" " + moneyCellOfAMeasuredZero, StringComparison.Ordinal)
+            || !costlessRow.Contains("≥", StringComparison.Ordinal))
+        {
+            problems.Add("an arm whose model turns reported NO cost estimate prints its money as a plain "
+                       + "figure, identical to a NO MODEL arm's measured zero — an absence rendered as a "
+                       + "total, in the money column, which is the one §55 is about.");
+        }
+
         // ── 4d. THE SHIPPED REGISTRY, cross-checked against a field declared for another purpose.
         //        Kind decides repetition and the sign test; ReachesAModel decides the money. A
         //        mis-declaration now has to be made twice, consistently, to pass.

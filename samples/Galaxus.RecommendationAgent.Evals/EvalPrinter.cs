@@ -1476,7 +1476,14 @@ public static class EvalPrinter
             _ => (cost.RunsWithEstimatedTokens > 0
                     ? "≈" + tokens.ToString(CultureInfo.InvariantCulture)
                     : tokens.ToString(CultureInfo.InvariantCulture),
-                  money,
+                  // ⚠ THE MONEY COLUMN OBEYS THE SAME RULE AS THE TOKEN COLUMN, and it did not.
+                  // A model arm whose turns all reported tokens but NO EstimatedCost is state
+                  // Measured, so the money cell printed a bare ¤0.0000 — byte-identical to a NO
+                  // MODEL arm's measured zero, which is the pair this whole row exists to keep
+                  // apart. It was live on the shipped panel: the live arm reads
+                  // "24 of 24 model turn(s) carried no cost estimate" in its FOOTNOTE and ¤0.0000
+                  // in its CELL, and a reader scanning the table sees the cell.
+                  cost.RunsWithoutCost > 0 ? "≥" + money : money,
                   Caveats(arm, cost)),
         };
 
