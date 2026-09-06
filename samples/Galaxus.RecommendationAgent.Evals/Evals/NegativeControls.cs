@@ -101,6 +101,7 @@ public static class NegativeControls
         rows.Add(await GuardedAsync("RubberStampLoop", () => CheckRubberStampLoopAsync(retriever, harness, options, ct)).ConfigureAwait(false));
         rows.Add(await GuardedAsync("ConstraintBlindFloor", () => CheckConstraintBlindFloorAsync(harness, options, ct)).ConfigureAwait(false));
         rows.Add(await GuardedAsync("ConstantPolicyCeiling", () => CheckConstantPolicyCeilingAsync(harness, options, ct)).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("Eval06ConstantPolicyCeiling", () => CheckEval06ConstantPolicyCeilingAsync(harness, options, ct)).ConfigureAwait(false));
         rows.Add(Guarded("GraderSanity", CheckGraderSanity));
         rows.Add(Guarded("CoverageGateRendering", CheckCoverageGateRendering));
         rows.Add(Guarded("PreRegisteredRuleReachability", CheckPreRegisteredRuleReachability));
@@ -1216,6 +1217,122 @@ public static class NegativeControls
             string.Join(" · ", measured.Select(m => $"{m.Name} {m.Clean}/{IntegrityCases.All.Count}"))
           + $" · ceiling {ceiling} (claimed {ConstantPolicies.MeasuredCeiling})"
           + $" · refuser {refuser} (claimed {ConstantPolicies.RefuserScore})",
+            tripped);
+    }
+
+    // ══ N-17 — the Eval 06 constant-policy ceiling, MEASURED ═══════════════════════════════
+
+    /// <summary>
+    /// Runs every constant trajectory policy through the real Eval 06 path and measures the claim
+    /// Eval 06's floor panel makes: that no constant policy passes all five cases.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect this closes (N-17).</b> Eval 06 prints <i>"The gate, constant policy: 0.000.
+    /// No constant policy passes all five"</i> and then concedes, in the same paragraph, that the
+    /// figure is <i>"asserted from the pair structure above, not measured — Eval 03's
+    /// ConstantPolicyCeiling row is where a MEASURED ceiling would come from, and Eval 06's cases
+    /// are not in it"</i>. That is a chance floor derived from an argument about the corpus rather
+    /// than from the corpus, and the argument would survive a corpus edit that falsified it. Eval
+    /// 01's identical claim was typed by hand twice and was wrong both times — the ceiling was 10,
+    /// not 8, and the refuser scored 5, not 8 (see <see cref="ConstantPolicies"/>). This row is
+    /// that lesson applied one eval over.
+    /// </para>
+    /// <para>
+    /// <b>It drives the IDENTICAL path.</b> <see cref="Eval06_ToolTrajectory.RunScriptedArmAsync"/>
+    /// is what the dry run's compliant and violating arms go through: the real
+    /// <c>GalaxusTools</c>, the real budget scope, the real <c>ToolUsageExtractor</c>, the real
+    /// assertions, the real per-case surface and the real opt-out profile override. Only the model
+    /// is replaced, and a constant policy has no model to replace.
+    /// </para>
+    /// <para>
+    /// <b>What is gated, and why that bar is not supplied by the artifact under test.</b> The
+    /// load-bearing clause is <c>ceiling &lt; TrajectoryCases.All.Count</c> — the case count, not a
+    /// number this control or the policies chose. Two pinned figures ride along
+    /// (<see cref="ConstantTrajectoryPolicies.MeasuredCeiling"/> and the per-pair ceiling) so that
+    /// a corpus edit which leaves the weak claim true while gutting the pair structure — four of
+    /// five, say — still fails this row. The policies are the SUBJECTS of the measurement; none of
+    /// them contributes to the bar.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Vacuity.</b> A ceiling measured over zero policies, or over policies whose cases all
+    /// threw, would be <c>-1</c> and would satisfy <c>&lt; 5</c> while measuring nothing. Both are
+    /// checked explicitly: every policy must have produced a verdict on every case, and the policy
+    /// count must be non-zero.
+    /// </para>
+    /// </remarks>
+    private static async Task<ControlRowSnapshot> CheckEval06ConstantPolicyCeilingAsync(
+        MAFEvaluationHarness harness, EvaluationOptions options, CancellationToken ct)
+    {
+        int caseCount = TrajectoryCases.All.Count;
+        var measured = new List<(string Name, int Passed, IReadOnlyList<string> PassedIds)>();
+        var pairCeilings = new Dictionary<string, int>(StringComparer.Ordinal);
+        int verdicts = 0;
+
+        foreach (var policy in ConstantTrajectoryPolicies.All)
+        {
+            var passedIds = new List<string>();
+            var perGroup = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            foreach (TrajectoryCase testCase in TrajectoryCases.All)
+            {
+                TrajectoryRow row = await Eval06_ToolTrajectory
+                    .RunScriptedArmAsync(testCase, policy.Script, harness, options, ct)
+                    .ConfigureAwait(false);
+
+                verdicts++;
+                if (!row.Passed) continue;
+
+                passedIds.Add(testCase.Id);
+                perGroup[testCase.Group] = perGroup.GetValueOrDefault(testCase.Group) + 1;
+            }
+
+            measured.Add((policy.Name, passedIds.Count, passedIds));
+
+            foreach (var (group, passed) in perGroup)
+            {
+                pairCeilings[group] = Math.Max(pairCeilings.GetValueOrDefault(group), passed);
+            }
+        }
+
+        int ceiling = measured.Count == 0 ? -1 : measured.Max(m => m.Passed);
+        int refuser = measured
+            .FirstOrDefault(m => m.Name.EndsWith("CallsNothing", StringComparison.Ordinal)).Passed;
+
+        // Only the strict PAIRS carry the argument; a single-case group has no pair ceiling.
+        var pairedGroups = TrajectoryCases.All
+            .GroupBy(c => c.Group, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        int worstPair = pairedGroups.Count == 0 ? -1 : pairedGroups.Max(g => pairCeilings.GetValueOrDefault(g));
+
+        int expectedVerdicts = ConstantTrajectoryPolicies.All.Count * caseCount;
+
+        bool tripped =
+            ConstantTrajectoryPolicies.All.Count > 0
+            && verdicts == expectedVerdicts                                     // vacuity: every case ran
+            && pairedGroups.Count > 0
+            && ceiling < caseCount                                              // THE claim: floor 0.000
+            && ceiling == ConstantTrajectoryPolicies.MeasuredCeiling
+            && worstPair == ConstantTrajectoryPolicies.MeasuredPairCeiling
+            && refuser == ConstantTrajectoryPolicies.RefuserScore;
+
+        return new ControlRowSnapshot(
+            "Eval06ConstantPolicyCeiling",
+            $"no CONSTANT trajectory policy may pass all {caseCount} Eval 06 cases — the 0.000 constant-policy "
+          + "floor Eval 06 PRINTS, which until now was argued from the pair structure and never measured. "
+          + $"Measured over {ConstantTrajectoryPolicies.All.Count} policies through the real "
+          + $"RunScriptedArmAsync path: ceiling exactly {ConstantTrajectoryPolicies.MeasuredCeiling} of "
+          + $"{caseCount}, no more than {ConstantTrajectoryPolicies.MeasuredPairCeiling} of the 2 cases in any "
+          + $"strict pair, and the refuser exactly {ConstantTrajectoryPolicies.RefuserScore}.",
+            string.Join(" · ", measured.Select(m =>
+                $"{m.Name} {m.Passed}/{caseCount}"
+              + (m.PassedIds.Count == 0 ? string.Empty : $" [{string.Join(",", m.PassedIds)}]")))
+          + $" · ceiling {ceiling} (claimed {ConstantTrajectoryPolicies.MeasuredCeiling}, gate needs {caseCount})"
+          + $" · worst pair {worstPair} (claimed {ConstantTrajectoryPolicies.MeasuredPairCeiling})"
+          + $" · refuser {refuser} (claimed {ConstantTrajectoryPolicies.RefuserScore})"
+          + $" · {verdicts} of {expectedVerdicts} case verdicts produced",
             tripped);
     }
 

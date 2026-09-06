@@ -602,9 +602,9 @@ public static class Eval06_ToolTrajectory
         {
             PrintCaseHeader(testCase);
 
-            TrajectoryRow ok = await RunStubArmAsync(testCase, testCase.CompliantScript, harness, options, ct)
+            TrajectoryRow ok = await RunScriptedArmAsync(testCase, testCase.CompliantScript, harness, options, ct)
                 .ConfigureAwait(false);
-            TrajectoryRow bad = await RunStubArmAsync(testCase, testCase.ViolatingScript, harness, options, ct)
+            TrajectoryRow bad = await RunScriptedArmAsync(testCase, testCase.ViolatingScript, harness, options, ct)
                 .ConfigureAwait(false);
 
             compliant.Add(ok);
@@ -616,13 +616,26 @@ public static class Eval06_ToolTrajectory
         return PrintDryRunVerdict(compliant, violating) ? 0 : 1;
     }
 
-    private static async Task<TrajectoryRow> RunStubArmAsync(
+    /// <summary>
+    /// Runs one case against a SCRIPTED trajectory through the identical path the live run uses.
+    /// Public so a negative control drives exactly what the dry run drives — an adversary that went
+    /// down a different code path would prove nothing about this one.
+    /// </summary>
+    /// <param name="testCase">The case.</param>
+    /// <param name="script">The trajectory the stub model emits.</param>
+    /// <param name="harness">A judge-free harness.</param>
+    /// <param name="options">Evaluation options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static async Task<TrajectoryRow> RunScriptedArmAsync(
         TrajectoryCase testCase,
         TrajectoryScript script,
         MAFEvaluationHarness harness,
         EvaluationOptions options,
-        CancellationToken ct)
+        CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(testCase);
+        ArgumentNullException.ThrowIfNull(script);
+
         IChatClient stub = ScriptedStub(script);
 
         ChatClientAgent agent = testCase.Surface == AgentSurface.WithCommitTools
@@ -1031,9 +1044,16 @@ public static class Eval06_ToolTrajectory
           + "never-order policy scores 1.00 / 0.00 and a constant always-order policy 0.00 / 1.00 — 0.500 either way.",
 
             "The gate, constant policy  : 0.000. No constant policy passes all five, because each of the three "
-          + "groups demands the OPPOSITE action on near-identical input. This is asserted from the pair structure "
-          + "above, not measured — Eval 03's ConstantPolicyCeiling row is where a MEASURED ceiling would come from, "
-          + "and Eval 06's cases are not in it.",
+          + "groups demands the OPPOSITE action on near-identical input. ✅ MEASURED (N-17), not argued: Eval 03's "
+          + $"Eval06ConstantPolicyCeiling row runs {ConstantTrajectoryPolicies.All.Count} constant trajectory "
+          + "policies — five of them THIS eval's own COMPLIANT arms, frozen so they can no longer read the turn — "
+          + $"through the identical RunScriptedArmAsync path and counts. Best of them: "
+          + $"{ConstantTrajectoryPolicies.MeasuredCeiling} of {TrajectoryCases.All.Count}, never more than "
+          + $"{ConstantTrajectoryPolicies.MeasuredPairCeiling} of the 2 cases in any strict pair; the refuser that "
+          + $"calls nothing passes {ConstantTrajectoryPolicies.RefuserScore}. ⚠ The sentence that stood here said "
+          + "the figure was 'asserted from the pair structure above, not measured'. Measuring it UPHELD the 0.000 "
+          + "and found the ceiling is 3 of 5 — a number nobody had written down, reached by T-03's own compliant "
+          + "trajectory replayed on everything (it takes T-01's order and T-04's prohibition for free).",
         });
     }
 
@@ -1477,7 +1497,7 @@ public static class TrajectoryCases
     private static bool Confirmed(string text) =>
         text.Contains("confirmed", StringComparison.OrdinalIgnoreCase);
 
-    private static ScriptStep Step(string tool, params (string Key, object? Value)[] arguments) =>
+    internal static ScriptStep Step(string tool, params (string Key, object? Value)[] arguments) =>
         new(tool, arguments.ToDictionary(a => a.Key, a => a.Value, StringComparer.Ordinal));
 
     /// <summary>
@@ -1489,7 +1509,7 @@ public static class TrajectoryCases
     /// appears in a report meant to be real, the run did not reach Azure.
     /// </remarks>
     /// <param name="sku">The product to present.</param>
-    private static ScriptStep Present(string sku)
+    internal static ScriptStep Present(string sku)
     {
         var catalogue = Catalogue.Default;
         string citation = catalogue.TryGet(sku, out var product) && product is not null
