@@ -140,8 +140,17 @@ public sealed class ConceptEmbeddingSource : IEmbeddingSource
     /// list and its order are unchanged — only the query-side lexicon grew — but a vector cached
     /// under <c>v1</c> was computed by a lexicon that projected <c>mode:on-bike</c> onto nothing,
     /// so it is not interchangeable with one computed now.
+    /// <para>
+    /// Bumped to <c>v3</c> by D-v's lexicon closure (plan item 8.11), for the same reason and by
+    /// the same rule: the dimension list and its order are untouched, and the lexicon grew by the
+    /// closable half of the authored phrases that embedded to zero. ⚠ <b>No cached concept vector
+    /// exists in this repository to invalidate</b> — the committed
+    /// <c>catalogue.embeddings.json</c> is keyed on <c>text-embedding-3-small</c>, not on this
+    /// source — so the bump costs nothing today and is made anyway, because the version suffix is
+    /// only worth having if it moves when the lexicon does.
+    /// </para>
     /// </remarks>
-    public const string ModelIdentifier = "galaxus-concept-v2";
+    public const string ModelIdentifier = "galaxus-concept-v3";
 
     /// <summary>
     /// Dense cosine floor suggested for this concept space.
@@ -912,6 +921,83 @@ public sealed class ConceptEmbeddingSource : IEmbeddingSource
         Add("power travel tech", PowerAndCharging, 0.9f, TravelPortability, 0.7f);
         Add("home audio", HomeAudio, 1.0f);
         Add("small appliances", KitchenAppliance, 0.9f);
+
+        // ── D-v (plan item 8.11): the CLOSABLE half of the dead authored phrases ─────────────
+        //
+        // `DeadPhrasesAreDiagnosedNotJustCounted` splits the authored context phrases that embed
+        // to ZERO into three buckets. The `closable` bucket is the one where the products the gold
+        // rewards for that interest DO embed, so a query-side entry can reach them; the
+        // `no-products` bucket is a CORPUS gap that no lexicon entry closes. These entries are the
+        // closable half, and every one of them is grounded in the tags the gold is derived from —
+        // not in what the phrase sounds like.
+        //
+        // ⚠ THREE AUTHORING RULES THIS BLOCK KEEPS, because breaking any of them would make the
+        //   diagnosis move for a reason that is not the fix:
+        //
+        //   1. ONLY CONTENT TOKENS. "the", "a", "an", "with", "on", "and", "out", "every" and the
+        //      possessive "s" appear in these phrases and are deliberately NOT added. A stop word
+        //      in this lexicon would give a non-zero vector to every query containing it, which
+        //      would close D-v on paper by making the measurement meaningless.
+        //
+        //   2. NOTHING HERE MAY TOUCH THE `no-products` BUCKET. Those six phrases turn on the
+        //      tokens `weather`, `gear`, `lasts`, `morning`, `routine`, `summer`, `conditions` and
+        //      `winter`. Adding any of them would stop those phrases embedding to zero and shrink
+        //      the dead count WITHOUT closing anything — the corpus still carries no product for
+        //      the token. That is why "training through the winter" is closed on `training` alone.
+        //
+        //   3. THE STEMMER IS DOING WORK AND THE SINGULAR IS THE ENTRY. `ride` covers "ride",
+        //      "rides" and "riding"; `ascent` covers "ascents"; `card` covers "cards"; `session`
+        //      covers "sessions"; `weigh` covers "weighing". Authoring both forms would hide a
+        //      stemmer regression behind a duplicate.
+        //
+        // ⚠ NO EXPECTED OUTCOME IS RECORDED HERE, ON PURPOSE. An earlier item in this plan filed a
+        //   figure that turned out to be three times too big, and had it been written beside the
+        //   change it would have been a pre-registered result rather than a measurement.
+
+        // all-day-riding — "all-day rides". Gold: on-bike training and bikepacking kit.
+        Add("ride", Cycling, 1.0f);
+        Add("all-day", Cycling, 0.4f, HikingTrekking, 0.3f);
+
+        // card-to-edit — "getting the day's cards onto a laptop". Gold: bodies and SD-slot kit.
+        Add("card", PhotographyCapture, 0.7f, StorageAndCarry, 0.3f);
+        Add("laptop", PhotographyCapture, 0.4f, TravelPortability, 0.3f);
+
+        // commute — "the daily commute". Gold: lights and travel audio, on-bike and on-foot.
+        Add("commute", TravelPortability, 0.6f, Cycling, 0.4f, LowLightAndDawn, 0.3f);
+
+        // couch-co-op — "four people on one sofa". Gold: console kit tagged living-room.
+        Add("sofa", GamingConsole, 0.5f, HomeAudio, 0.4f);
+
+        // enthusiast — "an enthusiast's standards". The experience-level axis, entered at the far
+        // end from `beginner` and at the same low weight the shipped `professional` entry uses:
+        // this dimension records THAT the customer stated a level, not which one.
+        Add("enthusiast", ValueAndEntryLevel, 0.2f);
+
+        // late-night-session — "late sessions without waking the flat". Gold: console kit and
+        // near-field audio, both tagged living-room / desk-listening.
+        Add("session", GamingConsole, 0.5f, HomeAudio, 0.5f);
+
+        // off-grid-power — "days with no socket". Gold: USB-C PD power banks.
+        Add("socket", PowerAndCharging, 1.0f);
+
+        // self-supported — "going out self-supported". Gold: hut-to-hut and bikepacking kit.
+        Add("self-supported", HikingTrekking, 0.8f, CarriedWeight, 0.4f, TravelPortability, 0.4f);
+
+        // steep-ascents — "steep ascents". Gold: multi-day trekking kit.
+        Add("ascent", HikingTrekking, 0.9f, CarriedWeight, 0.3f);
+        Add("steep", HikingTrekking, 0.7f);
+
+        // two-channel-room — "a two-channel room". Gold: amplifiers and speakers.
+        Add("two-channel", HomeAudio, 1.0f);
+
+        // weigh-every-shot — "weighing every dose and yield". Gold: espresso scales and grinders.
+        Add("weigh", MeasurementPrecision, 0.9f, EspressoBrewing, 0.4f);
+        Add("dose", EspressoBrewing, 0.8f, MeasurementPrecision, 0.6f, CoffeeGrinding, 0.4f);
+        Add("yield", EspressoBrewing, 0.7f, MeasurementPrecision, 0.5f);
+
+        // winter-base-miles — "training through the winter". Gold: turbo trainers and bike
+        // computers tagged context:training. ⚠ `winter` is deliberately NOT added — see rule 2.
+        Add("training", Cycling, 0.8f);
 
         return lexicon;
     }

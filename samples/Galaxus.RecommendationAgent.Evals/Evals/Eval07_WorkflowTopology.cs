@@ -162,7 +162,9 @@ namespace Galaxus.RecommendationAgent.Evals;
 ///   </description></item>
 ///   <item><description>
 ///   <b>Not the round-cap termination.</b> No customer in this corpus reaches
-///   <c>round-limit-reached</c> — Marco exhausts his queries at round 3 instead. It is printed as an
+///   <c>round-limit-reached</c> — Marco exhausts his queries at round 3 instead. ⚠ Since D-v's
+///   lexicon closure (plan item 8.11) the same is true of <c>no-progress</c>: Marco was its only
+///   live carrier and now exits satisfied in the concept space. It is printed as an
 ///   instrument finding, not gated. The demo lane's <c>DiscoveryTerminationProbe</c> forces that
 ///   condition with a scripted reviewer; this eval deliberately does not, because its subject is
 ///   what the shipped loop does on real customers.
@@ -324,7 +326,13 @@ public static class Eval07_WorkflowTopology
     ///   <item><description><c>USR-RB-10</c> Renzo — 0/1/<c>coverage-sufficient</c> in BOTH (the pin
     ///   says he must loop; he does not; that is GATE B's live failure)</description></item>
     ///   <item><description><c>USR-MI-02</c> Marco — concept <b>1 loop-back / 2 rounds /
-    ///   no-progress</b>, real <b>2 / 3 / gaps-unresolvable</b></description></item>
+    ///   coverage-sufficient</b>, real <b>2 / 3 / gaps-unresolvable</b>. 🔴 <b>SUPERSEDED 2026-09-06 by
+    ///   D-v's lexicon closure, and the superseded value is kept because the reason it moved is the
+    ///   record:</b> the concept cell read <b>no-progress</b> (11 items, DEGRADED) until plan item
+    ///   8.11 added the closable half of the dead authored phrases. Three of those entries —
+    ///   <c>weigh</c>, <c>dose</c>, <c>yield</c> — are what move him, bisected; and Marco is the
+    ///   gift-trap persona with no coffee interest at all, so they reach him through the PRODUCT
+    ///   side of the same lexicon, not through his query</description></item>
     ///   <item><description><c>USR-MB-13</c> Mirjam — concept <b>2 / 3 / gaps-unresolvable
     ///   (DEGRADED)</b>, real <b>1 / 2 / coverage-sufficient (APPROVED)</b></description></item>
     ///   <item><description><c>USR-NB-01</c> Nadia — 0/1/<c>coverage-sufficient</c> in BOTH</description></item>
@@ -333,6 +341,13 @@ public static class Eval07_WorkflowTopology
     /// <para>
     /// So Marco and Mirjam <b>swap round counts</b> between the spaces, Mirjam's exit disposition
     /// flips DEGRADED → APPROVED, and <c>no-progress</c> is not reachable at all on the real path.
+    /// 🔴 <b>AND SINCE D-v's LEXICON CLOSURE IT IS NOT REACHED ON THE CONCEPT PATH EITHER.</b> Marco
+    /// was the corpus's only live carrier of that reason; the advisory row
+    /// <i>"every frozen stop reason is reachable on this corpus"</i> now names <c>no-progress</c>
+    /// alongside <c>round-limit-reached</c> as forced-only, by the demo lane's
+    /// <c>DiscoveryTerminationProbe</c> with a scripted reviewer — which is a different claim from
+    /// "a real customer reaches it". <b>That is a coverage LOSS bought with a retrieval gain, and it
+    /// is a decision for the corpus owner, not a defect in this eval.</b>
     /// A single sentence describing "the run" is therefore wrong in whichever space it was not
     /// written for — and the Wave-4 sentence was written for the concept space, which is why
     /// <c>-- 3 --real-vectors</c> exited <b>1</b> the first time anyone ran it after that fix.
@@ -365,12 +380,22 @@ public static class Eval07_WorkflowTopology
           + "RealVectors 0 loop-backs / 1 round / coverage-sufficient."),
 
         new(Personas.MarcoUserId, "Marco Iten", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS and exits DEGRADED in both spaces. He is the only customer in this corpus that ever "
-          + "reaches the stop reason dedup makes possible — a round that re-finds what it already had adds "
-          + "zero NEW ids, so the loop stops instead of spending the rest of its budget — and he reaches it "
-          + "in the CONCEPT space only. The PARTIAL answer still leaves through the same exit edge, which is "
-          + "the property the graph is built for. "
-          + "OBSERVED PER SPACE: ConceptVectors 1 loop-back / 2 rounds / no-progress · "
+            "LOOPS in both spaces, and exits DEGRADED on the real one. 🔴 HE USED TO BE THE ONLY CUSTOMER "
+          + "IN THIS CORPUS THAT REACHED THE STOP REASON DEDUP MAKES POSSIBLE — a round that re-finds what "
+          + "it already had adds zero NEW ids, so the loop stops instead of spending the rest of its budget "
+          + "— and D-v's LEXICON CLOSURE (plan item 8.11) took that cell away: in the concept space he now "
+          + "finds new ids in round 2 and leaves satisfied. The clause below is the only place the reason "
+          + "is named, per this row's own rule. ⚠ THE CAUSE IS "
+          + "NOT HIS OWN VOCABULARY, WHICH IS WHY IT WAS WORTH BISECTING. Marco is the gift-trap persona — a "
+          + "console and a game, no coffee anything — and the three lexicon entries that move him are "
+          + "`weigh`, `dose` and `yield`. Removing that trio restores the old exit; removing the "
+          + "gaming/audio trio, the cycling four, the trekking three, `enthusiast`, or `card`/`laptop`/"
+          + "`socket` does not. The route is the PRODUCT side: in the concept space the same lexicon embeds "
+          + "product documents, the catalogue's own text carries `dose`, `weigh` and `yield`, so closing a "
+          + "QUERY-side gap re-embeds the catalogue and moves every cosine — for personas with nothing to do "
+          + "with the added words. The PARTIAL answer still leaves through the same exit edge on the real "
+          + "path, which is the property the graph is built for. "
+          + "OBSERVED PER SPACE: ConceptVectors 1 loop-back / 2 rounds / coverage-sufficient · "
           + "RealVectors 2 loop-backs / 3 rounds / gaps-unresolvable."),
 
         new(Personas.MirjamUserId, "Mirjam Bosshard", ExpectsLoopBack: true, PresentsAnswerText: true,
