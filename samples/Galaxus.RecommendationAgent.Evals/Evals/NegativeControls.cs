@@ -5188,6 +5188,16 @@ public static class NegativeControls
     /// that returns a usage block and one that does not, and reads what landed in
     /// <c>DiscoveryState.Spend</c>.
     /// </para>
+    /// <para>
+    /// ⚠ <b>Its SUBJECT is all three chat lanes, and it was one when it shipped.</b> Item 8.17
+    /// metered the discovery loop and Eval 08's workflow arm because that is where it was filed, and
+    /// this row's name says <i>the chat lane</i>. Demo 01's live single-agent turn is a chat lane
+    /// too — the same deployment, the same <c>AIAgent.RunAsync</c>, the same <c>response.Usage</c> —
+    /// and it was reading that response for its tool calls and never for its usage, while printing
+    /// the EMBEDDING lane's spend a few lines below. The review pass of 2026-09-06 metered it and
+    /// added it to clause 4. <b>The lesson is one wave old and was repeated inside the fix for
+    /// it:</b> a row's NAME is not its subject; count the lanes its body actually reaches.
+    /// </para>
     /// <list type="number">
     ///   <item><description><b>WIRED:</b> a response carrying usage lands in the state, with the
     ///   provider's exact numbers and not a rounding of them.</description></item>
@@ -5198,9 +5208,9 @@ public static class NegativeControls
     ///   <item><description><b>NEVER ESTIMATED:</b> the meter has no path from a string to a token
     ///   count, so a later "helpful" fallback cannot make our tokenizer look like the
     ///   provider's bill.</description></item>
-    ///   <item><description><b>REPORTED:</b> both spending lanes — Demo 02 and Eval 08's workflow
-    ///   arm — read the meter. A meter nobody prints is the state this row was written to
-    ///   end.</description></item>
+    ///   <item><description><b>REPORTED:</b> all three spending lanes — Demo 01, Demo 02 and Eval
+    ///   08's workflow arm — read the meter. A meter nobody prints is the state this row was written
+    ///   to end.</description></item>
     /// </list>
     /// </remarks>
     private static ControlRowSnapshot CheckTheChatLaneSaysWhatItSpent()
@@ -5302,9 +5312,19 @@ public static class NegativeControls
                  {
                      ("Demo 02", Path.Combine(agentRoot, "Demos", "Demo02_InterestMapWorkflow.cs"), "PrintChatSpend(result.State)"),
                      ("Eval 08's workflow arm", Path.Combine(SampleSourceRoot(), "Evals", "Eval08_StochasticStability.cs"), "PrintWorkflowChatSpend(workflowArm)"),
+                     // ⚠ THE THIRD LANE, added by the review pass of 2026-09-06. Demo 01's live
+                     //   single-agent turn is a chat lane too — the same deployment, the same
+                     //   AIAgent.RunAsync — and it read response.Messages for the tool trace and
+                     //   never response.Usage, so it printed a tool-call COUNT, elapsed seconds and
+                     //   the EMBEDDING lane's spend, and no chat bill at all. This row's NAME said
+                     //   "the chat lane" while its body reached one of the three: the same
+                     //   over-promise §55.4 recorded about ARunThatSaysItSpendsSaysHowMuch, made by
+                     //   the row written to fix it.
+                     ("Demo 01", Path.Combine(agentRoot, "Demos", "Demo01_RecommendationAgent.cs"), "chatSpend.Record(response.Usage)"),
+                     ("Demo 01's printer", Path.Combine(agentRoot, "Demos", "Demo01_RecommendationAgent.cs"), "PrintChatSpend(chatSpend)"),
                  })
         {
-            if (!File.ReadAllText(path).Contains(needle, StringComparison.Ordinal))
+            if (!WithoutCommentLines(File.ReadAllText(path)).Contains(needle, StringComparison.Ordinal))
             {
                 problems.Add($"{label} no longer prints the chat meter, so it makes live model calls and reports "
                            + "a call COUNT in place of a bill — which is the state item 8.17 was opened for.");
@@ -5314,7 +5334,7 @@ public static class NegativeControls
         return new ControlRowSnapshot(
             "TheChatLaneSaysWhatItSpent",
             "the discovery loop's model calls must report PROVIDER-reported tokens, a call whose response carried "
-          + "no usage block must render as UNKNOWN rather than as zero, and both spending lanes must print it. "
+          + "no usage block must render as UNKNOWN rather than as zero, and ALL THREE spending lanes must print it. "
           + "MEASURED: DiscoveryModelCall returned response.Text and dropped AgentResponse.Usage, so `agent -- 2` "
           + "made 3 live model calls and printed no token count on two consecutive verification runs, and Eval 08's "
           + "workflow arm fell back to the harness's text-length estimate over text REPLAYED from workflow state. "
@@ -5325,9 +5345,38 @@ public static class NegativeControls
                 + "no usage block adds no tokens and counts as an absence · a provider-reported ZERO and a MISSING "
                 + "block render in different words, and the missing one says UNKNOWN · the figure renders in the "
                 + "INVARIANT culture, so a log grep survives the machine · ChatSpend has no path from text to "
-                + "tokens · Demo 02 and Eval 08's workflow arm both print the meter"
+                + "tokens · Demo 01, Demo 02 and Eval 08's workflow arm all print the meter"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
+    }
+
+    /// <summary>
+    /// The source with every whole-line comment removed, so a needle search cannot be satisfied by
+    /// a comment that merely MENTIONS the call.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Found by ablating this row's own clause 4, on 2026-09-06.</b> The clause was a plain
+    /// <c>File.ReadAllText(...).Contains(needle)</c>, so commenting the call site OUT — the most
+    /// natural way anyone would disable it — left the needle sitting in the comment and the row
+    /// GREEN. That is the exact shape this row's remarks cite twice (§34.4's latch asserted by its
+    /// own dead field, §55.5's <i>"a source-text assertion would be satisfied by the comment
+    /// explaining it"</i>), reproduced inside the check written to avoid it. The earlier ablation
+    /// missed it only because it deleted the call rather than commenting it out.
+    /// </remarks>
+    /// <param name="source">The file's text.</param>
+    private static string WithoutCommentLines(string source)
+    {
+        var kept = source
+            .Split('\n')
+            .Where(line =>
+            {
+                string t = line.TrimStart();
+                return !t.StartsWith("//", StringComparison.Ordinal)
+                    && !t.StartsWith("*", StringComparison.Ordinal)
+                    && !t.StartsWith("/*", StringComparison.Ordinal);
+            });
+
+        return string.Join('\n', kept);
     }
 
     /// <summary>

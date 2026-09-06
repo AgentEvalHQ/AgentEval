@@ -12,6 +12,7 @@ using Galaxus.RecommendationAgent.Rendering;
 using Galaxus.RecommendationAgent.Retrieval;
 using Galaxus.RecommendationAgent.Signals;
 using Galaxus.RecommendationAgent.Tools;
+using Galaxus.RecommendationAgent.Workflows;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -449,32 +450,53 @@ public static class Demo01_RecommendationAgent
 
         AgentResponse? response;
         var startedAt = DateTimeOffset.UtcNow;
+
+        // THE THIRD SPENDING LANE, and it was the last one still silent. Item 8.17 metered the
+        // DISCOVERY loop (Demo 02) and Eval 08's workflow arm and stopped there, because that is
+        // where the item was filed; the row it added is called TheChatLaneSaysWhatItSpent and its
+        // body reached `DiscoveryModelCall` alone. THIS call site is a chat lane too — the same
+        // deployment, the same `AIAgent.RunAsync`, the same `response.Usage` — and it read
+        // `response.Messages` for the tool trace and never the usage, so `agent -- 1` printed a
+        // tool-call COUNT and elapsed seconds and no bill, while printing the EMBEDDING lane's
+        // fraction of a cent a few lines below. That is the shape §55.4 recorded one row earlier:
+        // a row's NAME is not its subject, and the flattering direction is a green tick beside a
+        // sentence that reads more general than the check underneath it.
+        var chatSpend = new ChatSpend();
         try
         {
             response = await agent.RunAsync(messages, session, cancellationToken: cancellationToken).ConfigureAwait(false);
+            chatSpend.Record(response.Usage);
         }
         catch (RequestFailedException azureEx)
         {
+            chatSpend.RecordNoResponse();
             PrintAzureFailure(azureEx.Status, azureEx.ErrorCode, azureEx.Message, azureEx.StackTrace);
+            PrintChatSpend(chatSpend);
             return null;
         }
         catch (ClientResultException clientEx)
         {
+            chatSpend.RecordNoResponse();
             PrintAzureFailure(clientEx.Status, errorCode: null, clientEx.Message, clientEx.StackTrace);
+            PrintChatSpend(chatSpend);
             return null;
         }
         catch (TaskCanceledException timeoutEx)
         {
+            chatSpend.RecordNoResponse();
             PrintGenericFailure("Timeout",
                 "Azure did not answer inside the SDK's HTTP timeout — usually throttling or a long content-filter check.",
                 timeoutEx);
+            PrintChatSpend(chatSpend);
             return null;
         }
         catch (Exception ex)
         {
+            chatSpend.RecordNoResponse();
             PrintGenericFailure($"{ex.GetType().Name} (agent run failed)",
                 "Most often a tool method threw, or the model returned a malformed tool call. The inner exception names the tool.",
                 ex);
+            PrintChatSpend(chatSpend);
             return null;
         }
 
@@ -492,6 +514,7 @@ public static class Demo01_RecommendationAgent
 
         RecommendationPrinter.PrintTraceFooter();
         PrintToolTrace(response, elapsed, summary);
+        PrintChatSpend(chatSpend);
 
         return new AgentRun(presented, userEvidence, provenance, candidates, used, summary, response.Text);
     }
@@ -1084,6 +1107,45 @@ public static class Demo01_RecommendationAgent
     /// Dumps every tool invocation in call order with its result preview, exactly as
     /// <c>Demo01_TravelAgent</c> does — the fastest way to see where a run broke.
     /// </summary>
+    /// <summary>
+    /// What this turn's model call cost, in tokens the PROVIDER reported.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The gap this closes, and it is the one item 8.17 did not reach.</b> That item metered the
+    /// discovery loop and Eval 08's workflow arm — the two lanes it was filed for — and the row it
+    /// shipped is named <c>TheChatLaneSaysWhatItSpent</c> while its body reached
+    /// <c>DiscoveryModelCall</c> and nothing else. This lane is the OTHER chat lane, and the one a
+    /// customer actually meets: a live <c>AIAgent.RunAsync</c> against the same deployment, whose
+    /// response was read for its tool calls and never for <c>response.Usage</c>. The turn printed a
+    /// tool-call COUNT, elapsed seconds, and — a few lines further down — the EMBEDDING lane's
+    /// fraction of a cent. <b>A count is not a bill, and the lane that spends most on this demo was
+    /// the one reporting nothing.</b>
+    /// </para>
+    /// <para>
+    /// <b>Why there is no currency figure.</b> Same reason as Demo 02's: this project has no
+    /// AgentEval dependency by design, so it reaches no rate table, and a meter may not invent one.
+    /// Tokens are the measurement. <see cref="ChatSpend.Describe"/> owns the UNKNOWN-is-not-zero
+    /// distinction, so a call that came back without a usage block — or did not come back at all —
+    /// cannot render as a free one.
+    /// </para>
+    /// </remarks>
+    /// <param name="spend">This turn's meter.</param>
+    private static void PrintChatSpend(ChatSpend spend)
+    {
+        var lines = spend.Describe();
+        if (lines.Count == 0) return;
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"  💸 Chat: {lines[0]}");
+        foreach (var extra in lines.Skip(1)) Console.WriteLine($"     {extra}");
+        Console.WriteLine($"     model: {Config.Model}");
+        Console.WriteLine("     cost : UNKNOWN IN THIS PROCESS — no rate table here (no AgentEval dependency, by");
+        Console.WriteLine("            design), and a meter may not invent a rate. The tokens above are the measurement.");
+        Console.ResetColor();
+        Console.WriteLine();
+    }
+
     private static void PrintToolTrace(AgentResponse response, TimeSpan elapsed, string budgetSummary)
     {
         var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
