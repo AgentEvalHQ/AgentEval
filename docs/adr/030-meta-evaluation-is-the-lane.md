@@ -1428,6 +1428,38 @@ Each item fixed a defect that was **shipped and live**.
 
 ### Slice 2 — statistics. ~1 week. BCL-only, zero coupling.
 
+> **✅ 2.1–2.5 SHIPPED 2026-09-06 (Wave 5). ⬜ 2.6 NOT BUILT — it is gated on Q6, which is the
+> user's.** Five new types in `AgentEval.Evals.Meta` (`Observation`, `ExactTests` +
+> `ZeroEventBound`, `ChanceFloor` + `FloorState` + `ArmProfile` + `FloorComparison`, `RepCollapse` +
+> `ObservationUnit`, `PairedComparison` + `PairedEvalComparer`) and one adapter class
+> (`ObservationAdapters`, in `AgentEval.Core` — deliberately **not** in the meta namespace, so the
+> meta lane stays BCL-only). **+51 tests on every TFM (9,648 → 9,699 net10; 9,430 → 9,481 net9/net8),
+> zero existing test files edited, 0 build errors.**
+>
+> ⚠️ **What is NOT built, and what gates it — stated rather than worked around.** **2.6 is the stop
+> rule**, and its acceptance criterion is *"the retrofit deletes the hand-rolled sign test and the
+> per-persona floor loop outright"*. Whether that deletion happens **is Q6**, and Q6 is a preference
+> question marked as the user's in §9. Building 2.6 would be answering it. §9's Q6 box now carries
+> the measurement that was missing — the deletion turns Eval 02's GATE 1 from ✅ 12 of 12 to ❌, under
+> every replacement test considered — so the decision has its evidence; it does not have an answer,
+> and this wave did not invent an acceptance criterion to unblock itself.
+>
+> ⚠️ **Q2's ruling (a) — a separate BCL-only `AgentEval.Meta` project — was NOT executed here, and
+> that is deliberate.** 2.1's acceptance is about the **namespace**, not the assembly: *"the namespace
+> references nothing outside the BCL; the architecture test in §4.6 passes"*, and both hold with the
+> files where they are, inside `AgentEval.Abstractions` (itself BCL-only, zero `PackageReference`).
+> The project extraction is a **packaging** change that edits `src/AgentEval/AgentEval.csproj`, the
+> one shipping package, and §4.1's standing note reserves it: *"moving these files to that project
+> later changes no namespace and therefore no consumer source."* Doing it in the same commit as five
+> new statistical types would have widened the blast radius of a change nothing else needed.
+>
+> ⚠️ **One thing the implementation added that the table does not name, because building it found the
+> need.** `FloorComparison.Compute` **refuses a fractional measured value** rather than rounding it
+> into a success count. That is not defensive tidiness: measured on this repository's own coverage
+> corpus, a per-case rep-mean of 0.778 tested as "2 of 3" reads p = 0.063 (not above) where the
+> correct null reads p = 0.002 (well above) — a per-case verdict flip caused entirely by the
+> rounding. The library refuses the exact substitution §9 Q6's own naive form would have made.
+
 | # | Change | Acceptance criterion | Test |
 |---|---|---|---|
 | 2.1 | `AgentEval.Evals.Meta` over `Observation`: `ExactTests` (5 functions), `RepCollapse` + `PairedEvalComparer`, `ChanceFloor` (5 factories + `NotDerivable`), `ObservationCensus`, `ObservationUnit` | The namespace references nothing outside the BCL; the architecture test in §4.6 passes | `MetaNamespace_HasNoNonBclDependencies()` + `MetaTypes_NeverImplement_IEval()` |

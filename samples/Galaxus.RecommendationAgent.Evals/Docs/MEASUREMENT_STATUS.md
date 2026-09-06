@@ -6437,3 +6437,128 @@ dotnet run --project $E -- 2 --dry-run                | grep    "GATE 1 —"    
 #   stat  = hits / gold.Latent.Count ; p = P(stat >= observed) over 200,000 trials
 #           and the same for the mean of three independent draws
 ```
+
+---
+
+## 45. WAVE 5 — ADR-030 Slice 2 shipped, 2.1 to 2.5. 2.6 is NOT built and Q6 is why (2026-09-06)
+
+Phase 4 was unblocked when Q2 closed. This is what landed, what did not, and what the acceptance
+criteria actually said — because the temptation on an item whose last row has no acceptance criterion
+is to write one.
+
+### 45.1 What shipped
+
+| file | types |
+|---|---|
+| `src/AgentEval.Abstractions/Evals/Meta/Observation.cs` | `Observation` |
+| `src/AgentEval.Abstractions/Evals/Meta/ExactTests.cs` | `ExactTests`, `ZeroEventBound` |
+| `src/AgentEval.Abstractions/Evals/Meta/ChanceFloor.cs` | `FloorState`, `ArmProfile`, `ChanceFloor`, `FloorComparison` |
+| `src/AgentEval.Abstractions/Evals/Meta/RepCollapse.cs` | `RepCollapse`, `ObservationUnit` |
+| `src/AgentEval.Abstractions/Evals/Meta/PairedEvalComparer.cs` | `PairedComparison`, `PairedEvalComparer` |
+| `src/AgentEval.Core/Evals/ObservationAdapters.cs` | `ObservationAdapters` — the three one-way projections |
+
+`MeasurementState` and `ObservationCensus` were already there from Slice 1.
+
+**Tests: +51 on every TFM. net10 9,648 → 9,699 of 9,701; net9 and net8 9,430 → 9,481 of 9,482.
+ZERO existing test files edited** — five new files under `tests/AgentEval.Tests/Evals/Meta/`.
+`dotnet build AgentEval.sln`: 0 errors. `-- 3` and `-- 3 --real-vectors`: exit 0.
+
+### 45.2 ⬜ What was NOT built, and the open question that gates it
+
+**Slice 2.6 — the stop rule.** Its acceptance criterion is *"the retrofit deletes the hand-rolled
+sign test and the per-persona floor loop outright; if it does not, the programme stops there"*.
+
+**Whether that deletion happens IS ADR-030 §9 Q6, and Q6 is the user's.** Building 2.6 would be
+answering it. What this wave did instead is §44: measure the thing Q6 was missing — the deletion
+moves Eval 02's GATE 1 from ✅ 12 of 12 to ❌, under the naive substitution, under a simulated
+one-draw null and under the simulated mean-of-3 null alike. The decision now has its evidence. It
+still does not have an answer, and **no acceptance criterion was invented to unblock the wave.**
+
+### 45.3 Q2's ruling (a) was NOT executed, and that is a declared deferral rather than an oversight
+
+Q2 closed on ruling **(a)**: a separate BCL-only `AgentEval.Meta` project at the bottom of the
+dependency graph. The new types went into `src/AgentEval.Abstractions/Evals/Meta/` instead, keeping
+the namespace `AgentEval.Evals.Meta`.
+
+**Why.** 2.1's acceptance criterion is about the NAMESPACE — *"the namespace references nothing
+outside the BCL; the architecture test in §4.6 passes"* — and both hold where the files are:
+`AgentEval.Abstractions` has zero `PackageReference` entries and the shipped
+`MetaNamespace_HasNoNonBclDependencies` test passes over the six new types. The project extraction is
+a **packaging** change to `src/AgentEval/AgentEval.csproj`, the one shipping package, and ADR-030 §4.1
+already reserves it: *"moving these files to that project later changes no namespace and therefore no
+consumer source."*
+
+**Direction of the risk being avoided:** landing a packaging change nothing else needed, in the same
+commit as five new statistical types, widens the blast radius of a change whose own acceptance did
+not ask for it.
+
+### 45.4 One design decision the ADR's table does NOT name, and building it is what found the need
+
+`FloorComparison.Compute` **throws** on a MEASURED observation whose value is neither 0 nor 1.
+
+A binomial tail is a statement about Bernoulli trials. Handing it a per-case mean and rounding to a
+success count integerises the statistic before testing it — and §44 measured what that costs on this
+repository's own corpus: `USR-PB-11`'s rep-mean of 0.7778, tested as **2 of 3**, reads **p = 0.0629
+(not above)**, where the correct null reads **p = 0.0019 (well above)**. A per-case verdict flip,
+caused entirely by the rounding.
+
+**So the library refuses the exact substitution ADR-030 §9 Q6's own naive form would have made.**
+`RepCollapse` is the sanctioned way to get a 0/1 outcome, and if the quantity is genuinely continuous
+then a binomial tail is the wrong test and `Compute` says so rather than pretending.
+
+### 45.5 The other things the implementation refuses, each with its recorded reason
+
+| what is refused | why, in one line |
+|---|---|
+| `ChanceFloor.NotDerivable(...).Value` — **throws** | an absent floor is not a zero floor; averaging an absence into a mean is how a metric gets condemned at p = 0.70 |
+| `ChanceFloor.UniformChoice(1)` — **NotDerivable**, not 1.0 | one alternative is a question with one answer, and scoring an arm against it says nothing about the arm |
+| `ChanceFloor.Empirical(…, policiesConsidered: 4)` with no `heldOutFrom` — **throws** | *"the best constant policy"* is a MAXIMUM over a family; the recorded instance was a ceiling TYPED as 8 and MEASURED at 10 |
+| an ESTIMATED floor compared against its point value | `ComparisonBar` returns the Clopper-Pearson upper bound instead — comparing an observed rate to a point estimate computed from the same corpus is the co-moving-operands failure |
+| `ExactTests.ZeroEventUpperBound(events: 7, trials: 14)` — **IsApplicable false** | the rule of three holds only at zero events; the recorded defect printed a 34.8% bound beside an observed 50% |
+| `ObservationUnit.Collapse([], …)` — **throws** | an empty rep set is a case that did not run, and 0.0 would score it as a failure |
+| a MEASURED `Observation` carrying NaN — **throws on both the ctor and the `with` path** | the AE-01/AE-08 pattern, copied rather than reinvented |
+| a `PairedEvalComparer` pair with a NotApplicable or NotMeasured side | **excluded and counted**, never tied — scoring an undecidable as a tie is what makes *"no difference found"* out of *"we could not look"* |
+| `MetricResult.Score` compared raw against `EvalScore.Value` | the adapter divides by 100 once, here; a 0..100 arm against a 0..1 arm is a wins table that means nothing and looks entirely plausible |
+| an M.E.AI metric present but carrying **no value** | `NotMeasured`, not 0.0 — an instrument that did not run reported as an arm that failed is the defect this lane exists to prevent |
+
+### 45.6 ⚠️ Reference values were computed OUTSIDE this codebase
+
+Every pinned constant in `ExactTestsTests` came from exact rational arithmetic run separately, not
+from running the implementation and recording what it said. The recorded reason: when this repository
+last added an exact test, **two hand-computed references were wrong** and were caught only because a
+control row compared the implementation against an independent one. A test that asserts an
+implementation against a number its own author derived in their head tests neither.
+
+⚠️ **And one precision cost is DECLARED rather than hidden.** `TwoSidedSignP(8, 18)` is pinned to 12
+decimals, not 15: log-space accumulation returns `0.81452941894531006` where exact rational
+arithmetic gives `0.8145294189453125`, about 2.4e-15 out — roughly two ULPs. That is the price of
+returning a finite p at n = 4,000 where the naive form returns NaN, and it is four orders of
+magnitude below any α anybody compares against. It is on the page because a test loosened without a
+reason is a test somebody loosened until it passed.
+
+### 45.7 What §45 does NOT claim
+
+- **Nothing in the Galaxus sample was migrated onto these types.** That is Slice 2.6 (Eval 02) and
+  Phase 5 (the rest), and 2.6 is Q6's. `ExactBinomial` in the sample still ships and still names
+  itself the migration target.
+- **The meta lane has no consumer inside this repository yet**, which is exactly the objection §9 Q5
+  records against the *controls* lane (*"machinery with one consumer rots in six months"*). Declared,
+  not answered.
+- **`ObservationCensus.ExtremeAndUnexamined` is not wired to anything.** It ships as a predicate; no
+  aggregation reads it.
+- **No renderer was added.** ADR-030 §6.3 records that the library ships no console renderer;
+  `ObservationCensus.RenderMean` and `PairedComparison.Describe` are the whole of what the library
+  offers, and nothing enforces their use.
+
+### 45.8 Commands
+
+```bash
+dotnet build AgentEval.sln                                     # 0 errors
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t; done
+#   net10 9,699/0/2 of 9,701 · net9 and net8 9,481/0/1 of 9,482
+dotnet test tests/AgentEval.Tests -f net10.0 --filter "FullyQualifiedName~AgentEval.Tests.Evals.Meta"
+#   67 passed — 51 new plus Slice 1's 16
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3                 # 0
+dotnet run --project $E -- 3 --real-vectors  # 0
+```
