@@ -882,15 +882,24 @@ number in §§1–21 is superseded by this run** — a dry run measures the plum
 **Logs:** `Docs/runs/2026-09-06_wave1-verify-41cd09a2/` — one file per command plus `EXITCODES.txt`. This
 document is the committed record.
 
-> 🔴 **A claim in this document's own header is FALSE, and it was checked rather than repeated.** The header
-> says the 2026-09-05 log directory *"is gitignored (`.gitignore:458`), deliberately and not by me"*.
-> Measured: `git check-ignore -v` on a file in `Docs/runs/` returns **nothing** — there is no rule for it, and
-> `.gitignore:458` is `samples/AgentEval.MafEvalLightPath/output/`. **Both run directories are untracked and
-> un-ignored**, which is one `git add .` away from committing console logs into a public repository. They were
-> credential-scanned again on 2026-09-06 (32+ char blobs, URLs, `Endpoint`, bearer/api-key patterns) and are
-> clean — the only long tokens are C# identifiers. `.gitignore` was **not** edited here: the header asserts an
-> intent, and making the tree match an asserted intent is a decision for the owner, not a side effect of a run.
-> Filed as plan item **8.24**.
+> ✅ **SETTLED 2026-09-06 (Wave 2). The header's claim was right in substance and the correction filed against
+> it was wrong in its measurement — so both are restated here.** The header said this directory *"is
+> gitignored (`.gitignore:458`), deliberately and not by me"*. `.gitignore:458` was indeed
+> `samples/AgentEval.MafEvalLightPath/output/`, and the correction concluded from one lookup that **"both run
+> directories are untracked AND un-ignored"**. **That is false.** Re-measured over every file:
+> `git check-ignore -v` names `.gitignore`'s global **`*.log`** rule for **53 of the 54** files. Exactly one
+> was exposed — `EXITCODES.txt`, which is not a `.log`.
+>
+> ⚠️ **And the hazard was real precisely there.** On 2026-09-06 a `git add <the eval project directory>`
+> during Wave 2 swept `EXITCODES.txt` into a commit. It was caught and removed before the commit was kept.
+> ⚠️ **Incidental protection that looks total is worse than none:** the next artefact written beside the logs
+> — a `.csv`, a `.json`, a `.md` — inherits no rule at all, and the directory *looks* covered.
+>
+> **Fixed:** `.gitignore` now carries an explicit rule for `samples/Galaxus.RecommendationAgent.Evals/Docs/runs/`,
+> and `git check-ignore` confirms it for **all 54** files. Both directories remain credential-clean (re-scanned
+> 2026-09-05 and 2026-09-06: 32+ char blobs, URLs, `Endpoint`, bearer/api-key patterns; the only long tokens
+> are C# identifiers). Plan item **8.24** is closed — and its lesson is the one this document keeps
+> re-learning: **a single `git check-ignore` on one path is not a measurement of a directory.**
 
 ⚠️ **"33 commands" is the systematic ledger, not the total number of executions.** Six further runs were
 made and are listed under REPEATS AND EXTRAS in `EXITCODES.txt`: the four per-persona `-- 2 --offline` runs
