@@ -44,11 +44,26 @@ nothing in this file is a measured claim about loop versus single agent, and the
 citable has moved from "impossible here" to "not yet run". Eval 02's own bar is unchanged: its
 bound Demo 2 arm is still deterministic and still deliberately outside its sign test.
 
-⚠️ **2026-09-04, evening — the headline pairing above was CONFOUNDED BY k, and §11 re-cuts it.** The
-live run this file's §2–§8 numbers sit beside paired a 5-item control against a live arm that presented
-0–4 items, on a recall metric that is monotone in k. Read §11 before quoting any "single shot vs live"
-figure: at the live arm's own k the direction reverses (live 0.664 vs single shot 0.568, W/L/T 3/6/2,
-p = 0.51), and the question is open rather than answered either way.
+⚠️ **2026-09-04, evening — the headline pairing above was CONFOUNDED BY k.** The live run this file's
+§2–§8 numbers sit beside paired a 5-item control against a live arm that presented 0–4 items, on a
+recall metric that is monotone in k.
+
+> ✅ **CORRECTED 2026-09-06 (Wave 3, plan item 1.1). This banner used to say "and §11 re-cuts it" and
+> then quote a re-cut inline. Both halves were wrong.** §11 is titled *"Eval-lane fixes B-2 / B-10 /
+> B-11 / B-12 / B-19"* and re-cuts nothing; and the figures the banner quoted — *"at the live arm's
+> own k the direction reverses (live 0.664 vs single shot 0.568, W/L/T 3/6/2, p = 0.51)"* — **had no
+> command behind them, were at the arm's OWN k, and are struck by standing rule 5** exactly as the
+> rest of that run's six-arm table is (§2.5.3 of the plan). They are **deleted here rather than
+> retargeted**, because an own-k figure quoted to caution against own-k figures is the defect, not
+> the caution. ⚠️ **Direction of the error: flattering to the live agent** — 0.664 vs 0.568 read as
+> the agent ahead, and it is the only comparison in this file that ever did.
+>
+> **Where the comparable form actually lives, both measured and both with commands:**
+> **§20.5** — the k = 5 panel, offline, both spaces, every arm legal at k = 5 (its live column is a
+> stub and says so). **§27.4 and `SUITE_SUMMARY` §23.3** — the PAID run at declared k = 5,
+> 2026-09-06: 36 live turns, ¤27.1208, GATE 1 12 of 12, GATE 2 passed, **0 pairs NOT COMPARABLE**.
+> Its answer is a tie, in the other direction: **single shot is 0.014 behind on recall at p = 1.0000**
+> and the agent is *behind* it on cross-persona forced choice, 0.556 vs 0.583.
 
 **Two things got WORSE, and they are reported here rather than found later.**
 
@@ -228,8 +243,15 @@ and then measured rather than adjusted until the rows went green.
 
 ⚠️ **k-BLIND — every cell below is at the arm's OWN presentation count** (controls 5, Demo 2's loop 7–12,
 the live agent 0–4 on the paid run). They may be read against their own floors and may NOT be read
-against each other. The comparable form of this table — every arm cut to the one declared k = 5, with a
-precision channel beside recall — is §11.2, and the fair reading of the paid run is §11.3.
+against each other. ~~The comparable form of this table — every arm cut to the one declared k = 5, with a
+precision channel beside recall — is §11.2, and the fair reading of the paid run is §11.3.~~
+
+> ✅ **CORRECTED 2026-09-06 (Wave 3, plan item 1.1) — both pointers landed on the wrong section.**
+> §11.2 is *"Numbers that moved"* and §11.3 is *"Verdicts that did NOT move, though their rendering
+> did"*; neither is a k = 5 recut. **The comparable form of this table is §20.5** (offline, both
+> spaces, every arm legal at k = 5, live column a declared stub), **and the fair reading of a paid
+> run is §27.4** — which did not exist when this line was written and does now: 36 live turns at
+> declared k = 5, **0 pairs NOT COMPARABLE**.
 
 Live arm shown from `--dry-run` (stub model, not a result — it is there to show the plumbing ran):
 
@@ -4513,4 +4535,80 @@ value is unchanged at 0.012** and both gating rows that assert it are untouched.
 
 ```bash
 dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3   # exit 0; the row is advisory
+```
+
+---
+
+## 30. WAVE 3 — PHASE 1: the dangling §11 pointers (1.1) and `rate > floor` (1.4) (2026-09-06)
+
+### 30.1 · 1.1 — three pointers landed on the wrong section, and the banner quoted a figure with no command
+
+**V-1's acceptance was *"the file contains no un-sourced comparative figure; every surviving figure names
+its command"*.** Three *"§11 re-cuts it"* pointers resolved to a section titled **"Eval-lane fixes B-2 /
+B-10 / B-11 / B-12 / B-19"**, which re-cuts nothing; and the banner at §1 quoted the re-cut **inline** —
+*"live 0.664 vs single shot 0.568, W/L/T 3/6/2, p = 0.51"* — with no command behind it, at the live arm's
+**own k**, in a banner whose entire subject is that own-k figures are confounded.
+
+| | superseded | corrected |
+|---|---|---|
+| §1 banner | *"and §11 re-cuts it"* + the four inline figures | figures **deleted**; struck by standing rule 5 with the rest of that run's six-arm table |
+| §2.3 pointer | *"the comparable form … is §11.2, and the fair reading of the paid run is §11.3"* | **§20.5** (offline k = 5 panel, both spaces) and **§27.4** (the PAID run at declared k = 5) |
+
+⚠️ **Direction of the error: flattering to the live agent.** 0.664 vs 0.568 read as the agent ahead, and
+it is the only comparison in this file that ever did. The measured replacement says the opposite: at
+declared k = 5 with **0 pairs NOT COMPARABLE**, single shot is 0.014 behind on recall at **p = 1.0000**
+and the agent is *behind* on cross-persona forced choice, 0.556 vs 0.583.
+
+### 30.2 · 1.4 — "above chance" is now a TEST
+
+`EvalPrinter.cs`'s `bool above = … rate > floor` is replaced by an exact one-sided binomial upper tail
+at α = 0.05, in **one** method — `ExactBinomial.AboveChance` — that all three decision sites call:
+`PrintForcedChoice`, `InstrumentCaveat`, and Eval 03's `LatentCoveragePersonaDiscrimination`. Two copies
+of the rule is how `rate > floor` survived in four places at once.
+
+**At n = 12 against the shipped 1/12 forced-choice floor** (reference values computed independently, and
+pinned in the control to 1e-6):
+
+| observed | old rule | exact upper-tail p | now |
+|---|---|---|---|
+| 2 of 12 | ▲ | **0.26400914** | ▼ |
+| 3 of 12 | ▲ | **0.07201153** | ▼ |
+| **4 of 12** | ▲ | **0.01383043** | **▲ — the boundary** |
+| 7 of 12 | ▲ | 0.00001515 | ▲ |
+| 0 of 12 | ▼ | 1.0 | ▼ |
+| 0 trials | — | **NaN** | not a verdict |
+
+**Proven failing-then-passing by ablation, executed.** Restoring `rate > floor` inside
+`AboveChance` — so the ablation reaches the shipped decision path and not a copy — turns the new gating
+row `AboveChanceIsAnExactTest` **red with exactly the two faults it names** (*"2 of 12 … came back ABOVE
+chance (p = 0.2640)"*, *"3 of 12 … (p = 0.0720)"*) and `-- 3` to **exit 1**. Restored: **exit 0**.
+
+**Three things declared, because two of them are unflattering.**
+
+1. ⚠️ **No shipped number moves today.** The plan's acceptance names 2/12 and 3/12, and **no arm on the
+   current corpus sits at either** — the paid run's forced choice is 0.556 (agent) and 0.583 (control)
+   over 12, both far above chance under either rule. **The fix is preventive**, and the control is what
+   demonstrates it, not a moved verdict. What *does* change in printed output: every forced-choice row
+   now carries its p-value, and the panel carries the multiplicity caveat below.
+2. ⚠️ **No multiplicity correction is applied.** Five arms tested against one floor at α = 0.05 is a
+   family-wise error rate of ≈ **0.23**. It is printed under the panel rather than corrected, because
+   the correction belongs with ADR-030 Slice 2.3's `ExactTests` and not in a printer.
+3. ⚠️ **A second defect was found on the way in and fixed with it.** The success count fed to the test
+   was `(int)Math.Round(rate * n)`, and a forced-choice outcome can be **fractional** — the stub panel
+   shows an arm at 0.042 = 0.5/12. Banker's rounding sent 0.5 **down** and would have sent 1.5 **up**,
+   so half a win could have become a whole one on the way into a significance test. It is now
+   `Math.Floor`, which is the conservative direction and is stated at the call site.
+
+**Migration target named, not assumed:** `ExactBinomial` is deleted when ADR-030 Slice 2.3 lands and its
+callers move to the library's `ExactTests` — the same arrangement `CalibratedThresholds` already declares
+for `ChanceFloor.Empirical`.
+
+### 30.3 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3              # exit 0 · 23 gating all caught + 5 advisory
+dotnet run --project $E -- 2 --dry-run    # exit 0 · the forced-choice panel now prints p per arm
+dotnet run --project $E -- --ci --dry-run # exit 0
+dotnet run --project $E -- 7              # exit 1 (GATE B, §28) — unchanged
 ```

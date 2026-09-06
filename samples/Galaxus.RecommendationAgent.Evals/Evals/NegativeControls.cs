@@ -110,6 +110,7 @@ public static class NegativeControls
         rows.Add(Guarded("RefusalCodesDoNotAnswerForEachOther", CheckRefusalCodesDoNotAnswerForEachOther));
         rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
         rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
+        rows.Add(Guarded("AboveChanceIsAnExactTest", CheckAboveChanceIsAnExactTest));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
@@ -1069,7 +1070,10 @@ public static class NegativeControls
         }
 
         double rate = decided == 0 ? double.NaN : wins / (double)decided;
-        bool aboveChance = !double.IsNaN(rate) && !double.IsNaN(floor) && rate > floor;
+
+        // ⚠ 1.4 / N-4 — the SAME exact test the forced-choice panel prints, through the SAME
+        //   method. `rate > floor` here said the oracle discriminates on 2 of 12 (p = 0.264).
+        var (aboveChance, chanceP) = ExactBinomial.AboveChance(wins, decided, floor);
 
         // Which personas share a latent-gold set, because that is the corpus fact behind a tie.
         var collisions = golds
@@ -1083,9 +1087,11 @@ public static class NegativeControls
             "LatentCoveragePersonaDiscrimination",
             $"the tag-join ORACLE — the arm that derives from the gold and therefore ceilings what this metric "
           + $"can possibly discriminate — should identify the customer its own answer was built for on MORE than "
-          + $"the {Format(floor)} chance rate (1/{scorable}). If it cannot, latent coverage carries no evidence "
-          + "about personalisation and no Eval 02 comparison between architectures means anything.",
+          + $"the {Format(floor)} chance rate (1/{scorable}) — judged by an EXACT one-sided binomial at p ≤ "
+          + $"{ExactBinomial.Alpha:0.00}, never by rate > chance (plan 1.4 / N-4). If it cannot, latent coverage "
+          + "carries no evidence about personalisation and no Eval 02 comparison between architectures means anything.",
             $"oracle forced choice {Format(rate)} ({wins} of {decided}) vs chance {Format(floor)} · "
+          + $"{ExactBinomial.FormatP(chanceP)} · "
           + string.Join(" · ", lines)
           + (collisions.Count > 0
                 ? " · ⚠ IDENTICAL GOLD SETS, so a strict win is impossible for either: " + string.Join(" ; ", collisions)
@@ -3004,6 +3010,98 @@ public static class NegativeControls
             observed,
             Tripped: true,
             Gating: false);
+    }
+
+    // == 1.4 / N-4 -- "above chance" must be a TEST, not a comparison. ====================
+    //
+    /// <summary>
+    /// Proves the suite's one "is this above chance?" decision is an exact one-sided binomial, at
+    /// the sizes this corpus actually has, and that the OLD rule would have answered differently.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It tests the shipped decision, not a copy of it.</b> Every ▲ in the forced-choice panel,
+    /// the instrument caveat's "arms that beat chance" count, and the oracle-discrimination row all
+    /// route through <see cref="ExactBinomial.AboveChance"/>; this row calls the same method. A row
+    /// that re-implemented the test would certify its own arithmetic and nothing else — the
+    /// co-derived-operand shape this panel already has two entries about.
+    /// </para>
+    /// <para>
+    /// <b>Both directions, and the counterfactual is part of the assertion.</b> The row fails if
+    /// 2 of 12 or 3 of 12 at a 1/12 floor come back ABOVE chance, and it also fails if 7 of 12 does
+    /// not — a test that refused everything would pass a one-sided check and be worthless. It
+    /// additionally records that <c>rate &gt; floor</c> says YES to all three, so the two ticks this
+    /// change removes are visible in the report rather than only in a commit message.
+    /// </para>
+    /// <para>
+    /// <b>And the arithmetic is pinned against a reference, not against itself.</b> The three
+    /// p-values are checked to 1e-4 against values computed independently from the binomial upper
+    /// tail (R: <c>binom.test(x, 12, 1/12, alternative = "greater")</c>).
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckAboveChanceIsAnExactTest()
+    {
+        var problems = new List<string>();
+        const double floor = 1.0 / 12.0;
+
+        var two   = ExactBinomial.AboveChance(2, 12, floor);
+        var three = ExactBinomial.AboveChance(3, 12, floor);
+        var seven = ExactBinomial.AboveChance(7, 12, floor);
+
+        // ── the two ticks this change removes ──
+        if (two.Above)
+            problems.Add($"2 of 12 against a 1/12 floor came back ABOVE chance ({ExactBinomial.FormatP(two.P)}) — that is the defect, not the fix.");
+        if (three.Above)
+            problems.Add($"3 of 12 against a 1/12 floor came back ABOVE chance ({ExactBinomial.FormatP(three.P)}).");
+
+        // ── and the tick it must KEEP, or the test refuses everything ──
+        if (!seven.Above)
+            problems.Add($"7 of 12 against a 1/12 floor did NOT come back above chance ({ExactBinomial.FormatP(seven.P)}) — a test that says no to everything is not a test.");
+
+        // ── the reference values, so the arithmetic is not certified by itself ──
+        if (Math.Abs(two.P   - 0.26400914) > 1e-6) problems.Add($"P(X>=2 | n=12, p=1/12) is {two.P:0.00000000}, reference 0.26400914.");
+        if (Math.Abs(three.P - 0.07201153) > 1e-6) problems.Add($"P(X>=3 | n=12, p=1/12) is {three.P:0.00000000}, reference 0.07201153.");
+        if (Math.Abs(seven.P - 0.00001515) > 1e-8) problems.Add($"P(X>=7 | n=12, p=1/12) is {seven.P:0.00000000}, reference 0.00001515.");
+
+        // ── the BOUNDARY, so the test is not merely refusing everything below 7 ──
+        //
+        // 4 of 12 is the smallest observation this floor admits: p = 0.01383 < 0.05, where 3 of 12
+        // is 0.07201 > 0.05. Pinning the PAIR pins the decision edge, which "refuses 3, accepts 7"
+        // on its own does not.
+        var four = ExactBinomial.AboveChance(4, 12, floor);
+        if (!four.Above)
+            problems.Add($"4 of 12 was refused ({ExactBinomial.FormatP(four.P)}) — the cut sits above its own boundary.");
+        if (Math.Abs(four.P - 0.01383043) > 1e-6)
+            problems.Add($"P(X>=4 | n=12, p=1/12) is {four.P:0.00000000}, reference 0.01383043.");
+
+        // ── the edges an empty denominator produces, because this suite meets them ──
+        if (!double.IsNaN(ExactBinomial.UpperTailP(0, 0, floor)))
+            problems.Add("zero trials returned a number — an empty denominator is not a result.");
+        if (ExactBinomial.AboveChance(0, 12, floor).Above)
+            problems.Add("an arm that scored NOTHING came back above chance.");
+
+        // ── and it must not have become monotone in the wrong direction ──
+        if (ExactBinomial.UpperTailP(3, 12, floor) > ExactBinomial.UpperTailP(2, 12, floor))
+            problems.Add("the upper tail grew with the observation — the test is inverted.");
+
+        bool oldRuleSaysYesToAll = (2.0 / 12.0 > floor) && (3.0 / 12.0 > floor) && (7.0 / 12.0 > floor);
+
+        return new ControlRowSnapshot(
+            "AboveChanceIsAnExactTest",
+            "every \u25b2 in this suite must come from an EXACT one-sided binomial upper tail at p \u2264 "
+          + $"{ExactBinomial.Alpha:0.00}, through the one method the printer calls. At n = 12 against a 1/12 "
+          + "floor that must REFUSE 2 of 12 and 3 of 12 and ACCEPT 7 of 12 \u2014 a rule that refuses everything "
+          + "passes a one-sided check and measures nothing. The three p-values are pinned against an "
+          + "independent reference, and zero trials must give NaN rather than a verdict",
+            problems.Count == 0
+                ? $"2 of 12 {ExactBinomial.FormatP(two.P)} \u25bc \u00b7 3 of 12 {ExactBinomial.FormatP(three.P)} \u25bc \u00b7 "
+                + $"4 of 12 {ExactBinomial.FormatP(four.P)} \u25b2 (the boundary) \u00b7 "
+                + $"7 of 12 {ExactBinomial.FormatP(seven.P)} \u25b2 \u00b7 0 trials \u2192 NaN \u00b7 0 of 12 \u25bc \u00b7 "
+                + $"the OLD rule (rate > floor) said \u25b2 to all three: {oldRuleSaysYesToAll} \u2014 so this change "
+                + "removes exactly two unearned ticks and keeps the earned one. \u26a0 No multiplicity correction: "
+                + "five arms at 0.05 is a family-wise error rate of \u2248 0.23"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
     }
 
     private static async Task<ControlRowSnapshot> CheckRefusalDetectorsSeeTheRealShapeAsync()

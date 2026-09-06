@@ -311,13 +311,22 @@ public static class EvalPrinter
 
         if (!double.IsNaN(chance))
         {
+            // ⚠ 1.4 / N-4 — the SAME exact test the panel prints, through the same method. Two
+            //   copies of "above chance" is how `rate > floor` survived in four places.
             var above = report.Arms
-                .Where(a => report.ForcedChoiceCount(a) > 0 && report.ForcedChoiceRate(a) > chance)
+                .Where(a =>
+                {
+                    int n = report.ForcedChoiceCount(a);
+                    if (n <= 0) return false;
+                    double r = report.ForcedChoiceRate(a);
+                    if (double.IsNaN(r)) return false;
+                    return ExactBinomial.AboveChance((int)Math.Floor((r * n) + 1e-9), n, chance).Above;   // floor: see PrintForcedChoice
+                })
                 .ToList();
 
             lines.Add(above.Count == 0
-                ? $"NO arm beats the forced-choice chance rate of {chance:F3}. Nothing here is evidence about personalisation."
-                : $"{above.Count} of {report.Arms.Count} arms beat the forced-choice chance rate of {chance:F3}: "
+                ? $"NO arm beats the forced-choice chance rate of {chance:F3} at an exact one-sided p ≤ 0.05. Nothing here is evidence about personalisation."
+                : $"{above.Count} of {report.Arms.Count} arms beat the forced-choice chance rate of {chance:F3} (exact one-sided p ≤ 0.05): "
                   + string.Join(", ", above.Select(a => $"{ShortArm(a)} {report.ForcedChoiceRate(a):F3}")) + ".");
         }
 
@@ -801,17 +810,34 @@ public static class EvalPrinter
         Console.ResetColor();
         Divider();
 
+        // ⚠ 1.4 / N-4 — an EXACT one-sided binomial, never `rate > floor`. At n = 12 against a
+        //   1/12 floor the old rule printed ▲ over 2 of 12 (p = 0.264) and 3 of 12 (p = 0.070).
+        //   The decision routes through ExactBinomial.AboveChance so the control row can test THIS
+        //   code path rather than a paraphrase of it.
         foreach (string arm in report.Arms)
         {
             double rate = report.ForcedChoiceRate(arm);
             int n = report.ForcedChoiceCount(arm);
-            bool above = !double.IsNaN(rate) && !double.IsNaN(floor) && rate > floor;
+            // ⚠ FLOOR, not round. A forced-choice outcome can be fractional — the shipped stub
+            //   panel shows an arm at 0.042 = 0.5/12 — and a binomial success count cannot be. The
+            //   conservative integerisation is downward: half a win must not become a whole one on
+            //   the way into a significance test. `Math.Round` was worse than wrong here, it was
+            //   arbitrary: banker's rounding sent 0.5 down and 1.5 up.
+            int wins = double.IsNaN(rate) ? 0 : (int)Math.Floor((rate * n) + 1e-9);
+            var (above, p) = ExactBinomial.AboveChance(wins, n, floor);
 
             Console.ForegroundColor = above ? ConsoleColor.Green : ConsoleColor.Yellow;
-            ContentRow($"  {(above ? "▲" : "▼")} {Fit(arm, 30)} {Format(rate)}  "
-                     + $"({(int)Math.Round(rate * n)} of {n})   chance {Format(floor)}");
+            ContentRow($"  {(above ? "▲" : "▼")} {Fit(arm, 26)} {Format(rate)}  "
+                     + $"({wins} of {n})  chance {Format(floor)}  {ExactBinomial.FormatP(p)}");
             Console.ResetColor();
         }
+
+        Divider();
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        ContentRow("  ▲ means an EXACT one-sided binomial upper tail at or below 0.05, not rate > chance.");
+        ContentRow("  No multiplicity correction is applied across the arms in this panel — with five");
+        ContentRow("  arms at 0.05 the family-wise error rate is ≈ 0.23, so read one ▲ accordingly.");
+        Console.ResetColor();
 
         BottomBorder();
         Console.WriteLine();
