@@ -1326,7 +1326,7 @@ Nothing here is invented for packs alone — every item is an existing gap with 
 
 | # | Addition | Where | Why it is not pack-specific |
 |---|---|---|---|
-| **C1** | `IEvalRegistry` — `Key → IEval`, `[ModuleInitializer]` self-registration, content-equality-idempotent `Register`, `TryGet`, `All`, `internal Reset()` | `AgentEval.Core` | Copies `BenchmarkFamilyRegistry` verbatim. First deliverable is **deleting** the 40-entry hand-authored dictionary at `BenchAgenticCalibrateCommand.cs:267` and pointing `CalibrationRunner`'s existing `Func<string, IEval?>` at it |
+| **C1** | ✅ **SHIPPED 2026-09-07** — `IEvalRegistry` / `EvalRegistry` / `EvalRegistration`, `[ModuleInitializer]` self-registration, content-equality-idempotent `Register`, `TryGet`, `All`, `Resolve`, `internal Reset()`. 🔴 **THE SIGNATURE THIS ROW FILED IS REFUTED — see the correction below the table.** | `AgentEval.Core` | Copies `BenchmarkFamilyRegistry`'s *mechanism*, not its row-text. First deliverable **done**: the 40-entry hand-authored dictionary at `BenchAgenticCalibrateCommand.cs:267` is deleted and `CalibrationRunner`'s existing `Func<string, IEval?>` resolves through the registry |
 | **C2** | `EvalConstructionContext` + `Func<EvalConstructionContext, IEval>` registrations declaring their required members | `AgentEval.Abstractions` | Solves the problem that dictionary's own comment concedes — `ProhibitedActionsEval` is a SKIPPED shim because the table cannot supply an `IPolicyResolver` |
 | **C3** | Move `EvaluatorCardRegistry` out of Mission Control | `AgentEval.Core` | 60 cards already carry `defaultThreshold`/`costTier`/`expectedInputs`; the CLI cannot reach them today |
 | **C4** | `EvalScore.ChanceFloor`, `EvalScore.Applicable`, label `"inapplicable"` | `AgentEval.Abstractions` | ADR-030 / AE-05. Two nullable init-only properties and a string constant |
@@ -1337,6 +1337,32 @@ Nothing here is invented for packs alone — every item is an existing gap with 
 | **C9** | `PackLayout`, `PackManifest`, `PackLoader`, `PackHasher`, `PackRunner`, `IPackHost` | `AgentEval.Core` / `.DataLoaders` | the genuinely new surface |
 | **C10** | `RunSummary.Cost` actually populated; `RunStats.Inapplicable` | `AgentEval.Core` | `RunCostInfo` exists and is constructed by nothing — cost is null in all 46 shipped summaries |
 | **C11** | `SaveBaselineAsync(SubjectIdentity, PackBaseline, CT)` overload | `IOutputStore` | fills the `baselines/` slot that is empty on every subject on disk |
+
+#### 🔴 C1's signature was WRONG AS FILED. Superseded → corrected, 2026-09-07
+
+| | |
+|---|---|
+| **Superseded (what this row said)** | `IEvalRegistry` — **`Key → IEval`** |
+| **Corrected (what shipped)** | **`Key → Func<IEvaluator?, string?, IEval>`** — a registry of **factories**, carried on an `EvalRegistration` (key + declared `EvalType` + factory + owning assembly), with the judge supplied at **resolution** time via `Resolve(key, judge, judgeModel)` |
+| **Why the filed signature cannot work** | All 40 entries of the dictionary C1 names as its first deliverable are `new XEval(judge, judgeModel: judgeModelName)`. The judge is resolved from the environment when the command runs, so at `[ModuleInitializer]` time — which the same row prescribes — **there is nothing to register**. A `Key → IEval` registry would have to be populated by the CLI at run time, which is the hand-authored dictionary again under a new name |
+| **The ADR's own model contradicted it** | `BenchmarkFamilyRegistry`, which C1 says to *"copy verbatim"*, is **itself a factory registry**: `Func<string, IEvaluator?, CompositeEval>? CompositeFactory` (`BenchmarkFamilyRegistry.cs:144`). Copying the mechanism gives the corrected signature; copying the row-text does not |
+| **Direction of the error** | **Understated the work.** The row reads as a one-line move of an existing dictionary. It is a shape change — the entries had to become deferred constructions and the consumer had to grow a per-run instance cache to keep "one evaluator instance per key per run", which the eager dictionary gave for free |
+| **Blast radius** | This row, and anything quoting `Key → IEval`. No other ADR-031 item depends on the signature: C2 (`EvalConstructionContext`) is the *next* widening of the same factory parameter list and is **unaffected in kind** — it replaces `(IEvaluator?, string?)` with a context object when a registration needs an `IPolicyResolver`. Nothing on disk moves; the registry is in-memory only |
+| **Falsifiable** | `grep -c 'Key → IEval' docs/adr/031-eval-packs-ship-reduced.md` finds it only inside this correction. `EvalRegistryTests.Resolve_PassesTheJudgeAndJudgeModelToTheFactory` fails the moment the judge stops being a resolution-time argument, and `AgenticEvalRegistrationTests.RegisterInto_RegistersExactlyTheFortyDispatchedKeys` fails on any change to the 40 keys |
+
+**Derivation:** `MEASUREMENT_STATUS` §67.6 (the refutation) and §70.1 (the build).
+
+⚠️ **C2 is NOT closed by this.** The dictionary's own comment conceded that `ProhibitedActionsEval`
+cannot be dispatched because the table cannot supply an `IPolicyResolver`. That is still true, and
+the shipped registrar still does not register it — the count is 40, not 41. What changed is only
+that the missing capability is now a missing *factory parameter* rather than a missing dictionary
+entry. ⚠️ And a stale sentence was found while moving the table: the dictionary's comment claimed
+`ProhibitedActionsEval` *"is dispatched via a no-op IEval shim that returns SKIPPED — keeping the
+11-Safety count for routing tests"*. **No such shim exists.** `grep -inc prohibited` over the file
+as it stood at `acd7ab32` returns **1**, and that one hit **is the comment itself** — there is no
+`prohibited_actions` key, no shim type, and no entry in the 20-key carve-out list either. The 11
+Safety keys are 11 real evaluators and `prohibited_actions` was simply absent, from both the
+dispatch table and the declared omissions. The claim was not carried over into the registrar.
 
 ### 8.4 Exit codes
 
