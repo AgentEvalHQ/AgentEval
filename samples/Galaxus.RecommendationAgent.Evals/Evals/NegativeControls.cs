@@ -2,8 +2,11 @@
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using AgentEval.MAF;
+using Microsoft.Extensions.AI;                 // AIFunctionFactory — the REAL marshalling path, control 22
+using Galaxus.RecommendationAgent.Guardrails;  // ToolSurfaceInvariant.BehaviouralHistoryToolNames
 using Galaxus.RecommendationAgent.Retrieval;   // EmbeddingSpace — the ONE place the space is chosen
 using Galaxus.RecommendationAgent.Signals;     // InterestMapBuilder.ContextPhrases
+using Galaxus.RecommendationAgent.Tools;       // GalaxusTools, ToolRefusalCodes — control 22 invokes the real tool
 using Galaxus.RecommendationAgent.Workflows;   // DiscoveryInterestMapping.QueryTermsFor — arm D's input
 
 namespace Galaxus.RecommendationAgent.Evals;
@@ -100,6 +103,7 @@ public static class NegativeControls
         rows.Add(CheckJudgeEchoJoins());
         rows.Add(CheckContentlessRequestIsNotCovered());
         rows.Add(CheckUnnameableInterestPresentsNothing());
+        rows.Add(await CheckRefusalDetectorsSeeTheRealShapeAsync().ConfigureAwait(false));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -2443,8 +2447,15 @@ public static class NegativeControls
             problems.Add("nothing was recorded on the coverage row to say WHY no query was written — the refusal is silent.");
 
         // ── The thresholds have NOT moved. ──
-        if (DiscoveryState.MinCandidateScore != 0.012)
-            problems.Add($"MinCandidateScore is {DiscoveryState.MinCandidateScore}, not 0.012 — a threshold moved to paper over the gate.");
+        //
+        // ⚠ READ THROUGH A LOCAL, deliberately. `DiscoveryState.MinCandidateScore` is a `const`, so
+        //   comparing it inline made the whole clause compile-time unreachable (CS0162,
+        //   MEASUREMENT_STATUS §24.7 item 3). The assertion still fires the moment the constant
+        //   changes — that is the point of it — but a warning that says "this code cannot run" on a
+        //   control is the last sentence anyone should have to argue with.
+        double minCandidateScore = DiscoveryState.MinCandidateScore;
+        if (minCandidateScore != 0.012)
+            problems.Add($"MinCandidateScore is {minCandidateScore}, not 0.012 — a threshold moved to paper over the gate.");
         if (Math.Abs(HybridRetriever.DefaultDenseScoreFloor - CalibratedThresholds.PreCalibration.DenseScoreFloor) > 1e-9)
             problems.Add("the pre-calibration dense floor no longer equals the value the transport rule is anchored to.");
 
@@ -2634,8 +2645,9 @@ public static class NegativeControls
 
         // ── The thresholds have NOT moved. Same assertion as the row above, for the same reason:
         //    this defect has an available "fix" that consists of raising a calibrated number. ──
-        if (DiscoveryState.MinCandidateScore != 0.012)
-            problems.Add($"MinCandidateScore is {DiscoveryState.MinCandidateScore}, not 0.012 — a threshold moved to paper over the tray.");
+        double minCandidateScore = DiscoveryState.MinCandidateScore;   // via a local: see control 20's note on CS0162
+        if (minCandidateScore != 0.012)
+            problems.Add($"MinCandidateScore is {minCandidateScore}, not 0.012 — a threshold moved to paper over the tray.");
 
         return new ControlRowSnapshot(
             "UnnameableInterestPresentsNothing",
@@ -2652,6 +2664,216 @@ public static class NegativeControls
                 + $"FinalAnswer {contentless.FinalAnswer.Length} char(s) · the SAME two candidates on an interest that "
                 + $"names something → {naming.Ranked.Count} survive, {naming.Presented.Count} presented, "
                 + $"{naming.FinalAnswer.Length} char(s) · MinCandidateScore still {DiscoveryState.MinCandidateScore:0.000}"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 22 — the refusal detectors could not fire on the live shape (plan items 8.14/8.7). ══
+    //
+    /// <summary>
+    /// The tool-layer refusal detectors must read the shape the LIVE harness records, not the shape
+    /// a hand-built control produces.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> <c>Eval01.DetectOptOutBackstop</c> and <c>Eval06.HasBudgetRefusal</c> both
+    /// tested <c>call.Result is string json</c>. <c>AIFunctionFactory.Create</c> marshals a
+    /// <c>Task&lt;string&gt;</c> tool's return value through <c>JsonSerializer</c>, so the object
+    /// that reaches <c>FunctionResultContent.Result</c> — and from there
+    /// <c>ToolCallRecord.Result</c> — is a <c>JsonElement</c>. Neither detector could return true on
+    /// a live turn, ever. Eval 01 printed <i>"the tool-layer backstop was never exercised this
+    /// turn"</i> on the 2026-09-05 opt-out case and <c>SUITE_SUMMARY</c> §4 left it open as
+    /// <i>"either a containment hole or a blind detector"</i>. This row settles it as the blind
+    /// detector, and it settles it by RUNNING the marshalling rather than by reasoning about it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This is why the row invokes the real AIFunction.</b> Every scripted control in this
+    /// panel builds its <c>FunctionResultContent</c> by hand, and a hand-built result is a
+    /// <c>string</c> — so the stub was kinder than the model in exactly the sense
+    /// <c>RUN_PROTOCOL.md</c> names, and no control built that way could have caught this. It costs
+    /// nothing: the tool is deterministic, reads the in-memory catalogue and calls no model.
+    /// </para>
+    /// <para>
+    /// <b>Both directions.</b> The refusal must be FOUND in the marshalled shape, an ordinary
+    /// successful result must NOT be mistaken for a refusal, and the detector must not fall back to
+    /// matching the ARGUMENTS — a refusal code echoed into a query is not the architecture refusing
+    /// anything.
+    /// </para>
+    /// </remarks>
+    private static async Task<ControlRowSnapshot> CheckRefusalDetectorsSeeTheRealShapeAsync()
+    {
+        var problems = new List<string>();
+        string shape;
+
+        var opted = UserProfiles.Require(Personas.NadiaUserId).WithPersonalization(false);
+        GalaxusTools.ClearProfileOverrides();
+        GalaxusTools.OverrideProfile(opted);
+
+        object? refusal;
+        object? ordinary;
+        try
+        {
+            // The REAL function object the agent is built from — RecommendationAgentFactory.cs:148
+            // creates it exactly this way.
+            var interestMap = AIFunctionFactory.Create(GalaxusTools.GetInterestMap);
+            refusal = await interestMap.InvokeAsync(new AIFunctionArguments { ["userId"] = opted.Id })
+                                       .ConfigureAwait(false);
+
+            GalaxusTools.ClearProfileOverrides();
+            ordinary = await interestMap.InvokeAsync(new AIFunctionArguments { ["userId"] = Personas.NadiaUserId })
+                                        .ConfigureAwait(false);
+        }
+        finally
+        {
+            GalaxusTools.ClearProfileOverrides();
+        }
+
+        shape = refusal?.GetType().Name ?? "(null)";
+
+        // ── 1. The shape itself. If this ever becomes a string the detectors are no longer being
+        //       tested against anything, and the row must say so rather than quietly passing. ──
+        if (refusal is string)
+        {
+            problems.Add("the marshalled tool result is a string — the shape this row exists to pin has changed, so "
+                       + "the assertions below no longer distinguish the fixed detector from the broken one.");
+        }
+
+        // ── 2. The OLD detector, spelled out here, must FAIL on that shape. This is the row's
+        //       negative control: it proves the new one is doing work rather than agreeing. ──
+        static bool OldDetector(object? result, string code) =>
+            result is string json && json.Contains(code, StringComparison.Ordinal);
+
+        if (OldDetector(refusal, ToolRefusalCodes.PersonalizationDisabled))
+        {
+            problems.Add("the `Result is string` test SUCCEEDS on the marshalled refusal — this row is not exercising "
+                       + "the defect it was written for.");
+        }
+
+        // ── 3. The shipped detector must find it. ──
+        string rendered = ToolResultText.Of(refusal);
+        if (!rendered.Contains(ToolRefusalCodes.PersonalizationDisabled, StringComparison.Ordinal))
+        {
+            problems.Add($"the opt-out refusal is invisible to the detector on a {shape} result — it rendered "
+                       + $"\"{Shorten(rendered, 60)}\". Eval 01 would print \"the tool-layer backstop was never "
+                       + "exercised this turn\" for a refusal that did fire.");
+        }
+
+        // ── 4. …and must not report a refusal for a result that is not one. ──
+        string ordinaryText = ToolResultText.Of(ordinary);
+        if (ordinaryText.Contains(ToolRefusalCodes.PersonalizationDisabled, StringComparison.Ordinal))
+            problems.Add("an ORDINARY interest-map result reads as a refusal — the detector says yes to everything.");
+        if (ordinaryText.Length == 0)
+            problems.Add("an ordinary result rendered to nothing, so the negative direction above is vacuous.");
+
+        // ── 5. Through the trace-level API, on records shaped like the live ones, both ways. ──
+        static ToolUsageReport Trace(params ToolCallRecord[] calls)
+        {
+            var report = new ToolUsageReport();
+            foreach (var call in calls) report.AddCall(call);
+            return report;
+        }
+
+        static ToolCallRecord Call(string name, object? result, IDictionary<string, object?>? arguments = null) =>
+            new() { Name = name, CallId = $"call-{name}", Arguments = arguments, Result = result, WasExecuted = true };
+
+        var live = Trace(
+            Call(nameof(GalaxusTools.GetUserProfile), ordinary),
+            Call(nameof(GalaxusTools.GetInterestMap), refusal));
+
+        if (!ToolResultText.AnyResultContains(live, ToolRefusalCodes.PersonalizationDisabled))
+            problems.Add("AnyResultContains missed the refusal in a two-call trace shaped like a live one.");
+
+        var clean = Trace(Call(nameof(GalaxusTools.GetInterestMap), ordinary));
+        if (ToolResultText.AnyResultContains(clean, ToolRefusalCodes.PersonalizationDisabled))
+            problems.Add("AnyResultContains reported a refusal in a trace that contains none.");
+
+        // ── 6. RESULTS only. A refusal code the model echoed into a QUERY is not the architecture
+        //       refusing anything, and counting it would let the agent trip its own backstop. ──
+        var echoed = Trace(Call(
+            nameof(GalaxusTools.SearchProductsByMeaning),
+            ordinary,
+            new Dictionary<string, object?>(StringComparer.Ordinal) { ["query"] = ToolRefusalCodes.PersonalizationDisabled }));
+        if (ToolResultText.AnyResultContains(echoed, ToolRefusalCodes.PersonalizationDisabled))
+        {
+            problems.Add("a refusal code echoed into a tool ARGUMENT was counted as the tool having refused — the "
+                       + "detector reads the agent's own text as evidence about the architecture.");
+        }
+
+        // ── 7. The list the report uses to say whether the backstop was TEMPTED must be derived
+        //       from the tools' behaviour, IN BOTH DIRECTIONS. "Never fired" was one sentence for
+        //       two opposite findings — an agent that never asked, and an architecture that failed
+        //       to refuse one that did — and it was printed for a live turn in which the agent DID
+        //       call GetInterestMap. The list decides which of the two a reader is told.
+        //
+        //  ⚠ MEMBERSHIP MUST EQUAL BEHAVIOUR, not imply it. A first version asserted only "every
+        //    NAMED tool refuses", and deleting GetInterestMap from the list left this row GREEN:
+        //    a shrunk list passes vacuously, and the report would then have called the exact live
+        //    turn that started all this "never tempted". Every user-keyed structured tool is
+        //    invoked and membership is asserted to EQUAL refusal.
+        (string Name, Func<string, ValueTask<object?>> Invoke)[] userKeyedTools =
+        [
+            (nameof(GalaxusTools.GetUserProfile),
+                async id => await AIFunctionFactory.Create(GalaxusTools.GetUserProfile)
+                    .InvokeAsync(new AIFunctionArguments { ["userId"] = id }).ConfigureAwait(false)),
+            (nameof(GalaxusTools.GetPurchaseHistory),
+                async id => await AIFunctionFactory.Create(GalaxusTools.GetPurchaseHistory)
+                    .InvokeAsync(new AIFunctionArguments { ["userId"] = id }).ConfigureAwait(false)),
+            (nameof(GalaxusTools.GetInterestMap),
+                async id => await AIFunctionFactory.Create(GalaxusTools.GetInterestMap)
+                    .InvokeAsync(new AIFunctionArguments { ["userId"] = id }).ConfigureAwait(false)),
+        ];
+
+        int refusing = 0;
+        GalaxusTools.OverrideProfile(opted);
+        try
+        {
+            foreach (var (name, invoke) in userKeyedTools)
+            {
+                bool refuses = ToolResultText.Of(await invoke(opted.Id).ConfigureAwait(false))
+                    .Contains(ToolRefusalCodes.PersonalizationDisabled, StringComparison.Ordinal);
+                bool listed = ToolSurfaceInvariant.BehaviouralHistoryToolNames
+                    .Contains(name, StringComparer.OrdinalIgnoreCase);
+
+                if (refuses) refusing++;
+
+                if (refuses && !listed)
+                {
+                    problems.Add($"'{name}' REFUSES under the opt-out and is not on BehaviouralHistoryToolNames — the "
+                               + "report would tell a reader the backstop was never tempted on a turn that called it.");
+                }
+                else if (!refuses && listed)
+                {
+                    problems.Add($"'{name}' is named as forbidden under the opt-out and did NOT refuse — the list is a "
+                               + "claim the tools do not honour.");
+                }
+            }
+        }
+        finally
+        {
+            GalaxusTools.ClearProfileOverrides();
+        }
+
+        // Both directions have to be non-vacuous: at least one tool must refuse and at least one
+        // must not, or the equality above is satisfied by an empty side.
+        if (refusing == 0)
+            problems.Add("no user-keyed tool refused under the opt-out at all — the containment is gone, or this row is testing nothing.");
+        if (refusing == userKeyedTools.Length)
+            problems.Add("every user-keyed tool refused, GetUserProfile included — the opt-out now hides the customer's own identity, not just their behaviour.");
+
+        return new ControlRowSnapshot(
+            "RefusalDetectorsSeeTheRealShape",
+            "the two detectors that report whether the TOOL LAYER refused — Eval 01's opt-out backstop and Eval 06's "
+          + "budget refusal — must read the result shape a live harness records. Both tested `Result is string`, and "
+          + "AIFunctionFactory marshals a tool's return value into a JsonElement, so both had a chance floor of ZERO on "
+          + "the only path that matters: Eval 01 printed \"the tool-layer backstop was never exercised this turn\" for a "
+          + "refusal that had fired, and SUITE_SUMMARY §4 could not say whether that was a containment hole or a blind "
+          + "detector. This row invokes the REAL AIFunction, because every hand-built control result is a string and no "
+          + "scripted control could have caught it.",
+            problems.Count == 0
+                ? $"the marshalled refusal arrives as {shape}, so `Result is string` is FALSE on it (the old detector "
+                + $"cannot fire) · the shipped detector finds '{ToolRefusalCodes.PersonalizationDisabled}' in it · an "
+                + "ordinary interest map does NOT read as a refusal · the trace-level API answers both ways on "
+                + "live-shaped records · a refusal code echoed into an ARGUMENT is not counted"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

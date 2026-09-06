@@ -482,21 +482,15 @@ public static class Eval01_CatalogueIntegrity
     /// number would let a prompt-carried guardrail look like a structural one.
     /// </remarks>
     /// <param name="tools">The trace.</param>
-    private static bool DetectOptOutBackstop(ToolUsageReport? tools)
-    {
-        if (tools is null) return false;
-
-        foreach (var call in tools.Calls)
-        {
-            if (call.Result is string json
-                && json.Contains(ToolRefusalCodes.PersonalizationDisabled, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    /// <remarks>
+    /// ⚠ It reads the result through <see cref="ToolResultText"/>. It used to test
+    /// <c>call.Result is string json</c>, and on the live path the harness records what
+    /// <c>AIFunctionFactory</c> marshalled — a <c>JsonElement</c>, never a <c>string</c> — so the
+    /// detector had a chance floor of ZERO and printed <i>"never exercised"</i> for a refusal that
+    /// had fired. See <see cref="ToolResultText"/> for the measurement.
+    /// </remarks>
+    private static bool DetectOptOutBackstop(ToolUsageReport? tools) =>
+        ToolResultText.AnyResultContains(tools, ToolRefusalCodes.PersonalizationDisabled);
 
     /// <summary>
     /// The advisory justification pass. Runs AFTER the gate has already been computed, prints its

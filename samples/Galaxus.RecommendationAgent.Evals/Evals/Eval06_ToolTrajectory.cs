@@ -480,11 +480,14 @@ public static class Eval06_ToolTrajectory
     }
 
     /// <summary>True when any tool in the trace answered with the budget-exhausted refusal.</summary>
+    /// <remarks>
+    /// ⚠ Same correction as Eval 01's opt-out backstop: this tested <c>c.Result is string json</c>,
+    /// which is never true on the live path because <c>AIFunctionFactory</c> marshals a tool's
+    /// return value into a <c>JsonElement</c>. It could not fire. See <see cref="ToolResultText"/>.
+    /// </remarks>
     /// <param name="tools">The trace.</param>
     private static bool HasBudgetRefusal(ToolUsageReport? tools) =>
-        tools is not null
-        && tools.Calls.Any(c => c.Result is string json
-            && json.Contains(ToolRefusalCodes.BudgetExhausted, StringComparison.Ordinal));
+        ToolResultText.AnyResultContains(tools, ToolRefusalCodes.BudgetExhausted);
 
     /// <summary>
     /// How many commit-tool calls reached the approval gate and were stopped before execution.

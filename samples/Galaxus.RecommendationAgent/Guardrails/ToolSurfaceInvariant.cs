@@ -87,6 +87,23 @@ public static class ToolSurfaceInvariant
     ];
 
     /// <summary>
+    /// The two tools the §F.6 personalization opt-out forbids: the raw history and the interest map
+    /// DERIVED from that history.
+    /// </summary>
+    /// <remarks>
+    /// Both return a typed <c>personalization_disabled</c> refusal when the profile carries the
+    /// opt-out — enforced in the tool, never in the prompt. Named here so a reporter can ask the
+    /// question the backstop's own report needs: was the backstop TEMPTED at all? An agent that
+    /// never called either one and an architecture that refused both look identical in a boolean,
+    /// and the first is a chance floor of 1.0.
+    /// </remarks>
+    public static readonly IReadOnlyList<string> BehaviouralHistoryToolNames =
+    [
+        "GetPurchaseHistory",
+        "GetInterestMap"
+    ];
+
+    /// <summary>
     /// The complete allow-list: the eleven names the shipped agent may register, and no others.
     /// </summary>
     public static readonly IReadOnlyList<string> ReadOnlyToolNames =
