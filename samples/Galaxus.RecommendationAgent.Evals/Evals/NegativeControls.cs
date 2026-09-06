@@ -1334,10 +1334,46 @@ public static class NegativeControls
         // ── ARM D — the queries the arms actually issue, on the resolved path.
         var (issuedTotal, deadIssued, issuedExamples) = MeasureIssuedQueries(space.Source);
 
+        // ── ARM D IS TWO DIFFERENT QUESTIONS, and until 2026-09-06 it printed one number for both.
+        //    Plan item 1.10.
+        //
+        //    On the DEFAULT concept path it is a real measurement of a real hole: a query that
+        //    embeds to zero in a 24-dimension hand-built space gives the dense leg nothing, and
+        //    8 of 50 do.
+        //
+        //    On --real-vectors it is a REACHABILITY probe wearing a measurement's clothes. Since
+        //    B-21 the query is embedded LIVE, and a live embedder returns a non-zero vector for any
+        //    non-empty text — so `0 of 50 dead` is close to guaranteed by construction. It can only
+        //    be non-zero if the path is UNREACHABLE: no credentials, a model-stamp mismatch, or a
+        //    failed space-identity probe. A check that cannot fail must not print a number that
+        //    reads as a result, and 0 of 50 is an extreme value: extreme values are wiring faults
+        //    until proven otherwise, and here it is proven VACUOUS instead, which is worse, because
+        //    it reads as a pass.
+        //
+        //    So the real path reports Reachable / Unreachable and NEVER a count out of 50. The
+        //    concept path keeps the count. Arm C is untouched — it is the independent measurement
+        //    that survives either way.
+        bool realPath = space.Chosen == EmbeddingSpaceChoice.RealVectors;
+        bool liveQueryPathReachable = deadIssued == 0;
+
+        string armDReading = realPath
+            ? "ARM D (REACHABILITY of the live query path — NOT a count): "
+            + (liveQueryPathReachable
+                ? "REACHABLE. Queries are embedded live against the deployment the committed index's own model "
+                + "stamp names, and every issued query came back with a vector. ⚠ This is not a measurement of "
+                + "retrieval quality: a live embedder returns a non-zero vector for ANY non-empty text, so this "
+                + "check can only fail on unreachability — absent credentials, a model-stamp mismatch, or a failed "
+                + "space-identity probe."
+                : $"UNREACHABLE. {deadIssued} issued query/queries came back with no vector, and on this path that "
+                + "is a wiring fault rather than a thin cache: absent credentials, a model-stamp mismatch, or a "
+                + $"failed space-identity probe. Examples: {string.Join(" | ", issuedExamples)}.")
+            : $"ARM D (the queries actually issued, on the resolved path): {deadIssued} of {issuedTotal} unanswerable"
+            + (deadIssued == 0 ? "." : $" — e.g. {string.Join(" | ", issuedExamples)}.");
+
         bool armAClean = deadA == 0;
         bool armBClean = deadB == 0;
         bool armCClean = deadC == 0;
-        bool armDClean = deadIssued == 0;
+        bool armDClean = realPath ? liveQueryPathReachable : deadIssued == 0;
 
         // ⚠ ARM C IS IN THE VERDICT SINCE B-21, and it was NOT before. The old verdict was
         // A && B && D, and while arm D read 38 of 50 on the real-vector path that could never go
@@ -1370,24 +1406,33 @@ public static class NegativeControls
           + "ARM C (the concept space, measured directly): the space --concept-vectors forces "
           + "and every asset-load failure falls back to, reported whether or not this run used it. ARM D is the "
           + "THING the other three only proxy: the actual query strings the scored personas' interest maps produce "
-          + "— joins of phrases, companion classes, category names — none of which is an authored phrase.",
+          + "— joins of phrases, companion classes, category names — none of which is an authored phrase. ⚠ ARM D "
+          + "ASKS TWO DIFFERENT QUESTIONS AND REPORTS THEM DIFFERENTLY (plan item 1.10): on the concept default it "
+          + "is a COUNT of queries the space cannot answer, a real hole; on --real-vectors, where B-21 embeds the "
+          + "query live and a live embedder returns a vector for any non-empty text, a count cannot fail, so it "
+          + "reports REACHABLE / UNREACHABLE and no n-of-50 at all.",
             $"SPACE: {space.Source.Name} ({space.Source.ModelId}, {space.Source.Dimensions} dims) · {space.Reason}"
           + $" · ARM A (resolved path): {deadA} of {total} authored phrase(s) unanswerable"
           + (deadA == 0 ? "." : $"; {deadGoldA.Count} of them latent-GOLD: {string.Join(", ", deadGoldA)}.")
           + $" · ARM B (the committed index, no live path): {deadB} of {totalB} product(s) unanswerable — {noteB}"
           + $" · ARM C (concept space, always measured): {deadC} of {total} embed to ZERO"
           + (deadC == 0 ? "." : $"; {deadGoldC.Count} latent-GOLD: {string.Join(", ", deadGoldC)}.")
-          + $" · ARM D (the queries actually issued, on the resolved path): {deadIssued} of {issuedTotal} unanswerable"
-          + (deadIssued == 0 ? "." : $" — e.g. {string.Join(" | ", issuedExamples)}.")
+          + $" · {armDReading}"
           + $" · {coMoves}"
           + (allRetrievable
                 ? " Every arm can ASK for every interest the gold rewards, and for every query it actually issues."
                 : " READ EVERY EVAL 02 ARM NUMBER WITH THIS IN FRONT OF IT: on the interests listed above the dense "
                 + "retrieval leg contributes nothing, so a low coverage cell there is not evidence that the arm "
                 + "failed to reason. ADVISORY — closing ARM C means choosing a concept mapping per phrase, which "
-                + "moves every coverage cell, so it is reported rather than silently repaired. ARM D on the "
-                + "real-vector path is no longer a paid rebuild away: since B-21 queries are embedded live, so a "
-                + "non-zero ARM D there means the live path is unreachable, not that the cache is thin."),
+                + "moves every coverage cell, so it is reported rather than silently repaired."
+                + (realPath
+                    ? " ⚠ ARM D on this path is a REACHABILITY verdict and contributes no count — read ARM C for "
+                    + "the measurement. 🔴 AND NOTHING IN THIS ROW REPLACES THE WEIGHT ARM D USED TO CARRY "
+                    + "HERE: the answer-quality question — of the queries that DO embed, how many have every dense "
+                    + "hit fall under the floor while the run still reports Degraded = false — is plan item 1.10's "
+                    + "third clause and is NOT BUILT. Its absence is declared rather than papered over with a "
+                    + "reachability tick."
+                    : string.Empty)),
             allRetrievable,
             Gating: false);
     }

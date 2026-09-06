@@ -7145,3 +7145,79 @@ dotnet run --project $E -- 2 --dry-run        # 0, no failure line
 #     guards disabled  -> Eval 07 GRADES the partial trace · `-- 2 --dry-run` exit 0
 #     (disable with `if (false)` in Eval07 and `false &&` on Eval02's IDiscoveryLoopArm pattern)
 ```
+
+---
+
+## 52. WAVE 5 — plan item 1.10: arm D printed a number that cannot fail. PARTIAL — two clauses of three (2026-09-06)
+
+### 52.1 The defect, restated from the measurement
+
+Eval 03's `AuthoredQueryPhraseRetrievability` arm D asks *"can the 50 queries the system actually
+issues be embedded?"* Since B-21 the query is embedded **live** on `--real-vectors`, and a live
+embedder returns a non-zero vector for **any non-empty text** — so **0 of 50 dead is close to
+guaranteed by construction**. It can only be non-zero on **unreachability**: absent credentials, a
+model-stamp mismatch, a failed space-identity probe.
+
+**A check that cannot fail must not print a number that reads as a result.** 0 of 50 is an extreme
+value, and extreme values are wiring faults until proven otherwise — here it is proven **vacuous**
+instead, which is worse, because it reads as a pass.
+
+⚠️ **It is NOT vacuous on the default path**, measured today: **8 of 50** unanswerable
+(*"Active bookshelf"*, *"Handheld hybrid"*, *"Over-ear wireless"*). Deleting the arm would have
+deleted a real hole, which is why the item says re-scope rather than retire.
+
+### 52.2 What shipped — the arm asks two questions and now reports them differently
+
+| path | arm D reads |
+|---|---|
+| concept default | **`8 of 50 unanswerable`** — a COUNT, unchanged, a real measurement of a real hole |
+| `--real-vectors` | **`REACHABILITY of the live query path — NOT a count: REACHABLE`**, with the sentence saying why this cannot be read as retrieval quality. **No `n of 50` at all** |
+
+**Arm C is untouched at 18 of 56 on both paths** — it is the independent measurement that survives
+either way, and it is what the row's own text now points a reader at on the real path.
+
+### 52.3 The ablation
+
+Forcing the live query path to return nothing (the credentials / stamp-mismatch / probe-failure
+state):
+
+```
+ARM D (REACHABILITY of the live query path — NOT a count): UNREACHABLE. 7 issued query/queries
+came back with no vector, and on this path that is a wiring fault rather than a thin cache …
+```
+
+**and no `n of 50` is printed anywhere in the run** (`grep -c "of 50 unanswerable"` → **0**). The row
+is `Gating: false`, so `-- 3 --real-vectors` stays exit 0 under both readings — an instrument finding
+is reported, never gated, and saying the exit code moved would be a claim about a number that did not.
+
+### 52.4 🔴 PARTIAL — the third clause is NOT BUILT, and the row says so
+
+1.10's acceptance has a fourth clause: *"a query whose dense hits all fall under the floor is counted
+and named, and the run no longer reports `Degraded = false` for it silently"* — the **answer-quality**
+check meant to replace the weight arm D loses on the real path.
+
+**It is not built.** Building it means plumbing per-query dense-hit scores and the `Degraded` flag out
+of the retriever, which is a new measurement with its own instrument questions, and this wave would
+have shipped it unverified: **the plan's figure for it — *"3 on real, 0 on concept"* — has never been
+re-executed, and it cannot be until the check exists.** Quoting it as the expected answer would be
+pre-registering a result.
+
+**What was done instead of shipping it half-built:** the row's own advisory text, on the real path
+only, now states that nothing replaces arm D's lost weight and names the missing question. **The
+absence is declared rather than papered over with a reachability tick** — which is the whole failure
+mode 1.10 was filed against.
+
+### 52.5 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 3                | grep "ARM D"   # 8 of 50 unanswerable
+dotnet run --project $E -- 3 --real-vectors | grep "ARM D"   # REACHABLE, no n-of-50
+dotnet run --project $E -- 3 --real-vectors | grep "ARM C"   # 18 of 56, unchanged
+
+# 52.3 ablation — NegativeControls, in the arm-D block:
+#   bool liveQueryPathReachable = false;
+#   deadIssued = 7; issuedExamples = ["ABLATION-a", "ABLATION-b"];
+#   -> "UNREACHABLE. 7 issued query/queries came back with no vector …", and
+#      grep -c "of 50 unanswerable" == 0
+```
