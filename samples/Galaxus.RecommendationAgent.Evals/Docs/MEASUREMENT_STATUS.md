@@ -8420,3 +8420,44 @@ other side.
 | **A** | the pins mis-set (all 0.0000) | **1** | `HELD: 0 of 6`, every pair named with its pinned value beside it |
 | **B** | **the asset file itself rotated by one product** | **1** | `HELD: 0 of 6` — `GLX-1001·GLX-1002 0.4600 ≠ pinned 0.6438` … — **while ARM B on the same run still read `0 of 99`** |
 | — | **restored** | **0** in both spaces | `HELD: 6 of 6`, positive control 6 of 6 rejected |
+
+### 59.3 ✅ 8.22 — a persona one arm scored and the other did not was DROPPED, and the drop moved a published sentence
+
+**The defect.** `PairedCoverageReport.SignTestAtEqualK` opened with a bare `continue` when either
+side's cell was missing or unscorable. Such a persona entered **neither `Excluded` nor any count**:
+the pairing's n shrank and **the shrink was indistinguishable from there having been fewer
+personas** — the flattering direction, because a smaller n is a weaker test that still prints a
+p-value beside it.
+
+**Fixed** at the pairing: one side scorable and the other not is now added to the NOT COMPARABLE list
+naming **which arm held the cell**, and `DescribeCell` keeps *"NO CELL"* and *"cell not scorable"*
+apart — different facts, different remedies. ⚠ **Both sides absent stays silent, deliberately**: a
+persona that ran in neither arm is a fact about the run, not about this pair, and listing it under
+every arm pair would bury the case that matters.
+
+**🔴 THIS MOVES NUMBERS, and they are declared.** Measured by running `-- 9 --dry-run` with the fix
+and with the bare `continue` restored:
+
+| | before | after |
+|---|---|---|
+| Eval 09 primary pairing, NOT COMPARABLE | **11** | **12** — the twelfth is `USR-MB-13 (LIVE single agent — Robin (Demo 1): scored vs LIVE workflow — discovery loop (Demo 2): NO CELL)` |
+| Eval 09 rubber-stamp pairing, NOT COMPARABLE | **1** | **2** — `USR-MB-13 (Loop control — rubber stamp: scored vs LIVE workflow …: NO CELL)` |
+| Eval 09 clause 1's own sentence | *"Not one of the **11** persona(s)"* | *"Not one of the **12** persona(s)"* |
+
+**That is exactly the discrepancy 8.22 was filed for** — *"clause 1 says 'the 11 persona(s)' where
+there were 12"* — reproduced, then closed, and the eval's own sentence now reconciles with the cohort.
+**Blast radius:** Eval 09's printed pairing lines and any sentence quoting them. Checked: **no
+published document in this repository quotes the 11**; the only occurrences are inside archived run
+logs under `Docs/runs/`, which are records of what those runs printed and are correct as they stand.
+`-- 2 --dry-run`, `-- 9 --dry-run`, `-- 3`, `-- 4` still exit **0**; `-- 7` and `--ci --dry-run` still
+exit **1**.
+
+**Gating row `APersonaInOneArmOnlyIsDeclared`** over five cells and five personas — two in both arms,
+one in the challenger only, one in the reference only, one in neither — asserting **both**
+directions. Measured: `W/L/T 2/0/0`, `NOT COMPARABLE (2): B-ONLY (A: NO CELL vs B: scored);
+A-ONLY (A: scored vs B: NO CELL)`, and the two-armed absence correctly absent.
+
+| # | ablation | `-- 3` | what it printed |
+|---|---|---|---|
+| **A** | the shipped bare `continue` restored | **1** | `NOT COMPARABLE (0): —` plus *"a persona the CHALLENGER scored and the reference did not is still dropped silently"* and the same for the reference |
+| — | **restored** | **0** in both spaces | `NOT COMPARABLE (2)`, both named |

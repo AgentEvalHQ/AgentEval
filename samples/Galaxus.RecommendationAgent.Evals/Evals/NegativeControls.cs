@@ -126,6 +126,7 @@ public static class NegativeControls
         rows.Add(Guarded("EverySnapshotSaysWhatProducedIt", CheckEverySnapshotSaysWhatProducedIt));
         rows.Add(Guarded("CatalogueEvidenceLineCarriesAFact", CheckCatalogueEvidenceLineCarriesAFact));
         rows.Add(Guarded("CommittedVectorsAreTheRightNumbers", CheckCommittedVectorsAreTheRightNumbers));
+        rows.Add(Guarded("APersonaInOneArmOnlyIsDeclared", CheckAPersonaInOneArmOnlyIsDeclared));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -1533,6 +1534,88 @@ public static class NegativeControls
 
 
 
+
+
+    // ══ Plan item 8.22 — a persona present in one arm and absent from the other ══════════════
+
+    /// <summary>
+    /// GATING. A persona one arm scored and the other did not must appear in the pairing's
+    /// NOT COMPARABLE list, not vanish from it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> <c>SignTestAtEqualK</c> opened with a bare <c>continue</c> when either
+    /// side was missing or unscorable, so such a persona entered neither <c>Excluded</c> nor any
+    /// count. The pairing's n shrank and the shrink was **indistinguishable from there having been
+    /// fewer personas** — the flattering direction, because a smaller n is a weaker test that still
+    /// prints a p-value beside it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Newly load-bearing.</b> Eval 09 pairs on the DECLARED-k report, which can be missing
+    /// cells the own-k report has: in the dry run its clause 1 said *"the 11 persona(s)"* where
+    /// there were twelve. Eval 09 noted the twelfth separately, so it was declared somewhere and
+    /// absent from the number — which is exactly the state a reader cannot reconcile.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Both sides absent stays silent, deliberately</b>, and the row asserts that too: a
+    /// persona that ran in NEITHER arm is a fact about the run, not about this pair, and listing it
+    /// under every arm pair would bury the case that matters. A row that demanded it would push the
+    /// suite toward noise and then toward ignoring the list.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckAPersonaInOneArmOnlyIsDeclared()
+    {
+        var problems = new List<string>();
+
+        // Two personas both arms scored, one the CHALLENGER alone scored, one the REFERENCE alone
+        // scored, and one NEITHER scored. Five recorded facts, three distinct expected outcomes.
+        var pairing = new PairedCoverageReport();
+        pairing.Record("BOTH-1",  "A", Cell(0.5, 1, 5));
+        pairing.Record("BOTH-1",  "B", Cell(1.0, 2, 5));
+        pairing.Record("BOTH-2",  "A", Cell(0.5, 1, 5));
+        pairing.Record("BOTH-2",  "B", Cell(1.0, 2, 5));
+        pairing.Record("B-ONLY",  "B", Cell(1.0, 2, 5));
+        pairing.Record("A-ONLY",  "A", Cell(0.5, 1, 5));
+        pairing.Record("NEITHER", "C", Cell(0.5, 1, 5));
+
+        var outcome = pairing.SignTestAtEqualK("A", "B", CoverageMetric.Recall);
+
+        if (outcome.Wins != 2 || outcome.Losses != 0 || outcome.Ties != 0)
+        {
+            problems.Add($"the two comparable personas counted W/L/T {outcome.Wins}/{outcome.Losses}/{outcome.Ties}, expected 2/0/0.");
+        }
+
+        bool declaresBOnly = outcome.Excluded.Any(x => x.StartsWith("B-ONLY", StringComparison.Ordinal));
+        bool declaresAOnly = outcome.Excluded.Any(x => x.StartsWith("A-ONLY", StringComparison.Ordinal));
+        bool mentionsNeither = outcome.Excluded.Any(x => x.StartsWith("NEITHER", StringComparison.Ordinal));
+
+        if (!declaresBOnly) problems.Add("a persona the CHALLENGER scored and the reference did not is still dropped silently.");
+        if (!declaresAOnly) problems.Add("a persona the REFERENCE scored and the challenger did not is still dropped silently.");
+        if (mentionsNeither) problems.Add("a persona NEITHER arm scored is listed under this arm pair — that is noise, and a list nobody reads declares nothing.");
+        if (outcome.Excluded.Count != 2)
+            problems.Add($"the NOT COMPARABLE list holds {outcome.Excluded.Count} entries, expected exactly the 2 one-armed personas.");
+
+        return new ControlRowSnapshot(
+            "APersonaInOneArmOnlyIsDeclared",
+            "a persona one arm scored and the other did not must be REPORTED as NOT COMPARABLE, never dropped. "
+          + "SignTestAtEqualK used to open with a bare continue in that case, so such a persona entered neither "
+          + "Excluded nor any count: the pairing's n shrank and the shrink was indistinguishable from there having "
+          + "been fewer personas — the flattering direction, because a smaller n is a weaker test that still prints "
+          + "a p-value. Newly load-bearing since Eval 09 pairs on the DECLARED-k report, which can be missing cells "
+          + "the own-k report has (its dry run said 'the 11 persona(s)' where there were 12). ⚠ It asserts the "
+          + "OTHER direction too: a persona NEITHER arm scored must stay OUT of this pair's list, because a list "
+          + "that fills with noise is a list nobody reads.",
+            $"5 cells over 5 personas — 2 in both arms, 1 in the challenger only, 1 in the reference only, 1 in "
+          + $"neither · W/L/T {outcome.Wins}/{outcome.Losses}/{outcome.Ties} over the comparable pairs · "
+          + $"NOT COMPARABLE ({outcome.Excluded.Count}): {(outcome.Excluded.Count == 0 ? "—" : string.Join("; ", outcome.Excluded))}"
+          + (problems.Count == 0
+                ? " · both one-armed personas are named with which arm held the cell, and the two-armed absence is correctly not listed."
+                : " · ❌ " + string.Join(" ❌ ", problems)),
+            problems.Count == 0);
+
+        static CoverageScore Cell(double latent, int hits, int k) =>
+            new(latent, double.NaN, hits, 2, 0, 0, k, 0, 0, DeclaredK: k, PresentedBeforeCut: k);
+    }
 
     // ══ Plan item 8.13 — the committed asset's CONTENTS were verified on ONE path only ════════
 

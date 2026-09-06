@@ -400,7 +400,30 @@ public sealed class PairedCoverageReport
         {
             var a = ScoreOf(persona, armA);
             var b = ScoreOf(persona, armB);
-            if (a is not { IsScorable: true } || b is not { IsScorable: true }) continue;
+
+            // ⚠ PLAN ITEM 8.22. This used to be a bare `continue`, so a persona that one arm
+            // scored and the other did not was dropped SILENTLY: not in Excluded, not in any
+            // count, not in the printed NOT COMPARABLE list. The pairing's n quietly shrank and
+            // the shrink was indistinguishable from there having been fewer personas — which is
+            // the flattering direction, because a smaller n is a weaker test that still prints a
+            // p-value. Newly load-bearing since Eval 09 started pairing on the declared-k report,
+            // which can be missing cells the own-k report has.
+            //
+            // Both sides absent is NOT this pair's business — the persona ran in neither arm, and
+            // listing it under every arm pair would be noise. One side present and the other not
+            // is exactly the case the acceptance names, and it is now DECLARED.
+            bool scorableA = a is { IsScorable: true };
+            bool scorableB = b is { IsScorable: true };
+
+            if (!scorableA || !scorableB)
+            {
+                if (scorableA || scorableB)
+                {
+                    notComparable.Add($"{persona} ({DescribeCell(armA, a)} vs {DescribeCell(armB, b)})");
+                }
+
+                continue;
+            }
 
             CoverageScore sa = a.Value, sb = b.Value;
 
@@ -454,6 +477,21 @@ public sealed class PairedCoverageReport
             _ => double.NaN,
         };
     }
+
+    /// <summary>
+    /// Names a missing or unscorable cell for the NOT COMPARABLE list (plan item 8.22).
+    /// </summary>
+    /// <remarks>
+    /// "No cell at all" and "a cell that could not be scored" are different facts with different
+    /// remedies — the first is a run that did not reach the persona, the second is a run that did
+    /// and got nothing usable — so they are not pooled into one word.
+    /// </remarks>
+    /// <param name="arm">The arm the cell belongs to.</param>
+    /// <param name="score">The cell, or null when the arm recorded none.</param>
+    private static string DescribeCell(string arm, CoverageScore? score) =>
+        score is null                    ? $"{arm}: NO CELL"
+      : score.Value.IsScorable           ? $"{arm}: scored"
+                                         : $"{arm}: cell not scorable";
 
     private SignTestOutcome Summarise(
         string armA, string armB, int wins, int losses, int ties, List<double> deltas,
