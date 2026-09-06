@@ -8381,3 +8381,42 @@ and that is the path where the MODEL picks the citation**, so this does not refu
 it says the two commands named do not currently produce it and that the deterministic arm cites specs.
 What *is* measured is the **latent** exposure: 578 tag-style attributes on **99 of 99** products, so
 the shape is one model citation away on every product in the catalogue.
+
+### 59.2 ✅ 8.13 — the committed asset's CONTENTS were checkable on ONE path, and that path needs credentials
+
+**The gap, as filed:** `EmbeddingSpace`'s space-identity probe was the **single** check that the
+committed vectors are the *right numbers* rather than merely present, well-formed and completely
+keyed — **and it does not run on the concept default**, which is the space the shipped demo and every
+asset-load fallback run in. ARM B cannot substitute: its key is **co-derived**.
+
+**Re-executed rather than cited (stage 0).** The asset was rotated on disk — every product's vector
+replaced by the next product's — and `-- 3` re-run: **ARM B still reads `0 of 99 unanswerable`**,
+exactly as §20.11 item 7 recorded. The corruption is invisible to every check the concept default had.
+
+**Built:** gating row `CommittedVectorsAreTheRightNumbers`. Six pairwise cosines between four named
+products, **derived once from the committed asset and checked in**, tolerance 5e-4. It needs **no
+credentials and makes no live call** — which is the whole point, because the gap was that the only
+content check required them. Measured, identical in both spaces:
+
+```
+99 committed 'text-embedding-3-small' vector(s) at 1536 dims, template v2, 0 live call(s)
+pinned pairwise cosines HELD: 6 of 6
+  GLX-1001·GLX-1002 0.6438 | GLX-1001·GLX-3004 0.2221 | GLX-1001·GLX-8002 0.2219
+  GLX-1002·GLX-3004 0.2574 | GLX-1002·GLX-8002 0.2691 | GLX-3004·GLX-8002 0.2155
+```
+
+⚠ **The row carries its own positive control**, in-process: the same pins are re-evaluated against a
+**rotated copy of the same asset** and must reject it — **6 of 6 rejected**. *A pin that cannot fail
+is worth less than no pin, because it reads as a pass.* Four products and six pairs rather than one,
+so a rotation cannot slip past on a single lucky pair.
+
+**`GLX-1001·GLX-1002 = 0.6438` is the same number §20.11 item 7 published** as
+`cosine(committed[GLX-1001], rotated[GLX-1001])` — necessarily, because a rotation by one product
+puts GLX-1002's vector under GLX-1001's key. An independent arrival at a published figure, from the
+other side.
+
+| # | ablation | `-- 3` | what it printed |
+|---|---|---|---|
+| **A** | the pins mis-set (all 0.0000) | **1** | `HELD: 0 of 6`, every pair named with its pinned value beside it |
+| **B** | **the asset file itself rotated by one product** | **1** | `HELD: 0 of 6` — `GLX-1001·GLX-1002 0.4600 ≠ pinned 0.6438` … — **while ARM B on the same run still read `0 of 99`** |
+| — | **restored** | **0** in both spaces | `HELD: 6 of 6`, positive control 6 of 6 rejected |

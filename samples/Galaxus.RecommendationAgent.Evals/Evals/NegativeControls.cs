@@ -125,6 +125,7 @@ public static class NegativeControls
         rows.Add(Guarded("VacuityIsDeclaredNotInferred", CheckVacuityIsDeclaredNotInferred));
         rows.Add(Guarded("EverySnapshotSaysWhatProducedIt", CheckEverySnapshotSaysWhatProducedIt));
         rows.Add(Guarded("CatalogueEvidenceLineCarriesAFact", CheckCatalogueEvidenceLineCarriesAFact));
+        rows.Add(Guarded("CommittedVectorsAreTheRightNumbers", CheckCommittedVectorsAreTheRightNumbers));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -1531,6 +1532,186 @@ public static class NegativeControls
     }
 
 
+
+
+    // ══ Plan item 8.13 — the committed asset's CONTENTS were verified on ONE path only ════════
+
+    /// <summary>
+    /// The four catalogue ids whose committed vectors are pinned, and the six pairwise cosines
+    /// between them. <b>Derived once from the committed asset and checked in</b>; thereafter the
+    /// asset cannot supply its own bar.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>A pinned constant has to be shown to DISCRIMINATE, or it is decoration.</b> These are
+    /// not "the numbers the asset happens to hold": the row below reloads the asset with every
+    /// vector <b>rotated by one product</b> — the exact corruption §20.11 item 7 measured ARM B
+    /// sailing through at 0 of 99 — and requires the pins to reject it. Four products rather than
+    /// one, and six pairs rather than one, so a rotation cannot slip past on a single lucky pair.
+    /// </para>
+    /// <para>
+    /// If the catalogue or the document template legitimately changes, the asset is rebuilt and
+    /// these move with it. That is the intended maintenance cost: an asset whose contents can
+    /// change with nothing to say so is what 8.13 is about.
+    /// </para>
+    /// </remarks>
+    private static readonly (string A, string B, double Expected)[] CommittedVectorPins =
+    [
+        ("GLX-1001", "GLX-1002", 0.6438),
+        ("GLX-1001", "GLX-3004", 0.2221),
+        ("GLX-1001", "GLX-8002", 0.2219),
+        ("GLX-1002", "GLX-3004", 0.2574),
+        ("GLX-1002", "GLX-8002", 0.2691),
+        ("GLX-3004", "GLX-8002", 0.2155),
+    ];
+
+    /// <summary>How far a pinned cosine may drift. A float32 dot over identical bytes is exact.</summary>
+    private const double CommittedVectorPinTolerance = 5e-4;
+
+    /// <summary>
+    /// GATING, on EVERY path including the concept default. Pins the committed index's CONTENTS —
+    /// the actual numbers — against checked-in cosines, and proves the pins reject an asset whose
+    /// vectors have been rotated by one product.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The gap this closes, as §20.11 item 7 and plan item 8.13 state it.</b>
+    /// <c>EmbeddingSpace</c>'s space-identity probe was the <b>single</b> check that the committed
+    /// vectors are the RIGHT NUMBERS rather than merely present, well-formed and completely keyed —
+    /// and <b>it does not run on the concept default</b>, which is the space the shipped demo and
+    /// every asset-load fallback run in. ARM B cannot substitute: its key is <b>co-derived</b> (the
+    /// loader and the arm render the document with the same build's template and look it up in the
+    /// same process), and measured against an asset with every vector rotated by one product it
+    /// still read <b>0 of 99</b> while <c>cosine(committed[GLX-1001], rotated[GLX-1001]) = 0.6438</c>
+    /// made the corruption plainly visible.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This row needs no credentials and issues no live call</b>, which is the whole point:
+    /// the gap was that the only content check required them.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It carries its own positive control.</b> The pins are re-evaluated against a ROTATED
+    /// copy of the same asset, in the same process, and must reject it. A pin that cannot fail is
+    /// worth less than no pin, because it reads as a pass — 1.10's finding, one section up.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckCommittedVectorsAreTheRightNumbers()
+    {
+        const string name = "CommittedVectorsAreTheRightNumbers";
+        const string expectation =
+            "the committed text-embedding-3-small index must be checkable for its CONTENTS — the actual numbers — "
+          + "on EVERY path, including the concept default that the shipped demo and every asset-load fallback run "
+          + "in. Until now the only content check was EmbeddingSpace's space-identity probe, which needs "
+          + "credentials and runs on --real-vectors alone; ARM B's key is CO-DERIVED and reads 0 of 99 over an "
+          + "asset with every vector rotated by one product. So six pairwise cosines between four named products "
+          + "are pinned, derived once from the asset and checked in. ⚠ The pins carry their own positive control: "
+          + "they are re-evaluated against a ROTATED copy of the same asset in the same process and must REJECT "
+          + "it. A pin that cannot fail is worth less than no pin, because it reads as a pass.";
+
+        var products = Catalogue.Default.All;
+
+        PrecomputedEmbeddingSource source;
+        try
+        {
+            source = PrecomputedEmbeddingSource.TryLoad(products, liveFallback: null);
+        }
+        catch (Exception ex)
+        {
+            return new ControlRowSnapshot(name, expectation,
+                $"the committed index could not be read at all ({ex.GetType().Name}), so its contents are "
+              + "unverifiable rather than verified.", Tripped: false);
+        }
+
+        if (source.IsEmpty)
+        {
+            return new ControlRowSnapshot(name, expectation,
+                "NO committed vectors loaded — "
+              + (source.LoadWarnings.Count > 0 ? source.LoadWarnings[0] : "the asset is absent.")
+              + " An absent asset is NOT a pass.", Tripped: false);
+        }
+
+        var byId = products.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        var vectors = new Dictionary<string, float[]>(StringComparer.Ordinal);
+        var missing = new List<string>();
+
+        foreach (string id in CommittedVectorPins.SelectMany(p => new[] { p.A, p.B }).Distinct(StringComparer.Ordinal))
+        {
+            if (!byId.TryGetValue(id, out var product)) { missing.Add(id); continue; }
+
+            var vector = EmbedThrough(source, EmbeddingDocument.ForProduct(product));
+            if (vector.IsUnavailable() || vector.Length == 0) { missing.Add(id); continue; }
+
+            vectors[id] = EmbeddingVectors.Normalized(vector.Span);
+        }
+
+        // ── The pins, against the committed asset. ──────────────────────────────────────────
+        var readings = new List<string>();
+        int held = 0, checkedPairs = 0;
+
+        foreach (var (a, b, expected) in CommittedVectorPins)
+        {
+            if (!vectors.TryGetValue(a, out var left) || !vectors.TryGetValue(b, out var right)) continue;
+
+            checkedPairs++;
+            double actual = EmbeddingVectors.DotOfUnitVectors(left, right);
+            bool ok = Math.Abs(actual - expected) <= CommittedVectorPinTolerance;
+            if (ok) held++;
+
+            readings.Add($"{a}·{b} {actual.ToString("F4", System.Globalization.CultureInfo.InvariantCulture)}"
+                       + (ok ? "" : $" ≠ pinned {expected.ToString("F4", System.Globalization.CultureInfo.InvariantCulture)}"));
+        }
+
+        // ── The positive control: the SAME pins against a ROTATED copy of the SAME asset. ───
+        //    Rotation by one product is exactly the corruption §20.11 item 7 measured ARM B
+        //    sailing through. If the pins accept it, they are decoration.
+        var ordered = CommittedVectorPins.SelectMany(p => new[] { p.A, p.B })
+                                         .Distinct(StringComparer.Ordinal)
+                                         .Where(vectors.ContainsKey)
+                                         .OrderBy(id => id, StringComparer.Ordinal)
+                                         .ToArray();
+        int rotatedRejected = 0, rotatedPairs = 0;
+
+        if (ordered.Length >= 2)
+        {
+            var rotated = new Dictionary<string, float[]>(StringComparer.Ordinal);
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                rotated[ordered[i]] = vectors[ordered[(i + 1) % ordered.Length]];
+            }
+
+            foreach (var (a, b, expected) in CommittedVectorPins)
+            {
+                if (!rotated.TryGetValue(a, out var left) || !rotated.TryGetValue(b, out var right)) continue;
+
+                rotatedPairs++;
+                double actual = EmbeddingVectors.DotOfUnitVectors(left, right);
+                if (Math.Abs(actual - expected) > CommittedVectorPinTolerance) rotatedRejected++;
+            }
+        }
+
+        bool everyPinChecked  = checkedPairs == CommittedVectorPins.Length && missing.Count == 0;
+        bool everyPinHeld     = everyPinChecked && held == checkedPairs;
+        bool pinsDiscriminate = rotatedPairs > 0 && rotatedRejected > 0;
+        bool ok2              = everyPinHeld && pinsDiscriminate;
+
+        return new ControlRowSnapshot(
+            name,
+            expectation,
+            $"{source.CachedVectorCount} committed '{source.ModelId}' vector(s) at {source.Dimensions} dims, "
+          + $"template {EmbeddingDocument.TemplateVersion}, {source.FallbackCalls} live call(s) — this row makes none · "
+          + $"pinned pairwise cosines HELD: {held} of {checkedPairs}"
+          + (missing.Count == 0 ? "" : $" ⚠ {missing.Count} pinned product(s) absent or unanswerable: {string.Join(", ", missing)}")
+          + $" · {string.Join(" | ", readings)}"
+          + $" · POSITIVE CONTROL, the same pins over the same asset ROTATED by one product: "
+          + $"{rotatedRejected} of {rotatedPairs} pair(s) rejected"
+          + (pinsDiscriminate
+                ? " — the pins discriminate, so their agreement above is evidence about the CONTENTS."
+                : " — ❌ the pins ACCEPT a rotated asset, so they are decoration and their agreement means nothing.")
+          + (ok2
+                ? " The committed vectors are checkable without credentials, on the concept default too."
+                : " ❌ 8.13 is open on this tree."),
+            Tripped: ok2);
+    }
 
     // ══ Plan item 8.15 — the product-side evidence line degenerated to a tautology ════════════
 
