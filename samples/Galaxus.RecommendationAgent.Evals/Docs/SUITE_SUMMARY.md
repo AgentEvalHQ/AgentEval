@@ -1137,8 +1137,8 @@ exactly as published — they are the 2026-09-05 run at `f5874915` and they are 
 | | |
 |---|---|
 | **Executions** | **48** — 12 stage-1 dry runs · 3 stage-2 live smokes · 5 paid evals · 4 control-panel runs (2 ablations) · 13 `--real-vectors` · 8 demo runs · 3 concept-space restores |
-| **exit 0** | **43** |
-| **exit 1** | **5** — three × `-- 7` (GATE B, pre-existing), plus the two deliberate ablations. *(The paid evals' own gate failures are per-eval verdicts below, not command failures of the sweep.)* |
+| **exit 0** | **39** |
+| **exit 1** | **9**, every one accounted for: three × `-- 7` (**GATE B**, pre-existing) · **two deliberate ablations** that had to fail · and **four paid evals whose gates fail on the agent** — `-- 1`, `-- 5`, and `-- 6` both before and after the fix. **No unexplained non-zero.** |
 | **Library tests** | net10 **9,648 / 0 / 2 of 9,650** — unchanged before and after the fix; no `src/` or `tests/` file touched, no existing test file modified |
 | **Solution build** | 0 errors |
 | **Control panel** | **22 gating + 4 advisory = 26 rows**, all 22 gating caught, in **both** spaces |

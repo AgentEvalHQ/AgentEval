@@ -4043,7 +4043,7 @@ new gating control, and the eval re-run live — which is the entire reason the 
 | **Solution build** | `AgentEval.sln` **0 errors** |
 | **Library tests** | `tests/AgentEval.Tests` net10 **9,648 / 0 / 2 of 9,650**, before and after the fix. No file under `src/` or `tests/` was touched and no existing test file was modified |
 | **Control panel** | **21 gating + 4 advisory** → **22 gating + 4 advisory = 26 rows**, all 22 gating caught |
-| **Executions** | **48** — 12 stage-1 dry runs · 3 stage-2 live smokes · 5 paid evals · 4 control-panel runs, 2 of them ablations · 13 `--real-vectors` · 8 demo runs · 3 concept-space restores. Exit codes in `Docs/runs/2026-09-06_wave2-verify-f6f54d27/STAGE1_EXITCODES.txt` and `STAGE3_EXITCODES.txt`. Every non-zero is accounted for: three × `-- 7` (GATE B, pre-existing), two ablations that were meant to fail, and the three paid evals whose gates fail on the agent |
+| **Executions** | **48** — 12 stage-1 dry runs · 3 stage-2 live smokes · 5 paid evals · 4 control-panel runs, 2 of them ablations · 13 `--real-vectors` · 8 demo runs · 3 concept-space restores. Exit codes in `Docs/runs/2026-09-06_wave2-verify-f6f54d27/STAGE1_EXITCODES.txt` and `STAGE3_EXITCODES.txt`. **exit 0 on 39, exit 1 on 9**, and every non-zero is accounted for: three × `-- 7` (GATE B, pre-existing) · two ablations that had to fail · four paid evals whose gates fail on the agent (`-- 1`, `-- 5`, `-- 6` pre- and post-fix) |
 | **Measured spend** | **USD 41.3215** over **66 graded live turns**, from each eval's own cost panel. Two spends are UNMETERED and named in 27.6 |
 
 ---
