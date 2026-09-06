@@ -4221,8 +4221,9 @@ scored as silence**, and none did.
 
 ### 27.5 Persistence — every snapshot this run wrote, with its timestamp
 
-All thirteen pointers, `.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. **Store: 413
-files** (was 316 after Wave 1). The eight marked ● were written by this run.
+All thirteen pointers, `.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`, listed **after the
+closing re-verification**. **Store: 416 files** (was 316 after Wave 1). The eight marked ● were written by
+this run.
 
 | file | written | bytes | what it is |
 |---|---|---|---|
@@ -4233,8 +4234,8 @@ files** (was 316 after Wave 1). The eight marked ● were written by this run.
 | `eval02b_stated_need_probe.json` | 2026-09-05 18:20:05 | 3,008 | untouched |
 | `eval02c_held_out.json` | 2026-09-05 20:20:12 | 26,446 | the live suite. Untouched |
 | `eval02c_held_out_probe.json` | 2026-09-05 16:16:33 | 3,032 | untouched |
-| ● `eval03_controls.json` | 05:01:06 | 29,601 | **this run**, concept space, 26 rows |
-| ● `eval04_injection.json` | 05:01:07 | 4,664 | **this run**, concept space |
+| ● `eval03_controls.json` | 05:12:41 | 29,601 | **this run**, concept space, 26 rows (05:01:06 before the closing re-verification) |
+| ● `eval04_injection.json` | 05:12:41 | 4,664 | **this run**, concept space (05:01:07 before it) |
 | ● `eval05_quality.json` | 04:24:53 | 3,257 | **this run**, `-- 5` LIVE, 10 judged cells |
 | ● `eval06_trajectory.json` | 04:05:56 | 4,137 | **this run**, `-- 6` LIVE **post-fix**. The pre-fix run of 04:05 → archived |
 | ● `eval07_topology.json` | 05:01:09 | 12,908 | **this run**, concept space, run last on purpose |
