@@ -193,13 +193,70 @@ public sealed class IntegrityRunReport
     /// <summary>True when no zero-tolerance class fired anywhere in the run.</summary>
     public bool HardClean => DefectClasses.HardClasses.All(cls => CountOf(cls) == 0);
 
-    /// <summary>True when the soft classes met their rate AND something was actually presented.</summary>
+    /// <summary>
+    /// One CASE's soft-class clean rate — the fraction of that case's own presentations carrying no
+    /// soft-class defect. <see cref="double.NaN"/> when the case presented nothing.
+    /// </summary>
+    /// <param name="row">The graded row.</param>
+    /// <returns>The rate, or NaN on an empty denominator.</returns>
+    public static double SoftClassCleanRateFor(IntegrityRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        if (row.Verdict.PresentedCount == 0) return double.NaN;
+
+        int offending = DefectClasses.SoftClasses.Sum(cls => row.Verdict.CountOf(cls));
+        return Math.Max(0.0, (row.Verdict.PresentedCount - offending) / (double)row.Verdict.PresentedCount);
+    }
+
+    /// <summary>
+    /// The cases whose OWN soft-class clean rate is below <see cref="SoftClassThreshold"/>, in run
+    /// order. Cases that presented nothing are not in this list — they have no rate at all.
+    /// </summary>
+    public IReadOnlyList<string> CasesBelowSoftThreshold =>
+    [
+        .. _rows.Where(r => SoftClassCleanRateFor(r) is var rate && !double.IsNaN(rate) && rate < SoftClassThreshold)
+                .Select(r => r.Case.Id)
+    ];
+
+    /// <summary>
+    /// True when EVERY case that presented anything met the soft-class rate on its OWN
+    /// presentations, and at least one case presented something.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>PER CASE, never pooled — plan item 1.6 / N-7, fixed 2026-09-06.</b> The rule was
+    /// <c>SoftClassCleanRate &gt;= 0.90</c> over the whole run's presentations, and at the live
+    /// denominator of 32 that let <b>three</b> soft-class defects through. It was not hypothetical:
+    /// on the 2026-09-04 paid run, case <c>C-07</c> cited an attribute token
+    /// (<c>ant+B-fe-c-and-bluetooth</c>) that the product does not carry — <b>a fabricated citation
+    /// — and the soft gate PASSED at 96.9 %</b> against its 90 % bar. One case can be carried by
+    /// thirty-one others; it cannot carry itself.
+    /// </para>
+    /// <para>
+    /// This is the same remedy the suite has already applied twice for the same defect class —
+    /// Eval 02's <c>EveryPersonaAboveOwnFloor</c> and the per-persona popularity control — and it is
+    /// applied here for the same reason: <b>a mean is passed by an arm that is below the bar on most
+    /// of the members that produced it.</b>
+    /// </para>
+    /// <para>
+    /// ⚠ <b>What it still does NOT do, declared rather than discovered.</b> The bar is a RATE, so a
+    /// case presenting ten or more items would still pass with one soft defect
+    /// (9/10 = 0.900 ≥ 0.900). No case in this corpus presents ten — measured, the maximum is well
+    /// below it — so on the shipped corpus this rule is equivalent to zero tolerance per case. If a
+    /// case ever grows past nine presentations, that equivalence silently ends, which is why the
+    /// per-case rates are printed rather than summarised.
+    /// </para>
+    /// <para>
+    /// The pooled <see cref="SoftClassCleanRate"/> is kept and still printed — as CONTEXT, and it is
+    /// explicitly not what this gate reads.
+    /// </para>
+    /// </remarks>
     public bool SoftOk
     {
         get
         {
-            double rate = SoftClassCleanRate;
-            return !double.IsNaN(rate) && rate >= SoftClassThreshold;
+            bool anyScorable = _rows.Any(r => !double.IsNaN(SoftClassCleanRateFor(r)));
+            return anyScorable && CasesBelowSoftThreshold.Count == 0;
         }
     }
 

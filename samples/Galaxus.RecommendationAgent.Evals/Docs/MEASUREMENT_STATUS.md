@@ -6917,3 +6917,82 @@ dotnet run --project $E -- 4 --real-vectors | grep "Rubber-stamp loop"   # ident
 #     with    `ProposedCount > 0 && CandidateCount > 0`  -> INAPPLICABLE, ❌ NOT CAUGHT, exit 1
 #     with    `ProposedCount > 0`                        -> CONTAINED,    ✅ caught,     exit 0
 ```
+
+---
+
+## 49. WAVE 5 — plan item 1.6 (N-7): the soft-class gate was POOLED, and it passed a fabricated citation on the paid run (2026-09-06)
+
+### 49.1 The defect, and it is not hypothetical
+
+`IntegrityRunReport.SoftOk` was `SoftClassCleanRate >= 0.90` **pooled over the whole run's
+presentations**. At the live denominator that admits three soft-class defects.
+
+**MEASURED on the 2026-09-04 paid run** (`SUITE_SUMMARY` §3 and §19 item 8): case **C-07** presented
+`GLX-6012` citing the attribute token `ant+B-fe-c-and-bluetooth` — **a value the product does not
+carry**, i.e. a fabricated citation, class D5. **The soft gate PASSED at 96.9 % of 32 presentations
+against its 90 % bar.** One case was carried by thirty-one others.
+
+### 49.2 The fix — per case, never pooled
+
+`SoftOk` now requires **every case that presented anything** to clear the threshold on **its own**
+presentations, and names the ones that do not. This is the third application of the same remedy in
+this suite — Eval 02's `EveryPersonaAboveOwnFloor` and the per-persona popularity control are the
+other two — and the reason is identical: **a mean is passed by an arm that is below the bar on most
+of the members that produced it.**
+
+The pooled rate is kept and still printed, explicitly labelled *"for context only, NOT the gate"*,
+the same arrangement Eval 02's GATE 1 note makes.
+
+### 49.3 The ablation — discriminating, both rules against the SAME injected defect
+
+One fabricated citation injected into one case, reproducing the live shape:
+
+| rule | verdict | what it printed |
+|---|---|---|
+| pooled (shipped until 2026-09-06) | **✅ SOFT CLASSES** | 95.8 % of 24 presentations clean — **the false green** |
+| per case | **❌ SOFT CLASSES** | `1 case(s) BELOW — C-07` |
+
+Both runs saw the identical defect. Only the rule differed.
+
+### 49.4 What moves, and what does not
+
+- **The SOFT gate's verdict on the 2026-09-04 run moves PASS → FAIL.** `Passed = HardClean && SoftOk`
+  and `Passed` decides a paid run's exit code — but **the exit code of that run does NOT move**,
+  because a hard class had already fired and it exited 1 either way. The published headline
+  (*"Eval 01 — GATE FAILED, exit 1"*) stands; the sentence *"Soft classes (D2, D5) passed at 96.9 %"*
+  does not.
+- **No dry-run exit code moves.** `-- 1 --dry-run` returns on `DryRunPlumbingHeld`, not on the gate,
+  and it stays 0.
+- `-- 3` and `-- 3 --real-vectors` stay 0.
+
+### 49.5 ⚠️ What the fix still does NOT do, declared rather than discovered later
+
+The bar is a **RATE**, so a case presenting **ten or more** items would still pass with one soft
+defect (9/10 = 0.900 ≥ 0.900). No case in this corpus presents ten. On the shipped corpus the new
+rule is therefore *equivalent to zero tolerance per case* — and that equivalence ends silently the
+day a case grows past nine presentations, which is why the per-case rates are printed rather than
+summarised.
+
+⚠️ **And the soft classes' stated reason describes only one of them.** The code's rationale is *"a
+legitimate 'presenting on an attribute match, no review available' path exists and a zero-tolerance
+rule there would punish honesty."* That path produces **no citation at all**, so it produces no D5
+defect — a D5 is a citation that resolves against nothing, which is a fabrication rather than an
+honest silence. **Whether D5 belongs in the soft bucket at all is a taxonomy question this item did
+not open**, and moving it would change `HardClasses`, which several controls assert on by name.
+Named, not changed.
+
+### 49.6 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet run --project $E -- 1 --dry-run | grep -A2 "SOFT CLASSES"   # ✅, all scorable cases clear it
+dotnet run --project $E -- 3                                       # 0
+dotnet run --project $E -- 3 --real-vectors                        # 0
+
+# 49.3 ablation — IntegrityRunReport.Add, inject one D5 on one case:
+#   if (row.Case.Id == "C-07" && row.Verdict.PresentedCount > 0)
+#       row = row with { Verdict = row.Verdict with { Defects = [.. row.Verdict.Defects,
+#           new IntegrityDefect(DefectClasses.UnresolvableEvidence, "C-07", "GLX-6012", "ABLATION")] } };
+#   with SoftOk PER CASE  -> ❌ SOFT CLASSES, "1 case(s) BELOW — C-07"
+#   with SoftOk POOLED    -> ✅ SOFT CLASSES at 95.8% of 24        ← the false green
+```

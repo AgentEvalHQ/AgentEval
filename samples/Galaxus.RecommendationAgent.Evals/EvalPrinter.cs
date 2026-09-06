@@ -192,10 +192,23 @@ public static class EvalPrinter
         }
         else
         {
+            // ⚠ PER CASE, not pooled (plan item 1.6 / N-7). The pooled rate is printed for context
+            //   and is explicitly NOT what the gate reads — the same arrangement Eval 02's GATE 1
+            //   note makes, and for the same reason: one case can be carried by thirty-one others.
+            var below = report.CasesBelowSoftThreshold;
             Console.ForegroundColor = report.SoftOk ? ConsoleColor.Green : ConsoleColor.Red;
             Console.WriteLine($"  {(report.SoftOk ? "✅" : "❌")} SOFT CLASSES  "
-                            + $"(D2, D5) — {softRate:P1} of {report.PresentedTotal} presentations clean, "
-                            + $"threshold {IntegrityRunReport.SoftClassThreshold:P0}");
+                            + $"(D2, D5) — EVERY case against its OWN presentations, "
+                            + $"threshold {IntegrityRunReport.SoftClassThreshold:P0}"
+                            + (below.Count == 0
+                                ? ": all scorable cases clear it"
+                                : $": {below.Count} case(s) BELOW — {string.Join(", ", below)}"));
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"     Pooled for context only, NOT the gate: {softRate:P1} of "
+                            + $"{report.PresentedTotal} presentations clean. At that denominator the pooled "
+                            + "form let three soft-class defects through, and on the 2026-09-04 paid run it "
+                            + "passed a fabricated citation at 96.9%.");
             Console.ResetColor();
         }
 
