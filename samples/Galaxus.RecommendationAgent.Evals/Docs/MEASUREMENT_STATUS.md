@@ -7484,10 +7484,18 @@ pasted into**, and the sites predate the list.
 
 | command | warnings | errors |
 |---|---|---|
-| `dotnet build AgentEval.sln`, **nothing to compile** | **0** | 0 |
-| `dotnet build AgentEval.sln`, **something to compile** (after the sample project was rebuilt) | **62** | 0 |
+| `dotnet build AgentEval.sln` | **0**, then **62**, then **224** — *the same command, three readings, one tree* | 0 |
 | `dotnet build AgentEval.sln --no-incremental` | **224** | 0 |
 | `dotnet build samples/Galaxus.RecommendationAgent.Evals --no-incremental`, filtered to the evals project | **6** | 0 |
+
+🔴 **The first row was written as three separate rows and the FOURTH reading refuted it inside this
+same pass.** It said *"incremental, nothing to compile → 0"* and *"incremental with something to
+compile → 62"*, as if the two were properties of the situation. The very next `dotnet build
+AgentEval.sln` in this session — after nothing but a **documentation** edit and a commit — emitted
+**224**, the forced figure. MSBuild's up-to-date check does not survive the mixed project-level and
+solution-level builds this pass ran, so **`dotnet build AgentEval.sln` has no warning count; it has a
+warning count *per invocation***. Recorded rather than tidied: this is the fifth reading, taken after
+the section claiming there were four had already been committed (`5a6125fa`).
 
 ⚠️ **The forced-solution figure moved 221 → 224 and the movement is NOT reconciled.** The published
 histogram head was *"CS8602 146, CS1574 54, CS1573 40, CS8604 18, …"*; this run reads CS8602 **146**,
@@ -7496,7 +7504,13 @@ something else fell by 3, and the published histogram was truncated with an elli
 closed by arithmetic. **Not chased, and named rather than smoothed over** — no Wave-5 file appears at
 any CS1574 site (all twelve distinct sites are in files the wave never touched), so the +3 is not
 attributable to the wave by location either. **The stable fact is 0 errors; the warning total is a
-per-command, per-build-state quantity and this run produced four different true values for it.**
+per-INVOCATION quantity and this pass produced five different true values for it — one of them after
+publishing the sentence that said there were four.**
+
+✅ **And the doc commit's inertness was checked, which is the only thing that mattered here:**
+`5a6125fa` touches one Markdown file, and after it `-- 3` is **0** and `-- 7` is **1** in both spaces,
+unchanged. A moving warning count over a documentation-only commit is a fact about MSBuild, not about
+the tree.
 
 ### 54.3 Tests — three TFMs, after a full build, all three reproduce
 
