@@ -9725,3 +9725,108 @@ grep -rnc "ToScenarioResult" src/ --include="*.cs" | awk -F: '{s+=$2} END{print 
 grep -n "two.*named test files\|One\." $E/Docs/RUN_PROTOCOL.md | head
 git rev-parse --short e34d9614
 ```
+
+---
+
+## 64. WAVE 7's FIX PASS — the close-out (2026-09-06)
+
+**Nine commits, `fa95f214` → this one. Two of them touch `src/`, and that is the first time this
+branch's Galaxus work has, deliberately: 8.23 and 7.6 are library items and were worked under the
+library rules.**
+
+### 64.1 The tree
+
+* **Build:** `dotnet build AgentEval.sln --no-incremental` — **0 errors**. ⚠ **229 warnings on this
+  invocation, and §62.1 is why that digit is not the fact:** the same command over a byte-identical
+  tree read 226 and 229 at the Wave-6 close-out. **The stable quantity is the SET of distinct
+  `file(line,col): warning CODE` identities, and it is 68 — measured on this tree, now.**
+  ⚠ §62.1 published **65** at the previous close-out and that figure is NOT re-derived here: the
+  earlier tree is gone, and quoting a stored number beside a fresh one as though both were taken
+  the same way is the shape §7's standing rule forbids. **What is re-derived is 68.** Quote the
+  set, never the total.
+* **Tests, after a full solution build, `--no-build` per TFM** (the multi-TFM stale-binary trap):
+
+  | TFM | before this wave | after | delta |
+  |---|---|---|---|
+  | net10.0 | 9,699 / 0 / 2 of 9,701 | **9,752 / 0 / 2 of 9,754** | +53 |
+  | net9.0 | 9,481 / 0 / 1 of 9,482 | **9,534 / 0 / 1 of 9,535** | +53 |
+  | net8.0 | 9,481 / 0 / 1 of 9,482 | **9,534 / 0 / 1 of 9,535** | +53 |
+
+  **+53 on every TFM, which is exactly the number of tests this wave adds** (44 for 8.23, 9 for
+  7.6). **No existing test's outcome moved**, no existing test file was edited, and no existing
+  assertion was weakened — the two new files are additions.
+
+  ⚠ **The stale-binary trap bit this wave once and it is worth the line.** 7.6's first ablation pass
+  ran the unit tests with `--no-build` after building only the SAMPLE project, and all three
+  ablations reported 9 passed. The test DLL was stale. Re-run after a full solution build they fail
+  3 / 1 / 1. **A green suite that did not recompile the thing under test is not a green suite.**
+
+### 64.2 Exit codes — every one OBSERVED with `$?`, both spaces
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1/2/2b/2c/5/6/8/9 --dry-run` | **0** | `-- 8 --dry-run` **0** |
+| `-- 1 --dry-run --judge` 🆕 | **0** | — |
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 7` | **1** | **1** |
+| `--ci --dry-run` | **1** — eleven steps, **10 `passed` on the tight grep**, Eval 07 the only FAILED | — |
+
+**NOTHING MOVED.** `-- 7`'s GATE B is still the suite's only red gate and still the only failing
+member of the CI chain, exactly as at `0263141d`. ⚠ Use `grep -cE "^ *· Eval [0-9a-c]+: passed\.$"`
+— the loose form still returns 11 because a control's own prose quotes *"Eval 07: passed."*
+
+### 64.3 The control panel — 36 → 42 gating, verified BY NAME in both spaces
+
+**Six gating rows added, one per code item.** Verified by extracting the row names from each `-- 3`
+log and `diff`ing the two spaces: **identical, and `❌ NOT CAUGHT` = 0 in both.**
+
+| row | item |
+|---|---|
+| `CostRowsSayWhichZeroTheyMean` | 8.3 |
+| `RepSpreadNeverInventsAZero` | 8.1 / B-18 |
+| `TheJudgedPathIsReachableWithoutPaying` | 8.5 |
+| `TheAnswerTheCustomerReadsIsScreenedToo` | 8.6 / N-11a |
+| `ApplicableFractionDoesNotPoolTwoAbsences` | 7.6 / ADR-031 S2b |
+| `DeadPhrasesAreDiagnosedNotJustCounted` | 8.11 / D-v |
+
+**Advisory unchanged at 7**, and the tripping set is still **2 in concept** / **3 on
+`--real-vectors`** (`DenseLegSaysWhenItRankedNothing` is the third) — §56's asymmetry, undisturbed.
+Both spaces genuinely resolved: `galaxus-concept-v2, 24 dims` and
+`precomputed+azure (text-embedding-3-small, 1536 dims) … space probe 1.0000`, read off the banner.
+
+**27 ablations were executed across the six items that gained a gating row** — 8.3 five, B-18 six,
+8.5 five, 8.6 five, 7.6 three, D-v three — **and every one turned its row red. Four more were run
+for 8.23, which is pinned by TESTS rather than by a control: 31 in all.** Two of them were GREEN on the first attempt and the fix is recorded with the item:
+8.5's `judgeWiringHeld` needle was satisfied by a use that discarded the value, and 8.23's
+CalibratedEvaluator half was invisible to all 62 existing tests of that class.
+
+### 64.4 Persistence and credentials
+
+* **14 canonical keys**, unchanged. A model-free run writes exactly **three** — `eval03_controls`,
+  `eval04_injection`, `eval07_topology` — named by the write ledger in the `--ci --dry-run` banner.
+  **No new key, no changed record shape.**
+* **Credentials: 0.** Scanned this wave's own DIFF rather than the tree, because that is what this
+  wave added: `git diff fa95f214..HEAD | grep "^+"` yields **46 distinct 32+ character runs and
+  every one is a C# identifier** (test method names, control row names, type names). A literal
+  `grep -F` for the endpoint host returns **0**, reported as a count and never as a value, and
+  `openai.azure.com` appears **0** times in the added lines. **Nothing was planted this wave**, so
+  `RUN_PROTOCOL` stage 0c has nothing to clean up — the only positive control any of these items
+  needed was synthetic by construction.
+
+### 64.5 What this wave does NOT claim
+
+* **No agent-side verdict was re-measured. Nothing was purchased.** Every model-backed eval ran
+  under `--dry-run` or against a stub, and the only paid numbers quoted anywhere in §63 or §64 are
+  read off snapshots earlier runs left behind.
+* **§0.2's two headline claims did not move**, and could not have: neither `Eval02b_StatedNeed`
+  nor `Eval02c_HeldOutNextPurchase` is among the changed paths, and neither instrument's stored
+  record carries a stamp from this wave.
+* **8.6's screen has never seen a live answer.** It is inert on this corpus and that is NOT a
+  measured zero the way 1.7's N-11b's was — the only answers it has been shown are a stub's fixed
+  prose. Its rate on the shipped corpus is UNKNOWN.
+* **8.11 is a DIAGNOSIS, not a repair.** No lexicon entry changed and no coverage cell moved. D-ii
+  and D-iii were not worked and the commit says why.
+* **8.23's byte-level prediction is a prediction.** It was verified against every test in the
+  repository and against four Galaxus evals; it has not been verified against a live judge, because
+  that needs a paid run.
