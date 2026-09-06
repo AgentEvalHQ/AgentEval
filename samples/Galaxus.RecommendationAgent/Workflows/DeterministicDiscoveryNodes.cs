@@ -635,7 +635,14 @@ public static class DiscoveryPresentation
             builder.AppendLine();
         }
 
-        if (state.DroppedSkus.Count > 0)
+        // ⚠ THE FOOTNOTE IS A FOOTNOTE TO A TRAY, and with no tray there is nothing for it to be a
+        //   footnote to. When the loop presents nothing, the customer-facing account of that is the
+        //   shortfall section — the interest, why it could not be served, and a handover to a human
+        //   — not a bare list of rejected SKUs. Emitting the list alone would turn an abstention
+        //   into a several-hundred-character answer, which is the shape plan item 8.18 exists to
+        //   remove: a customer who named nothing must be shown nothing, and "shown nothing" has to
+        //   be measurable as a zero-length answer rather than as a shorter one.
+        if (state.DroppedSkus.Count > 0 && builder.Length > 0)
         {
             builder.AppendLine("Deliberately not shown");
             foreach (var dropped in state.DroppedSkus)

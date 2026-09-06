@@ -25,7 +25,7 @@ namespace Galaxus.RecommendationAgent.Workflows;
 /// </remarks>
 public static class DiscoveryPostChecks
 {
-    /// <summary>Runs containment, compatibility and anti-interest, in that order.</summary>
+    /// <summary>Runs containment, unnameable-interest, compatibility and anti-interest, in that order.</summary>
     /// <param name="state">The run state; <see cref="DiscoveryState.Ranked"/> is rewritten in place.</param>
     /// <param name="catalogue">The catalogue façade.</param>
     /// <param name="progress">Where the drop lines go.</param>
@@ -39,11 +39,20 @@ public static class DiscoveryPostChecks
         ArgumentNullException.ThrowIfNull(catalogue);
         progress ??= NullDiscoveryProgressSink.Instance;
 
-        var lines = new List<string>(3);
+        var lines = new List<string>(4);
         int proposed = state.Ranked.Count;
 
         var survivors = ProductContainmentCheck.Apply(state, out int uncontained);
         lines.Add($"SKU containment   {survivors.Count}/{proposed} selected id(s) present in the candidate set  ({uncontained} dropped)");
+
+        // Second, so a hallucinated id is still reported as a hallucination rather than as an
+        // attribution failure — and before compatibility, because an interest that names nothing
+        // cannot be served by a compatible product either.
+        int unnameableInterests = state.Interests.Count(InterestAttribution.NamesNothing);
+        survivors = UnnameableInterestFilter.Apply(state, survivors, out int unnameable);
+        lines.Add(unnameableInterests == 0
+            ? "unnameable interest  ARM INAPPLICABLE — every interest on this map names something a product could be matched against (chance floor 1.0, not a pass)"
+            : $"unnameable interest  {unnameableInterests} interest(s) name nothing  ({unnameable} dropped)");
 
         survivors = CompatibilityChecker.Apply(state, catalogue, survivors, out int incompatible);
         lines.Add(state.Constraints.Count == 0
@@ -118,6 +127,83 @@ public static class ProductContainmentCheck
             }
 
             kept.Add(item);
+        }
+
+        return kept;
+    }
+}
+
+/// <summary>
+/// An interest that NAMES NOTHING cannot be served by anything, so nothing may be presented for
+/// it — whatever the retriever returned when the loop asked on its behalf.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Why this exists: the gate was fixed and the tray was not (plan item 8.18).</b>
+/// <c>aae2024d</c> stopped the COVERAGE gate keying on the retriever's ranking: an interest whose
+/// attribution vocabulary is empty is UNCOVERED and STARVED however many candidates came back and
+/// however well they scored, so the reviewer reports <c>GAPS_UNRESOLVABLE</c> and the loop does
+/// not go round again. That fixed the LOOP. It did not fix the ANSWER: the candidates retrieved in
+/// round 1, <i>before</i> the gate ran, are already in
+/// <see cref="DiscoveryState.Candidates"/>, and the Ranker reads the candidate set — not the
+/// coverage ledger. MEASURED at <c>41cd09a2</c> on <c>--real-vectors</c>: Luca Ferrari
+/// (<c>USR-LF-04</c>) — one order line and the contentless utterance <i>"Hi — what do you
+/// recommend for me?"</i> — went from five presented products to <b>two</b>, and two is not zero.
+/// A customer who named nothing was still shown a tray.
+/// </para>
+/// <para>
+/// <b>It screens the INTEREST, not the candidate.</b> The narrow, unambiguous case is the one that
+/// gates: nothing the customer said can be matched against anything, so every product credited to
+/// that interest is arbitrary by construction. The WIDER case — a candidate that carries nothing a
+/// nameable interest names — is measured and printed on every ledger
+/// (<see cref="InterestCoverage.AttributableProductIds"/>) and deliberately NOT gated here: it
+/// flips four of Eval 07's five personas and removes the corpus's only approved exit, which is a
+/// decision about what the shipped demo answers rather than a defect fix (plan item 8.21).
+/// </para>
+/// <para>
+/// <b>It runs where BOTH rankers pass.</b> <see cref="DeterministicRanker"/> and the model Ranker
+/// both end in <see cref="DiscoveryPostChecks.Apply"/>, so a model that selects a product for an
+/// unnameable interest is refused by the same code that refuses the deterministic arm's selection.
+/// Placing it inside either ranker would leave the other one open.
+/// </para>
+/// </remarks>
+public static class UnnameableInterestFilter
+{
+    /// <summary>Removes every ranked item credited to an interest that names nothing.</summary>
+    /// <param name="state">The run state; drops are appended to <see cref="DiscoveryState.DroppedSkus"/>.</param>
+    /// <param name="candidates">The survivors of the previous check.</param>
+    /// <param name="dropped">How many were removed.</param>
+    public static IReadOnlyList<RankedRecommendation> Apply(
+        DiscoveryState state,
+        IReadOnlyList<RankedRecommendation> candidates,
+        out int dropped)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var kept = new List<RankedRecommendation>(candidates.Count);
+        dropped = 0;
+
+        foreach (var item in candidates)
+        {
+            var interest = state.FindInterest(item.InterestId);
+
+            // An interest id that does not resolve is somebody else's defect — the model Ranker
+            // drops those itself, with its own reason. Screening it a second time here would
+            // attribute it to this check.
+            if (interest is null || !InterestAttribution.NamesNothing(interest))
+            {
+                kept.Add(item);
+                continue;
+            }
+
+            state.DroppedSkus.Add(new DroppedSku(item.ProductId,
+                $"selected for \"{interest.Label}\", which names nothing a product could be matched against — no "
+              + "attribute hint, no category hint, no content word. A query with no content still returns a ranked "
+              + "list, so this product is what the index happened to rank first and not an answer to anything the "
+              + "customer said. Removed, not down-ranked: there is no position at which an arbitrary product "
+              + "becomes a recommendation"));
+            dropped++;
         }
 
         return kept;

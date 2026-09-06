@@ -99,6 +99,7 @@ public static class NegativeControls
         rows.Add(CheckEval09RuleAndRemedy());
         rows.Add(CheckJudgeEchoJoins());
         rows.Add(CheckContentlessRequestIsNotCovered());
+        rows.Add(CheckUnnameableInterestPresentsNothing());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -2464,6 +2465,193 @@ public static class NegativeControls
                 + $"still {DiscoveryState.MinCandidateScore:0.000}, dense floor still "
                 + $"{HybridRetriever.DefaultDenseScoreFloor:0.000}. ⚠ SPACE-INDEPENDENT: this proves the MECHANISM, "
                 + "not that a --real-vectors run abstains again. That needs a paid run."
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 21 — the gate was fixed and the TRAY was not (plan item 8.18). ═════════════
+    //
+    /// <summary>
+    /// An interest that NAMES NOTHING must not put a single product in front of the customer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect this row exists for is the unclosed half of <c>aae2024d</c>.</b> That commit
+    /// made the coverage gate ask the right question, and the loop obeyed: the interest goes
+    /// UNCOVERED and STARVED, the reviewer reports <c>GAPS_UNRESOLVABLE</c> and no second query is
+    /// written. The ANSWER did not obey. The candidates retrieved in round 1 — before the gate ran
+    /// — are already in <c>DiscoveryState.Candidates</c>, and the Ranker reads the candidate set,
+    /// never the coverage ledger. MEASURED on <c>--real-vectors</c> at <c>41cd09a2</c>: Luca
+    /// Ferrari's five products became <b>two</b>, and a customer who named nothing was still shown
+    /// a tray.
+    /// </para>
+    /// <para>
+    /// <b>It drives the production path, not a convenience property.</b> The previous row in this
+    /// panel shipped asserting <c>InterestCoverage.IsStarved</c>, which nothing in the workflow
+    /// reads (correction ⑬ item 3). So this one runs the two real SKUs the real-vector run
+    /// actually surfaced — <c>GLX-7001</c> and <c>GLX-7006</c> — through
+    /// <see cref="DiscoveryPostChecks.Apply"/>, the one seam BOTH rankers pass through, and then
+    /// through <see cref="DiscoveryPresentation.Render"/>, which is what writes
+    /// <c>FinalAnswer</c> — the field Eval 07's GATE C measures.
+    /// </para>
+    /// <para>
+    /// <b>Both directions, and the threshold.</b> The same two SKUs credited to an interest that
+    /// DOES name something must survive and must produce a non-empty answer, or this is a filter
+    /// that refuses everything and would look identical on the row above. And the drop reason must
+    /// NOT name a score floor: there are two ways to present nothing now, and pointing the reader
+    /// at <c>MinCandidateScore</c> for the one where the candidates cleared it comfortably is the
+    /// fix that must not be made — the same shape as the pre-gate line corrected in
+    /// <c>41cd09a2</c>.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckUnnameableInterestPresentsNothing()
+    {
+        var problems = new List<string>();
+        var catalogue = Catalogue.Default;
+
+        // The two products the --real-vectors run actually put in front of Luca. Real SKUs, so a
+        // catalogue change that removes them fails this row loudly instead of silently emptying it.
+        string[] skus = ["GLX-7001", "GLX-7006"];
+
+        static Interest SessionRequest(string utterance, string id) =>
+            DiscoveryInterestMapping.ToInterest(
+                new InterestSignal(
+                    Label: utterance,
+                    Strength: 1.0,
+                    EvidenceKind: InterestEvidenceKinds.StatedInSession,
+                    EvidencePurchaseIds: []),
+                id);
+
+        // One state builder used for both directions, so the ONLY difference between the two runs
+        // below is what the customer said. Anything else differing would confound the comparison.
+        DiscoveryState Build(Interest interest)
+        {
+            var state = new DiscoveryState
+            {
+                CustomerId = Personas.LucaUserId,
+                Market = "CH",
+                Language = "fr",
+                SessionRequest = interest.Label,
+            };
+            state.Interests.Add(interest);
+
+            var coverage = state.CoverageFor(interest.Id);
+            coverage.QueriesRun.Add(state.SessionRequest);
+            coverage.AttributionVocabularyEmpty = InterestAttribution.NamesNothing(interest);
+
+            foreach (string sku in skus)
+            {
+                if (!catalogue.TryGet(sku, out var product) || product is null)
+                {
+                    problems.Add($"{sku} is not in the catalogue — this row is asserting nothing.");
+                    continue;
+                }
+
+                coverage.CandidateProductIds.Add(sku);
+                state.Candidates.Add(DiscoveryProjection.ToCandidate(
+                    catalogue, product, score: 0.500, interest.Id, state.SessionRequest));
+            }
+
+            return state;
+        }
+
+        var contentless = Build(SessionRequest(GalaxusDemoPrompts.LucaThinSignal, "I-1"));
+        var naming = Build(SessionRequest("I need a 58 mm espresso tamper and a scale", "I-1"));
+
+        // ── The Ranker SELECTS them. That is not the defect and must stay true, or the filter
+        //    below would be screening an empty list and would prove nothing. ──
+        contentless.Ranked.AddRange(DeterministicRanker.Select(contentless, catalogue));
+        naming.Ranked.AddRange(DeterministicRanker.Select(naming, catalogue));
+
+        if (contentless.Ranked.Count == 0)
+            problems.Add("the deterministic Ranker selected NOTHING for the contentless interest before the filter ran — "
+                       + "this row cannot show the filter fired, because there was nothing to filter.");
+
+        var lines = new List<string>();
+        var sink = new CapturingProgressSink(lines);
+
+        // ⚠ THROUGH DiscoveryPostChecks.Apply — the seam the deterministic Ranker AND the model
+        //   Ranker both end in. A filter placed inside either one leaves the other open.
+        var contentlessTrace = DiscoveryPostChecks.Apply(contentless, catalogue, sink);
+        var namingTrace = DiscoveryPostChecks.Apply(naming, catalogue, sink);
+
+        if (contentless.Ranked.Count != 0)
+        {
+            problems.Add($"{contentless.Ranked.Count} product(s) survived the post-checks for an interest that names "
+                       + $"NOTHING ({string.Join(", ", contentless.Ranked.Select(r => r.ProductId))}) — the coverage gate "
+                       + "refuses the interest and the tray is still built out of what the contentless query returned.");
+        }
+
+        if (naming.Ranked.Count != skus.Length)
+        {
+            problems.Add($"only {naming.Ranked.Count} of {skus.Length} product(s) survived for an interest that DOES name "
+                       + "something — the filter refuses everything, which would look identical on the row above.");
+        }
+
+        // ── The drop is VISIBLE and names the right cause. ──
+        string reasons = string.Join(" | ", contentless.DroppedSkus.Select(d => d.Reason));
+        if (contentless.DroppedSkus.Count != skus.Length)
+            problems.Add($"{contentless.DroppedSkus.Count} drop(s) recorded for {skus.Length} removed product(s) — a drop nobody can see is not a guardrail.");
+        if (!reasons.Contains("names nothing", StringComparison.Ordinal))
+            problems.Add($"the drop reason does not say the interest names nothing — it said: \"{Shorten(reasons, 70)}\".");
+        if (reasons.Contains("score floor", StringComparison.Ordinal) || reasons.Contains("MinCandidateScore", StringComparison.Ordinal))
+            problems.Add("the drop reason blames a SCORE FLOOR for candidates that cleared it — the printed remedy points at the one number that must not be moved.");
+        if (naming.DroppedSkus.Count != 0)
+            problems.Add($"{naming.DroppedSkus.Count} product(s) were dropped for an interest that names something.");
+
+        // The Ranker publishes these lines verbatim as its trace, so a reader sees the check fire.
+        string trace = string.Join(" | ", contentlessTrace);
+        if (!trace.Contains("unnameable interest", StringComparison.Ordinal))
+            problems.Add($"the Ranker's trace has no line for this check — it printed: \"{Shorten(trace, 70)}\".");
+        if (!trace.Contains("(2 dropped)", StringComparison.Ordinal))
+            problems.Add($"the trace line does not report the two drops — it printed: \"{Shorten(trace, 90)}\".");
+
+        // …and on a map where nothing is unnameable the arm is INAPPLICABLE, printed as such. A
+        // check that cannot fire on a customer must not print a tick beside their name.
+        string namingTraceText = string.Join(" | ", namingTrace);
+        if (!namingTraceText.Contains("ARM INAPPLICABLE", StringComparison.Ordinal))
+            problems.Add("with no unnameable interest on the map the arm printed a result rather than ARM INAPPLICABLE — "
+                       + "a check with a chance floor of 1.0 must say so, not show a tick.");
+
+        // ── And what the CUSTOMER ends up with. FinalAnswer is the field Eval 07's GATE C reads. ──
+        DiscoveryPresentation.Render(contentless, catalogue, sink, modelProse: null, print: false);
+        DiscoveryPresentation.Render(naming, catalogue, sink, modelProse: null, print: false);
+
+        if (contentless.Presented.Count != 0)
+            problems.Add($"{contentless.Presented.Count} item(s) reached the customer for an interest that names nothing.");
+        if (contentless.FinalAnswer.Length != 0)
+        {
+            problems.Add($"the composed answer is {contentless.FinalAnswer.Length} character(s) long where it must be zero — "
+                       + $"\"{Shorten(contentless.FinalAnswer, 60)}\". An abstention that still writes several hundred "
+                       + "characters is not an abstention, and Eval 07's GATE C measures exactly this length.");
+        }
+
+        if (naming.Presented.Count == 0 || naming.FinalAnswer.Length == 0)
+        {
+            problems.Add($"an interest that DOES name something presented {naming.Presented.Count} item(s) and composed "
+                       + $"{naming.FinalAnswer.Length} character(s) — the answer path is broken for everyone, not just for the refused case.");
+        }
+
+        // ── The thresholds have NOT moved. Same assertion as the row above, for the same reason:
+        //    this defect has an available "fix" that consists of raising a calibrated number. ──
+        if (DiscoveryState.MinCandidateScore != 0.012)
+            problems.Add($"MinCandidateScore is {DiscoveryState.MinCandidateScore}, not 0.012 — a threshold moved to paper over the tray.");
+
+        return new ControlRowSnapshot(
+            "UnnameableInterestPresentsNothing",
+            "an interest that NAMES NOTHING must reach the customer with an EMPTY tray and a zero-character answer, not "
+          + "with a shorter one. aae2024d fixed the coverage gate — the loop refuses the interest and stops — and left the "
+          + "presentation path alone, so the candidates retrieved before the gate ran still flowed through the Ranker to "
+          + "the Presenter: on --real-vectors Luca Ferrari went from five products to two, and two is not zero. The filter "
+          + "must sit where BOTH rankers pass, must still present the same products for an interest that does name "
+          + "something, must record a visible drop, and must not blame the score floor for candidates that cleared it.",
+            problems.Count == 0
+                ? $"{skus.Length} real candidate(s) ({string.Join(", ", skus)}) selected by the Ranker for a contentless "
+                + $"request → {contentless.Ranked.Count} survive the post-checks, {contentless.DroppedSkus.Count} drop(s) "
+                + $"recorded naming the interest rather than a threshold, {contentless.Presented.Count} presented, "
+                + $"FinalAnswer {contentless.FinalAnswer.Length} char(s) · the SAME two candidates on an interest that "
+                + $"names something → {naming.Ranked.Count} survive, {naming.Presented.Count} presented, "
+                + $"{naming.FinalAnswer.Length} char(s) · MinCandidateScore still {DiscoveryState.MinCandidateScore:0.000}"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

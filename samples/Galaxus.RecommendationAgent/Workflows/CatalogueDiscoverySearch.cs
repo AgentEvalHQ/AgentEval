@@ -87,9 +87,7 @@ public sealed class CatalogueDiscoverySearch(
             // the score the retriever happened to return.
             var forInterest = state.FindInterest(entry.InterestId);
             if (forInterest is not null)
-                coverage.AttributionVocabularyEmpty = InterestAttribution.Vocabulary(forInterest).Count == 0
-                    && forInterest.AttributeHints.Count == 0
-                    && forInterest.CategoryHints.Count == 0;
+                coverage.AttributionVocabularyEmpty = InterestAttribution.NamesNothing(forInterest);
 
             // Named, not counted. The search line is published AFTER ingest so it can say WHICH
             // products this query discovered — "→ 6" tells an audience a query worked, it does

@@ -180,6 +180,35 @@ public static class InterestAttribution
     }
 
     /// <summary>
+    /// True when <paramref name="interest"/> names NOTHING a product could be matched against:
+    /// no attribute hint, no category hint, and not one content word.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ONE predicate, read by everything that has to refuse such an interest.</b> It was
+    /// written inline in <see cref="CatalogueDiscoverySearch"/> and nowhere else, which made it a
+    /// property of the search rather than a property of the interest — so the coverage gate could
+    /// refuse the interest while the Ranker, which never looks at a coverage row, still built a
+    /// tray out of whatever the contentless query had returned. That is plan item <b>8.18</b>: the
+    /// gate was fixed and the tray was not.
+    /// </para>
+    /// <para>
+    /// It reads the interest and nothing else — no retrieval score, no candidate count, no
+    /// coverage row. A caller therefore cannot be handed an answer computed from the output it is
+    /// screening.
+    /// </para>
+    /// </remarks>
+    /// <param name="interest">The interest.</param>
+    public static bool NamesNothing(Interest interest)
+    {
+        ArgumentNullException.ThrowIfNull(interest);
+
+        return interest.AttributeHints.Count == 0
+            && interest.CategoryHints.Count == 0
+            && Vocabulary(interest).Count == 0;
+    }
+
+    /// <summary>
     /// True when two folded words are the same word: whole tokens, one a PREFIX of the other,
     /// both at least <see cref="MinimumWordLength"/> long.
     /// </summary>
