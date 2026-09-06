@@ -5676,3 +5676,63 @@ dotnet test tests/AgentEval.Tests -f net10.0 --filter "FullyQualifiedName~Inappl
 # the ablation: drop "inapplicable" from the label enum and the "measurement" line
 #   -> Failed: 4, Passed: 2, Total: 6
 ```
+
+---
+
+## 40. WAVE 4 — the closing sweep, and the stage-2 live smoke the constant split required (2026-09-06)
+
+### 40.1 Why there is a live stage at all
+
+Four of Wave 4's five commits are eval-side or schema-side and touch no model path. **One is not.**
+`DeterministicRanker.Confidence` — the method whose half-saturation constant was split — is called from
+`ModelDiscoveryNodes.cs:729`, on the **live** workflow's ranker branch. The standing protocol says a
+change that reaches a model path gets the smallest possible live unit before anything is claimed about
+it, and an arithmetically-inert change is still a change until it has been run.
+
+### 40.2 Stage 1 — every model-free command, at `de4ef8ca`
+
+| command | exit |
+|---|---|
+| `dotnet build AgentEval.sln -c Debug` | **0 errors**, 221 warnings (unchanged) |
+| `dotnet test tests/AgentEval.Tests` | net10 **9,648/0/2 of 9,650** · net9 **9,430/0/1 of 9,431** · net8 **9,430/0/1 of 9,431** |
+| `Evals -- 3` | **0** — 34 rows, 28 gating all caught, 6 advisory |
+| `Evals -- 4` | **0** |
+| `Evals -- 7` | **1** — GATE B, by decision (§36.4) |
+| `Evals --ci --dry-run` | **1** — the same GATE B, correctly |
+
+### 40.3 Stage 2 — one live unit, foreground, exit code captured
+
+`Agent -- 2 --user USR-NB-01` (live workflow, concept default — the reproducible space, decision D8).
+**Exit 0**, captured in the foreground, not derived.
+
+| | observed |
+|---|---|
+| model calls | **3** — `InterestMapper` (24.52 s), `Ranker` (31.63 s), `Presenter` (11.95 s). `Discovery` and `CoverageReviewer` made **0**, as the pre-model gate promises |
+| rounds | 2, with the loop-back **actually traversed** — route trace `…→ discovery-to-review → review-to-more-discovery → discovery-to-review →…` |
+| the split constant, live | `GLX-2006 — low_confidence: confidence 0.68 is below the primary threshold` — the live ranker branch reads `RetrievalConfidenceHalfSaturation` and routes on the number it produces |
+| tray | 7 selected, 7 shown, 0 post-check drops, 0 guardrail drops |
+| credential leakage | **0 matches** for `apikey` / `api-key` / `bearer` across all 275 lines of the log |
+
+**That is what the smoke was for:** the offline proof that the split is arithmetically inert is a proof
+about the deterministic arm, and the live arm reaches the same method by a different route.
+
+### 40.4 ⚠️ Cost: NOT METERED, and that is plan item 8.17 reproducing
+
+The run made three live model calls and **printed no token count, no usage block and no currency
+figure** — `grep -i "token|usd|spend|cost"` over the log returns only the pre-model gate's prose. Per
+the standing cost rule, the honest report is therefore **"3 live model calls, cost unmetered by the
+sample"**, and not an estimate. **Item 8.17 (*"neither demo prints a spend panel at all"*) is
+re-confirmed on a live run rather than inferred from the code**, which is the second time this wave a
+deferred item turned out to be checkable for free.
+
+### 40.5 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet build AgentEval.sln -c Debug
+dotnet test tests/AgentEval.Tests
+for c in 3 4 7; do dotnet run --project $E -- $c; echo "exit=$?"; done
+dotnet run --project $E -- --ci --dry-run; echo "exit=$?"
+dotnet run --project $A -- 2 --user USR-NB-01     # LIVE, 3 model calls, exit 0
+```
