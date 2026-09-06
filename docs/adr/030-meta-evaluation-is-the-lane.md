@@ -1472,6 +1472,40 @@ is `IsPackable=false` and **I have not traced how it reaches consumers**, so the
 consequence is unverified; **(b)** a namespace inside `AgentEval.Core`, giving up portability and the
 upstream option. Recommend (a). **Needs a packaging check before it is chosen.**
 
+> ✅ **ANSWERED 2026-09-06 (Wave 3) — the packaging path is TRACED AND MEASURED, and the premise of
+> the doubt was wrong.** The check is `dotnet pack src/AgentEval/AgentEval.csproj -c Release` followed
+> by reading the `.nupkg`, and it was run:
+>
+> - **`IsPackable=false` does not keep a type away from consumers.** Fifteen of the sixteen projects
+>   under `src/` are `IsPackable=false`; exactly two ship — `AgentEval` and `AgentEval.Cli`.
+>   `src/AgentEval/AgentEval.csproj` references every sub-project with `PrivateAssets="all"` and its
+>   `IncludeSubProjectDlls` target copies each `ProjectReference` output into `BuildOutputInPackage`.
+>   **Measured in `AgentEval.0.34.0-beta.nupkg`: `lib/net8.0/` holds 14 DLLs, and
+>   `AgentEval.Abstractions.dll` is one of them.** So `AgentEval.Abstractions`' public types are
+>   already on a consumer's compile surface today, through the `AgentEval` package.
+> - **The route for (a) is one line**: a `ProjectReference … PrivateAssets="all"` in
+>   `src/AgentEval/AgentEval.csproj`. No new `PackageId`, no second package to version in lockstep.
+> - **And the packaging check finds the real argument for (a), which is not portability.**
+>   `PrivateAssets="all"` suppresses transitive dependency propagation, so **every external
+>   `PackageReference` of every sub-project has to be re-declared by hand** in `AgentEval.csproj`.
+>   Measured: the packed nuspec's `net8.0` group carries **11** such hand-mirrored dependencies, and
+>   the file itself records that one of them (`OpenTelemetry.Api`, floor 1.15.3) exists only because
+>   omitting it let consumers resolve a vulnerable version — i.e. this list has already failed once,
+>   in a security-relevant way. **A BCL-only `AgentEval.Meta` adds ZERO entries to that list. A
+>   namespace in `AgentEval.Core` inherits four.** That is a measured property of this repo's
+>   packaging, not a preference.
+> - ⚠️ **One consequence to declare, because it narrows what "portable" buys.** A DLL that arrives via
+>   `BuildOutputInPackage` has **no NuGet identity**: nobody can reference `AgentEval.Meta` alone,
+>   they take all of `AgentEval`. Under this scheme the meta lane is portable **as source** — which
+>   is what an upstream contribution needs — and is *not* separately consumable. If separate
+>   consumability is ever wanted, that is a second `PackageId`, and it is a different decision from
+>   this one.
+>
+> **Ruling: (a).** It is a one-line packaging change, it is the only option that adds no entry to a
+> hand-maintained dependency mirror that has already failed once, and Slice 1's two existing types
+> (`MeasurementState`, `ObservationCensus`) move with it under the standing "a later file move
+> changes no namespace" note. **Q2 no longer blocks Phase 4.**
+
 **Q3 — `MicrosoftEvaluatorAdapter` retarget (Slice 0.4).** Hard break (`IMetric` → `IEval`), or keep
 both with the `IMetric` path `[Obsolete]` for one minor? Recommend dual-target with `[Obsolete]`;
 it costs ~20 lines and removes the only breaking change from Slice 0.
@@ -1511,6 +1545,27 @@ byte-level prediction either way.**
 > **today** — which that wave's rules forbid. Those two files say so themselves: *"the day the schema
 > bumps, they are the tests that have to change on purpose."* Re-derive with `MEASUREMENT_STATUS.md`
 > §25.3(c).
+>
+> ✅ **ANSWERED 2026-09-06 (Wave 3), and the answer is that Q4 is no longer what blocks 1.4.**
+> On the merits, with the measurement above in hand: **(i) is APPROVED — do the widening now.** It is
+> free, reversible, regresses **0 of 949** documents on disk, moves no stored content hash, and the
+> defect it fixes (an honest inapplicable artifact being *rejected* by our own schema) is live.
+> **(ii) — writing the field unconditionally and bumping `$id` — is DEFERRED to the next major**, and
+> the release note carries the byte-level prediction that every historical `ScenarioResult` content
+> hash changes at that boundary. Splitting them costs nothing and buys the whole of (i) immediately;
+> batching them, as the original recommendation proposed, prices the free half at the breaking half's
+> rate.
+>
+> ⚠️ **But (i) still did not ship, and the blocker has CHANGED IDENTITY without anybody recording it.**
+> It is no longer Q4. Widening the schema makes
+> `tests/AgentEval.Tests/Evals/InapplicableSchemaBoundaryTests.cs` and
+> `EvalScoreMeasurementWithExpressionTests.cs` fail **by design** — they exist to pin what v1 refuses
+> — and every wave since Wave 2 has run under a standing rule that no existing test file may be
+> edited. So **1.4 is blocked by a process rule, not by an open question**, and it will stay blocked
+> for as long as that rule holds, no matter how Q4 is answered. Whoever funds 1.4 must fund the edit
+> to those two files *in the same change* and say so up front; that is the whole remaining cost, and
+> it is about twenty lines. Recording this is the point: an item parked under the wrong blocker never
+> comes up for the decision that would actually release it.
 
 **Q5 — Slice 3 (negative controls): funded, or genuinely deferred?** The review's position is that
 machinery with one consumer rots in six months and controls are the most ceremony-heavy part. My
@@ -1518,10 +1573,43 @@ position is that the `(d3 > 0 || d4 > 0)` defect — a dead detector printing a 
 the single most valuable thing the controls prevent, and it is unwritable only if the API exists.
 **These conflict. The user decides.**
 
+> ⬜ **STILL THE USER'S — but the review's half of the conflict has weakened twice since it was
+> written, and both movements are measured.** The objection is *"machinery with one consumer rots in
+> six months"*, and when it was written the only consumer was the library's own retrofit.
+> **(1)** Phase 2.7 is a second consumer and it is not a test — six threshold values selected across
+> two embedding spaces is `ChanceFloor.Empirical(…, policiesConsidered: 6)` exactly, which §4.5 makes
+> throw without a named held-out split. **(2)** Wave 3 added a third instance of the defect class the
+> controls exist to prevent, found the same way the other two were — by adversarial re-reading rather
+> than by the suite: Eval 07's per-case expectation named a mechanism its own run refutes on **3 of 3**
+> looping cases (`MEASUREMENT_STATUS` §28). That is **four** logged instances (§20.11 items 3 and 7,
+> 2.7, §28), none of which any automated check caught.
+> ⚠️ **This is evidence about frequency, not about the API.** It says the defect keeps happening; it
+> does not say `INegativeControl` is what would have caught it — three of the four were caught by a
+> human reading, and no control suite has been shown able to catch any of them. The honest framing of
+> the decision is therefore *"fund a lane whose value is demonstrated and whose mechanism is not"*,
+> and that framing is the user's to weigh.
+
 **Q6 — The stop rule (Slice 2.6).** If the Eval 02 retrofit does not delete the hand-rolled sign
 test and the per-persona floor loop, does the programme actually stop, or does it continue with a
 recorded finding? Recommend it actually stops. **A stop rule nobody will honour is worse than no stop
 rule.**
+
+> ⬜ **STILL THE USER'S, and deliberately left open 2026-09-06 (Wave 3) — but the price is now known
+> and it is lower than when the question was written.** Wave 1 **deleted** `SignTest` outright from
+> `PairedCoverageReport` (correction ⑪) and `GraderSanity` now refuses, by reflection, any pairing
+> method without a `CoverageMetric`. So one of the two things 2.6's acceptance requires to be deleted
+> is *already gone*, deleted for an unrelated reason, and what remains under test is the per-persona
+> floor loop alone. That halves the thing the stop rule would have to stop for, and it is evidence
+> the deletion is achievable rather than aspirational. **Answering YES costs nothing today and is
+> expensive to renege on later; that asymmetry is the decision, and it is the user's to take.**
+
+> ### ⬜ Q5 and Q6 are the only two questions in §9 still open (2026-09-06, Wave 3)
+> Q1, Q3 and Q7 closed at `4d1f1bbc`; **Q2, Q4 and Q8 are answered above.** Q5 and Q6 are left open
+> **on purpose**: both are marked in this document as the user's call, one of them explicitly
+> (*"These conflict. The user decides."*), and answering a preference question on the owner's behalf
+> is not the same as discharging a factual one. What Wave 3 changed is that **neither of them blocks
+> anything that is currently ready to start**: Phase 4 was gated on Q2 and is now unblocked; Phase 7.4
+> is the only item still waiting on Q5.
 
 **Q7 — Does the exclusion list (§3.1) go into `docs/adr/030-*.md` as normative text**, so a PR adding
 `contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.
@@ -1533,6 +1621,22 @@ rule.**
 - `AgentEval.Abstractions`' packaging path (Q2);
 - the `~3,800` full-design library-growth figure is the migration lane's estimate at this repo's
   density and was not independently derived.
+
+> ✅ **DISCHARGED 2026-09-06 (Wave 3) — one of the four is now MEASURED, and the other three are
+> marked UNKNOWN in this text, which is what this question asked for.** Q8's acceptance was *"either
+> re-derived or marked UNKNOWN in the ADR text"*, and marking is the honest half of it: an estimate
+> that reads like a measurement is the defect, not the estimate.
+>
+> | # | Item | Status |
+> |---|---|---|
+> | 1 | ecosystem sweep (§2.4) | 🔶 **UNKNOWN — not re-run.** It needs network access to current releases of five frameworks; nothing offline can settle it. §10 item 1 is the standing trigger for re-running it, and until then §2.4's *"nobody in the ecosystem ships it"* is a **checkable claim that has not been re-checked**, dated 2026-09-05 |
+> | 2 | funded-slice delta ~−974 (§5.2) | 🔶 **UNKNOWN — an attribution estimate.** It cannot become a measurement until Phase 5.2 lands and `git diff --stat` exists (= Phase 5.3). Do not quote −974 as a measured number anywhere |
+> | 3 | `AgentEval.Abstractions`' packaging path | ✅ **MEASURED** — see the Q2 box above: packed, opened, `AgentEval.Abstractions.dll` present in `lib/net8.0/`, 11 hand-mirrored dependencies counted |
+> | 4 | `~3,800` library growth | 🔶 **UNKNOWN — not independently derived.** It is the *full four-lane* design's figure, and the full design is not funded (§8), so it is an estimate of work nobody has agreed to do. Its only current use is rhetorical; treat it as such |
+>
+> **The rule this leaves behind:** three of these four figures are quoted elsewhere in the programme.
+> Where they are, they must carry UNKNOWN with them. **Q8 no longer gates execution** — it gates
+> *quotation*, which is a standing obligation rather than a milestone.
 
 ---
 
