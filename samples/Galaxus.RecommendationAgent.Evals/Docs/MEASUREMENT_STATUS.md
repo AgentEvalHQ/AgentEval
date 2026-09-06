@@ -4612,3 +4612,99 @@ dotnet run --project $E -- 2 --dry-run    # exit 0 · the forced-choice panel no
 dotnet run --project $E -- --ci --dry-run # exit 0
 dotnet run --project $E -- 7              # exit 1 (GATE B, §28) — unchanged
 ```
+
+---
+
+## 31. WAVE 3 — 8.21 and 8.25: the attribution DECISION, and the cost that justified inaction is WRONG (2026-09-06)
+
+Both items' acceptance is *"a **decision recorded**, then whichever code follows from it — never the code
+first"*. This section is that record, and the first thing in it is that the measured cost the plan has
+been quoting to justify leaving the question open **does not reproduce on this tree**.
+
+### 31.1 The claim, and the measurement that refutes it
+
+The plan says, twice — under **8.21** and again under **8.25** — that gating coverage on the attributable
+count *"was built and run: it **flips four of Eval 07's five personas and removes the corpus's only
+APPROVED exit, so GATE C fails**"*. Re-run at this commit as a one-line ablation in
+`CatalogueDiscoverySearch.ClassifyCoverage` (`AttributableProductIds.Count == 0 ⇒ Uncovered`, inserted
+above the existing candidate-count clause), with every threshold untouched:
+
+| | shipped | with the gate | plan's claim |
+|---|---|---|---|
+| Eval 07 loop-back pins matching | 4 of 5 (Renzo ❌) | **4 of 5** (Renzo ❌, **Nadia** ❌, Marco ✅ recovered) | "four of five flip" |
+| personas whose verdict moved | — | **ONE** — `USR-NB-01` | four |
+| an APPROVED exit exists in the corpus | yes (Renzo) | **yes (Renzo)** | "removed" |
+| **GATE C** | ✅ | ✅ **PASSES** | "fails" |
+| `-- 7` exit | 1 (GATE B) | 1 (GATE B) | — |
+| `-- 2 --dry-run` exit | 0 | **0** | — |
+| `-- 3` exit | 0 | **1** — see 31.2 | — |
+
+**So the stated cost is wrong in every particular that was load-bearing.** It flips **one** persona, not
+four; the corpus keeps its APPROVED exit; and GATE C passes. ⚠️ The claim was measured during Wave 1 and
+Wave 2's 8.18 work has moved the tray path underneath it since — but it has been quoted as a live reason
+in two plan items, and a stale cost used as a current justification is the thing this repository keeps a
+rule about.
+
+⚠️ **One thing to declare in the other direction.** The APPROVED exit survives on a thin thread: Renzo
+keeps it because his two ledger rows read *1 attributable of 5 credited* and *1 attributable of 6*. One
+attributable candidate is what stands between this corpus and having no approved exit at all.
+
+### 31.2 What the gate actually costs, measured
+
+**Customer-visible, `USR-NB-01`:** 5 of 5 interests covered · APPROVED · 1 round → **3 of 5 covered ·
+DEGRADED `gaps-unresolvable` · 2 rounds · 10 items still presented**. She still gets a tray; what changes
+is that the system stops *claiming* it covered `I-3 Headlamps` with six products that are hiking shoes,
+trekking poles, a watch, a chest pack, a rear light and a running vest. `USR-MI-02` moves 5 of 5 → 4 of 5
+covered and keeps its stop reason class.
+
+**One control fails, and it fails on its FIXTURE, not on the design.**
+`ContentlessRequestIsNotCovered`'s positive direction — *"the gate must also still COVER an interest that
+DOES name something"* — builds an `InterestCoverage` by hand with `CandidateProductIds` populated and
+`AttributableProductIds` **empty**, which no real ingest ever produces (`CatalogueDiscoverySearch` fills
+both in the same loop). Under the gate that hand-made object is refused and the row reports *"the gate
+refuses everything"*, which is false. **This is the control-fixture hazard the 8.14 arc named, in its
+mirror image**: there the fixture was kinder than reality and the control was blind; here it is poorer
+than reality and the control cries wolf. Either way a control whose specimen is hand-made is not testing
+the path it claims to.
+
+### 31.3 THE DECISION
+
+> **8.21 — GATE ON ATTRIBUTION: YES.** An interest reported COVERED by candidates that carry nothing it
+> names is a claim the system cannot support, it is customer-visible, and the objection that has kept it
+> open for two waves — GATE C fails, four personas flip, the corpus loses its only approved exit — is
+> **measured false at this commit**. `COVERED` must mean *something came back that this interest names*.
+>
+> **8.25 — SAME DECISION, and 8.21 is the only instrument that can answer it.** 8.25's finding is that
+> 8.18's interest-side screen has a **chance floor of 1.0 on the live model path**: the `InterestMapper`
+> always produces interests that name *something*, so `NamesNothing` can never fire there, and Luca is
+> shown nine products for one order line. Tightening `NamesNothing` is explicitly refused by 8.25 itself
+> — the live interests genuinely do name things. **The candidate-side screen is therefore the only
+> screen that can fire on the path a customer actually meets**, which makes 8.21 not merely related to
+> 8.25 but its only available remedy. Recording that link is the substance of this entry.
+
+**NOT DONE IN THIS WAVE, and the reason is sequencing, not doubt.** Both items' own acceptance puts the
+decision first and the code second, and the code half has three preconditions that are real work:
+
+1. **`ContentlessRequestIsNotCovered`'s positive row must be rebuilt from a real ingest specimen** — run
+   the search node and read the coverage row it produces — instead of a hand-made `InterestCoverage`.
+   Shipping the gate against the current fixture would ship a red control (31.2).
+2. **`Starved` and `ClassifyCoverage` must be decided together.** Today `Starved` screens
+   `AttributionVocabularyEmpty` (*the INTEREST names nothing*) and the gate would screen
+   `AttributableProductIds` (*the CANDIDATES carry nothing*). Those are two different questions living in
+   two places, and shipping only the second leaves the pre-gate answering the first.
+3. **Nadia is the ⭐ negative direction of Eval 07's 2×2 and the gate flips her.** Re-pinning her to match
+   is the corpus supplying the bar for the change under test (§7 rule 1, and §28 refused exactly that
+   move for Renzo). The 2×2 has to be re-established from a customer who genuinely does not loop, or the
+   eval loses the property it is built on.
+
+### 31.4 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+# the ablation, for anyone re-deriving 31.1: add to CatalogueDiscoverySearch.ClassifyCoverage
+#   if (coverage.AttributableProductIds.Count == 0) return CoverageStatus.Uncovered;
+dotnet run --project $E -- 7                              # 4 of 5 pins, GATE C ✅, exit 1 (GATE B)
+dotnet run --project $E -- 3                              # exit 1 — ContentlessRequestIsNotCovered, on its fixture
+dotnet run --project $A -- 2 --offline --user USR-NB-01   # 3 of 5 covered, DEGRADED, 2 rounds, 10 items
+```
