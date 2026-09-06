@@ -38,11 +38,44 @@ been deleted. Anyone reading this ADR to find out what is still on the table rea
 
 | # | Item | Status |
 |---|---|---|
-| **S1** | `EvalResultStore` → `IOutputStore`. One store interface; the pack reporter writes through the same path as everything else. | Not started |
-| **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | Not started |
-| **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 |
-| **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; depends on ADR-030's deferred controls |
-| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | Not started; depends on S2 |
+| **S1** | `EvalResultStore` → `IOutputStore`. One store interface; the pack reporter writes through the same path as everything else. | **DEFERRED with a reason, 2026-09-06** — see the note below |
+| **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | ✅ **SHIPPED 2026-09-06 (`71bc44c3`)** — `StimulusHash.Of` / `.SameStimulus`, a non-positional `ScenarioResult.StimulusHash`, an optional `input` on `ToScenarioResult`, and three real producers. 16 new tests, **0 existing test files edited**, byte-identical output for every producer that does not set it. ⚠️ One of its two named sites is **unmeetable** — see below |
+| **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically, whose blocking rationale was **measured and corrected on 2026-09-06**; ADR-030's Q4 now carries the correction |
+| **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; gated on **Q5**, an open user decision |
+| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | Not started. **Unblocked by one fifth** — see the note below |
+
+### Wave 2, 2026-09-06 — what moved, and what the ADR got wrong
+
+**S2 shipped, and the row is wrong as specified by one site of two.** Plan item 7.2's acceptance is *"both
+sites carry a real input"*, naming `EvalResultPersistence.cs:79` and `DirectoryExporter.cs:182`. Measured:
+`DirectoryExporter.ExportThroughStoreAsync` builds its `ScenarioResult` from
+`EvaluationReport.TestResults`, whose element type is `TestResultSummary` — `Name`, `Category`, `Score`,
+`Passed`, `Skipped`, `DurationMs`, `Error`, `StackTrace`. **There is no input on it.** That site's
+`Input: ""` is honest rather than lazy, and the acceptance cannot be met without widening a public reporting
+model that feeds the HTML and JSON exports. **7.2 should be restated as one site plus a separate decision
+about `TestResultSummary`.**
+
+**Two properties of S2 that are load-bearing and were asserted rather than announced.**
+`ScenarioResult.StimulusHash` is a **non-positional** init-only member defaulting to `null`, and the store
+serialises with `DefaultIgnoreCondition = WhenWritingNull` — so an eleventh positional parameter never
+breaks a construction site, a producer that does not set it writes **byte-identical** scenario files, and
+none of the 46 stored manifest hashes moves. And `SameStimulus` returns **false** when either side is null:
+*"nobody computed a digest"* is not *"the digests match"*, and collapsing them is the silent-`{}` shape
+ADR-030 §4.2 rejects — it is precisely the behaviour S5 exists to refuse.
+
+**S5 is unblocked by one fifth, not unblocked.** Finding V1 lists five facts a run must carry for `compare`
+to be a pure function of two run directories: the eval's key, its version, the effective bar, the floor and
+the judge fingerprint — plus the stimulus. S2 landed **the stimulus**. A `compare` that refused on one of
+five would be refusing on a partial view and would report *"comparable"* for pairs that differ in the other
+four, which is the flattering direction. The remaining four are still not recorded on a run.
+
+**S1 is deferred, and the reason is a dependency rather than effort.** Half its stated defect is already
+gone: `EvalResultStore.Write<T>` archives the previous file under its own last-write time before the new one
+lands, so **two runs already coexist** and *"overwritten each run"* is stale. The remaining half — the
+migration itself — would push the Galaxus snapshots' `NOT COMPARABLE` / `VOID` / `INAPPLICABLE` cells into a
+`ScenarioResult`, which **cannot express any of them on disk until ADR-030 Slice 1.4 lands**. That is
+Phase 5.2's stated blocker one layer down, and doing it first would force an undecidable into a number —
+the exact defect ADR-030 exists to prevent.
 
 ### ⚠️ S3 as originally written is refuted by the ADR it depends on
 

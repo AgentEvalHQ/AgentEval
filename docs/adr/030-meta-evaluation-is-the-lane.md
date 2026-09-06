@@ -1422,7 +1422,7 @@ Each item fixed a defect that was **shipped and live**.
 | 1.1 | `MeasurementState` enum + `EvalScore.Measurement` init-only + `EvalScore.NotApplicable()` factory, **guard as a backing field + validating `init` accessor on both `EvalScore.Passed` and `EvalScore.Measurement`** — the AE-01/AE-08 pattern, §4.2 as folded 2026-09-05. **No guard on `EvalResult`.** | `EvalScore.NotApplicable() with { Passed = true }` throws, **and so does** `measuredPassingScore with { Measurement = MeasurementState.NotApplicable }` — the invariant is on the pair, so neither side can reach the bad state | `NotApplicableScore_CannotBePassed()` + a `…WithExpressionTests` file mirroring `EvalScoreWithExpressionTests.cs`, covering **both** `with` orderings, the object-initializer path, and a hostile `{"passed":true,"measurement":"NotApplicable"}` artifact failing deserialisation closed |
 | 1.2 | `EvalScoreExtensions.CountsTowardAggregate()`; all five aggregations route through it (fixes the `CapByWorst` asymmetry) | One predicate, five call sites | `InapplicableLeaf_DoesNotEqual_ZeroScoredLeaf()` — a composite `{0.8, 0.8, n/a}` scores **0.80**; `{0.8, 0.8, 0.0}` scores **0.533**; assert not equal |
 | 1.3 | `ObservationCensus` + the rule that no mean renders without its denominator | `0.62 (8 of 12 measured, 3 n/a, 1 not measured)`; `Census.Void` renders `VOID`, never `0.00` | `VoidAggregate_DoesNotRenderAsZero()` |
-| 1.4 | Schema **v1.1**: `score.measurement`, `label` enum gains `"inapplicable"`. **Not `chanceFloor`.** `$id` bumped; `ContentHasher` canonical converter updated | v1.1 documents validate; the release note carries the **byte-level prediction** that every historical `ScenarioResult` content hash changes at this boundary | `SchemaV1_1_AcceptsInapplicable()` + a golden-hash test pinning the new value |
+| 1.4 | Schema **v1.1**: `score.measurement`, `label` enum gains `"inapplicable"`. **Not `chanceFloor`.** `$id` bumped; `ContentHasher` canonical converter updated. ⛔ **The acceptance beside this row is WRONG AS SPECIFIED — see the Q4 correction of 2026-09-06.** The two schema edits are strictly permissive and change **no** historical hash (measured: 949 documents, 841 valid under both, **0** regressed); the break belongs to the *writer* half alone and this row prices them as one | ~~v1.1 documents validate; the release note carries the **byte-level prediction** that every historical `ScenarioResult` content hash changes at this boundary~~ → **split in two**: (i) v1.1 accepts an inapplicable score **and every currently-valid document stays valid** — no prediction is owed, nothing moves; (ii) the writer starts emitting `measurement` and `$id` bumps — *that* is where the byte-level prediction belongs | `SchemaV1_1_AcceptsInapplicable()` + `SchemaV1_1_RejectsNothingV1Accepted()` (the widening is only safe if it rejects nothing v1 accepted, and that must be asserted rather than reasoned) + a golden-hash test pinning the new value, **on the writer half only** |
 | 1.5 | `EvalResult.Skipped` writes its reason to `Details.Summary` as well as `Recommendations` (D13) | A skipped leaf renders `n/a` **with** its reason | `SkippedResult_ExposesReasonInSummary()` |
 | 1.6 | `EvalInput.CaseId` + `TestCase.Id` (D11) | Both present, both nullable, both additive | compile-only + one round-trip test |
 
@@ -1480,6 +1480,37 @@ it costs ~20 lines and removes the only breaking change from Slice 0.
 applicability until a v2 that batches other changes? Recommend now: the defect it fixes is live, and
 batching means the break lands anyway but later and larger. **The release note must carry the
 byte-level prediction either way.**
+
+> ⛔ **CORRECTION 2026-09-06 (Wave 2, MEASURED). This question is framed on a break that two of the
+> three parts of 1.4 do not cause.** 1.4 bundles a **schema widening** with a **writer change** and
+> prices them as one. Measured over **949 eval-result documents on disk**, against schema v1 and
+> against a v1.1 candidate carrying exactly the two edits 1.4 names — `score.measurement` added to
+> `score.properties`, `"inapplicable"` added to the `label` enum:
+>
+> | | v1 | v1.1 candidate |
+> |---|---|---|
+> | valid | **841** | **841** |
+> | **regressed (v1 accepted, v1.1 rejects)** | — | **0** |
+> | newly valid | — | 0 |
+> | an inapplicable score (`label: "inapplicable"`, `measurement: "notApplicable"`) | rejected | **accepted** |
+>
+> Both edits are **strictly permissive** — adding a member to `properties` under
+> `additionalProperties: false`, and adding a member to a closed `enum`, only ever widen what
+> validates. **No document on disk is invalidated and no stored content hash moves**, because
+> `EvalScore.Measurement` is `JsonIgnore(WhenWritingDefault)` and no shipped producer can currently
+> make it non-default. What *does* move bytes is the **write path** — emitting `measurement`
+> unconditionally — and the **`$id` bump**, and both are separable from the widening.
+>
+> **So Q4 is two questions, and only the second is a break.**
+> **(i)** Widen the schema so an honest artifact is *accepted* — free, reversible, moves nothing.
+> **(ii)** Start *writing* the field and bump `$id` — the historical-hash break this row describes.
+>
+> ⚠️ **Neither was shipped in Wave 2, and the reason is not effort.** Q4 is a user decision and still
+> gates the row; and landing even (i) requires editing `InapplicableSchemaBoundaryTests.cs` and
+> `EvalScoreMeasurementWithExpressionTests.cs`, whose entire purpose is to record what schema v1 does
+> **today** — which that wave's rules forbid. Those two files say so themselves: *"the day the schema
+> bumps, they are the tests that have to change on purpose."* Re-derive with `MEASUREMENT_STATUS.md`
+> §25.3(c).
 
 **Q5 — Slice 3 (negative controls): funded, or genuinely deferred?** The review's position is that
 machinery with one consumer rots in six months and controls are the most ceremony-heavy part. My

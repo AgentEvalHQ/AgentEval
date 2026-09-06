@@ -3676,3 +3676,218 @@ git checkout HEAD -- samples/ && dotnet build AgentEval.sln
 
 **Nothing in §24 was measured by a paid agent run.** Every figure is an exit code, a printed control row, a
 file on disk, a build output, or an ablation of this repository against its own earlier commit.
+
+---
+
+## §25 — WAVE 2 (2026-09-06, `3531a71f` → `71bc44c3`)
+
+**Six items, six commits, and three of them found the plan or the ADR wrong as specified.** Nothing here
+was measured by a paid agent run: every figure is an exit code, a printed control row, a file on disk, a
+build output, a test count, or an ablation of this repository against itself. The one thing that spends is
+`--real-vectors`, which embeds queries live; the whole wave is well under one cent by the §20 sweep's bound,
+and **nothing meters it** (8.12, still open).
+
+### 25.1 The ledger
+
+| # | Sha | Item | What it closed |
+|---|---|---|---|
+| 1 | `3531a71f` | **8.18** | The coverage gate refused the interest and the Ranker built a tray out of what the contentless query had already returned |
+| 2 | `1fe6c5a3` | **8.14** (+ 8.7, §11 item 11) | Both tool-layer refusal detectors had a chance floor of **zero** on the live path |
+| 3 | `742f0b91` | **8.19** | `--ci --dry-run` wrote two snapshots and printed that it had written none |
+| 4 | `38a1532c` | **8.24** | `Docs/runs/` is ignored — and the finding it was filed on overstated the exposure 53-fold |
+| 5 | `046f5425` | **8.20** | Evals 05 and 06 persist; every eval now DECLARES whether it does |
+| 6 | `71bc44c3` | **ADR-031 S2** | `ScenarioResult` carries the stimulus and a digest of it |
+
+### 25.2 Suite state at `71bc44c3`
+
+| Command | Concept | `--real-vectors` |
+|---|---|---|
+| `--ci --dry-run` | exit **0** | exit **0** |
+| `-- 3` | exit **0** | exit **0** |
+| `-- 4` | exit **0** | exit **0** |
+| `-- 7` | exit **1** — GATE A ✅ GATE B ❌ GATE C ✅ | exit **1** — GATE A ✅ GATE B ❌ **GATE C ✅** |
+| Demo 01 `--offline`, Demo 02 `--offline`, `-- 0` | exit 0 | — |
+
+**GATE B's exit 1 is the pre-existing Renzo pin mismatch in both spaces and this wave did not touch it.**
+**GATE C on `--real-vectors` was ❌ before this wave and is ✅ after it** — that is item 8.18, and it is the
+first time the real path has passed it.
+
+`tests/AgentEval.Tests` net10: **9,630 → 9,646 of 9,648**, 0 failed, 2 skipped. **Zero existing test files
+edited.** `AgentEval.sln` builds 0 errors. The control panel is **20 gating + 4 advisory = 24 rows**, up from
+16 + 4; all 20 gating rows caught.
+
+### 25.3 The three "wrong as specified" findings, each measured
+
+**(a) 8.14's prescribed fix was for a defect that does not exist, and the real one was invisible.**
+8.14 says *"today only the prompt forbids the second call; the fix is a structural gate on the tool
+surface."* `GalaxusTools.GetInterestMap:556` has returned a typed `personalization_disabled` refusal on
+`profile.PersonalizationOptOut` since the sample was built, exactly as `GetPurchaseHistory:503` does. The
+structural gate already shipped. What was open is the half `SUITE_SUMMARY` §4 could not settle:
+
+> *"Either the backstop did not fire (a containment hole) or the backstop-detector cannot see it (a
+> reporting hole). This run does not settle which, and one of the two is true."*
+
+**It is the reporting hole.** Measured by invoking the real `AIFunction` the agent is built from:
+
+| | |
+|---|---|
+| `AIFunctionFactory.Create(GalaxusTools.GetInterestMap).InvokeAsync(...)` | returns `System.Text.Json.JsonElement` |
+| `result is string` | **false** |
+| `Eval01.DetectOptOutBackstop` / `Eval06.HasBudgetRefusal` predicate | `call.Result is string json && json.Contains(code)` |
+
+Neither detector could return true on a live turn, ever. ⚠️ **Direction: damning to our own architecture and
+flattering to the instrument** — the suite published *"the tool-layer backstop was never exercised this
+turn"* on the single turn where containment mattered, while a detector with a chance floor of zero read as a
+clean negative. §7 rule 6, exactly.
+
+⚠️ **No scripted control could have caught it.** Every control in the panel builds `FunctionResultContent`
+by hand and a hand-built result is a `string` — the stub kinder than the model, in the sense
+`RUN_PROTOCOL.md` names. The new row invokes the real `AIFunction`, free and model-free.
+
+**What was NOT done, and why.** Taking the two tools off the agent's surface — 8.14's prescribed remedy —
+would make Eval 01 C-09's `D4` and Eval 06 T-02's `NeverCallTool(GetInterestMap)` **unfailable**: two gating
+controls with a chance floor of 1.0, which is the defect this sample exists to argue against. The prohibition
+is already structural in the tool; what those two evals score is the agent's **attempt**, and scoring an
+attempt requires the attempt to be possible. **C-09 and T-02 still fail and the agent's verdict is
+unchanged** — what changes is that the report no longer says the architecture stood by.
+
+**(b) 8.24 overstated its own exposure by a factor of 53, and the hazard was real in the one place it
+missed.** 8.24 says *"both run directories are untracked AND un-ignored … one `git add .` from putting raw
+console logs of a live agent run into a public repository."* Re-measured per file rather than per directory:
+
+| files under `Docs/runs/` | 54 |
+|---|---|
+| IGNORED by `.gitignore`'s global `*.log` | **53** |
+| NOT ignored | **1** — `EXITCODES.txt`, which is not a `.log` |
+
+The console logs were never at risk. ⚠️ **And during this wave a `git add <the eval project directory>`
+swept `EXITCODES.txt` into a commit** — caught in the same minute, `git reset --soft` + `git restore
+--staged`, nothing pushed. **Incidental protection that looks total is worse than none**: the next artefact
+written beside the logs inherits no rule at all and the directory *looks* covered. Fixed with an explicit
+rule; `git check-ignore` now names it for all 54.
+
+**(c) ADR-030 Slice 1.4's blocking rationale is one-third right.** The deferral says shipping either half of
+applicability *"would invalidate every document the library writes and change every historical
+`ScenarioResult` content hash."* Measured over **949 eval-result documents on disk**, against schema v1 and
+against a v1.1 candidate carrying exactly the two edits 1.4 names (`score.measurement` added,
+`"inapplicable"` added to the `label` enum):
+
+| | v1 | v1.1 candidate |
+|---|---|---|
+| valid | **841** | **841** |
+| **regressed (v1 ok, v1.1 rejects)** | — | **0** |
+| newly valid | — | 0 |
+| an inapplicable score | rejected | **accepted** |
+
+Both edits are **strictly permissive**: a document that validated still validates, and nothing on disk moves.
+What moves bytes is the **write path** — emitting `measurement` unconditionally — and the `$id` bump. 1.4
+bundles a free schema widening with a breaking writer change and treats them as one item.
+
+⚠️ **It is still DEFERRED, for two reasons that are structural rather than effort.** (1) Q4 is an open
+**user** decision and 1.4 is ADR-gated on it. (2) Landing even the permissive half requires editing
+`InapplicableSchemaBoundaryTests.cs` and `EvalScoreMeasurementWithExpressionTests.cs`, whose whole purpose is
+to record what schema v1 does **today** — and this wave's rules forbid modifying an existing test file. Those
+two tests say so themselves: *"the day the schema bumps, they are the tests that have to change on purpose."*
+
+### 25.4 8.18, measured by re-running the persona rather than by inference
+
+| `USR-LF-04` | concept | `--real-vectors` before | `--real-vectors` after |
+|---|---|---|---|
+| candidates discovered | 0 | 2 | 2 |
+| **recommended** | 0 | **2** | **0** |
+| **actually SHOWN** | 0 | **2** | **0** |
+| `FinalAnswer` | 0 char | non-empty | **0 char** |
+| stop reason | GapsUnresolvable | GapsUnresolvable | GapsUnresolvable |
+| Eval 07 GATE C | ✅ | ❌ | **✅** |
+
+**Concept space did not move.** `eval07_topology.json` is **IDENTICAL** to the pre-Wave-2 record ignoring
+`RunAt` (JSON-diffed with timestamp and duration keys stripped, not eyeballed). Luca already presented 0
+there, so the filter has nothing to remove and the shortfall-footnote change has no case with drops and no
+tray.
+
+**Where the fix sits:** `DiscoveryPostChecks.Apply`, the one seam the deterministic Ranker (`:274`) and the
+model Ranker (`:740`) both pass through. A filter inside either ranker leaves the other open, and the model
+ranker is the one that can select for any interest it likes.
+
+**What it screens, and what it deliberately does not.** It screens the **interest** — an interest whose
+attribution vocabulary is empty names nothing, so every product credited to it is arbitrary by construction.
+It does **not** screen the candidate: the wider finding of **3 of 16 COVERED rows carrying nothing the
+interest names** (§24.6) stays measured, printed and **ungated**, because gating it flips four of Eval 07's
+five personas and removes the corpus's only APPROVED exit. That is plan item **8.21** and it is a decision.
+**No threshold moved:** `MinCandidateScore` is still 0.012 and two control rows assert it.
+
+⚠️ **Declared, not fixed.** `ModelPresenter` can still return prose for an empty selection, and
+`DiscoveryPresentation.Render` prefers model prose over the composition — so on the LIVE workflow path a
+Presenter model could write an answer for a customer with nothing to present. The prompt is design §C.3
+verbatim and correction ⑬ item 5 is about exactly the undeclared prompt edit this would be. Eval 07 runs the
+deterministic bound arm, so it is not what GATE C measures.
+
+### 25.5 8.19 — the banner reports a ledger, not a list
+
+`EvalResultStore.KeysWrittenThisRun` is appended by both write chokepoints (`EvalResultStore.Write<T>` and
+`OfflineSnapshotStore.Save`); `SnapshotsWrittenThisRun` is the subset whose file is still on disk, and that
+is what the banner prints. A reader told a snapshot was written can go and look at it.
+
+```
+⚠️  THIS WAS A DRY RUN. … no model was called.
+      2 snapshot(s) WERE written, by the eval(s) that call no model and
+      therefore take no --dry-run parameter — they are real measurements, not stubs:
+        · eval03_controls.json
+        · eval04_injection.json
+```
+
+**Decided:** Evals 03 and 04 do **not** gain a `dryRun` parameter. Stubbing a real, model-free measurement
+inside a dry run would make the cheapest honest measurement in the suite worse in order to make a sentence
+true. `RUN_PROTOCOL.md`'s Persistence rule is restated accordingly.
+
+⚠️ **A hand-maintained list of "the two evals that persist" was the obvious fix and is the wrong one.** §2.4
+records what happened to the last enumerated call-site list in this programme: ADR-030 Slice 1.2 named five
+sites and there were six.
+
+### 25.6 8.20 — persistence, and the silence that was the actual defect
+
+`eval05_quality` and `eval06_trajectory` are new typed records, written on the **live** branch only.
+
+- **Eval 05** is the eval whose judge's re-grade spread on one fixed input is **25 points**
+  (45/30/35/55/35, `SUITE_SUMMARY` §18.1), and whose headline margin is **+20 — inside that spread**. The
+  spread is stored **in the file**, beside the scores it bounds.
+- **Eval 06**'s subject is the tool **ORDER**, recoverable from no other record in the store: T-02's opt-out
+  violation exists as `GetInterestMap` at **position #6**, and until this commit that lived only in a console
+  log the repository does not carry.
+- **Eval 08 still persists nothing** and its stated reason is unchanged.
+
+Every eval now carries a `// SNAPSHOT-POLICY:` line, `deliberately-none` must carry a reason, and a gating
+control checks the declaration **against the file's actual store calls, both directions**. Measured: **11
+files scanned, 10 `writes`, 1 `deliberately-none`.**
+
+⚠️ **Both write paths are invisible to a dry run** — they sit on the live branch, so stage 1 of the standing
+protocol is structurally blind to them. The control therefore **round-trips both new records through the real
+store with the awkward values the live path produces**: a `NaN` weighted score (how this suite spells an empty
+denominator), a null cost, a null error, and the tool order. A probe carrying only plausible values would be
+the stub-kinder-than-reality shape.
+
+### 25.7 What Wave 2 did NOT do, with the reason for each
+
+| Item | Why not |
+|---|---|
+| **2.2** — Eval 02 live at k = 5 | The wave was scoped offline. It is still §4.0c's number one and still ≈ USD 18.56 |
+| **ADR-030 3.4** — schema v1.1 | Q4 is an open **user** decision, and landing it requires editing two existing test files whose purpose is to pin the deferral. §25.3(c) corrects its rationale |
+| **ADR-031 S1** — `EvalResultStore` → `IOutputStore` | Half its stated defect is already fixed: `Write<T>` archives the previous file under its own mtime, so **two runs already coexist**. The remaining half — the migration itself — would force the Galaxus snapshots' NOT COMPARABLE / VOID / INAPPLICABLE cells into a `ScenarioResult` that **cannot express them on disk until 3.4 lands**. That is Phase 5.2's stated blocker, one layer down |
+| **ADR-031 S4** — `controlLedger` + VOID + exit 12 | Gated on **Q5**, an open user decision (Phase 0.7) |
+| **ADR-031 S5** — `agenteval compare`, exit 13 | S2 landed **one** of V1's five comparability facts (the stimulus). The eval key, version, effective bar, floor and judge fingerprint are still not recorded on a run, and a `compare` that refused on one of five would be refusing on a partial view |
+| **7.2's second site** | `DirectoryExporter` builds its `ScenarioResult` from `TestResultSummary`, which **has no input field**. Its `Input: ""` is honest, not lazy |
+
+### 25.8 How to re-derive §25
+
+```
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet build AgentEval.sln                                  # 0 errors
+dotnet test tests/AgentEval.Tests -f net10.0                # 9646/0/2 of 9648
+dotnet run --project $E -- 3                                # 24 rows: 20 gating caught, 4 advisory. exit 0
+dotnet run --project $E -- --ci --dry-run                   # exit 0; banner names eval03_controls + eval04_injection
+dotnet run --project $E -- 7                                # exit 1 (GATE B, pre-existing)
+dotnet run --project $E -- 7 --real-vectors                 # exit 1 (GATE B) — GATE C now PASSES
+dotnet run --project $A -- 2 --user USR-LF-04 --offline --real-vectors   # 2 discovered -> 0 recommended, 0 shown
+git check-ignore -v $E/Docs/runs/2026-09-06_wave1-verify-41cd09a2/EXITCODES.txt
+```
