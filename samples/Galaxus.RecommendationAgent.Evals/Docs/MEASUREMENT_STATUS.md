@@ -4708,3 +4708,51 @@ dotnet run --project $E -- 7                              # 4 of 5 pins, GATE C 
 dotnet run --project $E -- 3                              # exit 1 — ContentlessRequestIsNotCovered, on its fixture
 dotnet run --project $A -- 2 --offline --user USR-NB-01   # 3 of 5 covered, DEGRADED, 2 rounds, 10 items
 ```
+
+---
+
+## 32. WAVE 3 — PHASE 1 item 1.8 (N-8): the popularity control gated on a MEAN, and could not see an empty arm (2026-09-06)
+
+### 32.1 Mean to mean, replaced by persona to persona
+
+`CheckPopularityAsync` asserted `mean latent < mean floor`. **A mean-to-mean comparison destroys the
+pairing that makes the comparison mean anything**: an arm at 1.000 / 0.000 / 0.000 has a mean of 0.333 and
+passes a "below 0.462" bar while sitting at the ceiling on a third of the corpus. It is the same defect
+class as Eval 02's own floor gate — which passed an arm scoring 0.000 / 1.000 / 1.000 on mean 0.667 —
+and it fails in the flattering direction, because the control *looks* like it caught something.
+
+The bar is now **below its OWN floor on EVERY scorable persona**, with each persona's score kept beside
+the floor that persona's own gold produces (`PersonaCoverage`). The means are still printed, labelled
+*"reported for continuity and NOT what this row gates on"*.
+
+**Measured, shipped tree: 12 of 12 personas below their own floor, `-- 3` exit 0.** So on this corpus the
+mean form was not masking anything — the strengthening is free, and saying that is part of reporting it.
+
+**Ablation, executed, and it is the discriminating one.** Forcing a single persona's paired score to
+1.000 while leaving the mean untouched:
+
+| | old rule (mean to mean) | new rule (per persona) |
+|---|---|---|
+| observed | mean latent 0.000 vs mean floor 0.138 | **11 of 12 below · ⚠ CLEARS ITS FLOOR ON: `USR-NB-01` 1.000 ≥ 0.154** |
+| verdict | **GREEN** | **RED** |
+| `-- 3` exit | 0 | **1** |
+
+That is 1.8's acceptance — *"a 0/1/1 arm fails"* — demonstrated on the shipped decision path rather than
+argued.
+
+### 32.2 ⚠ A second defect, found while doing the first: the row could not tell 0.000 from "never asked"
+
+The row asserted only that the arm scores LOW. **An arm that presented nothing scores 0.000 on every
+persona and passes that bar vacuously** — the element-missing shape, and 0.000 on 12 of 12 is exactly the
+extreme value §7 rule 6 says to treat as a wiring fault until shown otherwise. `CheckSingleShotAsync`
+already asserts `presented > 0` of its comparator; this row did not, and it is the row whose arm is
+*supposed* to score zero, which is precisely why the difference between "scored zero" and "was never
+asked" has to be asserted here.
+
+`presented > 0` is now part of the verdict and the count is printed: **60 recommendations across the
+cohort** (five per persona, twelve personas). So the 0.000 is a measurement of a real answer, and the
+report now says so on its face.
+
+```bash
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3   # exit 0
+```

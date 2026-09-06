@@ -709,7 +709,7 @@ public static class NegativeControls
         Galaxus.RecommendationAgent.Retrieval.IProductRetriever retriever,
         MAFEvaluationHarness harness, EvaluationOptions options, CancellationToken ct)
     {
-        var (mean, floor, detail, presented, phantom, unresolved) = await MeanCoverageAsync(
+        var (mean, floor, detail, presented, phantom, unresolved, _) = await MeanCoverageAsync(
             () => new Broken03_SingleShotWorkflow(retriever), harness, options, ct).ConfigureAwait(false);
 
         // ⚠ The bar here is NOT "score low". An earlier version of this check used
@@ -741,7 +741,7 @@ public static class NegativeControls
     private static async Task<ControlRowSnapshot> CheckPopularityAsync(
         MAFEvaluationHarness harness, EvaluationOptions options, CancellationToken ct)
     {
-        var (mean, floor, detail, _, _, _) = await MeanCoverageAsync(
+        var (mean, floor, detail, presented, _, _, perPersona) = await MeanCoverageAsync(
             () => new Broken04_PopularityAgent(), harness, options, ct).ConfigureAwait(false);
 
         // A persona-blind arm must land BELOW a random draw from the eligible pool, because a random
@@ -752,15 +752,41 @@ public static class NegativeControls
         // The design pre-registers 0.00 here. That figure belongs to a bestseller list AUTHORED to
         // carry no latent tokens; this catalogue derives its list from rating counts, so the number
         // is MEASURED and whatever it comes out at is what the report carries.
-        bool tripped = !double.IsNaN(mean) && !double.IsNaN(floor) && mean < floor;
+        // ⚠ PLAN 1.8 / N-8 — PER PERSONA, not mean to mean. A mean-to-mean comparison passes an arm
+        //   at 1.000 / 0.000 / 0.000 (mean 0.333) against a 0.462 floor while it is at the CEILING
+        //   on a third of the corpus. That is the same defect class as Eval 02's floor gate, and it
+        //   fails in the flattering direction: the control looks like it caught something.
+        var scorable = perPersona.Where(p => !double.IsNaN(p.Score) && !double.IsNaN(p.Floor)).ToList();
+        var clears   = scorable.Where(p => p.Score >= p.Floor).ToList();
+
+        // ⚠ AND THE ARM MUST HAVE PRESENTED SOMETHING. Found while doing 1.8: this row asserted only
+        //   that the arm scores LOW, and an arm that presents nothing scores 0.000 on every persona
+        //   and passes that bar vacuously — the element-missing shape. 0.000 on 12 of 12 is an
+        //   extreme value, and §7 rule 6 says an extreme value is a wiring fault until shown
+        //   otherwise. `CheckSingleShotAsync` already asserts this of its comparator; this row did
+        //   not, and it is the row whose arm is SUPPOSED to score zero — which is exactly why the
+        //   distinction between "scored zero" and "was never asked" has to be made here.
+        bool tripped = scorable.Count > 0 && clears.Count == 0 && presented > 0;
 
         return new ControlRowSnapshot(
             nameof(Broken04_PopularityAgent),
-            $"score BELOW the derived random-draw floor ({Format(floor)}) — a persona-blind arm must do worse "
-          + "than a random draw from the pool the customer's interests actually live in. NOTE: the design "
-          + "pre-registers 0.00 for this arm, but that belongs to an authored bestseller list; this "
-          + $"catalogue's is derived, so the value is MEASURED. Selection: {string.Join(", ", Broken04_PopularityAgent.Selection)}.",
-            $"mean latent {Format(mean)} vs floor {Format(floor)} · {detail}",
+            "PRESENT something, and then score BELOW its OWN random-draw floor on EVERY scorable persona — a "
+          + "persona-blind arm must do "
+          + "worse than a random draw from the pool that customer's interests actually live in, and it must "
+          + "do so customer by customer. ⚠ The mean-to-mean form of this bar (plan 1.8 / N-8) passes an arm "
+          + "at 1.000/0.000/0.000 on a mean of 0.333 while it is at the ceiling on a third of the corpus. "
+          + "NOTE: the design pre-registers 0.00 for this arm, but that belongs to an authored bestseller "
+          + "list; this catalogue's is derived, so the value is MEASURED. Selection: "
+          + $"{string.Join(", ", Broken04_PopularityAgent.Selection)}.",
+            $"{presented} recommendation(s) presented across the cohort — an arm that presented NOTHING would "
+          + $"score 0.000 everywhere and pass this bar for the wrong reason · "
+          + $"{scorable.Count - clears.Count} of {scorable.Count} persona(s) below their own floor"
+          + (clears.Count == 0
+                ? string.Empty
+                : " · ⚠ CLEARS ITS FLOOR ON: "
+                + string.Join(", ", clears.Select(c => $"{c.Persona} {Format(c.Score)} ≥ {Format(c.Floor)}")))
+          + $" · (mean latent {Format(mean)} vs mean floor {Format(floor)}, reported for continuity and NOT "
+          + $"what this row gates on) · {detail}",
             tripped);
     }
 
@@ -1799,7 +1825,21 @@ public static class NegativeControls
         return report;
     }
 
-    private static async Task<(double Mean, double Floor, string Detail, int Presented, int Phantom, int Unresolved)>
+    /// <summary>One persona's score beside the floor that persona's own gold produces.</summary>
+    /// <remarks>
+    /// ⚠ <b>Added for plan item 1.8 (N-8).</b> The helper used to return only the MEAN of the scores
+    /// and the MEAN of the floors, and a mean-to-mean comparison hides the shape that matters: an
+    /// arm at 1.000 / 0.000 / 0.000 means 0.333 and passes a "below 0.462" bar while being at the
+    /// ceiling on a third of the corpus. That is the same defect class as Eval 02's floor gate,
+    /// which passed an arm scoring 0.000 / 1.000 / 1.000 on mean 0.667 &gt; floor 0.462.
+    /// </remarks>
+    /// <param name="Persona">The customer id.</param>
+    /// <param name="Score">That customer's latent coverage for this arm, NaN when unscorable.</param>
+    /// <param name="Floor">The random-draw floor at THIS arm's own k for that customer's gold.</param>
+    private readonly record struct PersonaCoverage(string Persona, double Score, double Floor);
+
+    private static async Task<(double Mean, double Floor, string Detail, int Presented, int Phantom, int Unresolved,
+                              IReadOnlyList<PersonaCoverage> PerPersona)>
         MeanCoverageAsync(
             Func<IEvaluableAgent> factory,
             MAFEvaluationHarness harness,
@@ -1810,6 +1850,7 @@ public static class NegativeControls
         var scores = new List<double>();
         var floors = new List<double>();
         var detail = new List<string>();
+        var perPersona = new List<PersonaCoverage>();
         int presentedTotal = 0, phantomTotal = 0, unresolvedTotal = 0;
 
         foreach (var persona in CoveragePersonas.All)
@@ -1846,6 +1887,13 @@ public static class NegativeControls
             if (score.IsScorable) scores.Add(score.Latent);
             if (!double.IsNaN(randomFloor)) floors.Add(randomFloor);
 
+            // The PAIR, kept together. A score and a floor from the same customer are the only two
+            // numbers that may be compared; averaging each column first destroys the pairing.
+            perPersona.Add(new PersonaCoverage(
+                persona.Id,
+                score.IsScorable ? score.Latent : double.NaN,
+                randomFloor));
+
             detail.Add($"{persona.Id} {Format(score.Latent)} ({score.LatentServed}/{score.LatentTotal})");
         }
 
@@ -1853,7 +1901,8 @@ public static class NegativeControls
             scores.Count == 0 ? double.NaN : scores.Average(),
             floors.Count == 0 ? double.NaN : floors.Average(),
             string.Join(", ", detail),
-            presentedTotal, phantomTotal, unresolvedTotal);
+            presentedTotal, phantomTotal, unresolvedTotal,
+            perPersona);
     }
 
     // ══ Control 10 — the GATE RENDERER, checked in every branch it has. ══════════════════
