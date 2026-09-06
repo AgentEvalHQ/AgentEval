@@ -9465,9 +9465,16 @@ grep -cE "^ *. Eval [0-9a-c]+: passed\.$" ci.log      # -> 10   (loose `grep -c 
 grep -E  "^ *. Eval [0-9a-c]+: FAILED\.$"  ci.log      # -> Eval 07
 
 # 62.4 — the panel, by NAME and not by a summary line, in both spaces.
+# 🔴 CORRECTED BY §65.6 — THE LOOSE FORM BELOW OVER-COUNTS BY ONE. `. caught` also matches the
+#    wrapped prose line "║ caught it." inside RefusalDetectorsSeeTheRealShape's expectation, so the
+#    set gains a phantom row named `it`. The 36 published here was right for THIS tree only because
+#    the count and the phantom cancelled in nobody's favour — re-run it now and it returns 43 where
+#    the answer is 42. USE THE ANCHORED FORM, and cross-check against the panel's own source:
+#      grep -oE "^║ +(✅ caught|❌ NOT CAUGHT) +[A-Za-z0-9_]+" p.log | awk '{print $NF}' | sort -u | wc -l
+#      grep -c '^        rows.Add(' $E/Evals/NegativeControls.cs      # gating + advisory, one line each
 for s in "" "--real-vectors"; do
   dotnet run --project $E --no-build -- 3 $s > p.log 2>&1
-  grep -oE "(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+" p.log | sort -u | wc -l          # -> 36
+  grep -oE "(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+" p.log | sort -u | wc -l          # -> 36 ⚠ see above
   grep -oE "[A-Za-z0-9_]+ +\(advisory" p.log | awk '{print $1}' | sort -u | wc -l    # -> 7
   grep -c "NOT CAUGHT" p.log                                                         # -> 0 (grep exits 1: that is grep)
 done
@@ -9810,7 +9817,11 @@ CalibratedEvaluator half was invisible to all 62 existing tests of that class.
   wave added: `git diff fa95f214..HEAD | grep "^+"` yields **46 distinct 32+ character runs and
   every one is a C# identifier** (test method names, control row names, type names). A literal
   `grep -F` for the endpoint host returns **0**, reported as a count and never as a value, and
-  `openai.azure.com` appears **0** times in the added lines. **Nothing was planted this wave**, so
+  `openai.azure.com` appears **0** times in the added lines *(🔴 corrected by §65.6: this very
+  sentence is an added line containing that string, so re-running the check returns **1**, not 0 —
+  the fifth sighting of the `baca28e4` shape, a check whose own prose carries the needle. The
+  finding stands; the count does not. Exclude this document, or read the hit and see that it is
+  this sentence.)*. **Nothing was planted this wave**, so
   `RUN_PROTOCOL` stage 0c has nothing to clean up — the only positive control any of these items
   needed was synthetic by construction.
 
@@ -9830,3 +9841,336 @@ CalibratedEvaluator half was invisible to all 62 existing tests of that class.
 * **8.23's byte-level prediction is a prediction.** It was verified against every test in the
   repository and against four Galaxus evals; it has not been verified against a live judge, because
   that needs a paid run.
+
+---
+
+## 65. WAVE 7's FIX PASS — THE INDEPENDENT REVIEW (2026-09-06)
+
+**Every ablation §63/§64 claims was re-EXECUTED rather than re-read, and the four items with a
+`src/` or a printer surface were attacked in the flattering direction first. 31 of 31 ablations
+reproduced. Four defects were found anyway, three of them in the flattering direction, and all four
+are fixed with an ablation apiece.**
+
+This section is written by the review, not by the wave it reviews. Nothing in it is copied from §63
+or §64; every figure below was produced by running the command beside it, on this tree, in this
+pass. Where a published figure did not reproduce, the published one is named and the observed one
+is given.
+
+### 65.1 The 31 ablations, re-executed — 31 of 31 turned their check red
+
+| item | ablations | result |
+|---|---|---|
+| **8.23** `a0e23518` | 4 | all four caught. A 3 red · B 3 red (incl. the invented-criterion test) · C **24** of 44 red · D red on the two new foreign-`IEvaluator` tests only, with `CalibratedEvaluatorTests` **29 / 29 green** — the "invisible to the existing suite" claim reproduces exactly |
+| **8.3** `209af383` | 5 | all five caught, `-- 3` exit 1 on each, and each names its own distinct fault |
+| **8.1 / B-18** `692c2c41` | 6 | all six caught, `-- 3` exit 1 on each, **fault counts identical to the published ones** (2 · 5 · 2 · 1 · 2 · 1) |
+| **8.5** `9665c8f6` | 5 | all five caught. B also drives `-- 1 --dry-run --judge` to exit 1, as published |
+| **8.6 / N-11a** `fbfaf472` | 5 | all five caught, fault counts identical (3 · 1 · 1 · 2 · 1) |
+| **7.6 / S2b** `e0d2f486` | 3 | all three caught in BOTH places — `-- 3` exit 1 **and** the unit tests red 3 / 1 / 1, after a **full solution build** |
+| **8.11 / D-v** `875aa676` | 3 | all three caught, fault text identical |
+
+**Three published fault counts did not reproduce, all of them cosmetic and none of them changing a
+caught/not-caught verdict.** They are recorded because a digit beside an ablation is a measurement
+like any other:
+
+| published | observed here | direction |
+|---|---|---|
+| 8.23 ablation C, *"22 of 44 red"* | **24 of 44** (14 distinct test methods; the file is unchanged since `a0e23518`) | under-states the ablation's reach |
+| 8.23 ablation B, *"2 red"* | **3 red** | under-states |
+| 8.3 ablation D, *"(2)"* | **1** | over-states |
+
+⚠ **An ablation's fault COUNT depends on how the ablation was written, and the wave did not publish
+its patches.** The reproducible half is the fault TEXT and the exit code, and both reproduced
+everywhere. The lesson for the next wave is the cheap one: publish the ablation as a patch, or
+publish only what does not depend on it.
+
+### 65.2 🔴 DEFECT 1 — the ordinal stripper ate short leading WORDS, and failed BOTH ways at once
+
+**`src/`, new this wave, and the unsafe direction is a join between two DIFFERENT criteria.** Fixed
+`e64cb587`.
+
+`CriterionText.StripLeadingEnumerator` discounted any leading run of one to three letters or digits
+followed by `.`, `)`, `:` or `-`. That is a description of a Roman numeral and it is equally a
+description of `Re-`, `AI-`, `No:`, `Do.` and `Top-`. Measured by executing the shipped build:
+
+```
+Normalize("Re-check the sources")          -> "check the sources"
+Normalize("AI-generated text is labelled") -> "generated text is labelled"
+Normalize("Top-3 results are relevant")    -> "3 results are relevant"
+Normalize("Do. not. hallucinate")          -> "not. hallucinate"
+Normalize("i.e. the second reading")       -> "e. the second reading"
+```
+
+Both consequences are bad and they are opposite:
+
+* **UNSAFE.** `AreSameCriterion("Re-check the sources", "Check the sources")` = **True**, and
+  `MatchDeclared("Check the sources", ["Re-check the sources"])` returned **`"Re-check the sources"`**.
+  A judge's verdict about one criterion is re-anchored onto a **different declared criterion**, and
+  `CalibratedEvaluator` then aggregates it under that other criterion's name. The type's own remarks
+  say *"nothing here matches by similarity"* and *"it can never add a join between two different
+  criteria"*. **Both sentences were false as shipped.** They are corrected in place, with the
+  measurement, rather than deleted.
+* **IT ALSO FAILED THE JOIN IT EXISTS FOR.** `MatchDeclared("1. Re-check the sources",
+  ["Re-check the sources"])` returned **null** — the declared side lost `Re-` while the echoed side
+  lost only the ordinal, so the two normalised forms differed.
+
+**It shipped in TWO places, because `a0e23518`'s own claim was not carried out.** That commit says
+it ported the rule into the library *"so there is one rule rather than one per consumer"* and then
+left Eval 05's `StripEnumeration` standing, so there were two rules with one defect.
+`Eval05_RecommendationQuality.StripEnumeration` now **calls** `CriterionText.StripLeadingEnumerator`.
+
+**Why 44 tests and a gating control all missed it.** Every negative case in
+`StripLeadingEnumerator_LeavesAnythingThatIsNotOneMarkerAlone` uses a leading word of **four or
+more** letters (`Rule.`, `Note:`), and so does every case in Eval 05's control table
+(`criterion 1 is met`). The ≤ 3-character boundary — the only place the rule can be wrong — was the
+one nobody sampled.
+
+The rule now has **three** conditions where it had one: SHORT (unchanged), SHAPED LIKE AN
+ENUMERATOR (all digits, one letter, or a Roman numeral), and TERMINATED (the separator is followed
+by a space or the end of the text). Two ablations, both executed, **both red in the unit tests AND
+in `-- 3`** — which is what proves the sample genuinely delegates rather than merely being
+documented as doing so.
+
+⚠ **One correction that goes the other way:** both copies' XML docs listed `#1` among *"the forms a
+list renderer produces"*. It has never been stripped, and `a0e23518`'s own test pins it as
+unstripped. **The doc was the wrong half**, and the doc was fixed rather than the code — widening
+the stripper is the direction that creates matches.
+
+### 65.3 🔴 DEFECT 2 — 8.3 replaced one unchecked declaration with another, and read a guess as a measurement
+
+Fixed `d0ee4f4c`. Two faults, one root: `RecordCost` believed what it was told and believed what it
+was handed.
+
+**(a) `CoverageArm.ReachesAModel` was a declaration nothing checked, and its default is the
+mis-declaring value.** Measured, by flipping the live arm's `ReachesAModel: true` to `false`:
+
+```
+-- 3            exit 0 · 42 gating rows · ❌ NOT CAUGHT = 0
+-- 2 --dry-run  Single Agent (Robin)  24  2.9  0  ¤0.0000
+                "NO MODEL — all 24 turn(s) ran without reaching one, as the arm registry
+                 declares. This zero is measured, not missing."
+```
+
+24 model turns, 2,952 recorded tokens, and the panel asserts a **measured zero** over them — the
+exact sentence §55 forbids, from a one-word change the entire control panel could not see. `209af383`
+names the direction itself (*"declaring them model-free would under-report spend that was paid — the
+flattering direction"*) while shipping `bool ReachesAModel = false` as the default, so a future
+model-backed arm inherits that sentence **by omission**.
+
+**(b) An estimate is not a usage block, and this was the one meter in the suite that did not say
+so.** `MAFEvaluationHarness:145` **estimates** token counts from text whenever a response carries no
+`TokenUsage` and stamps `TokensAreEstimated = true`. `SpendLedger`, Eval 07, Eval 08 and Eval 09 all
+read that flag; `RecordCost` did not. So
+
+* every deterministic arm arrives carrying a **non-zero token count invented from its own output**
+  — a first cut of (a) written against the numbers alone fired on all five of them, which is how
+  this was found; and
+* the live arm's row printed *"token counts are complete"* over **24 of 24 estimated** turns.
+  `RunsWithoutUsage` fires only on a NULL count and this harness never leaves one null, so
+  **`LowerBound` was unreachable on that path**: the absence had already been replaced by a guess
+  upstream, one layer above the meter that exists to preserve it.
+
+Both are now checked, and (a) two independent ways because the runtime one is not free: a
+**provider** usage block on a declared-model-free arm puts the arm on the new state `Contradicted`
+where neither number prints (paid runs only, declared), and the control **cross-checks the shipped
+registry against `Kind`**, a field declared independently for other consumers — so a
+mis-declaration has to be made twice, consistently, to pass. **Ablation C is the original mutation
+and `-- 3` is exit 1 on it.**
+
+### 65.4 🔴 DEFECT 3 — the money column still printed an UNKNOWN as `¤0.0000`, on the shipped panel
+
+Fixed `ce7cc771`. `ArmCostState.Measured` is reached whenever every model turn reported tokens;
+`RunsWithoutCost` is deliberately not in the `LowerBound` predicate. But the `Measured` branch then
+printed `money` as a bare figure, so an arm whose turns all reported tokens and **none** reported an
+`EstimatedCost` rendered `¤0.0000` — **byte-identical to the NO MODEL arm's measured zero two rows
+below it**, which is the pair the row's own headline says must never render alike.
+
+It was live on the shipped panel: the live arm read *"24 of 24 model turn(s) carried no cost
+estimate, so the money column is a LOWER BOUND"* in its **footnote** and `¤0.0000` in its **cell**.
+A reader scanning a table reads cells. `209af383`'s own control could not see it because its
+`measured` fixture carries `EstimatedCost = 0.0031m`, so the state that shipped the defect was never
+constructed. The new leg constructs it and asserts against the NO MODEL arm's **own** rendering
+rather than a literal, so the two cannot converge unnoticed.
+
+### 65.5 🟡 DEFECT 4 — D-v's `unclosable` bucket had no member, no positive control, and a comment saying otherwise
+
+Fixed `db9799f0`. The row splits 18 dead phrases into three buckets and measures **12 closable / 0
+unclosable / 6 no-products**. The middle branch has therefore never run, and *"0 phrases are
+unclosable"* is indistinguishable from *"the unclosable test is broken"* — **the empty-set shape,
+fourth sighting.**
+
+⚠ **The row claimed to have closed exactly that.** Its comment read *"Positive control: a phrase
+whose products are all forced dead must land in the unclosable bucket. Built here rather than hoped
+for in the corpus"* — and the code beneath asserted only that **some** catalogue product embeds. No
+phrase was built and none was ever placed in a bucket. Same class as the *"ZERO defects"* prose the
+wave itself caught in another row.
+
+**The measurement that makes the fix worth having.** Mutating `unclosable` to `closable`:
+
+* with the new synthetic classifier table → `-- 3` **exit 1**
+* with the table removed — i.e. the pre-fix control, same mutation → `-- 3` **exit 0**
+
+The diagnosis itself does not move: the row's observed block is byte-identical before and after in
+**both** spaces (md5 `621937de8ca2b953345f989814b1affc`, four readings), and D-v re-measures to
+**18 of 56** authored phrases dead, 10 latent-gold, every one with an unmapped token.
+
+### 65.6 🟡 Four documentation defects, and one of them is a command the record tells you to paste
+
+1. **§62.11's panel re-derivation over-counts gating rows by one.** The published command,
+   `grep -oE "(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+"`, also matches the wrapped prose line
+   `║ caught it.` inside `RefusalDetectorsSeeTheRealShape`'s expectation, yielding a phantom row
+   named **`it`**. On this tree it returns **43** where the answer is **42**. Established two
+   independent ways: the anchored form
+   `grep -oE "^║ +(✅ caught|❌ NOT CAUGHT) +[A-Za-z0-9_]+"` returns 42 in both spaces, and the
+   panel's own source has **49 `rows.Add(` lines = 42 gating + 7 advisory** (43 at `fa95f214`,
+   which is where §62's *36* came from and why that figure was right while its recipe was not).
+   The recipe is corrected in place at §62.11 with the reason kept.
+2. **§64.4's credential line is now its own false positive.** It asserts *"`openai.azure.com`
+   appears **0** times in the added lines"* and is itself an added line containing that string, so
+   re-running the check returns **1**. **Fifth sighting of the `baca28e4` shape** — a check whose
+   own prose contains the needle. Pinned with a line reference the way §62.3 pinned
+   *"Eval 07: passed."*.
+3. **§64 publishes no re-derivation block at all**, unlike §62.11 and §63.6, which breaks
+   `RUN_PROTOCOL`'s own rule that *"an ablation that is worth writing down is worth writing down
+   with the command that produces it"*. §65.10 below supplies one for this pass; §64's figures were
+   re-derived here by hand.
+4. **§64.4's *"46 distinct 32+ character runs"* reproduces only under `[A-Za-z0-9_]{32,}`**, and
+   the pattern is not stated. Under the loose `[A-Za-z0-9]{32,}` the same diff yields **29**. Both
+   are all-identifier sets; the figure is fine and the recipe is incomplete.
+
+### 65.7 Does 8.23's fix reach Eval 08 and Eval 09, or only Eval 05? — **all three**, by construction
+
+Read off the call sites, not inferred:
+
+* **Eval 08** — `Eval08_StochasticStability.cs:1102`, `new ChatClientEvaluator(client)` directly.
+* **Eval 09** — `Eval09_HypothesisComparison.cs:365`,
+  `new MAFEvaluationHarness(judgeClient, verbose: false)`; and `MAFEvaluationHarness.cs:35` is
+  `: this(new ChatClientEvaluator(evaluatorClient), …)`, which is the overload both it and Eval 05
+  take.
+* **Eval 05** — the same harness overload (`Eval05_RecommendationQuality.cs:495`).
+
+So the re-anchoring happens once, upstream of all three. ⚠ **And it matters for Eval 09
+specifically:** `Eval09JudgedReport.Record` joins verdicts to criteria with a raw
+`string.Equals(..., OrdinalIgnoreCase)` at `Eval09_HypothesisComparison.cs:3364` — the identical
+un-repaired join — and it is protected only because `ChatClientEvaluator` now re-anchors before it
+is reached. That protection is invisible at the call site.
+
+⚠ **A second ordinal-rendering site in `src/` was checked and is NOT affected:**
+`AgenticMetrics.cs:302` (`TaskCompletionMetric`) renders `$"{i + 1}. {c}"` into its prompt, but its
+parser reads only `score` and `reasoning` and never joins `criteriaResults` back to a criterion, so
+there is no join to break. Named here so the next reader does not have to re-derive it.
+
+### 65.8 The tree at the end of this pass — every figure re-derived, none copied
+
+* **Build:** `dotnet build AgentEval.sln --no-incremental` → **0 errors**. Distinct
+  `file(line,col): warning CODE` identities: **70** on this tree, measured now. ⚠ §64.1 published
+  **68** and §62.1 **65**; neither is re-derived here and neither should be quoted beside this one —
+  the trees differ. The rule from §62.1 stands: quote the identity SET's size with the command and
+  the tree, or say nothing.
+* **Tests**, after a full solution build, `--no-build` per TFM:
+
+  | TFM | before this review | after | delta |
+  |---|---|---|---|
+  | net10.0 | 9,752 / 0 / 2 of 9,754 | **9,766 / 0 / 2 of 9,768** | +14 |
+  | net9.0 | 9,534 / 0 / 1 of 9,535 | **9,548 / 0 / 1 of 9,549** | +14 |
+  | net8.0 | 9,534 / 0 / 1 of 9,535 | **9,548 / 0 / 1 of 9,549** | +14 |
+
+  **+14 on every TFM, exactly this pass's new tests.** No existing test file was edited; every test
+  path in `git diff --numstat main..HEAD -- tests/` is still **additions with zero deletions**, so
+  no existing assertion has been weakened or rewritten anywhere on this branch.
+* **Exit codes, both spaces, every one observed with `$?`:** `-- 1/2/2b/2c/5/6/8/9 --dry-run` **0**
+  · `-- 1 --dry-run --judge` **0** · `-- 3` **0** · `-- 4` **0** · `-- 7` **1** · `--ci --dry-run`
+  **1** · `agent -- 0`, `agent -- 1/2 --offline` **0**. **NOTHING MOVED.** The CI chain is 10
+  `passed` on the tight grep with Eval 07 the only `FAILED`.
+* **Panel: 42 gating + 7 advisory**, gating names extracted per space and `diff`ed to **nothing**,
+  `❌ NOT CAUGHT` **0** in both. Both spaces genuinely resolved, read off the banner —
+  `galaxus-concept-v2, 24 dims` and `precomputed+azure (text-embedding-3-small, 1536 dims) … space
+  probe 1.0000`.
+* **Snapshots: 14 canonical keys**, unchanged; the `--ci --dry-run` write ledger names exactly
+  three — `eval03_controls`, `eval04_injection`, `eval07_topology`. No new key, no changed record
+  shape; `ArmCostSnapshot` gained two optional members so a pre-existing document still
+  deserialises and `StateIsRecorded` is untouched.
+* **Credentials: 0.** Five patterns over this pass's own diff: endpoint host **0**, full URL **0**,
+  key **0**, `openai.azure.com` in added lines **0**, and **4** distinct 32+ character runs, all
+  four C# test-method names. ✅ A **SYNTHETIC** host and key were planted outside the repository,
+  all five patterns fired (1 · 1 · 1 · 1 · 1), the file was deleted in the same command and its path
+  re-scanned to 0 — `RUN_PROTOCOL` stage 0c's stronger form, so there was never anything real to
+  clean up.
+* **`git log main..HEAD -- strategy/` is still EMPTY.** The plan is edited on disk only.
+
+### 65.9 What this review does NOT claim
+
+* **Nothing was purchased and no agent-side verdict was re-measured.** Every model-backed eval ran
+  under `--dry-run` or against a stub. §0.2's two headline claims are untouched and could not have
+  moved: neither `Eval02b_StatedNeedSatisfaction.cs` nor `Eval02c_HeldOutNextPurchase.cs` is among
+  this pass's changed paths.
+* **Defect 1 is not verified against a live judge.** The fix changes what a judge's echo joins to,
+  and only a paid judged run could show that on real text. No shipped Galaxus rubric begins with a
+  short hyphenated token, so no stored verdict moves; the defect is in the **library's contract**,
+  which every consumer's rubric inherits.
+* **Defect 2's runtime half has never fired on a real run**, by construction: it needs a provider
+  usage block on an arm declared model-free, and a dry run has no provider. Its positive control is
+  synthetic, and the free half (the registry cross-check) is what actually catches the mutation
+  today.
+* **No judged verdict and no gate's internal reasoning was re-taken here either** — the same
+  exclusion §0.1's "independently re-taken" row has carried since §43.
+* **The three ablation fault-counts in §65.1 that did not reproduce are not evidence that the
+  wave's ablations were not run.** All 31 turned their check red with the published fault TEXT; only
+  three counts differ, and a count is a property of the patch, which was not published.
+
+### 65.10 How to re-derive §65 — every command, spending nothing
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+
+# 65.1 — the ablations. Each is a one-line edit, a project build, and `-- 3`; the patches are in
+# the four fix commits' own messages. The two that need the SOLUTION built are 7.6's and 8.23's:
+dotnet build AgentEval.sln && dotnet test tests/AgentEval.Tests -f net10.0 --no-build \
+  --filter "FullyQualifiedName~CriterionTextTests"          # 58 / 0
+dotnet test tests/AgentEval.Tests -f net10.0 --no-build \
+  --filter "FullyQualifiedName~CalibratedEvaluatorTests"     # 29 / 0  (8.23 ablation D's baseline)
+
+# 65.2 — the stripper, executed rather than read. Both directions, both false before e64cb587.
+#   AreSameCriterion("Re-check the sources", "Check the sources")            -> False (was True)
+#   MatchDeclared("1. Re-check the sources", ["Re-check the sources"])       -> the declared text
+#   MatchDeclared("Check the sources",       ["Re-check the sources"])       -> null
+git show e64cb587 --stat
+
+# 65.3 — the mis-declaration, which is the whole finding. ONE edit, then two commands.
+#   CoverageArms.cs: the Live arm's `ReachesAModel: true` -> `false`
+dotnet build $E -f net10.0 && dotnet run --project $E --no-build -- 3 ; echo $?   # -> 1 (was 0)
+#   and BEFORE d0ee4f4c the same edit gave: -- 3 exit 0, NOT CAUGHT 0, and
+#   `-- 2 --dry-run` printing "NO MODEL … This zero is measured, not missing." over 24 turns.
+grep -n "TokensAreEstimated" src/AgentEval.MAF/MAF/MAFEvaluationHarness.cs   # -> :145 estimates
+
+# 65.4 / 65.5 — the two rendering/ bucket faults, each one edit; see ce7cc771 and db9799f0.
+dotnet run --project $E --no-build -- 2 --dry-run | sed -n '/Cost per arm/,/Deterministic arms/p'
+
+# 65.6 item 1 — the phantom gating row, both counts, and the source-side arbiter.
+dotnet run --project $E --no-build -- 3 > p.log 2>&1
+grep -oE "(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+"      p.log | sort -u | wc -l   # -> 43  (WRONG)
+grep -oE "^║ +(✅ caught|❌ NOT CAUGHT) +[A-Za-z0-9_]+" p.log | awk '{print $NF}' | sort -u | wc -l
+                                                                                  # -> 42  (right)
+grep -c '^        rows.Add(' $E/Evals/NegativeControls.cs                          # -> 49 = 42 + 7
+grep -n "caught it" $E/Evals/NegativeControls.cs                                   # the phantom's source
+
+# 65.6 item 2 — the self-referential grep, now a known false positive.
+git diff fa95f214..8ee0a731 | grep -n "openai.azure.com"    # -> one hit: §64.4's own sentence
+
+# 65.7 — where the 8.23 fix reaches, read off the call sites.
+grep -n "new ChatClientEvaluator" src/AgentEval.MAF/MAF/MAFEvaluationHarness.cs   # -> :35
+grep -n "new ChatClientEvaluator\|new MAFEvaluationHarness(" $E/Evals/Eval0[589]*.cs | grep -v "///"
+grep -n "string.Equals(r.Criterion" $E/Evals/Eval09_HypothesisComparison.cs        # -> :3364
+
+# 65.8 — the tree. Report each command WITH its number or neither.
+dotnet build AgentEval.sln --no-incremental 2>&1 | tail -3
+dotnet build AgentEval.sln --no-incremental 2>&1 \
+  | grep -oE "[A-Za-z0-9_\.]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+" | sort -u | wc -l  # -> 70
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
+git diff --numstat main..HEAD -- tests/     # every row is  N  0  — additions only
+for s in "" "--real-vectors"; do for c in "1 --dry-run" "1 --dry-run --judge" "2 --dry-run" \
+  "2b --dry-run" "2c --dry-run" 3 4 "5 --dry-run" "6 --dry-run" 7 "8 --dry-run" "9 --dry-run" \
+  "--ci --dry-run"; do dotnet run --project $E --no-build -- $c $s >/dev/null 2>&1; echo "$c $s -> $?"; done; done
+git log --oneline main..HEAD -- strategy/   # -> empty
+```
+
+---
