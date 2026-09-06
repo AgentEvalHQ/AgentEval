@@ -491,8 +491,16 @@ public static class Eval01_CatalogueIntegrity
     /// detector had a chance floor of ZERO and printed <i>"never exercised"</i> for a refusal that
     /// had fired. See <see cref="ToolResultText"/> for the measurement.
     /// </remarks>
+    /// <remarks>
+    /// ⚠ It matches the DECLARED <c>code</c>, not loose text. <c>personalization_disabled</c> has
+    /// no collision in <c>ToolRefusalCodes</c> today, so this is not a verdict that moved — it is
+    /// the same rule Eval 06's budget detector had to adopt after a live run showed
+    /// <c>search_cap_exhausted</c> answering to the name <c>budget_exhausted</c>. A detector whose
+    /// correctness rests on no two payloads ever sharing a substring is one payload away from the
+    /// same defect.
+    /// </remarks>
     private static bool DetectOptOutBackstop(ToolUsageReport? tools) =>
-        ToolResultText.AnyResultContains(tools, ToolRefusalCodes.PersonalizationDisabled);
+        ToolResultText.AnyResultHasRefusalCode(tools, ToolRefusalCodes.PersonalizationDisabled);
 
     /// <summary>
     /// The advisory justification pass. Runs AFTER the gate has already been computed, prints its

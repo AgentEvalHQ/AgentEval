@@ -61,10 +61,22 @@ public static class ToolResultText
         _ => result.ToString() ?? string.Empty,
     };
 
-    /// <summary>True when any recorded tool RESULT in the trace contains <paramref name="code"/>.</summary>
+    /// <summary>
+    /// True when any recorded tool RESULT in the trace contains <paramref name="code"/> ANYWHERE in
+    /// its text.
+    /// </summary>
     /// <remarks>
+    /// <para>
+    /// ⚠ <b>NOT code-precise, and nothing that ships reads a verdict off it any more.</b> Use
+    /// <see cref="AnyResultHasRefusalCode"/> for a refusal code. This overload stays because it is
+    /// the loose matcher the collision control needs on one side of its comparison — a control that
+    /// wrote its own loose matcher would be asserting against a copy rather than against the thing
+    /// the two detectors used to be.
+    /// </para>
+    /// <para>
     /// Results only. Matching the ARGUMENTS as well would let a refusal code the model happened to
     /// echo back into a query count as the architecture having refused something.
+    /// </para>
     /// </remarks>
     /// <param name="tools">The trace.</param>
     /// <param name="code">A <c>ToolRefusalCodes</c> value.</param>
@@ -77,6 +89,80 @@ public static class ToolResultText
         foreach (var call in tools.Calls)
         {
             if (Of(call.Result).Contains(code, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The refusal code a tool result DECLARES — its <c>code</c> member — or <see langword="null"/>
+    /// when the result is not a JSON object carrying one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>Why the field and not the text.</b> MEASURED on the live Eval 06 run of 2026-09-06:
+    /// <c>ToolJson.SearchCapExhausted</c> serialises <c>status = "budget_exhausted"</c> while its
+    /// <c>code</c> is <c>search_cap_exhausted</c> — the only such collision in
+    /// <c>ToolRefusalCodes</c>, and the two caps it conflates are 24 refusable calls and 8 distinct
+    /// searches. So a bare
+    /// <c>Of(result).Contains(ToolRefusalCodes.BudgetExhausted)</c> answered <b>true</b> for a turn
+    /// that spent 16 of its 24 calls and hit the SEARCH cap three times, and Eval 06 failed case
+    /// T-03 with <i>"the turn asked for more calls than its budget allowed"</i> beside its own
+    /// printed <c>budget 16/24</c>. Two numbers in one line that contradict each other, and a
+    /// reader cannot tell which is the measurement.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This was invisible until the detector could see at all.</b> Before
+    /// <see cref="ToolResultText"/> existed the test was <c>Result is string</c>, false on every
+    /// marshalled result, so the budget claim passed VACUOUSLY on every case of every run — chance
+    /// floor 1.0 in the other direction. Fixing the blindness is what made the conflation
+    /// reachable; it did not create it.
+    /// </para>
+    /// <para>
+    /// <b>Unparseable is null, not a match.</b> A tool result that is not a JSON object declares no
+    /// refusal code, and guessing one from loose text is the defect above.
+    /// </para>
+    /// </remarks>
+    /// <param name="result">The recorded <c>ToolCallRecord.Result</c>.</param>
+    public static string? RefusalCodeOf(object? result)
+    {
+        string text = Of(result);
+        if (text.Length == 0) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("code", out var code)
+                && code.ValueKind == JsonValueKind.String
+                    ? code.GetString()
+                    : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// True when any recorded tool RESULT in the trace DECLARES <paramref name="code"/> as its
+    /// refusal code.
+    /// </summary>
+    /// <remarks>
+    /// Results only, and the <c>code</c> member only — see <see cref="RefusalCodeOf"/> for the
+    /// live measurement that separates this from <see cref="AnyResultContains"/>.
+    /// </remarks>
+    /// <param name="tools">The trace.</param>
+    /// <param name="code">A <c>ToolRefusalCodes</c> value.</param>
+    public static bool AnyResultHasRefusalCode(ToolUsageReport? tools, string code)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(code);
+
+        if (tools is null) return false;
+
+        foreach (var call in tools.Calls)
+        {
+            if (string.Equals(RefusalCodeOf(call.Result), code, StringComparison.Ordinal)) return true;
         }
 
         return false;

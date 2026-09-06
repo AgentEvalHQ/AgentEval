@@ -3,6 +3,7 @@
 //
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
 
+using System.Text.Json;                        // the marshalled JsonElement shape, control 23
 using AgentEval.MAF;
 using Microsoft.Extensions.AI;                 // AIFunctionFactory — the REAL marshalling path, control 22
 using Galaxus.RecommendationAgent.Guardrails;  // ToolSurfaceInvariant.BehaviouralHistoryToolNames
@@ -106,6 +107,7 @@ public static class NegativeControls
         rows.Add(Guarded("ContentlessRequestIsNotCovered", CheckContentlessRequestIsNotCovered));
         rows.Add(Guarded("UnnameableInterestPresentsNothing", CheckUnnameableInterestPresentsNothing));
         rows.Add(await GuardedAsync("RefusalDetectorsSeeTheRealShape", CheckRefusalDetectorsSeeTheRealShapeAsync).ConfigureAwait(false));
+        rows.Add(Guarded("RefusalCodesDoNotAnswerForEachOther", CheckRefusalCodesDoNotAnswerForEachOther));
         rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
         rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
@@ -157,7 +159,7 @@ public static class NegativeControls
     /// verdict to report and must stop, not print a red row that reads like a defect.
     /// </para>
     /// <para>
-    /// <b>Why this is needed here and not only in the row that found it.</b> Rows 22–24 read the
+    /// <b>Why this is needed here and not only in the row that found it.</b> Rows 22–25 read the
     /// source tree, invoke a real <c>AIFunction</c>, write and delete files in a shared store, and
     /// use reflection. <see cref="SampleSourceRoot"/> alone throws
     /// <see cref="DirectoryNotFoundException"/> whenever the eval binary runs from anywhere but the
@@ -203,7 +205,7 @@ public static class NegativeControls
       + "The panel continued and the snapshot was still written.",
         false);
 
-    // ══ Control 25 — the panel must survive a row that throws (Wave 2 review). ════════════
+    // ══ Control 26 — the panel must survive a row that throws (Wave 2 review). ════════════
     //
     /// <summary>
     /// A control row that throws must come back as a FAILED row, and a row that returns must come
@@ -3100,7 +3102,200 @@ public static class NegativeControls
             problems.Count == 0);
     }
 
-    // ══ Control 23 — the run must be able to say what it wrote (plan item 8.19). ═══════════
+    // ══ Control 23 — one refusal code must not answer to another's name (found LIVE, 2026-09-06). ══
+    //
+    /// <summary>
+    /// A tool-result detector asked for refusal code A must not fire on a payload whose declared
+    /// code is B.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>The defect, MEASURED on the live Eval 06 run of 2026-09-06 and reproduced on a
+    /// second.</b> <c>ToolJson.SearchCapExhausted</c> serialises <c>status = "budget_exhausted"</c>
+    /// beside <c>code = "search_cap_exhausted"</c>. The budget detector was a bare substring match,
+    /// so case T-03 — which spent <b>16 of its 24</b> refusable calls and hit the DISTINCT-SEARCH
+    /// cap three times at 8/8 — failed the claim <i>"the turn stayed inside its 24-call budget"</i>
+    /// with the message <i>"the turn asked for more calls than its budget allowed"</i>, printed
+    /// beside its own <c>budget 16/24 ⚠ OVERRUN</c>. Two numbers on one line that contradict each
+    /// other; a reader cannot tell which is the measurement, and the persisted
+    /// <c>eval06_trajectory.json</c> recorded <c>BudgetOverrun: true</c> for a turn that did not
+    /// overrun.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This became reachable only because the detector stopped being blind.</b> The previous
+    /// version tested <c>Result is string</c>, false on every marshalled result, so the budget
+    /// claim passed VACUOUSLY on every case of every run ever made. Plan item 8.14 fixed that; this
+    /// row closes what the fix then exposed. Two extremes in sequence — a claim that could never
+    /// fail, then one that failed for the wrong reason — and neither was visible from a dry run,
+    /// because both stubs return hand-built strings that carry exactly one code.
+    /// </para>
+    /// <para>
+    /// <b>Derived, not restated, and BOTH directions.</b> The codes are read off
+    /// <c>ToolRefusalCodes</c> by reflection, and the payload for each is produced by the tool
+    /// layer's own serialiser rather than written here — so a code added later, or a payload whose
+    /// fields change, is covered without editing this row. Every ordered pair of distinct codes is
+    /// checked for a false positive AND every code is checked against its own payload for a false
+    /// negative: a matcher that answered <see langword="false"/> to everything would pass the first
+    /// half alone.
+    /// </para>
+    /// <para>
+    /// <b>The live shape, not a string.</b> Each payload is round-tripped into a
+    /// <see cref="JsonElement"/> first, because that is what <c>AIFunctionFactory</c> hands the
+    /// harness and a control that tested the string would be the stub-kinder-than-reality shape
+    /// <c>RUN_PROTOCOL.md</c> names.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckRefusalCodesDoNotAnswerForEachOther()
+    {
+        var problems = new List<string>();
+
+        // ── The codes, off the tool surface. A code that exists and is not listed here cannot be
+        //    covered by a row that restates the list. ──
+        string[] codes =
+        [
+            .. typeof(ToolRefusalCodes)
+                .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+                .Select(f => (string)f.GetRawConstantValue()!)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+        ];
+
+        if (codes.Length < 2)
+        {
+            problems.Add($"ToolRefusalCodes yielded {codes.Length} code(s) — the cross-check below is vacuous.");
+        }
+
+        // ── The payloads, from the tool layer's own producers. The two that do NOT go through
+        //    ToolJson.Refused are the two whose `status` collides, which is the whole point. ──
+        static string PayloadFor(string code) => code switch
+        {
+            ToolRefusalCodes.BudgetExhausted => ToolJson.BudgetExhausted(24, 24),
+            ToolRefusalCodes.SearchCapExhausted => ToolJson.SearchCapExhausted(8, 8),
+            ToolRefusalCodes.AlreadyReturned => ToolJson.AlreadyReturned("SearchProductsByMeaning", 3, ["GLX-1001"]),
+            _ => ToolJson.Refused(code, "control payload — the reason text is not what any detector reads."),
+        };
+
+        // The shape a live harness records: AIFunctionFactory marshals a Task<string> through
+        // JsonSerializer, so the string arrives as a JsonElement holding a JSON string.
+        static object Marshalled(string payload) =>
+            JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(payload));
+
+        static ToolUsageReport TraceOf(object result)
+        {
+            var report = new ToolUsageReport();
+            report.AddCall(new ToolCallRecord
+            {
+                Name = nameof(GalaxusTools.SearchProductsByMeaning),
+                CallId = "call-refusal",
+                Result = result,
+                WasExecuted = true,
+            });
+            return report;
+        }
+
+        // ── 1. NON-VACUITY, in the row's own terms. If no payload ever collides loosely any more,
+        //       the defect this row was written for is gone and the assertions below stop
+        //       distinguishing the fixed detector from the broken one. Say so; do not pass. ──
+        int looseCollisions = 0;
+        foreach (string declared in codes)
+        {
+            var trace = TraceOf(Marshalled(PayloadFor(declared)));
+            foreach (string probe in codes)
+            {
+                if (string.Equals(declared, probe, StringComparison.Ordinal)) continue;
+                if (ToolResultText.AnyResultContains(trace, probe)) looseCollisions++;
+            }
+        }
+
+        if (looseCollisions == 0)
+        {
+            problems.Add("no refusal payload collides under the LOOSE matcher any more — this row is no longer "
+                       + "exercising the defect it was written for, so its green result would mean nothing. "
+                       + "Re-derive it against whatever the payloads now share, or retire it deliberately.");
+        }
+
+        // ── 2. FALSE POSITIVES — the direction that failed T-03. ──
+        foreach (string declared in codes)
+        {
+            string payload = PayloadFor(declared);
+            var trace = TraceOf(Marshalled(payload));
+
+            string? read = ToolResultText.RefusalCodeOf(Marshalled(payload));
+            if (!string.Equals(read, declared, StringComparison.Ordinal))
+            {
+                problems.Add($"the payload for '{declared}' declares code '{read ?? "(none)"}' — the producer and the "
+                           + "reader disagree, so every verdict below is about the wrong thing.");
+            }
+
+            foreach (string probe in codes)
+            {
+                if (string.Equals(declared, probe, StringComparison.Ordinal)) continue;
+
+                if (ToolResultText.AnyResultHasRefusalCode(trace, probe))
+                {
+                    problems.Add($"a '{declared}' refusal answers to the name '{probe}'. That is how Eval 06 failed "
+                               + "T-03 for a 24-call budget it never reached: 16 of 24 spent, three "
+                               + "distinct-search-cap refusals, and a claim that named the wrong cap.");
+                }
+            }
+        }
+
+        // ── 3. FALSE NEGATIVES — or a matcher that says no to everything would pass part 2. ──
+        int found = 0;
+        foreach (string declared in codes)
+        {
+            var trace = TraceOf(Marshalled(PayloadFor(declared)));
+            if (ToolResultText.AnyResultHasRefusalCode(trace, declared)) found++;
+            else problems.Add($"the shipped detector cannot find '{declared}' in its own payload — it is blind, not precise.");
+        }
+
+        if (found == 0)
+            problems.Add("no code was found in its own payload at all; part 2 above passed vacuously.");
+
+        // ── 4. The two detectors that ship must be the precise one. A row that proved the matcher
+        //       correct while Eval 01 and Eval 06 called the loose one would be testing a function
+        //       nothing uses — the shape §7 rule 6 flags.
+        foreach ((string file, string member) in new[]
+                 {
+                     ("Evals/Eval01_CatalogueIntegrity.cs", "DetectOptOutBackstop"),
+                     ("Evals/Eval06_ToolTrajectory.cs", "HasBudgetRefusal"),
+                 })
+        {
+            string source = File.ReadAllText(Path.Combine(SampleSourceRoot(), file));
+            int at = source.IndexOf(member + "(ToolUsageReport", StringComparison.Ordinal);
+            if (at < 0)
+            {
+                problems.Add($"{member} was not found in {file} — this clause is asserting nothing.");
+                continue;
+            }
+
+            string body = source[at..Math.Min(source.Length, at + 240)];
+            if (!body.Contains(nameof(ToolResultText.AnyResultHasRefusalCode), StringComparison.Ordinal))
+            {
+                problems.Add($"{file}'s {member} does not read the declared code — it is still on the loose matcher, "
+                           + "so this row proves a function that ships nowhere.");
+            }
+        }
+
+        return new ControlRowSnapshot(
+            "RefusalCodesDoNotAnswerForEachOther",
+            "a detector asked whether the tool layer returned refusal code A must not fire on a payload whose declared "
+          + "code is B. MEASURED live: ToolJson.SearchCapExhausted carries status = \"budget_exhausted\" with code = "
+          + "\"search_cap_exhausted\", so Eval 06 failed T-03 for a 24-call budget it never reached — 16 of 24 spent, "
+          + "three distinct-search-cap refusals at 8/8 — and persisted BudgetOverrun: true for a turn that did not "
+          + "overrun. Reachable only after 8.14 stopped the detector being blind, and invisible to a dry run, whose "
+          + "stubbed results carry one code each.",
+            problems.Count == 0
+                ? $"{codes.Length} code(s) derived from ToolRefusalCodes · {looseCollisions} loose collision(s) still "
+                + $"present in the payloads, so the row is not vacuous · 0 cross-matches under the shipped detector · "
+                + $"{found} of {codes.Length} code(s) found in their own payload · both shipped detectors read the "
+                + "declared code"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 24 — the run must be able to say what it wrote (plan item 8.19). ═══════════
     //
     /// <summary>
     /// The write ledger the <c>--ci --dry-run</c> banner reports must be driven by the write path
@@ -3266,7 +3461,7 @@ public static class NegativeControls
             "the eval project's source directory was not found from " + AppContext.BaseDirectory);
     }
 
-    // ══ Control 24 — silence about persistence is the defect (plan item 8.20). ═══════════
+    // ══ Control 25 — silence about persistence is the defect (plan item 8.20). ═══════════
     //
     /// <summary>
     /// Every eval must DECLARE whether it persists a snapshot, and the declaration must match what

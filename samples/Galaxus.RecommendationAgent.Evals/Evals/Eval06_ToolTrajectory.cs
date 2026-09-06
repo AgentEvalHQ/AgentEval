@@ -531,13 +531,24 @@ public static class Eval06_ToolTrajectory
 
     /// <summary>True when any tool in the trace answered with the budget-exhausted refusal.</summary>
     /// <remarks>
+    /// <para>
     /// ⚠ Same correction as Eval 01's opt-out backstop: this tested <c>c.Result is string json</c>,
     /// which is never true on the live path because <c>AIFunctionFactory</c> marshals a tool's
     /// return value into a <c>JsonElement</c>. It could not fire. See <see cref="ToolResultText"/>.
+    /// </para>
+    /// <para>
+    /// 🔴 <b>And then it fired for the wrong cap.</b> The sighted version was a bare substring
+    /// match, and <c>ToolJson.SearchCapExhausted</c> carries <c>status = "budget_exhausted"</c>
+    /// with <c>code = "search_cap_exhausted"</c>. MEASURED live 2026-09-06: T-03 spent 16 of its 24
+    /// refusable calls, hit the DISTINCT-SEARCH cap three times at 8/8, and this claim failed
+    /// naming a call budget it never reached. It now reads the declared <c>code</c>, so the two
+    /// caps answer for themselves. The search cap is a separate fact and is not asserted here —
+    /// asserting it under this claim's name is the defect, not the remedy.
+    /// </para>
     /// </remarks>
     /// <param name="tools">The trace.</param>
     private static bool HasBudgetRefusal(ToolUsageReport? tools) =>
-        ToolResultText.AnyResultContains(tools, ToolRefusalCodes.BudgetExhausted);
+        ToolResultText.AnyResultHasRefusalCode(tools, ToolRefusalCodes.BudgetExhausted);
 
     /// <summary>
     /// How many commit-tool calls reached the approval gate and were stopped before execution.
