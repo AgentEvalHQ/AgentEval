@@ -37,6 +37,59 @@ public sealed record ObservationCensus(int Measured, int NotApplicable, int NotM
     public bool ExtremeAndUnexamined => Total > 0 && (NotApplicable == 0 || NotApplicable == Total);
 
     /// <summary>
+    /// The fraction of observations that are REAL MEASUREMENTS — <c>Measured / Total</c>.
+    /// <see cref="double.NaN"/> when there are no observations at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>THE DENOMINATOR IS <see cref="Total"/>, AND THE ALTERNATIVE IS THE DEFECT THIS WHOLE
+    /// TYPE EXISTS TO PREVENT.</b> The tempting form is
+    /// <c>(Total − NotApplicable) / Total</c> — "the fraction we could have measured" — and it
+    /// POOLS <see cref="NotApplicable"/> with <see cref="NotMeasured"/>. Those are different
+    /// findings with different owners: a case that could not test the thing is a CORPUS finding,
+    /// and a run where the instrument did not run is an OPERATIONAL one. A number that cannot tell
+    /// them apart reports a broken harness as a well-scoped corpus, which is the flattering
+    /// direction (ADR-030 §4.2; ADR-031 §0.1 states the rule for <c>stats.applicableFraction</c>).
+    /// </para>
+    /// <para>
+    /// The two forms coincide exactly when <see cref="NotMeasured"/> is zero, which is why a
+    /// consumer that has never had an instrument fail cannot tell that it picked the wrong one.
+    /// </para>
+    /// </remarks>
+    public double MeasuredFraction => Total == 0 ? double.NaN : Measured / (double)Total;
+
+    /// <summary>
+    /// The form this type <b>refuses</b>: <c>(Total − NotApplicable) / Total</c>, exposed only so a
+    /// caller can demonstrate that it differs from <see cref="MeasuredFraction"/>.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Never report this.</b> It exists for one purpose: a control that asserts the shipped
+    /// denominator is not this one needs both numbers, and a control that recomputes the forbidden
+    /// form itself would drift from the definition it is checking against. It is documented as
+    /// forbidden at the point where it is defined, so nobody can adopt it by accident.
+    /// </remarks>
+    public double PooledFractionDoNotReport =>
+        Total == 0 ? double.NaN : (Total - NotApplicable) / (double)Total;
+
+    /// <summary>
+    /// Whether this census carries at least <paramref name="minimumApplicable"/> real measurements
+    /// — ADR-031 S2b's <c>minApplicable</c>.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ Counted against <see cref="Measured"/>, never against <c>Total − NotApplicable</c>. A run
+    /// whose instrument silently failed on four cases must not satisfy a minimum by counting those
+    /// four as "applicable".
+    /// </remarks>
+    /// <param name="minimumApplicable">The floor, in real measurements. Negative values are rejected.</param>
+    /// <returns>True when <see cref="Measured"/> reaches the floor.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="minimumApplicable"/> is negative.</exception>
+    public bool MeetsMinimumApplicable(int minimumApplicable)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(minimumApplicable);
+        return Measured >= minimumApplicable;
+    }
+
+    /// <summary>
     /// The denominator, rendered. <c>8 of 12 measured, 3 n/a, 1 not measured</c> — the zero buckets
     /// are omitted, but "measured" and its total never are.
     /// </summary>

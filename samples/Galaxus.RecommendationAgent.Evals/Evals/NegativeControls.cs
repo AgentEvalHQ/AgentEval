@@ -132,6 +132,7 @@ public static class NegativeControls
         rows.Add(Guarded("RepSpreadNeverInventsAZero", CheckRepSpreadNeverInventsAZero));
         rows.Add(await GuardedAsync("TheJudgedPathIsReachableWithoutPaying", CheckTheJudgedPathIsReachableWithoutPayingAsync).ConfigureAwait(false));
         rows.Add(Guarded("TheAnswerTheCustomerReadsIsScreenedToo", CheckTheAnswerTheCustomerReadsIsScreenedToo));
+        rows.Add(Guarded("ApplicableFractionDoesNotPoolTwoAbsences", CheckApplicableFractionDoesNotPoolTwoAbsences));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -7221,6 +7222,117 @@ public static class NegativeControls
                 + "sentence are NOT (§C-08's defect, one layer out) · 'not screened' and 'screened and clean' are "
                 + "distinguishable rather than both an empty list · Eval 01 hands the grader result.ActualOutput, "
                 + "so the screen is reachable rather than dead"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 48 — ADR-031 S2b's denominator (plan item 7.6). ═══════════════════════════
+    //
+    /// <summary>
+    /// <c>applicableFraction</c> must be <c>ObservationCensus.Measured / Total</c> and must never be
+    /// <c>(Total − NotApplicable) / Total</c> — pooling <c>NotApplicable</c> with <c>NotMeasured</c>
+    /// is the exact defect ADR-030 exists to prevent.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two absences, two owners.</b> A case that could not test the thing is a CORPUS finding; a
+    /// run in which the instrument did not run is an OPERATIONAL one. A fraction that cannot tell
+    /// them apart reports a broken harness as a well-scoped corpus, and that is the FLATTERING
+    /// direction — the pooled form is always the larger number.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>This is also the first place the Galaxus sample uses an ADR-030 Slice 2 TYPE.</b> Until
+    /// now the sample's adoption was strings, not types: its own <c>Observation</c> is a local
+    /// <c>private sealed record</c> in Eval 07 and its <c>ChanceFloors</c> is a local helper, and
+    /// there is no <c>using AgentEval.Evals.Meta</c> anywhere in it. A library type with no
+    /// consumer outside its own tests is a type whose contract nobody has had to live with.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckApplicableFractionDoesNotPoolTwoAbsences()
+    {
+        var problems = new List<string>();
+
+        // ── 1. The rule, on a census where the two forms CAN differ. ──
+        var mixed = new AgentEval.Evals.Meta.ObservationCensus(Measured: 8, NotApplicable: 3, NotMeasured: 1);
+        if (Math.Abs(mixed.MeasuredFraction - (8 / 12.0)) > 1e-12)
+            problems.Add($"the shipped fraction is {mixed.MeasuredFraction:F6}; Measured / Total is {8 / 12.0:F6}.");
+        if (Math.Abs(mixed.PooledFractionDoNotReport - (9 / 12.0)) > 1e-12)
+            problems.Add("the forbidden form no longer computes (Total − NotApplicable) / Total, so the comparison "
+                       + "below is not against the thing this row forbids.");
+        if (Math.Abs(mixed.MeasuredFraction - mixed.PooledFractionDoNotReport) < 1e-12)
+            problems.Add("the two denominators agree on a census built so that they cannot — the row is vacuous.");
+        if (mixed.PooledFractionDoNotReport <= mixed.MeasuredFraction)
+            problems.Add("pooling is no longer the LARGER number; the direction of this defect is what makes it "
+                       + "worth a control, and it must be stated correctly.");
+
+        // ── 2. The floor counts MEASUREMENTS. A run whose instrument failed on one case must not
+        //       satisfy a minimum of 9 by counting that failure as applicable. ──
+        if (!mixed.MeetsMinimumApplicable(8)) problems.Add("a floor of 8 is not met by 8 measurements.");
+        if (mixed.MeetsMinimumApplicable(9))
+        {
+            problems.Add("a floor of 9 is met by 8 measurements — the floor is counting the pooled applicable "
+                       + "population (Total − NotApplicable = 9) rather than the measured one.");
+        }
+
+        // ── 3. WHY A HEALTHY POPULATION CANNOT CHECK THIS, measured on the suite's own numbers. ──
+        //
+        //   The two forms coincide exactly when NotMeasured is 0. Eval 02's persisted cohort is
+        //   such a population, so it CANNOT discriminate — and saying so is the point: a control
+        //   that drew its evidence from there would pass under either denominator.
+        var persisted = EvalResultStore.LoadCoverage(EvalResultStore.CoverageKey);
+        string realPopulation;
+        if (persisted is null)
+        {
+            realPopulation = "no persisted Eval 02 snapshot on disk — the real population was NOT consulted";
+        }
+        else
+        {
+            int measured = persisted.Cells.Count(c => c.Latent >= 0);
+            int unscorable = persisted.Cells.Count(c => c.Latent < 0);
+            int missing = (persisted.PersonaCount * persisted.Arms.Count) - persisted.Cells.Count;
+            var real = new AgentEval.Evals.Meta.ObservationCensus(measured, unscorable, Math.Max(0, missing));
+
+            bool discriminates = Math.Abs(real.MeasuredFraction - real.PooledFractionDoNotReport) > 1e-12;
+            realPopulation =
+                $"the persisted cohort is {real.Describe()}, and it {(discriminates ? "DOES" : "does NOT")} "
+              + "discriminate the two denominators"
+              + (discriminates ? "" : " — NotMeasured is 0 there, so both forms agree and a control drawn from it "
+                                    + "would pass under either");
+
+            // Not a fault either way. What WOULD be a fault is claiming it discriminates when it
+            // does not, so the sentence above is derived rather than asserted.
+            if (real.Total != persisted.PersonaCount * persisted.Arms.Count)
+                problems.Add("the persisted census does not account for every persona × arm cell, so its three "
+                           + "buckets do not partition the population and its Describe() is not a denominator.");
+        }
+
+        // ── 4. NaN, not zero, when there was nothing to measure. ──
+        var empty = new AgentEval.Evals.Meta.ObservationCensus(0, 0, 0);
+        if (!double.IsNaN(empty.MeasuredFraction))
+            problems.Add("an empty census reports a fraction rather than NaN — 'nothing to measure' rendered as "
+                       + "'nothing was measurable', which is the silent-{} shape.");
+        var allFailed = new AgentEval.Evals.Meta.ObservationCensus(0, 0, 5);
+        if (allFailed.MeasuredFraction != 0.0 || Math.Abs(allFailed.PooledFractionDoNotReport - 1.0) > 1e-12)
+        {
+            problems.Add("a run in which the instrument never ran does not read 0.000 measured — the pooled form "
+                       + "calls it 100% applicable, which is the worst case of this defect.");
+        }
+        if (!allFailed.Void)
+            problems.Add("a census with no measurements is not VOID.");
+
+        return new ControlRowSnapshot(
+            "ApplicableFractionDoesNotPoolTwoAbsences",
+            "ADR-031 S2b's applicableFraction must be ObservationCensus.Measured / Total and NEVER "
+          + "(Total − NotApplicable) / Total. The second POOLS NotApplicable with NotMeasured, and those are "
+          + "different findings with different owners: a case that could not test the thing is a CORPUS finding, "
+          + "a run where the instrument did not run is an OPERATIONAL one. The pooled form is always the LARGER "
+          + "number, so it reports a broken harness as a well-scoped corpus. ⚠ This row is also the first place "
+          + "this sample uses an ADR-030 Slice 2 TYPE rather than its own local copy.",
+            problems.Count == 0
+                ? "on 8 measured / 3 n/a / 1 not measured the shipped fraction is 0.667 and the forbidden one "
+                + "0.750, and the forbidden one is LARGER · a floor of 9 is NOT met by 8 measurements even though "
+                + "Total − NotApplicable is 9 · an empty census is NaN, not 0.000 · a run where nothing ran reads "
+                + "0.000 measured and VOID while the pooled form calls it 1.000 applicable · " + realPopulation
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
