@@ -112,6 +112,7 @@ public static class NegativeControls
         rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
         rows.Add(Guarded("AboveChanceIsAnExactTest", CheckAboveChanceIsAnExactTest));
         rows.Add(Guarded("ForcedChoiceCountIsACountOfPersonas", CheckForcedChoiceCountIsACountOfPersonas));
+        rows.Add(Guarded("CiChainRunsModelFreeEvalsForReal", CheckCiChainRunsModelFreeEvalsForReal));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
@@ -3177,7 +3178,7 @@ public static class NegativeControls
             problems.Count == 0);
     }
 
-    // ══ Control 25 — the forced-choice count was a count of nothing (stage-2 smoke, 2026-09-06). ══
+    // ══ Control 27 — the forced-choice count was a count of nothing (stage-2 smoke, 2026-09-06). ══
     //
     /// <summary>
     /// The integer the forced-choice panel hands the exact binomial must be a COUNT OF PERSONAS,
@@ -3312,6 +3313,108 @@ public static class NegativeControls
                 + "given NaN · ⚠ MEASURED on the shipped paid cohort: 7 of the live arm's 12 cells are SPLIT "
                 + "across reps, so the panel printed 6 of 12 where the cells say 7 — p = 0.000199 → 0.000015, "
                 + "▲ either way"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 28 — the CI chain stubbed a model-free eval, and hid a red gate (2026-09-06). ══
+    //
+    /// <summary>
+    /// No eval the CI chain declares <c>NeedsModel: false</c> may be handed <c>--dry-run</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect, measured before the fix.</b> <c>--ci --dry-run</c> — the form
+    /// <c>Program.cs</c> itself recommends CI use, and the form every wave of this plan has run —
+    /// printed <i>"Eval 07: passed."</i> and returned <b>exit 0</b>, while <c>-- 7</c>, the
+    /// identical measurement on the identical tree, returned <b>exit 1</b> with <b>GATE B ❌</b>.
+    /// Eval 07 makes no model call on any path, so <c>--dry-run</c> had nothing to stub: its dry-run
+    /// form runs ONE of five cases and asserts only the plumbing. The chain passed
+    /// <c>parsed.DryRun</c> straight through, so the suite's only currently-failing gate was
+    /// invisible to the suite's own CI command.
+    /// </para>
+    /// <para>
+    /// <b>Why that is worse than an ordinary false green.</b> <c>RunCiAsync</c>'s own header
+    /// justifies putting Eval 07 in the chain with the sentence <i>"an eval that is not in the chain
+    /// has its failures reported nowhere at all"</i> — and under the recommended invocation its
+    /// failures were reported nowhere at all. The same argument had already been settled for Evals
+    /// 03 and 04 (RUN_PROTOCOL, plan item 8.19): a model-free eval gets no <c>dryRun</c> parameter,
+    /// because replacing a real free measurement with a stubbed copy of itself makes the cheapest
+    /// honest measurement in the suite worse in order to make a sentence true. Eval 07 is the third
+    /// model-free eval and it was the exception nobody had noticed.
+    /// </para>
+    /// <para>
+    /// <b>What this row does NOT do.</b> It does not forbid Eval 07's dry-run form. Run by hand,
+    /// <c>-- 7 --dry-run</c> is a fast, loud plumbing check that can and does fail, and its header
+    /// says so. What is forbidden is the CHAIN choosing it.
+    /// </para>
+    /// <para>
+    /// It reads <c>Program.cs</c> rather than reasoning about it — the same technique
+    /// <c>EveryEvalDeclaresItsSnapshotPolicy</c> and <c>EveryControlRowIsContained</c> use — so a
+    /// future edit that re-introduces the pass-through turns this row red instead of turning a gate
+    /// green.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckCiChainRunsModelFreeEvalsForReal()
+    {
+        var problems = new List<string>();
+        string source = File.ReadAllText(Path.Combine(SampleSourceRoot(), "Program.cs"));
+
+        // The CI chain's step table: `new("Eval NN", "…", NeedsModel: X, Slow: Y, () => …)`.
+        var steps = System.Text.RegularExpressions.Regex.Matches(
+            source,
+            @"new\(""(?<name>Eval [0-9a-c]+)"",[^)]*?NeedsModel:\s*(?<needs>true|false),\s*Slow:\s*(?:true|false),\s*\(\)\s*=>\s*(?<body>[^;]*?)\)\),",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        if (steps.Count < 11)
+        {
+            problems.Add($"only {steps.Count} CI step(s) were recognised in Program.cs — the scan is not reading the "
+                       + "chain it thinks it is, so its verdict means nothing.");
+        }
+
+        var modelFree = new List<string>();
+        var stubbed = new List<string>();
+
+        foreach (System.Text.RegularExpressions.Match step in steps)
+        {
+            if (step.Groups["needs"].Value != "false") continue;
+            string name = step.Groups["name"].Value;
+            modelFree.Add(name);
+
+            // `dryRun: parsed.DryRun` — or any variable at all — is the defect. `dryRun: false` is
+            // the fix, and no `dryRun:` argument (Evals 03 and 04) is stronger still.
+            var arg = System.Text.RegularExpressions.Regex.Match(step.Groups["body"].Value, @"dryRun:\s*(?<v>[A-Za-z0-9_.]+)");
+            if (arg.Success && arg.Groups["v"].Value != "false")
+                stubbed.Add($"{name} is driven with dryRun: {arg.Groups["v"].Value}");
+        }
+
+        if (modelFree.Count < 3)
+        {
+            problems.Add($"the chain declares only {modelFree.Count} model-free eval(s) — Evals 03, 04 and 07 all call "
+                       + "no model, so a smaller number means a declaration went stale.");
+        }
+
+        foreach (string s in stubbed)
+        {
+            problems.Add($"{s} — a model-free eval has nothing to stub, so this replaces a real free measurement with a "
+                       + "partial copy of itself and can only turn a red gate green in CI.");
+        }
+
+        return new ControlRowSnapshot(
+            "CiChainRunsModelFreeEvalsForReal",
+            "no eval the CI chain declares NeedsModel: false may be handed --dry-run. Such an eval has nothing to "
+          + "stub, so a dry-run form of it is a partial copy that can only lose failures. MEASURED before the fix: "
+          + "`--ci --dry-run` printed \"Eval 07: passed.\" and exited 0 while `-- 7` — the identical free measurement "
+          + "on the identical tree — exited 1 with GATE B failing, because Eval 07's dry run scores ONE of five cases. "
+          + "RunCiAsync's own header puts Eval 07 in the chain so that \"an eval that is not in the chain has its "
+          + "failures reported nowhere at all\", and under the recommended invocation they were reported nowhere at "
+          + "all. Evals 03 and 04 settled this in plan item 8.19 by taking no dryRun parameter; Eval 07 keeps its "
+          + "hand-run plumbing form and the CHAIN passes dryRun: false",
+            problems.Count == 0
+                ? $"{steps.Count} CI step(s) scanned in Program.cs · model-free: {string.Join(", ", modelFree)} · "
+                + "none of them is driven with a dryRun variable · ⚠ CONSEQUENCE, DECLARED: `--ci --dry-run` now "
+                + "returns 1, not 0, because Eval 07's GATE B is genuinely red — the exit code moved, the system "
+                + "did not"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

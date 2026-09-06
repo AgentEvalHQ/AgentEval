@@ -70,9 +70,10 @@ if (parsed is null)
     Console.Error.WriteLine("               They are then reported as exit 3 — NOT RUN — never as passes.");
     Console.Error.WriteLine("  --quick      fewer repetitions in Evals 02, 02b, 02c, 08 and 09");
     Console.Error.WriteLine("  --judge      Eval 01's ADVISORY justification judge. Never changes a gate.");
-    Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent. Evals 03 and 04 call");
-    Console.Error.WriteLine("               no model, take no --dry-run parameter and DO persist — the closing banner");
-    Console.Error.WriteLine("               names every snapshot the run actually wrote.");
+    Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent. Evals 03, 04 and 07");
+    Console.Error.WriteLine("               call no model, so --ci --dry-run runs all three FOR REAL and they DO persist");
+    Console.Error.WriteLine("               — the closing banner names every snapshot the run actually wrote. `-- 7");
+    Console.Error.WriteLine("               --dry-run` by hand is a one-case PLUMBING check and is not the eval.");
     Console.Error.WriteLine("  --only <id>  Evals 02, 02b and 02c: run ONE case (stage two of the run protocol). 02 takes a");
     Console.Error.WriteLine("               persona id, 02b a case id (SN-01…), 02c a customer id (USR-NB-01…). The snapshot");
     Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record. NOT honoured under");
@@ -168,8 +169,18 @@ static async Task<int> RunCiAsync(ParsedArgs parsed)
             () => Eval05_RecommendationQuality.RunAsync(dryRun: parsed.DryRun)),
         new("Eval 06", "tool trajectory",            NeedsModel: true,  Slow: false,
             () => Eval06_ToolTrajectory.RunAsync(dryRun: parsed.DryRun)),
+        // ⚠ `dryRun: false`, DELIBERATELY, and it is the third model-free eval to reach this
+        //   conclusion. Eval 07 calls no model on any path, so there is nothing for `--dry-run` to
+        //   stub; its dry-run form runs ONE case and asserts only the plumbing. Handing it
+        //   `parsed.DryRun` made `--ci --dry-run` — the form this file recommends CI actually use —
+        //   print "Eval 07: passed" and exit 0 while `-- 7`, the identical free measurement, exits 1
+        //   with GATE B ❌. That is precisely the outcome the comment above justifies putting Eval 07
+        //   in the chain to prevent: "an eval that is not in the chain has its failures reported
+        //   nowhere at all." Evals 03 and 04 take no `dryRun` parameter at all for the same reason
+        //   (RUN_PROTOCOL, plan item 8.19); Eval 07 has one for hand use and the chain must not pass
+        //   it. Pinned by Eval 03's gating row `CiChainRunsModelFreeEvalsForReal`.
         new("Eval 07", "workflow topology",          NeedsModel: false, Slow: false,
-            () => Eval07_WorkflowTopology.RunAsync(dryRun: parsed.DryRun)),
+            () => Eval07_WorkflowTopology.RunAsync(dryRun: false)),
         new("Eval 08", "repeated-run stability",     NeedsModel: true,  Slow: true,
             () => Eval08_StochasticStability.RunAsync(
                       runs: null, quick: parsed.Quick, dryRun: parsed.DryRun)),
