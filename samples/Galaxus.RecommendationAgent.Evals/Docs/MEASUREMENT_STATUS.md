@@ -3714,7 +3714,7 @@ first time the real path has passed it.
 
 `tests/AgentEval.Tests` net10: **9,630 → 9,646 of 9,648**, 0 failed, 2 skipped. **Zero existing test files
 edited.** `AgentEval.sln` builds 0 errors. The control panel is **20 gating + 4 advisory = 24 rows**, up from
-16 + 4; all 20 gating rows caught.
+16 + 4; all 20 gating rows caught. *(Superseded by §26.4: the review took it to **21 gating + 4 advisory = 25 rows** and the suite to 9,648 of 9,650.)*
 
 ### 25.3 The three "wrong as specified" findings, each measured
 
@@ -3883,11 +3883,144 @@ the stub-kinder-than-reality shape.
 E=samples/Galaxus.RecommendationAgent.Evals
 A=samples/Galaxus.RecommendationAgent
 dotnet build AgentEval.sln                                  # 0 errors
-dotnet test tests/AgentEval.Tests -f net10.0                # 9646/0/2 of 9648
-dotnet run --project $E -- 3                                # 24 rows: 20 gating caught, 4 advisory. exit 0
+dotnet test tests/AgentEval.Tests -f net10.0                # 9648/0/2 of 9650 (§26.4)
+dotnet run --project $E -- 3                                # 25 rows: 21 gating caught, 4 advisory. exit 0 (§26.4)
 dotnet run --project $E -- --ci --dry-run                   # exit 0; banner names eval03_controls + eval04_injection
 dotnet run --project $E -- 7                                # exit 1 (GATE B, pre-existing)
 dotnet run --project $E -- 7 --real-vectors                 # exit 1 (GATE B) — GATE C now PASSES
 dotnet run --project $A -- 2 --user USR-LF-04 --offline --real-vectors   # 2 discovered -> 0 recommended, 0 shown
 git check-ignore -v $E/Docs/runs/2026-09-06_wave1-verify-41cd09a2/EXITCODES.txt
 ```
+
+---
+
+## 26. WAVE 2 REVIEWED — five defects, three of them in the instrument that reports the other two (2026-09-06)
+
+**Scope.** A correctness-and-wiring review of the seven Wave 2 commits `3531a71f` → `7f92b91e`, run before
+anything else was built on them. Every fix below carries an ablation that was executed, not reasoned about.
+⚠️ **Two of the five are the same shape as the fixes they were reviewing** — a printed claim the run's own
+ledger refutes, and a bar supplied by something other than the artifact under test. That is the third wave in
+a row where the correcting commit needed correcting.
+
+### 26.1 What was verified and held
+
+| Claim | How it was checked | Verdict |
+|---|---|---|
+| Every fix is wired to production, not only to a diff | `DiscoveryPostChecks.Apply` grepped to **both** ranker call sites (`DeterministicDiscoveryNodes:274`, `ModelDiscoveryNodes:740`); `NamesNothing` to `CatalogueDiscoverySearch:90`; `ToolResultText` to `Eval01:495` + `Eval06:540` with **no `Result is string` predicate left anywhere in the sample**; `RecordWrite` to both chokepoints; `PersistRun` to the live branch of both evals | ✅ |
+| `CatalogueDiscoverySearch`'s inline predicate → `NamesNothing` is semantics-preserving | The three conjuncts are identical, reordered. It does **not** weaken Wave 1's coverage gate | ✅ |
+| The `JsonElement` claim reaches the harness, not just the `AIFunction` | Three hops read end to end: `MAFAgentAdapter:133` `Result = result.Result` → `MAFEvaluationHarness:307` `existingRecord.Result = chunk.ToolCallCompleted.Result` → `ToolCallRecord.Result`. `ApprovalAwareAgentAdapter` **derives from** `MAFAgentAdapter`, so Eval 06 shares the path | ✅ |
+| Nothing under `Docs/runs/` is tracked or un-ignored | `git check-ignore --stdin` over all **54** files: 54 ignored, 0 not; `git ls-files` on the directory: **0** | ✅ |
+| Non-breaking | `git diff --name-status 9bb139d2..HEAD`: **one test file added, none modified**. Full net10 suite green | ✅ |
+| Eval 07 concept output unmoved by 8.18 | Only `USR-LF-04` presents 0 in the concept space, and it had **0 drops**, so the footnote condition has no case to change there. `-- 7` exit **1** (GATE B), GATE C ✅ | ✅ |
+
+### 26.2 The five defects, each with its ablation
+
+**(1) A control row that threw took the whole panel — and the snapshot — with it.** `NegativeControls.RunAsync`
+added all 24 rows with no containment, and Wave 2 then added three rows that read the source tree, invoke a
+real `AIFunction`, and write and delete files. `SampleSourceRoot()` throws outright whenever the eval binary
+runs from anywhere but the repository tree. **This is the hazard Wave 2's own commit message records** —
+ablation D of 8.20 *"killed the process (exit 127) and took the whole panel with it"* — contained inside one
+row and left open for the panel.
+
+| `SampleSourceRoot()` forced to throw | before | after |
+|---|---|---|
+| exit code | **127**, unhandled `DirectoryNotFoundException` | **1** |
+| control report printed | **none** — 22 rows that had already run were lost | all **25** rows, three of them ❌ naming the type and message |
+| `eval03_controls.json` | **not written**, mtime unchanged `03:15:03` | **written**, `03:16:08` |
+
+Fixed with `Guarded` / `GuardedAsync`, which convert a throw into a **failed gating** row and leave a
+returning row untouched (`ReferenceEquals`-asserted). `OperationCanceledException` still propagates. New
+gating row **`EveryControlRowIsContained`** pins all of it and **asserts its own input**: it reads the panel's
+own source and requires every one of the 25 `rows.Add(` lines to go through the guard.
+
+**(2) Control 22 could be emptied one level down.** The row closed *"a shrunk list passes vacuously"* for
+`BehaviouralHistoryToolNames` and then depended on its own hand-written three-entry `userKeyedTools` array. A
+tool taking a customer id, refusing under the opt-out, and absent from **both** lists would leave the row
+green. The set of user-keyed tools is now **derived by reflection** from `GalaxusTools` and asserted equal to
+what the row exercises. **Ablation:** `GetUserProfile` deleted from the row's list → *"this row invokes
+[GetInterestMap, GetPurchaseHistory] and the tool surface declares user-keyed [GetInterestMap,
+GetPurchaseHistory, GetUserProfile]"*, exit **1**.
+
+**(3) 🔴 Eval 06 printed "writes no snapshot" three lines before saving one.** Found by running it live.
+`PrintGate` guards the sentence with `if (dryRun) return;`, so the claim was printed **only on the path where
+it is false**:
+
+```
+     Eval 06 writes no snapshot: it shares no comparison inputs with Eval 03, and an
+     unread result file is a liability rather than an asset.
+  📁 Snapshot saved → …\snapshots
+```
+
+Measured on the live run of **2026-09-06 01:20:57Z**, which wrote `eval06_trajectory.json` (5 cases, 4,592
+bytes). The sentence was true when written; **item 8.20 falsified it and did not come back for it** — 8.19's
+defect, one file over, reintroduced by the fix for the item beside it. Fixed, and pinned by a new clause in
+`EveryEvalDeclaresItsSnapshotPolicy`: in a file declaring `writes`, a printed denial of persistence must be
+attributable to a **dry run** — the words *"dry run"* in the literal or within six lines of it. ⚠️ Its limit
+is stated in code: `if (dryRun) return;` deliberately does **not** count, because that is exactly what made
+Eval 06's sentence live-only. **Ablation:** the old sentence restored → *"Eval06_ToolTrajectory.cs declares it
+WRITES and prints a denial of it that no dry run explains, at line 974"*, exit **1**.
+
+**(4) The byte-identity claim was asserted against a COPY of the store's settings.** ADR-031 S2's load-bearing
+property — a producer that does not set `StimulusHash` writes byte-identical scenario files — rested on
+`FileSystemOutputStore` using `DefaultIgnoreCondition = WhenWritingNull`, and the test that asserted it
+serialised under `s_storeLike`, a hand-built copy. The gate was fed by something other than the artifact under
+test. Two end-to-end tests now write through the **real** store and read the file off disk.
+**Ablation:** the shipped store set to `JsonIgnoreCondition.Never` →
+`ScenarioFileOnDisk_HasNoStimulusHashKey_WhenNoProducerSetOne` **FAILS** and the copy-based test still
+**passes**, which is precisely the blind spot. 16 → **18** tests in that file.
+
+**(5) Two documents were stale in the direction that misleads.** `RUN_PROTOCOL.md` — the standing document —
+still said *"05, 06 and 08 do not [persist] … 05's and 06's is neither stated nor intended (plan item
+8.20)"* after 8.20 had closed. It now tells the reader to read the policy off the code
+(`grep -n "SNAPSHOT-POLICY" …/Evals/*.cs`) rather than off a list that can go stale. And ADR-031 S2 declared
+only the half that does **not** move: the three composite runners now write `"input": "<query>"` where they
+wrote `""`, plus a `stimulusHash` key. That movement is now declared with its direction and blast radius.
+
+### 26.3 The paid runs this review made, and every number that moved
+
+Two live runs, **USD ≈ 4.39 total**, made to answer *"a claim that an eval now persists is worth nothing
+without the file"*. Both files landed:
+
+```
+-rw-r--r-- 4592 2026-09-06 03:24:55.626332000 +0200  eval06_trajectory.json
+-rw-r--r-- 3257 2026-09-06 03:32:59.020607500 +0200  eval05_quality.json
+```
+
+| Eval | Run | Result | Cost |
+|---|---|---|---|
+| **06** | `-- 6`, 5 live turns, 01:20:57Z–01:24:55Z | exit **1** · 3 of 5 cases · 23 of 26 claims · T-02 and T-03 FAIL — **unchanged** from `SUITE_SUMMARY` §12 | ~USD 2.27 |
+| **05** | `-- 5`, 5 personas × 2 arms + 10 judge calls, 01:27:38Z–01:32:59Z | exit **1** · gate fails on **ABSTENTION DISCRIMINATION only** | ~USD 2.12 agent-side (judge calls not surfaced) |
+
+⚠️ **Eval 05's numbers moved, and mostly in our favour — declared for that reason.** Against
+`SUITE_SUMMARY` §14 / §2.2:
+
+| | published (2026-09-05) | this run (2026-09-06) |
+|---|---|---|
+| INSTRUMENT HEALTH | ❌ — the judge's criteria did not join on **3 of 10** cells | ✅ — **0** missing verdicts, **0** invented, **0** join failures |
+| SEPARATION | ❌ — failed because `USR-NB-01` became unmeasurable | ✅ — agent strictly above the control on **4 of 4** personas owed recommendations |
+| ABSTENTION DISCRIMINATION | ❌ | ❌ — **4 of 5**; `USR-JV-08` still presents 0 where recommendations are owed |
+| per-persona margin | — | NB-01 **+100** · MI-02 **+80** · SK-03 **+100** · JV-08 **+20** · LF-04 **+80** |
+
+**This is the first live confirmation of Wave 1 correction ⑫**: the judge was echoing our own rubric with our
+own ordinal in front, our matcher did not recognise it, and with the matcher fixed the instrument reads clean
+on all ten cells. ⚠️ **The margins remain bounded by the same 25-point re-grade spread**, which is stored in
+the file beside them; nothing here is a claim that the agent improved, because the agent did not change.
+⚠️ **The stored `WeightedScore` carries the unrounded double** — `99.99999999999999` where the console prints
+`100.0` — so a byte comparison of two of these files is not a comparison of two scores.
+
+### 26.4 Suite state after the review
+
+`AgentEval.sln` **0 errors**. `tests/AgentEval.Tests` net10 **9,648 / 0 / 2 of 9,650** (was 9,646 of 9,648;
+**+2, both in the file this wave added, no existing test file edited**). Control panel **21 gating + 4
+advisory = 25 rows**, all 21 gating caught. `-- 3` exit **0**; `--ci --dry-run` exit **0**, banner still names
+exactly `eval03_controls` + `eval04_injection`; `-- 7` exit **1** (GATE B).
+
+### 26.5 Reported, not fixed — for a later wave
+
+| # | Finding | Why it is not fixed here |
+|---|---|---|
+| 1 | **§25.3(c)'s "949 documents / 841 valid / 0 regressed" has no command in §25.8.** The measurement cannot be re-run from this document | Re-deriving it needs the ad-hoc schema harness that produced it. It is a **reproducibility** gap, not a wrong number, and inventing a second script would be a second claim |
+| 2 | `EvalResultStore.Write<T>` archives with `if (!File.Exists(archive)) File.Copy(...)`, so **two writes of one key inside the same second silently lose the second archive**; the write itself is not atomic | Pre-existing, not introduced by Wave 2, and the store is on ADR-031 S1's migration path |
+| 3 | `ModelPresenter` can still return prose for an empty selection on the live workflow path | Declared by 8.18 already; the prompt is design §C.3 verbatim |
+| 4 | Control 23's second-chokepoint check reads `OfflineSnapshotStore.cs` as **text** | Declared in the row. A reflection-only check cannot see whether the method body records |
+| 5 | `EvalPrinter`'s new three-way opt-out sentence (never TEMPTED / 🔴 / 🛡) is **print-only and unasserted** | Control 22 pins the list it reads and the detector it reports; the branch selection itself would need a console-capture control |

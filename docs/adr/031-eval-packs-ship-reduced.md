@@ -39,7 +39,7 @@ been deleted. Anyone reading this ADR to find out what is still on the table rea
 | # | Item | Status |
 |---|---|---|
 | **S1** | `EvalResultStore` → `IOutputStore`. One store interface; the pack reporter writes through the same path as everything else. | **DEFERRED with a reason, 2026-09-06** — see the note below |
-| **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | ✅ **SHIPPED 2026-09-06 (`71bc44c3`)** — `StimulusHash.Of` / `.SameStimulus`, a non-positional `ScenarioResult.StimulusHash`, an optional `input` on `ToScenarioResult`, and three real producers. 16 new tests, **0 existing test files edited**, byte-identical output for every producer that does not set it. ⚠️ One of its two named sites is **unmeetable** — see below |
+| **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | ✅ **SHIPPED 2026-09-06 (`71bc44c3`)** — `StimulusHash.Of` / `.SameStimulus`, a non-positional `ScenarioResult.StimulusHash`, an optional `input` on `ToScenarioResult`, and three real producers. **18** tests (16 at `71bc44c3`, **+2 in the Wave 2 review**), **0 existing test files edited**, byte-identical output for every producer that does not set it — asserted against a file the **real `FileSystemOutputStore` wrote**, not against a copy of its settings. The three producers that DO set it gain two fields; that movement is declared below. ⚠️ One of its two named sites is **unmeetable** — see below |
 | **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically, whose blocking rationale was **measured and corrected on 2026-09-06**; ADR-030's Q4 now carries the correction |
 | **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; gated on **Q5**, an open user decision |
 | **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | Not started. **Unblocked by one fifth** — see the note below |
@@ -55,11 +55,34 @@ sites carry a real input"*, naming `EvalResultPersistence.cs:79` and `DirectoryE
 model that feeds the HTML and JSON exports. **7.2 should be restated as one site plus a separate decision
 about `TestResultSummary`.**
 
+**⚠️ What S2 DOES move, declared (added by the Wave 2 review, 2026-09-06).** The byte-identity claim above is
+about producers that do **not** set the field, and the row said nothing about the three that do. It is a
+one-directional, additive change and it is stated here rather than left to be discovered:
+
+| | before `71bc44c3` | after |
+|---|---|---|
+| `GdprBenchmarkRunner` / `EuAiActBenchmarkRunner` / `AgenticBenchmarkRunner` — each leaf scenario file | `"input": ""`, no `stimulusHash` key | `"input": "<the composite's own query>"` **plus** a `stimulusHash` key |
+| every other producer | — | **unchanged, byte for byte** |
+
+**Blast radius:** future runs of those three runners only. **Nothing already on disk moves** — no stored file
+is rewritten, and none of the 46 stored manifest hashes changes. What a reader must expect is that a
+content-hash comparison of a scenario file written by one of those three runners **across this commit**
+reports a difference, and that the difference is two added fields and no removed or altered one.
+**Falsifiable:** `git show 71bc44c3 -- src/AgentEval.Compliance.Gdpr` is the whole change at that site, and
+`StimulusHashTests.TheCompositeRunners_PassTheirInputThrough` fails the moment one of the three stops
+passing its input.
+
 **Two properties of S2 that are load-bearing and were asserted rather than announced.**
 `ScenarioResult.StimulusHash` is a **non-positional** init-only member defaulting to `null`, and the store
 serialises with `DefaultIgnoreCondition = WhenWritingNull` — so an eleventh positional parameter never
 breaks a construction site, a producer that does not set it writes **byte-identical** scenario files, and
-none of the 46 stored manifest hashes moves. And `SameStimulus` returns **false** when either side is null:
+none of the 46 stored manifest hashes moves. ⚠️ **Corrected by the Wave 2 review:** that claim shipped
+asserted against `s_storeLike`, a hand-built COPY of the store's options, so it would have stayed green if
+the shipped store's `DefaultIgnoreCondition` ever changed and every scenario file silently grew a
+`"stimulusHash": null` — the bar supplied by something other than the artifact under test. It is now also
+asserted end-to-end through `FileSystemOutputStore` (`ScenarioFileOnDisk_HasNoStimulusHashKey_WhenNoProducerSetOne`),
+**proven red** by setting the real store to `JsonIgnoreCondition.Never`: the on-disk test fails and the copy-based
+one still passes. And `SameStimulus` returns **false** when either side is null:
 *"nobody computed a digest"* is not *"the digests match"*, and collapsing them is the silent-`{}` shape
 ADR-030 §4.2 rejects — it is precisely the behaviour S5 exists to refuse.
 

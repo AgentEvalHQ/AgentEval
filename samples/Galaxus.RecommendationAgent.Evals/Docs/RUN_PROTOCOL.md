@@ -71,9 +71,25 @@ as far as the next person is concerned.
 > disk, so a reader who is told a snapshot was written can go and look at it. Pinned by Eval 03's gating
 > control `WriteLedgerMatchesTheStore`, proven red by removing either chokepoint's `RecordWrite`.
 
-**Which evals persist at all**, verified 2026-09-06: 01, 02, 02b, 02c, 03, 04, 07, 09 do. **05, 06 and 08
-do not.** Eval 08's silence is deliberate and stated in code (`Eval08:316-319`); 05's and 06's is neither
-stated nor intended (plan item **8.20**).
+**Which evals persist at all.** Do not read this list off a document again — read it off the code. Every
+eval file carries a `// SNAPSHOT-POLICY:` line on line 4, and Eval 03's gating control
+`EveryEvalDeclaresItsSnapshotPolicy` checks each declaration **against that file's actual store calls, in
+both directions**, so a stale declaration fails the build rather than misleading a reader:
+
+```
+grep -n "SNAPSHOT-POLICY" samples/Galaxus.RecommendationAgent.Evals/Evals/*.cs
+```
+
+Measured 2026-09-06 at `046f5425`: **11 files, 10 `writes`, 1 `deliberately-none`.** The one is **Eval 08**,
+and its reason is stated in code (`Eval08:316-319`) — nothing consumes a stability snapshot, and a number in
+a shared store that no gate reads is a hazard a later reader can mistake for one that is.
+
+> ✅ **CORRECTED 2026-09-06 (Wave 2, plan item 8.20).** This paragraph used to read *"01, 02, 02b, 02c, 03,
+> 04, 07, 09 do; **05, 06 and 08 do not**"*, and item **8.20** closed exactly that: `eval05_quality` and
+> `eval06_trajectory` are new typed records, written on the **live** branch only — so a dry run still writes
+> neither, and a paid run now leaves both. **The silence was the defect, not the missing file**: three
+> identical-looking silences, one deliberate and two accidental, with no way to tell them apart without
+> reading three files. That is what the declaration and its control remove.
 
 ## Cost discipline
 
