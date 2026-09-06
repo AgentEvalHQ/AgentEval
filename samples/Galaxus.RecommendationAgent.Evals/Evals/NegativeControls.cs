@@ -3114,36 +3114,74 @@ public static class NegativeControls
             Gating: false);
     }
 
-    // == The prose a reader meets FIRST must describe the case it is attached to. ================
+    // == The prose a reader meets FIRST must describe the case it is attached to, IN THIS SPACE. ==
     //
     /// <summary>
-    /// Where an Eval 07 topology case's own <c>Why</c> text NAMES a frozen stop reason, that must be
-    /// the stop reason the run produces for that customer.
+    /// Every Eval 07 topology case's own <c>Why</c> text must carry an <c>OBSERVED PER SPACE</c>
+    /// clause for every embedding space, and the clause for the space this process RESOLVED must
+    /// match the loop-back count, the round count and the frozen stop reason the run produces.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>The defect.</b> Marco's case text said <i>"Two loop-backs, three rounds … gaps-unresolvable,
-    /// not the round cap"</i> and Mirjam's said <i>"LOOPS ONCE and exits DEGRADED on no-progress"</i>.
-    /// Measured: Marco is 1 loop-back / 2 rounds / <c>no-progress</c>, Mirjam is 2 / 3 /
-    /// <c>gaps-unresolvable</c>. The two descriptions were each other's. <b>No pin and no verdict was
-    /// affected</b> — the pins are <c>ExpectsLoopBack</c> and <c>PresentsAnswerText</c>, identical for
-    /// both — which is exactly why nothing caught it for the eval's whole life: the wrong sentence
-    /// was in the one field nothing reads mechanically, in the eval whose GATE B is red and whose
-    /// prose is therefore the first thing a diagnosing reader believes.
+    /// <b>The defect this row was built for.</b> Marco's case text said <i>"Two loop-backs, three
+    /// rounds … gaps-unresolvable, not the round cap"</i> and Mirjam's said <i>"LOOPS ONCE and exits
+    /// DEGRADED on no-progress"</i>. Measured in the default concept space: Marco is 1 loop-back / 2
+    /// rounds / <c>no-progress</c>, Mirjam is 2 / 3 / <c>gaps-unresolvable</c>. The two descriptions
+    /// were each other's. <b>No pin and no verdict was affected</b> — the pins are
+    /// <c>ExpectsLoopBack</c> and <c>PresentsAnswerText</c>, identical for both — which is exactly why
+    /// nothing caught it for the eval's whole life: the wrong sentence was in the one field nothing
+    /// reads mechanically, in the eval whose GATE B is red and whose prose is therefore the first
+    /// thing a diagnosing reader believes.
     /// </para>
     /// <para>
-    /// <b>The join is derived, not hand-written.</b> The eval lane's stop-reason strings and the
-    /// workflow's <c>DiscoveryStopReason</c> enum are deliberately separate types
+    /// ⚠ <b>AND THE FIX WAS RIGHT IN ONE SPACE ONLY — measured 2026-09-06, Wave 4 verification
+    /// run.</b> The first revision of this row compared the prose against whatever run the resolved
+    /// space produced, and the prose it was written against was the concept space's. The first time
+    /// anyone ran <c>-- 3 --real-vectors</c> after that fix, this row went <b>red with 2 faults</b>
+    /// and took the command's exit code from a published <b>0</b> to <b>1</b>. The deterministic loop
+    /// is <b>not space-invariant</b>: Marco and Mirjam SWAP round counts between the spaces, Mirjam's
+    /// exit disposition flips DEGRADED → APPROVED, and <c>no-progress</c> is unreachable on the real
+    /// path. So a single sentence describing "the run" is wrong in whichever space it was not written
+    /// for, and correcting the sentence again would only have moved the defect back. <b>The case now
+    /// states a clause PER SPACE and this row checks the resolved one</b> — resolved, never
+    /// requested, because <c>--real-vectors</c> falls back to the concept space without credentials
+    /// and a row that read the request would then assert the wrong space's claim on a laptop with no
+    /// key.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>A third case was wrong in BOTH spaces, and the first revision could not see it.</b>
+    /// Renzo's text asserted in the present tense that <i>"the reviewer sends him back for more
+    /// discovery twice and then approves"</i>; he exits at round 1 in both spaces, which is the very
+    /// failure GATE B reports two lines below that sentence. The row missed it because it examined
+    /// only cases whose prose happened to name a frozen stop reason, and Renzo's named none — the
+    /// scope limit declared in <c>MEASUREMENT_STATUS</c> §41.4, realised within one wave. <b>The row
+    /// now requires a clause on EVERY case</b>, so the set it examines is the corpus rather than
+    /// whatever subset chose to be examinable.
+    /// </para>
+    /// <para>
+    /// <b>Both joins are derived, not hand-written.</b> (a) The eval lane's stop-reason strings and
+    /// the workflow's <c>DiscoveryStopReason</c> enum are deliberately separate types
     /// (<c>RealDiscoveryLoopArm.MapStopReason</c>'s remarks say why), and re-typing that table here
-    /// would let this row certify a copy of it. Instead the enum member name is kebab-cased
-    /// mechanically, and the row FAILS unless the resulting set is exactly
-    /// <see cref="DiscoveryStopReasons.All"/> — so a rename on either side is a red row rather than a
-    /// silently-skipped comparison.
+    /// would let this row certify a copy of it — so the enum member name is kebab-cased mechanically
+    /// and the row FAILS unless the resulting set is exactly <see cref="DiscoveryStopReasons.All"/>.
+    /// (b) The set of spaces a clause must cover is every non-<c>Auto</c> member of
+    /// <c>EmbeddingSpaceChoice</c>, read off the enum. Adding a third space therefore turns this row
+    /// red until every case describes it, which is the correct outcome: the alternative is five
+    /// descriptions silently claiming to cover a space nobody measured.
     /// </para>
     /// <para>
-    /// ⚠ <b>It asserts its own input.</b> A prose scan that finds no named reason is indistinguishable
-    /// from a prose scan that read no cases. The row fails if fewer than two cases name a reason, and
-    /// it names which ones it checked.
+    /// ⚠ <b>It asserts its own input, twice over.</b> A prose scan that finds no clause is
+    /// indistinguishable from a prose scan that read no cases, so the row fails unless it parsed a
+    /// clause for <i>every</i> case and names each one it checked. And a frozen stop reason appearing
+    /// anywhere OUTSIDE a clause is a fault in itself — that free-floating word is the space-blind
+    /// sentence this whole mechanism exists to retire, and leaving it unflagged would let the old
+    /// defect return in prose the row no longer reads.
+    /// </para>
+    /// <para>
+    /// <b>What it does NOT do.</b> The clause is a pin on the DESCRIPTION, never on the verdict. It
+    /// cannot make a gate pass, it is not <c>ExpectsLoopBack</c>, and Renzo's clause deliberately
+    /// records a run that contradicts his pin. Gating on the description is safe precisely because
+    /// the description scores nothing.
     /// </para>
     /// </remarks>
     /// <param name="retriever">The bound retriever; each case runs the real deterministic loop.</param>
@@ -3179,17 +3217,75 @@ public static class NegativeControls
             }
         }
 
-        int casesNamingAReason = 0;
+        // ── The SECOND derived join: which spaces a clause has to cover. Read off the enum, so a
+        //    third space turns this row red until every case describes it, rather than letting five
+        //    descriptions silently claim to cover a space nobody measured. `Auto` is not a space; it
+        //    is the absence of a request, and it always resolves to one of the others.
+        var spaces = Enum.GetValues<EmbeddingSpaceChoice>()
+            .Where(s => s != EmbeddingSpaceChoice.Auto)
+            .ToList();
+
+        // ⚠ RESOLVED, never REQUESTED. `--real-vectors` falls back to the concept space when there
+        //   are no credentials, and a row that read the request would assert the wrong space's claim
+        //   on every machine without a key — passing or failing for a reason that has nothing to do
+        //   with the prose.
+        var resolution = EmbeddingSpace.Current;
+        if (resolution is null)
+        {
+            problems.Add("no embedding space has resolved in this process, so there is no way to know which "
+                       + "per-space clause applies — refused rather than checked against a guess.");
+        }
+
+        EmbeddingSpaceChoice resolved = resolution?.Chosen ?? EmbeddingSpaceChoice.Auto;
+
+        int casesWithAClause = 0;
         var checkedCases = new List<string>();
 
         foreach (var topologyCase in Eval07_WorkflowTopology.Cases)
         {
-            var named = DiscoveryStopReasons.All
-                .Where(r => topologyCase.Why.Contains(r, StringComparison.Ordinal))
-                .ToList();
+            // ── parse every per-space clause out of the prose ──────────────────────────────────
+            var claims = new Dictionary<EmbeddingSpaceChoice, (int LoopBacks, int Rounds, string Reason)>();
+            var clauseSpans = new List<(int Start, int Length)>();
 
-            if (named.Count == 0) continue;
-            casesNamingAReason++;
+            foreach (EmbeddingSpaceChoice space in spaces)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    topologyCase.Why,
+                    $@"\b{System.Text.RegularExpressions.Regex.Escape(space.ToString())}\s+(\d+)\s+loop-backs?\s*/\s*(\d+)\s+rounds?\s*/\s*([a-z][a-z-]*)",
+                    System.Text.RegularExpressions.RegexOptions.None,
+                    TimeSpan.FromSeconds(2));
+
+                if (!match.Success)
+                {
+                    problems.Add($"{topologyCase.PersonaId}'s Why text carries no OBSERVED PER SPACE clause for "
+                               + $"{space} — a description that covers one space silently claims both, and this "
+                               + "corpus is measurably not space-invariant.");
+                    continue;
+                }
+
+                claims[space] = (
+                    int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                    int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture),
+                    match.Groups[3].Value);
+                clauseSpans.Add((match.Index, match.Length));
+            }
+
+            // ⚠ A frozen reason OUTSIDE a clause is the space-blind sentence this mechanism retires.
+            //   Blank the clauses out and look at what is left, so the old defect cannot come back
+            //   in prose the row no longer reads.
+            var outsideClauses = new System.Text.StringBuilder(topologyCase.Why);
+            foreach (var (start, length) in clauseSpans) outsideClauses.Remove(start, length).Insert(start, new string(' ', length));
+            string remainder = outsideClauses.ToString();
+
+            foreach (string stray in DiscoveryStopReasons.All.Where(r => remainder.Contains(r, StringComparison.Ordinal)))
+            {
+                problems.Add($"{topologyCase.PersonaId}'s Why text names {stray} OUTSIDE an OBSERVED PER SPACE "
+                           + "clause — an unqualified stop reason is a claim about both spaces, and it is false in "
+                           + "at least one of them for two of these five customers.");
+            }
+
+            if (claims.Count != spaces.Count) continue;
+            casesWithAClause++;
 
             var options = new Galaxus.RecommendationAgent.Workflows.DiscoveryLoopOptions(
                 Offline: true,
@@ -3200,37 +3296,66 @@ public static class NegativeControls
 
             var run = await GalaxusDiscoveryLoop.RunAsync(topologyCase.PersonaId, options, ct).ConfigureAwait(false);
             string observedReason = kebab[run.State.StopReason];
+            int observedLoopBacks = run.RoutesTaken.Count(
+                id => string.Equals(id, DiscoveryRouteIds.ReviewToMoreDiscovery, StringComparison.Ordinal));
+            int observedRounds = run.State.DiscoveryRound;
 
-            checkedCases.Add($"{topologyCase.PersonaId} says [{string.Join(", ", named)}], runs {observedReason}");
-
-            // ⚠ EVERY named reason must be the observed one, not merely one of them. Accepting a
-            //   match anywhere in the list would let a text that named all four satisfy this row on
-            //   any run — a control an indiscriminate artefact can satisfy is not a control.
-            foreach (string claim in named.Where(r => !string.Equals(r, observedReason, StringComparison.Ordinal)))
+            if (!claims.TryGetValue(resolved, out var claim))
             {
-                problems.Add($"{topologyCase.PersonaId}'s case text names {claim} and the run ends in "
-                           + $"{observedReason} — the sentence a reader meets first describes a different case.");
+                problems.Add($"{topologyCase.PersonaId} has no clause for the RESOLVED space {resolved} — "
+                           + "nothing to check this run against.");
+                continue;
+            }
+
+            checkedCases.Add($"{topologyCase.PersonaId} claims {claim.LoopBacks}/{claim.Rounds}/{claim.Reason} in "
+                           + $"{resolved} and runs {observedLoopBacks}/{observedRounds}/{observedReason}");
+
+            // ⚠ ALL THREE, not the reason alone. The Wave-4 defect was a swap, and two customers
+            //   swapped BOTH counts between spaces while one of them kept a matching reason — a row
+            //   that checked the reason alone would have certified half of it.
+            if (claim.Reason != observedReason)
+            {
+                problems.Add($"{topologyCase.PersonaId}'s {resolved} clause names {claim.Reason} and the run ends "
+                           + $"in {observedReason} — the sentence a reader meets first describes a different case.");
+            }
+
+            if (claim.LoopBacks != observedLoopBacks)
+            {
+                problems.Add($"{topologyCase.PersonaId}'s {resolved} clause claims {claim.LoopBacks} loop-back(s) "
+                           + $"and the route trace carries {observedLoopBacks}.");
+            }
+
+            if (claim.Rounds != observedRounds)
+            {
+                problems.Add($"{topologyCase.PersonaId}'s {resolved} clause claims {claim.Rounds} round(s) and the "
+                           + $"producer's counter says {observedRounds}.");
             }
         }
 
-        if (casesNamingAReason < 2)
+        if (casesWithAClause != Eval07_WorkflowTopology.Cases.Count)
         {
-            problems.Add($"only {casesNamingAReason} case text(s) name a stop reason at all — a scan that compared "
-                       + "almost nothing is not a verdict, and this row was written because TWO of them did.");
+            problems.Add($"only {casesWithAClause} of {Eval07_WorkflowTopology.Cases.Count} case(s) carry a complete "
+                       + "per-space clause — a scan that compared a subset is not a verdict, and the subset that "
+                       + "opted out is exactly where the third defect was hiding.");
         }
 
         return new ControlRowSnapshot(
             "TopologyCaseProseMatchesTheRun",
             "an Eval 07 case's Why text is the first thing a reader diagnosing a GATE B failure believes, and "
-          + "nothing reads it mechanically. MEASURED before the fix: Marco's text described Mirjam's run (two "
-          + "loop-backs, three rounds, gaps-unresolvable) and Mirjam's described Marco's (loops once, "
-          + "no-progress) — the descriptions were each other's, and no pin or verdict was affected, which is why "
-          + "it survived. Where a case names one of the four frozen stop reasons, the run must produce it. The "
-          + "eval-lane string and the workflow enum are deliberately separate types, so the join is derived by "
-          + "kebab-casing the enum member and is REFUSED unless the derived set equals DiscoveryStopReasons.All",
+          + "nothing read it mechanically. MEASURED: Marco's text described Mirjam's run and Mirjam's described "
+          + "Marco's; and Renzo's asserted he 'is sent back for more discovery twice and then approves' when he "
+          + "exits at round 1 in BOTH spaces — the very failure GATE B reports below the sentence. ⚠ The first "
+          + "revision of this row was itself right in ONE space: the deterministic loop is NOT space-invariant, "
+          + "Marco and Mirjam swap round counts, Mirjam's exit flips DEGRADED to APPROVED, and no-progress is "
+          + "unreachable on the real path — so `-- 3 --real-vectors` went 0 to 1 the first time it ran. EVERY case "
+          + "must therefore carry an OBSERVED PER SPACE clause for EVERY non-Auto EmbeddingSpaceChoice, the "
+          + "RESOLVED space's clause must match the run's loop-backs, rounds AND stop reason, and a frozen reason "
+          + "outside a clause is itself a fault. Both joins are derived — the reason set by kebab-casing "
+          + "DiscoveryStopReason and REFUSED unless it equals DiscoveryStopReasons.All, the space set off the enum",
             problems.Count == 0
-                ? $"{casesNamingAReason} of {Eval07_WorkflowTopology.Cases.Count} case(s) name a stop reason and "
-                + $"every one matches the run · {string.Join(" · ", checkedCases)} · the derived join covers all "
+                ? $"resolved space {resolved} · {casesWithAClause} of {Eval07_WorkflowTopology.Cases.Count} case(s) "
+                + $"carry a clause for all {spaces.Count} space(s) and every one matches the run · "
+                + $"{string.Join(" · ", checkedCases)} · the derived join covers all "
                 + $"{DiscoveryStopReasons.All.Count} frozen reasons"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);

@@ -315,38 +315,88 @@ public static class Eval07_WorkflowTopology
     /// red. Held by Eval 03's gating row <c>TopologyCaseProseMatchesTheRun</c>, which compares the
     /// stop reason a case's own prose NAMES against the one the run produces.
     /// </para>
+    /// <para>
+    /// ⚠ <b>CORRECTED AGAIN 2026-09-06 (Wave 4 verification run): the Wave-4 correction above was
+    /// right in ONE space and wrong in the other, and nobody had run the row in the other one.</b>
+    /// The deterministic loop is <b>not space-invariant</b>. Measured, all five cases, both spaces:
+    /// </para>
+    /// <list type="table">
+    ///   <item><description><c>USR-RB-10</c> Renzo — 0/1/<c>coverage-sufficient</c> in BOTH (the pin
+    ///   says he must loop; he does not; that is GATE B's live failure)</description></item>
+    ///   <item><description><c>USR-MI-02</c> Marco — concept <b>1 loop-back / 2 rounds /
+    ///   no-progress</b>, real <b>2 / 3 / gaps-unresolvable</b></description></item>
+    ///   <item><description><c>USR-MB-13</c> Mirjam — concept <b>2 / 3 / gaps-unresolvable
+    ///   (DEGRADED)</b>, real <b>1 / 2 / coverage-sufficient (APPROVED)</b></description></item>
+    ///   <item><description><c>USR-NB-01</c> Nadia — 0/1/<c>coverage-sufficient</c> in BOTH</description></item>
+    ///   <item><description><c>USR-LF-04</c> Luca — 0/1/<c>gaps-unresolvable</c> in BOTH</description></item>
+    /// </list>
+    /// <para>
+    /// So Marco and Mirjam <b>swap round counts</b> between the spaces, Mirjam's exit disposition
+    /// flips DEGRADED → APPROVED, and <c>no-progress</c> is not reachable at all on the real path.
+    /// A single sentence describing "the run" is therefore wrong in whichever space it was not
+    /// written for — and the Wave-4 sentence was written for the concept space, which is why
+    /// <c>-- 3 --real-vectors</c> exited <b>1</b> the first time anyone ran it after that fix.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>And a THIRD case was wrong in both spaces, which the Wave-4 row could not see.</b>
+    /// Renzo's text asserted, in the present tense, that <i>"the reviewer sends him back for more
+    /// discovery twice and then approves"</i>. He has never done that on the shipped tree in either
+    /// space — that is precisely the failure GATE B reports two lines below the sentence. The row
+    /// missed it because Renzo's text named no frozen stop reason and the row only examined cases
+    /// that did — the scope limit declared in <c>MEASUREMENT_STATUS</c> §41.4, realised. Every case
+    /// now carries an <c>OBSERVED PER SPACE</c> clause and the row requires all five.
+    /// </para>
+    /// <para>
+    /// <b>The clause is a PIN on the description, not on the verdict.</b> It records what the
+    /// deterministic loop does; it is not <c>ExpectsLoopBack</c> and it cannot make a gate pass.
+    /// Renzo's clause deliberately records a run that contradicts his pin, and the prose says so.
+    /// </para>
     /// </remarks>
     public static IReadOnlyList<TopologyCase> Cases { get; } =
     [
         new(Personas.RenzoUserId, "Renzo Bianchi", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS and still exits APPROVED. The cell that stops 'the loop-back fired' being read as a "
-          + "synonym for 'the run degraded': the reviewer sends him back for more discovery twice and then "
-          + "approves. If this case ever exits at round 1, the loop-back has died."),
+            "The cell that stops 'the loop-back fired' being read as a synonym for 'the run degraded': the "
+          + "PIN says the reviewer must send him back for more discovery and then approve anyway. ⚠ THE PIN "
+          + "IS UNMET AND THAT IS GATE B's LIVE FAILURE — he exits at round 1 in BOTH spaces, so the "
+          + "OBSERVED clause below records a run that contradicts ExpectsLoopBack on purpose. Why it is "
+          + "refused rather than re-pinned, and what the remedy costs, is MEASUREMENT_STATUS §28, §36 "
+          + "and §42. "
+          + "OBSERVED PER SPACE: ConceptVectors 0 loop-backs / 1 round / coverage-sufficient · "
+          + "RealVectors 0 loop-backs / 1 round / coverage-sufficient."),
 
         new(Personas.MarcoUserId, "Marco Iten", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS ONCE and exits DEGRADED on no-progress. One loop-back, two rounds, and the stop reason "
-          + "that only exists because dedup is identity-level at ingest: a round that re-finds what it "
-          + "already had adds zero NEW ids, and the loop stops instead of spending the rest of its budget. "
-          + "The PARTIAL answer still reaches the Presenter through the same exit edge, which is the "
-          + "property the graph is built for."),
+            "LOOPS and exits DEGRADED in both spaces. He is the only customer in this corpus that ever "
+          + "reaches the stop reason dedup makes possible — a round that re-finds what it already had adds "
+          + "zero NEW ids, so the loop stops instead of spending the rest of its budget — and he reaches it "
+          + "in the CONCEPT space only. The PARTIAL answer still leaves through the same exit edge, which is "
+          + "the property the graph is built for. "
+          + "OBSERVED PER SPACE: ConceptVectors 1 loop-back / 2 rounds / no-progress · "
+          + "RealVectors 2 loop-backs / 3 rounds / gaps-unresolvable."),
 
         new(Personas.MirjamUserId, "Mirjam Bosshard", ExpectsLoopBack: true, PresentsAnswerText: true,
-            "LOOPS TWICE and exits DEGRADED. Two loop-backs, three rounds, and then the reviewer has no "
-          + "materially different query left — gaps-unresolvable, not the round cap. A third distinct stop "
-          + "reason, reached the expensive way: the loop spends its whole budget and still stops on the "
-          + "reviewer's judgement rather than on the counter."),
+            "LOOPS in both spaces, and the EXIT DISPOSITION is the one thing in this corpus that the "
+          + "embedding space flips: the reviewer spends the whole budget and stops on its own judgement "
+          + "rather than on the counter in the concept space, and is satisfied a round earlier on the real "
+          + "one. Never the round cap either way. She is why the per-space clause exists at all — a single "
+          + "sentence describing 'the run' was wrong in whichever space it was not written for. "
+          + "OBSERVED PER SPACE: ConceptVectors 2 loop-backs / 3 rounds / gaps-unresolvable · "
+          + "RealVectors 1 loop-back / 2 rounds / coverage-sufficient."),
 
         new(Personas.NadiaUserId, "Nadia Brunner", ExpectsLoopBack: false, PresentsAnswerText: true,
             "⭐ THE NEGATIVE DIRECTION. Coverage is satisfied in round 1, so the loop-back edge must NOT "
           + "have been traversed. The same assertion that must validate on the three cases above must FAIL "
-          + "here — an edge that fires unconditionally is a bug that a positive-only test cannot see."),
+          + "here — an edge that fires unconditionally is a bug that a positive-only test cannot see. "
+          + "OBSERVED PER SPACE: ConceptVectors 0 loop-backs / 1 round / coverage-sufficient · "
+          + "RealVectors 0 loop-backs / 1 round / coverage-sufficient."),
 
         new(Personas.LucaUserId, "Luca Ferrari", ExpectsLoopBack: false, PresentsAnswerText: false,
             "The fourth cell: does NOT loop and still exits DEGRADED. One purchase, so the map is thin and "
           + "the reviewer has nothing runnable left after round 1. He is the suite's ABSTENTION persona and "
           + "presents nothing — measured here, that means a zero-character FinalAnswer — so he is scored on "
           + "ROUTING, and on the text/items biconditional, never on the content of an answer he correctly "
-          + "did not give."),
+          + "did not give. "
+          + "OBSERVED PER SPACE: ConceptVectors 0 loop-backs / 1 round / gaps-unresolvable · "
+          + "RealVectors 0 loop-backs / 1 round / gaps-unresolvable."),
     ];
 
     /// <summary>One customer, and what the graph is expected to do for them.</summary>
@@ -362,7 +412,18 @@ public static class Eval07_WorkflowTopology
     /// run's own output instead would let a run that silently presented nothing exempt itself from
     /// the check by failing it — see the finding in the type remarks.
     /// </param>
-    /// <param name="Why">Why this case is in the corpus, in the report's own words.</param>
+    /// <param name="Why">
+    /// Why this case is in the corpus, in the report's own words. <b>It MUST end with an
+    /// <c>OBSERVED PER SPACE:</c> clause naming, for every non-<c>Auto</c> member of
+    /// <c>EmbeddingSpaceChoice</c>, the loop-back count, the round count and the frozen stop reason
+    /// that member produces</b> — format <c>&lt;Member&gt; &lt;n&gt; loop-back(s) / &lt;m&gt;
+    /// round(s) / &lt;reason&gt;</c>, separated by <c>·</c>. Eval 03's gating row
+    /// <c>TopologyCaseProseMatchesTheRun</c> parses it, checks all three numbers against the run in
+    /// the space this process RESOLVED (never the one it requested — <c>--real-vectors</c> falls
+    /// back to concept without credentials), and refuses a case that names a frozen stop reason
+    /// anywhere OUTSIDE such a clause, because that is exactly the space-blind sentence the clause
+    /// exists to retire.
+    /// </param>
     public sealed record TopologyCase(
         string PersonaId,
         string DisplayName,
