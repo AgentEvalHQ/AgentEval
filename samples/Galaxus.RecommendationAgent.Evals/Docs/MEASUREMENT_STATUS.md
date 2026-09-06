@@ -11419,12 +11419,23 @@ itself**; `prohibited_actions` is in neither the dispatch table nor the 20-key c
 claim was not carried into the registrar.
 
 🟡 **A SECOND PRE-EXISTING FINDING, MEASURED WHILE PINNING THE KEY SET: 3 of the 40 dispatched keys
-have NO golden entry at all.** Set-differenced against the 45 distinct `evaluatorKey` values in
+have NO golden entry at all.** Set-differenced against the **46** distinct `evaluatorKey` values in
 `tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl`: `prompt_leak`, `escalation_resistance`
 and `protected_material` appear in **no** shipped dataset, so a calibration run never resolves them.
-The other half of the census is clean — the 8 golden keys with no registration are **exactly** the
+The other half of the census is clean — the **9** golden keys with no registration are **exactly** the
 Path A' carve-outs, subset-checked against `s_carveOutKeys` (20 keys). Direction: *"40 dispatched
 evaluators calibrated"* **overstates by 3**. Not fixed here; authoring goldens is corpus work.
+
+#### 🔴 §70.1's OWN golden census was off by one in BOTH cells. Superseded → corrected, 2026-09-07
+
+| | |
+|---|---|
+| **Superseded (what this paragraph said)** | *"the **45** distinct `evaluatorKey` values"* and *"the **8** golden keys with no registration"* |
+| **Corrected (re-derived by the Wave-9 review)** | **46** distinct keys; **9** with no registration |
+| **What was dropped** | **`f1_score`.** It is a top-level `evaluatorKey` on two lines of `golden-20-quality.jsonl` (`{"scenarioId":"cal-quality-019","evaluatorKey":"f1_score",…}`), and it is a Path A' carve-out — the *deterministic* one. §70.8's re-derivation line names the carve-outs as *"the 20-key carve-out list's multi-turn + trace-dependent members"*, which is 5 + 3 = 8 and silently omits the ninth bucket. The file's own Path A' comment has said **"5 multi-turn memory + 3 trace-dependent reasoning + f1_score deterministic"** — nine — since before this wave |
+| **Direction of the error** | **UNDERSTATED the census, and the qualitative claim it supports gets STRONGER, not weaker.** *"Exactly the Path A' carve-outs"* is true of all nine, `f1_score` included; re-verified by set difference, and the subset check against `s_carveOutKeys` still returns empty. The 3-key overstatement — the finding this paragraph exists for — is unaffected and reproduces exactly |
+| **Blast radius** | This paragraph and the §70.8 comment line beneath it. **Nothing in code moves**: the registrar holds 40 keys, `AgenticEvalRegistrationTests` pins them literally, and no test, control or gate reads a golden-key count. No other section quotes 45 or 8 for this census |
+| **Falsifiable** | `cat tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl \| grep -oE '"evaluatorKey"\s*:\s*"[^"]+"' \| sed -E 's/.*"([^"]+)"$/\1/' \| sort -u \| wc -l` → **46**, and `comm -13` of that against the 40 registered keys → **9** lines, the last of which is `f1_score` |
 
 ## §70.2 d-2 — N-17, and the measurement corrected TWO of this author's own guesses
 
@@ -11646,8 +11657,12 @@ dotnet test tests/AgentEval.Tests -f net8.0 --no-build \
 git show acd7ab32:src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs > /tmp/b.cs
 grep -inc prohibited /tmp/b.cs                                                    # -> 1, and it is the COMMENT
 #   registered keys vs golden keys: 3 registered keys appear in no golden
-#   (prompt_leak, escalation_resistance, protected_material); the 8 golden keys with no
-#   registration are exactly the 20-key carve-out list's multi-turn + trace-dependent members.
+#   (prompt_leak, escalation_resistance, protected_material); the NINE golden keys with no
+#   registration are exactly the 20-key carve-out list's multi-turn (5) + trace-dependent (3)
+#   + f1_score. This line SAID 8 and omitted f1_score — corrected 2026-09-07, see §70.1.
+cat tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl \
+  | grep -oE '"evaluatorKey"\s*:\s*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/' \
+  | sort -u | wc -l                                                               # -> 46, not 45
 
 # 70.2 - d-2. Both spaces, and the panel BY NAME with the tick stripped.
 dotnet run --project $E --no-build -- 3                >/dev/null 2>&1; echo $?    # -> 0
