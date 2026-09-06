@@ -70,7 +70,9 @@ if (parsed is null)
     Console.Error.WriteLine("               They are then reported as exit 3 — NOT RUN — never as passes.");
     Console.Error.WriteLine("  --quick      fewer repetitions in Evals 02, 02b, 02c, 08 and 09");
     Console.Error.WriteLine("  --judge      Eval 01's ADVISORY justification judge. Never changes a gate.");
-    Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent, nothing written");
+    Console.Error.WriteLine("  --dry-run    stub models everywhere: real code path, nothing spent. Evals 03 and 04 call");
+    Console.Error.WriteLine("               no model, take no --dry-run parameter and DO persist — the closing banner");
+    Console.Error.WriteLine("               names every snapshot the run actually wrote.");
     Console.Error.WriteLine("  --only <id>  Evals 02, 02b and 02c: run ONE case (stage two of the run protocol). 02 takes a");
     Console.Error.WriteLine("               persona id, 02b a case id (SN-01…), 02c a customer id (USR-NB-01…). The snapshot");
     Console.Error.WriteLine("               goes to a probe key and never overwrites the full-cohort record. NOT honoured under");
@@ -336,8 +338,30 @@ static void PrintCiSummary(
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("  ⚠️  THIS WAS A DRY RUN. Every ✅ above means the plumbing held for that eval —");
         Console.WriteLine("      arguments survive the round trip, the approval-gated call is visible, no case");
-        Console.WriteLine("      threw. None of them means the agent passed anything: no model was called and no");
-        Console.WriteLine("      snapshot was written.");
+        Console.WriteLine("      threw. None of them means the agent passed anything: no model was called.");
+
+        // ⚠ THIS BANNER USED TO END "…and no snapshot was written", AND THE RUN FALSIFIED IT.
+        //   Evals 03 and 04 call no model, so the chain hands them no `dryRun` argument, so they
+        //   run for real inside a dry run and persist. MEASURED (MEASUREMENT_STATUS §24.7 item 1):
+        //   eval03_controls and eval04_injection moved at 01:26:14 inside a dry run that ran
+        //   01:26:12–01:26:19 — and then did it AGAIN inside the run that verified the write-up.
+        //   The writes are right; the sentence was wrong. It now reports the store's own ledger.
+        //
+        //   DECIDED, and this is the half plan item 8.19 asks for: 03 and 04 do NOT gain a
+        //   `dryRun` parameter. They are real, model-free measurements, and replacing one with a
+        //   stubbed copy of itself inside a dry run would make the cheapest honest measurement in
+        //   the suite worse in order to make a sentence true. The sentence changes instead.
+        var written = EvalResultStore.SnapshotsWrittenThisRun;
+        if (written.Count == 0)
+        {
+            Console.WriteLine("      No snapshot was written — nothing in this chain reached a store.");
+        }
+        else
+        {
+            Console.WriteLine($"      {written.Count} snapshot(s) WERE written, by the eval(s) that call no model and");
+            Console.WriteLine("      therefore take no --dry-run parameter — they are real measurements, not stubs:");
+            foreach (string key in written) Console.WriteLine($"        · {key}.json");
+        }
         Console.ResetColor();
     }
 }

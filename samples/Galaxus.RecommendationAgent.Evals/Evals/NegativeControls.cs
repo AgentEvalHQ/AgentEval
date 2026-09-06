@@ -104,6 +104,7 @@ public static class NegativeControls
         rows.Add(CheckContentlessRequestIsNotCovered());
         rows.Add(CheckUnnameableInterestPresentsNothing());
         rows.Add(await CheckRefusalDetectorsSeeTheRealShapeAsync().ConfigureAwait(false));
+        rows.Add(CheckWriteLedgerMatchesTheStore());
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
 
@@ -2876,6 +2877,172 @@ public static class NegativeControls
                 + "live-shaped records · a refusal code echoed into an ARGUMENT is not counted"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
+    }
+
+    // ══ Control 23 — the run must be able to say what it wrote (plan item 8.19). ═══════════
+    //
+    /// <summary>
+    /// The write ledger the <c>--ci --dry-run</c> banner reports must be driven by the write path
+    /// itself, and must agree with the files on disk.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect.</b> The banner printed <i>"no model was called and no snapshot was
+    /// written"</i> unconditionally. Evals 03 and 04 call no model, so the CI chain hands them no
+    /// <c>dryRun</c> argument, so they run for real inside a dry run and persist — MEASURED,
+    /// <c>eval03_controls</c> and <c>eval04_injection</c> moved at 01:26:14 inside a dry run that
+    /// ran 01:26:12–01:26:19, and then did it a second time inside the run that wrote §24.7 up.
+    /// The writes are correct; the claim was the defect.
+    /// </para>
+    /// <para>
+    /// <b>What this row pins, and what it deliberately does not.</b> It cannot observe a CI chain
+    /// from inside one eval. What it can do — and what the banner's honesty actually rests on — is
+    /// prove the ledger is WIRED to the write path: a key that was written appears, a key that was
+    /// not does not, and the file the ledger names is on disk with a fresh timestamp. A banner
+    /// reading a hand-maintained list would be a second claim about the code; §2.4 records that the
+    /// last enumerated call-site list in this programme was wrong by 20 %.
+    /// </para>
+    /// <para>
+    /// ⚠ The probe writes and then DELETES its own snapshot. A number in a shared store that no
+    /// gate reads is the hazard Eval 08 states in code as its reason for persisting nothing.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckWriteLedgerMatchesTheStore()
+    {
+        var problems = new List<string>();
+        const string probeKey = "eval03_writeledger_probe";
+        string probePath = Path.Combine(EvalResultStore.StorageLocation, $"{probeKey}.json");
+
+        var before = EvalResultStore.KeysWrittenThisRun;
+        if (before.Contains(probeKey, StringComparer.Ordinal))
+            problems.Add($"'{probeKey}' was already in the ledger before this row wrote anything — the probe is not isolated.");
+
+        var beforeWrite = DateTime.UtcNow.AddSeconds(-2);
+
+        try
+        {
+            EvalResultStore.SaveControls(probeKey, new ControlSnapshot
+            {
+                Label = "write-ledger probe — deleted immediately, never a record of anything",
+                Controls = [],
+                AllControlsTripped = true,
+            });
+
+            var after = EvalResultStore.KeysWrittenThisRun;
+
+            // ── 1. The ledger saw it. ──
+            if (!after.Contains(probeKey, StringComparer.Ordinal))
+            {
+                problems.Add($"a snapshot was written and '{probeKey}' is NOT in KeysWrittenThisRun — the banner would "
+                           + "print \"no snapshot was written\" over a store that had just moved, which is the exact "
+                           + "sentence 8.19 exists to remove.");
+            }
+
+            // ── 2. …and it did not invent anything else. ──
+            if (after.Count != before.Count + 1)
+            {
+                problems.Add($"the ledger went from {before.Count} to {after.Count} key(s) on ONE write — it is counting "
+                           + "something other than writes, so the banner's list is not the run's list.");
+            }
+
+            if (after.Contains("eval99_never_written", StringComparer.Ordinal))
+                problems.Add("the ledger contains a key nothing ever wrote.");
+
+            // ── 2b. …and while the probe file exists, the BANNER's view must see it too. This is
+            //        the property that decides what a reader is told, and it is a different list. ──
+            if (!EvalResultStore.SnapshotsWrittenThisRun.Contains(probeKey, StringComparer.Ordinal))
+                problems.Add("the key is in the ledger and not in SnapshotsWrittenThisRun while its file is on disk — the banner reads the wrong list.");
+
+            // ── 3. The file the ledger names is really there, and it is THIS run's. Asserting the
+            //       ledger alone would certify the ledger; the banner's reader will go and look. ──
+            if (!File.Exists(probePath))
+            {
+                problems.Add("the ledger recorded a write and no file landed — the ledger is ahead of the store.");
+            }
+            else if (File.GetLastWriteTimeUtc(probePath) < beforeWrite)
+            {
+                problems.Add("the file the ledger names is older than this row — the ledger is reporting somebody "
+                           + "else's write as ours.");
+            }
+
+            // ── 4. BOTH chokepoints. Eval 02b and 02c persist through OfflineSnapshotStore, not
+            //       through EvalResultStore, and a store that writes without recording would put
+            //       the banner straight back where it was. Verified by reflection rather than by
+            //       calling it, because calling it would write a second file into a shared store. ──
+            var save = typeof(OfflineSnapshotStore).GetMethod(
+                nameof(OfflineSnapshotStore.Save), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (save is null)
+            {
+                problems.Add("OfflineSnapshotStore.Save was not found — the second write chokepoint has moved and this row is stale.");
+            }
+            else
+            {
+                string body = File.ReadAllText(Path.Combine(SampleSourceRoot(), "OfflineSnapshotStore.cs"));
+                if (!body.Contains("EvalResultStore.RecordWrite", StringComparison.Ordinal))
+                {
+                    problems.Add("OfflineSnapshotStore writes snapshots and does not record them in the ledger — "
+                               + "Evals 02b and 02c would persist invisibly to the banner.");
+                }
+            }
+        }
+        finally
+        {
+            // Written to prove the wiring, never kept: a snapshot no gate reads is a hazard.
+            if (File.Exists(probePath)) File.Delete(probePath);
+        }
+
+        if (File.Exists(probePath))
+            problems.Add("the probe snapshot is still on disk — this row leaves a record of nothing in a shared store.");
+
+        // ── 5. And once the file is gone the BANNER must stop naming it, or the sentence that
+        //       replaced "no snapshot was written" points a reader at a file that is not there. ──
+        if (EvalResultStore.SnapshotsWrittenThisRun.Contains(probeKey, StringComparer.Ordinal))
+        {
+            problems.Add("the banner still names the probe after its file was deleted — it would send a reader to look "
+                       + "for a snapshot that does not exist.");
+        }
+        if (!EvalResultStore.KeysWrittenThisRun.Contains(probeKey, StringComparer.Ordinal))
+            problems.Add("the raw ledger forgot a write — deleting a file must not erase the record that a write happened.");
+
+        return new ControlRowSnapshot(
+            "WriteLedgerMatchesTheStore",
+            "a run has to be able to say what it wrote. The `--ci --dry-run` banner printed \"no model was called and no "
+          + "snapshot was written\" unconditionally, and Evals 03 and 04 — which call no model, so the chain passes them "
+          + "no --dry-run argument — persisted inside every one of those runs. The writes are correct and stay; the "
+          + "banner now reports EvalResultStore.KeysWrittenThisRun. That ledger must be driven by the write path itself "
+          + "(both chokepoints), must not invent keys, and must name a file that is really on disk and really this run's.",
+            problems.Count == 0
+                ? $"one probe write → the key appears in the ledger, the ledger grew by exactly 1 (from {before.Count}), "
+                + "the named file was on disk with this run's timestamp, both write chokepoints record, and the probe "
+                + "snapshot was deleted rather than left in the store"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    /// <summary>
+    /// The <c>samples/Galaxus.RecommendationAgent.Evals</c> source directory, found by walking up
+    /// from the build output to the solution root.
+    /// </summary>
+    /// <remarks>
+    /// Source-reading controls exist here already (the meta-lane grep gate in <c>src/</c>); the
+    /// thing that made that one honest was asserting something about its own INPUT, so this one
+    /// throws rather than returning a path whose files are absent.
+    /// </remarks>
+    private static string SampleSourceRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (dir.GetFiles("AgentEval.sln").Length > 0)
+            {
+                string root = Path.Combine(dir.FullName, "samples", "Galaxus.RecommendationAgent.Evals");
+                if (File.Exists(Path.Combine(root, "OfflineSnapshotStore.cs"))) return root;
+            }
+            dir = dir.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "the eval project's source directory was not found from " + AppContext.BaseDirectory);
     }
 
     /// <summary>Collects the DETAIL lines of every published discovery event, so a control can read what a node PRINTED.</summary>

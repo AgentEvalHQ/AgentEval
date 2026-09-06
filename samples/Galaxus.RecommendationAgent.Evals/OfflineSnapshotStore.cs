@@ -41,6 +41,11 @@ public static class OfflineSnapshotStore
         Directory.CreateDirectory(EvalResultStore.StorageLocation);
         string path = Path.Combine(EvalResultStore.StorageLocation, $"{key}.json");
         File.WriteAllText(path, JsonSerializer.Serialize(snapshot, JsonOpts));
+
+        // The second of the suite's two write chokepoints. The `--ci --dry-run` banner reports what
+        // the run actually wrote, so a store that writes without saying so would put the banner
+        // back where it was: printing a claim the run falsifies.
+        EvalResultStore.RecordWrite(key);
         return path;
     }
 }

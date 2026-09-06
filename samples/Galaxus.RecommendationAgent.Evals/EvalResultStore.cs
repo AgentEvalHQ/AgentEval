@@ -52,6 +52,61 @@ public static class EvalResultStore
     /// <summary>Snapshot key for the negative-control run.</summary>
     public const string ControlsKey = "eval03_controls";
 
+    private static readonly List<string> WrittenKeys = [];
+
+    /// <summary>
+    /// Every snapshot key written by THIS process, in write order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why a ledger and not a list of expected keys.</b> The `--ci --dry-run` banner used to
+    /// print <i>"no model was called and no snapshot was written"</i> unconditionally, and it was
+    /// false: Evals 03 and 04 call no model, so the CI chain passes them no <c>dryRun</c> argument,
+    /// so they run for real inside a dry run and persist. MEASURED 2026-09-06
+    /// (<c>MEASUREMENT_STATUS</c> §24.7 item 1): <c>eval03_controls</c> and <c>eval04_injection</c>
+    /// moved at 01:26:14, inside a <c>00-ci-dryrun-concept</c> that ran 01:26:12–01:26:19. The
+    /// WRITES are correct — both are real, model-free measurements — and the CLAIM was the defect.
+    /// </para>
+    /// <para>
+    /// ⚠ The banner now reads this. A hand-maintained list of "the two evals that persist under a
+    /// dry run" would be a second claim about the code, and this repository's own §2.4 records what
+    /// happens to those: the enumerated call-site list in ADR-030 Slice 1.2 was wrong by 20 %.
+    /// A run reporting its own ledger cannot drift from it.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<string> KeysWrittenThisRun
+    {
+        get { lock (WrittenKeys) return [.. WrittenKeys]; }
+    }
+
+    /// <summary>
+    /// The subset of <see cref="KeysWrittenThisRun"/> whose file is still on disk.
+    /// </summary>
+    /// <remarks>
+    /// What the <c>--ci --dry-run</c> banner reports, and the reason is falsifiability: a reader
+    /// who is told a snapshot was written can go and look at it. A key whose file the run itself
+    /// removed again — Eval 03's write-ledger probe is the only one today — names a file that is
+    /// not there, and a banner naming a missing file is a new version of the defect it replaced.
+    /// </remarks>
+    public static IReadOnlyList<string> SnapshotsWrittenThisRun =>
+        [.. KeysWrittenThisRun.Where(Exists)];
+
+    /// <summary>Records a snapshot write in <see cref="KeysWrittenThisRun"/>.</summary>
+    /// <remarks>
+    /// Called by <see cref="Write{T}"/> and by <c>OfflineSnapshotStore.Save</c> — the suite's two
+    /// write chokepoints. A third would have to call it too, and the control that pins the ledger
+    /// says so.
+    /// </remarks>
+    /// <param name="key">The key just written.</param>
+    internal static void RecordWrite(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        lock (WrittenKeys)
+        {
+            if (!WrittenKeys.Contains(key, StringComparer.Ordinal)) WrittenKeys.Add(key);
+        }
+    }
+
     private static string FindStorePath()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -110,6 +165,7 @@ public static class EvalResultStore
         }
 
         File.WriteAllText(path, JsonSerializer.Serialize(snapshot, JsonOpts));
+        RecordWrite(key);
     }
 
     private static T? Read<T>(string key) where T : class

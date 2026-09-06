@@ -49,18 +49,31 @@ prints a check that says so rather than a green tick beside it.
 Every eval run that produces a verdict must persist a snapshot to
 `.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/` via `EvalResultStore`.
 **Verify the file landed** — list it with its timestamp. A run whose result was not written did not happen,
-as far as the next person is concerned. A dry run must NOT write a snapshot (it has no result to record).
+as far as the next person is concerned.
 
-> ⚠️ **That last sentence is FALSE for `--ci --dry-run`, measured 2026-09-06** (`MEASUREMENT_STATUS` §24.7).
-> Evals 03 and 04 take no `dryRun` parameter — the CI chain calls them with no argument — so they run for
-> real inside a dry run and **do** persist, while the chain's closing banner prints *"no model was called and
-> no snapshot was written"*. The **writes are correct** (both are real, model-free measurements); the
-> **banner and the sentence above are wrong**. Plan item **8.19**. Until it is fixed: after a
-> `--ci --dry-run`, expect `eval03_controls.json` and `eval04_injection.json` to have moved, and nothing else.
+**A dry run of a MODEL-BACKED eval must not write a snapshot** — it has no result to record. A dry run of a
+**model-free** eval writes normally, because there is nothing to stub: it is the same measurement either way.
+
+> ✅ **CORRECTED 2026-09-06 (Wave 2, plan item 8.19).** The rule above used to read *"a dry run must NOT
+> write a snapshot"* full stop, and `--ci --dry-run` falsified it on every run: Evals 03 and 04 call no
+> model, so the CI chain hands them no `dryRun` argument, so they run for real and persist —
+> `eval03_controls.json` and `eval04_injection.json` moved at 01:26:14 inside a dry run that ran
+> 01:26:12–01:26:19 (`MEASUREMENT_STATUS` §24.7 item 1), and again inside the run that verified the write-up.
+> **The writes were always correct; the claim was the defect.**
 >
-> **Which evals persist at all**, verified 2026-09-06: 01, 02, 02b, 02c, 03, 04, 07, 09 do. **05, 06 and 08
-> do not.** Eval 08's silence is deliberate and stated in code (`Eval08:316-319`); 05's and 06's is neither
-> stated nor intended (plan item **8.20**).
+> **Decided, not deferred:** 03 and 04 do **not** gain a `dryRun` parameter. Replacing a real, model-free
+> measurement with a stubbed copy of itself inside a dry run would make the cheapest honest measurement in
+> the suite worse in order to make a sentence true.
+>
+> **What changed instead:** `EvalResultStore` keeps a write ledger (`KeysWrittenThisRun` /
+> `SnapshotsWrittenThisRun`), fed by both write chokepoints, and the closing banner **names every snapshot
+> the run actually wrote** instead of asserting there were none. It reports only keys whose file is still on
+> disk, so a reader who is told a snapshot was written can go and look at it. Pinned by Eval 03's gating
+> control `WriteLedgerMatchesTheStore`, proven red by removing either chokepoint's `RecordWrite`.
+
+**Which evals persist at all**, verified 2026-09-06: 01, 02, 02b, 02c, 03, 04, 07, 09 do. **05, 06 and 08
+do not.** Eval 08's silence is deliberate and stated in code (`Eval08:316-319`); 05's and 06's is neither
+stated nor intended (plan item **8.20**).
 
 ## Cost discipline
 
