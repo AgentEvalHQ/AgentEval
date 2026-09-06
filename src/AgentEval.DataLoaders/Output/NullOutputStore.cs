@@ -52,7 +52,13 @@ public sealed class NullOutputStore : IOutputStore
         => Task.CompletedTask;
 
     public Task SaveBaselineAsync(SubjectIdentity subject, RunSummary summary, string? versionTag = null, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        // ⚠ Yes, even the null store. It stores nothing, so nothing is at risk on disk — but a
+        // caller that promotes a VOID run against the null store and gets no complaint learns that
+        // the promotion was fine, and will do it again against the real one. ADR-031 §5.3.
+        BaselinePromotion.EnsurePromotable(summary);
+        return Task.CompletedTask;
+    }
 
     public Task<RunSummary?> LoadBaselineAsync(SubjectIdentity subject, CancellationToken ct = default)
         => Task.FromResult<RunSummary?>(null);

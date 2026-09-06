@@ -457,6 +457,9 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     public async Task SaveBaselineAsync(SubjectIdentity subject, RunSummary summary, string? versionTag = null, CancellationToken ct = default)
     {
+        // ADR-031 §5.3. Refused BEFORE the path is chosen, so a refusal never half-writes.
+        BaselinePromotion.EnsurePromotable(summary);
+
         var path = versionTag is not null
             ? _layout.PinnedBaselineFile(subject, versionTag)
             : _layout.BaselineFile(subject);

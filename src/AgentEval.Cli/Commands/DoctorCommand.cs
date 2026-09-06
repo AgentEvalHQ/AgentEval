@@ -165,6 +165,65 @@ public static class DoctorCommand
                     errors++;
                 }
 
+                // ─── Baseline audit chain (ADR-031 §5.3 / 7.6 doctor check #3) ───
+                // A baseline is the bar every later run of this subject is measured against, so
+                // three things about it are worth saying out loud and none of them was checked:
+                //   · it validates against the summary schema it claims to be;
+                //   · its runId resolves to a run that still exists under THIS subject — the same
+                //     audit-chain question the compliance block already asks of evidence.json,
+                //     which §5.4 says baselines get "for free" and did not;
+                //   · it is still promotable. The write-side guard cannot see a baseline that was
+                //     hand-edited, or written before the guard existed. Checking at REST as well as
+                //     at write is the difference between a rule and a rule's history.
+                foreach (var baselineFile in EnumerateBaselineFiles(subjectDirPath))
+                {
+                    var (blSchemaOk, blSchemaErr) = SchemaValidator.ValidateFile(baselineFile, "summary.schema.json");
+                    if (!blSchemaOk)
+                    {
+                        Console.Error.WriteLine($"✖ {baselineFile}: {blSchemaErr}");
+                        errors++;
+                        continue;
+                    }
+
+                    RunSummary? baseline;
+                    try
+                    {
+                        baseline = await ReadJsonAsync<RunSummary>(baselineFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"✖ {baselineFile}: parse error: {ex.Message}");
+                        errors++;
+                        continue;
+                    }
+
+                    if (baseline is null)
+                    {
+                        Console.Error.WriteLine($"✖ {baselineFile}: empty document.");
+                        errors++;
+                        continue;
+                    }
+
+                    if (BaselinePromotion.RefusalFor(baseline) is { } refusal)
+                    {
+                        Console.Error.WriteLine($"✖ {baselineFile}: this baseline should never have been promoted — {refusal}.");
+                        errors++;
+                        continue;
+                    }
+
+                    var baselineRunDir = Path.Combine(subjectDirPath, "runs", baseline.RunId);
+                    if (!Directory.Exists(baselineRunDir))
+                    {
+                        Console.Error.WriteLine(
+                            $"✖ {baselineFile}: names run {baseline.RunId}, which does not exist under {subjectName} — "
+                            + "the bar every later run is measured against points at nothing.");
+                        errors++;
+                        continue;
+                    }
+
+                    ok++;
+                }
+
                 // ─── Validate runs ───────────────────────────────────────────
                 var runsDir = Path.Combine(subjectDirPath, "runs");
                 if (!Directory.Exists(runsDir)) continue;
@@ -470,6 +529,28 @@ public static class DoctorCommand
         }
 
         return warnings;
+    }
+
+    /// <summary>
+    /// Every baseline document for one subject: the unpinned <c>baseline.json</c> and every pinned
+    /// <c>baselines/&lt;version&gt;.json</c>.
+    /// </summary>
+    /// <param name="subjectDirPath">The subject directory.</param>
+    /// <returns>The baseline files that exist.</returns>
+    /// <remarks>
+    /// Enumerated rather than assumed: a check that only ever looked at <c>baseline.json</c> would
+    /// report a clean bill of health for a subject whose pinned baselines were all broken.
+    /// </remarks>
+    internal static IEnumerable<string> EnumerateBaselineFiles(string subjectDirPath)
+    {
+        var unpinned = Path.Combine(subjectDirPath, "baseline.json");
+        if (File.Exists(unpinned)) yield return unpinned;
+
+        var pinnedDir = Path.Combine(subjectDirPath, "baselines");
+        if (!Directory.Exists(pinnedDir)) yield break;
+
+        foreach (var pinned in Directory.EnumerateFiles(pinnedDir, "*.json").Order(StringComparer.Ordinal))
+            yield return pinned;
     }
 
     private static async Task<T?> ReadJsonAsync<T>(string path)

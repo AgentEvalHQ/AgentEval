@@ -193,6 +193,10 @@ public sealed class InMemoryOutputStore : IOutputStore
 
     public Task SaveBaselineAsync(SubjectIdentity subject, RunSummary summary, string? versionTag = null, CancellationToken ct = default)
     {
+        // ADR-031 §5.3 — every store, including this one. A rule that holds in some stores and not
+        // others is not a rule about baselines, it is a rule about which store you configured.
+        BaselinePromotion.EnsurePromotable(summary);
+
         lock (_lock)
         {
             if (versionTag is not null)
