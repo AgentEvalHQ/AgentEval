@@ -101,6 +101,39 @@ public class EvaluatorCardRegistryTests
     }
 
     [Fact]
+    public void ACardCarryingAssemblyInTheSECOND_PositionIsStillScanned()
+    {
+        // 🔴 THE ABLATION THIS EXISTS FOR, and it did not reproduce until this test was written.
+        // `d003ce97` published "N — only the first source assembly is scanned → 3 red". Re-executed
+        // 2026-09-06 (`MEASUREMENT_STATUS` §68.1): `sources.Take(1)` inside `LoadAll` left all NINE
+        // tests GREEN, and so did the same truncation in the constructor. Every other case in this
+        // file builds the registry over exactly ONE distinct assembly — `(Agentic, Agentic)`
+        // de-duplicates to one — so the `foreach (var asm in sources)` loop was never driven past
+        // its first element by anything that could fail.
+        //
+        // ⚠ That loop is not an incidental detail: taking the assemblies to scan, instead of naming
+        // one, is the whole reason the type could NOT simply be moved into Core (naming
+        // AgentEval.Evals.Agentic there closes a project-reference cycle), and the reason the commit
+        // gives for the shape — "a registry that names one assembly can only ever describe one
+        // assembly's evaluators". An untested loop is that argument unmade.
+        //
+        // The card-carrying assembly goes SECOND on purpose. First-position would pass under the
+        // ablation; second-position cannot.
+        var cardless = typeof(EvaluatorCardRegistryTests).Assembly;
+
+        var registry = new EvaluatorCardRegistry(cardless, Agentic);
+
+        // Asserts its own input: if the "cardless" assembly ever grew a card this test would be
+        // comparing two numbers that moved together, which is the co-moving-operands shape.
+        Assert.Equal(0, new EvaluatorCardRegistry(cardless).Count);
+
+        Assert.Equal(new EvaluatorCardRegistry(Agentic).Count, registry.Count);
+        Assert.True(registry.Count > 0, "the second source contributed nothing, so this asserts 0 == 0");
+        Assert.Equal(2, registry.ScannedAssemblies.Count);
+        Assert.Equal("AgentEval.Evals.Agentic", registry.ScannedAssemblies[1]);
+    }
+
+    [Fact]
     public void ListAndGetAgreeWithEachOther()
     {
         var registry = new EvaluatorCardRegistry(Agentic);
