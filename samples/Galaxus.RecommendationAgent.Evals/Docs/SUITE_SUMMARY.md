@@ -26,7 +26,7 @@ any file.** (MEASUREMENT_STATUS §21.6's `FingerprintKey` observation is closed 
 >
 > ⚠️ **AND ONE THING IN THIS FILE WAS NOT MERELY STALE — §22's Eval 07 table was WRONG, and it is
 > corrected in place** (§25.1, `MEASUREMENT_STATUS` §42.10). Two of its five rows carried the swapped
-> case descriptions that `b41262e2` had already fixed **in code**, one of them contradicted itself on
+> case descriptions that `b41268e2` had already fixed **in code**, one of them contradicted itself on
 > its own line and was marked GOOD, and the table mixed both embedding spaces without naming either.
 > **The deterministic loop is not space-invariant** — a per-case sentence has to say which space it
 > describes, and from `8af63683` a gating control makes it.
@@ -554,7 +554,7 @@ No model, fully deterministic, sub-second. GATE A (structure) ✅ · **GATE B (t
 > | Marco's observed | *"loop-back fired, 3 rounds"* | that is the **real**-space figure, in a concept-space table |
 > | Mirjam's expectation | *"loops once, exits DEGRADED on no-progress"* | concept **2 loop-backs · 3 rounds · `gaps-unresolvable`** |
 >
-> **① The expectations were each other's** — the swap `b41262e2` fixed in code on 2026-09-06 and never
+> **① The expectations were each other's** — the swap `b41268e2` fixed in code on 2026-09-06 and never
 > fixed here, so a corrected claim stayed alive at a second origin (the same shape as §41.3).
 > **② The Mirjam row contradicted itself on its own line** — expectation *"loops once"*, observed
 > *"fired twice"*, verdict **GOOD**. **③ The table silently mixed the two embedding spaces**, and the

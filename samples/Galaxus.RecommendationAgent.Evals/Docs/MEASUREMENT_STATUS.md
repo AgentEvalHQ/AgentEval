@@ -5883,7 +5883,7 @@ defect was created by Wave 4 itself and survived Wave 4's own review.**
 
 ### 42.1 🔴 `-- 3 --real-vectors` exited **1** at `4da0556b`, and §34.5 publishes **0** for it
 
-Wave 4 added the gating row `TopologyCaseProseMatchesTheRun` (`b41262e2`) and verified it in the
+Wave 4 added the gating row `TopologyCaseProseMatchesTheRun` (`b41268e2`) and verified it in the
 **concept space only**. The Wave-4 review then re-executed four of the wave's ablations — also in the
 concept space only — and reported them as reproducing, which they did.
 
@@ -6111,7 +6111,7 @@ eval has no result to record. Zero files with those keys carry a timestamp from 
 
 ### 42.10 🔴 A refuted claim still standing at a THIRD origin — `SUITE_SUMMARY` §22's Eval 07 table
 
-`b41262e2` corrected Marco's and Mirjam's prose **in code** and left `SUITE_SUMMARY` §22's copy of it
+`b41268e2` corrected Marco's and Mirjam's prose **in code** and left `SUITE_SUMMARY` §22's copy of it
 untouched. That table's "pinned expectation" column still carried the **swapped** sentences, and its
 Mirjam row was **self-contradicting on its own line** — expectation *"loops once … on no-progress"*,
 observed *"loop-back fired twice, 3 rounds"*, verdict **GOOD**.
