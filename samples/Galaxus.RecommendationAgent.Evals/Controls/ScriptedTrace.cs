@@ -88,7 +88,27 @@ public sealed partial class ScriptedTrace
 
     /// <summary>Freezes the trace into the response shape the harness consumes.</summary>
     /// <param name="modelId">Model id to stamp on the response, or null for a no-model control.</param>
-    public AgentResponse ToResponse(string? modelId = null)
+    /// <param name="usage">
+    /// PROVIDER-reported token usage for the work this trace replays, or null when there is none.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <b>Why usage is a parameter and not a computation.</b> A scripted trace's text is REPLAYED —
+    /// it is assembled from state a workflow already produced — so <c>MAFEvaluationHarness</c>'s
+    /// fallback (<c>ModelPricing.EstimateTokensFromText</c> over <c>ActualOutput</c>) measures the
+    /// length of a string no model was ever billed for. Handing the harness the real usage block
+    /// replaces an estimate of the wrong text with a measurement; handing it a computed one would
+    /// replace it with a better-dressed estimate. So the only thing that may be passed here is a
+    /// figure a provider returned.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Pass null unless the figure is COMPLETE.</b> Setting <c>TokenUsage</c> makes the harness
+    /// stamp <c>TokensAreEstimated = false</c>, i.e. "this is a measurement" — so a partial total,
+    /// from a run where some call returned no usage block, would be published as a whole one. That is
+    /// the flattering direction. The caller decides; see <c>Eval08LiveWorkflowArm.InvokeAsync</c>.
+    /// </para>
+    /// </remarks>
+    public AgentResponse ToResponse(string? modelId = null, TokenUsage? usage = null)
     {
         string text = _text.Length > 0 ? _text.ToString() : "(scripted control — no prose)";
         _messages.Add(new ChatMessage(ChatRole.Assistant, text));
@@ -98,6 +118,7 @@ public sealed partial class ScriptedTrace
             Text = text,
             RawMessages = [.. _messages.Cast<object>()],
             ModelId = modelId,
+            TokenUsage = usage,
             FinishReason = "Stop",
         };
     }

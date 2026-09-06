@@ -7779,3 +7779,210 @@ for f in samples/Galaxus.RecommendationAgent.Evals/Docs/{MEASUREMENT_STATUS,SUIT
   printf '%-40s unresolvable:%s\n' "$(basename $f)" "${bad:- none}"
 done
 ```
+
+---
+
+## 55. Item 8.17 — the chat lane spent and said nothing, because we dropped the provider's usage block (2026-09-06)
+
+**This is the precondition for every paid item left in the plan.** `RUN_PROTOCOL` stage 2 requires
+four observations of a live probe, one of which is *"usage is reported"*. On the lane that spends
+most — the discovery loop's model-backed stages, reached by `agent -- 2` and by Eval 08's workflow
+arm — that observation was **unsatisfiable by construction**, measured twice (§40.4, §42.8). Nothing
+paid downstream of it could be measured. It is now satisfiable, and the section below is the
+measurement, not the plan.
+
+### 55.1 THE ROOT CAUSE — not "the provider does not report it", and not "nobody asked"
+
+The item named three candidate causes: the usage is absent from the response, it is dropped by our
+code, or it was never asked for. **It is the second, and the discriminating evidence is inside this
+repository, so no spend was needed to establish it.**
+
+| | |
+|---|---|
+| the broken call | `samples/Galaxus.RecommendationAgent/Workflows/ModelDiscoveryNodes.cs`, `DiscoveryModelCall.RunAsync` — built a `ChatClientAgent`, called `agent.RunAsync(...)`, and then `return response.Text;` |
+| what it threw away | `Microsoft.Agents.AI.AgentResponse.Usage` — *"a `UsageDetails` … or `null` if usage information is not available"*, MAF 1.17.0's own XML doc. `MafApiSafety` on `AgentResponse.Usage`: **SAFE**, no registry entry |
+| the same-provider control | `src/AgentEval.MAF/MAF/MAFAgentAdapter.cs:71-80` makes the **identical** `_agent.RunAsync(messages, session, ct)` call against the **same deployment** and reads `response.Usage` into `TokenUsage`. Eval 02b/02c's live arms go through it and their `SpendLedger` reports `token-estimated 0 · unaccounted 0` — every turn had a real usage block |
+| the consequence on Demo 2 | nothing accumulated, so the demo printed a model-call **count** and no tokens. A count is not a bill |
+| the consequence on Eval 08's workflow arm | `Eval08LiveWorkflowArm` returns a `ScriptedTrace` response with `TokenUsage` null, so `MAFEvaluationHarness` fell to `ModelPricing.EstimateTokensFromText` over `ActualOutput` — and this arm's `ActualOutput` is **replayed from finished workflow state**. The estimate was of the wrong string, by the wrong tokenizer. §18's `USD 0.0062` artefact is that |
+
+**Two consuming lanes, one missing line. The usage arrived in this process on every call and was
+discarded before anything could read it.**
+
+### 55.2 THE PROOF, on the smallest live unit — `agent -- 2 --user USR-NB-01`, foreground, `$?` captured
+
+Two runs, both **exit 0**, both carrying the spend panel that did not exist before:
+
+| run | model calls | prompt | completion | total | calls with NO usage block | rounds / stop reason |
+|---|---|---|---|---|---|---|
+| 1 | 4 | 7,202 | 9,202 | **16,404** | **0** | 2 of 3 · `NoProgress` |
+| 2 | 3 | 5,344 | 6,779 | **12,123** | **0** | 2 of 3 · `GapsUnresolvable` |
+
+⚠️ **Quote the INVARIANT, not the digits.** The lane is stochastic and these two runs of the SAME
+persona disagree on call count, stop reason, token total and the size of the answer. What does not
+move is **`CallsWithoutUsage` = 0 on every call of both runs**: this deployment reports usage on the
+chat lane, so the figure is a measurement and not a lower bound.
+
+**🆕 And a finding the meter was built to make possible, which limits the cost-discipline note in
+`RUN_PROTOCOL` if that note is read as general.** It says *"prompt tokens dominate in a tool loop
+(measured: 96% of the bill)"*. On the **workflow** lane the split is the other way round:
+completion is **56%** of tokens in both runs (9,202 / 16,404 and 6,779 / 12,123). At `ModelPricing`'s
+row for this deployment — `gpt-5.5`, USD 5 / 1M in and USD 30 / 1M out, dated *"(2026-08)"* in
+library source — output is priced 6× input, so this lane's **bill is dominated by generation, not by
+context re-sending.** The 96% figure is the tool loop's and does not transport here. *Nobody could
+have known this before, because the lane reported nothing.*
+
+### 55.3 The money, and where it stops
+
+**Tokens are the measurement; currency is arithmetic over a declared rate; neither is an invoice.**
+The two lanes answer differently, on purpose:
+
+* **Demo 2 prints `cost: UNKNOWN IN THIS PROCESS`.** `Galaxus.RecommendationAgent` has **no
+  AgentEval dependency** — its csproj says so and says why — so it reaches no rate table, and a
+  meter may not invent one. It names the tokens, names the deployment, and points at the lane that
+  does have a declared source. Putting a number there would be §27.4's forbidden move with fewer
+  steps.
+* **Eval 08's workflow panel prints money**, because `ModelPricing` is reachable there, and it prints
+  **the rate it applied and where the rate came from** on the line above it, exactly as `SpendLedger`
+  does. When no row matches the deployment it prints `NOT COMPUTED` and the tokens stand alone.
+
+⚠️ **No cohort figure is scaled from these probes and none is offered.** §27.4 forbids it, and it is
+measured that a cohort turn is ~2× a probe turn.
+
+### 55.4 🔴 `ARunThatSaysItSpendsSaysHowMuch` was NOT inert. It was SCOPED, and its name over-promised
+
+The item asked whether the existing row is inert, given that it passed while 8.17 was open twice.
+**It is not inert** — §34.4's ablations still turn it red. **Its subject is one lane.** Every check in
+its body names `EmbeddingSpace.PrintLiveSpend`: both entry points call it, it still reads
+`azure.PromptTokens`, its `LOWER BOUND` caveat survives, it latches. The **chat** lane appears
+nowhere in it.
+
+**Measured rather than argued.** Under all four ablations of the new row below, `-- 3` goes red and
+**`ARunThatSaysItSpendsSaysHowMuch` stays ✅ green, in both spaces**. That is the scope gap as an
+observation, not as a reading of the source.
+
+**Direction: flattering.** A reader takes a green tick beside the sentence *"a run that says it
+spends says how much"* as covering the lane that costs the most, and that lane was reporting nothing.
+Corrected at its origin: the row's XML remarks now carry the scope, and its printed **expectation**
+now opens with `⚠ THE EMBEDDING LANE ONLY — the chat lane is TheChatLaneSaysWhatItSpent, and this row
+was green while that one's defect was open, twice.` Neither row covers the other's lane, which is why
+there are two.
+
+### 55.5 The new gating row — `TheChatLaneSaysWhatItSpent`, and it EXECUTES the seam
+
+A source-text assertion that `Usage` is mentioned would be satisfied by the comment that explains it
+— the exact shape §34.4 already recorded once, where a latch was asserted by an identifier its own
+dead field supplied. So the row drives a **real `DiscoveryModelCall`** against two stub clients, one
+whose response carries a usage block and one whose does not, and reads what landed in
+`DiscoveryState.Spend`. No network, no credentials, no model.
+
+| # | what it asserts | the ablation that breaks it |
+|---|---|---|
+| 1 | a response carrying usage `1234 / 56` reaches `DiscoveryState.Spend` **intact** | A |
+| 2 | a response with NO usage block adds **no tokens** and counts as `CallsWithoutUsage` | B |
+| 3 | a provider-reported **ZERO** and a **MISSING** block render in **different words**, and the missing one says `UNKNOWN` | B |
+| 4 | the figure renders in the **invariant culture** | D |
+| 5 | `ChatSpend` holds no path from text to a token count (`EstimateTokens`, `.Length / 4`) | — |
+| 6 | Demo 02 **and** Eval 08's workflow arm both print the meter | C |
+
+### 55.6 Ablations — four, all EXECUTED, and the sibling row's colour recorded each time
+
+| # | ablation | `-- 3` | the new row | `ARunThatSaysItSpendsSaysHowMuch` | the fault it printed |
+|---|---|---|---|---|---|
+| **A** | delete `state.Spend.Record(response.Usage)` — i.e. restore the shipped bug | **1**, both spaces | ❌ | **✅ green** | *"a chat response carrying a usage block did not reach DiscoveryState.Spend intact (read 0 call(s), 0 prompt, 0 completion; expected 1 / 1234 / 56)"* |
+| **B** | fold a missing usage block in as a measured zero | **1**, both spaces | ❌ | **✅ green** | *"a provider-reported ZERO and a MISSING usage block render identically ("1 model call(s) · 0 prompt + 0 completion = 0 token(s), read from the provider's own usage blocks."), so a figure nobody measured reads as a free run"* |
+| **C** | remove Demo 02's `PrintChatSpend` call | **1** | ❌ | **✅ green** | *"Demo 02 no longer prints the chat meter, so it makes live model calls and reports a call COUNT in place of a bill"* |
+| **D** | drop `CultureInfo.InvariantCulture` from the figure | **1** | ❌ | **✅ green** | *"expected the group separator in "1,234"; got "1 model call(s) · 1’234 prompt + 56 completion = 1’290 token(s)…""* |
+| — | **restored** | **0**, both spaces | ✅ | ✅ | — |
+
+**Ablation D is a defect this item's own code shipped for exactly one live run, found by executing
+it.** The first live probe printed **`7’202 prompt`** — a Swiss apostrophe, because `N0` formats in
+the MACHINE's culture. Same shape as the `C4`-renders-USD-as-CHF defect Eval 08 already carries a
+note about: a number whose *text* depends on who ran it cannot be summed out of a log by the next
+reader, which is exactly how §34.5's total came to be typed instead of summed. Fixed in both the
+demo's meter and Eval 08's panel, and pinned by check 4.
+
+### 55.7 A dry run of Eval 08 now EXERCISES the absence branch, and that is worth having
+
+`StubChatClient` sets no `Usage` — correctly; it is a stub — so `-- 8 --dry-run` prints:
+
+```
+  ─── Discovery workflow · what the LOOP spent (provider usage blocks) ─────
+    model      : gpt-5.5
+    calls      : 60 over 10 run(s) (6.0 per run) · 0 reported usage, 60 did not
+    tokens     : usage NOT REPORTED by the provider for any of the 60 call(s).
+    cost       : UNKNOWN — and UNKNOWN is not zero. Nothing is estimated in its place.
+```
+
+**So the branch that must never render as free is covered on every dry run**, in both spaces, without
+a model. The harness's own `PrintSpend` still reports its text-length estimate beside it, labelled as
+one — the two panels disagree on purpose and the new one says which is the bill.
+`Eval08LiveWorkflowArm` hands the harness the workflow's real usage **only when it is COMPLETE**
+(`CallsWithoutUsage == 0`), because setting `TokenUsage` sets `TokensAreEstimated = false`, and
+publishing a partial total as a measured whole is the flattering direction.
+
+### 55.8 NOTHING MOVED — every exit code re-observed with `$?` after the change
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 7` | **1** | **1** |
+| `-- 8 --dry-run` | **0** | **0** |
+| `--ci --dry-run` | **1** — 11 steps, **Eval 07 the only FAILED**, write ledger still naming `eval03_controls`, `eval04_injection`, `eval07_topology` | — |
+| `agent -- 0`, `agent -- 1 --offline`, `agent -- 2 --offline` | **0** | — |
+| `agent -- 2 --user USR-NB-01` **(live, paid)** | **0** | — |
+
+⚠️ **The CI recap must be read with a TIGHT grep.** `grep -c ": passed"` over that log returns
+**11**, and one of those matches is a control's own quoted prose *"Eval 07: passed."* inside the row
+that documents the defect. The verdict block is the eleven `     · Eval NN: …` lines. Same loose-grep
+shape as `baca28e4`.
+
+`AgentEval.sln`: **0 errors.** ⚠️ **No warning count is quoted** — §54.2 established that that
+command has a warning count *per invocation*, not a warning count.
+
+**Panel: 30 gating + 6 advisory = 36 rows in BOTH spaces, `❌ NOT CAUGHT` = 0**, the two `⚠️ FINDING`
+advisory rows unchanged (`AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised`). The
+gating count moved 29 → 30 because this item added one: count it, do not quote it.
+
+⚠️ **One thing observed and NOT claimed as new:** the AGENT project owns a pre-existing `CS1572` at
+`ModelDiscoveryNodes.cs:774` — a dangling `<param name="state">` on an orphaned summary block. It is
+untouched by this item (`git diff -U0` puts every hunk at lines 151-210) and it does not contradict
+§54.1, which counted *the evals project's own*. Recorded so the next reader does not find it and
+assume this item caused it.
+
+### 55.9 What §55 does NOT claim
+
+* **No cohort run was bought.** Eval 08's workflow panel is proven on a **dry run** and by ablation;
+  its LIVE numbers have never been taken, because that is a paid run and this item is its
+  precondition, not its execution.
+* **The two live probes are Demo 2's lane only.** Nothing here re-measures Eval 08, Eval 02b, any
+  judged verdict, or any gate's reasoning.
+* **`CallsWithoutUsage = 0` is a property of this deployment on these seven calls**, not a promise
+  about any deployment. The whole point of the absence branch is that the other case is possible, and
+  the dry run exercises it every time.
+* **No money figure is asserted for the two live probes.** The instrument printed `UNKNOWN IN THIS
+  PROCESS`, and this section does not quietly supply what the instrument declined to.
+
+### 55.10 How to re-derive §55
+
+```bash
+# The root cause, spending nothing: the two call sites, side by side.
+grep -n "response.Usage" src/AgentEval.MAF/MAF/MAFAgentAdapter.cs \
+                         samples/Galaxus.RecommendationAgent/Workflows/ModelDiscoveryNodes.cs
+
+# The row, green, in both spaces (exit 0 / 0):
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 ; echo $?
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 3 --real-vectors ; echo $?
+
+# Ablation A — restore the shipped bug and watch ONE row go red while its sibling does not.
+# Delete `state.Spend.Record(response.Usage);` from DiscoveryModelCall.RunAsync, rebuild, then:
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals --no-build -- 3 2>&1 \
+  | grep -oE "(OK caught|NOT CAUGHT)  (TheChatLaneSaysWhatItSpent|ARunThatSaysItSpendsSaysHowMuch)"
+
+# The absence branch, free, no credentials:
+dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 8 --dry-run 2>&1 \
+  | grep -A 5 "what the LOOP spent"
+
+# The live probe. PAID. Foreground, exit code captured, one persona:
+dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --user USR-NB-01 ; echo $?
+```

@@ -126,6 +126,7 @@ public static class Demo02_InterestMapWorkflow
             PrintScreenedAnswer(result.State);
             PrintRoutes(result);
             PrintDegradations(result.State);
+            PrintChatSpend(result.State);
             PrintExecutorFailures(result);
         }
         catch (Exception ex)
@@ -458,6 +459,63 @@ public static class Demo02_InterestMapWorkflow
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("  ─── Degraded this run (warnings, not failures) ──────────────────────────");
         foreach (var note in state.DegradedNotes) Console.WriteLine($"    ⚠  {note}");
+        Console.ResetColor();
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// What this run's model calls cost, in tokens the PROVIDER reported.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The gap this closes.</b> <c>RUN_PROTOCOL</c>'s stage 2 requires four observations of a
+    /// live probe, one of which is <i>"usage is reported"</i>. This lane made real model calls and
+    /// printed a model-call COUNT and nothing else — measured twice, in two consecutive verification
+    /// runs — so that observation was unsatisfiable by construction on the lane that spends most,
+    /// and every paid item downstream of it was unmeasurable. The count was never the bill; it was
+    /// the only number anyone had.
+    /// </para>
+    /// <para>
+    /// <b>Why there is no currency figure here, and why that is the correct output rather than a
+    /// gap.</b> A money figure needs a rate, and a rate needs a declared source. This project has no
+    /// AgentEval dependency by design (see the csproj), so it reaches no rate table, and this panel
+    /// will not invent one — <c>MEASUREMENT_STATUS</c> §27.4 already forbids scaling a cohort figure
+    /// onto a probe, and inventing a per-million rate is the same move with fewer steps. Tokens are
+    /// the measurement. The eval suite's <c>SpendLedger</c> and Eval 08's workflow panel DO have a
+    /// declared rate source and print money beside the rate they applied.
+    /// </para>
+    /// <para>
+    /// <b>It prints on the offline arm too, and says zero calls.</b> An offline run costs nothing and
+    /// saying so out loud is the point of the line; what it must never do is render "nothing was
+    /// spent" and "nobody told us what was spent" in the same words. <see cref="ChatSpend.Describe"/>
+    /// owns that distinction.
+    /// </para>
+    /// </remarks>
+    /// <param name="state">The finished run's state.</param>
+    private static void PrintChatSpend(DiscoveryState state)
+    {
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine("  ─── What this run spent (provider-reported, never estimated) ────────────");
+        Console.ResetColor();
+
+        var lines = state.Spend.Describe();
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        if (lines.Count == 0)
+        {
+            Console.WriteLine("    💸 Chat: 0 model call(s) — nothing was sent to a deployment, so nothing was billed.");
+        }
+        else
+        {
+            Console.WriteLine($"    💸 Chat: {lines[0]}");
+            foreach (var extra in lines.Skip(1)) Console.WriteLine($"       {extra}");
+
+            Console.WriteLine($"       model: {Config.Model}");
+            Console.WriteLine("       cost : UNKNOWN IN THIS PROCESS — this project carries no rate table (no AgentEval");
+            Console.WriteLine("              dependency, by design) and a meter may not invent a rate. Tokens above are the");
+            Console.WriteLine("              measurement; the eval suite's Eval 08 spend panel applies AgentEval's");
+            Console.WriteLine("              ModelPricing row for this deployment and prints the rate beside the money.");
+        }
         Console.ResetColor();
         Console.WriteLine();
     }

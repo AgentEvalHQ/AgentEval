@@ -289,6 +289,18 @@ public sealed class DiscoveryState
     /// <summary>Model calls actually made. Discovery contributes ZERO, by design.</summary>
     public int ModelCalls { get; set; }
 
+    /// <summary>
+    /// What those calls COST, in tokens the provider reported — never in tokens we counted.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ModelCalls"/> answers "how many", which is the number this eval suite has been
+    /// quoting in place of a bill because it was the only one available. This answers "how much",
+    /// and it answers UNKNOWN rather than zero when the provider did not say. Every increment of
+    /// <see cref="ModelCalls"/> is paired with exactly one <see cref="ChatSpend"/> record in
+    /// <c>DiscoveryModelCall.RunAsync</c>, on every exit path including the timeout one.
+    /// </remarks>
+    public ChatSpend Spend { get; } = new();
+
     /// <summary>Retrieval calls actually made.</summary>
     public int SearchesRun { get; set; }
 

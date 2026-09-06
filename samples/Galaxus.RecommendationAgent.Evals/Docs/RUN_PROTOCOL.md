@@ -190,14 +190,40 @@ Report cost from the provider's own usage blocks, never from an estimate. If a r
 measurement. Prompt tokens dominate in a tool loop (measured: 96% of the bill), so a per-turn cost is
 driven by context re-sending, not generation.
 
-> 🔴 **AND STAGE 2 CANNOT CURRENTLY SATISFY ITS OWN CHECKLIST ON THE AGENT'S DEMO LANE — 2026-09-06
-> (`MEASUREMENT_STATUS` §42.8).** The stage-2 table above requires *"usage is reported"*. `agent -- 2
-> --user <id>` makes real model calls and prints **no token count, no usage block and no currency
-> figure at all** — measured twice now, in Wave 4's smoke (§40.4) and in this run. **Plan item 8.17.**
-> Until it is fixed, a stage-2 unit on that lane is reported as **cost UNMETERED**, never as an
-> estimate scaled from a cohort turn: §27.4's rule forbids the scaling and §34.5's own corrected total
-> is what happens when a number is typed instead of summed. A deferral's stated cost is a claim like
-> any other — this one has now reproduced twice.
+> ⚠️ **THAT 96% IS THE TOOL LOOP'S AND DOES NOT TRANSPORT TO THE WORKFLOW LANE — measured 2026-09-06
+> (`MEASUREMENT_STATUS` §55.2), on the first two runs that could report it at all.** On the discovery
+> loop, **completion is 56% of tokens** — 9,202 of 16,404 and 6,779 of 12,123, two runs of one
+> persona. At `ModelPricing`'s row for this deployment output is priced **6× input**, so that lane's
+> bill is dominated by **generation**, not by context re-sending. Two lanes, opposite cost shapes:
+> name the lane before quoting either.
+
+> ✅ **STAGE 2 CAN NOW SATISFY ITS OWN CHECKLIST ON THE AGENT'S DEMO LANE — fixed 2026-09-06
+> (`MEASUREMENT_STATUS` §55).** ⚠️ **SUPERSEDED, and the superseded text is kept because the reason
+> it stood for two runs matters.** It read: *"the stage-2 table above requires 'usage is reported'.
+> `agent -- 2 --user <id>` makes real model calls and prints no token count, no usage block and no
+> currency figure at all — measured twice, in Wave 4's smoke (§40.4) and in the verification run
+> (§42.8). Plan item 8.17."* That was true and the cause was ours: `DiscoveryModelCall.RunAsync`
+> called `AIAgent.RunAsync` and returned `response.Text`, **dropping `AgentResponse.Usage`** — the
+> property `MAFAgentAdapter` reads off the identical call against the same deployment. The usage was
+> never absent and was never un-asked-for.
+>
+> **What a stage-2 unit on that lane now reports**, measured on `agent -- 2 --user USR-NB-01`, exit
+> **0**, foreground: `3 model call(s) · 5,344 prompt + 6,779 completion = 12,123 token(s), read from
+> the provider's own usage blocks`. **Quote the invariant, not the digits** — the lane is stochastic
+> and a second run of the same persona gave 4 calls and 16,404 tokens. The invariant is
+> `CallsWithoutUsage = 0`.
+>
+> ⚠️ **The lane still reports `cost: UNKNOWN IN THIS PROCESS`, and that IS inside this rule.** The
+> demo project has no rate table to reach — no AgentEval dependency, by design — so it names the
+> tokens and refuses to invent a rate. Eval 08's workflow panel, which can reach `ModelPricing`,
+> prints the money **with the rate and its source on the line above**. **UNKNOWN is never rendered as
+> zero anywhere**: a call whose response carried no usage block is counted separately and the total
+> is labelled a LOWER BOUND. Pinned by Eval 03's gating row `TheChatLaneSaysWhatItSpent`, which fails
+> when an absence renders as a zero.
+>
+> ⚠️ **`ARunThatSaysItSpendsSaysHowMuch` did not catch any of this, and it is not inert.** It is
+> **scoped to the EMBEDDING lane** — every check in it names `EmbeddingSpace` — and it stays green
+> under all four ablations of the chat-lane row. A row's NAME is not its subject; read its body.
 
 > ✅ **AND THE SUITE NOW OBEYS IT — 2026-09-06 (`MEASUREMENT_STATUS` §34.4).** Until this run, every
 > `--real-vectors` command printed *"This run EMBEDS QUERIES LIVE … it spends — a fraction of a cent,

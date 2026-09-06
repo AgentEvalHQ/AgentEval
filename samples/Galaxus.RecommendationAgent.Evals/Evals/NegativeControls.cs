@@ -114,6 +114,7 @@ public static class NegativeControls
         rows.Add(Guarded("ForcedChoiceCountIsACountOfPersonas", CheckForcedChoiceCountIsACountOfPersonas));
         rows.Add(Guarded("CiChainRunsModelFreeEvalsForReal", CheckCiChainRunsModelFreeEvalsForReal));
         rows.Add(Guarded("ARunThatSaysItSpendsSaysHowMuch", CheckARunThatSaysItSpendsSaysHowMuch));
+        rows.Add(Guarded("TheChatLaneSaysWhatItSpent", CheckTheChatLaneSaysWhatItSpent));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("CoverageCutIsNotTheConfidenceShapeParameter", CheckCoverageCutIsNotTheConfidenceShapeParameter));
         rows.Add(await GuardedAsync("LoopBackNegativeDirectionCensus", () => CheckLoopBackNegativeDirectionCensusAsync(retriever, ct)).ConfigureAwait(false));
@@ -4172,6 +4173,18 @@ public static class NegativeControls
     /// LOWER BOUND caveat for responses that carry no usage block, which is the clause that stops a
     /// missing usage block being reported as zero.
     /// </para>
+    /// <para>
+    /// 🔴 <b>SCOPE, corrected at its origin 2026-09-06 (plan item 8.17). This row's NAME reads as a
+    /// general rule and its BODY is one lane.</b> Every check below names
+    /// <c>EmbeddingSpace.PrintLiveSpend</c>, so the whole subject is the EMBEDDING lane. The CHAT
+    /// lane — the discovery loop's four model-backed stages, the lane that spends most — was never
+    /// in scope, and this row was green across two verification runs that each recorded
+    /// <c>agent -- 2</c> making three live model calls and printing no token count at all. It was
+    /// not inert: its ablations were executed and reproduce. It was SCOPED, and the name
+    /// over-promised, which is the flattering direction. The chat lane is now held by
+    /// <see cref="CheckTheChatLaneSaysWhatItSpent"/>; neither row covers the other's lane, and that
+    /// is why there are two.
+    /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckARunThatSaysItSpendsSaysHowMuch()
     {
@@ -4222,7 +4235,9 @@ public static class NegativeControls
 
         return new ControlRowSnapshot(
             "ARunThatSaysItSpendsSaysHowMuch",
-            "a command that prints \"This run EMBEDS QUERIES LIVE … it spends\" must also print what it spent, from "
+            "⚠ THE EMBEDDING LANE ONLY — the chat lane is TheChatLaneSaysWhatItSpent, and this row was green while "
+          + "that one's defect was open, twice. "
+          + "a command that prints \"This run EMBEDS QUERIES LIVE … it spends\" must also print what it spent, from "
           + "the provider's own usage blocks. MEASURED on the 2026-09-06 verification sweep: EmbeddingSpace."
           + "PrintLiveSpend was called from Demo 01 and ThresholdCalibration and from no eval, so 13 of the 14 "
           + "real-vector commands declared a cost and reported none — leaving \"a fraction of a cent\" as the only "
@@ -4236,6 +4251,236 @@ public static class NegativeControls
                 + "and it prints NOTHING on the concept path, where nothing is spent"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
+    }
+
+    // ══ Control 30 — the CHAT lane spent and said nothing, for two whole verification runs. ══
+    //
+    /// <summary>
+    /// A model call that spends must say how much, from the PROVIDER's usage block, and an absent
+    /// usage block must not render as a zero.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The defect this row exists for, and the row that did NOT catch it.</b>
+    /// <c>ARunThatSaysItSpendsSaysHowMuch</c> reads as a general rule and is not one: every check in
+    /// its body names <c>EmbeddingSpace.PrintLiveSpend</c>, so its whole subject is the EMBEDDING
+    /// lane. The CHAT lane — four model-backed stages of the discovery loop, the lane that spends
+    /// most — was never in its scope, which is why it stayed green across two verification runs
+    /// that both recorded <c>agent -- 2</c> making three live model calls and printing no token
+    /// count at all. The row was not inert; it was SCOPED, and its name over-promised. Direction:
+    /// flattering, because a reader takes a green tick beside that sentence as covering the lane
+    /// that costs the most.
+    /// </para>
+    /// <para>
+    /// <b>The root cause, which is neither "the provider does not report it" nor "nobody asked".</b>
+    /// <c>DiscoveryModelCall.RunAsync</c> called <c>AIAgent.RunAsync</c> and returned
+    /// <c>response.Text</c>, dropping <c>AgentResponse.Usage</c> — the property the provider fills
+    /// in on that exact call. The control that settles it is inside this repository:
+    /// <c>MAFAgentAdapter</c> makes the identical call against the same deployment and reads that
+    /// same property, and the evals that go through it report <c>token-estimated 0 · unaccounted
+    /// 0</c>. So the usage arrived and our code threw it away.
+    /// </para>
+    /// <para>
+    /// <b>Every check here EXECUTES the seam rather than reading it.</b> A source-text assertion
+    /// that <c>Usage</c> is mentioned would be satisfied by this very comment — the shape §34.4
+    /// already recorded once, where a latch was asserted by an identifier its own dead field
+    /// supplied. So the row drives a real <c>DiscoveryModelCall</c> against two stub clients, one
+    /// that returns a usage block and one that does not, and reads what landed in
+    /// <c>DiscoveryState.Spend</c>.
+    /// </para>
+    /// <list type="number">
+    ///   <item><description><b>WIRED:</b> a response carrying usage lands in the state, with the
+    ///   provider's exact numbers and not a rounding of them.</description></item>
+    ///   <item><description><b>ABSENCE ≠ ZERO:</b> a response carrying no usage adds no tokens,
+    ///   counts as <c>CallsWithoutUsage</c>, and RENDERS in different words from a call that
+    ///   reported a genuine zero. This is the check that fails when a missing figure is laundered
+    ///   into a free one.</description></item>
+    ///   <item><description><b>NEVER ESTIMATED:</b> the meter has no path from a string to a token
+    ///   count, so a later "helpful" fallback cannot make our tokenizer look like the
+    ///   provider's bill.</description></item>
+    ///   <item><description><b>REPORTED:</b> both spending lanes — Demo 02 and Eval 08's workflow
+    ///   arm — read the meter. A meter nobody prints is the state this row was written to
+    ///   end.</description></item>
+    /// </list>
+    /// </remarks>
+    private static ControlRowSnapshot CheckTheChatLaneSaysWhatItSpent()
+    {
+        var problems = new List<string>();
+
+        // ── 1 + 2. Drive the real seam, twice, with no network and no credentials ──────────
+        var withUsage = ProbeChatSpend(new UsageDetails { InputTokenCount = 1234, OutputTokenCount = 56 });
+        var reportedZero = ProbeChatSpend(new UsageDetails { InputTokenCount = 0, OutputTokenCount = 0 });
+        var noUsage = ProbeChatSpend(usage: null);
+
+        if (withUsage.CallsWithUsage != 1 || withUsage.PromptTokens != 1234 || withUsage.CompletionTokens != 56)
+        {
+            problems.Add("a chat response carrying a usage block did not reach DiscoveryState.Spend intact "
+                       + $"(read {withUsage.CallsWithUsage} call(s), {withUsage.PromptTokens} prompt, "
+                       + $"{withUsage.CompletionTokens} completion; expected 1 / 1234 / 56). The lane spends and "
+                       + "reports nothing again.");
+        }
+
+        if (noUsage.CallsWithoutUsage != 1 || noUsage.CallsWithUsage != 0
+            || noUsage.PromptTokens != 0 || noUsage.CompletionTokens != 0)
+        {
+            problems.Add("a chat response with NO usage block was not recorded as an absence "
+                       + $"({noUsage.CallsWithUsage} with usage, {noUsage.CallsWithoutUsage} without, "
+                       + $"{noUsage.PromptTokens} prompt tokens; expected 0 / 1 / 0).");
+        }
+
+        // The one that matters most: a MISSING figure and a MEASURED ZERO must not print the same
+        // sentence. Both are "0 tokens" arithmetically and only one of them is a measurement.
+        string zeroText = string.Join(" ", DescribeSpend(reportedZero));
+        string absentText = string.Join(" ", DescribeSpend(noUsage));
+
+        if (zeroText.Length == 0 || absentText.Length == 0)
+        {
+            problems.Add("the meter rendered nothing for a call that was made — a lane that spent must produce a line.");
+        }
+        else if (string.Equals(zeroText, absentText, StringComparison.Ordinal))
+        {
+            problems.Add("a provider-reported ZERO and a MISSING usage block render identically "
+                       + $"(\"{zeroText}\"), so a figure nobody measured reads as a free run.");
+        }
+        else if (!absentText.Contains("UNKNOWN", StringComparison.Ordinal))
+        {
+            problems.Add("the missing-usage rendering does not say UNKNOWN, so an absence is being reported "
+                       + $"as something else: \"{absentText}\".");
+        }
+
+        // A figure that renders differently on different machines cannot be summed out of a log by
+        // the next reader. The first live run of this meter printed `7’202` on a Swiss box — the same
+        // machine-culture shape as the `C4`-renders-USD-as-CHF defect Eval 08 already carries.
+        string figure = string.Join(" ", DescribeSpend(withUsage));
+        if (!figure.Contains("1,234", StringComparison.Ordinal))
+        {
+            problems.Add("the token figure is not rendered in the invariant culture "
+                       + $"(expected the group separator in \"1,234\"; got \"{figure}\"), so its text depends on "
+                       + "who ran it and a log grep for it fails on another machine.");
+        }
+
+        // ── 3. The meter may never derive a token count from text ──────────────────────────
+        string agentRoot = Path.Combine(Directory.GetParent(SampleSourceRoot())!.FullName, "Galaxus.RecommendationAgent");
+        string meter = File.ReadAllText(Path.Combine(agentRoot, "Workflows", "ChatSpend.cs"));
+        foreach (string forbidden in new[] { "EstimateTokens", ".Length / 4", "Length / 4.0" })
+        {
+            if (meter.Contains(forbidden, StringComparison.Ordinal))
+            {
+                problems.Add($"ChatSpend contains '{forbidden}' — it has grown a path from OUR text to a token "
+                           + "count, which measures our tokenizer and not the provider's bill.");
+            }
+        }
+
+        // ── 4. Both spending lanes must actually READ the meter ────────────────────────────
+        foreach (var (label, path, needle) in new[]
+                 {
+                     ("Demo 02", Path.Combine(agentRoot, "Demos", "Demo02_InterestMapWorkflow.cs"), "PrintChatSpend(result.State)"),
+                     ("Eval 08's workflow arm", Path.Combine(SampleSourceRoot(), "Evals", "Eval08_StochasticStability.cs"), "PrintWorkflowChatSpend(workflowArm)"),
+                 })
+        {
+            if (!File.ReadAllText(path).Contains(needle, StringComparison.Ordinal))
+            {
+                problems.Add($"{label} no longer prints the chat meter, so it makes live model calls and reports "
+                           + "a call COUNT in place of a bill — which is the state item 8.17 was opened for.");
+            }
+        }
+
+        return new ControlRowSnapshot(
+            "TheChatLaneSaysWhatItSpent",
+            "the discovery loop's model calls must report PROVIDER-reported tokens, a call whose response carried "
+          + "no usage block must render as UNKNOWN rather than as zero, and both spending lanes must print it. "
+          + "MEASURED: DiscoveryModelCall returned response.Text and dropped AgentResponse.Usage, so `agent -- 2` "
+          + "made 3 live model calls and printed no token count on two consecutive verification runs, and Eval 08's "
+          + "workflow arm fell back to the harness's text-length estimate over text REPLAYED from workflow state. "
+          + "⚠ ARunThatSaysItSpendsSaysHowMuch was green throughout: every check in it names EmbeddingSpace, so its "
+          + "subject is the EMBEDDING lane and its name over-promises",
+            problems.Count == 0
+                ? "a stubbed response carrying usage 1234/56 reaches DiscoveryState.Spend exactly · a response with "
+                + "no usage block adds no tokens and counts as an absence · a provider-reported ZERO and a MISSING "
+                + "block render in different words, and the missing one says UNKNOWN · the figure renders in the "
+                + "INVARIANT culture, so a log grep survives the machine · ChatSpend has no path from text to "
+                + "tokens · Demo 02 and Eval 08's workflow arm both print the meter"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    /// <summary>
+    /// Runs ONE real <c>DiscoveryModelCall</c> turn against a stub whose response carries
+    /// <paramref name="usage"/>, and returns what the state's meter recorded.
+    /// </summary>
+    /// <remarks>
+    /// The whole point is that this goes through the shipped call path — the same
+    /// <c>ChatClientAgent</c>, the same <c>RunAsync</c>, the same <c>state.Spend.Record</c> — rather
+    /// than testing <c>ChatSpend</c> in isolation. A meter that is correct and unwired is the defect,
+    /// not the fix.
+    /// </remarks>
+    /// <param name="usage">The usage block the stub's response carries, or null for none.</param>
+    private static ChatSpendSnapshot ProbeChatSpend(UsageDetails? usage)
+    {
+        var state = new DiscoveryState { CustomerId = "USR-CTL-30", Market = "CH", Language = "de" };
+        var call = new DiscoveryModelCall(new UsageStubChatClient(usage), NullDiscoveryProgressSink.Instance);
+
+        _ = call.RunAsync("spend-meter-probe", "You are a control.", "Reply with anything.", state, CancellationToken.None)
+                .AsTask().GetAwaiter().GetResult();
+
+        return state.Spend.Snapshot();
+    }
+
+    /// <summary>Renders a snapshot through the same words the demos print.</summary>
+    /// <param name="snapshot">The snapshot.</param>
+    private static IReadOnlyList<string> DescribeSpend(ChatSpendSnapshot snapshot)
+    {
+        var spend = new ChatSpend();
+        for (int i = 0; i < snapshot.CallsWithUsage; i++)
+        {
+            spend.Record(new UsageDetails
+            {
+                InputTokenCount = i == 0 ? snapshot.PromptTokens : 0,
+                OutputTokenCount = i == 0 ? snapshot.CompletionTokens : 0,
+            });
+        }
+
+        for (int i = 0; i < snapshot.CallsWithoutUsage; i++) spend.RecordNoResponse();
+        return spend.Describe();
+    }
+
+    /// <summary>
+    /// A chat client whose only interesting property is whether its response carries a usage block.
+    /// </summary>
+    /// <remarks>
+    /// <c>StubChatClient</c> deliberately sets none — which is correct for it, and is why a dry run
+    /// of Eval 08 now exercises the ABSENCE branch — so this control needs its own stub to drive the
+    /// positive case.
+    /// </remarks>
+    private sealed class UsageStubChatClient(UsageDetails? usage) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "{\"ok\":true}"))
+            {
+                ModelId = "usage-stub",
+                FinishReason = ChatFinishReason.Stop,
+                Usage = usage,
+            });
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
+            foreach (var update in response.ToChatResponseUpdates()) yield return update;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+        }
+
+        public void Dispose() { }
     }
 
     // ══ Control 28 — the CI chain stubbed a model-free eval, and hid a red gate (2026-09-06). ══

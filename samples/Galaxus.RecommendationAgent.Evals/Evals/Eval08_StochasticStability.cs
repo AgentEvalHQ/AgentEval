@@ -284,6 +284,11 @@ public static class Eval08_StochasticStability
         PrintSpend(agentArm);
         PrintSpend(workflowArm);
 
+        // Item 8.17. The line above reports what the HARNESS saw at this arm's boundary, which on a
+        // replayed answer is an estimate of the wrong text; this one reports what the LOOP was
+        // billed, read from the provider's usage blocks inside it.
+        PrintWorkflowChatSpend(workflowArm);
+
         // ── The one judged number: the JUDGE's own variance, on a fixed input ────────────
         JudgeReplication? judge = null;
         if (!dryRun && liveClient is not null)
@@ -518,6 +523,7 @@ public static class Eval08_StochasticStability
             RoundsTaken: state?.DiscoveryRound,
             StopReason: state?.ResolveStopReason().ToString(),
             ModelCalls: state?.ModelCalls,
+            WorkflowSpend: state?.Spend.Snapshot(),
             DegradedNotes: state?.DegradedNotes.Count ?? 0,
             StubTextSeen: result.ActualOutput?.Contains(StubChatClient.StubText, StringComparison.Ordinal) == true,
             Text: result.ActualOutput);
@@ -1260,6 +1266,109 @@ public static class Eval08_StochasticStability
         Console.ResetColor();
     }
 
+    /// <summary>
+    /// The workflow arm's OWN spend, summed from the provider's usage blocks inside the loop.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this panel is separate from <see cref="PrintSpend"/>.</b> That one reports what the
+    /// HARNESS saw at the agent boundary. On this arm the harness sees a replay: the answer text is
+    /// re-composed from finished workflow state, so before item 8.17 the harness estimated tokens
+    /// from that string's length and printed a currency figure derived from it — the eval's own
+    /// prose called the resulting <c>USD 0.0062</c> an artefact and pointed at the model-call COUNT
+    /// instead. The count is not a bill. This panel is the bill, and it comes from inside the loop,
+    /// where the four model-backed stages actually call the deployment.
+    /// </para>
+    /// <para>
+    /// <b>What it may and may not say.</b> Tokens are reported only from usage blocks; a call that
+    /// returned none is counted as an ABSENCE and the total is labelled a LOWER BOUND. Currency is
+    /// printed only when <c>ModelPricing</c> has a row for the deployment, and the rate and its
+    /// source are printed beside the money — that table's <c>gpt-5-mini</c> row is marked
+    /// "(placeholder)" in library source, so the tokens are the result and the currency is
+    /// arithmetic over a declared rate. When no row matches, the money is UNKNOWN and stays UNKNOWN.
+    /// </para>
+    /// </remarks>
+    /// <param name="arm">The workflow arm.</param>
+    private static void PrintWorkflowChatSpend(ArmStability arm)
+    {
+        var spends = arm.Personas
+            .SelectMany(p => p.Runs)
+            .Select(r => r.WorkflowSpend)
+            .OfType<ChatSpendSnapshot>()
+            .ToList();
+
+        if (spends.Count == 0) return;
+
+        int calls = spends.Sum(s => s.Calls);
+        int withUsage = spends.Sum(s => s.CallsWithUsage);
+        int withoutUsage = spends.Sum(s => s.CallsWithoutUsage);
+        long prompt = spends.Sum(s => s.PromptTokens);
+        long completion = spends.Sum(s => s.CompletionTokens);
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine("  ─── Discovery workflow · what the LOOP spent (provider usage blocks) ─────");
+        Console.ResetColor();
+
+        if (calls == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"    0 model call(s) over {spends.Count} run(s) — the loop ran fully deterministic and");
+            Console.WriteLine("    was billed nothing. That is a measured zero, not a missing figure.");
+            Console.ResetColor();
+            return;
+        }
+
+        // ⚠ InvariantCulture on every figure below. `N0` and `0.0` render in the MACHINE's culture
+        //   otherwise — the first live run of the sibling meter printed `7’202` on this Swiss box —
+        //   and a token count nobody can grep out of a log is a count the next reader re-types.
+        Console.WriteLine($"    model      : {Config.Model}");
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"    calls      : {calls} over {spends.Count} run(s) "
+          + $"({(double)calls / spends.Count:0.0} per run) · {withUsage} reported usage, {withoutUsage} did not"));
+
+        if (withUsage == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"    tokens     : usage NOT REPORTED by the provider for any of the {calls} call(s).");
+            Console.WriteLine("    cost       : UNKNOWN — and UNKNOWN is not zero. Nothing is estimated in its place.");
+            Console.ResetColor();
+            return;
+        }
+
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"    prompt     : {prompt,10:N0} tok"));
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"    completion : {completion,10:N0} tok"));
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"    total      : {prompt + completion,10:N0} tok"));
+
+        if (withoutUsage > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"    ⚠ LOWER BOUND — {withoutUsage} of {calls} call(s) returned no usage block. Their tokens are");
+            Console.WriteLine("      UNKNOWN, not zero, and are absent from the totals above.");
+            Console.ResetColor();
+        }
+
+        var rate = ModelPricing.GetPricing(Config.Model);
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        if (rate is null)
+        {
+            Console.WriteLine($"    cost       : NOT COMPUTED — ModelPricing has no row matching '{Config.Model}', and this");
+            Console.WriteLine("                 panel will not invent a rate. The token counts above stand on their own.");
+        }
+        else
+        {
+            decimal cost = (prompt / 1000m * rate.Value.InputPer1K) + (completion / 1000m * rate.Value.OutputPer1K);
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"    rate       : USD {rate.Value.InputPricePerMillion:0.####} / 1M in · "
+              + $"USD {rate.Value.OutputPricePerMillion:0.####} / 1M out   [source: AgentEval ModelPricing table]"));
+            Console.WriteLine($"    cost       : USD {cost.ToString("F4", CultureInfo.InvariantCulture)}"
+                            + (withoutUsage > 0 ? "   ← over the REPORTED tokens only, so a lower bound too" : ""));
+            Console.WriteLine("    ⚠ that table's row for this deployment is marked '(placeholder)' in library source.");
+            Console.WriteLine("      Read the TOKENS as the measurement and the currency as arithmetic over a declared rate.");
+        }
+        Console.ResetColor();
+    }
+
     private static void PrintJudgeReplication(JudgeReplication? judge, int runs)
     {
         Console.WriteLine();
@@ -1519,6 +1628,10 @@ public static class Eval08_StochasticStability
     /// <param name="RoundsTaken">Discovery rounds, on the workflow arm only.</param>
     /// <param name="StopReason">Terminal stop reason, on the workflow arm only.</param>
     /// <param name="ModelCalls">Model calls the workflow made — the arm's liveness signal.</param>
+    /// <param name="WorkflowSpend">
+    /// What those calls cost, from the provider's usage blocks inside the loop. Null on the agent
+    /// arm, which has no workflow. A count of calls is not a bill; this is the bill.
+    /// </param>
     /// <param name="DegradedNotes">How many stages fell back to their deterministic composition.</param>
     /// <param name="StubTextSeen">True when the dry-run stub's marker text appears in the answer.</param>
     /// <param name="Text">The answer text, kept for the judge-replication subject.</param>
@@ -1535,6 +1648,7 @@ public static class Eval08_StochasticStability
         int? RoundsTaken,
         string? StopReason,
         int? ModelCalls,
+        ChatSpendSnapshot? WorkflowSpend,
         int DegradedNotes,
         bool StubTextSeen,
         string? Text = null);
@@ -1781,8 +1895,26 @@ internal sealed class Eval08LiveWorkflowArm : IEvaluableAgent
 
         // ModelId is stamped only when a model actually ran. A deployment name on a fully-degraded
         // turn is the one line a reader would quote as evidence that the model produced this answer.
+        //
+        // ⚠ And the same discipline on the token count, which is the whole of item 8.17 on this arm.
+        //   The harness estimates from ActualOutput when TokenUsage is null, and this arm's
+        //   ActualOutput is REPLAYED from workflow state — so the estimate was of a string nothing
+        //   was billed for, which is how a `USD 0.0062` artefact got printed under a cost heading.
+        //   The workflow now carries the provider's own usage, so hand that over instead — but ONLY
+        //   when it is complete. Setting TokenUsage sets TokensAreEstimated = false, so a partial
+        //   total (some call returned no usage block) would be published as a measured whole. When
+        //   it is partial, leave it null and let PrintWorkflowChatSpend name the absence.
+        ChatSpendSnapshot spend = result.State.Spend.Snapshot();
+        var usage = spend.Complete
+            ? new TokenUsage
+            {
+                PromptTokens = (int)spend.PromptTokens,
+                CompletionTokens = (int)spend.CompletionTokens,
+            }
+            : null;
+
         return trace.Say(result.State.FinalAnswer)
-                    .ToResponse(modelId: result.State.ModelCalls > 0 ? Config.Model : null);
+                    .ToResponse(modelId: result.State.ModelCalls > 0 ? Config.Model : null, usage: usage);
     }
 }
 

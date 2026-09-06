@@ -148,6 +148,10 @@ public sealed class DiscoveryModelCall
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(_timeout);
 
+        // The meter records one entry per call the COUNTER saw, so the two can be compared. A throw
+        // before `state.ModelCalls++` never reached the deployment and must not become a meter row.
+        int callsBeforeThisAttempt = state.ModelCalls;
+
         try
         {
             var agent = new ChatClientAgent(_chatClient, new ChatClientAgentOptions
@@ -169,6 +173,19 @@ public sealed class DiscoveryModelCall
                 .RunAsync([new ChatMessage(ChatRole.User, userMessage)], session, cancellationToken: deadline.Token)
                 .ConfigureAwait(false);
 
+            // ⚠ THE LINE THIS WHOLE LANE WAS MISSING. `response.Usage` is where the provider puts
+            //   what it billed for, and this method used to return `response.Text` and drop it. The
+            //   usage was never absent and was never un-asked-for; it arrived and we threw it away,
+            //   so `agent -- 2` made real model calls and printed no token count, and Eval 08's
+            //   workflow arm fell back to the harness's text-length ESTIMATE over text replayed from
+            //   workflow state. `MAFAgentAdapter` makes the identical RunAsync call against the same
+            //   deployment and reads this same property — that is the control that settles which of
+            //   the three possible causes it was.
+            //
+            //   Record BEFORE the return, and never conditionally: a null usage is an ABSENCE and
+            //   ChatSpend records it as one.
+            state.Spend.Record(response.Usage);
+
             return response.Text;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -178,12 +195,19 @@ public sealed class DiscoveryModelCall
         }
         catch (OperationCanceledException)
         {
+            // The call was made — ModelCalls counted it — and quite possibly billed. Nothing came
+            // back to read usage from, which is UNKNOWN, not free.
+            if (state.ModelCalls > callsBeforeThisAttempt) state.Spend.RecordNoResponse();
             _progress.Publish(DiscoveryEvent.Degraded(agentName,
                 $"no response within {_timeout.TotalSeconds:0} s — the call was abandoned so the loop keeps moving"));
             return null;
         }
         catch (Exception ex)
         {
+            // Only pair a meter record with a call the counter actually saw. A throw from
+            // CreateSessionAsync happens BEFORE ModelCalls++ and bills nothing, so recording it
+            // would invent a call.
+            if (state.ModelCalls > callsBeforeThisAttempt) state.Spend.RecordNoResponse();
             _progress.Publish(DiscoveryEvent.Degraded(agentName, $"{ex.GetType().Name}: {ex.Message}"));
             return null;
         }
