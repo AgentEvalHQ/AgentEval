@@ -42,7 +42,7 @@ been deleted. Anyone reading this ADR to find out what is still on the table rea
 | **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | ✅ **SHIPPED 2026-09-06 (`71bc44c3`)** — `StimulusHash.Of` / `.SameStimulus`, a non-positional `ScenarioResult.StimulusHash`, an optional `input` on `ToScenarioResult`, and three real producers. **18** tests (16 at `71bc44c3`, **+2 in the Wave 2 review**), **0 existing test files edited**, byte-identical output for every producer that does not set it — asserted against a file the **real `FileSystemOutputStore` wrote**, not against a copy of its settings. The three producers that DO set it gain two fields; that movement is declared below. ⚠️ One of its two named sites is **unmeetable** — see below |
 | **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically, whose blocking rationale was **measured and corrected on 2026-09-06**; ADR-030's Q4 now carries the correction |
 | **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; gated on **Q5**, an open user decision |
-| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | Not started. **Unblocked by one fifth** — see the note below |
+| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | ✅ **SHIPPED 2026-09-07.** `RunComparison` (the decision, in `AgentEval.Core`, a pure function of two runs' scenario results) + `CompareCommand` (the I/O and the rendering) + `ExitCodes.Incomparable = 13`. **40 tests**, **0 existing test files edited**. Both outcomes are reachable on runs this repository produced with **zero spend** — see the Wave 9 note below |
 
 ### Wave 2, 2026-09-06 — what moved, and what the ADR got wrong
 
@@ -126,6 +126,65 @@ migration itself — would push the Galaxus snapshots' `NOT COMPARABLE` / `VOID`
 `ScenarioResult`, which **cannot express any of them on disk until ADR-030 Slice 1.4 lands**. That is
 Phase 5.2's stated blocker one layer down, and doing it first would force an undecidable into a number —
 the exact defect ADR-030 exists to prevent.
+
+### Wave 9, 2026-09-07 — S5 BUILT, and the two runs it compares were produced rather than assumed
+
+**The blocker was cleared by `03242a1d` and nothing replaced it.** Wave 8's close-out could only claim
+**reachability** — seven `ToScenarioResult` call sites, three of them on the built-in stub — because
+an isolated-workspace probe failed at `init-workspace` and writing into this repository's own
+`.agenteval/` would have destroyed the snapshot invariants it was measuring. Both are true and
+neither is a blocker: `init-workspace` refuses (exit 1) with *"Could not find a solution root (.sln,
+.slnx, or .git)"*, and **one empty `.sln` file in a scratch directory is the whole fix**. This wave
+produced **five real runs in an isolated workspace** — three `bench gdpr smoke` (stub judge, opted in
+by `AGENTEVAL_ALLOW_STUB_JUDGE=1`) and two `bench mitre atlas-smoke` (built-in stub agent) — with
+every credential environment variable unset, and **summed `estimatedCost` over all 86 scenario files
+is 0.0**.
+
+**Both outcomes are reachable on those runs, which is the clause the first S5 was refuted on.**
+Measured with `$?` on every invocation:
+
+| pair | flags | verdict | exit |
+|---|---|---|---|
+| GdprA vs GdprB (same input, same response) | — | COMPARABLE | **0** |
+| GdprA vs GdprB | `--strict` | INCOMPARABLE (`judge.rubricDigest` pinned by neither) | **13** |
+| GdprA vs GdprC (different input) | — | INCOMPARABLE (stimulus differs) | **13** |
+| MitreA vs MitreB | — | COMPARABLE, 2 blind spots declared | **0** |
+| MitreA vs MitreB | `--strict` | INCOMPARABLE | **13** |
+| GdprA vs MitreA | — | INCOMPARABLE (no shared scenario id) | **13** |
+| a run vs itself | — | COMPARABLE | **0** |
+| a missing path / a directory with no scenario files | — | usage error, **not** a comparability verdict | **2** |
+
+**Three axis states, not two, and that is the whole design.** An axis both runs recorded and that
+differs is a **mismatch**. An axis exactly one run recorded is **also** a mismatch — an asymmetry is a
+difference, not a gap. An axis **neither** run recorded is `Unpinned`: it is counted, printed as a
+blind spot, and refused under `--strict`. Reading it as a match would be the silent-`{}` collapse
+ADR-030 §4.2 rejects and that `StimulusHash.SameStimulus` already refuses; reading it as a mismatch
+would restore the one-reachable-outcome defect. Both are wrong, and the third state is what is left.
+
+🔴 **The chance floor is deliberately NOT a comparability axis, and the ablation is the argument.**
+V1 lists it among the six facts, and it is carried — but a floor answers *"is this score above
+chance?"*, not *"did these two runs measure the same thing?"*. **No shipped eval records one**
+(§69: `ChanceFloor` appears in 4 files in `src/`, intersection with the 74 `IEval` implementations is
+zero), so gating on it makes the success path unreachable. Ablated: gating on the floor takes
+`compare` to **exit 13 on BOTH real pairs** — the same-stimulus pair and the different-stimulus pair —
+which is precisely the one-outcome command Wave 7 refuted. The floor is therefore reported against
+the DELTA (*"n of m matched scenarios recorded no usable chance floor; their deltas cannot be read
+against chance"*) and never against the verdict.
+
+⚠️ **`JudgeSubjectRelation` has NO POSITIVE SPECIMEN and is not gated.** Every one of the five runs
+records `unknown`, because no shipped producer declares `EvalInput.SubjectModel` — §69.11's finding,
+re-observed here on runs made for this purpose. `compare` surfaces `SameModel` as a loud finding and
+gates on nothing derived from it; the `SameModel` / `DifferentModel` branches are exercised only on
+hand-built facts in `RunComparisonTests`, and that limit is stated in the test itself rather than
+papered over.
+
+🔴 **EXIT 13 IS A CI-READER CONTRACT ADDITION AND WANTS DECLARING IN A RELEASE NOTE.** Before it,
+`ExitCodes` topped out at `GateIndeterminate = 11`. §8.4 reserved 13 for exactly this and reserved
+**12** for `InstrumentVoid`; **12 is deliberately not added**, because it belongs to S4, which is
+gated on the open user decision Q5, and a documented code nothing can return is worse than none.
+`MEASUREMENT_STATUS` §67.5 recommends shipping this alongside the sample's exit-3-vs-11 reconciliation
+(plan 8.10 / N-18) in **one** release note, since both spend the same reader's attention. **N-18 is
+still not taken — it is a framed decision, not this wave's.**
 
 ### ⚠️ S3 as originally written is refuted by the ADR it depends on
 

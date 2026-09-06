@@ -131,4 +131,30 @@ public static class ExitCodes
     /// gatekeeper bridge.
     /// </summary>
     public const int GateIndeterminate = 11;
+
+    // ── compare (ADR-031 S5 / §8.4) ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>agenteval compare</c>: the two runs could NOT be shown comparable, so no delta was
+    /// emitted. ADR-031 §8.4 reserved this code for exactly this meaning.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>This is a CI-READER CONTRACT ADDITION.</b> Before it, <see cref="ExitCodes"/> topped out
+    /// at <see cref="GateIndeterminate"/> (11), and a reader that branches on "anything above 11 is
+    /// impossible" now has a new case. It is deliberately NOT folded into
+    /// <see cref="GateIndeterminate"/>: 11 means the run produced nothing scoreable, whereas 13
+    /// means two runs each produced a perfectly good verdict and comparing them would have been
+    /// meaningless. Collapsing them re-creates BUG-22's defect — one code with several meanings —
+    /// and in the flattering direction, because a team seeing "indeterminate" investigates the run
+    /// rather than the comparison.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>12 (<c>InstrumentVoid</c>) is reserved by ADR-031 §8.4 and is deliberately NOT added
+    /// here.</b> It belongs to S4 (<c>controlLedger</c> + the <c>VOID</c> verdict), which is gated on
+    /// an open user decision (Q5). Claiming the number before the feature exists would leave a
+    /// documented code nothing can return.
+    /// </para>
+    /// </remarks>
+    public const int Incomparable = 13;
 }
