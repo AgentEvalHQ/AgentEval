@@ -492,7 +492,8 @@ public static class Eval02_LatentInterestCoverage
         EvalPrinter.PrintPairedCoverage(ownK, floors,
             dryRun
                 ? $"Eval 02 — OWN k (GATE 1 floors; NOT for pairing) — DRY RUN, 'Single Agent' IS A STUB (n = {ownK.Personas.Count})"
-                : $"Eval 02 — OWN k (GATE 1 floors; NOT for pairing) (n = {ownK.Personas.Count}, {reps} rep(s) on the live arm)");
+                : $"Eval 02 — OWN k (GATE 1 floors; NOT for pairing) (n = {ownK.Personas.Count}, {reps} rep(s) on the live arm)",
+            forcedChoiceFloor);
 
         EvalPrinter.PrintForcedChoice(atK, forcedChoiceFloor, scorablePersonas);
 

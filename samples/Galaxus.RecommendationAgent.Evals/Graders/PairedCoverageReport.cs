@@ -255,6 +255,70 @@ public sealed class PairedCoverageReport
         _personaOrder.Count(p => ScoreOf(p, arm) is { } s && !double.IsNaN(s.ForcedChoice));
 
     /// <summary>
+    /// The forced choice reduced to a <b>count of personas</b> — the only form an exact binomial
+    /// can take as input — together with how many of those personas were SPLIT across their own
+    /// repetitions.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>Why this exists, and what it replaces (found by the stage-2 smoke, 2026-09-06).</b> A
+    /// persona's forced-choice cell is <c>CoverageScore.Mean</c>'s average over that arm's
+    /// repetitions, so on a multi-rep arm it takes values in {0, ⅓, ⅔, 1} and is <b>not a Bernoulli
+    /// outcome</b>. The panel used to hand the exact test
+    /// <c>(int)Math.Floor(meanOfCellMeans × personaCount)</c>, which is a count of nothing: on the
+    /// stage-2 probe (n = 1 persona, 3 reps) the live arm printed <c>0.667 (0 of 1)</c> — a rate and
+    /// a count that contradict each other on the same line — and on the shipped 12-persona paid
+    /// cohort it printed <b>6 of 12</b> for a live arm whose cells say <b>7</b>.
+    /// </para>
+    /// <para>
+    /// <b>The reduction, stated so it can be argued with.</b> A persona counts as a win iff the arm
+    /// identified it on <b>more than half</b> of that persona's repetitions. A rep split down the
+    /// middle is a LOSS, which is the same tie rule the forced choice already applies within a
+    /// single answer ("a tie is a loss"). The unit of analysis stays the PERSONA:
+    /// <c>CoverageScore.Mean</c> refuses to treat reps as independent trials — that is
+    /// pseudo-replication and would inflate any significance claim by √reps — so this method must
+    /// never be "re-fixed" by counting persona × rep.
+    /// </para>
+    /// <para>
+    /// <b><paramref name="arm"/>'s split count is reported, never hidden.</b> Where cells are split,
+    /// the majority tally and the mean rate are two different reductions of the same data and can
+    /// disagree; the panel prints both and says how many cells were split, because silently showing
+    /// one as if it were the other is the defect this method exists to remove.
+    /// </para>
+    /// </remarks>
+    /// <param name="arm">Arm label.</param>
+    /// <returns>
+    /// <c>Wins</c> — personas identified on a majority of their reps; <c>Trials</c> — personas with a
+    /// defined outcome (identical to <see cref="ForcedChoiceCount"/>); <c>Split</c> — personas whose
+    /// cell is strictly between 0 and 1, i.e. whose reps disagreed.
+    /// </returns>
+    public (int Wins, int Trials, int Split) ForcedChoiceTally(string arm)
+    {
+        var values = _personaOrder
+            .Select(p => ScoreOf(p, arm))
+            .Where(s => s is not null && !double.IsNaN(s.Value.ForcedChoice))
+            .Select(s => s!.Value.ForcedChoice)
+            .ToList();
+
+        return (
+            Wins: values.Count(v => v > 0.5),
+            Trials: values.Count,
+            Split: values.Count(v => v > 0.0 && v < 1.0));
+    }
+
+    /// <summary>
+    /// The personas whose forced-choice cell disagreed across repetitions for an arm, with the
+    /// value, in persona order. Empty when every cell is a clean 0 or 1.
+    /// </summary>
+    /// <param name="arm">Arm label.</param>
+    public IReadOnlyList<(string PersonaId, double Value)> ForcedChoiceSplitCells(string arm) =>
+        [.. _personaOrder
+            .Select(p => (PersonaId: p, Score: ScoreOf(p, arm)))
+            .Where(x => x.Score is { } s && !double.IsNaN(s.ForcedChoice)
+                     && s.ForcedChoice > 0.0 && s.ForcedChoice < 1.0)
+            .Select(x => (x.PersonaId, Value: x.Score!.Value.ForcedChoice))];
+
+    /// <summary>
     /// True when EVERY scorable persona's latent coverage cleared that persona's OWN floor for
     /// this arm, and at least one persona was scorable.
     /// </summary>

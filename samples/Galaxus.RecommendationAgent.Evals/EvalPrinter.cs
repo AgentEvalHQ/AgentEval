@@ -268,9 +268,26 @@ public static class EvalPrinter
     /// sentence about a corpus that no longer existed, printed in yellow above the table that
     /// contradicted it.
     /// </para>
+    /// <para>
+    /// ⚠ <b><paramref name="forcedChoiceFloor"/> is PASSED IN, and that is the fix, not a
+    /// convenience (stage-2 smoke, 2026-09-06).</b> This method used to derive the floor itself as
+    /// 1 / (personas that RAN). The forced choice is decided against every persona's gold in the
+    /// corpus, not against the personas this invocation happened to score, so on the probe path
+    /// (<c>--only</c>, one persona — the form <c>RUN_PROTOCOL</c> stage 2 mandates) it printed
+    /// <i>"NO arm beats the forced-choice chance rate of <b>1.000</b>"</i> beside a panel whose own
+    /// header said the chance was 0.083. A chance floor of 1.000 is unbeatable, so the sentence
+    /// that hangs off it — <i>"Nothing here is evidence about personalisation"</i> — was
+    /// unfalsifiable by construction. The caller (<c>Eval02:291</c>, <c>Eval09</c>) already derives
+    /// the floor from the GOLD map; it is now the only place that derives it.
+    /// </para>
     /// </remarks>
     /// <param name="report">The paired report the caveat describes.</param>
-    public static IReadOnlyList<string> InstrumentCaveat(PairedCoverageReport report)
+    /// <param name="forcedChoiceFloor">
+    /// The exact 1/N forced-choice chance floor, where N is the number of personas whose gold the
+    /// answer is discriminated against — derived by the caller from the gold map, never from the
+    /// personas this run scored. <see cref="double.NaN"/> suppresses the sentence entirely.
+    /// </param>
+    public static IReadOnlyList<string> InstrumentCaveat(PairedCoverageReport report, double forcedChoiceFloor)
     {
         ArgumentNullException.ThrowIfNull(report);
 
@@ -305,22 +322,20 @@ public static class EvalPrinter
                 : $"{identical} arm(s) reproduce the ORACLE cell for cell — on those, latent coverage is a tag join and nothing else.");
         }
 
-        int scorable = report.Personas.Count(p =>
-            report.Arms.Any(a => report.ScoreOf(p, a) is { IsScorable: true }));
-        double chance = InterestCoverageGrader.ForcedChoiceFloor(scorable);
+        // ⚠ NOT `1 / report.Personas.Count`. See the remarks: the personas this run scored are not
+        //   the personas the choice is made among, and on the probe path they differ by 12×.
+        double chance = forcedChoiceFloor;
 
         if (!double.IsNaN(chance))
         {
-            // ⚠ 1.4 / N-4 — the SAME exact test the panel prints, through the same method. Two
-            //   copies of "above chance" is how `rate > floor` survived in four places.
+            // ⚠ 1.4 / N-4 — the SAME exact test the panel prints, through the same method, and on
+            //   the SAME tally. Two copies of "above chance" is how `rate > floor` survived in four
+            //   places; two copies of "how many wins" is how 0.667 came to be printed as "0 of 1".
             var above = report.Arms
                 .Where(a =>
                 {
-                    int n = report.ForcedChoiceCount(a);
-                    if (n <= 0) return false;
-                    double r = report.ForcedChoiceRate(a);
-                    if (double.IsNaN(r)) return false;
-                    return ExactBinomial.AboveChance((int)Math.Floor((r * n) + 1e-9), n, chance).Above;   // floor: see PrintForcedChoice
+                    var (wins, trials, _) = report.ForcedChoiceTally(a);
+                    return trials > 0 && ExactBinomial.AboveChance(wins, trials, chance).Above;
                 })
                 .ToList();
 
@@ -340,10 +355,15 @@ public static class EvalPrinter
     /// <param name="report">The paired report.</param>
     /// <param name="floorByPersona">Derived random-draw floor per persona.</param>
     /// <param name="label">Panel title.</param>
+    /// <param name="forcedChoiceFloor">
+    /// The exact 1/N forced-choice floor the caller derived from the GOLD map. Passed straight to
+    /// <see cref="InstrumentCaveat"/>; see its remarks for why this may not be recomputed here.
+    /// </param>
     public static void PrintPairedCoverage(
         PairedCoverageReport report,
         IReadOnlyDictionary<string, double> floorByPersona,
-        string label)
+        string label,
+        double forcedChoiceFloor)
     {
         ArgumentNullException.ThrowIfNull(report);
         ArgumentNullException.ThrowIfNull(floorByPersona);
@@ -363,7 +383,7 @@ public static class EvalPrinter
         // computed from that run, or it is a claim the artifact makes about itself.
         Console.ForegroundColor = ConsoleColor.Yellow;
         ContentRow("  READ THE INSTRUMENT ROW IN EVAL 03 BEFORE READING THESE NUMBERS.");
-        foreach (string line in InstrumentCaveat(report))
+        foreach (string line in InstrumentCaveat(report, forcedChoiceFloor))
             ContentRow("  " + line);
         Console.ResetColor();
         Divider();
@@ -816,16 +836,23 @@ public static class EvalPrinter
         //   code path rather than a paraphrase of it.
         int tested = 0;
 
+        int splitCells = 0;
+        var splitDetail = new List<string>();
+
         foreach (string arm in report.Arms)
         {
             double rate = report.ForcedChoiceRate(arm);
-            int n = report.ForcedChoiceCount(arm);
-            // ⚠ FLOOR, not round. A forced-choice outcome can be fractional — the shipped stub
-            //   panel shows an arm at 0.042 = 0.5/12 — and a binomial success count cannot be. The
-            //   conservative integerisation is downward: half a win must not become a whole one on
-            //   the way into a significance test. `Math.Round` was worse than wrong here, it was
-            //   arbitrary: banker's rounding sent 0.5 down and 1.5 up.
-            int wins = double.IsNaN(rate) ? 0 : (int)Math.Floor((rate * n) + 1e-9);
+            // ⚠ A COUNT OF PERSONAS, from the cells, by a stated reduction — never
+            //   `Math.Floor(rate * n)` and never `Math.Round(rate * n)`. Both integerise a mean of
+            //   per-persona means, which is a count of nothing: on the stage-2 probe FLOOR printed
+            //   `0.667 (0 of 1)` and on the shipped paid cohort it printed `6 of 12` for a live arm
+            //   whose twelve cells say 7. See PairedCoverageReport.ForcedChoiceTally for the rule
+            //   (majority of that persona's reps; a split rep is a loss) and for why the unit stays
+            //   the persona rather than the persona × rep.
+            var (wins, n, split) = report.ForcedChoiceTally(arm);
+            splitCells += split;
+            if (split > 0)
+                splitDetail.Add($"{ShortArm(arm)} {string.Join(" ", report.ForcedChoiceSplitCells(arm).Select(c => $"{c.PersonaId}={c.Value:F2}"))}");
             var (above, p) = ExactBinomial.AboveChance(wins, n, floor);
 
             // ⚠ An arm with no trials is UNDECIDABLE, and ▼ would say it LOST. Same convention as
@@ -838,7 +865,7 @@ public static class EvalPrinter
             Console.ForegroundColor = above ? ConsoleColor.Green
                                     : decidable ? ConsoleColor.Yellow : ConsoleColor.DarkGray;
             ContentRow($"  {(above ? "▲" : decidable ? "▼" : "?")} {Fit(arm, 26)} {Format(rate)}  "
-                     + $"({wins} of {n})  chance {Format(floor)}  {ExactBinomial.FormatP(p)}");
+                     + $"(won {wins} of {n})  chance {Format(floor)}  {ExactBinomial.FormatP(p)}");
             Console.ResetColor();
         }
 
@@ -846,6 +873,21 @@ public static class EvalPrinter
         Console.ForegroundColor = ConsoleColor.DarkGray;
         ContentRow("  ▲ means an EXACT one-sided binomial upper tail at or below 0.05, not rate > chance.");
         ContentRow("  ? means the comparison is undecidable — no trials — never that the arm lost.");
+
+        // ⚠ THE RATE AND THE COUNT ARE TWO DIFFERENT REDUCTIONS, and where any cell is split they
+        //   disagree. Saying so is the point: the panel used to print one as if it were the other.
+        ContentRow("  the rate is the MEAN of the per-persona cells; the count is personas won on a");
+        ContentRow("  MAJORITY of their own reps (a split rep is a loss). Reps are NOT independent");
+        ContentRow("  trials, so n is personas — never persona x rep (CoverageScore.Mean).");
+        if (splitCells > 0)
+        {
+            ContentRow($"  ⚠ {splitCells} cell(s) SPLIT across reps this run, so rate != won/n:");
+            foreach (string d in splitDetail) ContentRow("      " + Fit(d, InnerWidth - 8));
+        }
+        else
+        {
+            ContentRow("  no cell was split across reps this run, so rate = won/n exactly.");
+        }
 
         // ⚠ COMPUTED from the arms this run actually tested, never a constant. The first revision
         //   printed "with five arms … ≈ 0.23" beneath a six-arm panel, whose rate is 0.265. A

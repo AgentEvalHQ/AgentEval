@@ -34,8 +34,15 @@ namespace Galaxus.RecommendationAgent.Evals;
 /// revision of this file said it was.</b> Three decision sites route through
 /// <see cref="AboveChance"/>: <c>EvalPrinter.PrintForcedChoice</c>,
 /// <c>EvalPrinter.InstrumentCaveat</c>, and Eval 03's <c>LatentCoveragePersonaDiscrimination</c>.
-/// All three test a <b>forced choice</b>, which is a genuine Bernoulli trial against an exact 1/N
-/// null. <b>Four other ▲ producers are still <c>rate &gt; floor</c> and are deliberately NOT
+/// All three test a <b>forced choice</b> against an exact 1/N null. ⚠ <b>Corrected 2026-09-06 by the
+/// stage-2 smoke: the first revision of this sentence called that "a genuine Bernoulli trial", and
+/// on a multi-rep arm it is not one.</b> A persona's forced-choice cell is
+/// <c>CoverageScore.Mean</c>'s average over reps, so it takes values in {0, ⅓, ⅔, 1}; the panel used
+/// to integerise the mean of those means with <c>Math.Floor(rate × personas)</c> and hand the result
+/// here as a success count. It is a Bernoulli trial only after the reduction
+/// <c>PairedCoverageReport.ForcedChoiceTally</c> now applies and prints — majority of that persona's
+/// reps, a split rep a loss — and the panel says how many cells were split so the reduction is
+/// visible rather than assumed. <b>Four other ▲ producers are still <c>rate &gt; floor</c> and are deliberately NOT
 /// converted here</b> — <c>CoverageScore.AboveOwnFloor</c>, <c>CoverageScore.AbovePrecisionFloor</c>
 /// (which together drive the latent-coverage, recall@k, precision@k and k_live panels <i>and</i>
 /// Eval 02's GATE 1, through <c>PairedCoverageReport.EveryPersonaAboveOwnFloor</c>) and Eval 02b's

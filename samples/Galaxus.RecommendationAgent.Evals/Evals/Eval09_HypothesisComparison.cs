@@ -537,7 +537,8 @@ public static class Eval09_HypothesisComparison
 
         // ══ PANELS ════════════════════════════════════════════════════════════════════════
         EvalPrinter.PrintPairedCoverage(report, floors,
-            $"Eval 09 — LIVE agent vs LIVE workflow (paired, n = {report.Personas.Count}, {reps} rep(s) per live arm)");
+            $"Eval 09 — LIVE agent vs LIVE workflow (paired, n = {report.Personas.Count}, {reps} rep(s) per live arm)",
+            forcedChoiceFloor);
 
         EvalPrinter.PrintForcedChoice(report, forcedChoiceFloor, scorablePersonas);
 

@@ -111,6 +111,7 @@ public static class NegativeControls
         rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
         rows.Add(Guarded("EveryEvalDeclaresItsSnapshotPolicy", CheckEveryEvalDeclaresItsSnapshotPolicy));
         rows.Add(Guarded("AboveChanceIsAnExactTest", CheckAboveChanceIsAnExactTest));
+        rows.Add(Guarded("ForcedChoiceCountIsACountOfPersonas", CheckForcedChoiceCountIsACountOfPersonas));
         rows.Add(await GuardedAsync("MinCandidateScoreDecidesNothing", () => CheckMinCandidateScoreDecidesNothingAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
@@ -3172,6 +3173,145 @@ public static class NegativeControls
                 + "an arm at 3 of 12 (Demo 2's deterministic arm, 0.250), so a verdict DOES move: \u25b2 \u2192 \u25bc. "
                 + $"\u26a0 No multiplicity correction: 5 tests {ExactBinomial.FamilyWiseErrorRate(5):0.000}, "
                 + $"6 tests {ExactBinomial.FamilyWiseErrorRate(6):0.000} \u2014 the shipped panel tests SIX"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 25 — the forced-choice count was a count of nothing (stage-2 smoke, 2026-09-06). ══
+    //
+    /// <summary>
+    /// The integer the forced-choice panel hands the exact binomial must be a COUNT OF PERSONAS,
+    /// and the chance floor the instrument caveat quotes must be the floor the panel tests against.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two defects, both found by running the RUN_PROTOCOL's own stage-2 probe
+    /// (<c>-- 2 --only USR-NB-01</c>, live), and both invisible on the full cohort.</b>
+    /// </para>
+    /// <list type="number">
+    ///   <item><description><b>A rate and a count that contradict each other on one line.</b> The
+    ///   panel printed <c>▼ Single Agent (Robin) 0.667 (0 of 1) chance 0.083 p = 1.0000</c>. A
+    ///   persona's forced-choice cell is <c>CoverageScore.Mean</c>'s average over that arm's reps,
+    ///   so on a 3-rep arm it is 0, ⅓, ⅔ or 1 — not a Bernoulli outcome. The panel integerised the
+    ///   MEAN OF THOSE MEANS with <c>Math.Floor(rate × personas)</c>, which counts nothing: ⅔ of one
+    ///   persona became "0 of 1". On the shipped 12-persona paid cohort
+    ///   (<c>eval02_coverage_ab.json</c>, 2026-09-06 02:56:46) the same expression printed
+    ///   <b>6 of 12</b> for a live arm <b>7</b> of whose twelve cells are majority wins, and
+    ///   <b>7 of those 12 cells are split across reps</b> — so this was never probe-only.
+    ///   </description></item>
+    ///   <item><description><b>A chance floor of 1.000, with a conclusion hanging off it.</b>
+    ///   <c>EvalPrinter.InstrumentCaveat</c> derived the floor as 1 / (personas that RAN). The
+    ///   forced choice is decided against every persona's gold in the corpus, so on the probe the
+    ///   caveat printed <i>"NO arm beats the forced-choice chance rate of 1.000 … Nothing here is
+    ///   evidence about personalisation"</i> — an unbeatable bar and therefore an unfalsifiable
+    ///   sentence — twelve lines above a panel whose own header said the chance was 0.083. It is
+    ///   the floor-above-attainable shape, printed as a finding about the system.</description></item>
+    /// </list>
+    /// <para>
+    /// ⚠ <b>What this row must NOT be "fixed" into.</b> Counting persona × rep would make every
+    /// cell integral and delete the problem — and would be pseudo-replication.
+    /// <c>CoverageScore.Mean</c> refuses it in terms, and inflating n by the rep count inflates any
+    /// significance claim by √reps. The unit stays the persona; the reduction is stated
+    /// (<c>ForcedChoiceTally</c>: majority of that persona's reps, a split rep is a loss) and the
+    /// split cells are printed so the reader can see where the tally and the mean part company.
+    /// </para>
+    /// <para>
+    /// <b>It tests the shipped path.</b> The tally comes from <c>PairedCoverageReport</c> and the
+    /// sentence from <c>EvalPrinter.InstrumentCaveat</c> — the same two methods Eval 02 and Eval 09
+    /// print from. A row that re-implemented either would certify its own arithmetic.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckForcedChoiceCountIsACountOfPersonas()
+    {
+        var problems = new List<string>();
+        const double corpusFloor = 1.0 / 12.0;
+
+        static CoverageScore Cell(double forced) =>
+            new(0.5, double.NaN, 1, 2, 0, 0, 5, 0, 0,
+                LatentFloor: 0.15, ForcedChoice: forced, DeclaredK: 5, PresentedBeforeCut: 5);
+
+        // ── the stage-2 probe's exact shape: ONE persona, three reps, split 1/0/1 ──
+        var probe = new PairedCoverageReport();
+        probe.Record("P1", CoverageArms.Live, Cell(2.0 / 3.0));
+
+        var probeTally = probe.ForcedChoiceTally(CoverageArms.Live);
+        if (probeTally.Trials != 1)
+            problems.Add($"the probe reported {probeTally.Trials} trial(s) for one persona.");
+        if (probeTally.Wins != 1)
+            problems.Add($"a persona identified on 2 of its 3 reps counted {probeTally.Wins} win(s) — that is the '0.667 (0 of 1)' defect.");
+        if (probeTally.Split != 1)
+            problems.Add($"the split cell was not reported ({probeTally.Split}) — a reader cannot see that the rate and the count are two reductions.");
+        if (probe.ForcedChoiceSplitCells(CoverageArms.Live).Count != 1)
+            problems.Add("the split cell was not nameable, so the panel could not print WHICH persona split.");
+
+        // ── and the counterfactual, so the defect stays visible in the report ──
+        double probeRate = probe.ForcedChoiceRate(CoverageArms.Live);
+        int oldFloorWins = (int)Math.Floor((probeRate * probeTally.Trials) + 1e-9);
+        int oldRoundWins = (int)Math.Round(probeRate * probeTally.Trials);
+        if (oldFloorWins != 0)
+            problems.Add("the OLD floor expression no longer reproduces the defect it is here to record — the counterfactual is stale.");
+
+        // ── a tie across reps is a LOSS, the same rule the forced choice uses within one answer ──
+        var tie = new PairedCoverageReport();
+        tie.Record("P1", CoverageArms.Live, Cell(0.5));
+        if (tie.ForcedChoiceTally(CoverageArms.Live).Wins != 0)
+            problems.Add("a persona whose reps split evenly counted as a WIN — a tie is a loss everywhere else in this panel.");
+
+        // ── clean cells must still be exact: no reduction may perturb a 0/1 corpus ──
+        var clean = new PairedCoverageReport();
+        clean.Record("P1", CoverageArms.SingleShot, Cell(1.0));
+        clean.Record("P2", CoverageArms.SingleShot, Cell(0.0));
+        clean.Record("P3", CoverageArms.SingleShot, Cell(1.0));
+        var cleanTally = clean.ForcedChoiceTally(CoverageArms.SingleShot);
+        if (cleanTally is not (2, 3, 0))
+            problems.Add($"a deterministic arm's clean 1/0/1 tallied {cleanTally.Wins} of {cleanTally.Trials} with {cleanTally.Split} split — expected 2 of 3 with none split.");
+        if (Math.Abs(clean.ForcedChoiceRate(CoverageArms.SingleShot) - (2.0 / 3.0)) > 1e-9)
+            problems.Add("the rate moved on a corpus with no split cells — the tally must not feed back into the mean.");
+
+        // ── an arm nobody scored is UNDECIDABLE, never zero wins out of zero ──
+        var empty = new PairedCoverageReport();
+        empty.Record("P1", CoverageArms.Popularity, Cell(double.NaN));
+        var emptyTally = empty.ForcedChoiceTally(CoverageArms.Popularity);
+        if (emptyTally.Trials != 0 || emptyTally.Wins != 0)
+            problems.Add($"an arm with no defined outcome tallied {emptyTally.Wins} of {emptyTally.Trials} rather than 0 of 0.");
+        if (!double.IsNaN(ExactBinomial.UpperTailP(emptyTally.Wins, emptyTally.Trials, corpusFloor)))
+            problems.Add("0 of 0 produced a p-value — an empty denominator is not a result.");
+
+        // ── THE CAVEAT'S FLOOR IS THE PANEL'S FLOOR, and it is not recomputed from who ran ──
+        //
+        // The probe report holds ONE persona. Derived locally that is 1/1 = 1.000, which nothing
+        // can beat. The caller derives 1/12 from the GOLD map, and that is the number the sentence
+        // must carry.
+        var caveat = EvalPrinter.InstrumentCaveat(probe, corpusFloor);
+        string caveatText = string.Join(" ", caveat);
+        if (caveatText.Contains("chance rate of 1.000", StringComparison.Ordinal))
+            problems.Add("the caveat quoted a chance rate of 1.000 — an unbeatable floor makes its conclusion unfalsifiable.");
+        if (!caveatText.Contains("chance rate of 0.083", StringComparison.Ordinal))
+            problems.Add($"the caveat did not quote the floor it was given (1/12 = 0.083): \"{Shorten(caveatText, 90)}\".");
+
+        // ── and it must SUPPRESS the sentence rather than invent a floor when given none ──
+        var noFloor = EvalPrinter.InstrumentCaveat(probe, double.NaN);
+        if (string.Join(" ", noFloor).Contains("chance rate of", StringComparison.Ordinal))
+            problems.Add("a NaN floor still produced a chance-rate sentence — the caveat invented a bar.");
+
+        return new ControlRowSnapshot(
+            "ForcedChoiceCountIsACountOfPersonas",
+            "the integer the forced-choice panel hands the exact binomial must be a COUNT OF PERSONAS produced "
+          + "by a stated reduction (majority of that persona's reps; a split rep is a loss), never "
+          + "Math.Floor(mean × personas) — a mean of per-persona means is not a success count. And the "
+          + "instrument caveat must quote the floor the PANEL tests against, derived by the caller from the GOLD "
+          + "map, never 1 / (personas that happened to run): a floor of 1.000 is unbeatable, so the sentence that "
+          + "hangs off it cannot be false. Both defects are invisible at n = 12 and both fire on the "
+          + "RUN_PROTOCOL's own stage-2 probe",
+            problems.Count == 0
+                ? $"probe (1 persona, reps 1/0/1): rate {Format(probeRate)} → won {probeTally.Wins} of {probeTally.Trials}, "
+                + $"{probeTally.Split} split · the OLD expressions gave floor → {oldFloorWins} (the shipped "
+                + $"'0.667 (0 of 1)') and round → {oldRoundWins} · an even rep split is a LOSS · a clean "
+                + "1/0/1 still tallies 2 of 3 with 0 split · 0 of 0 → NaN, not a verdict · caveat quotes "
+                + "0.083 (given), never 1.000 (derived from who ran), and prints NO chance sentence at all when "
+                + "given NaN · ⚠ MEASURED on the shipped paid cohort: 7 of the live arm's 12 cells are SPLIT "
+                + "across reps, so the panel printed 6 of 12 where the cells say 7 — p = 0.000199 → 0.000015, "
+                + "▲ either way"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
