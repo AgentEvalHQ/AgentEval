@@ -427,12 +427,48 @@ public sealed record CoverageCellSnapshot(
 /// <param name="PromptTokens">Prompt tokens.</param>
 /// <param name="CompletionTokens">Completion tokens.</param>
 /// <param name="EstimatedCost">Estimated cost.</param>
+/// <param name="ModelFreeRuns">
+/// Turns recorded with NO metrics object — a deterministic arm's turns. Plan item 8.3: without this
+/// the stored record cannot tell an arm that genuinely spent nothing from an arm whose usage never
+/// arrived, and <c>MEASUREMENT_STATUS</c> §55 forbids rendering those two alike.
+/// </param>
+/// <param name="ModelRuns">Turns that DID reach a model.</param>
+/// <param name="RunsWithoutUsage">Model turns whose metrics carried neither token count.</param>
+/// <param name="RunsWithPartialUsage">Model turns whose metrics carried exactly one (§60.2).</param>
+/// <param name="RunsWithoutCost">Model turns whose metrics carried no estimated cost.</param>
+/// <param name="RunsWithoutModelId">Model turns whose metrics named no model.</param>
+/// <param name="ModelIds">Every distinct model id the arm's turns named. Empty for a no-model arm.</param>
+/// <remarks>
+/// The six trailing members are OPTIONAL with a zero/empty default so a snapshot written before
+/// 8.3 still deserialises. ⚠ A pre-8.3 document therefore reads back as <c>ModelRuns = 0</c>,
+/// i.e. NoModel, for every arm — which is why <see cref="ArmCostSnapshot.StateIsRecorded"/> exists
+/// and why the printer reads the LIVE report rather than a rehydrated snapshot.
+/// </remarks>
 public sealed record ArmCostSnapshot(
     int Runs,
     long DurationMs,
     int PromptTokens,
     int CompletionTokens,
-    decimal EstimatedCost);
+    decimal EstimatedCost,
+    int ModelFreeRuns = 0,
+    int ModelRuns = 0,
+    int RunsWithoutUsage = 0,
+    int RunsWithPartialUsage = 0,
+    int RunsWithoutCost = 0,
+    int RunsWithoutModelId = 0,
+    IReadOnlyList<string>? ModelIds = null)
+{
+    /// <summary>
+    /// False for a document written before plan item 8.3, where the run-state members are absent and
+    /// their defaults are indistinguishable from a genuine deterministic arm.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ A reader must consult this BEFORE reading the state, for exactly the reason 8.3 exists: a
+    /// zero that means "not recorded" and a zero that means "measured as none" are different facts,
+    /// and a record that cannot tell them apart must say so rather than pick one.
+    /// </remarks>
+    public bool StateIsRecorded => ModelFreeRuns + ModelRuns == Runs && Runs > 0;
+}
 
 /// <summary>Serialisable snapshot of the negative-control run — the wiring self-check.</summary>
 public sealed record ControlSnapshot

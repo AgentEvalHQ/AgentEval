@@ -347,7 +347,8 @@ public static class Eval02_LatentInterestCoverage
                     string repLabel = arm.IsRepeated ? $"rep {rep}/{armReps}" : "deterministic";
 
                     var scored = await ScoreArmAsync(
-                        persona, goldByPersona, agent, harness, options, ownK, arm.Label, repLabel, declaredK, ct)
+                        persona, goldByPersona, agent, harness, options, ownK, arm.Label, repLabel, declaredK,
+                        arm.ReachesAModel, ct)
                         .ConfigureAwait(false);
 
                     // A loop arm says how many rounds it took. Design §D.3's guard (b): a degenerate
@@ -981,6 +982,7 @@ public static class Eval02_LatentInterestCoverage
         string armLabel,
         string repLabel,
         int declaredK,
+        bool reachesAModel,
         CancellationToken ct)
     {
         var testCase = new TestCase
@@ -996,7 +998,13 @@ public static class Eval02_LatentInterestCoverage
             result = await harness.RunEvaluationAsync(agent, testCase, options, ct).ConfigureAwait(false);
         }
 
-        costReport.RecordCost(armLabel, result.Performance);
+        // ⚠ NULL FOR A DETERMINISTIC ARM, AND THAT IS THE WHOLE OF PLAN ITEM 8.3. The harness hands
+        // every arm a PerformanceMetrics object whether or not a model was involved, so passing
+        // `result.Performance` unconditionally made an arm that genuinely spends nothing
+        // indistinguishable from an arm whose usage never arrived — both 0 tokens and $0.0000, the
+        // pair MEASUREMENT_STATUS §55 forbids rendering alike. Which arms reach a model is DECLARED
+        // on the registry (CoverageArm.ReachesAModel), never inferred from the totals.
+        costReport.RecordCost(armLabel, result.Performance, reachesAModel);
 
         // The error check comes FIRST. Nothing below it may produce a number.
         if (result.HasError)

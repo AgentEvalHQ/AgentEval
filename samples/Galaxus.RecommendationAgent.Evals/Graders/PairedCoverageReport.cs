@@ -157,18 +157,61 @@ public sealed class PairedCoverageReport
     /// <summary>Accumulates one run's cost into an arm's total.</summary>
     /// <param name="arm">Arm label.</param>
     /// <param name="metrics">Harness performance metrics, or null for a no-LLM arm.</param>
-    public void RecordCost(string arm, PerformanceMetrics? metrics)
+    /// <param name="reachesAModel">
+    /// Whether this arm issues chat-model calls at all. ⚠ <b>DECLARED by the caller (plan item
+    /// 8.3), never inferred here.</b> The harness hands every arm a <c>PerformanceMetrics</c>
+    /// object whether or not a model was involved, so <c>metrics is not null</c> does not answer
+    /// this question — and a zero total answers it even less, because a genuine zero and an
+    /// absent usage block are the same zero. <c>CoverageArm.ReachesAModel</c> is where it is known.
+    /// Timing is still taken from <paramref name="metrics"/> for a model-free arm: how long the
+    /// deterministic arms take is real information, and it is what the panel's footer talks about.
+    /// </param>
+    public void RecordCost(string arm, PerformanceMetrics? metrics, bool reachesAModel = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(arm);
         if (!_costs.TryGetValue(arm, out var cost)) cost = new ArmCost();
 
         cost.Runs++;
-        if (metrics is not null)
+        if (metrics is not null) cost.DurationMs += metrics.TotalDuration.TotalMilliseconds;
+
+        if (!reachesAModel)
         {
-            cost.DurationMs += metrics.TotalDuration.TotalMilliseconds;
+            // ⚠ THIS IS THE ONLY PLACE THE TWO ZEROES ARE STILL DISTINGUISHABLE — plan item 8.3.
+            // Once a model-free turn is folded into the running totals, an arm that genuinely spent
+            // nothing and an arm whose usage never arrived are both `0 tokens, $0.0000`, and §55
+            // forbids rendering those alike. Count the turns here so the printer can tell them
+            // apart later.
+            cost.ModelFreeRuns++;
+        }
+        else if (metrics is null)
+        {
+            // The arm DOES reach a model and the harness handed back no metrics at all. That is an
+            // absence, not a zero, and it must read as one: count the turn as a model turn whose
+            // usage never arrived, which puts the row on LOWER BOUND.
+            cost.ModelRuns++;
+            cost.RunsWithoutUsage++;
+            cost.RunsWithoutCost++;
+            cost.RunsWithoutModelId++;
+        }
+        else
+        {
+            cost.ModelRuns++;
             cost.PromptTokens += metrics.PromptTokens ?? 0;
             cost.CompletionTokens += metrics.CompletionTokens ?? 0;
             cost.EstimatedCost += metrics.EstimatedCost ?? 0m;
+
+            // §60.2's lesson applied at the point of accumulation: "an absence is not a zero"
+            // is about the HALVES of a usage block as well as the block. A response that reported
+            // a prompt count and no completion count is a LOWER BOUND, not a total.
+            bool hasPrompt = metrics.PromptTokens is not null;
+            bool hasCompletion = metrics.CompletionTokens is not null;
+            if (!hasPrompt && !hasCompletion) cost.RunsWithoutUsage++;
+            else if (!hasPrompt || !hasCompletion) cost.RunsWithPartialUsage++;
+
+            if (metrics.EstimatedCost is null) cost.RunsWithoutCost++;
+
+            if (!string.IsNullOrWhiteSpace(metrics.ModelUsed)) cost.NoteModel(metrics.ModelUsed);
+            else cost.RunsWithoutModelId++;
         }
 
         _costs[arm] = cost;
@@ -613,7 +656,11 @@ public sealed class PairedCoverageReport
                 a => a,
                 a => new ArmCostSnapshot(CostOf(a).Runs, (long)CostOf(a).DurationMs,
                                          CostOf(a).PromptTokens, CostOf(a).CompletionTokens,
-                                         CostOf(a).EstimatedCost),
+                                         CostOf(a).EstimatedCost,
+                                         CostOf(a).ModelFreeRuns, CostOf(a).ModelRuns,
+                                         CostOf(a).RunsWithoutUsage, CostOf(a).RunsWithPartialUsage,
+                                         CostOf(a).RunsWithoutCost, CostOf(a).RunsWithoutModelId,
+                                         CostOf(a).ModelIds),
                 StringComparer.Ordinal),
         };
 
@@ -640,9 +687,49 @@ public sealed class PairedCoverageReport
                     : null);
     }
 
+    /// <summary>How a cost row may be READ. Four states, and three of them are not a number.</summary>
+    /// <remarks>
+    /// <para>
+    /// Plan item 8.3 filed this as <i>"rendering only — print — when ModelId is null"</i> and that
+    /// is <b>unimplementable as written</b>: nothing on the snapshot carried a model id, so the
+    /// printer could not tell a deterministic arm's true zero from a model arm whose usage never
+    /// arrived. Both are <c>0 tokens · $0.0000</c>, and <c>MEASUREMENT_STATUS</c> §55 is the rule
+    /// that says those two must never render alike. The fix is a state, derived from what the
+    /// recorder actually saw, not a null check on a field that did not exist.
+    /// </para>
+    /// <para>
+    /// This is the third sighting of the <i>absence-is-not-a-zero</i> shape in this repository —
+    /// after the chat lane that spent and reported nothing (§55.1) and the meter that folded half a
+    /// usage block in as a zero (§60.2, §61.7). Both of those were found by asking what an ABSENT
+    /// input renders as; so was this one.
+    /// </para>
+    /// </remarks>
+    public enum ArmCostState
+    {
+        /// <summary>The arm was never run. No claim about its cost is available at all.</summary>
+        NotRun,
+
+        /// <summary>
+        /// Every run was recorded with NO metrics object — the caller's way of saying "this arm has
+        /// no model". A genuine zero, and the only state in which zero may be printed as a number.
+        /// </summary>
+        NoModel,
+
+        /// <summary>Every model run reported a complete usage block. The totals are totals.</summary>
+        Measured,
+
+        /// <summary>
+        /// At least one model run reported no usage block, or only half of one. The totals are a
+        /// LOWER BOUND and must never be rendered as though they were complete.
+        /// </summary>
+        LowerBound,
+    }
+
     /// <summary>Running cost totals for one arm.</summary>
     public sealed class ArmCost
     {
+        private readonly SortedSet<string> _modelIds = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>How many agent turns this arm ran.</summary>
         public int Runs { get; set; }
 
@@ -657,5 +744,44 @@ public sealed class PairedCoverageReport
 
         /// <summary>Total estimated cost.</summary>
         public decimal EstimatedCost { get; set; }
+
+        /// <summary>Turns this arm ran WITHOUT reaching a model — a deterministic arm's turns.</summary>
+        public int ModelFreeRuns { get; set; }
+
+        /// <summary>Turns this arm ran that DID reach a model, whatever the response reported.</summary>
+        public int ModelRuns { get; set; }
+
+        /// <summary>Model runs whose metrics carried NEITHER token count.</summary>
+        public int RunsWithoutUsage { get; set; }
+
+        /// <summary>Model runs whose metrics carried exactly ONE of the two token counts (§60.2).</summary>
+        public int RunsWithPartialUsage { get; set; }
+
+        /// <summary>Model runs whose metrics carried no <c>EstimatedCost</c>.</summary>
+        public int RunsWithoutCost { get; set; }
+
+        /// <summary>Model runs whose metrics named no model.</summary>
+        public int RunsWithoutModelId { get; set; }
+
+        /// <summary>Every distinct model id this arm's runs named, in order.</summary>
+        public IReadOnlyList<string> ModelIds => [.. _modelIds];
+
+        /// <summary>Records one run's model id.</summary>
+        /// <param name="modelId">The provider's name for the model. Ignored when blank.</param>
+        public void NoteModel(string? modelId)
+        {
+            if (!string.IsNullOrWhiteSpace(modelId)) _modelIds.Add(modelId.Trim());
+        }
+
+        /// <summary>
+        /// How this row may be read. <b>Derived from what was RECORDED, never from the totals</b> —
+        /// reading applicability out of the result is the defect §61.8 names, and a zero total is
+        /// exactly the input that cannot answer this question.
+        /// </summary>
+        public ArmCostState State =>
+            Runs == 0                                              ? ArmCostState.NotRun
+            : ModelRuns == 0                                       ? ArmCostState.NoModel
+            : RunsWithoutUsage > 0 || RunsWithPartialUsage > 0     ? ArmCostState.LowerBound
+                                                                   : ArmCostState.Measured;
     }
 }

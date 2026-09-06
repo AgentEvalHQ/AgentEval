@@ -1232,22 +1232,105 @@ public static class EvalPrinter
         ContentRow($"  {"arm",-30} {"runs",5} {"seconds",9} {"tokens",9} {"est. cost",12}");
         Divider();
 
+        var footnotes = new List<string>();
         foreach (string arm in report.Arms)
         {
-            var cost = report.CostOf(arm);
-            ContentRow($"  {Fit(arm, 30)} {cost.Runs,5} {cost.DurationMs / 1000.0,9:F1} "
-                     + $"{cost.PromptTokens + cost.CompletionTokens,9} "
-                     + $"{cost.EstimatedCost.ToString("C4", CultureInfo.InvariantCulture),12}");
+            var (row, footnote) = CostRow(arm, report.CostOf(arm));
+            ContentRow(row);
+            if (footnote is not null) footnotes.Add(footnote);
         }
         Console.ResetColor();
 
         Divider();
         Console.ForegroundColor = ConsoleColor.DarkGray;
+        foreach (var note in footnotes)
+            foreach (var line in Indented(note, 2))
+                ContentRow(line);
+        if (footnotes.Count > 0) ContentRow("");
         ContentRow("  Deterministic arms cost nothing and take milliseconds. That is not an advantage —");
         ContentRow("  it is the reason a baseline that scores well is a problem for the headline, not a win.");
         Console.ResetColor();
         BottomBorder();
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Renders ONE cost row and, when the row is not a plain measurement, the sentence that says why.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.3, and it was WRONG AS SPECIFIED.</b> It asked for <c>"—"</c> when
+    /// <c>ModelId is null</c>; there was no model id on the record, so the printer could not tell a
+    /// deterministic arm that genuinely spent nothing from a model arm whose usage never arrived.
+    /// Rendering <c>—</c> on a zero total would relabel a true zero as unknown; rendering
+    /// <c>$0.0000</c> labels an unknown as zero. <b>Neither is a rendering choice — the information
+    /// was missing.</b> It is now recorded at
+    /// <see cref="Graders.PairedCoverageReport.RecordCost"/> and read here as a STATE.
+    /// </para>
+    /// <para>
+    /// Pure on purpose, like <see cref="CoverageGateLines"/>: Eval 03's
+    /// <c>CostRowsSayWhichZeroTheyMean</c> asserts on the returned strings, so the branch that must
+    /// never render an absence as a zero is checked without a console scrollback.
+    /// </para>
+    /// </remarks>
+    /// <param name="arm">The arm label.</param>
+    /// <param name="cost">Its accumulated cost, with the run states the recorder saw.</param>
+    /// <returns>The table row, and a footnote when one is owed.</returns>
+    public static (string Row, string? Footnote) CostRow(string arm, Graders.PairedCoverageReport.ArmCost cost)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(arm);
+        ArgumentNullException.ThrowIfNull(cost);
+
+        long tokens = (long)cost.PromptTokens + cost.CompletionTokens;
+        string seconds = cost.DurationMs / 1000.0 <= 0 ? "—" : (cost.DurationMs / 1000.0).ToString("F1", CultureInfo.InvariantCulture);
+        string money = cost.EstimatedCost.ToString("C4", CultureInfo.InvariantCulture);
+
+        (string tokenCell, string costCell, string? footnote) = cost.State switch
+        {
+            Graders.PairedCoverageReport.ArmCostState.NotRun =>
+                ("—", "—",
+                 $"{arm}: NOT RUN. No turn was recorded, so nothing is claimed about its cost — "
+               + "not zero, and not unknown either."),
+
+            // The ONLY state in which a zero may be printed as a number, and it is printed as a
+            // number precisely because it is a measurement: every turn was recorded with no metrics
+            // object, which is the caller saying this arm reaches no model.
+            Graders.PairedCoverageReport.ArmCostState.NoModel =>
+                ("0", money,
+                 $"{arm}: NO MODEL — all {cost.Runs} turn(s) ran without reaching one, as the arm "
+               + "registry declares. This zero is measured, not missing."),
+
+            Graders.PairedCoverageReport.ArmCostState.LowerBound =>
+                ($"≥{tokens}", $"≥{money}",
+                 $"{arm}: LOWER BOUND. {Describe(cost)} A turn that reported no usage is not a turn "
+               + "that cost nothing, so these totals are a floor and the true figure is higher."),
+
+            _ => (tokens.ToString(CultureInfo.InvariantCulture), money,
+                  cost.RunsWithoutCost > 0
+                    ? $"{arm}: token counts are complete; {cost.RunsWithoutCost} of {cost.ModelRuns} "
+                    + "model turn(s) carried no cost estimate, so the money column is a LOWER BOUND."
+                    : null),
+        };
+
+        string models = cost.ModelIds.Count switch
+        {
+            0 when cost.State == Graders.PairedCoverageReport.ArmCostState.NoModel => "",
+            0 => "  (model NOT NAMED)",
+            1 => $"  ({cost.ModelIds[0]})",
+            _ => $"  ({string.Join(", ", cost.ModelIds)})",
+        };
+
+        string row = $"  {Fit(arm, 30)} {cost.Runs,5} {seconds,9} {tokenCell,9} {costCell,12}{models}";
+        return (row, footnote);
+
+        static string Describe(Graders.PairedCoverageReport.ArmCost c)
+        {
+            var parts = new List<string>();
+            if (c.RunsWithoutUsage > 0) parts.Add($"{c.RunsWithoutUsage} of {c.ModelRuns} model turn(s) reported NO usage block");
+            if (c.RunsWithPartialUsage > 0) parts.Add($"{c.RunsWithPartialUsage} reported HALF of one");
+            if (c.RunsWithoutCost > 0) parts.Add($"{c.RunsWithoutCost} carried no cost estimate");
+            return string.Join("; ", parts) + ".";
+        }
     }
 
     /// <summary>What GATE 2 actually observed. Four states, and three of them fail.</summary>

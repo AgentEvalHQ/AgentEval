@@ -80,6 +80,18 @@ public sealed record CoverageArmContext(
 /// load-bearing. Eval 02's second gate reads this rather than a positional index.
 /// </param>
 /// <param name="Note">One sentence explaining what this arm is for, printed in the legend.</param>
+/// <param name="ReachesAModel">
+/// True when this arm issues chat-model calls at all — under a dry run that is the stub, which is
+/// still a model call as far as the meter is concerned.
+/// <para>
+/// ⚠ <b>DECLARED, not inferred (plan item 8.3).</b> The cost panel has to tell an arm that genuinely
+/// spent nothing from an arm whose usage never arrived, and both look like <c>0 tokens · $0.0000</c>.
+/// The only place that distinction is KNOWN is here, where the arm is registered; deriving it from a
+/// zero total downstream is reading applicability out of the result, which is the shape §61.8 names.
+/// Every arm but the live one runs deterministically — the notes above each entry say so — so the
+/// default is <see langword="false"/> and the one exception is spelled out.
+/// </para>
+/// </param>
 public sealed record CoverageArm(
     string Label,
     CoverageArmKind Kind,
@@ -87,7 +99,8 @@ public sealed record CoverageArm(
     string AbsenceReason = "",
     bool EntersSignTest = false,
     bool IsPrimaryControl = false,
-    string Note = "")
+    string Note = "",
+    bool ReachesAModel = false)
 {
     /// <summary>True when this arm can actually be run in this repository.</summary>
     public bool IsRunnable => Factory is not null;
@@ -168,7 +181,8 @@ public static class CoverageArms
         new CoverageArm(
             Live, CoverageArmKind.Live,
             Factory: context => context.LiveAgentFactory(),
-            Note: "The shipped single agent with its five tools. Repeated, because it is stochastic."),
+            Note: "The shipped single agent with its five tools. Repeated, because it is stochastic.",
+            ReachesAModel: true),
 
         new CoverageArm(
             SingleShot, CoverageArmKind.Control,

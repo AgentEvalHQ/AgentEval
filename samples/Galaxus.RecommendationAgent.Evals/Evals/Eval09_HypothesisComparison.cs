@@ -942,7 +942,14 @@ public static class Eval09_HypothesisComparison
             result = await harness.RunEvaluationAsync(agent, testCase, options, ct).ConfigureAwait(false);
         }
 
-        report.RecordCost(armLabel, result.Performance);
+        // ⚠ EVERY ARM IS RECORDED AS MODEL-BACKED HERE, AND THAT IS DELIBERATE (plan item 8.3).
+        // Two of Eval 09's four arms — the rubber stamp and the contentless floor — run no agent
+        // model, so it is tempting to declare them model-free the way Eval 02's registry does. It
+        // would be WRONG here: this eval's harness call carries `EvaluationCriteria`, so a JUDGE
+        // runs inside `RunEvaluationAsync` and its spend is real. Marking those arms model-free
+        // would under-report money that was actually paid, which is the flattering direction.
+        // The conservative default stands until the judge's spend is attributed separately.
+        report.RecordCost(armLabel, result.Performance, reachesAModel: true);
 
         if (result.HasError)
         {

@@ -128,6 +128,7 @@ public static class NegativeControls
         rows.Add(Guarded("CommittedVectorsAreTheRightNumbers", CheckCommittedVectorsAreTheRightNumbers));
         rows.Add(Guarded("APersonaInOneArmOnlyIsDeclared", CheckAPersonaInOneArmOnlyIsDeclared));
         rows.Add(Guarded("AssertionFaultsAreNamedAndNotGated", CheckAssertionFaultsAreNamedAndNotGated));
+        rows.Add(Guarded("CostRowsSayWhichZeroTheyMean", CheckCostRowsSayWhichZeroTheyMean));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -6612,6 +6613,162 @@ public static class NegativeControls
                 + "combinations read differently and print different prose · the superseded language criterion is "
                 + "absent from the shipped rubric and lacks the existential its replacement carries "
                 + "⚠ TEXT ONLY — that a judge HONOURS the existential needs a judged run (8.16 #5)"
+                : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
+            problems.Count == 0);
+    }
+
+    // ══ Control 44 — a zero in the cost table must say WHICH zero it is (plan item 8.3). ═══
+    //
+    /// <summary>
+    /// The cost printer must render an arm that reaches no model and an arm whose usage never
+    /// arrived DIFFERENTLY, and the state it renders from must be recorded by the recorder rather
+    /// than inferred from the totals.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Plan item 8.3 was WRONG AS SPECIFIED, and this row is what it should have said.</b> It
+    /// asked for <c>"—"</c> when <c>ModelId is null</c>. <c>ArmCostSnapshot</c> carried no model id
+    /// and <c>ArmCost</c> carried nothing but running totals, so the printer had no input that could
+    /// distinguish the two zeroes: rendering <c>—</c> on a zero total relabels a true zero as
+    /// unknown, rendering <c>$0.0000</c> labels an unknown as zero, and
+    /// <c>MEASUREMENT_STATUS</c> §55 forbids exactly that pair being rendered alike.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>The state is derived from the INPUT, never from the RESULT.</b> §61.8's defect — five
+    /// dry-run checks that read applicability out of what came back — is the shape available here,
+    /// because a zero total is precisely the value that cannot answer "was there a model?".
+    /// <c>ArmCost.State</c> reads the run counters the recorder incremented.
+    /// </para>
+    /// </remarks>
+    private static ControlRowSnapshot CheckCostRowsSayWhichZeroTheyMean()
+    {
+        var problems = new List<string>();
+
+        static PerformanceMetrics Metrics(int? prompt, int? completion, decimal? cost, string? model) =>
+            new()
+            {
+                StartTime = DateTimeOffset.UnixEpoch,
+                EndTime = DateTimeOffset.UnixEpoch.AddSeconds(2),
+                PromptTokens = prompt,
+                CompletionTokens = completion,
+                EstimatedCost = cost,
+                ModelUsed = model,
+            };
+
+        var report = new PairedCoverageReport();
+        // Two ways to be model-free, and BOTH must land on the same state: no metrics object at
+        // all, and a metrics object from an arm the registry declares reaches no model. The second
+        // is the one that ships — the harness hands every arm a PerformanceMetrics.
+        report.RecordCost("deterministic", null, reachesAModel: false);
+        report.RecordCost("deterministic", Metrics(0, 0, null, null), reachesAModel: false);
+        report.RecordCost("silent-model", Metrics(null, null, null, "gpt-5.5"));
+        report.RecordCost("no-metrics-at-all", null, reachesAModel: true);
+        report.RecordCost("half-block", Metrics(1_234, null, null, "gpt-5.5"));
+        report.RecordCost("measured", Metrics(100, 20, 0.0031m, "gpt-5.5"));
+        report.RecordCost("measured", Metrics(100, 20, 0.0031m, "gpt-5.5"));
+
+        var deterministic = report.CostOf("deterministic");
+        var silent = report.CostOf("silent-model");
+        var noMetrics = report.CostOf("no-metrics-at-all");
+        var half = report.CostOf("half-block");
+        var measured = report.CostOf("measured");
+        var notRun = report.CostOf("never-recorded");
+
+        // ── 1. The five states are the five the recorder can actually produce. ──
+        (string Label, PairedCoverageReport.ArmCost Cost, PairedCoverageReport.ArmCostState Want)[] states =
+        [
+            ("deterministic", deterministic, PairedCoverageReport.ArmCostState.NoModel),
+            ("silent-model", silent, PairedCoverageReport.ArmCostState.LowerBound),
+            // The harness handed back NOTHING for an arm that does reach a model. That is the
+            // absence, and it must not collapse into the deterministic arm's measured zero.
+            ("no-metrics-at-all", noMetrics, PairedCoverageReport.ArmCostState.LowerBound),
+            ("half-block", half, PairedCoverageReport.ArmCostState.LowerBound),
+            ("measured", measured, PairedCoverageReport.ArmCostState.Measured),
+            ("never-recorded", notRun, PairedCoverageReport.ArmCostState.NotRun),
+        ];
+        foreach (var (label, cost, want) in states)
+        {
+            if (cost.State != want)
+                problems.Add($"'{label}' reads {cost.State}, not {want} — the recorded run states no longer decide it.");
+        }
+
+        // ── 2. THE PAIR THIS ROW EXISTS FOR: the deterministic arm and the silent model arm have
+        //       IDENTICAL totals (0 tokens, 0.0000) and must not render the same text. The equality
+        //       is asserted first, so the separation below cannot be coming from the arithmetic.
+        if (deterministic.PromptTokens + deterministic.CompletionTokens != silent.PromptTokens + silent.CompletionTokens
+            || deterministic.EstimatedCost != silent.EstimatedCost)
+        {
+            problems.Add("the two arms this row separates no longer have identical totals, so the separation below "
+                       + "could be coming from the arithmetic rather than from the recorded state — the row is vacuous.");
+        }
+
+        var (detRow, detNote) = EvalPrinter.CostRow("deterministic", deterministic);
+        var (silRow, silNote) = EvalPrinter.CostRow("silent-model", silent);
+        var (halfRow, halfNote) = EvalPrinter.CostRow("half-block", half);
+        var (measRow, measNote) = EvalPrinter.CostRow("measured", measured);
+        var (nrRow, nrNote) = EvalPrinter.CostRow("never-recorded", notRun);
+
+        static string WithoutLabel(string row, string label) => row.Replace(label, "", StringComparison.Ordinal).Trim();
+
+        if (string.Equals(WithoutLabel(detRow, "deterministic"), WithoutLabel(silRow, "silent-model"), StringComparison.Ordinal))
+        {
+            problems.Add("a deterministic arm and a model arm that reported no usage render IDENTICALLY once the label "
+                       + "is discounted — the exact pair §55 forbids rendering alike.");
+        }
+
+        // ── 3. Each row's text has to carry the claim its state makes. ──
+        // The measured zero prints as a NUMBER, in the same currency rendering every other row uses
+        // — a figure whose text depends on who ran it cannot be read out of a log (§55.6).
+        string zeroMoney = 0m.ToString("C4", System.Globalization.CultureInfo.InvariantCulture);
+        if (!detRow.Contains(zeroMoney, StringComparison.Ordinal) || detRow.Contains('≥'))
+            problems.Add("the NO MODEL row does not print its zero as a plain number in the shared currency "
+                       + "rendering; a measured zero must read as a measurement.");
+        if (detNote is null || !detNote.Contains("measured, not missing", StringComparison.Ordinal))
+            problems.Add("the NO MODEL row does not say its zero was measured.");
+        if (!silRow.Contains('≥') || silNote is null || !silNote.Contains("LOWER BOUND", StringComparison.Ordinal))
+            problems.Add("a model arm with no usage block does not render as a LOWER BOUND — an absence is being shown as a total.");
+        if (halfNote is null || !halfNote.Contains("HALF", StringComparison.Ordinal))
+            problems.Add("a HALF usage block is not named (§60.2: the rule applies to the halves, not only the block).");
+        if (!measRow.Contains("240", StringComparison.Ordinal) || measNote is not null)
+            problems.Add("a fully measured arm does not render as a plain total with no caveat.");
+        if (!nrRow.Contains('—') || nrNote is null || !nrNote.Contains("NOT RUN", StringComparison.Ordinal))
+            problems.Add("an arm that was never run does not read as NOT RUN — 'no turns' is not 'no cost'.");
+
+        // ── 4. The model id reaches the row, and its ABSENCE is named rather than left blank. ──
+        if (!measRow.Contains("gpt-5.5", StringComparison.Ordinal))
+            problems.Add("the model id does not reach the printed row — 8.3's own premise ('the printer cannot know') would still hold.");
+        var anonymous = new PairedCoverageReport();
+        anonymous.RecordCost("anonymous", Metrics(10, 5, 0.001m, null));
+        var (anonRow, _) = EvalPrinter.CostRow("anonymous", anonymous.CostOf("anonymous"));
+        if (!anonRow.Contains("model NOT NAMED", StringComparison.Ordinal))
+            problems.Add("a model turn whose metrics named no model renders indistinguishably from a deterministic arm.");
+        if (anonymous.CostOf("anonymous").RunsWithoutModelId != 1)
+            problems.Add("a metrics object with no ModelUsed was not counted as one.");
+
+        // ── 5. It reaches the STORED record too, and a pre-8.3 document says it cannot answer. ──
+        var snapshot = new ArmCostSnapshot(2, 4_000, 200, 40, 0.0062m, 0, 2, 0, 0, 0, 0, ["gpt-5.5"]);
+        if (!snapshot.StateIsRecorded || snapshot.ModelIds is null || snapshot.ModelIds.Count != 1)
+            problems.Add("a snapshot written now does not carry the run state and the model id.");
+        var legacy = new ArmCostSnapshot(2, 4_000, 200, 40, 0.0062m);
+        if (legacy.StateIsRecorded)
+            problems.Add("a pre-8.3 snapshot claims to carry a run state it does not have — the defaults are being read "
+                       + "as a measurement, which is the same class of error 8.3 is about.");
+
+        return new ControlRowSnapshot(
+            "CostRowsSayWhichZeroTheyMean",
+            "the cost table must not render 'this arm reaches no model' and 'this arm's usage never arrived' the same "
+          + "way. Both are 0 tokens and $0.0000, and MEASUREMENT_STATUS §55 forbids rendering them alike. Plan item "
+          + "8.3 asked for a rendering change against a `ModelId` field that did not exist, so it was unimplementable "
+          + "as written: the printer had no input that could tell the two apart. The state is now RECORDED by "
+          + "PairedCoverageReport.RecordCost — from whether a metrics object arrived, not from what the totals came "
+          + "to — and read here off EvalPrinter.CostRow's returned strings rather than off a console scrollback.",
+            problems.Count == 0
+                ? "all five states reproduce from recorded run counts (NotRun · NoModel · LowerBound x3, one of "
+                + "them an arm that reaches a model and got NO metrics object · Measured) · "
+                + "the deterministic arm and the silent model arm carry IDENTICAL totals and render differently · the "
+                + "measured zero prints as $0.0000 and says so · a missing usage block prints ≥ and LOWER BOUND · a "
+                + "HALF block is named separately · an unnamed model reads 'model NOT NAMED' · a pre-8.3 snapshot "
+                + "reports that it cannot answer instead of defaulting to NoModel"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }
