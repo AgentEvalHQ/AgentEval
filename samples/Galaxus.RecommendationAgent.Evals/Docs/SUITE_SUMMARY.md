@@ -17,11 +17,19 @@ any file.** (MEASUREMENT_STATUS §21.6's `FingerprintKey` observation is closed 
 > are closed, the fourth is half closed, and one number moved. **No agent turn was bought in that run**, so
 > every agent-side figure in §§1–21 stands exactly as measured.
 >
-> **Read newest-first: §24 (2026-09-06, `f3d192cc`) → §23 (Wave 2, paid) → §22 (Wave 1, free) → §§1–21.**
+> **Read newest-first: §25 (2026-09-06, `8af63683`) → §24 (`f3d192cc`) → §23 (Wave 2, paid) →
+> §22 (Wave 1, free) → §§1–21.**
 > Three headings below are stale as counts and are left standing because their run is: **§10 says
-> "16 rows · 12 of 12 gating"** and the panel is now **31 rows · 26 gating + 5 advisory** (§24.2);
+> "16 rows · 12 of 12 gating"** and the panel is now **34 rows · 28 gating + 6 advisory** (§25.3);
 > **§13's "NOT ESTABLISHED"** on the Renzo pin was settled in `MEASUREMENT_STATUS` §28 without any
 > checkout; and every `--ci --dry-run` exit 0 anywhere in this file is now **exit 1**, correctly (§24.4).
+>
+> ⚠️ **AND ONE THING IN THIS FILE WAS NOT MERELY STALE — §22's Eval 07 table was WRONG, and it is
+> corrected in place** (§25.1, `MEASUREMENT_STATUS` §42.10). Two of its five rows carried the swapped
+> case descriptions that `b41262e2` had already fixed **in code**, one of them contradicted itself on
+> its own line and was marked GOOD, and the table mixed both embedding spaces without naming either.
+> **The deterministic loop is not space-invariant** — a per-case sentence has to say which space it
+> describes, and from `8af63683` a gating control makes it.
 
 ---
 
@@ -537,13 +545,34 @@ No model, fully deterministic, sub-second. GATE A (structure) ✅ · **GATE B (t
 > ablation settled is narrower and different: whether the **wave-1 fixes** moved Eval 07 (they did not, in
 > the concept space). Renzo's pin mismatch predates both and its origin commit is still NOT ESTABLISHED.
 
-| case | pinned expectation | observed | verdict |
-|---|---|---|---|
-| **USR-RB-10 Renzo** | **loops** (reviewer sends him back twice) and still exits **APPROVED** | **0 loop-backs · 1 of 3 rounds · 5 super-steps · `coverage-sufficient` · 9 items presented** | 🔴 **WRONG** — the pin says loop, the run does not |
-| USR-MI-02 Marco | loops, exits DEGRADED on `gaps-unresolvable` | loop-back fired, 3 rounds | **GOOD** |
-| USR-MB-13 Mirjam | loops once, exits DEGRADED on no-progress | loop-back fired **twice**, 3 rounds | **GOOD** |
-| USR-NB-01 Nadia | ⭐ **must NOT loop** — coverage satisfied in round 1 | did not loop | **GOOD** (this is the negative direction; an edge that fires unconditionally is invisible to a positive-only test) |
-| USR-LF-04 Luca | does not loop, exits DEGRADED, presents **nothing** | did not loop, zero-character answer | **GOOD** |
+> 🔴 **CORRECTED IN PLACE 2026-09-06 (Wave-4 verification run, `MEASUREMENT_STATUS` §42.10). The two
+> middle rows of the table below were wrong in three separate ways and were marked GOOD.**
+>
+> | | superseded | corrected |
+> |---|---|---|
+> | Marco's expectation | *"loops, exits DEGRADED on `gaps-unresolvable`"* | concept **1 loop-back · 2 rounds · `no-progress`** |
+> | Marco's observed | *"loop-back fired, 3 rounds"* | that is the **real**-space figure, in a concept-space table |
+> | Mirjam's expectation | *"loops once, exits DEGRADED on no-progress"* | concept **2 loop-backs · 3 rounds · `gaps-unresolvable`** |
+>
+> **① The expectations were each other's** — the swap `b41262e2` fixed in code on 2026-09-06 and never
+> fixed here, so a corrected claim stayed alive at a second origin (the same shape as §41.3).
+> **② The Mirjam row contradicted itself on its own line** — expectation *"loops once"*, observed
+> *"fired twice"*, verdict **GOOD**. **③ The table silently mixed the two embedding spaces**, and the
+> deterministic loop is **not space-invariant**: Marco and Mirjam swap round counts between spaces and
+> Mirjam's exit flips DEGRADED → APPROVED (§42.2).
+> **Direction: flattering.** Two rows read as agreeing when the numbers on them did not.
+> **Blast radius: this table only.** No pin, no gate and no exit code moved — GATE A/B/C were ✅/❌/✅
+> and `-- 7` exited 1 before and after, in both spaces. **Falsifiable:** run
+> `dotnet run --project samples/Galaxus.RecommendationAgent.Evals -- 7 | grep termination`, with and
+> without `--real-vectors`, and the two columns below are what prints.
+
+| case | pinned expectation | observed (**ConceptVectors** — the default) | observed (**RealVectors**) | verdict |
+|---|---|---|---|---|
+| **USR-RB-10 Renzo** | **loops** and still exits **APPROVED** (the pin; the shipped `Why` also asserted *"sends him back twice"* in the present tense, which was **false in both spaces** and is corrected at `8af63683`) | **0 loop-backs · 1 round · 5 super-steps · `coverage-sufficient` · 9 items** | **0 · 1 · `coverage-sufficient` · 8 items** | 🔴 **WRONG** — the pin says loop, the run does not, in **either** space |
+| USR-MI-02 Marco | loops, exits DEGRADED | **1 loop-back · 2 rounds · `no-progress`** | **2 · 3 · `gaps-unresolvable`** | **GOOD** (pin met in both) |
+| USR-MB-13 Mirjam | loops, exits DEGRADED | **2 loop-backs · 3 rounds · `gaps-unresolvable`** | **1 · 2 · `coverage-sufficient` — APPROVED, not degraded** | **GOOD** on the loop-back pin in both; the *disposition* is space-dependent |
+| USR-NB-01 Nadia | ⭐ **must NOT loop** — coverage satisfied in round 1 | **0 · 1 · `coverage-sufficient`** | **0 · 1 · `coverage-sufficient`** | **GOOD** (the negative direction; an edge that fires unconditionally is invisible to a positive-only test) |
+| USR-LF-04 Luca | does not loop, exits DEGRADED, presents **nothing** | **0 · 1 · `gaps-unresolvable`**, zero-character answer | **0 · 1 · `gaps-unresolvable`**, zero-character answer | **GOOD** |
 
 **What this is and is not.** The three witnesses agree on Renzo (`loop-backs = rounds − 1`,
 `super-steps = 2·rounds + 3`), the assertion is demonstrably capable of returning false, and both directions
@@ -1485,3 +1514,95 @@ runs them for real**, and that is what it now says.
   already in the snapshot; only the arithmetic over them changed.
 * **`--ci --dry-run` exiting 1 is not a regression.** The suite says the same thing it said before, in
   one more place.
+
+---
+
+## 25. Wave-4 verification run — 2026-09-06, commit `8af63683`
+
+**30 commands, both spaces, every exit code OBSERVED in the foreground. One live stage-2 unit of 3
+model calls. The whole test suite on three TFMs. No cohort was bought, so no agent-side verdict in
+§§1–21 or §23 moves.** Full write-up: `MEASUREMENT_STATUS` §42.
+
+### 25.1 The one defect, and it was this repository's own
+
+**`-- 3 --real-vectors` exited 1 at `4da0556b`.** Wave 4 added the gating row
+`TopologyCaseProseMatchesTheRun`, verified it in the concept space, and the Wave-4 review then
+re-executed four of the wave's ablations — also in the concept space. The first real-vector command of
+this run found the row red with 2 faults, against a **published exit code of 0** (§34.5).
+
+**Underneath it is a fact nobody had written down: the deterministic discovery loop is not
+space-invariant.** Marco and Mirjam swap round counts between the two embedding spaces, Mirjam's exit
+disposition flips DEGRADED → APPROVED, and `no-progress` is unreachable on the real path. A single
+sentence describing "the run" is therefore wrong in whichever space it was not written for.
+
+**And a third case was wrong in both spaces**: Renzo's `Why` asserted that *"the reviewer sends him
+back for more discovery twice and then approves"*, and he exits at round 1 in both — the very failure
+GATE B prints two lines below the sentence. The Wave-4 row could not see it, because it examined only
+cases whose prose named a stop reason and Renzo's named none: the scope limit §41.4 declared,
+realised one wave later.
+
+**Fixed at `8af63683`**: every case carries an `OBSERVED PER SPACE` clause; the row checks loop-backs,
+rounds and stop reason against the **resolved** space; a frozen reason outside a clause is itself a
+fault; all five cases are required. Five ablations, all red.
+
+### 25.2 Exit codes — every one OBSERVED
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1 --dry-run` · `-- 2 --dry-run` · `-- 2b --dry-run` · `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** ⬅ was **1** at `4da0556b` |
+| `-- 4` | 0 | 0 |
+| `-- 5 --dry-run` · `-- 6 --dry-run` · `-- 8 --dry-run` · `-- 9 --dry-run` | 0 | 0 |
+| **`-- 7`** | **1** | **1** |
+| **`--ci --dry-run`** | **1** | **1** |
+| `agent -- 0` · `agent -- 1 --offline` · `agent -- 2 --offline` | 0 | 0 |
+| **`agent -- 2 --user USR-NB-01`** (LIVE, stage 2, foreground) | **0** | — |
+
+**The two non-zero codes are one gate**: Eval 07 GATE B, on `USR-RB-10`, in both spaces. It is
+**DEFERRED BY DECISION**, not open — see §36 and the plan's close-out.
+
+### 25.3 Per-case verdicts this run re-established
+
+| eval | cases | measured by | verdict | change |
+|---|---|---|---|---|
+| **03** negative controls | **34 rows** — 28 gating + 6 advisory | real, model-free | ✅ **all 28 gating caught**, exit 0, **both spaces** | real-space exit 1 → 0 |
+| **04** review injection | 1 case × 4 arms | real, model-free | ✅ PASSED, exit 0, both spaces | none |
+| **07** workflow topology | 5 cases | real, model-free | ❌ **FAILED**, exit 1, both spaces. GATE A ✅ · **GATE B ❌** · GATE C ✅ | none |
+| **07** per case | `USR-RB-10` ❌ · `USR-MI-02` ✅ · `USR-MB-13` ✅ · `USR-NB-01` ✅ does NOT fire · `USR-LF-04` ✅ does NOT fire | | **4 of 5 pinned**, both spaces | none |
+| **07** stop reasons | 3 of 4 frozen reasons observed on concept, **2 of 4 on real** | | advisory, never gates | 🆕 first time measured per space |
+| 01, 02, 02b, 02c, 05, 06, 08, 09 | — | **`--dry-run` only** | plumbing exit 0 in both spaces | **NOT a verdict about the agent** |
+| Demo 01, Demo 02, `agent -- 0` | — | offline | exit 0, both spaces | none |
+| Demo 02 | Nadia | **LIVE, 3 model calls** | exit 0, 2 of 3 rounds, 9 recommended | stage 2 |
+
+**Tests:** net10 **9,648 / 0 / 2 of 9,650**, net9 and net8 **9,430 / 0 / 1 of 9,431** — identical to
+the pre-run baseline.
+
+### 25.4 Cost
+
+| what | measured |
+|---|---|
+| real-vector half, 14 commands | **8,550 embedding prompt tokens**, every one from a usage block — independently reproducing §34.5's corrected total |
+| concept half, 15 commands | **zero** calls, zero tokens, zero spend — offline by construction |
+| the live stage-2 unit, 3 model calls | 🔴 **UNMETERED.** No token count, no usage block, no currency figure was printed. **Plan item 8.17 reproducing for the second consecutive run.** Reported as unmetered, never estimated |
+
+**Credentials:** 0 matches for the key or the endpoint host across **65,148 lines in 38 log files**.
+
+### 25.5 Persistence
+
+**36 snapshot files** written; the store went **619 → 652**. Three canonical keys —
+`eval03_controls.json` (44,995 B), `eval04_injection.json` (4,664 B), `eval07_topology.json`
+(16,772 B) — all at 2026-09-06 06:53:16–06:53:19 UTC. **The write-ledger banner names exactly those
+three, in both spaces, and they are the three most recent files on disk.**
+
+✅ **The rule's other half was verified by absence**: `eval01`, `eval02*`, `eval05`, `eval06`,
+`eval08` and `eval09` wrote **nothing** across 30 commands, because each ran under `--dry-run` and a
+dry run of a model-backed eval has no result to record.
+
+### 25.6 What a reader must NOT take from this section
+
+* **No agent-side verdict moved.** All eight model-backed evals ran under `--dry-run`; their exit 0 is
+  a statement about plumbing and nothing else.
+* **`-- 3 --real-vectors` going 1 → 0 is not an improvement in the agent.** It is a description that
+  stopped being wrong.
+* **`-- 7` and `--ci --dry-run` exiting 1 is not a regression.** It is the suite's only red gate,
+  deferred by decision, saying the same thing in two places.

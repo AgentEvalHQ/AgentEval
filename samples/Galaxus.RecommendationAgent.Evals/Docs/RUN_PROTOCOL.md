@@ -48,6 +48,35 @@ the command that produces it*, so re-running it is one paste. Every §-section i
 `MEASUREMENT_STATUS.md` that records an ablation now ends with that command block, and the ones that
 did not are the ones that went stale.
 
+### Stage 0b — RE-EXECUTE IN **BOTH SPACES**, and that includes the control you just wrote
+
+**Added 2026-09-06 (Wave-4 verification run, `MEASUREMENT_STATUS` §42). It is stage 0 applied to your
+own work rather than to somebody else's.**
+
+> **A control verified in one embedding space is unverified.** Run every new or changed gating row
+> **in both spaces before the wave closes** — `-- 3` and `-- 3 --real-vectors`, `-- 7` and
+> `-- 7 --real-vectors`. They are free, they take seconds, and the numbers underneath them are not
+> the same numbers.
+
+Wave 4 added the gating row `TopologyCaseProseMatchesTheRun`, verified it under `-- 3`, and its own
+review then re-executed four of the wave's ablations — all in the **default concept space**. The
+first `-- 3 --real-vectors` anyone ran afterwards came back **exit 1**, against a published exit code
+of **0**. The wave's own new control was red on the tree the wave declared clean.
+
+**Why one space is not a sample of the other, measured:** the deterministic discovery loop is **not
+space-invariant**. Two of Eval 07's five customers **swap round counts** between the spaces, one
+flips DEGRADED → APPROVED, and one of the four frozen stop reasons is **unreachable** on the real
+path. The gates did not move — GATE A/B/C are ✅/❌/✅ in both — so nothing about a gate's verdict
+warned that everything underneath it had.
+
+**The general form, which is not about embeddings.** This suite has two resolved *configurations* that
+both claim to be the product: a default and a flag. Anything you assert without naming one of them is
+an assertion about both, and it is checked against whichever one you happened to run. The fix in this
+instance was to make the artefact **name the configuration it describes** and let the control read the
+**resolved** one — never the requested one, because `--real-vectors` falls back to concept without
+credentials and a check that reads the request asserts the wrong configuration on every machine
+without a key.
+
 ## Why stage 2 exists — the evidence from this repository
 
 Every one of these passed a dry run and was still broken:
@@ -129,7 +158,8 @@ both directions**, so a stale declaration fails the build rather than misleading
 grep -n "SNAPSHOT-POLICY" samples/Galaxus.RecommendationAgent.Evals/Evals/*.cs
 ```
 
-Measured 2026-09-06 at `046f5425`: **11 files, 10 `writes`, 1 `deliberately-none`.** The one is **Eval 08**,
+Measured 2026-09-06 at `046f5425` and **re-executed at `8af63683`, unchanged** (stage 0 applies to
+this claim too — it is one `grep`): **11 files, 10 `writes`, 1 `deliberately-none`.** The one is **Eval 08**,
 and its reason is stated in code (`Eval08:316-319`) — nothing consumes a stability snapshot, and a number in
 a shared store that no gate reads is a hazard a later reader can mistake for one that is.
 
@@ -159,6 +189,15 @@ Report cost from the provider's own usage blocks, never from an estimate. If a r
 `token-estimated > 0` or `unaccounted > 0`, say so — a currency figure derived from a guess is not a
 measurement. Prompt tokens dominate in a tool loop (measured: 96% of the bill), so a per-turn cost is
 driven by context re-sending, not generation.
+
+> 🔴 **AND STAGE 2 CANNOT CURRENTLY SATISFY ITS OWN CHECKLIST ON THE AGENT'S DEMO LANE — 2026-09-06
+> (`MEASUREMENT_STATUS` §42.8).** The stage-2 table above requires *"usage is reported"*. `agent -- 2
+> --user <id>` makes real model calls and prints **no token count, no usage block and no currency
+> figure at all** — measured twice now, in Wave 4's smoke (§40.4) and in this run. **Plan item 8.17.**
+> Until it is fixed, a stage-2 unit on that lane is reported as **cost UNMETERED**, never as an
+> estimate scaled from a cohort turn: §27.4's rule forbids the scaling and §34.5's own corrected total
+> is what happens when a number is typed instead of summed. A deferral's stated cost is a claim like
+> any other — this one has now reproduced twice.
 
 > ✅ **AND THE SUITE NOW OBEYS IT — 2026-09-06 (`MEASUREMENT_STATUS` §34.4).** Until this run, every
 > `--real-vectors` command printed *"This run EMBEDS QUERIES LIVE … it spends — a fraction of a cent,

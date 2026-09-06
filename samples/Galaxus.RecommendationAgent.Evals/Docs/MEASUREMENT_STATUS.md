@@ -5872,3 +5872,270 @@ for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t; done
 dotnet run --project $E -- 3   # (a) exit 0 . (b) exit 1, TopologyCaseProseMatchesTheRun
 dotnet run --project $E -- 7   # both: 3 of 5 pins, exit 1
 ```
+
+---
+
+## 42. WAVE 4 VERIFICATION RUN — the wave's own new gating row was red in the other space, and nobody had looked (2026-09-06)
+
+**Commit `8af63683`. 30 commands, both spaces, every exit code OBSERVED in the foreground; one live
+stage-2 unit of 3 model calls; the whole test suite on three TFMs. It found ONE defect, and the
+defect was created by Wave 4 itself and survived Wave 4's own review.**
+
+### 42.1 🔴 `-- 3 --real-vectors` exited **1** at `4da0556b`, and §34.5 publishes **0** for it
+
+Wave 4 added the gating row `TopologyCaseProseMatchesTheRun` (`b41262e2`) and verified it in the
+**concept space only**. The Wave-4 review then re-executed four of the wave's ablations — also in the
+concept space only — and reported them as reproducing, which they did.
+
+The first command of this run's real-vector half was `-- 3 --real-vectors`. It came back **exit 1**:
+
+```
+❌ NOT CAUGHT  TopologyCaseProseMatchesTheRun
+observed: 2 fault(s): USR-MI-02's case text names no-progress and the run ends in
+gaps-unresolvable …; USR-MB-13's case text names gaps-unresolvable and the run ends in
+coverage-sufficient …
+```
+
+**The published exit code for that command is 0** (§34.5 row 5, both columns). It was correct when it
+was written and stopped being correct one commit later.
+
+### 42.2 THE FACT UNDERNEATH: the deterministic loop is **not space-invariant**
+
+Nothing in this repository said so, and Eval 07's whole per-case narrative had been written as though
+it were. Measured, all five cases, both spaces, on the shipped deterministic path:
+
+| case | ConceptVectors | RealVectors | moves? |
+|---|---|---|---|
+| `USR-RB-10` Renzo | 0 loop-backs · 1 round · `coverage-sufficient` | 0 · 1 · `coverage-sufficient` | no |
+| `USR-MI-02` Marco | **1 · 2 · `no-progress`** (DEGRADED) | **2 · 3 · `gaps-unresolvable`** (DEGRADED) | **yes** |
+| `USR-MB-13` Mirjam | **2 · 3 · `gaps-unresolvable`** (DEGRADED) | **1 · 2 · `coverage-sufficient`** (**APPROVED**) | **yes** |
+| `USR-NB-01` Nadia | 0 · 1 · `coverage-sufficient` | 0 · 1 · `coverage-sufficient` | no |
+| `USR-LF-04` Luca | 0 · 1 · `gaps-unresolvable` | 0 · 1 · `gaps-unresolvable` | no |
+
+Three consequences, none of them previously recorded:
+
+1. **Marco and Mirjam SWAP round counts between the spaces.** Whichever space a single sentence is
+   written for, it describes the *other* customer in the other space. That is why correcting the
+   prose a second time would only have moved the defect back.
+2. **Mirjam's exit disposition flips DEGRADED → APPROVED.** The eval's advisory *"the degraded path is
+   distinguishable"* row therefore reads **2 approved / 3 degraded** on concept and **3 / 2** on real.
+3. **`no-progress` is unreachable on the real path.** The advisory *"every frozen stop reason is
+   reachable on this corpus"* names **`round-limit-reached`** as missing on concept and
+   **`round-limit-reached`, `no-progress`** on real — 3 of 4 reasons observed against 2 of 4.
+
+⚠️ **GATE A, GATE B and GATE C are unchanged in both spaces** (✅ / ❌ / ✅, `-- 7` exit 1, four of
+five pins matching, `USR-RB-10` the failure). The pins are space-stable; the *narrative* was not. So
+this defect could never have been caught by a gate — only by a row that reads the prose.
+
+### 42.3 🔴 And a THIRD case was wrong in BOTH spaces, which the Wave-4 row could not see
+
+`USR-RB-10`'s `Why` asserted, in the present tense, that *"the reviewer sends him back for more
+discovery twice and then approves"*. He exits at **round 1 in both spaces** — which is the very
+failure GATE B prints two lines below that sentence, in the eval whose GATE B is the suite's only red
+gate. It shipped that way for the eval's whole life.
+
+The Wave-4 row missed it because it examined only cases whose prose happened to name a frozen stop
+reason, and Renzo's named none. **That is exactly the scope limit §41.4 declared** —
+*"`casesNamingAReason < 2` is tight at exactly 2 of 5 today"* — realised inside one wave, in the
+direction the declaration did not consider: not that the set might grow, but that the set was already
+too small to cover the corpus.
+
+### 42.4 The fix — a clause per SPACE, checked in the RESOLVED one
+
+Every case's `Why` now ends with an `OBSERVED PER SPACE:` clause giving **loop-backs / rounds / stop
+reason** for **every non-`Auto` member of `EmbeddingSpaceChoice`**. The row:
+
+* parses the clause and checks **all three numbers**, not the reason alone — the defect was a swap and
+  two customers swapped both counts while one kept a matching reason, so a reason-only check would
+  have certified half of it;
+* reads the space this process **RESOLVED**, never the one it requested — `--real-vectors` falls back
+  to concept without credentials, and a row reading the request would assert the wrong space's claim
+  on every machine without a key;
+* **faults on a frozen stop reason appearing anywhere OUTSIDE a clause**, because that free-floating
+  word is the space-blind sentence the mechanism exists to retire;
+* requires a clause on **all five** cases, not "at least two" — the subset that opted out is where the
+  third defect was hiding;
+* keeps **both** joins derived: the reason set by kebab-casing `DiscoveryStopReason` and refused
+  unless it equals `DiscoveryStopReasons.All`, and the space set read off the enum, so a third space
+  turns the row red until every case describes it.
+
+⚠️ **The clause pins the DESCRIPTION, never the verdict.** It is not `ExpectsLoopBack`, it scores
+nothing and it cannot make a gate pass. **Renzo's clause deliberately records a run that contradicts
+his own pin**, and his prose now says so and points at §28/§36 for why the pin is refused rather than
+re-pinned. Gating on a description is safe precisely because the description decides nothing.
+
+### 42.5 The ablations — five, all red, each a different direction
+
+| # | ablation | `-- 3` | the row |
+|---|---|---|---|
+| **A** | swap Marco's and Mirjam's **concept** clauses — the original Wave-4 defect, re-introduced | **1** | ❌ NOT CAUGHT, **3 fault(s)** |
+| **B** | delete Marco's `RealVectors` clause — space-blind prose | **1** | ❌ NOT CAUGHT, **2 fault(s)** |
+| **C** | put a bare `no-progress` back into Marco's free prose | **1** | ❌ NOT CAUGHT, **1 fault** |
+| **D** | give Renzo `2 loop-backs / 3 rounds` — **the claim he actually shipped** | **1** | ❌ NOT CAUGHT, **2 fault(s)**, both naming `USR-RB-10` |
+| **E** | wrong **count** only, reason still right (Mirjam concept `1 / 2 / gaps-unresolvable`) | **1** | ❌ NOT CAUGHT, **2 fault(s)** |
+
+Restored after each; `-- 3` back to **0** in both spaces. **D is the one that matters most**: it
+reproduces the sentence that was live in the shipped tree, and the row names it. The pre-fix red is
+not an ablation at all — it was **observed on the shipped tree** as the first real-vector command of
+this run.
+
+⚠️ **Ablation D would not apply as written the first time**, because Renzo and Nadia carry the same
+clause text and the patch harness asserts a unique match. It refused rather than patching whichever
+one it found first. Recorded because a harness that silently patches the wrong case is how an
+ablation comes back green for the wrong reason.
+
+### 42.6 The full sweep — 30 commands, both spaces, every exit code OBSERVED
+
+Nothing was detached. `--no-build` after one `dotnet build AgentEval.sln` (0 errors, 3 warnings, all
+pre-existing in the evals project).
+
+| # | command | concept | `--real-vectors` | embedding prompt tokens (real) |
+|---|---|---|---|---|
+| 1 | `-- 1 --dry-run` | 0 | 0 | 158 |
+| 2 | `-- 2 --dry-run` | 0 | 0 | 930 |
+| 3 | `-- 2b --dry-run` | 0 | 0 | 1,364 |
+| 4 | `-- 2c --dry-run` | 0 | 0 | 788 |
+| 5 | `-- 3` | 0 | **0** ⬅ was **1** at `4da0556b` | 1,248 |
+| 6 | `-- 4` | 0 | 0 | 241 |
+| 7 | `-- 5 --dry-run` | 0 | 0 | 158 |
+| 8 | `-- 6 --dry-run` | 0 | 0 | 179 |
+| 9 | `-- 7` | **1** | **1** | 356 |
+| 10 | `-- 8 --dry-run` | 0 | 0 | 248 |
+| 11 | `-- 9 --dry-run` | 0 | 0 | 474 |
+| 12 | `--ci --dry-run` | **1** | **1** | 2,015 |
+| 13 | `agent -- 0` | 0 | 0 | — (no space resolved) |
+| 14 | `agent -- 1 --offline` | 0 | 0 | 178 |
+| 15 | `agent -- 2 --offline` | 0 | 0 | 213 |
+
+**Embedding prompt tokens, real-vector half: 8,550**, summed from the 14 usage blocks —
+**independently reproducing §34.5's corrected total** (the figure that was typed as 8,364 and
+re-derived as 8,550). Concept half: zero calls, zero tokens, zero spend.
+
+`--ci --dry-run` fails on **Eval 07 only** — `Eval 07: FAILED`, every other eval `passed` — which is
+the same statement `-- 7` makes, in one more place.
+
+**Tests, all three TFMs, measured not assumed:** net10 **9,648 / 0 / 2 of 9,650**, net9 **9,430 / 0 /
+1 of 9,431**, net8 **9,430 / 0 / 1 of 9,431**. Identical to the pre-run baseline — the fix touches
+`samples/` only.
+
+### 42.7 Stage 2 — one live unit, foreground, exit code observed
+
+The only model-reaching path this wave touched is the **model ranker**:
+`ModelDiscoveryNodes.cs:729` calls `DeterministicRanker.Confidence`, whose half-saturation constant
+`a7da6bb6` split out. Eval 07, Eval 03 and the schema change reach no model.
+
+`dotnet run --project samples/Galaxus.RecommendationAgent -- 2 --user USR-NB-01`, 06:48:16 →
+06:49:36 UTC, **exit 0 observed** (not derived — foreground, the code captured by the shell):
+
+| property the protocol requires | observed |
+|---|---|
+| the **model channel** was used | **3 model calls** — InterestMapper 37.12 s, Ranker 27.90 s, Presenter 13.97 s |
+| the **loop** ran | 2 of 3 rounds, `stop_reason GapsUnresolvable`, 14 searches, 19 discovered |
+| the result is **not degenerate** | 9 recommended with real prices and stock, confidence values printed (`GLX-2006 · 0.70`) |
+| **no timeouts** | 0 — the 60 s ceiling was not reached on any of the three calls |
+| **usage was reported** | 🔴 **NO.** See §42.8 |
+
+**Credentials:** 0 matches for the key or the endpoint host across **65,148 lines in 38 log files**
+written by this run.
+
+### 42.8 ⚠️ Cost: **NOT METERED**, and that is plan item 8.17 reproducing for the second consecutive run
+
+The live demo printed **no token count, no usage block and no currency figure** — a case-insensitive
+search of its 284 lines for prompt tokens, usage, spend or a currency symbol matches only the
+pre-model gate's *"before spending a token"*. §40.4 recorded exactly this after Wave 4's smoke. It has
+not moved.
+
+**Reported as unmetered, not estimated.** Three calls on the same deployment as a `-- 2` cohort turn
+(measured ¤0.753) would suggest a figure, and §27.4's own rule forbids quoting it: a currency figure
+derived from a guess is not a measurement. **The real-vector half's 8,550 embedding tokens ARE
+metered**, from usage blocks, and are the only measured spend of this run.
+
+⚠️ Note what this means for `RUN_PROTOCOL`'s stage-2 checklist: one of its four required
+observations — *"usage is reported"* — **cannot be satisfied on the agent's demo lane today**. The
+protocol asks for something the code does not print. That is 8.17's real cost, and it is larger than
+"a missing figure": it makes a stage of the standing protocol unpassable by construction on the one
+lane that spends the most.
+
+### 42.9 Persistence — 36 files, and the ledger matches disk
+
+Every eval run this session wrote to
+`.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots/`. **36 files** landed (3 canonical
+keys plus their timestamped history copies); the store went **619 → 652** files.
+
+The three canonical keys, final write of the run:
+
+| key | bytes | written (UTC) |
+|---|---|---|
+| `eval03_controls.json` | 44,995 | 2026-09-06 06:53:16 |
+| `eval04_injection.json` | 4,664 | 2026-09-06 06:53:16 |
+| `eval07_topology.json` | 16,772 | 2026-09-06 06:53:19 |
+
+**The write-ledger banner matches the disk**, in both spaces:
+
+```
+3 snapshot(s) WERE written, by the eval(s) that call no model — the
+chain runs them FOR REAL under --dry-run, so these are measurements, not stubs:
+  · eval03_controls.json
+  · eval04_injection.json
+  · eval07_topology.json
+```
+
+✅ **And the other half of the rule was verified by absence, which is the half nobody usually
+checks.** `eval01_integrity`, `eval02*`, `eval05`, `eval06`, `eval08` and `eval09` wrote **nothing**
+in 30 commands, because every one of them ran under `--dry-run` and a dry run of a **model-backed**
+eval has no result to record. Zero files with those keys carry a timestamp from this run.
+
+### 42.10 🔴 A refuted claim still standing at a THIRD origin — `SUITE_SUMMARY` §22's Eval 07 table
+
+`b41262e2` corrected Marco's and Mirjam's prose **in code** and left `SUITE_SUMMARY` §22's copy of it
+untouched. That table's "pinned expectation" column still carried the **swapped** sentences, and its
+Mirjam row was **self-contradicting on its own line** — expectation *"loops once … on no-progress"*,
+observed *"loop-back fired twice, 3 rounds"*, verdict **GOOD**.
+
+It was also **mixed across spaces**: its Marco row (*"`gaps-unresolvable`, 3 rounds"*) is the
+**real**-space Marco while its Mirjam row is the **concept**-space Mirjam, in one table, with no space
+named. Corrected in place with a superseded → corrected banner. **This is the same shape as §41.3**
+(§31.1's refuted table left standing at its origin) and it is the second consecutive wave in which the
+correction of a stale claim left another copy of the stale claim alive somewhere else.
+
+### 42.11 Declared, not fixed
+
+1. **The clause format is prose-parsed.** A case that writes `ConceptVectors 1 loop-back/2 rounds/…`
+   with spacing the regex does not accept is a **missing clause**, which is a fault — so the failure
+   direction is safe, but the message will say "carries no clause" rather than "is formatted oddly".
+2. **`EmbeddingSpaceChoice.Auto` is excluded by name.** If a future member is added that is also not a
+   space, the row will demand a clause for it and go red until someone excludes it. Red-on-ambiguity
+   is the intended direction; it is still a maintenance cost and it is stated here rather than
+   discovered later.
+3. **The row runs the deterministic loop five times per invocation** (once per case), on top of the
+   runs Eval 07 already does. Measured: `-- 3` concept wall time is unchanged to the second.
+4. **Nothing here re-measures the AGENT.** All eight model-backed evals ran under `--dry-run`. Every
+   paid per-case verdict in `SUITE_SUMMARY` §§1–21 and §23 stands exactly as its own run measured it.
+
+### 42.12 How to re-derive §42
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+dotnet build AgentEval.sln                          # 0 errors, 3 warnings (pre-existing)
+dotnet run --project $E -- 3                        # 0 — 28 gating caught, 6 advisory
+dotnet run --project $E -- 3 --real-vectors         # 0 — was 1 at 4da0556b
+dotnet run --project $E -- 7                        # 1 (GATE B), both spaces
+dotnet run --project $E -- --ci --dry-run           # 1 — Eval 07 FAILED, ledger names 3 snapshots
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t; done
+
+# 42.2 — the space-dependence, read off two runs of the same eval
+dotnet run --project $E -- 7                 | grep "termination"
+dotnet run --project $E -- 7 --real-vectors  | grep "termination"
+
+# 42.5 ablations, all in Eval07_WorkflowTopology.Cases, then `-- 3` (exit 1 each)
+#   A  swap the ConceptVectors clauses of USR-MI-02 and USR-MB-13
+#   B  delete USR-MI-02's "RealVectors 2 loop-backs / 3 rounds / gaps-unresolvable"
+#   C  reinstate "LOOPS ONCE and exits DEGRADED on no-progress." in USR-MI-02's free prose
+#   D  USR-RB-10's ConceptVectors clause -> "2 loop-backs / 3 rounds / coverage-sufficient"
+#      (⚠ Renzo and Nadia share clause text — anchor the patch, do not replace-all)
+#   E  USR-MB-13's ConceptVectors clause -> "1 loop-back / 2 rounds / gaps-unresolvable"
+
+# PAID — stage 2, the only paid thing this run needed (3 model calls, no usage block: 8.17):
+dotnet run --project $A -- 2 --user USR-NB-01       # exit 0. FOREGROUND. Capture the code.
+```
