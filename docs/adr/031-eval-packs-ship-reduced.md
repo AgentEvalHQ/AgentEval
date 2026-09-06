@@ -92,6 +92,33 @@ the judge fingerprint — plus the stimulus. S2 landed **the stimulus**. A `comp
 five would be refusing on a partial view and would report *"comparable"* for pairs that differ in the other
 four, which is the flattering direction. The remaining four are still not recorded on a run.
 
+### Wave 7, 2026-09-06 — S5 measured, S1's acceptance met on its second clause
+
+**S5's "unblocked by one fifth" is now EXECUTED, not argued.** A real run directory was inspected
+(`.agenteval/subjects/agents/AgenticSampleAgent/runs/2026-05-18_10-07-05_cc672600`): a scenario file
+carries `id, name, input, output, passed, score, metrics, assertions, duration, estimatedCost`;
+`summary.json` carries `schemaVersion, runId, verdict, stats, metrics`; `manifest.json` carries
+`solution, subject, run, git, agentEval, environment, contentHash`. **Five of V1's six comparability
+facts are absent, and the sixth is absent from that run too** because it predates `71bc44c3`. A
+`compare` built to Phase 7.5's acceptance today would therefore exit 13 on **every** pair of runs in
+this repository — its success path would never execute on real data, leaving a command with one
+reachable outcome. **The prerequisite is recording the other four facts, which is not `compare`'s
+work.** `MASTER_PLAN` §0.5 rank 7 lists S5 as blocked on "Nothing"; that cell is refuted by the
+above. `MEASUREMENT_STATUS` §58.
+
+**S1's second acceptance clause SHIPPED (`311e3889`), and the mechanism stays deferred.** Phase 7.1's
+acceptance is *"two runs coexist; the model id is recorded"*. Clause 1 was already true and is
+re-verified by execution — the store holds hundreds of dated archives beside its thirteen canonical
+keys. Clause 2 was **false on every canonical key**: `eval03_controls` and `eval07_topology` carried
+`Label`, their payload and `RunAt` and nothing about what produced them, in a suite that resolves two
+configurations and whose canonical file holds whichever ran last. A `SnapshotProvenance` block is now
+attached at the single write chokepoint, naming the **resolved** embedding space and the
+**configured** chat deployment, with a note in the file saying configured is not called. **The
+`IOutputStore` migration itself is unchanged and still deferred** — verified against the type rather
+than re-read: `ScenarioResult` has no label and no measurement state, `MeasurementState` exists only
+on `EvalScore`, and the serialised half is `MASTER_PLAN` 3.4 part (ii), which Q4 defers.
+`MEASUREMENT_STATUS` §57.
+
 **S1 is deferred, and the reason is a dependency rather than effort.** Half its stated defect is already
 gone: `EvalResultStore.Write<T>` archives the previous file under its own last-write time before the new one
 lands, so **two runs already coexist** and *"overwritten each run"* is stale. The remaining half — the
