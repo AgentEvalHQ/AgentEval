@@ -7425,3 +7425,343 @@ for sp in "" "--real-vectors"; do
     | sort -n | uniq -c
 done                                                                                # 25… vs 27…
 ```
+
+---
+
+## 54. WAVE 5 CLOSE-OUT RUN at `db7dcf42` — the state re-taken from outside, and the build figure this plan has carried is WRONG (2026-09-06)
+
+**⚠ The task that produced this section asked for "a new §44 for Wave 5". §44 already exists — it is
+Wave 5's own first section, written by the wave. Wave 5 occupies §44–§53. The close-out is therefore
+§54, and the item was wrong as specified in the harmless direction: following it literally would have
+overwritten the measurement it was meant to confirm.**
+
+This is the close-out pass: build, tests, the full deterministic sweep in **both spaces**, persistence
+and credentials, all **executed**, none re-read. It made **no code change**. Its one finding is §54.1.
+
+### 54.1 🔴 THE FINDING — "3 warnings, owned by the evals project" is **6**, by its own published command
+
+`MASTER_PLAN` §0.1 and §42.6 both carry the figure **3**, and §42.6 states it was *"verified by
+LISTING them rather than counting them"*, pasting three lines. Re-running **the command §42.6
+prints**, verbatim, on the shipped tree:
+
+```
+dotnet build samples/Galaxus.RecommendationAgent.Evals --no-incremental 2>&1 \
+  | grep "warning CS" | grep "RecommendationAgent.Evals" | sed 's/ \[.*//' | sort -u
+```
+
+| file | warning | in §42.6's published list? |
+|---|---|---|
+| `Eval02c_HeldOutNextPurchase.cs(704,97)` | CS8602 | ✅ |
+| `Eval02c_HeldOutNextPurchase.cs(705,88)` | CS8602 | ✅ |
+| `NegativeControls.cs(2104,51)` | CS0162 | ✅ (line was 2058; Wave 5 added rows above it) |
+| `Eval09_HypothesisComparison.cs(2146,59)` | CS1574 `cref="Decide"` | ❌ **absent** |
+| `Eval09_HypothesisComparison.cs(2147,74)` | CS1574 `cref="Print"` | ❌ **absent** |
+| `Eval09_HypothesisComparison.cs(2153,16)` | CS1574 `cref="TheoreticalMinimumTwoSidedP"` | ❌ **absent** |
+
+**Six on three files, not three on two.** Direction: **flattering** — the sample looked cleaner than it is.
+
+**And this is not something Wave 5 introduced.** The three cref sites are byte-identical at `ba9fec13`,
+the commit that published the list (lines 2144/2145/2151 there, shifted by Wave 5's edits above them),
+and the hunk that introduced them is `90da3dc8`, the sample's first commit:
+
+```
+git show ba9fec13:samples/Galaxus.RecommendationAgent.Evals/Evals/Eval09_HypothesisComparison.cs \
+  | grep -n 'cref="Decide"\|cref="Print"\|cref="TheoreticalMinimumTwoSidedP"'
+```
+
+⚠️ **What cannot be settled without rebuilding `ba9fec13`, and is therefore NOT claimed:** whether
+those three warnings were *emitted* then. The standing rules forbid a second checkout, so the honest
+statement is the one above — **the published command refutes the published list on the tree it is
+pasted into**, and the sites predate the list.
+
+**The invariant, which is what should have been recorded in the first place:**
+
+> **0 errors under every build command.** The evals project's own warning set is **a listed set over
+> three files** — `Eval02c` (2× CS8602), `NegativeControls` (1× CS0162), `Eval09` (3× CS1574) — and a
+> reader who wants a number must run the command, because the number is a property of the command.
+
+### 54.2 Build — four commands, four true numbers, and none of them is "the" warning count
+
+| command | warnings | errors |
+|---|---|---|
+| `dotnet build AgentEval.sln`, **nothing to compile** | **0** | 0 |
+| `dotnet build AgentEval.sln`, **something to compile** (after the sample project was rebuilt) | **62** | 0 |
+| `dotnet build AgentEval.sln --no-incremental` | **224** | 0 |
+| `dotnet build samples/Galaxus.RecommendationAgent.Evals --no-incremental`, filtered to the evals project | **6** | 0 |
+
+⚠️ **The forced-solution figure moved 221 → 224 and the movement is NOT reconciled.** The published
+histogram head was *"CS8602 146, CS1574 54, CS1573 40, CS8604 18, …"*; this run reads CS8602 **146**,
+CS1574 **60**, CS1573 **40**, CS8604 **18**. That is +6 on one code against +3 on the total, so
+something else fell by 3, and the published histogram was truncated with an ellipsis, so it cannot be
+closed by arithmetic. **Not chased, and named rather than smoothed over** — no Wave-5 file appears at
+any CS1574 site (all twelve distinct sites are in files the wave never touched), so the +3 is not
+attributable to the wave by location either. **The stable fact is 0 errors; the warning total is a
+per-command, per-build-state quantity and this run produced four different true values for it.**
+
+### 54.3 Tests — three TFMs, after a full build, all three reproduce
+
+`dotnet build AgentEval.sln` first, then `dotnet test tests/AgentEval.Tests -f <tfm> --no-build` —
+so no target framework could have run a stale binary.
+
+| TFM | passed / failed / skipped | of | matches Wave 5 |
+|---|---|---|---|
+| net10.0 | **9,699 / 0 / 2** | 9,701 | ✅ |
+| net9.0 | **9,481 / 0 / 1** | 9,482 | ✅ |
+| net8.0 | **9,481 / 0 / 1** | 9,482 | ✅ |
+
+### 54.4 The sweep — **32 commands, both spaces, every exit code OBSERVED with `$?`**
+
+Nothing detached. `--no-build` throughout, after the solution build above.
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 7` | **1** | **1** |
+| `--ci --dry-run` | **1** | **1** |
+| `agent -- 0` | 0 | 0 |
+| `agent -- 0 --offline` | 0 | 0 |
+| `agent -- 1 --offline` | 0 | 0 |
+| `agent -- 2 --offline` | 0 | 0 |
+
+**No exit code has moved since `0263141d`.** `-- 7` and `--ci --dry-run` are the only 1s, in both
+spaces, and both report the same deferred-by-decision GATE B.
+
+`agent -- 0 --offline` is **new to the sweep** — §42.6 ran demo 0 without the flag. Both forms were run
+so that "0/1/2 `--offline`" is an observation and not an extrapolation from the un-flagged form.
+
+**`--ci --dry-run` fails for exactly one reason, in both spaces:** eleven evals in the chain, `Eval 07:
+FAILED`, the other ten `passed`. The chain is not red for a second reason hiding behind the known one.
+
+**The real-vector space genuinely RESOLVED — checked, not assumed.** Every real-half run except the two
+demo-0 runs (which resolve no space) prints:
+
+```
+Embedding space: precomputed+azure (text-embedding-3-small, 1536 dims) · 99 committed product
+vectors · queries embedded LIVE against 'text-embedding-3-small' · space probe 1.0000 · --real-vectors
+```
+
+and the concept half prints `concept (galaxus-concept-v2, 24 dims) · queries embedded offline`. A
+`--real-vectors` run without credentials falls back silently, so the space-probe line is the evidence
+and the request flag is not.
+
+**Cost, from the provider's own usage blocks:** 14 of the 16 real-half runs report one; the two that do
+not are the demo-0 pair, which make no embedding call. **594 query calls, 8,550 prompt tokens** —
+which **reproduces §42.6's 8,550 exactly**, on a different day, over a sweep with two commands added,
+and is the third independent arrival at that figure (it was once typed as 8,364). Concept half: zero
+calls, zero tokens, zero spend. No chat-model call was made by this pass.
+
+### 54.5 The control panel — 29 gating + 6 advisory = 35, **verified by NAME in both spaces**
+
+`✅ caught` on all 29 gating rows, `❌ NOT CAUGHT` on **0**, in both spaces. The six advisory rows,
+named so the count is checkable rather than quotable:
+
+`AuthoredQueryPhraseRetrievability` · `LatentCoverageDiscrimination` ·
+`LatentCoveragePersonaDiscrimination` · `LoopBackNegativeDirectionCensus` ·
+`MinCandidateScoreDecidesNothing` · `SuppressionDetectorExercised`
+
+Two of the six trip: `⚠️ 2 INSTRUMENT FINDING(S)` — `AuthoredQueryPhraseRetrievability` and
+`SuppressionDetectorExercised`, the same two in both spaces. **This reproduces the README's Wave-5
+correction exactly** (35 rows, 29 gating all caught, 6 advisory of which 2 `⚠️ FINDING`, both spaces),
+which is the fifth vintage of that cell and the first to be stated with the panel's own row names.
+
+✅ **`baca28e4`'s finding reproduces:** the loose grep prints **30** and the tight one **29**, in both
+spaces. The extra hit is the prose *"caught it."* inside a row's observed text, exactly as recorded.
+
+### 54.6 Persistence — the KEY SET, the ledger, and the rotation. **No file counts, no byte sizes.**
+
+⚠️ §42.9 has been corrected twice for publishing counts and bytes that had already decayed. This
+section records only quantities that survive the next invocation.
+
+**The key set is 13 canonical snapshot keys** (a canonical file is one whose name carries no
+`.<stamp>Z` segment):
+
+```
+eval01_integrity · eval02_coverage_ab · eval02_coverage_ab_probe · eval02b_stated_need
+eval02b_stated_need_probe · eval02c_held_out · eval02c_held_out_probe · eval03_controls
+eval04_injection · eval05_quality · eval06_trajectory · eval07_topology · eval09_hypothesis_ab
+```
+
+**Exactly three of them were written by this run** — `eval03_controls`, `eval04_injection`,
+`eval07_topology` — established two ways that do not share an input:
+
+1. **The write ledger**, from the closing banner of `--ci --dry-run` in **both** spaces:
+   *"3 snapshot(s) WERE written, by the eval(s) that call no model … · eval03_controls.json ·
+   eval04_injection.json · eval07_topology.json"*.
+2. **Disk**, by mtime window rather than by reading the banner:
+   `find … ! -name "*Z.json" -newermt "<sweep start>"` returns those three canonical files **and no
+   others**. Ledger and disk agree, and neither was derived from the other.
+
+✅ **Zero files for any model-backed key carry a timestamp from this run.** The other ten canonical
+keys' mtimes are unchanged from the pre-sweep reading, to the second. The three that moved are the
+three model-free evals, and this is the 8.19/§34.3 decision behaving as decided: a dry run of a
+model-free eval is the same measurement either way, so it writes.
+
+✅ **Archive-on-next-write, checked as a NEGATIVE.** Each key was written four times by this sweep
+(`-- N` and `--ci` in each space). Archive copies exist, each named for the version it holds; **the
+newest canonical's own stamp has no archive copy** — `eval03_controls.<stamp>Z.json`,
+`eval04_injection.<stamp>Z.json` and `eval07_topology.<stamp>Z.json` for the current canonical
+timestamps are all **ABSENT**. The newest run is the one with no archive, by design.
+
+⚠️ **The persisted record is SPACE-DEPENDENT, and the invariant replaces the byte count.** §0.1 has
+carried *"`eval07_topology.json` is 123 B shorter on the real path"* — a digit that decays. Measured
+structurally instead: the `--ci` write from the concept half and the `--ci` write from the real half
+differ, and the differing top-level fields are **`Controls` and `RunAt`** — not `RunAt` alone. Same
+key set on both sides, no field present in one and absent in the other. **So the canonical file holds
+whichever space ran last, and the sweep's ordering decides what the store records.** That is the
+durable statement; the byte delta is not.
+
+### 54.7 GATE 1 REPLAY — available here, and it prints the SHIPPED rule's verdict
+
+Wave 5's advisory ran in both spaces and read the persisted paid run:
+
+> *GATE 1 REPLAY (ADVISORY — decides nothing, gates nothing) · the SAME predicate and the SAME run over
+> live cells from the PERSISTED snapshot of 2026-09-06 02:56 UTC (DeclaredK = 5): **PASS — 12 of 12**
+> scorable persona(s) above their OWN floor.*
+
+That is the **shipped** floor rule's ✅ 12 of 12 — the baseline §44.3's ❌ 8 of 12 moves *from*. Both
+halves of the pair are therefore observed on this tree.
+
+⚠️ **§53.3's hazard stands unchanged and is the reason this is not a reproduction anyone else can
+make:** the replay reads `.agenteval/`, which is **gitignored** (`.gitignore:453`). On a fresh clone it
+prints NOT AVAILABLE — *"an absence, not a pass"*, correctly — and §44.3 cannot be re-derived there.
+Named again, not repaired.
+
+### 54.8 Credentials — **loose first, every hit classified, and the scanner proven able to hit**
+
+**39 logs, 36,543 lines** — every log this pass produced (32 sweep runs, 3 test runs, 4 builds).
+
+| pattern | hits | classification |
+|---|---|---|
+| any 32+ character alphanumeric run | **16 distinct** | **all 16 are C# identifiers** — `AgentEvalGatekeeperExtensionsTests`, `RetrievalConfidenceHalfSaturation`, `BehavioralPolicyViolationException`, `CoverageCutIsNotTheConfidenceShapeParameter`, `LatentCoveragePersonaDiscrimination`, … |
+| `*.openai.azure.com` / `*.openai.com` hostname | **0** | — |
+| `api_key` / `secret` / `bearer` / `authorization` assignment | **0** | — |
+| `sk-…` token | **0** | — |
+| the **actual** values of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` and `OPENAI_API_KEY`, matched **literally** with `grep -F` and reported as a COUNT ONLY | **0 · 0 · 0** | the strongest form: not a pattern that might miss the real string, but the real string itself |
+
+✅ **Positive control.** A scratch file containing a **synthetic** endpoint, a synthetic `sk-` token and
+a synthetic key assignment was planted and every one of the four patterns fired on it (hostname 1,
+assignment 2, `sk-` 1, long-run 2). The file was deleted. **A scan that finds nothing proves nothing
+until you have shown it can hit** — §43.4's rule, applied again.
+
+✅ **No credential printer was added or regressed.** `Config.PrintAzureTarget` prints `(set)`/`(unset)`
+and the deployment name; it was last touched at `2f4d8510` (2026-09-05, *"stop printing the API key and
+the endpoint URL entirely"*), and no `Config.cs` appears anywhere in `f6c1f133^..db7dcf42`.
+
+### 54.9 What this pass did NOT check — stated, so nobody reads it as broader than it is
+
+- **No model call was made.** No judged verdict, no cohort, no live agent turn was re-taken. Stage 2's
+  live unit remains Wave 4's observation, and **8.17 is still open** — the demo-2 lane still reports no
+  usage block, so stage 2 on that lane still cannot satisfy its own checklist.
+- **No gate's internal reasoning was re-derived.** Exit codes, the CI split, the panel's row names and
+  the two `⚠️ FINDING` rows were observed; the arithmetic behind GATE A/B/C was not.
+- **Wave 5's twelve ablations were not re-executed here** — §53 did that, independently, and all
+  twelve reproduced. This pass re-ran the *state*, not the *ablations*, with one exception:
+  `baca28e4`'s loose-vs-tight grep, which reproduced.
+- **The 221 → 224 warning delta is not reconciled** (§54.2).
+- **Whether the three Eval09 CS1574 warnings were emitted at `ba9fec13`** is not established (§54.1).
+
+### 54.10 How to re-derive §54
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+A=samples/Galaxus.RecommendationAgent
+
+# 54.1 — the finding. Prints SIX lines over THREE files, not the three §42.6 pasted.
+dotnet build $E --no-incremental 2>&1 \
+  | grep "warning CS" | grep "RecommendationAgent.Evals" | sed 's/ \[.*//' | sort -u
+# and the sites predate the claim:
+git show ba9fec13:$E/Evals/Eval09_HypothesisComparison.cs \
+  | grep -n 'cref="Decide"\|cref="Print"\|cref="TheoreticalMinimumTwoSidedP"'
+
+# 54.2 — four commands, four true warning counts, 0 errors under all of them
+dotnet build AgentEval.sln                      # 0 when there is nothing to compile
+dotnet build AgentEval.sln --no-incremental     # 224 here; a per-build-state quantity
+
+# 54.3 — full build FIRST, then --no-build per TFM (the multi-TFM stale-binary trap)
+dotnet build AgentEval.sln
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
+
+# 54.4 — the sweep. Capture $? per command; never derive one.
+for sp in "" "--real-vectors"; do
+  for c in 1 2 2b 2c 5 6 8 9; do dotnet run --project $E --no-build -- $c --dry-run $sp; echo "$? <- $c"; done
+  for c in 3 4 7;             do dotnet run --project $E --no-build -- $c            $sp; echo "$? <- $c"; done
+  dotnet run --project $E --no-build -- --ci --dry-run $sp;      echo "$? <- ci"
+  dotnet run --project $A --no-build -- 0 $sp;                   echo "$? <- a0"
+  for d in 0 1 2; do dotnet run --project $A --no-build -- $d --offline $sp; echo "$? <- a$d"; done
+done
+# space actually resolved (NOT the request flag):
+#   grep "Embedding space:" <any real-half log>   -> "space probe 1.0000 · --real-vectors"
+# cost, from the provider's usage blocks:
+#   grep -oh "prompt token(s) in total" is the anchor; sum the integer before it
+#     -> 8550 over 14 usage blocks, 594 query calls
+
+# 54.5 — the panel, by NAME rather than by count
+dotnet run --project $E --no-build -- 3 | grep -cE "(✅ caught|❌ NOT CAUGHT)  [A-Za-z0-9_]"   # 29
+dotnet run --project $E --no-build -- 3 | grep -cE "(caught|NOT CAUGHT) +[A-Za-z0-9_]+"       # 30 — baca28e4
+dotnet run --project $E --no-build -- 3 | grep -oE "[A-Za-z0-9_]+ +\(advisory — never gates\)" # the 6
+
+# 54.6 — persistence. Key set and rotation, never counts or bytes.
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+find $S -maxdepth 1 -name "*.json" ! -name "*Z.json" -printf "%TH:%TM:%TS %f\n" | sort -k2   # 13 keys
+find $S -maxdepth 1 -name "*.json" ! -name "*Z.json" -newermt "<sweep start>"                # exactly 3
+#   the newest canonical's own stamp must be ABSENT from the archives — archive-on-next-write
+#   space dependence, as an invariant rather than a byte delta:
+python -c "import json,sys; a=json.load(open(sys.argv[1],encoding='utf-8')); \
+b=json.load(open(sys.argv[2],encoding='utf-8')); \
+print([k for k in sorted(set(a)&set(b)) if a[k]!=b[k]])" \
+  $S/eval07_topology.<concept-half stamp>Z.json $S/eval07_topology.json   # ['Controls','RunAt']
+
+# 54.8 — credentials: LOOSE first, classify every hit, then prove the scanner can hit
+grep -ohE "[A-Za-z0-9]{32,}" <logs> | sort -u          # 16, every one a C# identifier
+grep -ohE "[A-Za-z0-9._-]*\.openai\.(azure\.)?com" <logs> | wc -l          # 0
+grep -icE "(api[_-]?key|secret|bearer|authorization)[\"' ]*[:=][\"' ]*[A-Za-z0-9]" <logs>  # 0
+grep -ohE "sk-[A-Za-z0-9_-]{16,}" <logs> | wc -l                           # 0
+#   then the literal test, COUNT ONLY so the value is never printed:
+printf '%s\n' "$AZURE_OPENAI_ENDPOINT" > .needle && grep -F -f .needle <logs> | wc -l && rm .needle
+#   then plant a SYNTHETIC secret in a scratch file and confirm all four patterns fire.
+```
+
+### 54.11 The sha INVARIANT, re-run at the close-out — it holds, and the counts moved again
+
+§47.6/§53.2 established that a distinct-sha **count** decays and the **invariant** does not:
+
+> **Every unresolvable sha in any of these documents must be a sha quoted inside its own correction.
+> There must be no other kind.**
+
+Re-run over all seven documents on the close-out's working tree. ⚠️ **And then re-run AGAIN after this
+section was written into the file, which is the defect `3e2a5ced` fixed** — a sweep that excludes the
+document it is being written into is not a sweep. Both counts below survived that second pass
+unchanged, because §54.11 introduces no sha the page did not already carry.
+
+| document | distinct shas | unresolvable | quoted-inside-its-own-correction? |
+|---|---|---|---|
+| `MEASUREMENT_STATUS.md` | 50 *(was 41)* | **1 — `b41262e2`** | ✅ §47.4's own retraction |
+| `SUITE_SUMMARY.md` | 15 | 0 | — |
+| `RUN_PROTOCOL.md` | 6 | 0 | — |
+| `docs/adr/030-*.md` | 4 | 0 | — |
+| `docs/adr/031-*.md` | 1 | 0 | — |
+| `MASTER_PLAN.md` | 85 *(was 80)* | **1 — `b41262e2`** | ✅ §0.4's correction row |
+| `Galaxus_RecommendationAgent_Design.md` | 13 | 0 | — |
+
+✅ **The invariant holds; `b41262e2` survives a SIXTH sweep and is still the same false positive.**
+⚠️ **Two of the seven counts moved within a day of being published, as predicted** — 41 → 50 and
+80 → 85, both because this pass wrote into those documents. **That is the reason the counts are
+stamped and the invariant is the thing checked.** The command:
+
+```bash
+for f in samples/Galaxus.RecommendationAgent.Evals/Docs/{MEASUREMENT_STATUS,SUITE_SUMMARY,RUN_PROTOCOL}.md \
+         docs/adr/03{0,1}-*.md strategy/Galaxus/{MASTER_PLAN,Galaxus_RecommendationAgent_Design}.md; do
+  bad=""; for s in $(grep -oE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u); do
+    git rev-parse --quiet --verify "$s^{commit}" >/dev/null || bad="$bad $s"; done
+  printf '%-40s unresolvable:%s\n' "$(basename $f)" "${bad:- none}"
+done
+```
