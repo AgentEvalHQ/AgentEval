@@ -59,6 +59,57 @@ public class CriterionTextTests
     public void StripLeadingEnumerator_RemovesExactlyOneMarker()
         => Assert.Equal("2. the second one", CriterionText.StripLeadingEnumerator("1. 2. the second one"));
 
+    // ── The SHORT-WORD hole. Found by the review pass of 2026-09-06, in BOTH directions. ───────
+
+    [Theory]
+    // A two- or three-letter WORD followed by a hyphen, a colon or a full stop is not a label.
+    // Every one of these was eaten by the first shipped rule, which asked only "is it short?".
+    [InlineData("Re-check the sources")]
+    [InlineData("AI-generated text is labelled")]
+    [InlineData("Top-3 results are relevant")]
+    [InlineData("No: the answer refuses")]
+    [InlineData("Do. not. hallucinate")]
+    [InlineData("Q&A pairs are cited")]
+    // A Roman-numeral-shaped run is still not a marker when nothing follows the separator but more
+    // word: a marker in a rendered list is followed by a space.
+    [InlineData("iv-league schools are named")]
+    [InlineData("i.e. the second reading")]
+    public void StripLeadingEnumerator_DoesNotEatAShortLeadingWord(string input)
+        => Assert.Equal(input, CriterionText.StripLeadingEnumerator(input));
+
+    [Fact]
+    public void AreSameCriterion_DoesNotJoinTwoCriteriaThatDifferByAShortLeadingWord()
+    {
+        // ⚠ THE UNSAFE DIRECTION. This returned true on the first shipped rule, because both sides
+        // normalised to "check the sources" — a similarity match made by the type whose remarks say
+        // it makes none. In CalibratedEvaluator that is one criterion's verdict aggregated under
+        // another criterion's name.
+        Assert.False(CriterionText.AreSameCriterion("Re-check the sources", "Check the sources"));
+        Assert.False(CriterionText.AreSameCriterion("AI-generated text is labelled",
+                                                   "generated text is labelled"));
+        Assert.Null(CriterionText.MatchDeclared("Check the sources", ["Re-check the sources"]));
+    }
+
+    [Fact]
+    public void AreSameCriterion_StillJoinsTheOrdinalEchoOfAShortLeadingWordCriterion()
+    {
+        // ⚠ THE OTHER DIRECTION, and it failed at the same time: the declared side lost its "Re-"
+        // while the echoed side lost only the ordinal, so the two normalised forms differed and the
+        // echo this whole type exists to rejoin did not rejoin.
+        Assert.True(CriterionText.AreSameCriterion("Re-check the sources", "1. Re-check the sources"));
+        Assert.Equal("Re-check the sources",
+                     CriterionText.MatchDeclared("1. Re-check the sources", ["Re-check the sources"]));
+    }
+
+    [Theory]
+    // The forms that ARE markers keep working — a Roman numeral, a single letter, digits.
+    [InlineData("iv. the fourth", "the fourth")]
+    [InlineData("III) the third", "the third")]
+    [InlineData("b: the second", "the second")]
+    [InlineData("12. the twelfth", "the twelfth")]
+    public void StripLeadingEnumerator_StillRemovesARealLabel(string input, string expected)
+        => Assert.Equal(expected, CriterionText.StripLeadingEnumerator(input));
+
     [Fact]
     public void StripLeadingEnumerator_Null_Throws()
         => Assert.Throws<ArgumentNullException>(() => CriterionText.StripLeadingEnumerator(null!));

@@ -3522,14 +3522,26 @@ public static class NegativeControls
             problems.Add($"the echo's nearest declared criterion is '{echoDiagnosis.NearestKey}', not '{rubric[0].Criterion.Key}'.");
 
         // ── 5. The enumeration stripper must not eat real words. ──
-        foreach (var (input, expected, why) in new[]
+        var stripperCases = new[]
                  {
                      ("no sentence states a price", "no sentence states a price", "a two-letter word followed by a space is not a label"),
                      ("it asks at least one question", "it asks at least one question", "a word is not an ordinal"),
                      ("1. every recommendation", "every recommendation", "an ordinal IS an ordinal"),
                      ("- every recommendation", "every recommendation", "a bullet is a bullet"),
                      ("criterion 1 is met", "criterion 1 is met", "a long leading word is never a label"),
-                 })
+                     // ⚠ THE SHORT-WORD HOLE, found by the review pass of 2026-09-06. Every case above
+                     // uses a leading word of FOUR OR MORE letters, so the table certified a rule that
+                     // ate every short one: "re-check…" became "check…" and "ai-generated…" became
+                     // "generated…". A separator is not enough — the run has to be shaped like a label
+                     // AND be followed by a space.
+                     ("re-check the sources", "re-check the sources", "a two-letter word plus a hyphen is a WORD"),
+                     ("ai-generated text is labelled", "ai-generated text is labelled", "so is a two-letter initialism"),
+                     ("top-3 results are relevant", "top-3 results are relevant", "and a three-letter one"),
+                     ("no: the answer refuses", "no: the answer refuses", "a colon does not make a word a label"),
+                     ("i.e. the second reading", "i.e. the second reading", "a marker is followed by a SPACE"),
+                     ("iv. the fourth criterion", "the fourth criterion", "a real roman numeral still IS a label"),
+                 };
+        foreach (var (input, expected, why) in stripperCases)
         {
             string got = Eval05_RecommendationQuality.StripEnumeration(input);
             if (!string.Equals(got, expected, StringComparison.Ordinal))
@@ -3548,7 +3560,7 @@ public static class NegativeControls
                 ? $"all {rubric.Count} echoed criteria join and carry their OWN verdicts · the same set in reverse "
                 + "order joins identically (not positional) · an invented criterion is still refused and diagnosed "
                 + $"INVENTED · an echo is diagnosed JOIN FAILURE against '{echoDiagnosis.NearestKey}' "
-                + $"({echoDiagnosis.OverlapChars} shared chars) · 5 of 5 stripper cases behave"
+                + $"({echoDiagnosis.OverlapChars} shared chars) · {stripperCases.Length} of {stripperCases.Length} stripper cases behave, six of them short leading words"
                 : $"{problems.Count} fault(s): {string.Join("; ", problems)}",
             problems.Count == 0);
     }

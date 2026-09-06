@@ -34,6 +34,17 @@ namespace AgentEval.Core;
 /// criterion. A criterion the judge genuinely invented does not match anything, is left exactly as
 /// the judge wrote it, and stays visible to the consumer that wants to report it.
 /// </para>
+/// <para>
+/// ⚠ <b>THAT PARAGRAPH WAS FALSE AS FIRST SHIPPED, and the reason is worth keeping.</b> The
+/// normalising step discounted ANY leading run of one to three letters followed by
+/// <c>. ) : -</c> — which describes a Roman numeral and equally describes <c>Re-</c>, <c>AI-</c>,
+/// <c>No:</c> and <c>Top-</c>. Measured on the shipped build:
+/// <c>AreSameCriterion("Re-check the sources", "Check the sources")</c> returned
+/// <see langword="true"/>, a similarity match made by the class that promises none; and
+/// <c>MatchDeclared("1. Re-check the sources", ["Re-check the sources"])</c> returned
+/// <see langword="null"/>, so the echo this type exists to rejoin did not rejoin. Both directions
+/// failed at once, from one missing condition. See <see cref="StripLeadingEnumerator"/>.
+/// </para>
 /// </remarks>
 public static class CriterionText
 {
@@ -43,14 +54,25 @@ public static class CriterionText
     /// <remarks>
     /// <para>
     /// <b>Deliberately narrow.</b> One marker, only at the start, only the forms a list renderer
-    /// produces: <c>1.</c> <c>1)</c> <c>(1)</c> <c>a.</c> <c>A.</c> <c>iv.</c> <c>#1</c> <c>-</c>
-    /// <c>*</c> <c>•</c>. Everything after it is left as text. A label longer than three characters
-    /// is a word, and stripping a word is how a normaliser starts inventing matches.
+    /// produces: <c>1.</c> <c>1)</c> <c>(1)</c> <c>a.</c> <c>A.</c> <c>iv.</c> <c>-</c> <c>*</c>
+    /// <c>•</c>. Everything after it is left as text. <c>#1</c> is <b>not</b> one of them and never
+    /// was: that form carries no separator, and the test suite has pinned it as UNSTRIPPED since
+    /// this type shipped. The list above named it anyway, in both copies of it.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>THREE CONDITIONS, AND TWO OF THEM WERE MISSING AT FIRST SHIP.</b> A leading run is
+    /// discounted only when it is <b>short</b> (one to three characters), <b>shaped like an
+    /// enumerator</b> (all digits, one letter, or a Roman numeral) and <b>followed by a separator
+    /// and then a space or the end of the text</b>. Without the last two,
+    /// <c>Re-check the sources</c> normalised to <c>check the sources</c> and
+    /// <c>AI-generated text is labelled</c> to <c>generated text is labelled</c> — a real leading
+    /// word eaten because it happened to be short and hyphenated.
     /// </para>
     /// <para>
     /// Ported from the Galaxus Eval 05 repair of 2026-09-05 so the rule lives in one place instead
-    /// of once per consumer. It accepts upper-case labels as well as lower-case, which the sample's
-    /// copy could not see because it lower-cased first; on lower-cased input the two are identical.
+    /// of once per consumer — the sample's copy CALLS this method now rather than keeping a second
+    /// one that could drift. It accepts upper-case labels as well as lower-case; on lower-cased
+    /// input the two are identical.
     /// </para>
     /// </remarks>
     /// <param name="text">The text to strip. Not null.</param>
@@ -75,14 +97,47 @@ public static class CriterionText
             return text[2..];
         }
 
-        // A label has to be SHORT — "1", "12", "a", "iv".
+        // A label has to be SHORT — "1", "12", "a", "iv" …
         if (labelLength is < 1 or > 3) return text;
 
+        // … AND SHAPED LIKE ONE. "Re", "AI", "No", "Do" and "Top" are short WORDS, and
+        // discounting a word is how a normaliser starts inventing matches.
+        if (!IsEnumeratorLabel(text.AsSpan(labelStart, labelLength))) return text;
+
+        int afterLabel = i;
         while (i < text.Length && (text[i] == '.' || text[i] == ')' || text[i] == ':' || text[i] == '-')) i++;
-        if (i == labelStart + labelLength) return text;      // no separator: not an enumeration
+        if (i == afterLabel) return text;                    // no separator: not an enumeration
+
+        // … AND THE MARKER HAS TO END. A rendered list puts a space after it; a hyphenated word
+        // does not, which is what leaves "iv-league" and "i.e. something" as text.
+        if (i < text.Length && text[i] != ' ') return text;
+
         while (i < text.Length && text[i] == ' ') i++;
 
         return i >= text.Length ? text : text[i..];
+    }
+
+    /// <summary>
+    /// Whether a short leading run is shaped like an enumeration label: all digits (<c>1</c>,
+    /// <c>12</c>), one letter (<c>a</c>, <c>A</c>), or a Roman numeral (<c>iv</c>, <c>III</c>).
+    /// </summary>
+    /// <remarks>
+    /// ⚠ The point of it is what it REFUSES. Every two- or three-letter word that is not a Roman
+    /// numeral — <c>Re</c>, <c>AI</c>, <c>No</c>, <c>Do</c>, <c>Top</c> — fails here, so a criterion
+    /// that begins with one keeps its first word.
+    /// </remarks>
+    /// <param name="label">The candidate label, one to three characters.</param>
+    /// <returns>True when the run could be an enumeration label.</returns>
+    private static bool IsEnumeratorLabel(ReadOnlySpan<char> label)
+    {
+        bool allDigits = true;
+        bool allRoman = true;
+        foreach (char c in label)
+        {
+            if (!char.IsAsciiDigit(c)) allDigits = false;
+            if ("ivxlcdmIVXLCDM".IndexOf(c) < 0) allRoman = false;
+        }
+        return allDigits || allRoman || (label.Length == 1 && char.IsAsciiLetter(label[0]));
     }
 
     /// <summary>

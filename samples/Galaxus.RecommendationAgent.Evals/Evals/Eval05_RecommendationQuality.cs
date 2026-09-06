@@ -5,6 +5,7 @@
 
 using System.Globalization;
 using System.Text;
+using AgentEval.Core;
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Agents;
 using Microsoft.Agents.AI;
@@ -810,30 +811,15 @@ public static class Eval05_RecommendationQuality
     {
         ArgumentNullException.ThrowIfNull(normalised);
 
-        int i = 0;
-        if (i < normalised.Length && (normalised[i] == '(' || normalised[i] == '#')) i++;
-
-        int labelStart = i;
-        while (i < normalised.Length && (char.IsAsciiDigit(normalised[i]) || char.IsAsciiLetterLower(normalised[i]))) i++;
-        int labelLength = i - labelStart;
-
-        // A bullet: no label at all, just the mark.
-        if (labelLength == 0 && labelStart == 0 && normalised.Length > 1
-            && (normalised[0] == '-' || normalised[0] == '*' || normalised[0] == '•')
-            && normalised[1] == ' ')
-        {
-            return normalised[2..];
-        }
-
-        // A label has to be SHORT — "1", "12", "a", "iv". Anything longer is a word, and stripping
-        // a word is how a normaliser starts inventing matches.
-        if (labelLength is < 1 or > 3) return normalised;
-
-        while (i < normalised.Length && (normalised[i] == '.' || normalised[i] == ')' || normalised[i] == ':' || normalised[i] == '-')) i++;
-        if (i == labelStart + labelLength) return normalised;      // no separator: not an enumeration
-        while (i < normalised.Length && normalised[i] == ' ') i++;
-
-        return i >= normalised.Length ? normalised : normalised[i..];
+        // ⚠ ONE RULE, IN ONE PLACE — and it was two places for exactly one wave.
+        // a0e23518 ported this method into AgentEval.Core.CriterionText saying it did so "so there
+        // is one rule rather than one per consumer", and then left this copy standing, so there
+        // were two. The review pass of 2026-09-06 found a defect in the rule that was therefore
+        // present in BOTH: any leading run of one to three letters followed by `. ) : -` was
+        // discounted, so "re-check the sources" normalised to "check the sources". Delegating is
+        // what makes the sentence true; a second copy is what let the defect be fixed once and
+        // survive.
+        return CriterionText.StripLeadingEnumerator(normalised);
     }
 
     private static string Normalise(string? text) =>
