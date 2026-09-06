@@ -4687,9 +4687,17 @@ APPROVED exit, so GATE C fails**"*. Re-run at this commit as a one-line ablation
 `CatalogueDiscoverySearch.ClassifyCoverage` (`AttributableProductIds.Count == 0 ⇒ Uncovered`, inserted
 above the existing candidate-count clause), with every threshold untouched:
 
+> ⚠️ **THIS TABLE'S FIRST ROW WAS WRONG AND IS CORRECTED IN PLACE, 2026-09-06 (Wave 4 review, §41.3).**
+> It published **4 of 5** *"(Renzo ❌, Nadia ❌, Marco ✅ recovered)"* — two failures out of five is
+> **three** matching, and Marco was already ✅ at baseline, so nothing recovered. §38.1 refuted it 700
+> lines below and **left the number standing here**, which is where a reader lands. Superseded → corrected
+> is in the row itself. Direction of the error: **flattering to the gate**. Blast radius: this row, §31.4's
+> command block (also corrected), and the two plan items that quote §31.1; GATE C, the APPROVED exit and
+> both exit codes are unaffected and were re-measured.
+
 | | shipped | with the gate | plan's claim |
 |---|---|---|---|
-| Eval 07 loop-back pins matching | 4 of 5 (Renzo ❌) | **4 of 5** (Renzo ❌, **Nadia** ❌, Marco ✅ recovered) | "four of five flip" |
+| Eval 07 loop-back pins matching | 4 of 5 (Renzo ❌) | ~~4 of 5 … Marco ✅ recovered~~ → **3 of 5** (Renzo ❌, **Nadia** ❌; Marco ✅ **at baseline too**) | "four of five flip" |
 | personas whose verdict moved | — | **ONE** — `USR-NB-01` | four |
 | an APPROVED exit exists in the corpus | yes (Renzo) | **yes (Renzo)** | "removed" |
 | **GATE C** | ✅ | ✅ **PASSES** | "fails" |
@@ -4760,10 +4768,14 @@ decision first and the code second, and the code half has three preconditions th
 ```bash
 E=samples/Galaxus.RecommendationAgent.Evals
 A=samples/Galaxus.RecommendationAgent
-# the ablation, for anyone re-deriving 31.1: add to CatalogueDiscoverySearch.ClassifyCoverage
-#   if (coverage.AttributableProductIds.Count == 0) return CoverageStatus.Uncovered;
-dotnet run --project $E -- 7                              # 4 of 5 pins, GATE C ✅, exit 1 (GATE B)
-dotnet run --project $E -- 3                              # exit 1 — ContentlessRequestIsNotCovered, on its fixture
+# ⚠ THE ABLATION HAS TWO FORMS AND THEY DO NOT GIVE THE SAME ANSWER — corrected 2026-09-06 (§41.3).
+#   Everything below §38.3 was measured in form (a). Form (b) is what §38.3 DECIDES to ship.
+# (a) ClassifyCoverage only:  add above the candidate-count clause
+#       if (coverage.AttributableProductIds.Count == 0) return CoverageStatus.Uncovered;
+# (b) …AND the same clause in CoverageReview.Starved's OR — the decided, shippable form.
+dotnet run --project $E -- 7                              # (a) and (b): 3 of 5 pins, GATE C ✅, exit 1 (GATE B)
+dotnet run --project $E -- 3                              # (a) exit 0 · (b) exit 1 — TopologyCaseProseMatchesTheRun,
+                                                          #   because Marco's stop reason moves no-progress → gaps-unresolvable
 dotnet run --project $A -- 2 --offline --user USR-NB-01   # 3 of 5 covered, DEGRADED, 2 rounds, 10 items
 ```
 
@@ -5501,9 +5513,16 @@ the path the reviewer's veto actually takes.
 
 | ablation | result |
 |---|---|
-| **A — apply the 8.21 attribution gate** (the precondition's whole point) | `ContentlessRequestIsNotCovered` **✅ caught**, `-- 3` exit **0**. With the old fixture the same gate gave *"1 fault: an interest that DOES name something was not Covered"* and exit **1** |
+| **A — apply the 8.21 attribution gate** (the precondition's whole point) | `ContentlessRequestIsNotCovered` **✅ caught**. With the old fixture the same gate gave *"1 fault: an interest that DOES name something was not Covered"* and exit **1** |
 | **B — make `ClassifyCoverage` refuse everything** | **❌ NOT CAUGHT** — *"a REAL ingest row that names something and has 12 attributable candidate(s) was not Covered (`USR-NB-01/I-1`…) — the gate refuses everything"*, `-- 3` exit **1** |
 | restored | ✅ caught, `-- 3` exit 0, `-- 7` exit 1 |
+
+> ⚠️ **THE `-- 3` EXIT CODE ON ABLATION A WAS PUBLISHED AS 0 AND IS CORRECTED, 2026-09-06 (§41.2).**
+> Exit **0** is form (a), `ClassifyCoverage` only. In form **(b)** — the both-site form §38.3 immediately
+> below DECIDES to ship — `-- 3` exits **1**, on a row this same wave added one commit earlier. **The
+> precondition-1 clearance itself is unaffected and re-measured**: `ContentlessRequestIsNotCovered` is
+> ✅ caught under BOTH forms. What was wrong was reading a green suite off the variant the next
+> subsection rejects. §41.2 records the fourth precondition that falls out of it.
 
 ### 38.3 Precondition 2 — DECIDED: both sites, in one change
 
@@ -5735,4 +5754,121 @@ dotnet test tests/AgentEval.Tests
 for c in 3 4 7; do dotnet run --project $E -- $c; echo "exit=$?"; done
 dotnet run --project $E -- --ci --dry-run; echo "exit=$?"
 dotnet run --project $A -- 2 --user USR-NB-01     # LIVE, 3 model calls, exit 0
+```
+
+---
+
+## 41. WAVE 4 REVIEW — four defects, all found by re-executing, none by re-reading (2026-09-06)
+
+Wave 4's own new rule (`RUN_PROTOCOL` **Stage 0**: *re-execute the ablation you are about to build
+on*) was applied to Wave 4. **It found four things, and three of them are in text the wave wrote
+specifically to correct an earlier stale claim.** The rate holds: every wave's review has found
+defects of the same shape as the fixes it reviewed.
+
+**What was re-executed and REPRODUCED, so it is not in the list below:** the constant split is
+arithmetically inert (`-- 7` whole-log diff across the split = **24 lines, every one a clock**);
+the ablation on `CoverageCutIsNotTheConfidenceShapeParameter` → **NOT CAUGHT, 2 faults, exit 1**;
+the schema ablation → **Failed 4, Passed 2 of 6**; the prose row's ablation, run in its FULL pre-fix
+form (both texts swapped, not just Marco's) → **NOT CAUGHT, 2 faults** — stronger than published;
+§38.1's correction of §31.1 → **3 of 5, confirmed under both ablation forms**; the whole suite →
+net10 **9,648/0/2 of 9,650**, net9 and net8 **9,430/0/1 of 9,431**.
+
+### 41.1 The census's ONE survivor is a 0 of 0 — and its direction label was inverted
+
+Fixed in `504fce6e`; the reasoning and both ablations are in that commit. Two facts for the record:
+
+| | measured |
+|---|---|
+| `USR-LF-04`, the row's only survivor | admissible snippet pool **0 of 0 snippets** |
+| every other customer's denominator | **13 – 27** |
+| durable **by examination** | **0** of the 10 non-looping customers |
+| mapper-map vs final-map pool, non-looping customers | **identical on all ten** — the methodological choice is a measured no-op |
+
+`USR-LF-04` is already an Eval 07 case pinned `ExpectsLoopBack: false, PresentsAnswerText: false` —
+the ABSTENTION cell. **It cannot replace Nadia's negative cell**, whose value is that the reviewer
+ran on a customer with a full tray and chose not to loop. The corrected reading **STRENGTHENS
+§36.4's refusal**: zero durable-by-examination, not one.
+
+The second half: the row called measuring novelty against the mapper-origin map *"the larger-pool
+and therefore unflattering choice"*. A larger pool makes FEWER customers durable, which makes *"no
+replacement cell exists"* — the conclusion §28.2 and §31.3 quote this row for — **easier** to say.
+It is conservative about each per-customer durability claim and anti-conservative about the
+aggregate the row is used for. Both pools are now computed and the row reports whether the durable
+set moves; it does not.
+
+### 41.2 8.21's code half has a FOURTH precondition, and this wave created it
+
+`b41268e2` added the gating row `TopologyCaseProseMatchesTheRun`, which pins each Eval 07 case's
+`Why` prose to the stop reason its run produces. Marco's prose names `no-progress`. **Under the
+attribution gate in the both-site form §38.3 decides to ship, Marco's stop reason becomes
+`gaps-unresolvable`** and the row goes red.
+
+| ablation form | `-- 3` | `-- 7` GATE B | Marco's stop reason |
+|---|---|---|---|
+| shipped (no gate) | **0** | 4 of 5 pins, Renzo fails | `no-progress` |
+| **(a)** `ClassifyCoverage` only — what §31.1, §38.1, §38.2 and §38.4 all measured | **0** | **3 of 5**, Renzo + Nadia fail | `no-progress` |
+| **(b)** `ClassifyCoverage` **and** `Starved` — the form §38.3 DECIDES | **1** — 1 fault, `TopologyCaseProseMatchesTheRun` | **3 of 5**, Renzo + Nadia fail | **`gaps-unresolvable`** |
+
+§38.3 says the ablations *"were all run with the clause in `ClassifyCoverage` only; the shipped
+change must carry both, and its own measurement must be taken with both."* **It names the obligation
+and does not discharge it** — and the both-site measurement is exactly where the wave's own new row
+turns red. So:
+
+> **PRECONDITION 4 (new, cheap, and it must land in the SAME commit as the gate): re-author Marco's
+> `Why` in `Eval07_WorkflowTopology.Cases` from `no-progress` to `gaps-unresolvable`.** Predict the
+> new stop reasons for all five cases BEFORE the run, then run. The row is doing its job — prose
+> that describes a run the code no longer produces is precisely what it was built to catch — so this
+> is a cost of the gate, not a defect in the row.
+
+**The precondition-1 clearance is unaffected and was re-measured:** `ContentlessRequestIsNotCovered`
+is caught under **both** forms, on the real `USR-NB-01/I-1` specimen. The defect is the exit code
+that was read off the rejected variant, not the fix.
+
+### 41.3 §31.1's refuted table was never corrected at its origin, and its command block still pasted the refuted number
+
+§38.1 refuted §31.1's *"4 of 5 … Marco recovered"* — **and left it standing in §31.1**, 700 lines
+above, which is where a reader lands, together with §31.4's paste-ready
+`dotnet run … -- 7   # 4 of 5 pins`. **That is the exact failure Stage 0 was written to prevent**:
+the wave's own rule says an ablation is worth writing down *with the command that produces it, so
+re-running it is one paste* — and the command block was the thing carrying the refuted number.
+
+Both are corrected in place above, superseded then corrected, with the direction of the error
+(flattering to the gate) and the blast radius named. §31.4's block now also carries **both**
+ablation forms and their differing `-- 3` exit codes, so the next reader cannot re-derive (a) while
+shipping (b).
+
+### 41.4 Scope limits of the new controls — declared, not fixed
+
+Neither is a defect today; both are the shape that becomes one quietly.
+
+- **`CoverageCutIsNotTheConfidenceShapeParameter`** asserts the separation **per named method body**
+  — `Confidence`, `ClassifyCoverage`, `Starved`. A NEW site that squashed with `MinCandidateScore`,
+  or cut with `RetrievalConfidenceHalfSaturation`, is outside the scan. It asserts its own input
+  (three bodies located, both constants present and `IsLiteral`, a partial scan is a fault), so it
+  cannot pass vacuously — it simply cannot see a fourth site.
+- **`TopologyCaseProseMatchesTheRun`** skips a case whose `Why` names no stop reason, and guards
+  that with `casesNamingAReason < 2`. Exactly **2** of 5 name one today, so the guard is currently
+  tight; a third case naming one would make deleting a claim from the prose a silent way to go
+  green.
+
+### 41.5 Commands
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+dotnet build AgentEval.sln -c Debug
+for c in 3 4 7; do dotnet run --project $E -- $c; echo "exit=$?"; done   # 0 . 0 . 1
+dotnet run --project $E -- --ci --dry-run; echo "exit=$?"               # 1
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t; done
+
+# 41.1 ablations, on the census's two NEW mechanisms
+#   V: bool vacuousSurvivor = false && ...        -> "1 of those 1 ... none is vacuous" beside "pool 0 of 0"
+#   M: int admissiblePoolFinalMap = 99 + Pool(..) -> "the two maps DISAGREE on ..." naming all ten
+
+# 41.2 the two ablation forms -- (b) is the one to measure from now on
+#   (a) CatalogueDiscoverySearch.ClassifyCoverage, above the candidate-count clause:
+#         if (coverage.AttributableProductIds.Count == 0) return CoverageStatus.Uncovered;
+#   (b) ...and CoverageReview.Starved's OR:
+#         || coverage.AttributableProductIds.Count == 0
+dotnet run --project $E -- 3   # (a) exit 0 . (b) exit 1, TopologyCaseProseMatchesTheRun
+dotnet run --project $E -- 7   # both: 3 of 5 pins, exit 1
 ```
