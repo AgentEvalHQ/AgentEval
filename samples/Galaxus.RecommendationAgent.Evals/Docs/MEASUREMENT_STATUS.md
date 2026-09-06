@@ -6821,22 +6821,54 @@ quoted from this table* — plus the exact greps, and that banner is the entire 
 Wave 4 found four pointers naming `b41262e2`, which git cannot resolve. Every distinct sha in seven
 documents was passed through `git rev-parse --verify`:
 
-| document | distinct shas | unresolvable |
-|---|---|---|
-| `MEASUREMENT_STATUS.md` | 38 | 0 |
-| `SUITE_SUMMARY.md` | 15 | 0 |
-| `RUN_PROTOCOL.md` | 6 | 0 |
-| `docs/adr/030-*.md` | 4 | 0 |
-| `docs/adr/031-*.md` | 1 | 0 |
-| `MASTER_PLAN.md` | 71 | **1 — `b41262e2`** |
-| `Galaxus_RecommendationAgent_Design.md` | 11 | 0 |
+🔴 **CORRECTED IN THE WAVE-5 REVIEW — and the correction is the finding.** This table was first
+published as a row of fixed counts, with `MEASUREMENT_STATUS.md | 38 | 0`. Re-executed at the very
+commit that published it (`436674e3`) the same file reads **40 distinct, 1 unresolvable** — and the
+one is **`b41262e2`, which §47.4's own prose introduces two lines above the table**.
 
-⚠️ **The one hit is a FALSE POSITIVE and it is recorded so the next sweep does not "fix" it.** The
-`b41262e2` in `MASTER_PLAN` §0.4 is the wrong sha quoted **inside its own correction row**
-(`` `b41262e2` → `b41268e2` ``). A sweep that resolves every sha in a document will always flag a
-document that names a refuted sha in order to retract it. **The check is right and the finding is
-not a defect** — which is itself worth writing down, because the cheapest way to make a sweep look
-clean is to delete the sentence that records the error.
+**The sweep was run over the seven documents as they stood BEFORE this section was written into one
+of them, and the result was published as if it described the shipped document.** That is the
+gate-self-examination shape with the artifact and the instrument in the same file: the sweep's output
+excluded the only document the sweep was editing. **Direction: FLATTERING** — it certified the
+document carrying the sweep as clean while flagging the document it pointed at, when both carry the
+identical, identically-harmless quoted-inside-its-own-correction hit.
+
+⚠️ **AND A FIXED COUNT IS THE WRONG SHAPE HERE ANYWAY.** Every one of these numbers moves the next
+time anyone writes a sha into any of these files — four commits after `436674e3` did exactly that,
+and `MEASUREMENT_STATUS.md` went 40 → 41 without anybody touching the sweep. A quantity that changes
+when you re-run the thing is not a measurement. **So the counts are stated as of one named commit and
+the INVARIANT is stated separately, and it is the invariant that is worth checking:**
+
+> **Every unresolvable sha in any of these documents must be a sha quoted inside its own correction.
+> There must be no other kind.**
+
+Measured at `HEAD` of the Wave-5 review, by the command below:
+
+| document | distinct shas | unresolvable | each one a quoted-inside-its-own-correction hit? |
+|---|---|---|---|
+| `MEASUREMENT_STATUS.md` | 41 | **1 — `b41262e2`** | ✅ yes — §47.4's own retraction, twice on this page |
+| `SUITE_SUMMARY.md` | 15 | 0 | — |
+| `RUN_PROTOCOL.md` | 6 | 0 | — |
+| `docs/adr/030-*.md` | 4 | 0 | — |
+| `docs/adr/031-*.md` | 1 | 0 | — |
+| `MASTER_PLAN.md` | 80 | **1 — `b41262e2`** | ✅ yes — §0.4's correction row |
+| `Galaxus_RecommendationAgent_Design.md` | 13 | 0 | — |
+
+⚠️ **Both hits are FALSE POSITIVES and they are recorded so the next sweep does not "fix" them.** The
+`b41262e2` in `MASTER_PLAN` §0.4 and the two in `MEASUREMENT_STATUS` §47.4 are the wrong sha quoted
+**inside its own correction** (`` `b41262e2` → `b41268e2` ``). A sweep that resolves every sha in a
+document will always flag a document that names a refuted sha in order to retract it. **The check is
+right and the finding is not a defect** — which is itself worth writing down, because the cheapest
+way to make a sweep look clean is to delete the sentence that records the error.
+
+⚠️ **The superseded counts, kept because the direction of the error is the point:** 38/0, 15/0, 6/0,
+4/0, 1/0, 71/1, 11/0. Three of the seven were wrong (`MEASUREMENT_STATUS` 38 → 40, `MASTER_PLAN`
+71 → 80, the design file 11 → 13) and only one of the three moved the *unresolvable* column — the one
+that names the document the sweep was being written into.
+
+⚠️ **Run it over the documents AS THEY WILL SHIP, not as they stood before this section was
+written** — that is the whole of what went wrong the first time. Re-run it as the LAST step of any
+commit that adds a sha, and check the invariant, not the count.
 
 ```bash
 for f in <the seven documents>; do
