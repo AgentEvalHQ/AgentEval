@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
@@ -5212,6 +5212,14 @@ public static class NegativeControls
         var reportedZero = ProbeChatSpend(new UsageDetails { InputTokenCount = 0, OutputTokenCount = 0 });
         var noUsage = ProbeChatSpend(usage: null);
 
+        // ⚠ THE HALF-BLOCK, added by the review pass of 2026-09-06. The absence rule was applied to
+        //   the WHOLE block and then `?? 0` was written for each half, so a response reporting a
+        //   prompt count and NO completion count read as `1,234 prompt + 0 completion`, `Complete`
+        //   stayed true, and Eval08LiveWorkflowArm would have handed that to the harness as
+        //   TokensAreEstimated = false. Same defect as check 2, one level down, and in the same
+        //   flattering direction.
+        var halfBlock = ProbeChatSpend(new UsageDetails { InputTokenCount = 1234 });
+
         if (withUsage.CallsWithUsage != 1 || withUsage.PromptTokens != 1234 || withUsage.CompletionTokens != 56)
         {
             problems.Add("a chat response carrying a usage block did not reach DiscoveryState.Spend intact "
@@ -5226,6 +5234,24 @@ public static class NegativeControls
             problems.Add("a chat response with NO usage block was not recorded as an absence "
                        + $"({noUsage.CallsWithUsage} with usage, {noUsage.CallsWithoutUsage} without, "
                        + $"{noUsage.PromptTokens} prompt tokens; expected 0 / 1 / 0).");
+        }
+
+        if (halfBlock.CallsWithPartialUsage != 1 || halfBlock.CallsWithUsage != 0
+            || halfBlock.PromptTokens != 1234 || halfBlock.CompletionTokens != 0 || halfBlock.Complete)
+        {
+            problems.Add("a usage block carrying ONE of the two counts was not recorded as a PARTIAL reading "
+                       + $"({halfBlock.CallsWithUsage} complete, {halfBlock.CallsWithPartialUsage} partial, "
+                       + $"{halfBlock.PromptTokens} prompt, {halfBlock.CompletionTokens} completion, "
+                       + $"Complete={halfBlock.Complete}; expected 0 / 1 / 1234 / 0 / False). A completion count "
+                       + "the provider never sent is being summed as a measured zero, and a total nobody measured "
+                       + "in full is being published as complete.");
+        }
+
+        string halfText = string.Join(" ", DescribeSpend(halfBlock));
+        if (!halfText.Contains("LOWER BOUND", StringComparison.Ordinal))
+        {
+            problems.Add("a half-reported usage block renders without a LOWER BOUND caveat, so a partial total "
+                       + $"reads as a whole one: \"{halfText}\".");
         }
 
         // The one that matters most: a MISSING figure and a MEASURED ZERO must not print the same
@@ -5338,6 +5364,11 @@ public static class NegativeControls
                 InputTokenCount = i == 0 ? snapshot.PromptTokens : 0,
                 OutputTokenCount = i == 0 ? snapshot.CompletionTokens : 0,
             });
+        }
+
+        for (int i = 0; i < snapshot.CallsWithPartialUsage; i++)
+        {
+            spend.Record(new UsageDetails { InputTokenCount = i == 0 ? snapshot.PromptTokens : 0 });
         }
 
         for (int i = 0; i < snapshot.CallsWithoutUsage; i++) spend.RecordNoResponse();

@@ -1301,6 +1301,7 @@ public static class Eval08_StochasticStability
 
         int calls = spends.Sum(s => s.Calls);
         int withUsage = spends.Sum(s => s.CallsWithUsage);
+        int partialUsage = spends.Sum(s => s.CallsWithPartialUsage);
         int withoutUsage = spends.Sum(s => s.CallsWithoutUsage);
         long prompt = spends.Sum(s => s.PromptTokens);
         long completion = spends.Sum(s => s.CompletionTokens);
@@ -1323,11 +1324,15 @@ public static class Eval08_StochasticStability
         //   otherwise — the first live run of the sibling meter printed `7’202` on this Swiss box —
         //   and a token count nobody can grep out of a log is a count the next reader re-types.
         Console.WriteLine($"    model      : {Config.Model}");
+        string partialClause = partialUsage > 0
+            ? $", {partialUsage} reported only ONE of the two counts"
+            : string.Empty;
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"    calls      : {calls} over {spends.Count} run(s) "
-          + $"({(double)calls / spends.Count:0.0} per run) · {withUsage} reported usage, {withoutUsage} did not"));
+          + $"({(double)calls / spends.Count:0.0} per run) · {withUsage} reported usage, {withoutUsage} did not"
+          + $"{partialClause}"));
 
-        if (withUsage == 0)
+        if (withUsage == 0 && partialUsage == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"    tokens     : usage NOT REPORTED by the provider for any of the {calls} call(s).");
@@ -1348,6 +1353,14 @@ public static class Eval08_StochasticStability
             Console.ResetColor();
         }
 
+        if (partialUsage > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"    ⚠ LOWER BOUND — {partialUsage} of {calls} call(s) reported only ONE of the two counts.");
+            Console.WriteLine("      The reported half is in the totals above; the other half is UNKNOWN, not zero.");
+            Console.ResetColor();
+        }
+
         var rate = ModelPricing.GetPricing(Config.Model);
         Console.ForegroundColor = ConsoleColor.DarkGray;
         if (rate is null)
@@ -1362,7 +1375,9 @@ public static class Eval08_StochasticStability
                 $"    rate       : USD {rate.Value.InputPricePerMillion:0.####} / 1M in · "
               + $"USD {rate.Value.OutputPricePerMillion:0.####} / 1M out   [source: AgentEval ModelPricing table]"));
             Console.WriteLine($"    cost       : USD {cost.ToString("F4", CultureInfo.InvariantCulture)}"
-                            + (withoutUsage > 0 ? "   ← over the REPORTED tokens only, so a lower bound too" : ""));
+                            + (withoutUsage > 0 || partialUsage > 0
+                                    ? "   ← over the REPORTED tokens only, so a lower bound too"
+                                    : ""));
             Console.WriteLine("    ⚠ that table's row for this deployment is marked '(placeholder)' in library source.");
             Console.WriteLine("      Read the TOKENS as the measurement and the currency as arithmetic over a declared rate.");
         }

@@ -33,6 +33,15 @@ namespace Galaxus.RecommendationAgent.Workflows;
 /// second is an unknown.
 /// </para>
 /// <para>
+/// ⚠ <b>And the same rule one level down, which the first version of this type broke.</b> The check
+/// above was applied to the whole block and then each half was read as <c>?? 0</c>, so a response
+/// carrying a prompt count and NO completion count was recorded as <c>1,234 prompt + 0 completion</c>
+/// and reported <see cref="Complete"/>. A half-populated block is now a
+/// <see cref="CallsWithPartialUsage"/>: the reported half is summed because the provider did report
+/// it, the missing half adds nothing, the total is labelled a LOWER BOUND, and the meter no longer
+/// calls itself complete — so <c>Eval08LiveWorkflowArm</c> cannot publish it as measured.
+/// </para>
+/// <para>
 /// <b>It never estimates, and it never sees our own text.</b> There is no path in this type from a
 /// string to a token count. That is deliberate: a meter that counts our own tokens is measuring our
 /// tokenizer, not the provider's bill. If a later change wants a fallback, it belongs somewhere
@@ -58,45 +67,78 @@ public sealed class ChatSpend
     /// </summary>
     public int CallsWithoutUsage { get; private set; }
 
-    /// <summary>Every chat call this meter was told about.</summary>
-    public int Calls => CallsWithUsage + CallsWithoutUsage;
+    /// <summary>
+    /// Calls whose usage block carried ONE of the two counts and not the other — a prompt count with
+    /// no completion count, or the reverse.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Found by the review pass of 2026-09-06, and it is this type's own rule broken one level
+    /// down.</b> <see cref="Record"/> applied "an absence is not a zero" to the WHOLE block and then
+    /// wrote <c>usage.OutputTokenCount ?? 0</c>, so a response reporting 1,234 prompt tokens and no
+    /// completion count at all was recorded as <c>1,234 prompt + 0 completion</c> — a figure nobody
+    /// measured, rendered in the words reserved for one that was, and with
+    /// <see cref="Complete"/> still true, so <c>Eval08LiveWorkflowArm</c> would have handed it to the
+    /// harness as <c>TokensAreEstimated = false</c>. The half that WAS reported is still summed,
+    /// because the provider did report it; what may not happen is calling the result complete.
+    /// </remarks>
+    public int CallsWithPartialUsage { get; private set; }
 
-    /// <summary>Prompt tokens the PROVIDER reported, over <see cref="CallsWithUsage"/> only.</summary>
+    /// <summary>Every chat call this meter was told about.</summary>
+    public int Calls => CallsWithUsage + CallsWithPartialUsage + CallsWithoutUsage;
+
+    /// <summary>
+    /// Prompt tokens the PROVIDER reported, over the calls that reported one. A call counted in
+    /// <see cref="CallsWithPartialUsage"/> contributes the half it reported and nothing for the half
+    /// it did not.
+    /// </summary>
     public long PromptTokens { get; private set; }
 
-    /// <summary>Completion tokens the PROVIDER reported, over <see cref="CallsWithUsage"/> only.</summary>
+    /// <summary>Completion tokens the PROVIDER reported, on the same terms as <see cref="PromptTokens"/>.</summary>
     public long CompletionTokens { get; private set; }
 
     /// <summary>The reported total.</summary>
     public long TotalTokens => PromptTokens + CompletionTokens;
 
     /// <summary>
-    /// True when every call this meter saw reported usage, so the totals are complete rather than a
-    /// lower bound. False for a lane that made no call at all — nothing is a complete measurement of
-    /// nothing.
+    /// True when every call this meter saw reported BOTH counts, so the totals are complete rather
+    /// than a lower bound. False for a lane that made no call at all — nothing is a complete
+    /// measurement of nothing — and false when any call reported only half of its usage.
     /// </summary>
-    public bool Complete => CallsWithUsage > 0 && CallsWithoutUsage == 0;
+    public bool Complete => CallsWithUsage > 0 && CallsWithoutUsage == 0 && CallsWithPartialUsage == 0;
 
     /// <summary>
     /// Records one chat call from the provider's usage block.
     /// </summary>
     /// <param name="usage">
     /// The response's usage, or null. Null — and a block carrying neither an input nor an output
-    /// count — is recorded as an ABSENCE, never as a zero.
+    /// count — is recorded as an ABSENCE, never as a zero. A block carrying exactly ONE of the two
+    /// counts is recorded as a PARTIAL reading: the reported half is summed, the missing half adds
+    /// nothing, and the meter stops calling itself <see cref="Complete"/>.
     /// </param>
     public void Record(UsageDetails? usage)
     {
         lock (_gate)
         {
-            if (usage is null || (usage.InputTokenCount is null && usage.OutputTokenCount is null))
+            long? input  = usage?.InputTokenCount;
+            long? output = usage?.OutputTokenCount;
+
+            if (input is null && output is null)
             {
                 CallsWithoutUsage++;
                 return;
             }
 
-            CallsWithUsage++;
-            PromptTokens += usage.InputTokenCount ?? 0;
-            CompletionTokens += usage.OutputTokenCount ?? 0;
+            if (input is null || output is null)
+            {
+                CallsWithPartialUsage++;
+            }
+            else
+            {
+                CallsWithUsage++;
+            }
+
+            PromptTokens     += input  ?? 0;
+            CompletionTokens += output ?? 0;
         }
     }
 
@@ -139,7 +181,7 @@ public sealed class ChatSpend
         {
             if (Calls == 0) return [];
 
-            if (CallsWithUsage == 0)
+            if (CallsWithUsage == 0 && CallsWithPartialUsage == 0)
             {
                 return
                 [
@@ -162,6 +204,13 @@ public sealed class ChatSpend
                         + "calls' tokens are UNKNOWN, not zero, and are absent from the total above.");
             }
 
+            if (CallsWithPartialUsage > 0)
+            {
+                lines.Add($"⚠ LOWER BOUND: {CallsWithPartialUsage} of {Calls} call(s) reported only ONE of the two "
+                        + "counts. The half the provider gave is in the total above; the other half is UNKNOWN and "
+                        + "is NOT counted as zero.");
+            }
+
             return lines;
         }
     }
@@ -169,27 +218,33 @@ public sealed class ChatSpend
     /// <summary>An immutable copy, for a consumer that keeps one per repetition.</summary>
     public ChatSpendSnapshot Snapshot()
     {
-        lock (_gate) return new ChatSpendSnapshot(CallsWithUsage, CallsWithoutUsage, PromptTokens, CompletionTokens);
+        lock (_gate)
+        {
+            return new ChatSpendSnapshot(
+                CallsWithUsage, CallsWithPartialUsage, CallsWithoutUsage, PromptTokens, CompletionTokens);
+        }
     }
 }
 
 /// <summary>One run's chat spend, frozen.</summary>
-/// <param name="CallsWithUsage">Calls whose response carried a usage block.</param>
+/// <param name="CallsWithUsage">Calls whose response carried BOTH token counts.</param>
+/// <param name="CallsWithPartialUsage">Calls whose response carried exactly one of the two counts.</param>
 /// <param name="CallsWithoutUsage">Calls whose token cost is UNKNOWN.</param>
 /// <param name="PromptTokens">Provider-reported prompt tokens.</param>
 /// <param name="CompletionTokens">Provider-reported completion tokens.</param>
 public readonly record struct ChatSpendSnapshot(
     int CallsWithUsage,
+    int CallsWithPartialUsage,
     int CallsWithoutUsage,
     long PromptTokens,
     long CompletionTokens)
 {
     /// <summary>Every chat call in the run.</summary>
-    public int Calls => CallsWithUsage + CallsWithoutUsage;
+    public int Calls => CallsWithUsage + CallsWithPartialUsage + CallsWithoutUsage;
 
     /// <summary>The reported total.</summary>
     public long TotalTokens => PromptTokens + CompletionTokens;
 
-    /// <summary>True when every call in this run reported usage.</summary>
-    public bool Complete => CallsWithUsage > 0 && CallsWithoutUsage == 0;
+    /// <summary>True when every call in this run reported BOTH counts.</summary>
+    public bool Complete => CallsWithUsage > 0 && CallsWithoutUsage == 0 && CallsWithPartialUsage == 0;
 }
