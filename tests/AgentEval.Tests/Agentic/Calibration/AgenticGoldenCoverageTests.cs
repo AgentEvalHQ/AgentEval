@@ -725,7 +725,7 @@ public class AgenticGoldenCoverageTests
     // NOT shaped away from 0.0. Shaping an expectation around the artifact's own sentinel is the
     // self-examination defect this repository has now recorded seven times, and moving a shipped band
     // breaks docs/eval-benchmark-architecture.md §6.3 property 4. cal-gdq-002 is left untouched and
-    // pinned (GoldenReachabilityTests.s_recordsThatReachNoVerdict and .s_sentinelsCreditedWithoutARun,
+    // pinned (GoldenReachabilityTests.s_recordsThatReachNoVerdict and .s_creditedWithoutReachingAVerdict,
     // both set-equality ratchets); what closes the defect is cal-gdq-005, a `fail` record carrying the
     // SAME failure — a circular restatement that decomposes nothing — with enough enumeration
     // structure that the evaluator actually runs it.

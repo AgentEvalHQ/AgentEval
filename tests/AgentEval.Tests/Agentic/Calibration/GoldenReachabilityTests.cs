@@ -660,25 +660,55 @@ public class GoldenReachabilityTests
     }
 
     /// <summary>
-    /// The subset of <see cref="s_recordsThatReachNoVerdict"/> that the calibration report CREDITS
-    /// anyway: the skip sentinel is exactly 0.0, and 0.0 falls inside the record's authored band, so
-    /// <c>CalibrationRunner</c>'s <c>WithinScoreRange</c> counts a run that never happened.
+    /// Every record on <see cref="s_recordsThatReachNoVerdict"/> that the calibration report CREDITS
+    /// anyway, with WHICH of its two credits it takes. <c>CalibrationRunner</c> hands out two per
+    /// entry and they are independent:
+    /// <list type="bullet">
+    ///   <item><c>within-range</c> — <c>Score.Value</c> falls inside the authored band, so
+    ///   <c>WithinScoreRange</c> counts a run that never happened.</item>
+    ///   <item><c>verdict-match</c> — <c>Score.Label</c> equals <c>ExpectedVerdict</c>, so the pair
+    ///   goes into <c>Accuracy</c> and <c>CohensKappa</c> as agreement. This is the STRONGER credit:
+    ///   it moves the two headline calibration numbers.</item>
+    /// </list>
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// ⚠ WAVE 12 REVIEW — THIS LIST WAS SKIP-ONLY, AND THAT HID THE STRONGER CREDIT. The predecessor
+    /// filtered to <see cref="Reach.Skipped"/> before testing for credit while documenting itself as
+    /// "the subset of <see cref="s_recordsThatReachNoVerdict"/> that the report credits anyway". The
+    /// two <see cref="Reach.ResponseBlind"/> records it dropped — <c>cal-jr-001</c> and
+    /// <c>cal-jr-004</c>, fast-passed at 1.0 with the response never read — are credited on BOTH
+    /// counts, because a fast pass's label is <c>"pass"</c> and theirs expect <c>"pass"</c>. A skip
+    /// can never take the verdict-match credit (its label is <c>"skipped"</c>, which no
+    /// <c>ExpectedVerdict</c> equals), so restricting to skips excluded precisely the records that
+    /// inflate accuracy and kappa. Direction: FLATTERING — 9 credits recorded against 11 measured,
+    /// and the 2 omitted were the only ones touching the headline numbers.
+    /// </para>
+    /// <para>
     /// ⚠ The fix for a member of this list is to give its KEY a reachable record in that verdict
-    /// direction — never to shape the band away from 0.0. Moving a shipped band would break
-    /// <c>docs/eval-benchmark-architecture.md</c> §6.3 property 4, and shaping an expectation around
-    /// the artifact's own sentinel is the self-examination defect this file exists to close.
+    /// direction — never to shape the band away from the artifact's own sentinel. Moving a shipped
+    /// band would break <c>docs/eval-benchmark-architecture.md</c> §6.3 property 4, and shaping an
+    /// expectation around the artifact's output is the self-examination defect this file exists to
+    /// close. This list RECORDS; it is not the bar and it grants nothing.
+    /// </para>
     /// </remarks>
-    private static readonly string[] s_sentinelsCreditedWithoutARun =
+    private static readonly string[] s_creditedWithoutReachingAVerdict =
     [
-        "cal-gdq-002",
-        "cal-utu-001", "cal-utu-004", "cal-utu-007", "cal-utu-009",
-        "cal-utu-012", "cal-utu-016", "cal-utu-018", "cal-utu-020",
+        "cal-gdq-002=within-range",
+        "cal-jr-001=within-range+verdict-match",
+        "cal-jr-004=within-range+verdict-match",
+        "cal-utu-001=within-range",
+        "cal-utu-004=within-range",
+        "cal-utu-007=within-range",
+        "cal-utu-009=within-range",
+        "cal-utu-012=within-range",
+        "cal-utu-016=within-range",
+        "cal-utu-018=within-range",
+        "cal-utu-020=within-range",
     ];
 
     [Fact]
-    public async Task EverySkipSentinelCreditedByTheReport_IsOnTheRecordedList()
+    public async Task EveryCreditGivenToARecordThatReachedNoVerdict_IsOnTheRecordedList()
     {
         var entries = GoldenEntries();
         var registry = Populated();
@@ -687,27 +717,50 @@ public class GoldenReachabilityTests
 
         var census = await TakeCensusAsync(entries, registry);
 
-        var skipped = census.Where(c => c.Class == Reach.Skipped).ToList();
-        Assert.True(skipped.Count > 0, "no record is skipped at all — either the skip pre-passes are gone (delete this list) or this test is no longer wired to them");
+        // EVERY non-evidence class, not just the skips. A verdict-less record earns its credit from
+        // the score and the label the evaluator actually produced, and which code path produced them
+        // is irrelevant to `CalibrationRunner`, which sees only an `EvalResult`.
+        var reachedNoVerdict = census.Where(c => !IsEvidence(c.Class)).ToList();
+        Assert.True(
+            reachedNoVerdict.Count > 0,
+            "no record fails to reach a verdict at all — either the short-circuits are gone (delete this list) or this test is no longer wired to them");
 
-        // The sentinel is 0.0 by construction of EvalResult.Skipped, and read back here rather than
-        // assumed, so a future change to the sentinel value cannot leave this test asserting a
-        // constant nobody produces any more.
+        // Wiring check on the skip subset only: the sentinel is 0.0 with a null threshold by
+        // construction of EvalResult.Skipped, read back here rather than assumed, so a change to the
+        // sentinel cannot leave this test asserting a constant nobody produces any more.
+        var skipped = reachedNoVerdict.Where(c => c.Class == Reach.Skipped).ToList();
+        Assert.NotEmpty(skipped);
         Assert.All(skipped, c => Assert.Equal(0.0, c.Result.Score.Value));
         Assert.All(skipped, c => Assert.Null(c.Result.Score.Threshold));
 
-        var credited = skipped
-            .Where(c => c.Result.Score.Value >= c.Entry.ExpectedScoreMin &&
-                        c.Result.Score.Value <= c.Entry.ExpectedScoreMax)
-            .Select(c => c.Entry.ScenarioId)
-            .OrderBy(s => s, StringComparer.Ordinal)
-            .ToList();
+        var measured = new List<string>();
+        foreach (var c in reachedNoVerdict)
+        {
+            var credits = new List<string>();
+
+            if (c.Result.Score.Value >= c.Entry.ExpectedScoreMin &&
+                c.Result.Score.Value <= c.Entry.ExpectedScoreMax)
+                credits.Add("within-range");
+
+            // CalibrationRunner adds (ExpectedVerdict, Score.Label) to the pairs that become
+            // Accuracy and CohensKappa. An agreeing pair from a record the evaluator never read is
+            // agreement about nothing.
+            if (string.Equals(c.Result.Score.Label, c.Entry.ExpectedVerdict, StringComparison.Ordinal))
+                credits.Add("verdict-match");
+
+            if (credits.Count > 0)
+                measured.Add($"{c.Entry.ScenarioId}={string.Join("+", credits)}");
+        }
+
+        measured.Sort(StringComparer.Ordinal);
+        var recorded = s_creditedWithoutReachingAVerdict.OrderBy(s => s, StringComparer.Ordinal).ToList();
 
         Assert.True(
-            credited.SequenceEqual(s_sentinelsCreditedWithoutARun.OrderBy(s => s, StringComparer.Ordinal), StringComparer.Ordinal),
-            $"the set of skip sentinels the calibration report credits as within-score-range has changed. " +
-            $"Recorded: [{string.Join(", ", s_sentinelsCreditedWithoutARun.OrderBy(s => s, StringComparer.Ordinal))}]. " +
-            $"Measured: [{string.Join(", ", credited)}]. Each of these is a within-range credit for an " +
-            $"evaluation that never ran.");
+            measured.SequenceEqual(recorded, StringComparer.Ordinal),
+            $"the set of credits the calibration report gives to records that reached NO verdict has changed. " +
+            $"{Render(census)}. Recorded: [{string.Join(", ", recorded)}]. " +
+            $"Measured: [{string.Join(", ", measured)}]. `within-range` is a WithinScoreRange credit " +
+            $"for an evaluation that never ran; `verdict-match` additionally feeds Accuracy and " +
+            $"CohensKappa, which are the two headline calibration numbers.");
     }
 }
