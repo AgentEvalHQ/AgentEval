@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -249,6 +249,22 @@ public static class TestRunEvalProjection
     /// (see <see cref="ToolNotExecutedResultPrefix"/>); <see cref="ToolInvocation"/> has no such
     /// field, so a timeline invocation is taken at face value.
     /// </para>
+    /// <para>
+    /// ⚠ <b>A dropping report is blind, timeline or no timeline.</b> When
+    /// <see cref="ToolUsageReport.DroppedApprovalRequestCount"/> is non-zero the projection returns
+    /// <see langword="null"/> even if a <see cref="ToolCallTimeline"/> is attached, because the only
+    /// producer derives that timeline from the same report
+    /// (<c>MAFEvaluationHarness.cs:129 → PopulateTimelineFromToolUsage, :599</c>). Reading it as a
+    /// second recorder turned an absence into <c>[]</c> — a MEASURED zero — on precisely the
+    /// absence-based safety questions that cannot survive one. So: <see langword="null"/> means no
+    /// recorder, or none that could see the whole run; an empty list means a complete recorder saw
+    /// nothing.
+    /// </para>
+    /// <para>
+    /// <b>Declared residual.</b> <c>MAFEvaluationHarness.RunEvaluationStreamingAsync</c> (<c>:257</c>)
+    /// never records a drop count at all, so a streamed run cannot report this blindness. It has 0
+    /// callers in <c>src/</c> and <c>samples/</c> and is not fixed here.
+    /// </para>
     /// </remarks>
     private static IReadOnlyList<ToolCall>? ProjectToolCalls(TestResult result)
     {
@@ -259,6 +275,14 @@ public static class TestRunEvalProjection
         if (usage is not null && usage.Calls.Count > 0)
         {
             return usage.Calls.OrderBy(c => c.Order).Select(FromRecord).ToList();
+        }
+
+        // A dropping report is a BLIND recorder, and a timeline beside it is not a second opinion:
+        // MAFEvaluationHarness.cs:129 builds that timeline from this very report
+        // (PopulateTimelineFromToolUsage, :599), so it inherits the same blindness.
+        if (result.ToolUsage is { DroppedApprovalRequestCount: > 0 })
+        {
+            return null;
         }
 
         if (result.Timeline is { } timeline && timeline.Invocations.Count > 0)

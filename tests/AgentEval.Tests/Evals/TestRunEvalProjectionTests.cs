@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -388,8 +388,14 @@ public class TestRunEvalProjectionTests
     }
 
     [Fact]
-    public void ADroppingReportFallsThroughToATimeline_WhichIsADifferentRecorder()
+    public void ADroppingReportIsBlind_EvenWhenATimelineIsAttached_SoToolCallsIsNull()
     {
+        // SUPERSEDED: this test used to assert the timeline was read as a DIFFERENT recorder. No
+        // producer satisfies that premise — `.Timeline = ` has four sites, all in
+        // MAFEvaluationHarness.cs (:217, :246, :394, :453), and :129 fills it from this same report
+        // via PopulateTimelineFromToolUsage (:599). Falling through therefore returned `[]` — a
+        // MEASURED zero — for a run whose only calls were approval-gated, on exactly the
+        // absence-based safety questions that cannot survive one.
         var blind = new ToolUsageReport { DroppedApprovalRequestCount = 2 };
         blind.AddCall(new ToolCallRecord { Name = "from_report", CallId = "c1", Order = 1 });
         var timeline = new ToolCallTimeline();
@@ -399,7 +405,24 @@ public class TestRunEvalProjectionTests
 
         var input = FullyPopulatedCase().ToEvalInput(result);
 
-        Assert.Equal(new[] { "from_timeline" }, input.ToolCalls!.Select(c => c.Name));
+        Assert.Null(input.ToolCalls);
+    }
+
+    [Fact]
+    public void ACompleteReportBesideATimeline_ProjectsFromTheReport()
+    {
+        // The positive control for the test above: the guard must refuse a BLIND report, not any
+        // report that happens to sit beside a timeline.
+        var complete = new ToolUsageReport { DroppedApprovalRequestCount = 0 };
+        complete.AddCall(new ToolCallRecord { Name = "from_report", CallId = "c1", Order = 1 });
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        { ToolName = "from_timeline", StartTime = TimeSpan.Zero, Duration = TimeSpan.Zero, Succeeded = true });
+        var result = new TestResult { TestName = "n", ToolUsage = complete, Timeline = timeline };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.Equal(new[] { "from_report" }, input.ToolCalls!.Select(c => c.Name));
     }
 
     [Fact]
