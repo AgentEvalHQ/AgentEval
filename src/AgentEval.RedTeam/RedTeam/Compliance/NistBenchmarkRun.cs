@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -156,7 +156,8 @@ public sealed class NistBenchmarkRun
                 Recommendations: report.Recommendations.Count > 0 ? report.Recommendations.ToList() : null,
                 SubResults: leaves,
                 AggregationStrategy: "Min"),
-            Provenance: new("composite", Judge is null ? null : "nist-judge-passthrough", null, null, null, 0.0, false),
+            // JudgeModel is NEVER a judge name: the IEvaluator this run holds is never invoked.
+            Provenance: new("composite", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

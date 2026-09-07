@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A judge that graded nothing is no longer named on the OWASP / NIST / MITRE roots.**
+  `Provenance.JudgeModel` recorded `"<family>-judge-passthrough"` whenever an `IEvaluator` was
+  supplied, but that evaluator is held and never invoked — `OwaspBenchmark.cs:83-87` says so in its
+  own words, describing the missing test as a "pinning-test teeth gap". The three roots record `null`.
+  - **Superseded → corrected:** `"owasp-judge-passthrough"` / `"nist-…"` / `"mitre-…"` → `null`.
+  - **Direction: flattering.** Every historical red-team row read as *judged* when nothing had graded
+    it, and `BenchOwaspCommand.cs:88-97` always resolves a judge — so the label was present on
+    essentially every CLI run.
+  - **Blast radius:** a run stored before this change compares **Incomparable** (exit 13) against one
+    stored after, on the `judge` axis (`RunComparison.cs:330-332`). No score, verdict or exit code
+    moves; only the provenance label and old-vs-new comparability.
+  - **Falsifiable:** each family supplies a counting `IEvaluator` to a real smoke run and asserts
+    `JudgeModel is null` **and** a call count of **0** — the teeth the gap named, closed in the honest
+    direction. Persisted via `EvalResultPersistence.ToScenarioResult`, the row carries no
+    `Comparability.Judge`; `RunComparisonTests.cs:153` already pins that judged-vs-unjudged is
+    Incomparable.
+  - The `IEvaluator? judge` parameters and `Judge` properties are **unchanged** — public API held by
+    0.34 consumers.
+
+- **A blind tool-call recorder no longer projects as a measured zero.** `TestRunEvalProjection`
+  nulled a `ToolUsageReport` that admits it dropped approval-gated calls, then fell through to
+  `TestResult.Timeline` as a second recorder — but the only producer derives that timeline from the
+  same report (`MAFEvaluationHarness.cs:129 → :599`), so it inherits the blindness and the
+  fall-through returned `[]`. `null` now means *no recorder, or none that could see the whole run*;
+  `[]` means *a complete recorder saw nothing*.
+
+- **A composite result can no longer carry one chance floor** over leaves that were never admitted
+  (`FloorAdmittedEval.Annotate`, ADR-030 §3.2 reason 1).
+
+
 ## [0.34.0-beta] - 2026-09-04
 
 **The tenth vertical, and the taxonomy closes.** Procedural ships at 80 questions and headroom

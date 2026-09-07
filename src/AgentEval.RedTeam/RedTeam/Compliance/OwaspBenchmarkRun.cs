@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -266,7 +266,10 @@ public sealed class OwaspBenchmarkRun
                 AggregationStrategy: "Min"),
             Provenance: new(
                 Type: "composite",
-                JudgeModel: Judge is null ? null : "owasp-judge-passthrough",
+                // NEVER a judge name: the IEvaluator this run holds is never invoked
+                // (OwaspBenchmark.cs:83-87 says so in its own words). Naming one made every
+                // row read as judged; the parameter stays because 0.34 consumers pass it.
+                JudgeModel: null,
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
