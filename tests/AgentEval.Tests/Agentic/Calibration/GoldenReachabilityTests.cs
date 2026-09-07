@@ -41,6 +41,15 @@
 //     the census; they do not decide whether the corpus passes.
 //   * THE MEASUREMENT — which class a record falls in — is necessarily read off the evaluator.
 //     That is legitimate: a measurement may come from the artifact, a bar may not.
+//   * ⚠ AND THE MEASUREMENT MUST NOT TAKE THE EVALUATOR'S WORD FOR IT EITHER (Wave 12 review). The
+//     first cut of this file granted `Judged` on `judge.Calls > 0` alone and asserted in a doc
+//     comment that the judge "saw the response". It was never checked. Executed: withholding the
+//     response from every judge call — one line in `AtomicLlmEval`, the boundary all 298 judged
+//     records cross — left all 9 tests here and all 33 in this namespace GREEN. That is d-8's
+//     defect (a verdict produced without the response being read) on the far side of the judge, and
+//     it is the flattering direction on 88% of the corpus. `Judged` now REQUIRES the record's own
+//     response to be the text the evaluator handed the judge, on every call; anything else is
+//     `JudgedWithoutTheResponse` and is not evidence.
 //   * THE ONLY ESCAPE from the bar is a TRANSPORT gap, and it must be PROVED, not declared:
 //     the exempt key must reach a verdict through an `EvalInput` channel `CalibrationEntry` has no
 //     column for, and must not reach one through the columns it does have. See
@@ -70,8 +79,21 @@ public class GoldenReachabilityTests
     /// </summary>
     internal enum Reach
     {
-        /// <summary>The judge was called: it saw the response, so the verdict is a function of it.</summary>
+        /// <summary>
+        /// The judge was called AND the record's own response is the agent text it was handed, on
+        /// every call. Both halves are measured: see <see cref="Reach.JudgedWithoutTheResponse"/>
+        /// for why the call alone is not enough.
+        /// </summary>
         Judged,
+
+        /// <summary>
+        /// The judge WAS called, and the response never reached it: not one call was handed the
+        /// record's response. This is d-8's defect on the far side of the judge boundary — a verdict
+        /// produced without the response being read — and <c>judge.Calls &gt; 0</c>, the signal this
+        /// file already rejects as insufficient for the judge-free classes, cannot see it. NOT
+        /// evidence: the judge's verdict cannot be a function of text it was never shown.
+        /// </summary>
+        JudgedWithoutTheResponse,
 
         /// <summary>
         /// The judge was not called, but a deterministic pre-pass READ THE RESPONSE and decided —
@@ -105,12 +127,22 @@ public class GoldenReachabilityTests
     /// </summary>
     private sealed class RecordingJudge : IEvaluator
     {
+        private readonly List<string> _outputsSeen = [];
+
         public int Calls { get; private set; }
+
+        /// <summary>
+        /// The <c>output</c> argument of every judge call, in order — exactly the agent text the
+        /// evaluator chose to hand the judge. Read off the ARTIFACT: our golden text is the other
+        /// operand of the fidelity check, never both.
+        /// </summary>
+        public IReadOnlyList<string> OutputsSeen => _outputsSeen;
 
         public Task<EvaluationResult> EvaluateAsync(
             string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
         {
             Calls++;
+            _outputsSeen.Add(output ?? string.Empty);
             return Task.FromResult(new EvaluationResult { OverallScore = 42, Summary = "recording-stub" });
         }
     }
@@ -140,7 +172,29 @@ public class GoldenReachabilityTests
         var result = await eval!.EvaluateAsync(input);
 
         if (result.Score.Label == "skipped") return (Reach.Skipped, result);
-        if (judge.Calls > 0) return (Reach.Judged, result);
+
+        if (judge.Calls > 0)
+        {
+            // ⚠ THE HALF A CALL COUNT CANNOT SEE, and the reason this branch is not a one-liner.
+            // `judge.Calls > 0` says the judge RAN; it never says the judge was SHOWN the response.
+            // An evaluator that hands the judge a constant, the query alone, or a summary it built
+            // from metadata produces a verdict that is not a function of the response — d-8's defect
+            // exactly, on the far side of the judge boundary — and this file rejects `judge.Calls`
+            // as a sufficient signal three paragraphs above. So the response must be found in what
+            // the evaluator actually passed.
+            //
+            // EVERY call, not any: a multi-pattern evaluator averages its per-call scores, so a
+            // single call that never saw the response is a share of the aggregate decided blind.
+            //
+            // An empty or whitespace response is NOT waved through — `Contains("")` is true of every
+            // string, so the check would be vacuous exactly where it needs to bite.
+            var response = input.Response;
+            bool everyCallSawTheResponse =
+                !string.IsNullOrWhiteSpace(response) &&
+                judge.OutputsSeen.All(o => o.Contains(response, StringComparison.Ordinal));
+
+            return (everyCallSawTheResponse ? Reach.Judged : Reach.JudgedWithoutTheResponse, result);
+        }
 
         foreach (var control in ControlResponses)
         {
@@ -385,6 +439,81 @@ public class GoldenReachabilityTests
 
         // And the separation is real, not four names for one behaviour.
         Assert.Equal(4, new[] { judged.Class, blind.Class, skipped.Class, decided.Class }.Distinct().Count());
+    }
+
+    /// <summary>
+    /// Two synthetic evals that differ in ONE thing: whether the agent's response is the text they
+    /// hand the judge. Both call the judge exactly once and return the same score from it, so
+    /// <c>judge.Calls</c> and the result are identical and only the response-fidelity check can tell
+    /// them apart.
+    /// </summary>
+    /// <remarks>
+    /// Synthetic on purpose. NO shipped evaluator withholds the response today — which is precisely
+    /// why the separation has to be demonstrated on a case built for it: a classifier validated only
+    /// against a corpus in which the failure does not yet occur has not been shown to detect it. The
+    /// class this proves detectable is the one the review's ablation drove through
+    /// <c>AtomicLlmEval</c>, where 298 of 338 records reach the judge.
+    /// </remarks>
+    private sealed class SyntheticJudgeCallingEval(IEvaluator judge, bool forwardTheResponse) : IEval
+    {
+        public string Key => "synthetic_judge_calling";
+
+        public string Name => "Synthetic judge-calling eval";
+
+        public string Category => "test-only";
+
+        public string Version => "1.0.0";
+
+        public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+        {
+            var handedToTheJudge = forwardTheResponse
+                ? input.Response ?? string.Empty
+                : "<this evaluator never hands the judge the agent's response>";
+
+            var er = await judge.EvaluateAsync(input.Query, handedToTheJudge, [], ct);
+
+            var value = Math.Clamp(er.OverallScore / 100.0, 0.0, 1.0);
+            bool passed = value >= 0.70;
+
+            return new EvalResult(
+                Metric: new(Key, Name, Category, Version),
+                Score: new(value, null, passed ? "pass" : "fail", passed, 0.70, "none", null),
+                Details: new(null, null, null, null, null),
+                Provenance: new("atomic-llm", null, null, null, null, 0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+        }
+    }
+
+    [Fact]
+    public async Task TheClassifier_SeparatesAJudgeThatWasShownTheResponseFromOneThatWasNot()
+    {
+        // An isolated registry, so this proves a property of the CLASSIFIER rather than a property
+        // of the shipped dispatch table.
+        var registry = new EvalRegistry();
+        registry.Register(new EvalRegistration(
+            "synthetic_forwards", typeof(SyntheticJudgeCallingEval),
+            (j, _) => new SyntheticJudgeCallingEval(j!, forwardTheResponse: true)));
+        registry.Register(new EvalRegistration(
+            "synthetic_withholds", typeof(SyntheticJudgeCallingEval),
+            (j, _) => new SyntheticJudgeCallingEval(j!, forwardTheResponse: false)));
+
+        var input = new EvalInput(
+            Query: "Summarise the incident report.",
+            Response: "The outage began at 09:12 and was resolved at 10:40.");
+
+        var forwarded = await ClassifyAsync(registry, "synthetic_forwards", input);
+        var withheld = await ClassifyAsync(registry, "synthetic_withholds", input);
+
+        Assert.Equal(Reach.Judged, forwarded.Class);
+        Assert.Equal(Reach.JudgedWithoutTheResponse, withheld.Class);
+
+        // The separation is not a side effect of the two producing different verdicts: label, score
+        // and judge-call count are identical, so nothing but the fidelity check distinguishes them.
+        Assert.Equal(forwarded.Result.Score.Label, withheld.Result.Score.Label);
+        Assert.Equal(forwarded.Result.Score.Value, withheld.Result.Score.Value);
+
+        Assert.True(IsEvidence(forwarded.Class));
+        Assert.False(IsEvidence(withheld.Class));
     }
 
     [Fact]
