@@ -28,6 +28,10 @@
     <ProjectReference Include="../../src/AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
     <ProjectReference Include="../../src/AgentEval.Core/AgentEval.Core.csproj" />
     <ProjectReference Include="../../src/AgentEval.MAF/AgentEval.MAF.csproj" />
+    <!-- 3.5: BenchmarkRunner writes through IOutputStore (Abstractions); the FILE-SYSTEM
+         implementation lives here. A consumer that only wants to run a benchmark still needs
+         this package — recorded in MEASUREMENT_STATUS §83. -->
+    <ProjectReference Include="../../src/AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
   </ItemGroup>
 
   <ItemGroup>

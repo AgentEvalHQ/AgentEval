@@ -117,6 +117,7 @@ try
             "3" => await NegativeControls.RunAsync(),
             "cal" => await Galaxus.RecommendationAgent.Evals.Calibration.ThresholdCalibration.RunAsync(),
             "4" => await Eval04_ReviewInjectionContainment.RunAsync(),
+            "4d" => await Eval04_AsDefinition.RunAsync(dryRun: parsed.DryRun),
             "5" => await Eval05_RecommendationQuality.RunAsync(dryRun: parsed.DryRun),
             "6" => await Eval06_ToolTrajectory.RunAsync(dryRun: parsed.DryRun),
             "7" => await Eval07_WorkflowTopology.RunAsync(dryRun: parsed.DryRun),
@@ -516,7 +517,7 @@ internal sealed record CiStep(
 internal sealed class ParsedArgs
 {
     /// <summary>Every eval selector this program accepts. The ONE list — the `--log` path sniffer reads it too.</summary>
-    private static readonly string[] Selectors = ["1", "2", "2b", "2c", "3", "4", "5", "6", "7", "8", "9", "cal"];
+    private static readonly string[] Selectors = ["1", "2", "2b", "2c", "3", "4", "4d", "5", "6", "7", "8", "9", "cal"];
 
     /// <summary>Eval selector (1..9), or null for the interactive menu.</summary>
     public string? Eval { get; private set; }
