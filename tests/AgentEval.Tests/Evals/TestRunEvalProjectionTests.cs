@@ -133,6 +133,32 @@ public class TestRunEvalProjectionTests
         Assert.Equal(FullyPopulatedCase().Input, FullyPopulatedCase().ToEvalInput(FullyPopulatedResult()).Query);
     }
 
+    [Fact]
+    public void ACaseWithANullInput_IsRefused_AndTheMessageNamesTheCase()
+    {
+        // The fourth way the projection could fail to be total, and the only one that used to pass
+        // silently: `required string` is not `non-null`, EvalInput.Query is non-nullable, and the
+        // null was carried straight through until the first eval to read Query threw an
+        // unattributable NullReferenceException. Defaulting to "" is refused for the reason this
+        // whole signature exists: it makes a fabricated stimulus look like a recorded one.
+        var testCase = new TestCase { Id = "case-7", Name = "Refund flow", Input = null! };
+
+        var ex = Assert.Throws<ArgumentException>(() => testCase.ToEvalInput(new TestResult { TestName = "n" }));
+
+        Assert.Contains("case-7", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("testCase", ex.ParamName);
+    }
+
+    [Fact]
+    public void TheOtherDirection_AnExplicitlyEmptyInput_IsCarriedThrough()
+    {
+        // A run that genuinely had no prompt is representable — the caller writes the empty string
+        // and owns it. Only the null, which nobody chose, is refused.
+        var input = new TestCase { Name = "n", Input = "" }.ToEvalInput(new TestResult { TestName = "n" });
+
+        Assert.Equal("", input.Query);
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // Refutation 2: CaseId does not fall back to a display name
     // ══════════════════════════════════════════════════════════════════════════

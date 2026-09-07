@@ -146,10 +146,31 @@ public static class TestRunEvalProjection
     /// <param name="result">What the run produced. Supplies the response and the tool calls.</param>
     /// <returns>The projected input. See the type's remarks for the full field table.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="testCase"/> or <paramref name="result"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="testCase"/> carries a null <see cref="TestCase.Input"/>, so there is no query.
+    /// </exception>
     public static EvalInput ToEvalInput(this TestCase testCase, TestResult result)
     {
         ArgumentNullException.ThrowIfNull(testCase);
         ArgumentNullException.ThrowIfNull(result);
+
+        // 🔴 The fourth way this projection could fail to be total, and the only one that used to pass
+        // silently. TestCase.Input is `required string`, but `required` is not `non-null`: a `null!`,
+        // a nullable-oblivious caller or a deserialiser handed an explicit JSON null all reach here,
+        // and EvalInput.Query is non-nullable. The null used to be carried straight through, so the
+        // first eval to read Query threw a NullReferenceException with nothing naming the case.
+        // Defaulting to "" is refused for the reason stated above: it makes a fabricated stimulus
+        // look like a recorded one.
+        if (testCase.Input is null)
+        {
+            throw new ArgumentException(
+                $"TestCase '{Describe(testCase)}' carries a null Input, so this run has no query to project and "
+                + $"{nameof(EvalInput)}.{nameof(EvalInput.Query)} cannot be filled. This projection will not "
+                + "invent one — an empty query is a fabricated stimulus wearing a recorded one's clothes. Give "
+                + "the case its input, or (if the run genuinely had no prompt) say so with an explicit empty "
+                + "string so the fabrication is the caller's, recorded and deliberate.",
+                nameof(testCase));
+        }
 
         return new EvalInput(
             Query: testCase.Input,
@@ -505,6 +526,15 @@ public static class TestRunEvalProjection
         var copy = new Dictionary<string, object>(metadata.Count);
         foreach (var pair in metadata) copy[pair.Key] = pair.Value;
         return copy;
+    }
+
+    /// <summary>Names a case for a fault message, without assuming any of its strings is non-null.</summary>
+    /// <param name="testCase">The case.</param>
+    /// <returns>Its id, else its name, else a placeholder.</returns>
+    private static string Describe(TestCase testCase)
+    {
+        if (!string.IsNullOrWhiteSpace(testCase.Id)) return testCase.Id!;
+        return string.IsNullOrWhiteSpace(testCase.Name) ? "(unnamed)" : testCase.Name;
     }
 
     private static JsonElement ParseDetached(string json)
