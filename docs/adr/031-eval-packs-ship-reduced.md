@@ -2,9 +2,10 @@
 
 > **Location note (superseded 2026-09-05):** the two companion documents this ADR used to defer to — `EvalPacks_Design.md` (the reduced-scope design) and `EvalPack_Galaxus_WorkedExample.md` (the worked evidence) — lived in `strategy/Galaxus/`, which is gitignored and local-only, so **no reader of this repository could ever open them.** Both were **deleted on 2026-09-05** and everything this ADR depended on them for is now stated in-repo: **S1–S5 in §0.1**, the findings **V1–V7 in §0.2**, and the portability verdict in **§0.3**. This ADR no longer points outside the repository for anything load-bearing.
 
-**Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.**
+**Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.** ↪ *(one name with the README index: §12.3)*
 **What survives:** five items, no new format, no new root, no new verbs — **S1**–**S5**, stated in full in **[§0.1](#01-the-five-surviving-items-s1s5--the-authoritative-statement)**, which is the authoritative statement of them. The findings that sank the format and set the Stage-2 gate are **V1–V7 in [§0.2](#02-the-findings-that-sank-the-format--v1v7)**. `pack.json` is Stage 2, unproven, gated on a real second use case.
 **Why this body is kept:** it is the record of what was rejected and why. **Nothing below §0.3 is scheduled**, and where the body disagrees with §0.1–§0.3 or with ADR-030, the body loses. The worked example's load-bearing claim was **re-measured against the tree on 2026-09-05** rather than cited: `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. Confirmed. (The "nine ports gated on AE-06" figure was **not** re-measured and must not be quoted as current.)
+> ↪ **Amended 2026-09-07 — §12.2 rows 1–2:** `compare` is a root verb (`Program.cs:781`); the 0 / 59 counts are now 3 files / 66. The verdict rests on V1/V2/V4/V5/V6, not on the count.
 **Original status line (retained):** PROPOSED — design only. No code written.
 **Depends on:** ADR-030 (meta-evaluation: floors, controls, exact tests) · AE-01 (assertions → `AssertionResult`) · AE-05 (undecidable) · plan-13 T3.11 (deferred agent-manifest ADR).
 **Supersedes nothing. Forks nothing.**
@@ -40,9 +41,9 @@ been deleted. Anyone reading this ADR to find out what is still on the table rea
 |---|---|---|
 | **S1** | `EvalResultStore` → `IOutputStore`. One store interface; the pack reporter writes through the same path as everything else. | **DEFERRED with a reason, 2026-09-06** — see the note below |
 | **S2** | `ScenarioResult.Input` + `stimulusHash` — persist *what was asked*, and hash it, so two runs can be shown to have been given the same stimulus. Prerequisite for S5. | ✅ **SHIPPED 2026-09-06 (`71bc44c3`)** — `StimulusHash.Of` / `.SameStimulus`, a non-positional `ScenarioResult.StimulusHash`, an optional `input` on `ToScenarioResult`, and three real producers. **18** tests (16 at `71bc44c3`, **+2 in the Wave 2 review**), **0 existing test files edited**, byte-identical output for every producer that does not set it — asserted against a file the **real `FileSystemOutputStore` wrote**, not against a copy of its settings. The three producers that DO set it gain two fields; that movement is declared below. ⚠️ One of its two named sites is **unmeetable** — see below |
-| **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically, whose blocking rationale was **measured and corrected on 2026-09-06**; ADR-030's Q4 now carries the correction |
+| **S3** | **Applicability on the score.** ⚠️ **RESTATED against ADR-030 as ratified — the original wording is dead. See the note below.** | Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically, whose blocking rationale was **measured and corrected on 2026-09-06**; ADR-030's Q4 now carries the correction ↪ **§12.2 row 5: HALF SHIPPED (`878e5da4` + `e34d9614`); the writer half is Q4(ii).** |
 | **S4** | `controlLedger` in the run artifact + a new verdict `VOID` + exit code 12, for a gating control that ran and did not trip. | Not started; gated on **Q5**, an open user decision |
-| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | ✅ **SHIPPED 2026-09-07.** `RunComparison` (the decision, in `AgentEval.Core`, a pure function of two runs' scenario results) + `CompareCommand` (the I/O and the rendering) + `ExitCodes.Incomparable = 13`. **40 tests**, **0 existing test files edited**. Both outcomes are reachable on runs this repository produced with **zero spend** — see the Wave 9 note below |
+| **S5** | `agenteval compare`, refusing to emit deltas across incomparable runs (exit 13) rather than warning. | ✅ **SHIPPED 2026-09-07.** `RunComparison` (the decision, in `AgentEval.Core`, a pure function of two runs' scenario results) + `CompareCommand` (the I/O and the rendering) + `ExitCodes.Incomparable = 13`. **40 tests**, **0 existing test files edited**. Both outcomes are reachable on runs this repository produced with **zero spend** — see the Wave 9 note below ↪ **§12.2 rows 3–4: 51 tests, not 40; exit 13 is still absent from `CHANGELOG.md`.** |
 
 ### Wave 2, 2026-09-06 — what moved, and what the ADR got wrong
 
@@ -170,6 +171,7 @@ zero), so gating on it makes the success path unreachable. Ablated: gating on th
 which is precisely the one-outcome command Wave 7 refuted. The floor is therefore reported against
 the DELTA (*"n of m matched scenarios recorded no usable chance floor; their deltas cannot be read
 against chance"*) and never against the verdict.
+> ↪ **Census stale — §12.2 row 6:** 7 / 79 / 1; one shipped eval (the door, `FloorAdmittedEval`) now records a floor on every result. The conclusion — the floor is not a comparability axis — stands.
 
 ⚠️ **`JudgeSubjectRelation` has NO POSITIVE SPECIMEN and is not gated.** Every one of the five runs
 records `unknown`, because no shipped producer declares `EvalInput.SubjectModel` — §69.11's finding,
@@ -1144,6 +1146,7 @@ Task SaveBaselineAsync(SubjectIdentity subject, PackBaseline baseline, Cancellat
 ## §6. CONTROLS AND FLOORS IN THE ARTIFACT
 
 ADR-030's load-bearing rule holds without exception: **meta-evaluation never implements `IEval`.** A floor is a field on a score. A control is a run *of* an eval. A comparison is a function *of* results.
+> ↪ **Refuted by ADR-030 §3.2 — §12.2 row 7.** The banner at §0.1 already declares this body stale; floors live in `Details.Dimensions["chance_floor"]` + evidence, never on the score.
 
 ### 6.1 A floor cannot be declared as a number
 
@@ -1388,8 +1391,8 @@ Nothing here is invented for packs alone — every item is an existing gap with 
 | **C1** | ✅ **SHIPPED 2026-09-07** — `IEvalRegistry` / `EvalRegistry` / `EvalRegistration`, `[ModuleInitializer]` self-registration, content-equality-idempotent `Register`, `TryGet`, `All`, `Resolve`, `internal Reset()`. 🔴 **THE SIGNATURE THIS ROW FILED IS REFUTED — see the correction below the table.** | `AgentEval.Core` | Copies `BenchmarkFamilyRegistry`'s *mechanism*, not its row-text. First deliverable **done**: the 40-entry hand-authored dictionary at `BenchAgenticCalibrateCommand.cs:267` is deleted and `CalibrationRunner`'s existing `Func<string, IEval?>` resolves through the registry |
 | **C2** | `EvalConstructionContext` + `Func<EvalConstructionContext, IEval>` registrations declaring their required members | `AgentEval.Abstractions` | Solves the problem that dictionary's own comment concedes — `ProhibitedActionsEval` is a SKIPPED shim because the table cannot supply an `IPolicyResolver` |
 | **C3** | Move `EvaluatorCardRegistry` out of Mission Control | `AgentEval.Core` | 60 cards already carry `defaultThreshold`/`costTier`/`expectedInputs`; the CLI cannot reach them today |
-| **C4** | `EvalScore.ChanceFloor`, `EvalScore.Applicable`, label `"inapplicable"` | `AgentEval.Abstractions` | ADR-030 / AE-05. Two nullable init-only properties and a string constant |
-| **C5** | `IChanceFloor` / `ChanceFloor` / `FloorGatedCodeEval` | ADR-030 API-1 | Retrofit target is `ToolInputSchemaEval`'s flattering 1.0 on absent input |
+| **C4** | `EvalScore.ChanceFloor`, `EvalScore.Applicable`, label `"inapplicable"` | `AgentEval.Abstractions` | ADR-030 / AE-05. Two nullable init-only properties and a string constant ↪ **§12.2 row 8: shipped as `EvalScore.Measurement` + the Dimensions convention.** |
+| **C5** | `IChanceFloor` / `ChanceFloor` / `FloorGatedCodeEval` | ADR-030 API-1 | Retrofit target is `ToolInputSchemaEval`'s flattering 1.0 on absent input ↪ **§12.2 row 8: shipped as `ChanceFloor` + `FloorAdmittedEval` (not `FloorGatedCodeEval`).** |
 | **C6** | `INegativeControl` / `ControlSuite` / `NullOutputControl` / `ShuffledGoldControl` | ADR-030 API-2 | The library ships no negative controls at all |
 | **C7** | `AgentEvalScope.Collect()` + `RecordPass` + wiring both `ScenarioResult` construction sites | AE-01 | Already in progress |
 | **C8** | `RunManifest.Pack`, canonical-writer entry, `run.kind += "pack"`, `verdict += "VOID"` | `AgentEval.Abstractions` + schemas | The hash-format change is deliberate and precedented |
@@ -1431,8 +1434,8 @@ Reuse `ExitCodes` and `BenchExitCodes.FromLabel` unchanged for pass/warn/fail/in
 |---|---|---|
 | 0 / 1 / 2 / 3 | as today | success / test failure / **bad arguments only** / runtime error |
 | 9 / 10 / 11 | as today | gate FAIL / gate WARN / gate indeterminate (nothing scoreable ran) |
-| **12** | `InstrumentVoid` | **NEW** — a gating control did not trip, a gating eval produced a score with no floor, or `applicableFraction < minApplicable`. The measurement is inadmissible |
-| **13** | `Incomparable` | **NEW** — `pack compare` refused to emit deltas |
+| **12** | `InstrumentVoid` | **NEW** — a gating control did not trip, a gating eval produced a score with no floor, or `applicableFraction < minApplicable`. The measurement is inadmissible ↪ **§12.2 row 9: reserved, NOT added (`ExitCodes.cs:153`); gated on Q5.** |
+| **13** | `Incomparable` | **NEW** — `pack compare` refused to emit deltas ↪ **§12.2 row 9: shipped for the root `compare` verb (`ExitCodes.cs:159`).** |
 
 BUG-22's lesson is the reason these are two codes and not one: code 2 once meant bad-args **and** gate-FAIL **and** judge-misconfigured, and CI could not tell them apart. A pack runner that collapsed "the subject failed" and "the instrument is void" into one code would re-introduce exactly that defect — and in the flattering direction, because a team that sees `FAIL` investigates the agent instead of the harness.
 
@@ -1523,3 +1526,78 @@ public interface IPackHost
 - If a VOID run can be promoted to a baseline, or renders like a FAIL, the distinction is decorative.
 - If `host.requires` can go unsatisfied and the run still spends money, the load-time gate is not where it claims to be.
 - If a sixth result model appears, ADR-030 §5a's mitigation has been broken and the pack lane is the one that broke it.
+
+---
+
+## §12 — Amendment 2026-09-07: what the join and `compare` moved in this record
+
+**Tree:** `d563fd9d` on `joslat/digitec-galaxus`, clean; every number below was re-taken by the
+command beside it. Nothing above §12 is rewritten; each stale sentence carries a one-line pointer here.
+**Line references of the form `:N` into this file are to it as of `d563fd9d`, before the pointer
+lines this amendment inserts** (each pointer shifts every later line by one); `path:line` references
+into `src/`, `samples/` and `tests/` are unaffected. Per the header, where the body (§1–§11)
+disagrees with §0.1–§0.3 or ADR-030 the body loses; this section adds ADR-030 §11 and
+[ADR-032](032-benchmark-definition-run-score.md) to what it loses to.
+
+### 12.1 What the join changed about V1–V7 and the Stage-2 gate
+
+- **V1 is confirmed by construction.** Comparability lives on the run, not on a manifest:
+  `EvalResultPersistence.ComparabilityOf` (`src/AgentEval.Core/Evals/EvalResultPersistence.cs:148`)
+  records the eval key, version, effective bar, floor and judge on each `ScenarioResult` (`:121`), S2
+  added the stimulus, and `RunComparison` gates on
+  `evalKey / evalVersion / effectiveBar / judge / judge.modelId / judge.rubricDigest / stimulus`
+  (`src/AgentEval.Core/Output/RunComparison.cs:155`, `:322-339`). Nothing in `RunComparison.cs` or
+  `CompareCommand.cs` reads the manifest's `Harness` or `EvalProject` strings
+  (`grep -c 'Harness\|EvalProject'` → 0 and 0). That is V1's sentence made code.
+- **V3 moved by one eval of nine.** `samples/Galaxus.RecommendationAgent.Evals` now names `IEval` in
+  **3** files and `MAFEvaluationHarness` **66** times (`grep -rl '\bIEval\b' … --include=*.cs | wc -l`;
+  `grep -ro MAFEvaluationHarness … --include=*.cs | wc -l`). One `AtomicCodeEval`
+  (`NamedSkuNotPresentedEval`) is admitted through `AddEval(eval, floor)` as one check of Eval 04
+  (`.AddEval(` → 1 call site). Eight evals and every other check still print to `Console` and return
+  exit codes. V3's "nine ports" is now eight and a fraction; the direction is right and the size is not
+  materially different.
+- **V2, V4, V5, V6 and V7 are untouched** by anything since 2026-09-04. V2 gained a second application
+  in the tree's own reasoning: ADR-032 declines a definition content hash on exactly V2's ground
+  (nothing reads one; a hash over prose kills itself on first use).
+- **The Stage-2 gate is unchanged** — a second subject through registry + facts + `compare`. C1
+  (`EvalRegistry`, 2026-09-07, with the corrected factory signature) and AE-04 (the join) are the two
+  Stage-2 **preconditions** met since the verdict; what remains is the second subject. ADR-032's
+  `BenchmarkRunner` is designed to be that subject at zero CLI change (one run per (arm, rep), scenario
+  id `case·check`), but it is Proposed and gated: the price fell, the gate did not open.
+
+### 12.2 Corrections of record
+
+House form: what was published · what is true on the tree · direction of the error · blast radius.
+
+| # | Where | Superseded (what was published) | Corrected (what is true on `d563fd9d`) | Direction | Blast radius |
+|---|---|---|---|---|---|
+| 1 | Header `:6` | "no new format, no new root, **no new verbs**" | `agenteval compare` is a **root verb** — `src/AgentEval.Cli/Program.cs:781`, `rootCmd.Add(CompareCommand.Create())`. It is not a `pack` verb *group*, which is what the sentence was refusing; it is a new verb | Overstated "nothing new" | Readers of the header only; the header contradicts its own §0.1 S5 row. |
+| 2 | Header `:7` | "**0** references to `IEval` and **59** to `MAFEvaluationHarness`. Confirmed." | 3 files / 66 (§12.1). The verdict rests on V1, V2, V4, V5 and V6, not on this count; cite those instead | Stale, direction neutral | This sentence, and ADR-030 §0.0 `:40` which it echoes (corrected there, ADR-030 §11.2 row 2). |
+| 3 | §0.1 S5 `:45` | "**40 tests**" | `grep -c '\[Fact\]'` over `tests/AgentEval.Tests/Cli/CompareCommandTests.cs` (12) + `Cli/CompareCommandDeltaRenderingTests.cs` (11) + `Output/RunComparisonTests.cs` (28) = **51**, 0 `[Theory]`; the 11 are the post-ADR delta-rendering fixes | Under-counted | none |
+| 4 | §0.1 S5 `:45`; Wave 9 `:181-187` | "EXIT 13 … WANTS DECLARING IN A RELEASE NOTE" | Still undeclared: `grep -c 'agenteval compare\|Incomparable\|exit 13' CHANGELOG.md` → **0**; `CHANGELOG.md:8` `[Unreleased]` is empty. `ExitCodes.Incomparable = 13` at `src/AgentEval.Cli/ExitCodes.cs:159`; 12 is reserved and deliberately absent (`:153-154`) | none — an open obligation, restated | The `v0.35.0-beta` cut (ADR-032 D12). |
+| 5 | §0.1 S3 `:43` | "Blocked on ADR-030 Slice 1 — and Slice **1.4** specifically" | **Half shipped.** `MeasurementState` + `EvalScore.Measurement` in `878e5da4` (2026-09-05); schema (i) — `"inapplicable"` in the `label` enum and `score.measurement` — in `e34d9614` (2026-09-06; `src/AgentEval.DataLoaders/Output/Schema/v1/eval-result.schema.json:26`, `:29`). The *writer* half (emit `measurement` unconditionally, bump `$id`) is ADR-030 Q4(ii), deferred to the next major. Three documents carried three statuses for one item | Stale in the "more blocked" direction | S1's blocker bundle (`:122-128`) named VOID / NOT COMPARABLE / INAPPLICABLE as all going through 1.4; only INAPPLICABLE does, and its schema half is in. |
+| 6 | Wave 9 `:167-168` | "§69: `ChanceFloor` appears in 4 files in `src/`, intersection with the 74 `IEval` implementations is zero" and "No shipped eval records one" | **7 / 79 / 1** — the door, `FloorAdmittedEval` (commands in ADR-030 §11.1). "No shipped eval records one" is false by exactly one: an admitted eval records its floor on every result | Stale; the ablation's conclusion (the floor is not a comparability axis) is unaffected and is re-affirmed by ADR-032 D2 | `compare`'s warning path (`src/AgentEval.Cli/Commands/CompareCommand.cs:245`) now has a positive specimen it did not have when written. |
+| 7 | §6 `:1146` | "A floor is a field on a score." | ADR-030 §3.2 cut `EvalScore.ChanceFloor` (the banner at `:189-206` already declares this body stale). On the tree floors live in `Details.Dimensions["chance_floor"]` + `EvalEvidence("chance-floor", …)`, written by the door and read by `ComparabilityOf` | The body's sentence is the refuted design | Covered by the banner; the pointer stops a reader landing at §6 from missing it. |
+| 8 | §8.3 C4/C5 `:1391-1392` | `EvalScore.ChanceFloor` / `EvalScore.Applicable` / `IChanceFloor` / `FloorGatedCodeEval` | C4 → `EvalScore.Measurement` (shipped) and the Dimensions convention; C5 → the `ChanceFloor` record (shipped, ADR-030 Slice 2) plus `FloorAdmittedEval` — which is **not** `FloorGatedCodeEval` (no `DeriveFloor`, no input access; ADR-030 §11.2 row 7). C5's retrofit target, `ToolInputSchemaEval`'s flattering 1.0, was fixed by ADR-030 Slice 0.3 | none | The banner is completed with this pointer; the rows stay as the record. |
+| 9 | §8.4 `:1434-1435` | exit **12** `InstrumentVoid` "NEW"; exit 13 for "`pack compare`" | 13 shipped for the root `compare` verb; 12 was **not** added and is reserved (`ExitCodes.cs:153`), gated on Q5 | Overstated by one code | none |
+| 10 | §1.3 | `pack.version` PATCH/MINOR/MAJOR rules on a manifest nothing builds | Re-homed by ADR-032 D2 onto `BenchmarkDefinition.Version`: a bump is a re-baseline; "the version is documentation, the hash is the mechanism" — with the mechanism being the per-scenario facts `compare` already gates on, **not** a definition hash (V2) | none | ADR-032. |
+| 11 | §0.1 (absent) | — | C1 and AE-04 recorded as the two **Stage-2 preconditions** met since the verdict (§12.1), so the gate's remaining price — the second subject — is legible | none | none |
+
+### 12.3 One name for this ADR's status
+
+The header (`:5`) says **REJECTED AS SCOPED … SHIP REDUCED**; `docs/adr/README.md:54` said
+**Proposed (reduced; …)**. Two names for one state. Reconciled to the header's: the README row now
+reads *Rejected as scoped; SHIP REDUCED* with the per-item state (S2, S5 shipped; S3 half; S1
+deferred; S4 gated on Q5). "Proposed" implied a pending ratification and there is none — the five
+surviving items are individually shipped, deferred, half-shipped or gated, and none awaits a decision
+on the pack.
+
+### 12.4 What remains blocked, and on what
+
+Named as gates; nothing here answers any of them.
+
+| Gate | Blocks in this ADR |
+|---|---|
+| **Q4(ii)** (ADR-030) | S3's writer half; S1's serialised half — a `ScenarioResult` that can express INAPPLICABLE on disk without reading `label`; `RunStats.Inapplicable` (C10's second half) |
+| **Q5** (ADR-030) | S4 entire — `controlLedger`, `VOID`, exit 12, and a producer for the consumer-side guard that already exists (`src/AgentEval.Abstractions/Output/BaselinePromotion.cs:48`, `VoidVerdict = "VOID"`, refused at `:62`) |
+| **Q6** (ADR-030) | Nothing in S1–S5 directly. Indirectly: whether the floor `compare` reports against the delta ever gates anything is ADR-030's Q6; and ADR-032's Wave 2 — the second subject Stage 2 needs — is gated on the owner's reading of "AE-04 before AE-06" (ADR-032 §6 Q-A) |
