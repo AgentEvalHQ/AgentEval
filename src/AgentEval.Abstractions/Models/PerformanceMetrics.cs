@@ -30,8 +30,32 @@ public class PerformanceMetrics
     /// <summary>Number of completion/output tokens used.</summary>
     public int? CompletionTokens { get; set; }
     
-    /// <summary>Total tokens used.</summary>
-    public int? TotalTokens => (PromptTokens ?? 0) + (CompletionTokens ?? 0);
+    /// <summary>
+    /// Total tokens used, or <see langword="null"/> when the provider reported NO usage at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>This was <c>(PromptTokens ?? 0) + (CompletionTokens ?? 0)</c>, which is never null.</b>
+    /// The type said <c>int?</c> — "this can be unknown" — and the body made that impossible, so a
+    /// provider that reported no usage read as a run that used ZERO tokens. That is the absence-as-a-
+    /// zero defect, in the flattering direction: an unmeasured run is the cheapest one in the suite.
+    /// </para>
+    /// <para>
+    /// Two readers were relying on the promise the body broke.
+    /// <c>StochasticResult.GetTotalTokens</c> filters on <c>Performance?.TotalTokens != null</c> — a
+    /// filter that could never remove anything, so every unmeasured run contributed a fabricated 0
+    /// into <c>TotalTokenStats</c> and pulled the mean down. <c>PerformanceAssertions</c> compares
+    /// <c>TotalTokens &gt; max</c>, so an unmeasured run passed every token budget. Both are correct
+    /// now without changing a line of either.
+    /// </para>
+    /// <para>
+    /// ⚠ PARTIAL usage is still usage: when one side is reported and the other is not, the missing
+    /// side counts as 0 and the total is real. Only BOTH being absent means nobody measured.
+    /// </para>
+    /// </remarks>
+    public int? TotalTokens => PromptTokens is null && CompletionTokens is null
+        ? null
+        : (PromptTokens ?? 0) + (CompletionTokens ?? 0);
     
     /// <summary>Number of tool calls made.</summary>
     public int ToolCallCount { get; set; }

@@ -72,6 +72,32 @@ public sealed record EvalInput(
     public string? CaseId { get; init; }
 
     /// <summary>
+    /// What the run COST to produce: wall-clock, time-to-first-token, tokens. Optional,
+    /// non-positional and init-only, so every existing construction site is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>An observation, not a verdict — and that distinction is the whole reason this is
+    /// carried when <c>TestResult.Passed</c>, <c>Score</c> and <c>AssertionResults</c> are not.</b>
+    /// <see cref="TestRunEvalProjection"/> refuses to feed a prior verdict to the eval about to
+    /// produce one; that is the gate-self-examination shape. A latency is not a verdict about the
+    /// run, it is a fact of the run — the same category as <see cref="ToolCalls"/>, which is carried
+    /// for exactly this reason. It was previously grouped with the verdicts because of where it sits
+    /// on <c>TestResult</c> rather than because of what it is, and that grouping made a whole family
+    /// of deterministic checks — latency, token budget, cost — inexpressible as an
+    /// <c>AtomicCodeEval</c>.
+    /// </para>
+    /// <para>
+    /// ⚠ <b><see langword="null"/> means nobody measured, never "it was instant".</b> A check that
+    /// reads a missing measurement as a zero duration turns an unmeasured run into the best possible
+    /// one. Every check over this field must decline rather than score when it is absent, which is
+    /// what <c>AtomicCodeEval.NotApplicable</c> is for. The harness only populates it when
+    /// <c>EvaluationOptions.TrackPerformance</c> is on.
+    /// </para>
+    /// </remarks>
+    public AgentEval.Models.PerformanceMetrics? Performance { get; init; }
+
+    /// <summary>
     /// The model the SUBJECT ran on, when the producer knows it. Optional, non-positional and
     /// init-only, so every existing construction site and every deconstruction is unchanged.
     /// </summary>

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -52,9 +52,19 @@ using AgentEval.Models;
 /// <c>Name</c>, <c>ExpectedOutputContains</c>, <c>EvaluationCriteria</c>, <c>PassingScore</c>,
 /// <c>Tags</c>. Not carried from <see cref="TestResult"/>: <c>TestName</c>, <c>Passed</c>,
 /// <c>Score</c>, <c>Details</c>, <c>Suggestions</c>, <c>CriteriaResults</c>,
-/// <c>AssertionResults</c>, <c>Error</c>, <c>Performance</c>, <c>MetricResults</c>, <c>Failure</c>,
+/// <c>AssertionResults</c>, <c>Error</c>, <c>MetricResults</c>, <c>Failure</c>,
 /// <c>RedTeam</c>. Those are a VERDICT; an <see cref="EvalInput"/> is a STIMULUS. Feeding a prior
 /// verdict to the eval that is about to produce one is the gate-self-examination shape.
+/// </para>
+/// <para>
+/// 🔴 <b><c>Performance</c> WAS on that list and is now carried</b> (<see cref="EvalInput.Performance"/>).
+/// It was grouped with the verdicts because of where it sits on <see cref="TestResult"/> rather than
+/// because of what it is: a latency is not a verdict ABOUT the run, it is a fact OF the run — the same
+/// category as <see cref="EvalInput.ToolCalls"/>, which is carried for exactly that reason. The grouping
+/// made a whole family of deterministic checks (latency, token budget, cost) inexpressible as an
+/// <c>AtomicCodeEval</c>, which is how the defect was found. ⚠ <see langword="null"/> still means NOBODY
+/// MEASURED — the harness populates it only under <c>EvaluationOptions.TrackPerformance</c> — never
+/// "it was instant".
 /// </para>
 /// <para>
 /// ⚠ <b>CaseId is <see cref="TestCase.Id"/> only, never a fallback to the test's name.</b> A
@@ -184,6 +194,12 @@ public static class TestRunEvalProjection
             Metadata: CopyMetadata(testCase.Metadata))
         {
             CaseId = testCase.Id,
+
+            // 7.5: carried straight through, null included. Null means NOBODY MEASURED — the
+            // harness populates it only under EvaluationOptions.TrackPerformance — and a check
+            // that reads a missing measurement as a zero duration turns an unmeasured run into
+            // the best possible one.
+            Performance = result.Performance,
         };
     }
 
