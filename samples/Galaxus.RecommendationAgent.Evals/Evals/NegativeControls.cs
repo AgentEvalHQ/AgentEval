@@ -4,6 +4,7 @@
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
 
 using System.Text.Json;                        // the marshalled JsonElement shape, control 23
+using AgentEval.Evals.Meta;                    // ExactTests, ObservationCensus — ADR-030 Slice 2, consumed not copied
 using AgentEval.MAF;
 using Microsoft.Extensions.AI;                 // AIFunctionFactory — the REAL marshalling path, control 22
 using Galaxus.RecommendationAgent.Guardrails;  // ToolSurfaceInvariant.BehaviouralHistoryToolNames
@@ -5119,6 +5120,28 @@ public static class NegativeControls
         if (ExactBinomial.AboveChance(13, 12, floor).Above)
             problems.Add("13 of 12 came back ABOVE chance — an impossible observation printed the most confident verdict in the panel.");
 
+        // ── ...and that refusal is THIS type's, not the library's it now delegates to ──────────
+        //
+        // ADOPTION, pinned in both directions. `UpperTailP` is now a thin front end over
+        // `AgentEval.Evals.Meta.ExactTests.BinomialTailP` (ADR-030 Slice 2.3), and the library
+        // CLAMPS successes into 0..trials where this suite refuses them: BinomialTailP(13, 12, 1/12)
+        // is P(X >= 12) ~ 1e-13, which is the greenest tick the panel can print, for an observation
+        // that cannot occur. So both halves are asserted — that the guard still refuses, and that
+        // the library still clamps. Without the second, a future library fix would leave this file
+        // documenting a difference that no longer exists; without the first, a "simplification" that
+        // dropped the wrapper would restore the defect silently, in the flattering direction.
+        if (ExactBinomial.UpperTailP(13, 12, floor) != 0.0)
+        {
+            problems.Add("13 of 12 produced a tail probability — the impossible-observation guard is gone, and the "
+                       + "library tail it delegates to CLAMPS rather than refusing.");
+        }
+        if (ExactTests.BinomialTailP(13, 12, floor) is var clamped && (double.IsNaN(clamped) || clamped <= 0.0))
+        {
+            problems.Add($"ExactTests.BinomialTailP(13, 12, 1/12) is {clamped} — the library no longer clamps an "
+                       + "impossible observation, so the guard above is documented against something that is no "
+                       + "longer true.");
+        }
+
         // ── the MULTIPLICITY family is computed from the run, not quoted from a constant ──
         //
         // Pinned against 1 - 0.95^m, computed independently. The shipped panel tests SIX arms
@@ -5153,7 +5176,8 @@ public static class NegativeControls
                 ? $"2 of 12 {ExactBinomial.FormatP(two.P)} \u25bc \u00b7 3 of 12 {ExactBinomial.FormatP(three.P)} \u25bc \u00b7 "
                 + $"4 of 12 {ExactBinomial.FormatP(four.P)} \u25b2 (the boundary) \u00b7 "
                 + $"7 of 12 {ExactBinomial.FormatP(seven.P)} \u25b2 \u00b7 0 trials \u2192 NaN \u00b7 0 of 12 \u25bc \u00b7 "
-                + "13 of 12 \u2192 refused \u00b7 "
+                + "13 of 12 \u2192 refused, and the LIBRARY tail this now delegates to clamps it to "
+                + $"{ExactTests.BinomialTailP(13, 12, floor):0.0E+0} instead, so the refusal is pinned \u00b7 "
                 + $"the OLD rule (rate > floor) said \u25b2 to all three: {oldRuleSaysYesToAll} \u2014 so this change "
                 + "removes exactly two unearned ticks and keeps the earned one. \u26a0 The paid \u00a727.4 panel HAS "
                 + "an arm at 3 of 12 (Demo 2's deterministic arm, 0.250), so a verdict DOES move: \u25b2 \u2192 \u25bc. "
@@ -7518,11 +7542,16 @@ public static class NegativeControls
     /// direction — the pooled form is always the larger number.
     /// </para>
     /// <para>
-    /// ⚠ <b>This is also the first place the Galaxus sample uses an ADR-030 Slice 2 TYPE.</b> Until
-    /// now the sample's adoption was strings, not types: its own <c>Observation</c> is a local
-    /// <c>private sealed record</c> in Eval 07 and its <c>ChanceFloors</c> is a local helper, and
-    /// there is no <c>using AgentEval.Evals.Meta</c> anywhere in it. A library type with no
-    /// consumer outside its own tests is a type whose contract nobody has had to live with.
+    /// ⚠ <b>This was the FIRST place the Galaxus sample used an ADR-030 Slice 2 type, and for a
+    /// while it was the only one.</b> A library type with no consumer outside its own tests is a
+    /// type whose contract nobody has had to live with — so the census row stayed, and the rest of
+    /// the suite has since followed it: <c>ChanceFloors.AtLeastOneHit</c> is now
+    /// <c>ChanceFloor.AtLeastOneHit</c>, and <c>ExactBinomial.UpperTailP</c> is now
+    /// <c>ExactTests.BinomialTailP</c>. Living with those contracts produced two findings the tests
+    /// had not: the library refuses a floor at <c>k = 0</c> where this corpus has a derived zero,
+    /// and its binomial tail CLAMPS an impossible observation where this suite refuses one. Both are
+    /// recorded at the wrappers; the second is pinned in both directions by the
+    /// <c>AboveChanceIsAnExactTest</c> row.
     /// </para>
     /// </remarks>
     private static ControlRowSnapshot CheckApplicableFractionDoesNotPoolTwoAbsences()
@@ -7603,8 +7632,9 @@ public static class NegativeControls
           + "(Total − NotApplicable) / Total. The second POOLS NotApplicable with NotMeasured, and those are "
           + "different findings with different owners: a case that could not test the thing is a CORPUS finding, "
           + "a run where the instrument did not run is an OPERATIONAL one. The pooled form is always the LARGER "
-          + "number, so it reports a broken harness as a well-scoped corpus. ⚠ This row is also the first place "
-          + "this sample uses an ADR-030 Slice 2 TYPE rather than its own local copy.",
+          + "number, so it reports a broken harness as a well-scoped corpus. ⚠ This row was the FIRST place this "
+          + "sample used an ADR-030 Slice 2 TYPE rather than its own local copy; ChanceFloors and ExactBinomial "
+          + "have since followed it onto ChanceFloor and ExactTests.",
             problems.Count == 0
                 ? "on 8 measured / 3 n/a / 1 not measured the shipped fraction is 0.667 and the forbidden one "
                 + "0.750, and the forbidden one is LARGER · a floor of 9 is NOT met by 8 measurements even though "

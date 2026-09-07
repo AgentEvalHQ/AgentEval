@@ -1545,6 +1545,17 @@ public static class Eval07_WorkflowTopology
     }
 
     /// <summary>Everything one case produced. A refused case carries only <see cref="Refusal"/>.</summary>
+    /// <remarks>
+    /// ⚠ <b>Not <c>AgentEval.Evals.Meta.Observation</c>, and deliberately not converted to it.</b>
+    /// The library's <c>Observation</c> is a four-field collapsed tuple — case, arm, ONE number, and
+    /// whether that number is real — and its whole value is that a floor test, a rep collapse and a
+    /// paired comparison can be defined over it and nothing else (ADR-030 §4.1). This record is the
+    /// opposite kind of thing: thirty-odd fields of raw per-case topology evidence — traversed
+    /// edges, rounds, super-steps, stop reason, proposal refusals, timings — none of which is a
+    /// score. It is a name collision, not a duplicated type, and flattening it into a single value
+    /// would delete the evidence this eval exists to print. Where Eval 07 does reduce a case to a
+    /// verdict, that verdict is a gate, not an observation fed to a null.
+    /// </remarks>
     private sealed record Observation
     {
         public required TopologyCase Case { get; init; }

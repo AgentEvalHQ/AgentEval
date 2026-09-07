@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
+using AgentEval.Evals.Meta;
+
 namespace Galaxus.RecommendationAgent.Evals.Graders;
 
 /// <summary>
@@ -20,6 +22,13 @@ namespace Galaxus.RecommendationAgent.Evals.Graders;
 /// The floor that matters is the random-draw one, and it is computed per persona from the real
 /// eligible pool.
 /// </para>
+/// <para>
+/// <b>The hypergeometric arithmetic is the LIBRARY's</b> — <see cref="ChanceFloor.AtLeastOneHit"/>
+/// (ADR-030 §4.3). Everything below it is corpus knowledge that cannot live in a library: which
+/// pool a customer's interests are actually drawn from, which vocabulary the grader will credit a
+/// hit over, which leaves the customer already owns. That split is the point of this file — the
+/// suite stopped carrying a second copy of the maths, and kept the part that is about Galaxus.
+/// </para>
 /// </remarks>
 public static class ChanceFloors
 {
@@ -31,26 +40,38 @@ public static class ChanceFloors
     /// <paramref name="poolSize"/> contains at least one of <paramref name="favourable"/> items:
     /// 1 - C(pool - favourable, k) / C(pool, k).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The arithmetic is <see cref="ChanceFloor.AtLeastOneHit"/>'s.</b> This suite used to carry
+    /// its own product-form copy of it; the library's is the same recurrence, and having two was
+    /// two things to keep right.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>One input class where the library REFUSES and this suite must not.</b>
+    /// <see cref="ChanceFloor.AtLeastOneHit"/> returns <see cref="FloorState.NotDerivable"/> when
+    /// <c>k &lt;= 0</c> or the pool is empty, and reading <c>Value</c> there THROWS — because an
+    /// absent floor averaged in as a zero is how a metric gets condemned. That rule is right for an
+    /// absent derivation and wrong for this one: <b>P(a 0-draw contains something) is not absent,
+    /// it is exactly 0</b>, and a 0-draw is a thing an arm here really does.
+    /// </para>
+    /// <para>
+    /// It is REACHED, and it is load-bearing in the un-flattering direction. A silent arm's floor is
+    /// derived at its OWN k (<c>InterestCoverageGrader.GradeWithControls</c> passes
+    /// <c>score.PresentedCount</c>), so an arm that presents nothing is scored 0.000 against a floor
+    /// of 0.000, <c>Score &gt;= Floor</c> is TRUE, that persona counts as CLEARING its floor, and
+    /// negative control 4 goes RED. Mapping the refusal to 0.0 is therefore not a paper-over of the
+    /// library's ruling; it is the one case where a derived zero and an absent floor are different
+    /// facts and this corpus has the derived one. Named here rather than hidden, because the whole
+    /// value of the library's rule is that a deviation from it has to be argued.
+    /// </para>
+    /// </remarks>
     /// <param name="poolSize">Total items available to draw from.</param>
     /// <param name="favourable">How many of them count as a hit.</param>
     /// <param name="k">How many are drawn.</param>
     public static double AtLeastOneHit(int poolSize, int favourable, int k)
     {
-        if (poolSize <= 0 || k <= 0 || favourable <= 0) return 0.0;
-        if (favourable >= poolSize) return 1.0;
-        if (k >= poolSize) return 1.0;
-
-        // Product form of C(pool - fav, k) / C(pool, k) — no factorials, no overflow.
-        double missAll = 1.0;
-        for (int i = 0; i < k; i++)
-        {
-            double numerator = poolSize - favourable - i;
-            double denominator = poolSize - i;
-            if (numerator <= 0) return 1.0;
-            missAll *= numerator / denominator;
-        }
-
-        return 1.0 - missAll;
+        var floor = ChanceFloor.AtLeastOneHit(poolSize, favourable, k);
+        return floor.State is FloorState.Derived ? floor.Value : 0.0;
     }
 
     /// <summary>
@@ -58,6 +79,15 @@ public static class ChanceFloors
     /// <paramref name="poolSize"/> AVOIDS all <paramref name="forbidden"/> items — the floor for
     /// a suppression case.
     /// </summary>
+    /// <remarks>
+    /// ⚠ <b>The complement of <see cref="AtLeastOneHit"/>, deliberately NOT
+    /// <see cref="ChanceFloor.AvoidsAll"/>.</b> The library's avoidance floor refuses <c>k &lt;= 0</c>
+    /// the same way, and here the degenerate answer is 1.0, not 0.0: an arm that retrieved NOTHING
+    /// avoided the forbidden SKU with certainty. That input is reached —
+    /// <c>InjectionContainmentGrader</c> passes the arm's own candidate count, which is 0 for a loop
+    /// that gathered nothing — so the two floors need opposite degenerate values, and defining this
+    /// one as the complement is what keeps them exactly consistent rather than an ULP apart.
+    /// </remarks>
     /// <param name="poolSize">Total items available.</param>
     /// <param name="forbidden">How many must be avoided.</param>
     /// <param name="k">How many are drawn.</param>

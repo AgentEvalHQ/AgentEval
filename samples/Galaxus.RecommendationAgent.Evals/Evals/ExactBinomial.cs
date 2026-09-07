@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using System.Globalization;
+using AgentEval.Evals.Meta;
 
 namespace Galaxus.RecommendationAgent.Evals;
 
@@ -56,14 +57,26 @@ namespace Galaxus.RecommendationAgent.Evals;
 /// <para>
 /// <b>Computed in log space, deliberately.</b> The naive product form loses the tail entirely once
 /// <c>n</c> passes a few hundred — the defect ADR-030 §4.4's <c>SignP_SurvivesLargeN</c> exists to
-/// pin — and this suite's Eval 09 pairs at n in the dozens today but is not bounded there.
+/// pin — and this suite's Eval 09 pairs at n in the dozens today but is not bounded there. <b>The
+/// log-space tail itself is now <see cref="ExactTests.BinomialTailP"/>'s</b>; this file used to
+/// carry a second copy of it, down to its own <c>LogChoose</c> and <c>LogFactorial</c>.
 /// </para>
 /// <para>
-/// ⚠ <b>MIGRATION TARGET, named rather than assumed.</b> This is the sample-side instance of
-/// ADR-030 Slice 2.3 (<c>ExactTests</c>) and Slice 2.4 (<c>ZeroEventUpperBound</c>). When Phase 4
-/// lands, this type is deleted and its callers move to the library's — the same arrangement
-/// <c>CalibratedThresholds</c> already declares for <c>ChanceFloor.Empirical</c>. It is written here
-/// now because 1.4 is independently doable today and the defect it fixes is live in printed output.
+/// ⚠ <b>What is left here is the DECISION and the RENDERING, not the maths</b> — and that is the
+/// honest division. The library ships no console renderer on purpose (ADR-030 §6.3), and
+/// <see cref="AboveChance"/> is this suite's forced-choice cut, not a general one: the library's
+/// nearest equivalent, <c>FloorComparison.AboveFloor</c>, additionally refuses a comparison that
+/// could not have reached α at any observation, which is right for a floor test built from
+/// <c>Observation</c> rows and is not what the three call sites below hand it.
+/// </para>
+/// <para>
+/// ⚠ <b>ONE guard is kept sample-side, and it is a finding about the library.</b>
+/// <see cref="UpperTailP"/> refuses <c>successes &gt; trials</c> with NaN;
+/// <see cref="ExactTests.BinomialTailP"/> CLAMPS it into range instead, so
+/// <c>BinomialTailP(13, 12, 1/12)</c> returns <c>P(X ≥ 12)</c> ≈ 1e-13 — the most confident ▲ the
+/// panel could print, for an observation that cannot happen. A clamp turns a broken caller into a
+/// result, and it does so in the flattering direction. Reported, not patched here: changing a
+/// shipped library's tail behaviour is not a sample's call to make.
 /// </para>
 /// <para>
 /// <b>What it is NOT.</b> It is not a correction for multiplicity: several arms are tested against
@@ -78,8 +91,12 @@ namespace Galaxus.RecommendationAgent.Evals;
 /// </remarks>
 public static class ExactBinomial
 {
-    /// <summary>The significance level every caller in this suite uses. One number, one place.</summary>
-    public const double Alpha = 0.05;
+    /// <summary>
+    /// The significance level every caller in this suite uses. One number, one place — and that
+    /// place is now the library's <see cref="ExactTests.DefaultAlpha"/>, so the suite cannot drift
+    /// from the α the library's own floor comparisons apply.
+    /// </summary>
+    public const double Alpha = ExactTests.DefaultAlpha;
 
     /// <summary>
     /// P(X ≥ <paramref name="successes"/>) for X ~ Binomial(<paramref name="trials"/>,
@@ -89,26 +106,22 @@ public static class ExactBinomial
     /// <param name="trials">Trials. Zero trials give NaN — an empty denominator is not a result.</param>
     /// <param name="chance">The null rate. Outside (0, 1) gives NaN.</param>
     /// <returns>The upper-tail probability, or NaN when the question is not askable.</returns>
+    /// <remarks>
+    /// The tail is <see cref="ExactTests.BinomialTailP"/>'s. The three guards in front of it are
+    /// this suite's, and the third one is the one that matters: the library CLAMPS
+    /// <paramref name="successes"/> into <c>0..trials</c> where this refuses it, so an impossible
+    /// observation would come back as a very small p rather than as "no answer". A caller that
+    /// counted wrong must not be handed the panel's most confident tick. The other two agree with
+    /// the library exactly — zero trials is NaN there too, and a clamped zero success count returns
+    /// 1.0 — and are kept only so the contract reads at the point of use.
+    /// </remarks>
     public static double UpperTailP(int successes, int trials, double chance)
     {
         if (trials <= 0) return double.NaN;
         if (double.IsNaN(chance) || chance <= 0.0 || chance >= 1.0) return double.NaN;
-        if (successes <= 0) return 1.0;                       // P(X ≥ 0) is 1 by definition
         if (successes > trials) return 0.0;
 
-        double logP = Math.Log(chance);
-        double logQ = Math.Log(1.0 - chance);
-
-        // Log-space term by term, summed with the exponential taken per term. The alternative —
-        // summing the log terms — is wrong; the alternative that multiplies raw terms underflows.
-        double total = 0.0;
-        for (int k = successes; k <= trials; k++)
-        {
-            double logTerm = LogChoose(trials, k) + (k * logP) + ((trials - k) * logQ);
-            total += Math.Exp(logTerm);
-        }
-
-        return Math.Clamp(total, 0.0, 1.0);
+        return ExactTests.BinomialTailP(successes, trials, chance);
     }
 
     /// <summary>
@@ -168,32 +181,4 @@ public static class ExactBinomial
         double.IsNaN(p) ? "p n/a"
         : p < 0.0001 ? "p < 0.0001"
         : string.Create(CultureInfo.InvariantCulture, $"p = {p:0.0000}");
-
-    /// <summary>log C(n, k), via the log-gamma of the factorials — no factorial is ever formed.</summary>
-    private static double LogChoose(int n, int k) =>
-        LogFactorial(n) - LogFactorial(k) - LogFactorial(n - k);
-
-    /// <summary>
-    /// log(n!) by Lanczos-free summation for the small n this suite has, and Stirling above it.
-    /// </summary>
-    /// <remarks>
-    /// The exact summation is used up to n = 1000, which covers every denominator this repository
-    /// has ever produced by three orders of magnitude and is exact rather than asymptotic. Above it
-    /// the Stirling series is used so the function cannot blow up on a caller it was not sized for.
-    /// </remarks>
-    private static double LogFactorial(int n)
-    {
-        if (n <= 1) return 0.0;
-
-        if (n <= 1000)
-        {
-            double sum = 0.0;
-            for (int i = 2; i <= n; i++) sum += Math.Log(i);
-            return sum;
-        }
-
-        double x = n + 1.0;
-        return ((x - 0.5) * Math.Log(x)) - x + (0.5 * Math.Log(2.0 * Math.PI))
-             + (1.0 / (12.0 * x)) - (1.0 / (360.0 * x * x * x));
-    }
 }

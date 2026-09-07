@@ -4684,6 +4684,10 @@ chance (p = 0.2640)"*, *"3 of 12 … (p = 0.0720)"*) and `-- 3` to **exit 1**. R
 **Migration target named, not assumed:** `ExactBinomial` is deleted when ADR-030 Slice 2.3 lands and its
 callers move to the library's `ExactTests` — the same arrangement `CalibratedThresholds` already declares
 for `ChanceFloor.Empirical`.
+> ⚠️ **SUPERSEDED IN PART by §79 (2026-09-07).** The migration happened, and it was not a deletion:
+> `ExactBinomial.UpperTailP` now delegates to `ExactTests.BinomialTailP` and the class survives as the
+> suite's DECISION plus RENDERING, because the library ships neither. `ChanceFloor.Empirical` is still
+> unused. §79.2(b) records why one guard stayed sample-side.
 
 ### 30.3 Commands
 
@@ -6623,9 +6627,13 @@ TFMs; the meta filter is still 67.
 - **Nothing in the Galaxus sample was migrated onto these types.** That is Slice 2.6 (Eval 02) and
   Phase 5 (the rest), and 2.6 is Q6's. `ExactBinomial` in the sample still ships and still names
   itself the migration target.
+  ⚠️ **SUPERSEDED by §79 (2026-09-07):** `ChanceFloors` and `ExactBinomial` now consume
+  `ChanceFloor` and `ExactTests`. Slice 2.6 — Eval 02's GATE 1 — is still NOT built and is still Q6's.
 - **The meta lane has no consumer inside this repository yet**, which is exactly the objection §9 Q5
   records against the *controls* lane (*"machinery with one consumer rots in six months"*). Declared,
   not answered.
+  ⚠️ **SUPERSEDED by §79:** it has one now, and living with the contract produced two findings the
+  library's own tests had not — §79.2. That is the argument FOR Q5's lane, made by measurement.
 - **`ObservationCensus.ExtremeAndUnexamined` is not wired to anything.** It ships as a predicate; no
   aggregation reads it.
 - **No renderer was added.** ADR-030 §6.3 records that the library ships no console renderer;
@@ -15082,4 +15090,131 @@ cp /tmp/r.orig src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs
 
 # 78.13 - the fitness question, in one command: HAS THIS CORPUS EVER BEEN JUDGED?
 grep -rl '"cohensKappa"' --include=*.json . | grep -v '/obj/\|/bin/' | wc -l    # 0. It has not.
+```
+
+---
+
+## §79 — the sample now CONSUMES ADR-030 Slice 2. **1 type → 4, 4 sites → 10**, and the arbiter that published "1 and 0" five times cannot see it (2026-09-07)
+
+**§66.9, §69.9, §72.9, §74.10, §76.10 and §78.12 all published the same number: ADR-030 Slice 2 types
+the sample uses = 1, ADR-031 types = 0.** That was the one criticism of this project that landed:
+*a library whose own flagship sample re-implements the library.* This wave closes the ADR-030 half by
+DELETION, not by addition — two local copies of library maths are gone.
+
+| local type | library type | outcome |
+|---|---|---|
+| `Graders/ChanceFloors.AtLeastOneHit` (product-form hypergeometric, 18 lines) | `AgentEval.Evals.Meta.ChanceFloor.AtLeastOneHit` | **ADOPTED** |
+| `Evals/ExactBinomial.UpperTailP` + its private `LogChoose` / `LogFactorial` (43 lines) | `AgentEval.Evals.Meta.ExactTests.BinomialTailP` | **ADOPTED** |
+| `ExactBinomial.Alpha = 0.05` | `ExactTests.DefaultAlpha` | **ADOPTED** |
+| `ChanceFloors.AvoidsAll` | `ChanceFloor.AvoidsAll` | **NOT ADOPTED** — see §79.2(a) |
+| `Eval07_WorkflowTopology.Observation` (a `private sealed record`, 31 fields) | `AgentEval.Evals.Meta.Observation` (4 fields) | **NOT ADOPTED** — a name collision, not a duplicate |
+
+### §79.1 🔴 The arbiter this record published FIVE TIMES is blind to the adoption it was measuring
+
+`grep -rn "AgentEval\.Evals\.Meta\." $E $A --include=*.cs` reads **6**, and **2 of those 6 are prose
+written in this same wave.** The four real construction sites are the same `ObservationCensus` ones
+§74.10 published. **It did not move, because a namespace is normally adopted by `using` + short name,
+and a fully-qualified grep cannot see that.** The arbiter this document has called *"misleading"* five
+times — `grep -rn "using AgentEval.Evals.Meta"` — is the one that is now right: it was **1 hit and that
+hit was a DOC COMMENT saying there were none**; it is now **3, all real directives**. So there were
+never two ways this grep was wrong, there were three: `bin`/`obj`, prose, **and short-name binding**.
+
+| arbiter | before | after | verdict |
+|---|---|---|---|
+| `AgentEval\.Evals\.Meta\.` fully qualified, `--include=*.cs` | 4 | **6** (4 real + 2 new prose) | ⛔ blind to the change |
+| `using AgentEval.Evals.Meta`, `--include=*.cs` | 1 (a doc comment) | **3** (all directives) | ✅ |
+| references RESOLVED to an `AgentEval.Evals.Meta` type | **4 sites / 1 type** | **10 sites / 4 types** | ✅ the honest count |
+| unrestricted (no `--include`) | 232 | **256** | ⛔ counts this document |
+
+Resolved sites: `ChanceFloors.cs:73` (`ChanceFloor`), `:74` (`FloorState`), `ExactBinomial.cs:99`,
+`:124`, `NegativeControls.cs:5138`, `:5180` (`ExactTests`), `NegativeControls.cs:7562`, `:7599`,
+`:7616`, `:7620` (`ObservationCensus`). **ADR-031 types the sample uses is still 0, and this wave did
+not try to move it**: ADR-031's surface is output and packaging, and the sample has no call for it.
+
+### §79.2 Two findings the library's own tests had not produced, because nobody had lived with the contract
+
+**(a) `ChanceFloor` refuses `k = 0`, and this corpus has a DERIVED zero there, not an absent floor.**
+`ChanceFloor.AtLeastOneHit` returns `NotDerivable` when `k <= 0`, and reading `.Value` THROWS — the
+right rule for an absent derivation, because an absence averaged in as a zero is how a metric gets
+condemned. But P(a 0-draw contains something) is not absent, it is exactly **0**, and `k = 0` is
+REACHED: `InterestCoverageGrader.GradeWithControls` derives each floor at the arm's OWN
+`score.PresentedCount`, so a silent arm is scored 0.000 against a floor of 0.000, `Score >= Floor` is
+TRUE, that persona counts as CLEARING, and **negative control 4 goes RED**. Mapped to 0.0 at the
+wrapper with the argument written out, not swallowed.
+**`ChanceFloor.AvoidsAll` is NOT adopted for the same reason with the opposite sign**: it refuses
+`k = 0` too, where the correct answer is **1.0** — an arm that retrieved nothing avoided the forbidden
+SKU with certainty — and `InjectionContainmentGrader` passes exactly that when a loop gathers nothing.
+Defining it as `1 - AtLeastOneHit` keeps the two floors exactly complementary instead of an ULP apart.
+
+**(b) 🔴 `ExactTests.BinomialTailP` CLAMPS an impossible observation where this suite refuses one.**
+`BinomialTailP(13, 12, 1/12)` clamps 13 into `0..12` and returns `P(X >= 12)` = **1.1E-13** — the most
+confident ▲ the panel can print, for an observation that cannot occur. A caller that counted wrong is
+handed the greenest tick on screen, which is the flattering direction. The `successes > trials` refusal
+is therefore KEPT sample-side, and the `AboveChanceIsAnExactTest` control now pins **both halves** — that
+the wrapper still refuses, AND that the library still clamps — so a future library fix cannot leave this
+file documenting a difference that no longer exists. Reported, not patched: changing a shipped library's
+tail is not a sample's call. **This is the one printed number this wave adds.**
+
+### §79.3 Proven INERT by execution, both spaces, whole-log diff
+
+Four invocations × two embedding spaces, credentials unset **in the command**, snapshot store restored
+to a pristine copy before each generation so the runs start from identical state. The noise floor was
+measured first by running the baseline TWICE: after canonicalising clock, ISO-stamp, `TotalDuration`,
+`ms` and `s` tokens, two identical runs differ by **0 lines** on `-- 3`, `-- 4` and `-- 7`, and by
+**6** on `--ci --dry-run` (three latency means and one seconds column).
+
+| invocation | exit before → after | canonicalised whole-log diff |
+|---|---|---|
+| `-- 3` (both spaces) | 0 → 0 | **16 lines, all prose written this wave** (the clamp value, the corrected "first place" claim) |
+| `-- 4` (both spaces) | 0 → 0 | **0** |
+| `-- 7` (both spaces) | 1 → 1 | **0** |
+| `--ci --dry-run` (both spaces) | 1 → 1 | **22 lines** = the same 16 prose lines + the 6-line timing noise floor |
+| `stderr`, all eight | — | **0** |
+
+**Not one number moved** — no floor, no p-value, no ▲/▼, no gate, no exit code. That is the expected
+result and it is provable rather than argued: `ChanceFloor.AtLeastOneHit` is the same recurrence in the
+same order as the copy it replaced, and `ExactTests.BinomialTailP` is the same log-space tail with the
+same `LogFactorial`. Panel unchanged at **43 gating (0 NOT CAUGHT) + 7 advisory**. Sample-project
+warning identity set AND counts unchanged across a `--no-incremental` build; `dotnet build AgentEval.sln
+--no-incremental` still **0 errors**. Zero spend: `-- 3`, `-- 4` and `-- 7` call no model, and `--ci
+--dry-run` stubs every one.
+
+### §79.4 What was deliberately NOT done
+
+* **`Eval07_WorkflowTopology.Observation` was not converted.** The library's `Observation` is a
+  four-field collapsed tuple whose entire value is that a floor test, a rep collapse and a paired
+  comparison are defined over it and nothing else (ADR-030 §4.1). Eval 07's is 31 fields of raw
+  topology evidence — traversed edges, rounds, super-steps, stop reason, proposal refusals, timings —
+  **none of which is a score**. Flattening it to one number would delete the evidence the eval exists
+  to print. A remark now says so at the declaration, so the collision is a recorded decision.
+* **No new machinery.** No new type, no new file, no new concept. Two library findings were
+  recorded and one existing control row grew two assertions; everything else is deletion.
+* **`ChanceFloors`' corpus-specific derivations stay local** — `SuppressionFloor`, `EvidenceFloor`,
+  `RandomDrawFloor`, `RandomPrecisionFloor`. They encode which pool a customer's interests are drawn
+  from and which vocabulary the grader credits a hit over. That is Galaxus knowledge and it does not
+  belong in a library. The split is the point: the maths moved out, the domain stayed.
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+SCRUB="env -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_DEPLOYMENT \
+       -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
+
+# 79.1 - THE THREE ARBITERS. The one this record published five times is the blind one.
+grep -rn "AgentEval\.Evals\.Meta\." $E $A --include=*.cs | wc -l    # 6 - and 2 of them are PROSE
+grep -rn "using AgentEval.Evals.Meta" $E $A --include=*.cs | wc -l  # 3 - all real directives now
+grep -rn "AgentEval\.Evals\.Meta\." $E $A | wc -l                   # 256 - counts THIS document,
+#   the-bare-name greps are worse, not better: `ChanceFloor` matches a `string ChanceFloor`
+#   PROPERTY 21 times and `Observation` matches Eval 07's LOCAL record 23 times.
+#   RESOLVE the name to its binding. -> 10 sites / 4 types.
+
+# 79.2(b) - the clamp, in one line. THE LIBRARY RETURNS A NUMBER FOR AN IMPOSSIBLE OBSERVATION.
+$SCRUB dotnet run --project $E --no-build -- 3 --concept-vectors | grep -A1 "13 of 12"
+#   -> "refused, and the LIBRARY tail this now delegates to clamps it to 1.1E-13 instead"
+
+# 79.3 - THE INERTNESS PROOF. Restore the snapshot store between generations or the diff is noise.
+#   before/ and after/ each: {3, 4, 7, --ci --dry-run} x {concept, real}. Canonicalise, THEN diff.
+sed -E -e 's/[0-9]{2}:[0-9]{2}:[0-9]{2} UTC/<CLOCK> UTC/g' -e 's/[0-9]{8}T[0-9]{6}Z/<STAMP>/g' \
+       -e 's/[0-9]+(\.[0-9]+)? ms/<MS> ms/g' -e 's/[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+/<DUR>/g'
+#   MEASURE THE NOISE FLOOR FIRST by diffing TWO baseline runs, or the result is unreadable:
+#   it is 0 lines on 3/4/7 and 6 on --ci, and without that number "22 lines" means nothing.
 ```
