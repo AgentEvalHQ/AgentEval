@@ -62,6 +62,11 @@ internal static class Program
         var runComposite  = !args.Contains("--flat-only", StringComparer.OrdinalIgnoreCase);
         PrintHeader();
 
+        // --selftest: the admitted leaf's invariants, offline. It runs BEFORE the credential read
+        // because it is the one part of this sample that needs nothing configured.
+        if (args.Contains("--selftest", StringComparer.OrdinalIgnoreCase))
+            return await ToolFindingsCitedSelfTest.RunAsync();
+
         var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
         var apiKey     = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
@@ -159,7 +164,39 @@ internal static class Program
         // is an AgentEval IEvaluator (ChatClientEvaluator); we then wrap the whole composite as a single
         // MEAI IEvaluator so MAF can run it.
         var benchmarkJudge = new ChatClientEvaluator(judge);
-        var composite = AgenticBenchmark.ToolCallAccuracy(benchmarkJudge, judgeModel: deployment);
+        var preset = AgenticBenchmark.ToolCallAccuracy(benchmarkJudge, judgeModel: deployment);
+
+        // ── The admitted leaf ──────────────────────────────────────────────────────────────
+        // One DETERMINISTIC check, admitted through AgentEval's floor-gated door and dropped into
+        // the preset's component list. Two things this deliberately does NOT do:
+        //
+        //   · it does not admit the composite ROOT. FloorAdmittedEval refuses a result carrying
+        //     sub-results, because one floor stamped on a root would certify every floorless leaf
+        //     beneath it. The floor rides on the LEAF and travels up inside the captured tree.
+        //   · it does not read its floor back off its own output. The floor is supplied here,
+        //     before anything runs.
+        //
+        // ⚠ WEIGHT. ToolCallAccuracy is a single-component preset (weight 1.0), so admitting a leaf
+        // at the default weight makes this composite an explicit 50/50 of one judged aggregate and
+        // one deterministic check. That is a real change to what the number means, so the preset is
+        // re-keyed and re-named rather than reported under the preset's own name.
+        var admittedLeaf = new EvalComponent(
+            FloorAdmittedEval.Admit(new ToolFindingsCitedEval(), ToolFindingsCitedEval.DeclaredFloor));
+
+        var composite = new CompositeEval(
+            key: preset.Key + ".with_admitted_leaf",
+            name: preset.Name + " + 1 admitted leaf",
+            category: preset.Category,
+            version: preset.Version,
+            components: [.. preset.Components, admittedLeaf],
+            aggregation: preset.Aggregation,
+            threshold: preset.Threshold);
+
+        Console.WriteLine(
+            $"  composite: {preset.Components.Count} preset component(s) + 1 admitted leaf " +
+            $"('{ToolFindingsCitedEval.EvalKey}', weight {admittedLeaf.Weight:0.00}, floor: " +
+            $"{ToolFindingsCitedEval.DeclaredFloor.Kind}), threshold {preset.Threshold:0.00}");
+
         var compositeEvaluator = composite.AsMeaiEvaluator();   // AgentEval.MAF: IEval -> MEAI IEvaluator
 
         // Same MAF-native path: wrap the composite as an IAgentEvaluator and run the native overload.
@@ -210,8 +247,12 @@ internal static class Program
         [Description("Travel date")] string date)
     {
         Console.WriteLine($"  🔧 SearchFlights({origin} → {destination}, {date})");
-        return $"Found 3 flights {origin}→{destination} on {date}: " +
-               "AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h).";
+        // The identifiers come from ToolFindingsCitedEval so the admitted leaf's pool cannot drift
+        // from what the agent was actually shown. A checker whose pool has diverged from reality
+        // fails honest arms and passes nothing.
+        var f = ToolFindingsCitedEval.FlightIds;
+        return $"Found {f.Count} flights {origin}→{destination} on {date}: " +
+               $"{f[0]} ($450, 10h), {f[1]} ($520, 9h), {f[2]} ($480, 11h).";
     }
 
     [Description("Search for available hotels in a city for given dates.")]
@@ -221,8 +262,9 @@ internal static class Program
         [Description("Check-out date")] string checkOut)
     {
         Console.WriteLine($"  🔧 SearchHotels({city}, {checkIn}–{checkOut})");
-        return $"Found 3 hotels in {city}: Hotel Le Marais ($180/night, 4★), " +
-               "Ibis Paris ($95/night, 3★), Ritz Paris ($650/night, 5★).";
+        var h = ToolFindingsCitedEval.HotelNames;   // same single source of truth as the flights
+        return $"Found {h.Count} hotels in {city}: {h[0]} ($180/night, 4★), " +
+               $"{h[1]} ($95/night, 3★), {h[2]} ($650/night, 5★).";
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
