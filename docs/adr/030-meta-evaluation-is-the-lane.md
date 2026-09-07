@@ -1866,6 +1866,45 @@ rule.**
 > verdict; floors are recorded and unapplied, exactly as `FloorAdmittedEval` records them. Answering
 > Q6 does not retroactively bind a floor that no code applies.
 
+### §11.6 — every number in §11 RE-TAKEN 2026-09-07, and three of the COMMANDS are what moved
+
+Plan task 5.2. Re-run against the tree at `9ce3f50f`, after Waves 0–3, 6 and 7.1/7.2/7.5 shipped.
+**No stated figure was found wrong.** What was found wrong is three of the commands that verify them.
+
+| §11 claim | command re-run | now reads | verdict |
+|---|---|---|---|
+| row 2 — Galaxus references `IEval` 0 times | `grep -rl '\bIEval\b' <galaxus> --include=*.cs \| wc -l` | **4** | **superseded by design.** Wave 2.2 and 3.5 put four admitted evals in that sample; the row records the state the join was built to change |
+| row 2 — …and `MAFEvaluationHarness` 59 times | `grep -ro MAFEvaluationHarness <galaxus> \| wc -l` | **67** | moved with the sample, not a defect |
+| row 8 — `ApprovalAwareAgentAdapter` deleted | `grep -rl ApprovalAwareAgentAdapter <galaxus> \| wc -l` | **8** | unchanged from §11's own reading; the row's point stands |
+| row 11 — `SignTestAtEqualK` at 11 sites | the row's own command | **11** | ✅ exact, and `grep -rn SignTest src` is still **0** |
+| row 14 — the four ducks | `TryGetValue("agent")` outside the new owner | **0** | 7.1 closed it; the ducks now share one keyed read |
+| — | strict `IEval` declarers in `src/` | **75** | ✅ unchanged across every wave |
+
+**🔴 The finding: three verifying commands cannot return their stated value in a repository that
+documents its own decisions.** All three are the same shape, and this record has now hit it four
+times (§82.1 for `SyntheticEval`, task 1.4's grep, and twice here):
+
+1. `grep -rn '\.Eval\b' src/AgentEval.Core/Evals/Aggregations/` is quoted in §11 and in each of the
+   five aggregation strategies as returning **0**. It returns **5** — and all five hits are *the doc
+   comment quoting the grep*. The claim is true of the CODE and false of the FILE, because the file
+   states the claim. I wrote four of those five myself in task 1.1 and then repeated the claim in
+   7.1's new `IAggregationStrategy` documentation.
+2. `grep -rn controlLedger src` is quoted as **0**. It returns **5**: one real source hit
+   (`ExitCodes.cs:154`, a comment explaining that exit 12 belongs to S4 and is therefore *not* taken)
+   and four copies in generated `bin/` and `obj/` XML. The command is unscoped — it never said
+   `--include=*.cs`.
+3. `grep -c 'agenteval compare\|Incomparable\|exit 13' CHANGELOG.md` is quoted as **0** as a
+   pre-edit precondition. It now reads **3**, correctly: the 0.35.0-beta notes disclose the feature.
+
+None of the three is a defect in the code. All three are gates that a reader re-running them today
+would read as regressions, which is worse than a stale number — a stale number is inert, and a
+self-refuting command sends the next reader looking for a bug that is not there.
+
+**The rule this yields, stated so it can be applied rather than admired:** a verifying grep must
+exclude the document that quotes it, or be scoped narrowly enough that quoting it cannot satisfy it
+(`--include=*.cs` plus a path that excludes `bin`/`obj` is usually enough). Where neither is
+possible, state the expected value as *"0 live references; N prose"* rather than as *"0"*.
+
 **Q7 — Does the exclusion list (§3.1) go into `docs/adr/030-*.md` as normative text**, so a PR adding
 `contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.
 
