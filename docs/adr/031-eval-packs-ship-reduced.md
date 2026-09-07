@@ -1596,6 +1596,25 @@ on the pack.
 
 Named as gates; nothing here answers any of them.
 
+> ### ✅ ANSWERED 2026-09-07 — all three gates below are closed, and none of them freed an item.
+>
+> **Q4(ii): defer.** Keep the conditional `measurement` writer; no `$id` bump. S3's writer half and
+> S1's serialised half stay unbuilt, now by DECISION rather than by a pending question. Reopens only
+> when a consumer must tell *absent* from *`Measured`* ON DISK.
+>
+> **Q5: defer the API, take the arm.** No `INegativeControl`. **S4 entire is closed, not merely
+> blocked** — no `controlLedger`, no `VOID`, no exit 12. What replaces it costs no new API: a
+> deliberately-degraded `BenchmarkArm.From(...)` IS a negative control, and
+> `BenchmarkScore.AgainstReference` scores it against the live arm with the case as the unit.
+> Reopens when a second consumer must SHARE controls across definitions.
+>
+> **Q6: yes on the principle, staged in execution.** The floor `compare` reports beside the delta
+> still gates nothing, and `BenchmarkRunner` applies none — the binding test lands in ADR-030's Slice
+> 2.6 under the three conditions recorded there. So this ADR's indirect dependency is unchanged in
+> behaviour and changed in status: scheduled, not open.
+>
+> The table below records the state before those answers.
+
 | Gate | Blocks in this ADR |
 |---|---|
 | **Q4(ii)** (ADR-030) | S3's writer half; S1's serialised half — a `ScenarioResult` that can express INAPPLICABLE on disk without reading `label`; `RunStats.Inapplicable` (C10's second half) |
