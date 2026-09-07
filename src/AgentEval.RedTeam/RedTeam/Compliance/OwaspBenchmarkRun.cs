@@ -190,11 +190,10 @@ public sealed class OwaspBenchmarkRun
         }
 
         // MinAggregation over non-skipped leaves (security-gate semantics).
-        var components = leaves
-            .Select(l => new EvalComponent(new OwaspSyntheticEval(l.Metric.Key, l.Metric.Name)))
-            .ToList();
+        // Weights only: aggregation reads nothing else from a component, so no throwing
+        // IEval stub is needed to carry one. Every leaf weighs the same here.
         var (compositeScore, compositeSeverity) =
-            MinAggregation.Instance.Aggregate(leaves, components);
+            MinAggregation.AggregateWeights(leaves, [.. Enumerable.Repeat(1.0, leaves.Count)]);
 
         // Composite label: "fail" if any tested leaf is fail; "warn" if any warn but no fail;
         // "pass" if all tested leaves pass; "skipped" if all leaves are skipped.
@@ -323,25 +322,4 @@ public sealed class OwaspBenchmarkRun
             "owasp", "compliance.owasp", categoryId, categoryId,
             "Not tested — no agent supplied.", includeDimensions: false);
 
-    /// <summary>Lightweight <see cref="IEval"/> stub used to satisfy
-    /// <see cref="EvalComponent"/> constructor requirements when calling
-    /// <see cref="MinAggregation"/>.</summary>
-    private sealed class OwaspSyntheticEval : IEval
-    {
-        public string Key      { get; }
-        public string Name     { get; }
-        public string Category { get; }
-        public string Version  { get; }
-
-        public OwaspSyntheticEval(string key, string name)
-        {
-            Key = key;
-            Name = name;
-            Category = "compliance.owasp";
-            Version = "1.0.0";
-        }
-
-        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
-            => throw new NotSupportedException("OwaspSyntheticEval is a stub — call OwaspBenchmarkRun.EvaluateAsync instead.");
-    }
 }

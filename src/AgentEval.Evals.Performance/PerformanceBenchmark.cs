@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -506,15 +506,11 @@ public class PerformanceBenchmark
         var costLeaf     = BuildCostLeaf(costResult,          opts);
 
         var leaves = new[] { latencyLeaf, throughputLeaf, costLeaf };
-        var components = new[]
-        {
-            new EvalComponent(new SyntheticEval("perf_latency",   "Latency",   "performance", "1.0.0")),
-            new EvalComponent(new SyntheticEval("perf_throughput", "Throughput","performance", "1.0.0")),
-            new EvalComponent(new SyntheticEval("perf_cost",       "Cost",      "performance", "1.0.0")),
-        };
-
-        // CapByWorst: any high/critical-fail caps the composite.
-        var (compositeScore, compositeSeverity) = CapByWorstAggregate(leaves, components);
+        // CapByWorst over three equally weighted leaves. Weights only: aggregation reads
+        // nothing else from a component, so the three SyntheticEval stubs that existed to
+        // satisfy the EvalComponent constructor are gone.
+        var (compositeScore, compositeSeverity) =
+            CapByWorstAggregation.AggregateWeights(leaves, [1.0, 1.0, 1.0]);
         bool passed = compositeScore >= opts.CompositePassThreshold
             && leaves.All(l => l.Score.Label != "fail");
         string label = passed ? "pass"
@@ -712,54 +708,6 @@ public class PerformanceBenchmark
             Details: new(null, null, new[] { reason }, null, null),
             Provenance: new("skipped", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
-
-    /// <summary>Minimal CapByWorst aggregation without taking a CoreEval dependency on the real class.</summary>
-    private static (double Score, string Severity) CapByWorstAggregate(
-        IReadOnlyList<EvalResult> results,
-        IReadOnlyList<EvalComponent> components)
-    {
-        double weightSum = 0, weightedSum = 0;
-        for (int i = 0; i < results.Count; i++)
-        {
-            if (results[i].Score.Label == "skipped") continue;
-            weightSum     += components[i].Weight;
-            weightedSum   += results[i].Score.Value * components[i].Weight;
-        }
-        var rawScore = weightSum > 0 ? weightedSum / weightSum : 0;
-
-        bool hasCrit = results.Any(r => r.Score.Label != "skipped" && r.Score.Severity == "critical" && !r.Score.Passed);
-        bool hasHigh = results.Any(r => r.Score.Label != "skipped" && r.Score.Severity == "high"     && !r.Score.Passed);
-
-        if (hasCrit) return (Math.Min(rawScore, 0.40), "critical");
-        if (hasHigh) return (Math.Min(rawScore, 0.69), "high");
-
-        // derive severity from the worst non-skipped leaf
-        var severities = results
-            .Where(r => r.Score.Label != "skipped")
-            .Select(r => r.Score.Severity)
-            .ToList();
-        var worstSeverity = severities
-            .OrderByDescending(s => s switch { "critical" => 4, "high" => 3, "medium" => 2, "low" => 1, _ => 0 })
-            .FirstOrDefault() ?? "none";
-        return (rawScore, worstSeverity);
-    }
-
-    /// <summary>Lightweight IEval stub used to satisfy EvalComponent constructor requirements.</summary>
-    private sealed class SyntheticEval : IEval
-    {
-        public string Key      { get; }
-        public string Name     { get; }
-        public string Category { get; }
-        public string Version  { get; }
-
-        public SyntheticEval(string key, string name, string category, string version)
-        {
-            Key = key; Name = name; Category = category; Version = version;
-        }
-
-        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
-            => throw new NotSupportedException("SyntheticEval is a stub — call PerformanceBenchmark.EvaluateAsync instead.");
-    }
 
     private static TimeSpan CalculatePercentile(List<TimeSpan> values, int percentile)
     {

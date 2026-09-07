@@ -109,10 +109,10 @@ public sealed class NistBenchmarkRun
 
         var leaves = report.Controls.Select(c => BuildLeaf(c, attacksByName)).ToList();
 
-        var components = leaves
-            .Select(l => new EvalComponent(new NistSyntheticEval(l.Metric.Key, l.Metric.Name)))
-            .ToList();
-        var (compositeScore, compositeSeverity) = MinAggregation.Instance.Aggregate(leaves, components);
+        // Weights only: aggregation reads nothing else from a component, so no throwing
+        // IEval stub is needed to carry one. Every leaf weighs the same here.
+        var (compositeScore, compositeSeverity) =
+            MinAggregation.AggregateWeights(leaves, [.. Enumerable.Repeat(1.0, leaves.Count)]);
 
         var testedLeaves = leaves.Where(l => l.Score.Label != "skipped").ToList();
         string compositeLabel;
@@ -235,14 +235,4 @@ public sealed class NistBenchmarkRun
         return leaf;
     }
 
-    /// <summary>Lightweight <see cref="IEval"/> stub to satisfy <see cref="EvalComponent"/> for <see cref="MinAggregation"/>.</summary>
-    private sealed class NistSyntheticEval(string key, string name) : IEval
-    {
-        public string Key => key;
-        public string Name => name;
-        public string Category => "compliance.nist";
-        public string Version => "1.0.0";
-        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
-            => throw new NotSupportedException("NistSyntheticEval is a stub — call NistBenchmarkRun.EvaluateAsync instead.");
-    }
 }

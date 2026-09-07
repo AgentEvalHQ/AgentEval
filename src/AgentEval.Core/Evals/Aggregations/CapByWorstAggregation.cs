@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -30,8 +30,27 @@ public sealed class CapByWorstAggregation : IAggregationStrategy
         if (results.Count != components.Count)
             throw new InvalidOperationException("Results and components must align 1:1.");
 
+        return AggregateWeights(results, components.Select(c => c.Weight).ToArray());
+    }
+
+    /// <summary>
+    /// The weights-only entry point. Aggregation reads nothing from an <see cref="EvalComponent"/>
+    /// except its <see cref="EvalComponent.Weight"/> — verified across all five strategies:
+    /// <c>grep '\.Eval|\.Required' src/AgentEval.Core/Evals/Aggregations/</c> returns 0 — so a
+    /// caller that has weights but no evals does not need a throwing <c>IEval</c> stub to carry them.
+    /// Four such stubs existed only to satisfy the <see cref="EvalComponent"/> constructor.
+    /// </summary>
+    public static (double Score, string Severity) AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(weights);
+        if (results.Count != weights.Count)
+            throw new InvalidOperationException("Results and weights must align 1:1.");
+
         // Start from the standard weighted-sum
-        var (rawScore, severity) = WeightedSumAggregation.Instance.Aggregate(results, components);
+        var (rawScore, severity) = WeightedSumAggregation.AggregateWeights(results, weights);
 
         // Cap rule — only scores that count toward the aggregate can trigger the cap. ADR-030 Slice 1.2:
         // this test used to read `Label != "skipped"` alone, so an "error" leaf — an infrastructure or

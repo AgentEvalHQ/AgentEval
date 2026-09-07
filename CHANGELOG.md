@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Aggregation no longer requires an `IEval` to carry a weight.** The five strategies gain a static
+  `AggregateWeights(results, weights)`; the instance `Aggregate(results, components)` forwards to it.
+  Nothing in aggregation ever read anything from an `EvalComponent` except its `Weight` — `.Eval` and
+  `.Required` appear **0** times across `src/AgentEval.Core/Evals/Aggregations/` — yet four `IEval`
+  stubs whose `EvaluateAsync` throws existed only to satisfy the `EvalComponent` constructor. All
+  four are deleted (`SyntheticEval`, `OwaspSyntheticEval`, `NistSyntheticEval`,
+  `MitreSyntheticEval`), along with `PerformanceBenchmark`'s private `CapByWorstAggregate`.
+  `IAggregationStrategy` is untouched.
+- **`PerformanceBenchmark` now follows Core's `CountsTowardAggregate` cap rule.** Its private copy
+  excluded only `"skipped"`; Core also excludes `"error"` and `"inapplicable"`. A **rule** change with
+  **no observable behaviour change on perf's inputs**, measured rather than asserted: an equivalence
+  test walks every leaf shape perf can produce — label × severity × passed, cubed, **27,000 triples** —
+  and the two agree on all of them, because perf emits neither `"error"` nor `"inapplicable"`
+  (grep → 0). Adding `"error"` to the enumerated labels makes **29,860 of 64,000** triples disagree,
+  which is how the test is known not to be vacuous.
+
 ### Fixed
 
 - **A judge that graded nothing is no longer named on the OWASP / NIST / MITRE roots.**

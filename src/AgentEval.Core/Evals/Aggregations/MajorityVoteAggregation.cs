@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -30,6 +30,25 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         ArgumentNullException.ThrowIfNull(components);
         if (results.Count != components.Count)
             throw new InvalidOperationException("Results and components must align 1:1.");
+
+        return AggregateWeights(results, components.Select(c => c.Weight).ToArray());
+    }
+
+    /// <summary>
+    /// The weights-only entry point. Aggregation reads nothing from an <see cref="EvalComponent"/>
+    /// except its <see cref="EvalComponent.Weight"/> — verified across all five strategies:
+    /// <c>grep '\.Eval|\.Required' src/AgentEval.Core/Evals/Aggregations/</c> returns 0 — so a
+    /// caller that has weights but no evals does not need a throwing <c>IEval</c> stub to carry them.
+    /// Four such stubs existed only to satisfy the <see cref="EvalComponent"/> constructor.
+    /// </summary>
+    public static (double Score, string Severity) AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(weights);
+        if (results.Count != weights.Count)
+            throw new InvalidOperationException("Results and weights must align 1:1.");
 
         // 17: exclude "error" leaves too (transient provider failure, severity "none" by construction), not
         // just "skipped" — an "error" leaf never counts as a pass/warn/fail vote (its label matches none of
