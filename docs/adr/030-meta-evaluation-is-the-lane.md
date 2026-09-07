@@ -1,4 +1,4 @@
-﻿# ADR-030: Meta-evaluation is the lane. Contract unification is not.
+# ADR-030: Meta-evaluation is the lane. Contract unification is not.
 
 - **Status:** **Accepted (2026-09-05).** Ratification is what funds §8: Slices 1 and 2 are now
   funded. Slice 0 was **already executed** before ratification (see the ratification note) — the gate
@@ -1860,6 +1860,30 @@ rule.**
 > `Eval02`, `Eval09` and `NegativeControls`, and `grep -rn SignTest src --include=*.cs` → **0**. What
 > was deleted is the unconditioned `SignTest`; the hand-rolled sign test still exists, renamed and
 > conditioned. 2.6's precondition is two deletions, not one.
+>
+> ### ✅ Q6 CONDITION 2 DISCHARGED 2026-09-08 — the movement is PUBLISHED, and it reproduced
+>
+> `SimulatedLatentNull` draws the null instead of comparing to its mean, and Eval 02 now prints the
+> result beside the shipped verdict as an ADVISORY line that gates nothing. Observed on a free
+> command (`-- 2 --dry-run`, exit 0, credentials unset): the shipped predicate reads **PASS, 12 of
+> 12**; the drawn null reads **9 of 12** at α = 0.05, below being `USR-MI-02` p = 0.0560,
+> `USR-LM-09` p = 0.1235, `USR-NK-12` p = 0.2429.
+>
+> **That is this box's own single-draw figure, reproduced INDEPENDENTLY** — the simulator was written
+> from the pool definition rather than from this document, and lands on the same three personas. The
+> number recorded above was a measurement, not a claim, and it holds. `MEASUREMENT_STATUS` §86
+> carries the method, the seed and the sample count.
+>
+> **Condition 1 honoured:** `ExactBinomial.AboveChance(LatentServed, …)` is NOT shipped, for the
+> reason recorded above — it integerises a rounded rep-mean.
+>
+> ⚠ **A gap that blocks the EXACT test, found by building it.** The correct null is a mean of REPS,
+> and `CoverageScore` does not record how many reps it is a mean of. The line therefore reports the
+> single-draw null and says so; it under-admits, which is the safe direction. Recording the rep count
+> is what unblocks the mean-of-3 figure this box measured at 10 of 12.
+>
+> **Condition 3 is still owed:** `SignTestAtEqualK` remains live at 11 call sites. The deletion waits
+> until the default flips, which waits on this publication having been read.
 >
 > **Consequence for the contract:** Phase 7.2 is unblocked — `AgentEvalCompositeEvaluator` may take a
 > floor. Until 2.6 lands under conditions 1–3, `BenchmarkRunner` still applies **no** floor to any
