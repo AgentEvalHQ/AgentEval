@@ -11991,3 +11991,505 @@ HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed -E 's#^https?://##; s#/.*$##')
 git grep -lF "$HOST" | wc -l ; git diff ecf89339..HEAD | grep -cF "$HOST"    # -> 0 and 0
 grep -rlF "$HOST" $S | wc -l                                                 # then delete, re-count -> 0
 ```
+
+---
+
+# §72. THE WAVE-9 CLOSE-OUT RUN — 2026-09-07, at `ea0004e5`. Category (d) is **NOT EMPTY**: the three it had are built, and executing this close-out put **two new ones** in
+
+**The seventh independent state re-take, and the second written to answer one question: *is the plan
+finished?* It is not.** Wave 9 built all three of §69.10's members and each is verified here by
+execution. **But this close-out found two more (d) members while running — one of them by refuting a
+limit §71 declared — so (d) went 3 → 2, not 3 → 0.** Nothing agent-side was purchased; the only live
+path is query embedding on `--real-vectors`, which the banner reports and which is metered below.
+
+**Layers under this one:** §71 the Wave-9 review, §70 the Wave-9 build, §69 the Wave-8 close-out,
+§68 the Wave-8 review, §67 the Wave-8 fix.
+
+## §72.1 Build — 0 errors, identity set **70** twice, and a recipe that is portable **by design**
+
+`dotnet build AgentEval.sln --no-incremental`, twice on this tree:
+
+| invocation | errors | warning TOTAL | distinct identities |
+|---|---|---|---|
+| build 1 | **0** | 231 | **70** |
+| build 2 | **0** | 231 | **70** |
+
+`diff` between the two identity sets: **empty**. ⚠️ **Two agreeing readings of the TOTAL still do not
+make it quotable** — §62.1 read 226 then 229 on a byte-identical tree, and that observation is what
+killed the total. The identity **set** is the durable form.
+
+🔴 **§66.11's RECIPE IS REPLACED, NOT RE-USED.** §69.1 established that its ERE bracket class
+`[A-Za-z0-9_\.]+` admits `\` **literally**, so on Windows it silently matches the whole path and is
+right only by accident. The replacement makes the separator question explicit and then removes it:
+
+```bash
+grep -oE '[^ ]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+' build.log \
+  | tr '\\' '/' | sort -u                       # -> 70   (full, separator-normalised)
+#   ... | sed 's|^.*/AgentEval/||' | sort -u    # -> 70   (repo-relative)
+#   ... | sed 's|^.*/||'           | sort -u    # -> 70   (basename+line+col+code)
+```
+
+`[^ ]+` neither admits nor forbids a backslash by accident, and `tr` normalises the separator so a
+`/`-platform yields the same set. **All three arbiters return 70**, which also proves no two distinct
+files collide on a basename — the failure mode that would have made §66.11's accidental basename set
+smaller *and* still self-consistent.
+
+**Codes, so the set is auditable without listing it:** CS8602 ×26, CS1573 ×13, CS1574 ×12, CS8604 ×3,
+CS8629/CS8601/CS1734/CS0618 ×2 each, and CS9107 · CS8714 · CS7022 · CS1580 · CS1572 · CS0419 · CS0414 ·
+CS0162 ×1 each. **Neither CS1734 is Wave 9's** — they sit in `VerboseLoggingChatClient.cs(24,102)` and
+`DomainAllowListGate.cs(22,89)`; §70's own `RunComparison.cs` CS1734 is gone, fixed in `1013ead9`.
+**Not one of Wave 9's five new or changed files appears in the set**, checked by name
+(`EvalRegistry.cs`, `AgenticEvalRegistration.cs`, `RunComparison.cs`, `CompareCommand.cs`,
+`ExitCodes.cs`). The relocated `CS0162` §71 flagged is where the review left it:
+`NegativeControls.cs(3164,51)`.
+
+## §72.2 Three TFM totals, after a full solution build, `--no-build` per TFM
+
+| TFM | passed | failed | skipped | total |
+|---|---|---|---|---|
+| **net10.0** | **9,928** | **0** | 2 | 9,930 |
+| **net9.0** | **9,710** | **0** | 1 | 9,711 |
+| **net8.0** | **9,710** | **0** | 1 | 9,711 |
+
+Reproduces §71 to the digit from a tree this close-out built itself.
+
+**The invariants, which do not decay:**
+
+* **0 failures on all three TFMs.**
+* `git diff --numstat main..HEAD -- tests/` returns **36** paths and **not one has a non-zero deletion
+  column**. No existing assertion has ever been weakened or rewritten on this branch. ⚠️ The path count
+  was 32 at the Wave-8 close-out — count it, never quote it; the zero deletion column is the invariant,
+  now held over **seven** takings.
+* `git log --oneline main..HEAD -- strategy/` is **empty**. Seventh consecutive taking.
+
+## §72.3 Exit codes — **30** commands, both spaces, every one OBSERVED with `$?`
+
+| command | concept | `--real-vectors` |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 1 --dry-run --judge` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** |
+| `-- 4` | 0 | 0 |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| **`-- 7`** | **1** | **1** |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| **`--ci --dry-run`** | **1** | **1** |
+| `agent -- 0` · `agent -- 0/1/2 --offline` | 0 · 0 · 0 · 0 | — |
+
+**NOTHING MOVED.** Seventh independent sweep since `0263141d` with the same answer, and **the
+immobility across seven sweeps is the invariant, not the table** — Wave 9 added three features to
+`src/` and a gating row to the panel without moving one exit code.
+
+`--ci --dry-run` fails on **Eval 07 only**, in both spaces: the TIGHT arbiter
+`grep -cE '^ *. Eval [0-9a-c]+: passed\.$'` returns **10**, the eleventh member is `Eval 07: FAILED.`
+⚠️ The loose `': passed'` still returns **11** — a control's own prose quoting *"Eval 07: passed."* —
+the **fifth** sighting of the `baca28e4` shape.
+
+**THE REAL SPACE DID NOT FALL BACK, read off the banner and never inferred from the flag:**
+`Embedding space: precomputed+azure (text-embedding-3-small, 1536 dims) · 99 committed product
+vectors · queries embedded LIVE against 'text-embedding-3-small' · space probe 1.0000`, and the banner
+states that `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`'s `text-embedding-ada-002` was **NOT** used. Concept
+reads `concept (galaxus-concept-v3, 24 dims)`.
+
+⚠️ **AND THAT MATTERS THIS TIME, because §71's real half DID fall back.** The Wave-9 review ran with
+the credential variables unset and recorded *"`-- 3 --real-vectors` resolved to `precomputed` and
+called nothing"*. **Its real-space column is therefore a second reading of the concept path, not of the
+real one.** This close-out's is live. Nothing in §71 is wrong — it says what it did — but a
+`--real-vectors` exit code is only a real-space fact when the banner says the queries went out.
+
+**What the live half spent, from the suite's own meter and not an estimate:** **581 query
+embedding calls + 13 space-identity probes, 8,338 prompt tokens** summed over the thirteen
+`--real-vectors` commands (`-- 3` alone: 119 calls / 1,269 tokens; `--ci --dry-run`: 159 / 2,015).
+Cached lookups — **1,433** from the per-run memo and **1,683** from the committed index — are reported
+at no cost by the meter itself. **No chat model was called by any eval in this sweep.**
+
+⚠️ **Those two cache figures were WRONG in this section's first draft (1,432 and 1,584) and were
+caught before the commit.** They were summed by hand off a `uniq -c` histogram — a multiplied row
+counted once — and the correction came from re-deriving them with a parser over the thirteen logs.
+**Rule 4 in one line: a number added in your head is a stored number, not a derived one.** The
+per-command values it is built from are `-- 3` 119 calls / 1,269 tokens and `--ci --dry-run` 159 /
+2,015; the parser's own output is `logs=13 calls=581 probes=13 memo=1433 idx=1683 tok=8338`.
+
+## §72.4 `compare` — **both** exit paths exercised, on runs PRODUCED in this session
+
+**Stage 0: nothing here is cited from §70.3 or §71.5.** A fresh isolated workspace, an empty `.sln`
+(`init-workspace` exits **0** with it), and **nine** runs made with every credential variable unset
+**in the command** — §70.4's standing correction, because a flag's name does not govern the judge and
+the environment does. **Nine, counted on disk: GdprA/B/C/D, MitreA/B, PerfA/B/C** — 117 scenario files
+in total, of which the census below is over the **86** written by the five that the exit-code table
+compares.
+
+| | measured this session |
+|---|---|
+| scenario files across the five compare-subject runs | **86** |
+| **summed `estimatedCost` over all 86** | **0.0** |
+| `comparability.judge.subjectRelation` | **`unknown` on 86 of 86** |
+| scenarios carrying a `chanceFloor` | **0** |
+| scenarios carrying a `judge.rubricDigest` | **0** |
+
+**Nine invocations, `$?` on every one:**
+
+| pair | flags | verdict | **exit** |
+|---|---|---|---|
+| GdprA vs GdprB (same input, same response) | — | COMPARABLE | **0** |
+| GdprA vs GdprB | `--strict` | INCOMPARABLE (`judge.rubricDigest` pinned by neither) | **13** |
+| GdprA vs GdprC (different `--input`) | — | INCOMPARABLE (**axis** `stimulus`, on the same 28 ids) | **13** |
+| MitreA vs MitreB | — | COMPARABLE, blind spots declared | **0** |
+| MitreA vs MitreB | `--strict` | INCOMPARABLE | **13** |
+| GdprA vs MitreA | — | INCOMPARABLE (no shared scenario id) | **13** |
+| a run vs itself | — | COMPARABLE | **0** |
+| a missing path · a directory with no scenario files | — | usage error, never a verdict | **2** · **2** |
+
+✅ **Exit 0 has a positive specimen and is not an artefact of identical inputs** — GdprA vs GdprC is an
+**axis** refusal on the same 28 scenario ids, not a set mismatch, and a sixth run (**GdprD**, same
+`--input`, a deliberately worse `--response` of `"No."`) compares **COMPARABLE, exit 0**. ⚠️ **The
+chance floor is not a comparability axis:** 28 of 28 matched scenarios recorded no usable floor and
+`compare` reports that beside the delta rather than gating on it.
+
+## §72.5 The control panel — **43 gating + 7 advisory**, by NAME, in both spaces
+
+| | concept | `--real-vectors` |
+|---|---|---|
+| gating rows, by distinct NAME | **43** | **43** |
+| `❌ NOT CAUGHT` | **0** | **0** |
+| advisory rows, by distinct NAME | **7** | **7** |
+| advisory rows TRIPPING | **2** | **3** |
+
+`diff` of the gating NAME sets across the spaces: **empty**. `diff` of the advisory NAME sets:
+**empty**. Source-side arbiter `grep -c '^        rows.Add(' NegativeControls.cs` → **50 = 43 + 7**.
+**Both extractions strip the state before sorting** (§69.4's correction to §66.11, which sorted the
+tick together with the name and so emitted two strings for a row that flips): tripping advisory is
+concept `{AuthoredQueryPhraseRetrievability, SuppressionDetectorExercised}`, real those two **plus**
+`DenseLegSaysWhenItRankedNothing`. **Any sentence saying "two advisory findings" must name the space.**
+
+**ARM C reads 6 of 56 in BOTH spaces** — Wave 8's D-v lexicon closure, observed in the running
+instrument; the real space additionally prints **ARM A (resolved path) 0 of 56**.
+
+**N-17, the row Wave 9 added, re-observed in both spaces:**
+`ceiling 3 (claimed 3, gate needs 5) · worst pair 1 (claimed 1) · refuser 0 (claimed 0, policy
+PRESENT) · 35 of 35 case verdicts produced`. **`policy PRESENT` is §71.1's fix speaking** — before it,
+an ABSENT policy and a measured 0 were byte-identical on that line.
+
+## §72.6 Persistence — the KEY SET, two independent arbiters, and the model-backed keys to the second
+
+**The canonical KEY SET is 14 and is unchanged by Wave 9:**
+
+```
+eval01_integrity            eval02_coverage_ab          eval02_coverage_ab_probe
+eval02b_stated_need         eval02b_stated_need_probe   eval02c_held_out
+eval02c_held_out_probe      eval03_controls             eval04_injection
+eval05_quality              eval06_trajectory           eval07_topology
+eval09_hypothesis_ab        eval09_hypothesis_ab_probe
+```
+
+**This wave wrote exactly three — `eval03_controls`, `eval04_injection`, `eval07_topology` —
+established two independent ways, because the ledger alone cannot do it:**
+
+1. **The write ledger, a COUNT arbiter.** `grep -c "Snapshot saved"` over `--ci --dry-run` → **3**, in
+   both spaces. ⚠️ **The `Snapshot saved →` line names the DIRECTORY, not the keys** (§69.5's
+   correction to §66) — it can say *how many*, never *which*.
+2. **The key NAMES, from a different line of the same log.**
+   `grep -oE "eval0[0-9][a-c]?_[a-z_]+"` returns exactly those three and nothing else, both spaces.
+3. **The disk, as a third and stricter arbiter.** A per-key mtime taken before and after the sweep
+   moves for exactly those three; **the other eleven are unchanged TO THE SECOND.**
+
+🔒 **All eleven unchanged keys are the model-backed ones**, and the split is not a coincidence: the
+three that moved are exactly the three model-free evals, which the CI chain runs for real
+(`RUN_PROTOCOL`, item 8.19/§34.3). **Both headline records are among the eleven**, read from the
+JSON's own `RunAt` rather than an mtime: `eval02b_stated_need` = `2026-09-05T17:53:19.8608498Z`,
+`eval02c_held_out` = `2026-09-05T18:20:12.5118072Z`.
+
+`grep -rl '"Comparability"' .agenteval` and its camel-case form both return **0** — the field
+`03242a1d` added still reaches no persisted artifact in this repository.
+
+⚠️ **No file count and no byte size is recorded in this section, on purpose** (§42.9 was corrected
+twice for doing so).
+
+## §72.7 Credentials — 0, with a SYNTHETIC positive control, and every hit classified
+
+**Corpus: 55 files, 39,420 lines**, every one produced by this close-out.
+
+| # | pattern | distinct hits | classification |
+|---|---|---|---|
+| P1 | `[A-Za-z0-9_]{32,}` | **29** | **29 of 29 are strings that occur in the tracked repository** — control-row names, test names, type names. ⚠️ That bucket also absorbs the environment-variable **NAME** earlier waves counted separately, because the name is itself a tracked string; the classifier tests repo-membership first |
+| P2 | `[A-Za-z0-9_]{40,}` | **4** | all four likewise tracked identifiers |
+| P3 | `sk-[A-Za-z0-9_-]{16,}` | **0** | — |
+| P4 | `[A-Za-z0-9._-]+\.openai\.azure\.com` | **0** | — |
+| P5 | `[0-9a-f]{32,}` | **0** | — |
+| P6 | bearer / api-key / authorization + value | **0** | — |
+| — | **CREDENTIAL-BEARING** (hit contains the real key or the real host) | **0** | the only classification that matters |
+| — | **UNCLASSIFIED** | **0** | — |
+
+**The classifier never prints a hit's value.** It reports a hit by CATEGORY, and would report an
+unclassified one by SHAPE (length only). There were none.
+
+**Literal `grep -F`, needles checked non-empty FIRST, reported as COUNTS ONLY:**
+
+| corpus | full URL | host | API key |
+|---|---|---|---|
+| this wave's 55 artifacts | **0** | **0** | **0** |
+| tracked repository (`git grep -l`) | **0** | **0** | **0** |
+| `git diff main..HEAD` | — | **0** | **0** |
+| `strategy/Galaxus` | — | **0** | **0** |
+| `.agenteval/` | — | **2** | **0** |
+
+**The two `.agenteval` hits are reported by COUNT and by DATE and are NOT resolved to a path** —
+**2026-07-11** and **2026-07-17**, §57.4a's known pre-existing pair, both predating this branch's first
+commit. §69.6's rule is honoured literally: *on a credential hit the path may BE the credential*, and
+one of those two files carries the host in its own filename.
+
+✅ **POSITIVE CONTROL — SYNTHETIC, planted OUTSIDE the repository, deleted in the SAME command.** A
+made-up host, a made-up 49-character `sk-SYNTHETIC…` key, a 39-character bearer token, a 48-hex digest
+and a 60-character opaque run id (lengths **computed**, not eyeballed — the first draft of this
+sentence guessed one of them and was wrong). **All six patterns fired — 4 · 3 · 1 · 1 · 1 · 1 — and the literal `grep -F`
+mechanism fired too** (1, on a synthetic needle). The file was deleted in the same command and its path
+re-scanned to **0 files, 0 hits**. ⚠️ **RULE 1 HELD: no real credential and no real endpoint was
+written anywhere, at any point.** The literal scan's needle is real; the demonstration that the literal
+*mechanism* can hit uses a synthetic needle — two different claims, kept apart.
+
+## §72.8 The two headline claims — did they move? **NO.** FIFTH consecutive wave
+
+**Neither instrument was reachable from anything Wave 9 did.** Measured two ways:
+
+1. **Neither was touched.** `git diff --name-only 870e116e..HEAD` does not list
+   `Eval02b_StatedNeedSatisfaction.cs` or `Eval02c_HeldOutNextPurchase.cs`.
+2. **Neither stored record moved** — from the JSON's own `RunAt`, both **2026-09-05**, before Wave 9's
+   first commit; and this close-out's own 30-command sweep left both **unchanged to the second**
+   (§72.6).
+
+**Wave 9 bought nothing agent-side.** The 0.889 / 1.000 at equal mean k, the 0.949, the 0.385,
+W/L/T 3/1/9, p = 0.6250 and the 0.125 attainable floor all stand exactly as §21 and §23 left them.
+
+⚠️ **This is the FIFTH consecutive wave with that answer and the reason has not changed once, so read
+it as a cost, not as diligence.** It is **structural, not scheduling**: the two claims live in Eval 02b
+and Eval 02c, both are judged cohorts, and the *only* operation that can move either is a paid re-run.
+Wave 9 was commissioned to build category (d) — three items that by definition need **no money** — so
+it could not have moved them even in principle, and neither can any future (d)-only wave. **The
+purchase that would move them is §0.5's Phase 2 remainder, category (b), and it is last on purpose.**
+
+## §72.9 ADR-030 / ADR-031 adoption by the sample — **1 and 0**, and Wave 9 widened the gap again
+
+Measured with the only correct arbiter, the **fully-qualified reference** (§66.9):
+
+* `grep -rn "AgentEval\.Evals\.Meta\."` over the sample → **4 sites, one distinct type,
+  `AgentEval.Evals.Meta.ObservationCensus`, all four in `NegativeControls.cs`**.
+  **ADR-030 Slice 2 types the sample uses = 1.**
+* `grep -rn "namespace AgentEval.Packs" src/` → **0**; `AgentEval.Packs.` in the sample → **0**.
+  **ADR-031 types the sample uses = 0.**
+* ⚠️ The misleading arbiter still misleads: `grep -rn "using AgentEval.Evals.Meta"` returns **exactly
+  one hit and it is a DOC COMMENT saying there is no such using** — now at `NegativeControls.cs:7524`
+  (it was `:7382`, then `:7366`; **the line number moves, the count does not**).
+
+🔴 **AND THE GAP WIDENED A SECOND TIME.** Wave 9 added three library surfaces —
+`IEvalRegistry`/`EvalRegistry`/`EvalRegistration`, `RunComparison`, and `ExitCodes.Incomparable` — and
+the sample references **none of them**, by FQN or by bare name (measured per type, all zero). Wave 8
+added five types with zero sample references; Wave 9 added three more. That is not automatically wrong
+— these are CLI- and runner-side types and the sample is not a runner — but *"machinery with one
+consumer rots in six months"* is **Q5's own reviewer objection**, and this is the second consecutive
+wave of evidence **for** it.
+
+## §72.10 🔴 CATEGORY (d) IS **NOT EMPTY**. The three are built; **two new ones** were found by executing
+
+**Wave 9 built all three of §69.10's members and each is verified here by a command, not by its
+report:**
+
+| # | member | the command that decides it | state |
+|---|---|---|---|
+| **d-1** | 7.6 (e) `IEvalRegistry` | `grep -rn "IEvalRegistry" src/` → **9** (was 0); `sed -n '267,400p' BenchAgenticCalibrateCommand.cs \| grep -cE '^\s+\["'` → **0** (was 40); `grep -cE '^        Add<' AgenticEvalRegistration.cs` → **40**, 40 distinct keys | ✅ **BUILT** |
+| **d-2** | 8.10's N-17 half | `Eval06ConstantPolicyCeiling` is a **gating** row in the 43; both spaces print `ceiling 3 · worst pair 1 · refuser 0 (policy PRESENT) · 35 of 35` | ✅ **BUILT** |
+| **d-3** | ADR-031 S5 / 7.5, `compare` | `agenteval --help \| grep -c compare` → **1**; `ExitCodes.cs:159 Incomparable = 13`; both exit paths driven on runs produced this session (§72.4) | ✅ **BUILT** |
+
+**And then executing this close-out put two members back in.**
+
+### 🆕 (d-4) — three dispatched calibration keys have **no golden entry**, so they can never be calibrated
+
+**§70.1 found this and wrote *"Not fixed here; authoring goldens is corpus work."* Re-measured here,
+not re-read:**
+
+```bash
+cat tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl \
+  | grep -ohE '"evaluatorKey"[[:space:]]*:[[:space:]]*"[^"]+"' \
+  | sed -E 's/.*"([^"]+)"$/\1/' | sort -u          # -> 46 golden keys
+grep -ohE '^        Add<[A-Za-z0-9_]+>\("[a-z_0-9]+"' \
+  src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs \
+  | grep -oE '"[a-z_0-9]+"' | tr -d '"' | sort -u  # -> 40 registered keys
+comm -23 reg.keys golden.keys                       # -> escalation_resistance prompt_leak protected_material
+```
+
+**Why it is (d) and not (c):** the three are **not** in `s_carveOutKeys` — that set holds 20 keys
+(6 telemetry, 1 operational, 1 efficiency, 3 judge-meta, 5 multi-turn memory, 3 trace-dependent
+reasoning, `f1_score`), checked by reading it, and none of the three is among them. So they are not
+deliberately excluded; they are dispatched and unreachable. **And authoring the fixture needs no
+model:** a golden record is `scenarioId · evaluatorKey · articleControlId · input · agentResponse ·
+expectedVerdict · expectedScoreMin · expectedScoreMax · rationale`, every field hand-written, and the
+repository already ships eighteen such files including adversarial and safety ones. **No decision, no
+purchase, nothing in front of it.** Direction of the standing claim: *"40 dispatched evaluators
+calibrated"* **overstates by 3**.
+
+### 🆕 (d-5) — the `compare` report renders a **non-zero delta as `0.0000`**
+
+Found by refuting §71.5's own declared limit — see §72.11. `CompareCommand.cs:185` and `:190` format
+with `F4`, so a real difference below 5e-05 prints as an exact zero in the human report while the
+`--json` form carries it. **Buildable, no decision, no purchase**: the fix is a rendering rule (a
+significant-figures or "≠0" marker), and the JSON already has the number.
+
+⚠️ **NEITHER NEW MEMBER IS A RECLASSIFICATION.** Nothing was moved *out* of (d) to shorten the list —
+the three that left, left because they were **built** and each has a command above proving it. The two
+that arrived are new findings, and both arrived in the **non-flattering** direction.
+
+⚠️ **The (d) cell has now been wrong in both directions in three consecutive waves.** Wave 8's fix
+ejected four (6.1–6.4); Wave 8's close-out added one (7.5); Wave 9's close-out adds two. **The failure
+is not optimism — it is that (d) is only ever right immediately after somebody runs the commands.**
+
+## §72.11 🔴 §71.5's DECLARED LIMIT IS REFUTED BY EXECUTION — a produced pair **does** yield a non-zero delta
+
+**§71.5 declared:** *"no pair of PRODUCED runs has ever yielded a non-zero delta … All six runs grade
+through the declared stub judge, which returns a constant"*, and filed `Recovered` / `Regressed` /
+signed `MeanScoreDelta` as a **fourth member** of §69.11's wired-with-no-live-subject list.
+
+**The premise is false, and the counterexample is free.** `bench perf latency` is the seventh
+`ToScenarioResult` call site, it runs the **built-in EchoAgent stub with no credentials**, and it does
+**not** grade through a judge — it scores a measured latency. Two runs, same preset, credentials unset
+in the command:
+
+| | PerfA | PerfC (4,000-character prompt) |
+|---|---|---|
+| `p99_ms` | 62.9596 | 62.7842 |
+| scenario score | 0.9958026933333333 | 0.9958143866666666 |
+
+`compare --baseline PerfA --candidate PerfC --json` → `deltas[0].delta` =
+**`1.1693333333284706e-05`**.
+
+**Exit 0, COMPARABLE, and the delta is not zero.** So the delta arithmetic HAS a live subject in this
+repository, reachable with no purchase, and §71.5's fourth member does not belong on §69.11's list as
+written.
+
+🔴 **AND THE REFUTATION IMMEDIATELY EXPOSES A DEFECT OF THE FLATTERING SHAPE.** The human report for
+that identical pair prints:
+
+```
+  perf-latency                                0.9958     0.9958    0.0000
+  mean score delta: 0.0000  ·  recovered 0  ·  regressed 0
+```
+
+**A measured difference is rendered as an exact zero.** `F4` cannot distinguish *"the two runs are
+identical"* from *"they differ below the fourth decimal"*, and the first reading is the one a reader
+takes. That is (d-5).
+
+⚠️ **What is NOT refuted, and the honest half of this section.** `Recovered` and `Regressed` still have
+**no live specimen** — both read 0 on every pair produced here, because no produced pair flips a
+scenario's pass/fail. **Two credential-free routes to a flip were tried and both failed:** GdprD's
+deliberately worse response (`"No."`) still scores `0.7500` on all 28, because the declared stub judge
+IS constant; and PerfA-vs-PerfC's difference is 1.2e-05 against a composite pass threshold nowhere
+near it. **A flip needs a scorer that crosses a bar, and the only one this repository can reach is a
+real judge.** That half stays on §69.11's list and is category **(b)**.
+
+## §72.12 🔴 §0.1's `src/` INVARIANT IS NOW FALSE **AS WORDED**, not merely miscounted
+
+§0.1 says *"`src/` has been modified only by the library commits implementing the ADRs"* and has had
+its count bumped four times (six → nine → thirteen → sixteen). **This taking is different: the RULE
+itself no longer holds.**
+
+`git log --oneline main..HEAD -- src/` returns **16**, and one of them is **`1013ead9`, a `docs(...)`
+commit** — §70's own record — which touched `src/AgentEval.Core/Output/RunComparison.cs` by **1
+insertion / 1 deletion**, the CS1734 doc-comment warning §70 found in its own new file and fixed in
+place. So the honest statement is **fifteen library commits and one documentation commit that repaired
+a warning it had itself introduced**.
+
+**Direction: it understates.** A reader who trusts *"only library commits touch `src/`"* will not open
+a `docs(...)` commit, and this one changed a shipped file. Blast radius: §0.1's cell and any sentence
+quoting it. **Falsifiable in one command:**
+`git log --oneline main..HEAD -- src/ | grep -c '^[0-9a-f]* docs'` → **1**.
+
+## §72.13 What this close-out does NOT claim
+
+* **Nothing agent-side was purchased and no agent-side verdict was re-measured.** Every model-backed
+  eval ran under `--dry-run` or against a stub. The one live path is query embedding, metered in
+  §72.3: 581 calls / 8,338 prompt tokens, no chat model.
+* **It re-executed NO ablation from §70 or §71.** §71 re-executed all seventeen and they reproduced;
+  this close-out builds on that, and on the four things it re-derived itself (the panel, the exits, the
+  snapshot ledger, the compare exit table). Every ablation number in §70 and §71 is cited on their
+  authority, not re-taken here.
+* **`compare`'s exit-13 path is demonstrated on FIVE refusals of three kinds** — `--strict` on an
+  unpinned axis, a stimulus mismatch, and a disjoint scenario set. It is **not** demonstrated on a
+  `judge.modelId` mismatch or on a `subjectRelation` finding: no run this repository can produce
+  declares `EvalInput.SubjectModel`, and all 86 read `unknown`.
+* **No Eval 02 coverage cell was re-derived after `fc352481`'s lexicon change.** §67.4's open item
+  stands; the cohort costs money and was not approved.
+* **Eval 07 GATE B is still red and still deferred by decision** (`MASTER_PLAN` §0.3). `-- 7` and
+  `--ci --dry-run` exiting 1 is the honest state of the instrument.
+* **The two headline claims were not re-measured, only shown unreachable** — deliberately the weaker
+  sentence.
+* **(d-4) is stated as buildable, not as easy.** Authoring three calibration goldens is judgement work
+  about what the right verdict is; what is measured here is only that no decision, no purchase and no
+  other item stands in front of it.
+
+## §72.14 How to re-derive §72 — every command, spending nothing agent-side
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+
+# 72.1 - build TWICE. Report the identity SET, never the total. PORTABLE recipe:
+dotnet build AgentEval.sln --no-incremental 2>&1 \
+  | grep -oE '[^ ]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+' | tr '\\' '/' | sort -u | wc -l   # 70
+
+# 72.2 - tests after the full build, then the invariants.
+for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
+git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'     # -> 0 paths with a deletion
+git log --oneline main..HEAD -- strategy/ | wc -l                      # -> 0
+git log --oneline main..HEAD -- src/ | wc -l                           # -> 16
+git log --oneline main..HEAD -- src/ | grep -c '^[0-9a-f]* docs'       # -> 1   <-- 72.12
+
+# 72.3 - 26 eval commands both spaces + 4 agent lanes, $? on EVERY one.
+for s in "" "--real-vectors"; do for c in "1 --dry-run" "1 --dry-run --judge" "2 --dry-run" \
+  "2b --dry-run" "2c --dry-run" 3 4 "5 --dry-run" "6 --dry-run" 7 "8 --dry-run" "9 --dry-run" \
+  "--ci --dry-run"; do dotnet run --project $E --no-build -- $c $s >log 2>&1; echo "$c $s -> $?"
+done; done
+grep -i "Embedding space:" real3.log     # the BANNER. Never infer non-fallback from the flag.
+grep -o "Live embedding: [0-9]* query call" real*.log   # the meter, not an estimate
+
+# 72.4 - compare. ISOLATED workspace, credentials unset IN THE COMMAND.
+W=$SCRATCH/ws; rm -rf $W; mkdir -p $W; printf '' > $W/x.sln
+run () { env -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_DEPLOYMENT \
+  -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT -u AZURE_OPENAI_JUDGE_ENDPOINT \
+  -u AZURE_OPENAI_JUDGE_API_KEY -u AZURE_OPENAI_JUDGE_DEPLOYMENT -u OPENAI_API_KEY \
+  AGENTEVAL_ALLOW_STUB_JUDGE=1 dotnet src/AgentEval.Cli/bin/Debug/net8.0/AgentEval.Cli.dll "$@"; }
+#   then: sum estimatedCost over every scenario file -> 0.0, and $? on all nine compares.
+
+# 72.5 - the panel BY NAME, tick STRIPPED before sorting.
+grep -oE "^. +(. caught|. NOT CAUGHT) +[A-Za-z0-9_]+" three.log | awk '{print $NF}' | sort -u  # 43
+grep -E "\(advisory" three.log | sed -E 's/^.*(finding ok|FINDING) +([A-Za-z0-9_]+).*$/\2/' \
+  | grep -E '^[A-Za-z0-9_]+$' | sort -u                                                        # 7
+grep -c '^        rows.Add(' $E/Evals/NegativeControls.cs                                      # 50
+
+# 72.6 - persistence. KEY SET + mtime window. NEVER a file count, NEVER a byte size.
+ls $S | grep -vE "\.[0-9]{8}T[0-9]{6}Z\.json$" | sed 's/\.json$//' | sort      # -> 14 keys
+grep -c "Snapshot saved" ci.log                                                # -> 3 (a COUNT)
+grep -oE "eval0[0-9][a-c]?_[a-z_]+" ci.log | sort -u                           # -> the 3 NAMES
+#   plus a per-key mtime before/after: 3 move, 11 unchanged to the second.
+
+# 72.7 - credentials. Loose first, classify EVERY hit WITHOUT printing it, then literals as COUNTS.
+#   On a hit report the COUNT and the DATE; resolving it to a PATH may print the credential.
+HOST=$(printf '%s' "$AZURE_OPENAI_ENDPOINT" | sed 's|^https\?://||; s|/.*$||')
+[ -n "$HOST" ] || echo "EMPTY NEEDLE - the zeros below prove nothing"
+git grep -lF -- "$HOST" | wc -l ; git grep -lF -- "$AZURE_OPENAI_API_KEY" | wc -l    # -> 0 and 0
+#   positive control: SYNTHETIC host + sk-SYNTHETIC key OUTSIDE the repo, deleted in the SAME
+#   command, path re-scanned to 0. All six patterns fired 4, 3, 1, 1, 1, 1.
+
+# 72.10 / 72.11 - the (d) census and the refutation.
+grep -rn "IEvalRegistry" src/ --include=*.cs | wc -l                                    # 9  (d-1)
+grep -c '^        Add<' src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs          # 40 (d-1)
+grep -c Eval06ConstantPolicyCeiling $E/Evals/NegativeControls.cs                        # >0 (d-2)
+dotnet run --project src/AgentEval.Cli --no-build -f net8.0 -- --help | grep -c compare # 1  (d-3)
+comm -23 reg.keys golden.keys                                                           #    (d-4)
+run bench perf latency --subject PerfA --root $W
+run bench perf latency --subject PerfC --root $W --prompt "$(printf 'x%.0s' $(seq 1 4000))"
+dotnet "$CLI" compare --baseline RUN_A --candidate RUN_C --json | grep -o '"delta":[^,}]*'
+                                                    # -> 1.1693333333284706e-05, NOT 0   (d-5)
+```
