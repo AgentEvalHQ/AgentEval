@@ -140,6 +140,7 @@ public static class NegativeControls
         rows.Add(Guarded("TheAnswerTheCustomerReadsIsScreenedToo", CheckTheAnswerTheCustomerReadsIsScreenedToo));
         rows.Add(Guarded("ApplicableFractionDoesNotPoolTwoAbsences", CheckApplicableFractionDoesNotPoolTwoAbsences));
         rows.Add(Guarded("DeadPhrasesAreDiagnosedNotJustCounted", CheckDeadPhrasesAreDiagnosedNotJustCounted));
+        rows.Add(Guarded("SimulatedNullSeparatesPerfectFromChance", CheckSimulatedNullSeparatesPerfectFromChance));
         rows.Add(Guarded("EveryControlRowIsContained", CheckEveryControlRowIsContained));
 
         EvalPrinter.PrintControlReport(rows, "Eval 03 — Negative controls (wiring self-check, no model calls)");
@@ -7981,5 +7982,67 @@ public static class NegativeControls
                 : $"NOT CAUGHT: fabricated -> {bad.Score.Label}, clean -> {good.Score.Label}",
             caught);
     }
+    /// <summary>
+    /// ADR-030 Q6's binding test must SEPARATE. An instrument that says "above chance" for everything
+    /// is the shipped defect wearing a p-value.
+    /// </summary>
+    /// <remarks>
+    /// Both directions, on the same persona and the same pool, so the only thing that varies is the
+    /// observation: a PERFECT coverage must clear the drawn null, and a coverage sitting AT the
+    /// null's own analytic mean must NOT. The second half is the one that matters — it is exactly the
+    /// value the shipped predicate (<c>Latent &gt; LatentFloor</c>) is a coin flip on.
+    /// </remarks>
+    private static ControlRowSnapshot CheckSimulatedNullSeparatesPerfectFromChance()
+    {
+        var persona = CoveragePersonas.All.FirstOrDefault(candidate =>
+            InterestMapGold.Derive(candidate.Id) is { LatentIsEmpty: false });
+
+        if (persona is null)
+        {
+            return new ControlRowSnapshot(
+                "SimulatedNullSeparatesPerfectFromChance",
+                "at least one persona must have a non-empty latent gold set, or this control passes on an empty set",
+                "NOT CAUGHT: no persona carries latent gold",
+                false);
+        }
+
+        var gold = InterestMapGold.Derive(persona.Id);
+        var floor = ChanceFloors.RandomDrawFloor(gold).ExpectedLatent;
+
+        // Small sample count: this row runs on every `-- 3` and must stay free. The separation it
+        // asserts is gross, not marginal.
+        const int Samples = 20_000;
+
+        var perfect = SimulatedLatentNull.For(gold, 1.0, reps: 1, samples: Samples);
+        var atTheMean = SimulatedLatentNull.For(gold, floor, reps: 1, samples: Samples);
+
+        if (perfect is not { } hi || atTheMean is not { } mid)
+        {
+            return new ControlRowSnapshot(
+                "SimulatedNullSeparatesPerfectFromChance",
+                "the simulator must return a result for a scorable persona",
+                "NOT CAUGHT: the simulator declined a persona with latent gold",
+                false);
+        }
+
+        // A coverage sitting at the null's MEAN must not clear the null — that is the whole point.
+        // A perfect coverage must. Anything else is an instrument that cannot discriminate.
+        bool caught = hi.AboveNull && !mid.AboveNull && hi.PValue < mid.PValue;
+
+        return new ControlRowSnapshot(
+            "SimulatedNullSeparatesPerfectFromChance",
+            "ADR-030 Q6's drawn null must SEPARATE: a PERFECT latent coverage clears it, and a coverage "
+          + "sitting at the null's own analytic mean does NOT. The second half is the shipped defect — "
+          + "`Latent > LatentFloor` compares an observation to a null's MEAN, which a coin flip clears "
+          + "half the time. An instrument that called both of these 'above chance' would be that defect "
+          + "with a p-value on it",
+            caught
+                ? $"perfect p={hi.PValue:0.0000} (above), at-the-mean {floor:0.000} p={mid.PValue:0.0000} (below); "
+                + $"persona {persona.Id}, pool {hi.PoolSize}, seed {SimulatedLatentNull.Seed}"
+                : $"NOT CAUGHT: perfect p={hi.PValue:0.0000} above={hi.AboveNull}, "
+                + $"at-the-mean p={mid.PValue:0.0000} above={mid.AboveNull}",
+            caught);
+    }
+
 
 }

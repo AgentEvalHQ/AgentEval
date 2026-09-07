@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval02_coverage_ab — the paid record the own-k re-read is built on
@@ -686,6 +686,64 @@ public static class Eval02_LatentInterestCoverage
         {
             notes.Add("GATE 1 REPLAY · NOT AVAILABLE — no persisted live run was re-read, so there are no live cells "
                     + "to replay the per-persona floor loop over. This is an absence, not a pass. ADR-030 §9 Q6.");
+        }
+
+        // ── ADR-030 Q6's BINDING TEST, simulated. ADVISORY — decides nothing, gates nothing. ──
+        //
+        // Q6 was answered "yes on the principle, STAGED in execution". This is the staging: the test
+        // that WOULD bind, reported beside the verdict that DOES, so the movement can be published
+        // with its date and its cause before any default changes.
+        //
+        // 🔴 The shipped predicate is `Latent > LatentFloor`, and LatentFloor is the ANALYTIC MEAN of
+        // the uniform-draw null (ChanceFloors.RandomDrawFloor). Comparing an observation to a null's
+        // MEAN is not a test — a coin flip clears it half the time. This draws the null instead.
+        //
+        // ⚠ NOT ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor), which Slice 2.6's
+        // acceptance originally named: LatentServed is Math.Round of a rep-mean, so that call
+        // integerises the statistic before testing it — the defect corrected at 9407cfbd — and on
+        // USR-PB-11 it alone reads p = 0.0629 (not above) against a simulated 0.0019 (well above).
+        if (rereadReport is not null)
+        {
+            var clearsNull = new List<string>();
+            var underNull = new List<string>();
+            var unscorable = 0;
+
+            foreach (string personaId in rereadReport.Personas)
+            {
+                var cell = rereadReport.ScoreOf(personaId, ArmLive);
+                if (cell is not { IsScorable: true } score
+                    || !goldByPersona.TryGetValue(personaId, out var gold)
+                    || score.PresentedCount <= 0)
+                {
+                    unscorable++;
+                    continue;
+                }
+
+                // k is the number this persona ACTUALLY received, not the declared budget: the own-k
+                // re-read exists precisely because the live arm was not given the declared one, and a
+                // null drawn at the wrong k is a null for a different question.
+                var simulated = SimulatedLatentNull.For(
+                    gold, score.Latent, draws: score.PresentedCount, reps: 1);
+
+                if (simulated is not { } outcome) { unscorable++; continue; }
+                (outcome.AboveNull ? clearsNull : underNull).Add($"{personaId} p={outcome.PValue:0.0000}");
+            }
+
+            int scored = clearsNull.Count + underNull.Count;
+            notes.Add(scored == 0
+                ? "GATE 1 · SIMULATED NULL (ADVISORY) · NOT AVAILABLE — no live cell carried both a gold "
+                + "map and a positive presented count, so the null could not be drawn. An absence, not a pass."
+                : $"GATE 1 · SIMULATED NULL (ADVISORY — decides nothing, gates nothing) · "
+                + $"{clearsNull.Count} of {scored} scorable persona(s) clear a DRAWN uniform null at α = 0.05"
+                + (underNull.Count > 0 ? $"; below: {string.Join(", ", underNull)}" : "")
+                + $". Seed {SimulatedLatentNull.Seed}, {SimulatedLatentNull.DefaultSamples:N0} samples, "
+                + "p = (1 + hits) / (1 + samples) so it is never reported as zero. "
+                + "The shipped gate compares this same coverage to the null's MEAN, which is not a test. "
+                + "⚠ CONSERVATIVE: the null is drawn ONCE per sample because CoverageScore does not "
+                + "record how many reps it is a mean of, and the observed cell IS a rep-mean. Averaging "
+                + "shrinks the null's spread, so the correct mean-of-reps null admits MORE, not fewer — "
+                + "ADR-030 §9 measured 9 of 12 single-draw against 10 of 12 at mean-of-3. This number "
+                + "under-admits, which is the safe direction, and it is not the final one. ADR-030 §9 Q6.");
         }
 
         // ⚠ GATE 2 reads EVERY equal-k recall comparison against the primary control — the
