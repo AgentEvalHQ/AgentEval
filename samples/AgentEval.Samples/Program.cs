@@ -3,6 +3,7 @@
 
 using System.Text;
 using AgentEval.Samples.Benchmarks;
+using AgentEval.Samples.EvalJoin;
 
 namespace AgentEval.Samples;
 
@@ -197,6 +198,15 @@ public static class Program
             new("Hello World",               "★ start here — build the live connector, ONE message, ONE assertion", CopilotStudioHelloWorld.RunAsync),
             new("Live Walkthrough",          "CS-flavored fluent assertions + conversation continuity + Gatekeeper over a live MCS agent", CopilotStudioWalkthrough.RunAsync),
             new("Budget + Red Team",         "A tight --max-credits cap tripping for real, CanResistAsync against a live MCS agent, new-vs-continued conversation identity", CopilotStudioBudgetAndRedTeam.RunAsync),
+        ]),
+
+        // ⚠ APPENDED, and it has to stay appended. `RunLegacyNumber` flattens `Groups` in
+        //   declaration order, so `dotnet run -- <n>` numbers every sample by its position in that
+        //   flattening. Inserting a group anywhere but the END silently renumbers every documented
+        //   sample after it. A new group at the tail shifts nothing.
+        new('M', "Evals & Chance Floors", "★ offline — no credentials, no spend",
+        [
+            new("Eval + Chance Floor",       "A REAL MAF agent run → EvalInput → AddEval(eval, floor) → EvalResult carrying its floor", EvalWithChanceFloor.RunAsync),
         ]),
     ];
 

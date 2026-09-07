@@ -66,6 +66,17 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         var result = new TestResult { TestName = testCase.Name };
         var metrics = options.TrackPerformance ? new PerformanceMetrics { WasStreaming = false } : null;
         var timeline = ToolCallTimeline.Create(testCase.Name);
+
+        // 🔴 Whether a tool RECORDER actually ran, which is not the same fact as "a timeline object
+        // exists". The timeline is constructed unconditionally (it also carries the turn's timing),
+        // and it used to be attached to the result unconditionally too — so a run with
+        // `TrackTools = false`, and a run that THREW before extraction, both handed back an EMPTY
+        // ToolCallTimeline. Downstream that is read as a positive declaration: TestRunEvalProjection
+        // maps "a timeline is attached" to `ToolCalls = []`, documented as "a recorder ran and the
+        // agent called nothing" — a MEASURED zero. An absence-based policy (NeverCallTool) then
+        // evaluates cleanly against a recorder that never recorded, in the flattering direction, on
+        // a safety question. Only the block below earns that declaration; nothing else may make it.
+        var toolsRecorded = false;
         WarnIfExpectedToolsUnenforced(testCase);
 
         try
@@ -93,6 +104,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             // Extract tool usage if tracking
             if (options.TrackTools && response.RawMessages != null)
             {
+                toolsRecorded = true;
                 result.ToolUsage = ToolUsageExtractor.Extract(response.RawMessages, options.IncludeApprovalGatedToolCalls);
 
                 // ADR-030 Slice 0.5: the default extraction is blind to approval-gated calls. Never drop one
@@ -201,7 +213,8 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             }
 
             result.ActualOutput = response.Text;
-            result.Timeline = timeline;
+            // ⚠ null, not an empty timeline, when nothing recorded. See `toolsRecorded`.
+            result.Timeline = toolsRecorded ? timeline : null;
 
             // Build failure report if test failed
             if (!result.Passed)
@@ -225,7 +238,12 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             result.Details = $"Error: {ex.Message}";
             result.Error = ex;
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
-            result.Timeline = timeline;
+            // ⚠ The throw is the commonest way to reach this with nothing recorded: the agent failed
+            //   BEFORE extraction, so `toolsRecorded` is false and an attached empty timeline would
+            //   report a failed run as one where the agent cleanly called no tool. The failure report
+            //   below still carries the timeline — it is a diagnostic bundle, not a declaration an
+            //   eval reads.
+            result.Timeline = toolsRecorded ? timeline : null;
 
             // Build failure report for exception
             result.Failure = BuildExceptionFailureReport(ex, testCase, timeline);
