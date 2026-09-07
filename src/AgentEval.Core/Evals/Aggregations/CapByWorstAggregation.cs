@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -19,6 +19,13 @@ public sealed class CapByWorstAggregation : IAggregationStrategy
 
     /// <inheritdoc/>
     public string Name => "CapByWorst";
+
+    /// <inheritdoc/>
+    /// <remarks>Forwards to the static of the same name, so the interface and the direct call
+    /// cannot diverge.</remarks>
+    (double Score, string Severity) IAggregationStrategy.AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights) => AggregateWeights(results, weights);
 
     /// <inheritdoc/>
     public (double Score, string Severity) Aggregate(

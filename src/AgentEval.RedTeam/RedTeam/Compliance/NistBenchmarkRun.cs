@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -80,14 +80,14 @@ public sealed class NistBenchmarkRun
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        IEvaluableAgent? agent = null;
-        if (input.Metadata?.TryGetValue("agent", out var rawAgent) == true)
-            agent = rawAgent as IEvaluableAgent;
-
-        if (agent is null)
-            return BuildSkippedComposite(
-                "NIST AI RMF adapter requires an IEvaluableAgent at EvalInput.Metadata[\"agent\"]. " +
-                "Use NistBenchmarkRun.ScanAsync(agent) directly, or wrap the agent into Metadata[\"agent\"].");
+        // 7.1: ONE owner for the legacy Metadata["agent"] convention. The read, the key and the
+        // refusal used to be written out by hand in four families — one convention with four
+        // implementations, four messages and four chances to diverge.
+        if (!EvalInputAgentBinding.TryReadAgent(input, out var agent))
+        {
+            return BuildSkippedComposite(EvalInputAgentBinding.AbsentAgentReason(
+                "NIST AI RMF", "NistBenchmarkRun.ScanAsync(agent)"));
+        }
 
         var redTeamResult = await _pipeline.ScanAsync(agent, ct);
         return BuildEvalResult(redTeamResult);
@@ -180,7 +180,12 @@ public sealed class NistBenchmarkRun
 
         return new EvalResult(
             Metric: new($"nist.{PresetName.ToLowerInvariant()}", $"NIST AI RMF — {PresetName}", "compliance.nist", "1.0.0"),
-            Score: new(0.0, null, "skipped", false, 1.0, "none", null),
+            Score: new(0.0, null, "skipped", false, null, "none", null),   // 7.1: Confidence was 1.0 on a
+                //     result that measured NOTHING. Confidence means "deterministic, no sampling
+                //     uncertainty" (F1ScoreEval.cs:34) and it is rendered, persisted as
+                //     _lifted.confidence, and served over GraphQL. Declaring certainty about a
+                //     verdict never reached is the flattering direction; the perf family already
+                //     wrote null here (PerformanceBenchmark.cs:707).
             Details: new(null, null, new[] { reason }, leaves, "Min"),
             Provenance: new("skipped", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);

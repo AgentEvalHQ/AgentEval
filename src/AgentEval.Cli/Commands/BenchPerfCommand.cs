@@ -116,7 +116,9 @@ public static class BenchPerfCommand
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
         var metadata = new Dictionary<string, object>
         {
-            ["agent"] = agent,
+            // 7.1: the WRITE side of the legacy convention, keyed off the same constant the four
+            // families read, so a rename moves both ends together instead of compiling on one.
+            [AgentEval.Evals.EvalInputAgentBinding.AgentMetadataKey] = agent,
             ["preset"] = preset,
         };
         var deploymentEnv = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
