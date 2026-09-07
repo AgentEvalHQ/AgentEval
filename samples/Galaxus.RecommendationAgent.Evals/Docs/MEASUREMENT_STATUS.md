@@ -12682,8 +12682,11 @@ nothing in front of it ⇒ category (d).**
   The `bench agentic calibrate` run used `AGENTEVAL_ALLOW_STUB_JUDGE=1` and writes no scenario file.
   **No chat model was called by anything in this wave.**
 * **Live-credential scan, needles length-checked non-empty first (84 / 35 / 132 characters), no match
-  ever echoed:** the whole `main..HEAD` diff (7,027,632 bytes) → **0**, the three changed files →
-  **0**, the scratchpad → **0**.
+  ever echoed:** the whole `main..HEAD` diff → **0**, the three changed files → **0**, the scratchpad
+  → **0**. ⚠️ **Taken TWICE, because the first taking could not have seen this wave's own commits.**
+  At `dac7a137` the diff was **7,027,632** bytes; re-run after `d4186a68` it is **7,045,023** bytes,
+  and the count is **0** on all three needles both times. A scan run before the commits it is meant
+  to clear is a scan of somebody else's work.
 * **Synthetic positive control**, outside the repo, **deleted in the same command**: 6 pattern hits
   plus the `grep -F` mechanism, and a re-scan of the planted path → **0**.
 * **Repo-wide shape census, reported by COUNT and DATE only:** **5** tracked files contain a string
