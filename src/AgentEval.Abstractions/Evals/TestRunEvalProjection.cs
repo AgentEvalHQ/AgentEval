@@ -274,7 +274,7 @@ public static class TestRunEvalProjection
 
         if (usage is not null && usage.Calls.Count > 0)
         {
-            return usage.Calls.OrderBy(c => c.Order).Select(FromRecord).ToList();
+            return usage.Calls.OrderBy(c => c.Order).Select(ToToolCall).ToList();
         }
 
         // A dropping report is a BLIND recorder, and a timeline beside it is not a second opinion:
@@ -300,8 +300,38 @@ public static class TestRunEvalProjection
         return null;
     }
 
-    private static ToolCall FromRecord(ToolCallRecord record) =>
-        new(record.Name, ArgumentsOf(record.Arguments), ResultOfRecord(record));
+    /// <summary>
+    /// Projects one recorded tool call into the shape an <see cref="IEval"/> sees. Public so a
+    /// consumer with its own runner gets the same marker rules without owning a <see cref="TestResult"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The three-way contract on <see cref="ToolCall.Result"/>.</b> <see langword="null"/> means
+    /// the call ran, returned nothing and did not fail — the only honest empty. A string beginning
+    /// <see cref="ToolNotExecutedResultPrefix"/> means the run says the call is not known to have
+    /// executed. A string beginning <see cref="ToolErrorResultPrefix"/> means it ran and threw.
+    /// </para>
+    /// <para>
+    /// <b>Composition order, and why.</b> Non-execution outranks failure, and failure outranks a
+    /// recorded payload. Whatever was recorded about a call that may never have run is weaker than
+    /// the fact that it may never have run, so the not-executed marker leads and the rest is appended
+    /// after <c>|</c> rather than discarded. A recorded payload never outranks a failure: a call that
+    /// threw and also left a partial result is a FAILED call, and reading the payload first turned a
+    /// thrown call into one that worked.
+    /// </para>
+    /// <para>
+    /// This is a rendering of facts already on the record, never an inference: a call with no
+    /// exception, no payload and no non-execution reason projects <see langword="null"/>, which the
+    /// caller must not read as an empty success.
+    /// </para>
+    /// </remarks>
+    /// <param name="record">The recorded call.</param>
+    /// <returns>The projected call.</returns>
+    public static ToolCall ToToolCall(ToolCallRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        return new(record.Name, ArgumentsOf(record.Arguments), ResultOfRecord(record));
+    }
 
     /// <summary>
     /// Renders one record's result, leading with the fact that it is not known to have executed when

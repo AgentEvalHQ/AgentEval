@@ -959,4 +959,73 @@ public class TestRunEvalProjectionTests
         Assert.NotNull(suppliedEmpty.Metadata);
         Assert.Empty(suppliedEmpty.Metadata!);
     }
+    // ─── 1.3: ToToolCall is public, so a consumer's own runner gets the same rules ─────
+
+    [Fact]
+    public void ToToolCall_LeadsWithTheNotExecutedMarker_ThenTheFailure()
+    {
+        // Non-execution outranks failure: whatever was recorded ABOUT a call that may never have run
+        // is the weaker fact. The failure is appended after `|`, never discarded.
+        var record = new ToolCallRecord
+        {
+            Name = "charge_card",
+            CallId = "c1",
+            Order = 1,
+            Exception = new InvalidOperationException("gateway refused"),
+            ApprovalState = ToolCallRecord.ApprovalRejected,
+        };
+
+        var call = TestRunEvalProjection.ToToolCall(record);
+
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, call.Result, StringComparison.Ordinal);
+        Assert.Contains("rejected at the approval gate", call.Result, StringComparison.Ordinal);
+        Assert.Contains("gateway refused", call.Result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToToolCall_AnExecutedCallThatThrew_LeadsWithTheErrorPrefix()
+    {
+        var record = new ToolCallRecord
+        {
+            Name = "charge_card",
+            CallId = "c1",
+            Order = 1,
+            Exception = new InvalidOperationException("gateway refused"),
+        };
+
+        var call = TestRunEvalProjection.ToToolCall(record);
+
+        Assert.StartsWith(TestRunEvalProjection.ToolErrorResultPrefix, call.Result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToToolCall_ARecordedPayloadNeverOutranksTheFailure()
+    {
+        // The 68a362fd defect, pinned on the public surface: a call that threw and also left a
+        // partial payload is a FAILED call. Reading the payload first turned a thrown call into one
+        // that worked.
+        var record = new ToolCallRecord
+        {
+            Name = "charge_card",
+            CallId = "c1",
+            Order = 1,
+            Result = "{\"partial\":true}",
+            Exception = new InvalidOperationException("gateway refused"),
+        };
+
+        var call = TestRunEvalProjection.ToToolCall(record);
+
+        Assert.StartsWith(TestRunEvalProjection.ToolErrorResultPrefix, call.Result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToToolCall_ACallThatRanAndReturnedNothing_ProjectsNull_NotAnEmptySuccess()
+    {
+        var record = new ToolCallRecord { Name = "ping", CallId = "c1", Order = 1 };
+
+        var call = TestRunEvalProjection.ToToolCall(record);
+
+        Assert.Null(call.Result);
+    }
+
 }
