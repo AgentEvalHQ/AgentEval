@@ -15864,3 +15864,77 @@ sample's behalf, which is the point of the runner existing.
 6.4's line-deletion metric and 6.1's `SyntheticEval` expectation still measure the wrong thing —
 nothing in Wave 3 touched either. The per-commit test-METHOD count is what was read above, and it is
 the instrument that answers the question the deletion gate was written to ask.
+
+## §85 — Wave 6 re-taken after Wave 7. Every sample now reaches the door, and the census rose where it should (2026-09-07)
+
+The third re-take, at `359648f8`, after 7.1 / 7.2 / 7.5, 4.3's in-repo half and 5.2.
+
+| gate | observed |
+|---|---|
+| strict `IEval` declarers under `src/` | **75** — unchanged across every wave of this plan |
+| the intersection with `ChanceFloor` | **exactly `FloorAdmittedEval.cs`** — still the door, and nothing else |
+| files naming `ChanceFloor` under `src/` | **7 → 13** — every one a wave of this plan: `AdmittedCheck`, `BenchmarkRunner`, `BenchmarkScore`'s callers, the composite door, the perf checks, the red-team projection |
+| `': IEval'` inside `src/AgentEval.Core/Benchmarks/` | **0** |
+| hand-rolled `TryGetValue("agent")` outside its owner | **4 → 0** |
+| a skipped result declaring `Confidence: 1.0` | **4 → 0** |
+| build (`--no-incremental`) | `: error ` **0** |
+| net10 / net9 / net8 | **10206 / 9988 / 9988**, `Failed: 0`, skipped 2 / 1 / 1 |
+| PartnerDesk tests | **82**, 0 failed (was 75) |
+| test methods per commit (`tests/` + `samples/`) | **8036 → 8151**, never falling |
+| credential scan, delta since the plan began | **0 on all five patterns** |
+
+### §85.1 Every sample reaches the door
+
+`AtomicCodeEval` files / `.AddEval(` calls / `FloorAdmittedEval.Admit(` calls:
+
+| sample | at the plan's start | now |
+|---|---|---|
+| `AgentEval.Samples` | 1 / 1 / 0 | 1 / 1 / 0 |
+| `Galaxus.RecommendationAgent.Evals` | 1 / 1 / 0 | **4 / 5 / 0** |
+| `AgentEval.TravelDemo.Evals` | 0 / 0 / 0 | **1 / 2 / 0** |
+| `AgentEval.MafEvalLightPath` | 0 / 0 / 0 | **1 / 1 / 1** |
+| `AgentEval.MafEvalFoundryAlongsideLocal` | 0 / 0 / 0 | **1 / 1 / 1** |
+| `AgentEval.PartnerDeskDemo.Evals` | 0 / 0 / 0 | **1 / 0 / 0** |
+
+PartnerDesk reads `1 / 0 / 0` because its four checks are published as `AdmittedCheck`s for a caller
+to run — the pairing goes through `AdmittedCheck.Admit()`, which is the door by another name. The
+sample that had NO path to an `IEval` when this plan started now ships four floored checks.
+
+### §85.2 Exit codes, all offline
+
+Galaxus `1 / 2b / 2c --dry-run`, `3`, `4`, **`4d --dry-run`** → **0**; `7` and `--ci --dry-run` → **1**,
+unchanged (Eval 07's GATE B is still the only FAILED of eleven). `AgentEval.Samples -- 97` and
+**`-- 98`** → 0. `TravelDemo`, **`MafEvalLightPath`**, **`MafEvalFoundryAlongsideLocal`** and
+`PartnerDeskDemo` selftests → 0. **stderr 0 bytes on every row.**
+
+### §85.3 What Wave 7 found on the way
+
+Three defects, none of them the thing being built:
+
+1. **`PerformanceMetrics.TotalTokens` could never be null** though its type promised it could, so a
+   provider reporting no usage read as a zero-token run. Two readers relied on the broken promise —
+   `StochasticResult` filtered on `!= null` (a filter that removed nothing, feeding fabricated zeros
+   into `TotalTokenStats`) and `PerformanceAssertions` compared `> max` (so an unmeasured run passed
+   every budget). Both correct now with no change to either.
+2. **Four compliance sites declared `Confidence: 1.0` on a SKIPPED result** — certainty about a
+   verdict never reached, rendered, persisted as `_lifted.confidence` and served over GraphQL.
+3. **`FileSystemOutputStore` could not create its own workspace** (§83.3).
+
+Each was found by trying to USE the library rather than by reading it, which is the same way AE-04
+was found.
+
+### §85.4 The three ceilings, together
+
+Wave 7 produced three separate floors at 1.000, and they say the same thing about three different
+suites:
+
+| suite | the trivial null | consequence |
+|---|---|---|
+| red-team resistance | an agent that refuses everything resists every probe | no resistance rate can be above chance |
+| PartnerDesk containment | an agent that does nothing avoids everything | no containment rate can be above chance |
+| Galaxus catalogue integrity (§81) | no catalogue product is off-catalogue | undecidable, permanently |
+
+None is a defect. All three say that **an avoidance measurement cannot establish capability**, and
+each suite now carries the check that saves it: PartnerDesk's attempt check and Eval 04d's fixture
+gate both fail on exactly the inert arm that maximises the containment score. A safety suite that
+reports refusals without reporting attempts is reporting a mute agent as a safe one.
