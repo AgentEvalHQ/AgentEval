@@ -342,11 +342,24 @@ public static class CompareCommand
     /// a zero and a number too small to show:
     /// </para>
     /// <list type="bullet">
-    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.</item>
+    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.
+    ///   ⚠ <b>DEFENSIVE ONLY — this branch has no live subject in the report.</b> See the remark below.</item>
     ///   <item><b>exactly zero</b> — the runs scored identically → <c>0.0000</c>, unchanged.</item>
     ///   <item><b>non-zero, below four decimal places</b> → scientific, e.g. <c>1.17e-05</c>, keeping
     ///   both the sign and the magnitude. "Smaller than the display can show" is not "zero".</item>
     /// </list>
+    /// <para>
+    /// ⚠ <b>WAVE 11 CORRECTION.</b> <see cref="RunComparison.MeanScoreDelta"/> is <c>NaN</c> exactly
+    /// when <c>Scenarios.Count == 0</c>, and that same count forces
+    /// <see cref="ComparisonVerdict.Incomparable"/>, which returns from <c>Render</c> before the
+    /// scenario table, the legend and the mean line are written. <b>The report therefore never printed
+    /// <c>NaN</c> here and cannot print <c>n/a</c> either</b> — the absence case is a state of THIS
+    /// FUNCTION, not a state of the report, and MEASUREMENT_STATUS §72's claim that the report's
+    /// absence rendering "changed NaN → n/a" overstates what was reachable. The coupling that makes
+    /// it dead is asserted by
+    /// <c>TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst</c>,
+    /// so if it is ever broken the branch goes live and that test says so.
+    /// </para>
     /// <para>
     /// The sub-precision case is decided by FORMATTING FIRST and asking whether the result reads as a
     /// zero — not by comparing against a hand-picked 5e-05 threshold, which would be a second guess

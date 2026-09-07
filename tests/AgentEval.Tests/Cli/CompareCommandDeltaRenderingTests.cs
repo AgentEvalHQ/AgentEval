@@ -21,7 +21,17 @@
 //     absent (no scenarios to average, MeanScoreDelta is NaN) -> "n/a"
 //     an exact zero (the runs scored identically)             -> "0.0000"
 //     non-zero but below F4's precision                       -> scientific, e.g. "1.17e-05"
+//
+// ⚠ WAVE 11 CORRECTION — ONLY TWO OF THOSE THREE HAVE A LIVE SUBJECT IN THE REPORT. `MeanScoreDelta`
+// is NaN exactly when `Scenarios.Count == 0`, and that count forces Verdict = Incomparable, which
+// returns from `Render` BEFORE the scenario table, the legend or the mean line is printed. So the
+// report could never have printed `NaN` there and cannot print `n/a` either: `FormatDelta(NaN)` is
+// a DEFENSIVE branch, pinned by a formatter test and by
+// TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst, which
+// asserts the coupling that makes it dead. Wave 10 filed the absence case as a state of the report
+// it had fixed; it is a state of the FUNCTION.
 
+using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Output;
 using AgentEval.Tests.Output;
@@ -275,5 +285,37 @@ public class CompareCommandDeltaRenderingTests
         Assert.Equal(0, exit);
 
         Assert.DoesNotContain("smaller than four decimal places", output);
+    }
+
+    // ── The absence rendering has NO LIVE SUBJECT, and this is why ───────────
+
+    [Fact]
+    public async Task TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst()
+    {
+        // ⚠ Wave 10 filed `n/a` as one of "three states, three renderings" of the report and said
+        // the absence case previously "rendered as NaN" there. It never could. `MeanScoreDelta` is
+        // NaN exactly when `Scenarios.Count == 0` (RunComparison), and `Scenarios.Count == 0` forces
+        // Verdict = Incomparable, which returns from Render BEFORE the scenario table, the legend
+        // and the mean line are printed. So `FormatDelta(NaN)` is a DEFENSIVE branch with no live
+        // subject in the shipped report — a fact worth pinning rather than a claim worth repeating.
+        // If the coupling below is ever broken, this test goes red and the branch has gone live.
+        using var temp = TempWorkspace.Create("CompareNoSharedScenario");
+        string a = await WriteMultiScenarioRunAsync(temp, "EmptyBase", ("only-in-baseline", 0.5));
+        string b = await WriteMultiScenarioRunAsync(temp, "EmptyCand", ("only-in-candidate", 0.5));
+
+        var (output, exit) = CaptureCompare(a, b);
+
+        Assert.Equal(ExitCodes.Incomparable, exit);
+        Assert.DoesNotContain("mean score delta", output);
+        Assert.DoesNotContain("n/a", output);
+
+        // The coupling itself, in the library, without a filesystem: a NaN mean and a comparable
+        // verdict cannot occur together, which is what makes the branch unreachable.
+        var comparison = RunComparison.Of([], []);
+        Assert.True(double.IsNaN(comparison.MeanScoreDelta));
+        Assert.Equal(ComparisonVerdict.Incomparable, comparison.Verdict);
+
+        // And the formatter still answers correctly if it is ever handed one.
+        Assert.Equal("n/a", CompareCommand.FormatDelta(comparison.MeanScoreDelta));
     }
 }
