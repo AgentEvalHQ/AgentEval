@@ -186,11 +186,27 @@ public static class CompareCommand
         }
 
         int subPrecision = comparison.Scenarios.Count(s => IsBelowDisplayPrecision(s.ScoreDelta));
-        if (subPrecision > 0 || IsBelowDisplayPrecision(comparison.MeanScoreDelta))
+        bool meanIsSubPrecision = IsBelowDisplayPrecision(comparison.MeanScoreDelta);
+        if (subPrecision > 0 || meanIsSubPrecision)
         {
+            // ⚠ The legend must count what it is pointing at. It is triggered by the scenario rows
+            // OR by the mean, and a count that only ever tallies the rows printed
+            // "0 delta(s) are NON-ZERO but smaller than four decimal places" directly above a mean
+            // rendered in scientific notation — telling the reader there is nothing to see beside
+            // the one thing this legend exists to explain. Reproduced on two scenarios differing by
+            // +1.0e-04 and -9.0e-05: neither row is sub-precision, their mean is.
+            string subject = (subPrecision, meanIsSubPrecision) switch
+            {
+                (0, true)  => "The mean below is",
+                (1, false) => "1 delta above is",
+                (_, false) => $"{subPrecision} deltas above are",
+                (1, true)  => "1 delta above, and the mean below, are",
+                _          => $"{subPrecision} deltas above, and the mean below, are",
+            };
+
             Console.WriteLine();
-            Console.WriteLine($"  ⚠ {subPrecision} delta(s) are NON-ZERO but smaller than four decimal places, and are");
-            Console.WriteLine("    shown in scientific notation. Smaller than the column can print is not the same");
+            Console.WriteLine($"  ⚠ {subject} NON-ZERO but smaller than four decimal places, and shown");
+            Console.WriteLine("    in scientific notation. Smaller than the column can print is not the same");
             Console.WriteLine("    thing as zero; --json carries the full value.");
         }
 
