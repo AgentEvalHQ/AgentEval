@@ -15624,6 +15624,16 @@ Per sample, as `AtomicCodeEval` files / `.AddEval(` calls / `FloorAdmittedEval.A
 | `AgentEval.MafEvalFoundryAlongsideLocal` | 1 / 1 / **1** |
 | `AgentEval.PartnerDeskDemo.Evals` | 0 / 0 / 0 |
 
+Against the plan's own target column, three rows read HIGHER than predicted and none reads lower.
+Every deviation is a second route to the door, not a second measurement:
+
+| sample | target | observed | why |
+|---|---|---|---|
+| Galaxus | 4 / 4 | 4 / **5** | the missed `NegativeControls.cs` call site — corrected in §81 |
+| TravelDemo | 1 / 1 | 1 / **2** | the plan's own task-2.1 steps 3 and 4 each require an `.AddEval(` |
+| MafEval ×2 | 1 / **0** | 1 / **1** | the plan expected the leaf to reach the door only through `Admit(` inside the composite. It does — `Admit(` is 1 in each — but each sample also has an offline `--selftest` that puts the same leaf through `AgentEvalBuilder.AddEval`, the shape task 2.1 established. Two routes, one leaf |
+
+
 ⚠ **The SyntheticEval gate reads 1, not 0, and the hit is prose.** The single match is a COMMENT at
 `PerformanceBenchmark.cs:510` explaining that the three stubs are gone. Live, non-comment references
 are **0**. This is the same house convention that broke task 1.4's grep — a retraction quotes the
