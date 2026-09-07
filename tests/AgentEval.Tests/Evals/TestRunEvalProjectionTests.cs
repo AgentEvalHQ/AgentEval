@@ -301,6 +301,81 @@ public class TestRunEvalProjectionTests
         Assert.Empty(input.ToolCalls!);
     }
 
+    // ── A report that dropped approval-gated calls is not a record ────────────
+    // ToolUsageReport.DroppedApprovalRequestCount is the library's own statement that Calls is
+    // INCOMPLETE — "any absence-based policy (NeverCallTool) evaluated on this report has a chance
+    // floor of 1.0". Every case below is ablated against its complete-report twin.
+
+    [Fact]
+    public void ADroppingReportThatRecordedNothing_YieldsNull_NotAMeasuredZero()
+    {
+        // The flattering collapse this prevents: the extractor could not SEE the approval-gated
+        // calls, and [] would report that as "the agent called nothing" — a clean safety result
+        // manufactured out of a blind recorder.
+        var blind = new ToolUsageReport { DroppedApprovalRequestCount = 3 };
+        var result = new TestResult { TestName = "n", ToolUsage = blind };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.Null(input.ToolCalls);
+    }
+
+    [Fact]
+    public void TheOtherDirection_TheSameEmptyReportWithNoDrops_StillYieldsAMeasuredZero()
+    {
+        // Direction control for the test above: the ONLY difference is the drop count, so the null
+        // cannot be coming from "the report was empty".
+        var seeing = new ToolUsageReport { DroppedApprovalRequestCount = 0 };
+        var result = new TestResult { TestName = "n", ToolUsage = seeing };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.NotNull(input.ToolCalls);
+        Assert.Empty(input.ToolCalls!);
+    }
+
+    [Fact]
+    public void ADroppingReportThatRecordedSomeCalls_IsStillNotReturnedAsTheRecord()
+    {
+        // A partial list presented as a whole one makes an unseeable call look like one that never
+        // happened. EvalInput has no channel for "this list is partial", so the honest answer is the
+        // undecidable one — see the projection's remarks for what that costs and why.
+        var partial = new ToolUsageReport { DroppedApprovalRequestCount = 1 };
+        partial.AddCall(new ToolCallRecord { Name = "lookup_order", CallId = "c1", Order = 1, Result = "found" });
+        var result = new TestResult { TestName = "n", ToolUsage = partial };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.Null(input.ToolCalls);
+    }
+
+    [Fact]
+    public void TheOtherDirection_TheSameCallsWithNoDrops_AreReturned()
+    {
+        var complete = new ToolUsageReport { DroppedApprovalRequestCount = 0 };
+        complete.AddCall(new ToolCallRecord { Name = "lookup_order", CallId = "c1", Order = 1, Result = "found" });
+        var result = new TestResult { TestName = "n", ToolUsage = complete };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.Equal(new[] { "lookup_order" }, input.ToolCalls!.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void ADroppingReportFallsThroughToATimeline_WhichIsADifferentRecorder()
+    {
+        var blind = new ToolUsageReport { DroppedApprovalRequestCount = 2 };
+        blind.AddCall(new ToolCallRecord { Name = "from_report", CallId = "c1", Order = 1 });
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        { ToolName = "from_timeline", StartTime = TimeSpan.Zero, Duration = TimeSpan.Zero, Succeeded = true });
+        var result = new TestResult { TestName = "n", ToolUsage = blind, Timeline = timeline };
+
+        var input = FullyPopulatedCase().ToEvalInput(result);
+
+        Assert.Equal(new[] { "from_timeline" }, input.ToolCalls!.Select(c => c.Name));
+    }
+
     [Fact]
     public void ToolCalls_AreOrderedChronologically_EvenWhenRecordedOutOfOrder()
     {

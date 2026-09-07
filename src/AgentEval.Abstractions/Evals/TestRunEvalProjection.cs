@@ -153,6 +153,29 @@ public static class TestRunEvalProjection
     /// missing evidence into a clean safety result.
     /// </para>
     /// <para>
+    /// 🔴 <b>A report that DROPPED approval-gated calls is not a record, and is never returned as
+    /// one.</b> <see cref="ToolUsageReport.DroppedApprovalRequestCount"/> is the library's own
+    /// statement that <see cref="ToolUsageReport.Calls"/> is INCOMPLETE — its remarks say in as many
+    /// words that "any absence-based policy (<c>NeverCallTool</c>) evaluated on this report has a
+    /// chance floor of 1.0", because MAF wraps an approval-required call in a
+    /// <c>ToolApprovalRequestContent</c> that the default extractor cannot see. Handing such a report
+    /// to an eval as a list makes an unseeable call look like one that never happened, and an empty
+    /// one manufactures a MEASURED ZERO out of a recorder that was blind — the flattering direction,
+    /// on a safety question. So a dropping report is skipped: the timeline is consulted if it has
+    /// invocations, and otherwise the answer is <see langword="null"/>, UNKNOWN.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>What this does NOT fix.</b> When a dropping report also carries recorded calls and no
+    /// timeline is present, those calls are not returned either — the list would be a partial record
+    /// presented as a whole one, and <see cref="EvalInput"/> has no per-input channel for "this list
+    /// is partial". Recording that partiality without discarding evidence needs new API surface
+    /// (a projection-authored <see cref="EvalInput.Metadata"/> key changes what
+    /// <see cref="EvalInput.Metadata"/> means), which is an owner's decision, not this projection's.
+    /// Until then the honest answer is the undecidable one. Opt into approval-aware extraction
+    /// (<c>ToolUsageExtractor.Extract(rawMessages, includeApprovalGatedCalls: true)</c>) and the
+    /// report stops dropping.
+    /// </para>
+    /// <para>
     /// <b>Ordering.</b> <see cref="EvalInput.ToolCalls"/> is a contract, not a convenience: the
     /// approval gate treats an approval as valid only if it appears at an earlier index than the
     /// sensitive call (BUG-37). So records are ordered by <see cref="ToolCallRecord.Order"/> and
@@ -176,7 +199,11 @@ public static class TestRunEvalProjection
     /// </remarks>
     private static IReadOnlyList<ToolCall>? ProjectToolCalls(TestResult result)
     {
-        if (result.ToolUsage is { } usage && usage.Calls.Count > 0)
+        // A report that admits it dropped approval-gated calls is not a record of the run, so it is
+        // neither read as one nor counted as "a recorder was present". See the remarks.
+        var usage = result.ToolUsage is { DroppedApprovalRequestCount: 0 } complete ? complete : null;
+
+        if (usage is not null && usage.Calls.Count > 0)
         {
             return usage.Calls.OrderBy(c => c.Order).Select(FromRecord).ToList();
         }
@@ -187,12 +214,12 @@ public static class TestRunEvalProjection
         }
 
         // A recorder was attached and saw nothing: a MEASURED zero.
-        if (result.ToolUsage is not null || result.Timeline is not null)
+        if (usage is not null || result.Timeline is not null)
         {
             return Array.Empty<ToolCall>();
         }
 
-        // No recorder at all: UNKNOWN. Not a zero.
+        // No recorder at all, or none that could see the whole run: UNKNOWN. Not a zero.
         return null;
     }
 
