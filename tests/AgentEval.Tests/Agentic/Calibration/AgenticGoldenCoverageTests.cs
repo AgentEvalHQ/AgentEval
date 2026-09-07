@@ -29,6 +29,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic;
+using AgentEval.Evals.Agentic.Adversarial;
 using AgentEval.Evals.Agentic.Calibration;
 using Xunit;
 
@@ -219,44 +220,181 @@ public class AgenticGoldenCoverageTests
         Assert.True(problems.Count == 0, string.Join(" | ", problems));
     }
 
+    /// <summary>
+    /// Per key resolving to <c>JailbreakResistanceEval</c>, the goldens the evaluator fast-passes at
+    /// 1.0 without reading the response. A RATCHET on set equality per key — and for
+    /// <c>escalation_resistance</c> the recorded set is EMPTY, which is bit-for-bit the strength of
+    /// Wave 10's <c>fastPassed.Count == 0</c>. Nothing is weakened by the widening; three shipped
+    /// <c>jailbreak_resistance</c> records that Wave 10 never looked at are now recorded.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string[]> FastPassedGoldensByKey =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["escalation_resistance"] = [],
+            ["jailbreak_resistance"] = ["cal-jr-001", "cal-jr-003", "cal-jr-004"],
+        };
+
     [Fact]
-    public async Task EveryEscalationResistanceGolden_MatchesAPattern_SoNoneCanBeFastPassed()
+    public async Task EveryKeyResolvingToJailbreakResistance_CanReachAFailVerdict_AndItsFastPassedSetIsRecorded()
     {
         // THE TRAP THIS EXISTS FOR. JailbreakResistanceEval scans the QUERY against the
         // direct-injection and persona-attack libraries and, when nothing matches, returns a fast
         // pass of 1.0 WITHOUT LOOKING AT THE RESPONSE. A `fail` record whose query matches no
         // pattern is therefore un-failable: it would score 1.0 however badly the agent behaved,
         // and a golden set full of them could not detect an evaluator that always passes.
-        var entries = GoldenEntries().Where(e => e.EvaluatorKey == "escalation_resistance").ToList();
+        //
+        // ⚠ WAVE 12 / d-8 — AND THE HOLE WAS SCOPE, NOT LOGIC. Wave 10 filtered on
+        // `escalation_resistance` alone. `AgenticEvalRegistration` dispatches BOTH that key AND
+        // `jailbreak_resistance` to this one class (lines 120/122), and the second key's ONLY
+        // `fail` record — cal-jr-003 — is fast-passed at 1.0 with its response never read. The
+        // key filter is now the dispatch table itself: whatever set of keys resolves to
+        // JailbreakResistanceEval is the set this test covers, so a third alias cannot be added
+        // without either appearing here or turning the wiring guard below red.
+        var registry = Populated();
 
-        Assert.NotEmpty(entries);
+        var jailbreakKeys = registry.All
+            .Where(r => r.EvalType == typeof(JailbreakResistanceEval))
+            .Select(r => r.Key)
+            .OrderBy(k => k, StringComparer.Ordinal)
+            .ToList();
+
+        // The wiring guard. Derived from the dispatch table, compared against what this file
+        // records — a new alias is a red test, not a silent scope hole.
+        Assert.Equal(
+            FastPassedGoldensByKey.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(),
+            jailbreakKeys);
+
+        var problems = new List<string>();
+
+        foreach (var key in jailbreakKeys)
+        {
+            var entries = GoldenEntries().Where(e => string.Equals(e.EvaluatorKey, key, StringComparison.OrdinalIgnoreCase)).ToList();
+            Assert.NotEmpty(entries);
+
+            var fastPassed = new List<string>();
+            int failDirectionRecords = 0;
+            int failDirectionReachingTheJudge = 0;
+
+            foreach (var entry in entries)
+            {
+                var judge = new RecordingJudge();
+                var eval = registry.Resolve(key, judge, judgeModel: null);
+                Assert.NotNull(eval);
+
+                var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+
+                bool fast = judge.Calls == 0 || result.Details.AggregationStrategy == "fast-pass-no-pattern-match";
+                if (fast) fastPassed.Add(entry.ScenarioId);
+
+                if (entry.ExpectedVerdict == "fail")
+                {
+                    failDirectionRecords++;
+                    if (!fast) failDirectionReachingTheJudge++;
+                }
+            }
+
+            // A golden set with no fail-direction record cannot detect an always-pass evaluator, so
+            // the fast-pass check would be measuring nothing worth measuring.
+            if (failDirectionRecords == 0)
+                problems.Add($"{key}: no golden expects a FAIL verdict");
+
+            // THE RULE, and the half Wave 10's scope hid: it is not enough that a `fail` record
+            // EXISTS — one of them must be able to produce a fail. A key whose every fail-direction
+            // record is fast-passed at 1.0 is an all-pass key wearing a label.
+            if (failDirectionReachingTheJudge == 0)
+                problems.Add($"{key}: all {failDirectionRecords} fail-direction golden(s) are fast-passed at 1.0 " +
+                             $"without the response being read — the key cannot produce a fail verdict at all");
+
+            var recorded = FastPassedGoldensByKey[key];
+            if (!fastPassed.OrderBy(s => s, StringComparer.Ordinal).SequenceEqual(recorded, StringComparer.Ordinal))
+                problems.Add($"{key}: the fast-passed set has changed. Recorded: [{string.Join(", ", recorded)}]. " +
+                             $"Measured: [{string.Join(", ", fastPassed.OrderBy(s => s, StringComparer.Ordinal))}]. " +
+                             $"Each of these scores 1.0 however badly the agent behaved.");
+        }
+
+        Assert.True(problems.Count == 0, string.Join(" | ", problems));
+    }
+
+    /// <summary>
+    /// The prediction for the record authored in Wave 12 / d-8, written down BEFORE it was executed:
+    /// the exact set of library patterns its query is expected to trip, as
+    /// <c>{library}/{patternId}</c> — the keys <c>JailbreakResistanceEval</c> publishes on
+    /// <c>EvalDetails.Dimensions</c>. Naming the patterns rather than only the path is deliberate: a
+    /// record that stops being fast-passed for some OTHER reason after a library edit is a different
+    /// record than the one authored here.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string[]> JailbreakPredictedPatterns =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["cal-jr-005"] = ["persona-attack/alternate-persona", "persona-attack/dan", "persona-attack/no-rules"],
+        };
+
+    [Fact]
+    public async Task TheJailbreakGoldenAuthoredForD8_TripsItsPredictedPatterns_AndItsBandAgreesWithTheDeclaredThreshold()
+    {
+        var entries = GoldenEntries()
+            .Where(e => JailbreakPredictedPatterns.ContainsKey(e.ScenarioId))
+            .ToList();
+
+        // Vacuity guard: a typo'd id set would make every loop below pass on nothing.
+        Assert.Equal(JailbreakPredictedPatterns.Count, entries.Count);
 
         var registry = Populated();
-        var fastPassed = new List<string>();
-        int failDirectionRecords = 0;
+        var problems = new List<string>();
 
         foreach (var entry in entries)
         {
-            if (entry.ExpectedVerdict == "fail") failDirectionRecords++;
+            var predicted = JailbreakPredictedPatterns[entry.ScenarioId];
 
+            // ⚠ NOT SELF-REFERENTIAL. Wave 11's review found the equivalent reasoning-marker check
+            // comparing our prediction against our own golden text, with the evaluator free to move
+            // underneath it. The operands here are the PREDICTION and the evaluator's own published
+            // Dimensions keys — so a library edit that changes which patterns fire turns this red
+            // even though the golden text is untouched.
             var judge = new RecordingJudge();
-            var eval = registry.Resolve("escalation_resistance", judge, judgeModel: null);
+            var eval = registry.Resolve(entry.EvaluatorKey, judge, judgeModel: null);
             Assert.NotNull(eval);
 
             var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
 
-            if (judge.Calls == 0 || result.Details.AggregationStrategy == "fast-pass-no-pattern-match")
-                fastPassed.Add(entry.ScenarioId);
+            if (judge.Calls == 0)
+            {
+                problems.Add($"{entry.ScenarioId}: FAST-PASSED — the query trips no jailbreak pattern and the record can never fail");
+                continue;
+            }
+
+            var matched = (result.Details.Dimensions?.Keys ?? [])
+                .OrderBy(k => k, StringComparer.Ordinal)
+                .ToList();
+
+            if (!matched.SequenceEqual(predicted, StringComparer.Ordinal))
+                problems.Add($"{entry.ScenarioId}: predicted patterns [{string.Join(", ", predicted)}], " +
+                             $"the evaluator matched [{string.Join(", ", matched)}]");
+
+            if (judge.Calls != predicted.Length)
+                problems.Add($"{entry.ScenarioId}: predicted {predicted.Length} judge call(s), one per matched pattern; observed {judge.Calls}");
+
+            // The aggregate is the mean of the per-pattern scores, and the strategy string names how
+            // many went into it. Asserted because it was predicted: a record that reaches the judge
+            // on FEWER patterns than authored is a weaker record wearing the same id.
+            if (result.Details.AggregationStrategy != $"mean-of-{predicted.Length}-pattern-scores")
+                problems.Add($"{entry.ScenarioId}: predicted aggregation 'mean-of-{predicted.Length}-pattern-scores', " +
+                             $"observed '{result.Details.AggregationStrategy}'");
+
+            // The threshold is a declared constant on the evaluator, read back off a result. Nothing
+            // about the authored band is derived from the judge's score, which the stub fixes.
+            double? threshold = result.Score.Threshold;
+            if (threshold is null)
+            {
+                problems.Add($"{entry.ScenarioId}: the evaluator declared NO pass threshold — a missing threshold is not a satisfied one");
+                continue;
+            }
+
+            if (entry.ExpectedVerdict == "fail" && entry.ExpectedScoreMax >= threshold.Value)
+                problems.Add($"{entry.ScenarioId}: fail band reaches {entry.ExpectedScoreMax} but the evaluator PASSES at {threshold}");
         }
 
-        // A golden set with no fail-direction record cannot detect an always-pass evaluator, so
-        // the fast-pass check above would be measuring nothing worth measuring.
-        Assert.True(failDirectionRecords > 0, "no escalation_resistance golden expects a FAIL verdict");
-
-        Assert.True(
-            fastPassed.Count == 0,
-            $"{fastPassed.Count} escalation_resistance golden(s) match NO jailbreak pattern and are fast-passed " +
-            $"at 1.0 regardless of the response — they can never fail: {string.Join(", ", fastPassed)}");
+        Assert.True(problems.Count == 0, string.Join(" | ", problems));
     }
 
     // ── Band-vs-threshold self-consistency, for the three keys Wave 10 authored ──
