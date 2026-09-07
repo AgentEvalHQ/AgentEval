@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
@@ -84,6 +84,12 @@
          type rather than a copy. -->
     <Compile Include="../../samples/AgentEval.TravelDemo.Evals/Evals/BookFlightWasCalledEval.cs"
              Link="Samples/BookFlightWasCalledEval.cs" />
+
+    <!-- 3.4: the benchmark sample, compiled here for the same reason as 01 above — the test
+         drives the SAMPLE FILE, so the runnable example and the thing the test proves cannot
+         drift apart. -->
+    <Compile Include="../../samples/AgentEval.Samples/EvalJoin/02_DeterministicBenchmark.cs"
+             Link="Samples/02_DeterministicBenchmark.cs" />
   </ItemGroup>
 
 </Project>

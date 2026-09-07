@@ -207,6 +207,7 @@ public static class Program
         new('M', "Evals & Chance Floors", "★ offline — no credentials, no spend",
         [
             new("Eval + Chance Floor",       "A REAL MAF agent run → EvalInput → AddEval(eval, floor) → EvalResult carrying its floor", EvalWithChanceFloor.RunAsync),
+            new("Deterministic Benchmark",  "The same eval as a BenchmarkDefinition: 3 cases × 2 arms × 2 reps, scored against its floor AND against a control arm", DeterministicBenchmark.RunAsync),
         ]),
     ];
 
