@@ -1,4 +1,4 @@
-# MEASUREMENT_STATUS — what this eval suite can and cannot support
+﻿# MEASUREMENT_STATUS — what this eval suite can and cannot support
 
 **Last measured: 2026-09-04.** Two dated layers: §§1–9 were measured after the Eval 02 corpus extension (§4);
 §§0a–0c and §10 were added when Evals 05–09 joined the suite and the credential rule was made uniform. Every
@@ -15506,3 +15506,63 @@ comm -12 <(grep -rlE "$DECL" --include=*.cs src/|sort) \
          <(grep -rl "\bChanceFloor\b" --include=*.cs src/|sort)   # 1: FloorAdmittedEval.cs
 #   a bare 'grep -rl IEval src/' gives 213 and an intersection of 2. Different question.
 ```
+
+## §81 — Evals 01, 02b and 02c reach the door. **43 gating rows -> 46**, and one floor is at CEILING (2026-09-07)
+
+Plan task 2.2. Three deterministic evals, three floors, three controls. The graders and the printed
+report are untouched; each admitted eval sits **beside** its grader, and the two read a blind
+recorder differently on purpose.
+
+### §81.1 What was measured
+
+| command | observed |
+|---|---|
+| `-- 1 --dry-run`, `-- 2b --dry-run`, `-- 2c --dry-run` | **0 / 0 / 0** |
+| `-- 3` | **0**; gating rows **46** by distinct name (was 43); `NOT CAUGHT` **0** |
+| `--ci --dry-run` | **1** — Eval 07 the only FAILED of eleven, unchanged |
+| `AtomicCodeEval` files in the evals project | 1 -> **4** |
+| `.AddEval(` uses | 1 -> **4** |
+
+Credentials were unset **in the command** for every figure above. `--real-vectors` is therefore
+**refused, not run**, and no real-space column is claimed here.
+
+### §81.2 The three floors, and why one of them earns no p-value
+
+| eval | floor | note |
+|---|---|---|
+| 02c `HeldOutTargetPresentedEval` | `AtLeastOneHit(N, 1, 5)` | one target in the catalogue, at the suite's declared draw size |
+| 02b `StatedNeedSatisfiedAtLeastOnceEval` | `AtLeastOneHit(N, S, 5)` **per case** | the floor VARIES per case (favourable = that case's satisfying count). Admissible at the door — the floor is recorded on each row and `compare` reads per scenario — but **not poolable** into one binomial tail by `FloorComparison.Compute`, which takes one floor per arm (ADR-032 D13 row 3). Recorded, not worked around |
+| 01 `NoUncataloguedSkuPresentedEval` | `AvoidsAll(N, 0, 5)` = **1.000** | **AT CEILING.** No catalogue product is off-catalogue, so a uniform draw avoids every uncatalogued SKU with certainty. `ExactTests.BinomialTailP` refuses a floor at or above 1.0 and returns NaN, so this eval is **undecidable against chance, permanently** |
+
+**Why 01 is admitted at 1.000 rather than declared not-derivable.** Declaring it not-derivable would
+make a p-value appear where none is earned — manufacturing a bar so a statistic works, which is the
+flattering direction. The honest reading is that this check measures a real property luck cannot
+fail, so it earns no significance and claims none.
+
+### §81.3 The clamp that would have recorded a zero as a bar
+
+`ChanceFloor.AtLeastOneHit(N, 0, k)` does **not** throw and does **not** return a not-derivable
+floor. It clamps favourable to 0, computes miss = 1.0, and returns a **Derived floor of 0.0**
+(`ChanceFloor.cs:118-129`) — a bar everything clears. 02b's satisfying set is empty for some cases,
+so `FloorFor` returns `ChanceFloor.NotDerivable(reason)` explicitly for those. Verified by reading
+the loop, not by assuming the constructor guards it.
+
+### §81.4 What was NOT changed, and stays true
+
+`PresentedCall.FromToolUsage(null)` still returns an empty list (`Graders/PresentedCall.cs:78`), so
+the three graders still read an unrecorded run as an empty one. That helper has **14 callers** and is
+out of scope here; the admitted evals bypass it by reading `EvalInput.ToolCalls`, where null and
+empty are different answers. Declared rather than fixed.
+
+The per-SKU evidence floor (`ChanceFloors.EvidenceFloor`) is a per-case floor and is **not**
+migrated — the same named hole as 02b's per-case variation.
+
+### §81.5 Ablation
+
+Each control was made to present the CORRECT thing — the target, a satisfying product, no
+fabrication — with each replacement count asserted before building. `-- 3` then exits **1** and
+exactly the three new rows read NOT CAUGHT. Restored from a copy: **46 gating, 0 NOT CAUGHT, exit
+0**. `git checkout --` was not used.
+
+Both directions are asserted inside each control, because an eval that always fails would catch its
+planted defect for the wrong reason.

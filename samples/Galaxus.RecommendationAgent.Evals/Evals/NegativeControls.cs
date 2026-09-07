@@ -1,8 +1,9 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too
 
+using AgentEval.Evals;
 using System.Text.Json;                        // the marshalled JsonElement shape, control 23
 using AgentEval.Evals.Meta;                    // ExactTests, ObservationCensus — ADR-030 Slice 2, consumed not copied
 using AgentEval.MAF;
@@ -111,6 +112,9 @@ public static class NegativeControls
         rows.Add(Guarded("JudgeEchoJoins", CheckJudgeEchoJoins));
         rows.Add(await GuardedAsync("ContentlessRequestIsNotCovered", () => CheckContentlessRequestIsNotCoveredAsync(retriever, ct)).ConfigureAwait(false));
         rows.Add(Guarded("UnnameableInterestPresentsNothing", CheckUnnameableInterestPresentsNothing));
+        rows.Add(await GuardedAsync("HeldOutTargetEvalCatchesAMiss", CheckHeldOutTargetEvalCatchesAMissAsync).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("StatedNeedEvalCatchesAnUnsatisfiedAnswer", CheckStatedNeedEvalCatchesAnUnsatisfiedAnswerAsync).ConfigureAwait(false));
+        rows.Add(await GuardedAsync("UncataloguedSkuEvalCatchesAFabrication", CheckUncataloguedSkuEvalCatchesAFabricationAsync).ConfigureAwait(false));
         rows.Add(await GuardedAsync("RefusalDetectorsSeeTheRealShape", CheckRefusalDetectorsSeeTheRealShapeAsync).ConfigureAwait(false));
         rows.Add(Guarded("RefusalCodesDoNotAnswerForEachOther", CheckRefusalCodesDoNotAnswerForEachOther));
         rows.Add(Guarded("WriteLedgerMatchesTheStore", CheckWriteLedgerMatchesTheStore));
@@ -7856,4 +7860,126 @@ public static class NegativeControls
 ");
         Console.ResetColor();
     }
+    // --- 2.2: one control per admitted eval. Each plants the defect the eval exists to catch,
+    //     runs it THROUGH THE DOOR, and asserts BOTH directions. A control that only ever sees a
+    //     clean arm proves the eval compiles, not that it discriminates.
+
+    /// <summary>A scripted presentation trace: one PresentRecommendation call per SKU.</summary>
+    private static AgentEval.Evals.EvalInput ScriptedPresentation(params string[] skus)
+    {
+        var usage = new ToolUsageReport();
+        int order = 1;
+        foreach (var sku in skus)
+        {
+            usage.AddCall(new ToolCallRecord
+            {
+                Name = PresentedCall.ToolName,
+                CallId = $"c{order}",
+                Order = order++,
+                WasExecuted = true,
+                Arguments = new Dictionary<string, object?> { [PresentRecommendationArguments.Sku] = sku },
+                Result = "presented",
+            });
+        }
+
+        var tc = new TestCase { Name = "control", Input = "control" };
+        return tc.ToEvalInput(new TestResult { TestName = "control", ToolUsage = usage });
+    }
+
+    private static async Task<AgentEval.Evals.EvalResult> ThroughTheDoorAsync(
+        AgentEval.Evals.IEval eval, AgentEval.Evals.Meta.ChanceFloor floor, AgentEval.Evals.EvalInput input)
+    {
+        var runner = await new AgentEval.Core.AgentEvalBuilder()
+            .AddEval(eval, floor).BuildAsync(CancellationToken.None).ConfigureAwait(false);
+        return (await runner.EvaluateEvalsAsync(input, CancellationToken.None).ConfigureAwait(false))[0];
+    }
+
+    private static async Task<ControlRowSnapshot> CheckHeldOutTargetEvalCatchesAMissAsync()
+    {
+        var catalogue = Catalogue.Default;
+        var target = catalogue.All[0].Sku;
+        var other = catalogue.All[1].Sku;
+
+        var miss = await ThroughTheDoorAsync(
+            new HeldOutTargetPresentedEval(target), HeldOutTargetPresentedEval.DeclaredFloor,
+            ScriptedPresentation(other)).ConfigureAwait(false);
+        var hit = await ThroughTheDoorAsync(
+            new HeldOutTargetPresentedEval(target), HeldOutTargetPresentedEval.DeclaredFloor,
+            ScriptedPresentation(other, target)).ConfigureAwait(false);
+
+        var caught = !miss.Score.Passed && hit.Score.Passed;
+
+        return new ControlRowSnapshot(
+            "HeldOutTargetEvalCatchesAMiss",
+            "an arm that presents everything EXCEPT the held-out purchase must FAIL 02c's admitted eval, and the "
+          + "same arm with the target added must PASS. Both directions are asserted because an eval that always "
+          + "fails would catch this defect for the wrong reason",
+            caught
+                ? $"miss -> {miss.Score.Label}, hit -> {hit.Score.Label}; floor {HeldOutTargetPresentedEval.DeclaredFloor.Value:0.0000}"
+                : $"NOT CAUGHT: miss -> {miss.Score.Label}, hit -> {hit.Score.Label}",
+            caught);
+    }
+
+    private static async Task<ControlRowSnapshot> CheckStatedNeedEvalCatchesAnUnsatisfiedAnswerAsync()
+    {
+        var applicable = StatedNeedCases.All.FirstOrDefault(ConstraintSatisfactionGrader.IsApplicable);
+        if (applicable is null)
+        {
+            return new ControlRowSnapshot(
+                "StatedNeedEvalCatchesAnUnsatisfiedAnswer",
+                "at least one stated-need case must have a non-empty satisfying set, or this control passes on an empty set",
+                "NOT CAUGHT: no applicable case exists",
+                false);
+        }
+
+        var satisfying = ConstraintSatisfactionGrader.SatisfyingSet(applicable)
+            .Select(p => p.Sku).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unsatisfying = Catalogue.Default.All.First(p => !satisfying.Contains(p.Sku)).Sku;
+
+        var bad = await ThroughTheDoorAsync(
+            new StatedNeedSatisfiedAtLeastOnceEval(applicable),
+            StatedNeedSatisfiedAtLeastOnceEval.FloorFor(applicable),
+            ScriptedPresentation(unsatisfying)).ConfigureAwait(false);
+        var good = await ThroughTheDoorAsync(
+            new StatedNeedSatisfiedAtLeastOnceEval(applicable),
+            StatedNeedSatisfiedAtLeastOnceEval.FloorFor(applicable),
+            ScriptedPresentation(unsatisfying, satisfying.First())).ConfigureAwait(false);
+
+        var caught = !bad.Score.Passed && good.Score.Passed;
+
+        return new ControlRowSnapshot(
+            "StatedNeedEvalCatchesAnUnsatisfiedAnswer",
+            "an arm presenting only products OUTSIDE the satisfying set must FAIL 02b's admitted eval, and adding "
+          + "one satisfying product must make it PASS",
+            caught
+                ? $"unsatisfied -> {bad.Score.Label}, satisfied -> {good.Score.Label}; case {applicable.Id}, |S| = {satisfying.Count}"
+                : $"NOT CAUGHT: unsatisfied -> {bad.Score.Label}, satisfied -> {good.Score.Label}",
+            caught);
+    }
+
+    private static async Task<ControlRowSnapshot> CheckUncataloguedSkuEvalCatchesAFabricationAsync()
+    {
+        var real = Catalogue.Default.All[0].Sku;
+        const string Fabricated = "GLX-0000-DOES-NOT-EXIST";
+
+        var bad = await ThroughTheDoorAsync(
+            new NoUncataloguedSkuPresentedEval(), NoUncataloguedSkuPresentedEval.DeclaredFloor,
+            ScriptedPresentation(real, Fabricated)).ConfigureAwait(false);
+        var good = await ThroughTheDoorAsync(
+            new NoUncataloguedSkuPresentedEval(), NoUncataloguedSkuPresentedEval.DeclaredFloor,
+            ScriptedPresentation(real)).ConfigureAwait(false);
+
+        var caught = !bad.Score.Passed && good.Score.Passed;
+
+        return new ControlRowSnapshot(
+            "UncataloguedSkuEvalCatchesAFabrication",
+            "an arm presenting a SKU that resolves nowhere in the catalogue must FAIL 01's admitted eval, and the "
+          + "same arm without it must PASS. This eval's floor is at CEILING (1.000): no catalogue draw can hit a "
+          + "SKU that does not exist, so it is undecidable against chance and earns no p-value - declared, not hidden",
+            caught
+                ? $"fabricated -> {bad.Score.Label}, clean -> {good.Score.Label}; floor {NoUncataloguedSkuPresentedEval.DeclaredFloor.Value:0.0000} (at ceiling)"
+                : $"NOT CAUGHT: fabricated -> {bad.Score.Label}, clean -> {good.Score.Label}",
+            caught);
+    }
+
 }

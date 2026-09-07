@@ -1,8 +1,9 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval02c_held_out — held-out hit-rate, target authored in Personas.cs
 
+using AgentEval.Evals;
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Agents;
 using Galaxus.RecommendationAgent.Evals.Adapters;
@@ -413,6 +414,17 @@ public static class Eval02c_HeldOutNextPurchase
         }
 
         var presented = PresentedCall.FromToolUsage(result.ToolUsage);
+
+        // 2.2 — the SAME run, through the library's floor-gated door. The grader above remains the
+        // report's source; this is the admitted, floor-carrying measurement beside it. The two read a
+        // blind recorder differently ON PURPOSE: FromToolUsage(null) returns [] (PresentedCall.cs:78),
+        // so an unrecorded run scores as an empty one; the projection returns null and the eval below
+        // declines to answer instead of manufacturing a measurement.
+        var doorRunner = await new AgentEval.Core.AgentEvalBuilder()
+            .AddEval(new HeldOutTargetPresentedEval(target.Target.Sku), HeldOutTargetPresentedEval.DeclaredFloor)
+            .BuildAsync(ct).ConfigureAwait(false);
+        var doorResult = (await doorRunner
+            .EvaluateEvalsAsync(tc.ToEvalInput(result), ct).ConfigureAwait(false))[0];
         var hit = HeldOutHitGrader.Grade(target, presented, K);
 
         if (print)
