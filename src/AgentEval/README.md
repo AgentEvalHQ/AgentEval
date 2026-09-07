@@ -134,3 +134,12 @@ services.AddAgentEvalRedTeam();       // Red Team security testing
 ## License
 
 MIT License — See [LICENSE](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE) for details.
+
+## Deterministic evals
+
+A deterministic eval is one measurement of an agent run, computed in code — no model, no cost, same
+answer every time. Register one with `AgentEvalBuilder.AddEval(eval, floor)`: the door takes the eval
+**and** the chance floor it is judged against, because a score you cannot compare to luck is not a
+measurement. See [Deterministic evals](https://agentevalhq.github.io/AgentEval/deterministic-evals.html)
+for the contract — what the eval sees, what `null` versus `[]` tool calls mean, and how to say "this
+could not be measured" without saying "this scored zero".
