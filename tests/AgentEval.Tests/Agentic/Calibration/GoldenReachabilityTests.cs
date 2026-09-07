@@ -298,16 +298,34 @@ public class GoldenReachabilityTests
                 if (reachable) continue;
 
                 int asserted = group.Count(c => c.Entry.ExpectedVerdict == direction);
+
+                // The two failure modes have DIFFERENT fixes and are reported as different things:
+                // authoring is what fixes an absent direction; making an existing record runnable is
+                // what fixes an unreachable one.
+                if (asserted == 0)
+                {
+                    violations.Add(
+                        $"{group.Key}: NOT ONE golden record asserts the '{direction}' verdict — the set is " +
+                        $"single-direction, and §6.3 property 2 says a single-direction set cannot calibrate " +
+                        $"anything. Fix by AUTHORING a '{direction}' record for this key.");
+                    continue;
+                }
+
                 var blocked = group
                     .Where(c => c.Entry.ExpectedVerdict == direction)
                     .Select(c => $"{c.Entry.ScenarioId}={c.Class}")
                     .OrderBy(s => s, StringComparer.Ordinal);
 
+                // ⚠ SAY ONLY WHAT WAS MEASURED (Wave 12 review). What is measured is REACHABILITY —
+                // that the record produces a verdict at all. Whether the evaluator would produce
+                // THIS direction is NOT measured and cannot be from here: the judge is a stub with a
+                // fixed score, so every judged label is the stub's, not the evaluator's.
                 violations.Add(
-                    $"{group.Key}: NO golden record can produce the '{direction}' verdict. " +
-                    $"{asserted} record(s) assert it, none of them reaches one [{string.Join(", ", blocked)}]. " +
-                    $"The key cannot distinguish its evaluator from one that always answers the other way, " +
-                    $"and the hand-written label is credited to a run that never happened.");
+                    $"{group.Key}/{direction}: all {asserted} record(s) asserting '{direction}' reach NO verdict " +
+                    $"[{string.Join(", ", blocked)}]. The direction rests entirely on hand-written labels the " +
+                    $"evaluator is never asked to earn, so the key cannot distinguish its evaluator from one " +
+                    $"that always answers the other way. Fix by making one of them RUNNABLE, or by authoring a " +
+                    $"'{direction}' record that is.");
             }
         }
 
@@ -338,9 +356,19 @@ public class GoldenReachabilityTests
         var census = await TakeCensusAsync(entries, registry);
         var violations = BarViolations(census, registry, s_transportExemptKeys);
 
+        // ⚠ ONE VIOLATION IS ONE (key, direction) PAIR, NOT ONE KEY (Wave 12 review). A key that
+        // fails in both directions produced TWO violations and the header called them two keys —
+        // an overstatement of the blast radius by up to 2x, in a message whose whole job is to size
+        // the damage. Both counts are now stated, and they are derived separately.
+        int keysAffected = violations
+            .Select(v => v.Split(':', 2)[0].Split('/')[0])
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+
         Assert.True(
             violations.Count == 0,
-            $"{violations.Count} dispatched key(s) assert a verdict direction no golden record can reach. " +
+            $"{violations.Count} (key, verdict-direction) pair(s) across {keysAffected} dispatched key(s) " +
+            $"assert a verdict direction no golden record reaches. " +
             $"{Render(census)}. Exempt by proven transport gap: [{string.Join(", ", s_transportExemptKeys)}]. " +
             string.Join(" | ", violations));
     }
@@ -397,7 +425,10 @@ public class GoldenReachabilityTests
         Assert.All(census, c => Assert.Equal(Reach.Skipped, c.Class));
 
         var violations = BarViolations(census, registry, s_transportExemptKeys);
-        Assert.Contains(violations, v => v.Contains("NOT ONE golden record", StringComparison.Ordinal));
+        // The CORPUS-WIDE violation specifically. Matched on the phrase that only it carries: the
+        // per-direction violations also open "NOT ONE golden record", and a substring both can
+        // satisfy would let this test pass on the wrong finding.
+        Assert.Contains(violations, v => v.Contains("in the whole corpus", StringComparison.Ordinal));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
