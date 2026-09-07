@@ -561,6 +561,71 @@ public class TestRunEvalProjectionTests
     }
 
     [Fact]
+    public void AFailedCallThatAlsoRecordedAPayload_StillReportsTheFailure()
+    {
+        // The defect: a tool that threw AFTER writing a partial result projected as that payload
+        // alone. `Result is not null` outranked the exception, so `Succeeded`/`Exception` vanished
+        // and the call was indistinguishable from one that worked — the flattering direction.
+        string? projected = TestRunEvalProjection.ResultOf("partial payload", new InvalidOperationException("gateway timeout"));
+
+        Assert.StartsWith(TestRunEvalProjection.ToolErrorResultPrefix, projected);
+        Assert.Contains("gateway timeout", projected, StringComparison.Ordinal);
+        Assert.Contains("partial payload", projected, StringComparison.Ordinal); // and nothing is lost
+    }
+
+    [Fact]
+    public void TheOtherDirection_TheSamePayloadWithNoException_IsCarriedBare()
+    {
+        // Direction control: the ONLY difference from the test above is the exception, so the
+        // prefix cannot be coming from "a payload was present".
+        string? projected = TestRunEvalProjection.ResultOf("partial payload", null);
+
+        Assert.Equal("partial payload", projected);
+    }
+
+    [Fact]
+    public void AFailedTimelineInvocationThatAlsoRecordedAResult_StillReportsTheFailure()
+    {
+        // Same defect on the timeline path, where it is more reachable: ToolInvocation.Succeeded is
+        // `required`, so EVERY producer declares it, and Result is commonly populated with the error
+        // payload itself.
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        {
+            ToolName = "charge",
+            StartTime = TimeSpan.Zero,
+            Duration = TimeSpan.Zero,
+            Succeeded = false,
+            ErrorMessage = "gateway timeout",
+            Result = "partial payload",
+        });
+        var result = new TestResult { TestName = "n", Timeline = timeline };
+
+        string? projected = FullyPopulatedCase().ToEvalInput(result).ToolCalls![0].Result;
+
+        Assert.StartsWith(TestRunEvalProjection.ToolErrorResultPrefix, projected);
+        Assert.Contains("gateway timeout", projected, StringComparison.Ordinal);
+        Assert.Contains("partial payload", projected, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheOtherDirection_ASucceedingTimelineInvocationCarriesItsResultBare()
+    {
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        {
+            ToolName = "charge",
+            StartTime = TimeSpan.Zero,
+            Duration = TimeSpan.Zero,
+            Succeeded = true,
+            Result = "partial payload",
+        });
+        var result = new TestResult { TestName = "n", Timeline = timeline };
+
+        Assert.Equal("partial payload", FullyPopulatedCase().ToEvalInput(result).ToolCalls![0].Result);
+    }
+
+    [Fact]
     public void AFailedTimelineInvocation_CarriesItsErrorMessage()
     {
         var timeline = new ToolCallTimeline();

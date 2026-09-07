@@ -95,6 +95,12 @@ public static class TestRunEvalProjection
     /// <see cref="ToolCall.Result"/> has no field for an error and a failed call must not be
     /// indistinguishable from a void-returning successful one.
     /// </summary>
+    /// <remarks>
+    /// EVERY failed call carries it, including one that also recorded a payload — the payload is
+    /// appended after the reason rather than replacing it, so
+    /// <c>Result.StartsWith(ToolErrorResultPrefix)</c> is a reliable "this call failed" test and
+    /// nothing the tool wrote can suppress it.
+    /// </remarks>
     public const string ToolErrorResultPrefix = "__tool_error__:";
 
     /// <summary>
@@ -230,9 +236,14 @@ public static class TestRunEvalProjection
         new(
             invocation.ToolName,
             ArgumentsOf(invocation.Arguments),
-            invocation.Result ?? (invocation.Succeeded
-                ? null
-                : Failure(invocation.ErrorMessage ?? "the tool call failed and no message was recorded")));
+            invocation.Succeeded
+                ? invocation.Result
+                // ⚠ The result does NOT win over the failure. A failed invocation that also recorded a
+                // payload used to project as that payload alone, so `Succeeded = false` and the error
+                // message vanished and the call read as a successful one.
+                : Failure(
+                    invocation.ErrorMessage ?? "the tool call failed and no message was recorded",
+                    invocation.Result));
 
     /// <summary>
     /// Converts a recorded argument bag, keeping "absent" and "present and null" apart.
@@ -310,12 +321,22 @@ public static class TestRunEvalProjection
     /// </remarks>
     internal static string? ResultOf(object? value, Exception? error)
     {
-        if (value is null)
-        {
-            // No result. A call that FAILED still has something to say, and "failed" must not read as
-            // "returned nothing" — a void-returning tool that succeeded looks exactly like that.
-            return error is null ? null : Failure(error.Message);
-        }
+        string? rendered = Render(value);
+
+        // A call that FAILED still has something to say, and "failed" must not read as "returned
+        // nothing" — a void-returning tool that succeeded looks exactly like that. ⚠ Nor may a
+        // recorded payload outrank the failure: a tool that threw AFTER writing a partial result
+        // used to project as that payload alone, with the exception dropped, so the call read as a
+        // successful one. The marker leads; whatever was rendered follows it.
+        return error is null ? rendered : Failure(error.Message, rendered);
+    }
+
+    /// <summary>Renders a recorded result object as text, or <see langword="null"/> when there was none.</summary>
+    /// <param name="value">The recorded result object.</param>
+    /// <returns>The text, or <see langword="null"/> only when <paramref name="value"/> is null.</returns>
+    private static string? Render(object? value)
+    {
+        if (value is null) return null;
 
         if (value is string text) return text;
 
@@ -355,8 +376,16 @@ public static class TestRunEvalProjection
         catch (Exception) { return null; }
     }
 
-    private static string Failure(string? message) =>
-        string.Create(CultureInfo.InvariantCulture, $"{ToolErrorResultPrefix} {message}");
+    /// <summary>
+    /// Renders a failure, keeping anything the call did record beside the reason it failed.
+    /// </summary>
+    /// <param name="message">Why the call failed.</param>
+    /// <param name="recorded">What the call recorded before or while failing, when it recorded anything.</param>
+    /// <returns>A line that always begins with <see cref="ToolErrorResultPrefix"/>.</returns>
+    private static string Failure(string? message, string? recorded = null) =>
+        string.IsNullOrEmpty(recorded)
+            ? string.Create(CultureInfo.InvariantCulture, $"{ToolErrorResultPrefix} {message}")
+            : string.Create(CultureInfo.InvariantCulture, $"{ToolErrorResultPrefix} {message} | recorded result: {recorded}");
 
     private static string Unconvertible(string what) =>
         string.Create(CultureInfo.InvariantCulture, $"{UnconvertibleResultPrefix} {what}");
