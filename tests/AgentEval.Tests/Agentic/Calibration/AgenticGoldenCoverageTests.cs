@@ -711,6 +711,104 @@ public class AgenticGoldenCoverageTests
         Assert.True(problems.Count == 0, string.Join(" | ", problems));
     }
 
+    // ── Wave 12 / d-9 — goal_decomposition_quality, and the skip that was credited free ──
+    //
+    // ⚠ THE TRAP, AND IT IS d-7's TRAP ON A DIFFERENT EVALUATOR. GoalDecompositionQualityEval's
+    // ResolveDecomposition returns null when Metadata["plan"] is absent AND the response contains
+    // none of its twelve decomposition markers, and the evaluator then returns EvalResult.Skipped
+    // WITHOUT CALLING THE JUDGE. CalibrationEntry carries no metadata field, so a marker in the
+    // response is the ONLY route in. cal-gdq-002 — the key's only `fail` record — has no marker, is
+    // skipped at exactly 0.0, and 0.0 sits inside its own authored [0.00, 0.15] band, so
+    // CalibrationRunner's WithinScoreRange CREDITS an evaluation that never ran.
+    //
+    // ⚠ THE FIX IS STRUCTURAL, NOT COSMETIC, and it follows Wave 11's precedent exactly: the band is
+    // NOT shaped away from 0.0. Shaping an expectation around the artifact's own sentinel is the
+    // self-examination defect this repository has now recorded seven times, and moving a shipped band
+    // breaks docs/eval-benchmark-architecture.md §6.3 property 4. cal-gdq-002 is left untouched and
+    // pinned (GoldenReachabilityTests.s_recordsThatReachNoVerdict and .s_sentinelsCreditedWithoutARun,
+    // both set-equality ratchets); what closes the defect is cal-gdq-005, a `fail` record carrying the
+    // SAME failure — a circular restatement that decomposes nothing — with enough enumeration
+    // structure that the evaluator actually runs it.
+
+    /// <summary>
+    /// The prediction for the record authored in Wave 12 / d-9, written down BEFORE it was executed:
+    /// which of the evaluator's decomposition markers the response is expected to carry. The first
+    /// entry is the OPERATIVE one — first in the evaluator's own array order among those present —
+    /// and the second is the semantically intended one.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string[]> DecompositionPredictedMarkers =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["cal-gdq-005"] = ["1.", "sub-goal"],
+        };
+
+    [Fact]
+    public async Task TheGoalDecompositionGoldenAuthoredForD9_TripsItsPredictedMarkers_AndItsBandAgreesWithTheDeclaredThreshold()
+    {
+        var entries = GoldenEntries()
+            .Where(e => DecompositionPredictedMarkers.ContainsKey(e.ScenarioId))
+            .ToList();
+
+        // Vacuity guard: a typo'd id set would make every loop below pass on nothing.
+        Assert.Equal(DecompositionPredictedMarkers.Count, entries.Count);
+
+        var registry = Populated();
+        var problems = new List<string>();
+        int failDirectionRecords = 0;
+
+        foreach (var entry in entries)
+        {
+            if (entry.ExpectedVerdict == "fail") failDirectionRecords++;
+
+            foreach (var marker in DecompositionPredictedMarkers[entry.ScenarioId])
+            {
+                if (!entry.AgentResponse.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    problems.Add($"{entry.ScenarioId}: response no longer contains the predicted marker '{marker}'");
+
+                // ⚠ THE HALF WAVE 11's REVIEW FOUND MISSING, AND IT FAILED IN THE FLATTERING
+                // DIRECTION. The check above compares our prediction against golden text WE ALSO OWN,
+                // so the evaluator could drop a marker and the assertion would never see it. The probe
+                // closes that through the PUBLIC surface only: the marker ON ITS OWN must still make
+                // the evaluator take the judge path. If it does not, the recorded prediction is false
+                // even though the response still contains the string, and the record now reaches the
+                // judge (if at all) by some route other than the one authored.
+                var markerProbe = new RecordingJudge();
+                var probeEval = registry.Resolve(entry.EvaluatorKey, markerProbe, judgeModel: null);
+                Assert.NotNull(probeEval);
+                await probeEval!.EvaluateAsync(new EvalInput(Query: "marker probe", Response: marker));
+                if (markerProbe.Calls == 0)
+                    problems.Add($"{entry.ScenarioId}: the evaluator NO LONGER RECOGNISES '{marker}' as a decomposition marker");
+            }
+
+            var judge = new RecordingJudge();
+            var eval = registry.Resolve(entry.EvaluatorKey, judge, judgeModel: null);
+            Assert.NotNull(eval);
+
+            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+
+            if (judge.Calls == 0)
+                problems.Add($"{entry.ScenarioId}: predicted the judge path, but the evaluator SKIPPED it — it scores a 0.0 sentinel and measures nothing");
+
+            // The threshold is a declared constant on the evaluator (passThreshold: 0.75), read back
+            // off a result. Nothing about the authored band is derived from the judge's score.
+            double? threshold = result.Score.Threshold;
+            if (threshold is null)
+            {
+                problems.Add($"{entry.ScenarioId}: the evaluator declared NO pass threshold — a missing threshold is not a satisfied one");
+                continue;
+            }
+
+            if (entry.ExpectedVerdict == "fail" && entry.ExpectedScoreMax >= threshold.Value)
+                problems.Add($"{entry.ScenarioId}: fail band reaches {entry.ExpectedScoreMax} but the evaluator PASSES at {threshold}");
+        }
+
+        // The whole point of d-9: without a fail-direction record that RUNS, this key cannot catch an
+        // evaluator that always passes.
+        Assert.True(failDirectionRecords > 0, "no goal_decomposition_quality golden authored here expects a FAIL verdict");
+
+        Assert.True(problems.Count == 0, string.Join(" | ", problems));
+    }
+
     // ── Wave 11 REVIEW — every golden the judge never sees, CORPUS-WIDE and in BOTH directions ──
     //
     // WHY THIS EXISTS, AND WHY THE PER-KEY CONTROLS ABOVE WERE NOT ENOUGH. Three evaluator families
