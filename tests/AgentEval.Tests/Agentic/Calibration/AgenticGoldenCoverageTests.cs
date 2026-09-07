@@ -300,4 +300,105 @@ public class AgenticGoldenCoverageTests
 
         Assert.True(straddling.Count == 0, string.Join(" | ", straddling));
     }
+
+    [Fact]
+    public async Task TheThreeKeysAuthoredForD4_HaveFailBandsThatCannotDisagreeWithTheirOwnVerdict()
+    {
+        // ⚠ THE MIRROR OF THE TEST ABOVE, AND THE HALF WAVE 10 LEFT OPEN. The pass rule was
+        // enforced and the fail rule was not, so a `fail` record whose band REACHES ABOVE the
+        // evaluator's pass threshold was accepted: a judge score of 0.93 against a band of
+        // [0.00, 0.95] is "within score range" — the entry is credited — while the same result is
+        // labelled `pass` against an entry that says `fail`. Wave 11 re-executed the gap: raising
+        // cal-pm-002's fail band from 0.20 to 0.95 left all seven tests GREEN.
+        //
+        // Scope matches the test above deliberately: corpus-wide, 0 of 123 shipped fail records
+        // straddle, but 9 of them are on evaluators that declare NO threshold at all and would be
+        // reported here rather than waved through. That census is MEASUREMENT_STATUS §73, not a
+        // gate on a corpus that predates the rule.
+        string[] keys = ["prompt_leak", "escalation_resistance", "protected_material"];
+        var entries = GoldenEntries().Where(e => keys.Contains(e.EvaluatorKey, StringComparer.OrdinalIgnoreCase)).ToList();
+
+        Assert.Equal(15, entries.Count);
+
+        var registry = Populated();
+        var straddling = new List<string>();
+        int checkedRecords = 0;
+
+        foreach (var entry in entries.Where(e => e.ExpectedVerdict == "fail"))
+        {
+            checkedRecords++;
+
+            var eval = registry.Resolve(entry.EvaluatorKey, new RecordingJudge(), judgeModel: null);
+            Assert.NotNull(eval);
+
+            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+
+            // Same rule as above: a missing threshold is not a satisfied one.
+            double? threshold = result.Score.Threshold;
+            if (threshold is null)
+            {
+                straddling.Add($"{entry.ScenarioId}/{entry.EvaluatorKey}: the evaluator declared NO pass threshold, so the band cannot be checked against one");
+                continue;
+            }
+
+            if (entry.ExpectedScoreMax >= threshold.Value)
+                straddling.Add($"{entry.ScenarioId}/{entry.EvaluatorKey}: fail band reaches {entry.ExpectedScoreMax} but the evaluator PASSES at {threshold} — a score inside this band is credited as within range and labelled pass at once");
+        }
+
+        // Vacuity guard: with no fail-direction record the loop above asserts nothing at all, and
+        // the sibling test below is what stops that from happening silently.
+        Assert.True(checkedRecords > 0, "no fail-direction record was checked — the loop asserted nothing");
+
+        Assert.True(straddling.Count == 0, string.Join(" | ", straddling));
+    }
+
+    // ── Both directions, corpus-wide ─────────────────────────────────────────
+
+    /// <summary>
+    /// Dispatched keys whose golden set is known to carry only ONE verdict direction. This is a
+    /// RATCHET, not a carve-out: the assertion is set EQUALITY, so removing the last one-direction
+    /// key turns this red until the entry is deleted, and a new one turns it red immediately.
+    /// </summary>
+    /// <remarks>
+    /// <c>reasoning_correctness</c> ships four <c>pass</c> records and no <c>fail</c> record, so
+    /// nothing in its golden set can distinguish the evaluator from one that always passes.
+    /// MEASUREMENT_STATUS §73 files it; it is not Wave 10's and is not fixed here, because
+    /// authoring reasoning goldens is corpus work with its own review.
+    /// </remarks>
+    private static readonly string[] s_knownOneDirectionKeys = ["reasoning_correctness"];
+
+    [Fact]
+    public void EveryDispatchedKeyWithGoldens_CarriesBothVerdictDirections()
+    {
+        // THE RULE. A golden set of nothing but `pass` records cannot catch an evaluator that
+        // always passes, and a set of nothing but `fail` records cannot catch one that always
+        // fails. Wave 10 asserted this for escalation_resistance alone; Wave 11 re-executed the
+        // gap by rewriting protected_material's three fail records as passes — five all-pass
+        // records, and the whole suite stayed GREEN.
+        var entries = GoldenEntries();
+        var registry = Populated();
+
+        Assert.NotEmpty(entries);
+        Assert.Equal(AgenticEvalRegistration.DispatchedEvaluatorCount, registry.All.Count);
+
+        var dispatched = registry.All.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var oneDirection = entries
+            .Where(e => dispatched.Contains(e.EvaluatorKey))
+            .GroupBy(e => e.EvaluatorKey, StringComparer.OrdinalIgnoreCase)
+            .Where(g => !g.Any(e => e.ExpectedVerdict == "pass") || !g.Any(e => e.ExpectedVerdict == "fail"))
+            .Select(g => g.Key)
+            .OrderBy(k => k, StringComparer.Ordinal)
+            .ToList();
+
+        // Vacuity guard on the operand that could make the difference empty for the wrong reason.
+        Assert.NotEmpty(entries.Where(e => dispatched.Contains(e.EvaluatorKey)));
+
+        Assert.True(
+            oneDirection.SequenceEqual(s_knownOneDirectionKeys, StringComparer.Ordinal),
+            $"the set of dispatched keys whose goldens carry only ONE verdict direction has changed. " +
+            $"Recorded: [{string.Join(", ", s_knownOneDirectionKeys)}]. Measured: [{string.Join(", ", oneDirection)}]. " +
+            $"A key that GAINED its missing direction must be removed from s_knownOneDirectionKeys; a key that " +
+            $"LOST one has a golden set that can no longer catch an evaluator which always answers that way.");
+    }
 }
