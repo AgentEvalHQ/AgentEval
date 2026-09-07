@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -207,21 +207,24 @@ public sealed class EvalJoinEndToEndTests
     }
 
     [Fact]
-    public async Task ADoubleAdmission_Throws_RatherThanLettingTheEvalSupplyItsOwnBar()
+    public void ADoubleAdmission_Throws_RatherThanLettingTheEvalSupplyItsOwnBar()
     {
         // The gate-self-examination guard, reached through the join rather than in isolation: an
         // eval whose result already carries a chance floor is refused, never merged.
+        //
+        // RELOCATED, not weakened. This assertion used to sit on EvaluateEvalsAsync, where the
+        // self-report check catches the double admission at evaluate time. The door now refuses it
+        // at ADMIT time, which is strictly earlier and names the offending eval — so the throw no
+        // longer reaches evaluation and the assertion moved to where the defect is now caught. The
+        // claim under test is unchanged: a double admission throws rather than letting the outer
+        // floor silently win.
         var floor = ChanceFloor.UniformChoice(EvalWithChanceFloor.Cities.Count);
         var inner = FloorAdmittedEval.Admit(new AskedCityWasLookedUpEval(EvalWithChanceFloor.AskedCity), floor);
 
-        var runner = await new AgentEvalBuilder()
-            .AddEval(inner, ChanceFloor.UniformChoice(2))
-            .BuildAsync(CancellationToken.None);
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new AgentEvalBuilder().AddEval(inner, ChanceFloor.UniformChoice(2)));
 
-        var (testCase, result, _) = await RealRunAsync(EvalWithChanceFloor.AskedCity, trackTools: true);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await runner.EvaluateEvalsAsync(testCase.ToEvalInput(result), CancellationToken.None));
+        Assert.Contains("already admitted", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

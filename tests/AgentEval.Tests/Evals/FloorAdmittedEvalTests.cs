@@ -55,6 +55,17 @@ public class FloorAdmittedEvalTests
     // ── 0.2: the door refuses a double admission and a composite ──────────────────
 
     [Fact]
+    public void Admit_RefusesAnAlreadyAdmittedEval_AtAdmitTime()
+    {
+        // Re-admitting would let the OUTER floor win over the one the eval was measured against.
+        var once = FloorAdmittedEval.Admit(new StubEval(), Derived);
+
+        var ex = Assert.Throws<ArgumentException>(() => FloorAdmittedEval.Admit(once, ChanceFloor.UniformChoice(2)));
+
+        Assert.Contains("already admitted", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Annotate_RefusesAResultCarryingSubResults()
     {
         // A composite has ONE Score over leaves that were never individually admitted, so a floor on

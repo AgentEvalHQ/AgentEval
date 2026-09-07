@@ -129,6 +129,16 @@ public sealed class FloorAdmittedEval : IEval
     {
         ArgumentNullException.ThrowIfNull(eval);
 
+        if (eval is FloorAdmittedEval already)
+        {
+            throw new ArgumentException(
+                $"Eval '{already.Key}' is already admitted under a '{already.Floor.Kind}' floor, so a second "
+                + "admission was refused. Re-admitting would let the OUTER floor silently win over the one the "
+                + "eval was actually measured against — the eval supplying its own bar by another route. Admit "
+                + "the inner eval once, with the floor you mean.",
+                nameof(eval));
+        }
+
         if (floor is null)
         {
             throw new ArgumentException(
