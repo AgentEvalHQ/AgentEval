@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`BenchmarkRunner`** — runs one `BenchmarkDefinition` against one `BenchmarkArm` into one run
+  directory, one row per (case, check). Every check is admitted through the door **before any case is
+  observed**, so a definition carrying a floorless check fails having spent nothing. It applies no
+  floor to any verdict, writes no `VOID`, and adds no manifest field; `EvalInput.Metadata` is data,
+  and an arm that puts an `IEvaluableAgent`, an `IChatClient` or a `Delegate` in it is refused before
+  any check runs.
+- **`EvalInput.Performance`** — the run's wall-clock, time-to-first-token and tokens now survive the
+  projection. A latency is a fact OF the run, not a verdict ABOUT it, and excluding it made a whole
+  family of deterministic checks inexpressible. `null` still means nobody measured.
+- **`PerformanceChecks`** — latency, token-budget and time-to-first-token as admitted
+  `AtomicCodeEval`s, each declining rather than scoring when the measurement is absent. Every floor
+  is `NotDerivable` with its reason: a threshold comparison has no draw model, so chance does not
+  produce a p99.
+- **`RedTeamProbeObservations`** — a red-team scan projected per PROBE into the meta lane, so it can
+  be censused and paired. An errored probe is `NotMeasured` and an inconclusive one is
+  `NotApplicable`; neither folds into "resisted". Its `ResistanceCeilingFloor` is **1.000**: an agent
+  that refuses every input resists every probe, so no resistance rate can be shown above chance.
+- **`EvalInputAgentBinding`** — one owner for the legacy `Metadata["agent"]` convention that four
+  benchmark families each hand-wrote. A containment, not an endorsement: new code binds its subject
+  in a `BenchmarkArm`.
+- **`FileSystemOutputStore.InitializeSolutionAsync`** — a workspace can now be created through the
+  library. The writer existed but was private with no callers, so every non-CLI consumer hand-rolled
+  `solution.json`.
+- **`AgentEvalCompositeEvaluator`** takes an optional declared root chance floor and reports
+  `FlooredLeafCount` / `LeafCount` read off the tree that ran. The floor is **recorded and never
+  applied**. A floorless MAF composite and a fully floored one previously rendered identically.
+- **`IAggregationStrategy.AggregateWeights`** — the weights-only path is on the interface. It was a
+  `public static` per strategy and unreachable polymorphically, which is why four throwing `IEval`
+  stubs existed.
 - **AE-04 — the join from an agent run to an `IEval`.** There was no path from a MAF agent run to a
   deterministic eval, and the count of evals reachable from the primary entry point was zero. Three
   pieces close it: `TestRunEvalProjection.ToEvalInput(TestCase, TestResult)` projects a run into an
@@ -95,6 +124,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`PerformanceMetrics.TotalTokens` could never be null**, though its type said it could. The body
+  was `(PromptTokens ?? 0) + (CompletionTokens ?? 0)`, so a provider that reported no usage read as a
+  run that used ZERO tokens. Two readers were relying on the promise the body broke:
+  `StochasticResult` filtered on `TotalTokens != null` — a filter that could never remove anything,
+  so unmeasured runs contributed fabricated zeros to `TotalTokenStats` — and `PerformanceAssertions`
+  compared `TotalTokens > max`, so an unmeasured run passed every token budget. Both are correct now
+  without a line changing in either. Partial usage is still usage; only both sides absent means
+  nobody measured.
+- **A skipped compliance result declared `Confidence: 1.0`** at four sites — certainty about a
+  verdict never reached, rendered in the HTML report, persisted as `_lifted.confidence` and served
+  over GraphQL. Now `null`, matching the performance family, which already had it right.
 - **The judge fingerprint refused an endpoint on one of its two strings and claimed both.** Both are
   now checked.
 - **`compare` rendered a non-zero delta as `0.0000`.** A genuine zero still renders as one.
