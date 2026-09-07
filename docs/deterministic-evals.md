@@ -147,14 +147,85 @@ The chance floor is **reported, never gated**. When matched scenarios recorded n
 
 ---
 
+## Bring your own runner
+
+You do not need a `TestResult`, a MAF harness, or an agent at all. A **benchmark arm** is a name and
+a way to produce one `EvalInput` for one case:
+
+```csharp
+var arm = BenchmarkArm.From("my-agent", async (testCase, ct) =>
+    new EvalInput(Query: testCase.Input, Response: await MyOwnAgent.AnswerAsync(testCase.Input, ct))
+    {
+        ToolCalls = MyCalls(),   // null, [], or the calls — see below
+    });
+```
+
+`BenchmarkArm.FromHarness(armId, harness, agent, options)` is the shortcut when you *do* have a
+`TestResult`; it is the same thing with `ToEvalInput` in the middle.
+
+### The one contract you have to get right
+
+`ToolCalls` is three-valued, and the third value is the one that gets lost:
+
+| you write | it means |
+|---|---|
+| `null` | **no recorder could see this run.** Every tool check declines rather than scoring a zero |
+| `[]` | a recorder ran and saw **no calls**. A measured zero |
+| `[...]` | the calls, in chronological order |
+
+Returning `[]` when you simply did not record anything turns a blindness into a measurement, and it
+does it in the flattering direction — a "no forbidden call" check passes on an empty list. If you
+are unsure which you have, `null` is the honest answer.
+
+To build the entries, use the projection's own converter rather than hand-rolling one, so your runner
+inherits the failure-marker rules instead of re-deriving them:
+
+```csharp
+ToolCall call = TestRunEvalProjection.ToToolCall(record);
+```
+
+A call that was **rejected at an approval gate** and a call that **threw** are both distinguishable
+from a call that returned nothing: `__tool_not_executed__:` outranks `__tool_error__:`, which
+outranks whatever payload the tool wrote.
+
+### What an arm may not do
+
+`EvalInput.Metadata` is **data**. `BenchmarkRunner` refuses an arm that puts an `IEvaluableAgent`,
+an `IChatClient` or a `Delegate` in it, and it refuses **before any check runs**:
+
+```
+Arm 'live' put a IEvaluableAgent in EvalInput.Metadata["agent"] on case 'c1', so the run was
+refused before any check ran. Metadata is DATA. …
+```
+
+This is not fussiness. It is the shape the four duck-typed benchmark families use — an agent passed
+through `Metadata["agent"]` and fished back out by string key — and it is a second, untyped way to
+run the subject that nothing type-checks. A **data** record in `Metadata` is fine and stays fine.
+
+### Controls are arms, not an interface
+
+A negative control is an arm you built to be wrong: a deliberately degraded observer, a shuffled
+gold, a replay of a fixture. Give it its own `ArmId`, run it against the same definition, and score
+it with `BenchmarkScore.AgainstReference(control, live)` — the case is the unit, and a case only one
+arm reached is excluded rather than counted as a tie. There is no `INegativeControl` and there is no
+`Controls` slot on a definition (ADR-030 Q5, answered: defer the API, take the arm).
+
+---
+
 ## What this does not do
 
-**The floor gates nothing.** Nothing in the library refuses a result for scoring below its chance
-floor, and nothing marks such a run void. Whether a floor should bind — a stop rule — is an open
-question in ADR-030 that only the project owner can answer, and inventing an answer would be worse
-than leaving it open.
+**The floor gates nothing — yet.** Nothing in the library refuses a result for scoring below its
+chance floor, and nothing marks such a run void. `BenchmarkRunner` applies no floor to any verdict.
 
-So today a floor makes a score *interpretable*. It does not make it *enforced*.
+ADR-030's Q6 — *should a floor bind?* — was **answered on 2026-09-07: yes on the principle,
+staged in execution.** A floor that gates nothing is decoration, and `rate > floor` is not a test.
+What is staged is the landing, for two measured reasons: the substitution the stop rule originally
+specified integerises a rounded rep-mean before testing it (a verdict flip on its own), and turning
+the binding test on moves this repository's headline gate from green to red on a paid run. That
+movement gets published with its date and its cause before it becomes the default.
+
+So today a floor still makes a score *interpretable* rather than *enforced* — and the reason is now
+a schedule, not an open question.
 
 ---
 
