@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -202,6 +202,16 @@ public sealed class FloorAdmittedEval : IEval
                 + ". The floor an eval is judged against may not be supplied by the eval — that is the "
                 + "gate-self-examination failure, and it fails in the flattering direction. Remove the "
                 + "self-reported floor, or admit the eval with the floor it actually wants.");
+        }
+
+        if (result.Details.SubResults is { Count: > 0 } subResults)
+        {
+            throw new InvalidOperationException(
+                $"Eval '{Key}' produced a COMPOSITE result ({subResults.Count} sub-result(s)), so the floor was "
+                + "refused. A composite has one Score over leaves that were never individually admitted, so one "
+                + "floor stamped on the root would certify every floorless leaf beneath it (ADR-030 §3.2 reason "
+                + "1). Admit each leaf with its own floor. This is a structural check because Admit lives in "
+                + "Abstractions and cannot name CompositeEval, which lives in Core.");
         }
 
         var dimensions = Floor.State is FloorState.Derived

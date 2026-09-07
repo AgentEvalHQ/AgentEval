@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -51,6 +51,42 @@ public class FloorAdmittedEvalTests
         EvaluatedAt: DateTimeOffset.Parse("2026-09-07T00:00:00Z"));
 
     private static readonly ChanceFloor Derived = ChanceFloor.UniformChoice(4);
+
+    // ── 0.2: the door refuses a double admission and a composite ──────────────────
+
+    [Fact]
+    public async Task Annotate_RefusesAResultCarryingSubResults()
+    {
+        // A composite has ONE Score over leaves that were never individually admitted, so a floor on
+        // the root would certify every floorless leaf beneath it.
+        var composite = PlainResult() with
+        {
+            Details = new(null, null, null, new[] { PlainResult("leaf") }, "CapByWorst"),
+        };
+        var admitted = FloorAdmittedEval.Admit(new StubEval(produce: _ => composite), Derived);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => admitted.EvaluateAsync(Input));
+
+        Assert.Contains("COMPOSITE", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Annotate_AcceptsAnEmptySubResultsList()
+    {
+        // Positive control: an EMPTY list is not a composite. Without this, the guard could be
+        // written as `SubResults is not null` and still pass its own test — a fixture that cannot
+        // reach the distinction it exists to draw.
+        var notComposite = PlainResult() with
+        {
+            Details = new(null, null, null, Array.Empty<EvalResult>(), null),
+        };
+        var admitted = FloorAdmittedEval.Admit(new StubEval(produce: _ => notComposite), Derived);
+
+        var result = await admitted.EvaluateAsync(Input);
+
+        Assert.NotNull(result.Details.Dimensions);
+    }
+
     private static readonly EvalInput Input = new("q");
 
     // ══════════════════════════════════════════════════════════════════════════
