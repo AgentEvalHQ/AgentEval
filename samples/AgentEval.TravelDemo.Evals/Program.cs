@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 //
 // ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -22,6 +22,14 @@ Console.OutputEncoding = Encoding.UTF8;
 //   dotnet run -- 1
 //   dotnet run -- 1 --log
 //   dotnet run -- 1 --model gpt-4o-mini --log ./logs/eval01.log
+// --selftest: the deterministic eval's invariants, offline. It must NOT construct Config, which
+// reads credentials (AgentEval.TravelDemo/Config.cs:70-71) — an interview demo that needs a key is a
+// demo that fails in the room, and this check is about the projection, not about a live model.
+if (args.Contains("--selftest", StringComparer.Ordinal))
+{
+    Environment.Exit(await BookFlightSelfTest.RunAsync());
+}
+
 var (evalArg, parsedArgs) = ParseArgs(args);
 IDisposable? logScope = null;
 if (parsedArgs.LogRequested) logScope = ConsoleLogRecorder.StartLogging(parsedArgs.LogPath);

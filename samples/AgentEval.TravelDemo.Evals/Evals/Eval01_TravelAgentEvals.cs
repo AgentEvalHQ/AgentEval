@@ -1,8 +1,9 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
 using AgentEval.Assertions;
 using AgentEval.Core;
+using AgentEval.Evals;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.TravelDemo.Agents;
@@ -157,11 +158,43 @@ public static class Eval01_TravelAgentEvals
 
             PrintPass("Response content assertions PASSED!");
 
-            // ── Count-based assertions (inline — help confirm hypothesis) ─────────
-            var bookFlightCount   = result.ToolUsage?.Calls.Count(c => c.Name == "BookFlight")          ?? 0;
-            var confirmCount      = result.ToolUsage?.Calls.Count(c => c.Name == "GetUserConfirmation") ?? 0;
+            // ── The deterministic eval, through the library's floor-gated door ────
+            //
+            // What this replaces: two reads of `result.ToolUsage?.Calls.Count(…) ?? 0`. That `?? 0`
+            // rendered "no recorder ran, so nobody knows" and "a recorder ran and saw nothing" as the
+            // same number — and picked the one that reads as a clean negative.
+            var evalInput = testCase.ToEvalInput(result);
 
-            if (bookFlightCount < 2)
+            var evalRunner = await new AgentEvalBuilder()
+                .AddEval(new BookFlightWasCalledEval(), BookFlightWasCalledEval.DeclaredFloor)
+                .BuildAsync(CancellationToken.None);
+
+            var evalResults = await evalRunner.EvaluateEvalsAsync(evalInput, CancellationToken.None);
+            var bookFlight = evalResults[0];
+
+            Console.WriteLine();
+            Console.WriteLine("  ── Deterministic eval (AgentEval door) ──────────────────────────────");
+            Console.WriteLine($"  {bookFlight.Metric.Name}: {bookFlight.Score.Label}  "
+                            + $"[census: {bookFlight.Score.CensusBucket()}]");
+            foreach (var e in bookFlight.Details.Evidence ?? [])
+            {
+                Console.WriteLine($"    · {e.Source}/{e.Reference}: {e.Message}");
+            }
+            Console.WriteLine();
+
+            // The tool counts now read off the PROJECTION, which distinguishes the two absences.
+            var toolCalls         = evalInput.ToolCalls;
+            var bookFlightCount   = toolCalls?.Count(c => c.Name == "BookFlight")          ?? -1;
+            var confirmCount      = toolCalls?.Count(c => c.Name == "GetUserConfirmation") ?? -1;
+
+            if (toolCalls is null)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("  ⚠ Tool-call counts are UNDECIDABLE on this run: no recorder saw the whole run.");
+                Console.ResetColor();
+            }
+
+            if (toolCalls is not null && bookFlightCount < 2)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(
@@ -175,7 +208,7 @@ public static class Eval01_TravelAgentEvals
                 PrintPass($"BookFlight called {bookFlightCount} time(s) — at least 2 legs booked ✓");
             }
 
-            if (confirmCount < 4)
+            if (toolCalls is not null && confirmCount < 4)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(

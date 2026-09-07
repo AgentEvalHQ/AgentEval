@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
@@ -79,6 +79,11 @@
          drift apart. Same pattern as ReliabilityRaceStatistics above. -->
     <Compile Include="../../samples/AgentEval.Samples/EvalJoin/01_EvalWithChanceFloor.cs"
              Link="Samples/01_EvalWithChanceFloor.cs" />
+
+    <!-- 2.1: the TravelDemo deterministic eval, compiled here so its tests bind the shipped
+         type rather than a copy. -->
+    <Compile Include="../../samples/AgentEval.TravelDemo.Evals/Evals/BookFlightWasCalledEval.cs"
+             Link="Samples/BookFlightWasCalledEval.cs" />
   </ItemGroup>
 
 </Project>
