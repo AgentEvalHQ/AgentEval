@@ -12493,3 +12493,258 @@ run bench perf latency --subject PerfC --root $W --prompt "$(printf 'x%.0s' $(se
 dotnet "$CLI" compare --baseline RUN_A --candidate RUN_C --json | grep -o '"delta":[^,}]*'
                                                     # -> 1.1693333333284706e-05, NOT 0   (d-5)
 ```
+
+## §73.0 Wave 10 reviewed — 11 of 11 ablations re-executed, **four defects**, three of them fixed here
+
+| sha | what |
+|---|---|
+| `51a6217f` | **DEFECT 1** — d-4 enforced only the flattering half of its own rule. An all-pass golden set stayed GREEN |
+| `6c8d15a0` | **DEFECT 2** — d-5's new legend printed *"0 delta(s)"* directly above a mean rendered in scientific notation |
+| `f6024bd9` | **DEFECT 3** — d-5's third rendering (`n/a`) has **no live subject**; the report can never reach it |
+
+**DEFECT 4** is a census, not a code change: §72's proposed **(d-6)** does not reproduce as published
+(§73.6). Nothing was pushed. HEAD `f6024bd9`, tree clean.
+
+## §73.1 EVERY published ablation RE-EXECUTED. 11 of 11 reproduce, and the d-4 prediction held
+
+**Never re-read — re-run, each restored from a COPY and re-diffed to identical (`git status` 0).**
+
+| # | ablation | published | observed here |
+|---|---|---|---|
+| A1 | delete `golden-protected-material.jsonl` | RED naming `protected_material` | **2 RED**: *"1 dispatched evaluator key(s) have NO golden entry … : protected_material"* and the band row (`Expected: 15 / Actual: 10`) |
+| A2 | flip all five `prompt_leak` path predictions | RED reporting each observed path | **1 RED**, verbatim: `001` judge · `002` deterministic · `003` deterministic · `004` judge · `005` judge |
+| A3 | benign query on `cal-esc-002`, verdict kept `fail` | RED on fast-pass | **1 RED**: *"1 escalation_resistance golden(s) match NO jailbreak pattern and are fast-passed at 1.0 … : cal-esc-002"* |
+| A4 | widen `cal-pm-004` 0.90 → 0.80 | RED | **1 RED**: *"pass band starts at 0.8 but the evaluator passes at 0.9"* |
+| A5 | VACUITY — empty corpus | 6 of 7 RED, `NoCarvedOutKey_IsAlsoDispatched` green | **6 RED / 1 GREEN**, the same one green |
+| d-5 a | pre-fix binary on a sub-precision pair | `0.0000` | **`0.0000`** for a true delta of `1.0466666666486546e-05` |
+| d-5 b | pre-fix binary, negative sub-precision pair | *(not published)* | **`-0.0000`** for `-1.9393333333450613e-05` — the negative zero the commit describes, live |
+| d-5 c | post-fix, same pairs | `4.36e-05` + legend | **`1.05e-05`** and **`-1.94e-05`**, both with the legend |
+| d-5 d | above `F4` | `0.0001`, no legend | **`0.0001`**, no legend (PerfB vs PerfD, `5.18e-05`) |
+| d-5 e | a true zero | `0.0000`, no legend | **`0.0000`**, no legend (PerfA vs PerfA) |
+| d-5 f | `--json` carries the number | yes | **`1.0466666666486546e-05`** |
+
+**A2 is the evidence the d-4 prediction held**, and the prediction is carried in the commit itself —
+`PromptLeakPredictedPath`, with a one-line derivation per record — not only in the message. Its
+scratch source survives at `…\scratchpad\w10\PREDICTIONS.md` and matches the shipped bands exactly.
+⚠️ **What is NOT provable from any artifact is the ORDERING** — that the file was written before the
+first execution. The commit carries a pre-execution prediction and that prediction is falsifiable
+(A2 falsifies it on demand); *"it was written first"* rests on the author's word.
+
+**Column arithmetic checked rather than taken.** Header `74`, post-fix rule `74`, post-fix row
+`2+40+2+8+2+9+2+9 = 74`; pre-fix row `73`, pre-fix rule `71`. The header WAS one to the right of the
+numbers and the rule WAS three short, exactly as `dac7a137` says.
+
+## §73.2 Consumption proven BY EXECUTION — the drop test §72 never ran
+
+A census that says a golden file exists does not say the calibration reads it. `bench agentic
+calibrate` run in-process with a stub judge, every credential variable unset in the command:
+
+| | with all goldens | after deleting ONE file |
+|---|---|---|
+| `adversarial` entries | **22** (`prompt_leak` 5 + `escalation_resistance` 5 + 12 pre-existing) | 22 |
+| `safety` entries | **223** (`protected_material` 5 + 218 pre-existing) | **218** |
+
+`DeriveCategory` routes `prompt_leak` / `escalation_resistance` → `adversarial` and
+`protected_material` → `safety`, **both gated categories** — neither is the skipped `unknown`
+bucket. The three keys are consumed and graded, not merely present on disk.
+
+## §73.3 🔴 DEFECT 1 — d-4 enforced the flattering half of its OWN rule, and an all-pass set stayed GREEN
+
+`53da7df5`'s message states the rule: *"A golden set with no fail-direction record cannot detect an
+always-pass evaluator."* It then enforced it for `escalation_resistance` **alone**, and enforced the
+band-vs-threshold rule for **`pass` records alone**. Both gaps were re-executed, not argued:
+
+| ablation | result |
+|---|---|
+| rewrite `protected_material`'s three `fail` records as `pass` with band [0.90, 1.00] | **ALL SEVEN Wave-10 tests GREEN** on five all-pass records |
+| raise `cal-pm-002`'s `fail` band 0.20 → 0.95, above the evaluator's 0.90 bar | **ALL SEVEN GREEN.** A judge score of 0.93 is then "within the authored range" (credited) *and* labelled `pass` against an entry that says `fail` |
+
+Both leave the corpus **looking calibrated while it has lost the ability to fail** — the flattering
+direction. `51a6217f` adds the fail-band mirror (same scope, same *"a missing threshold is not a
+satisfied one"* rule, plus a vacuity guard) and a **corpus-wide** both-directions test over all 40
+dispatched keys, written as a **ratchet**: set equality against `s_knownOneDirectionKeys`, so a key
+that gains its missing direction turns it red until the entry is deleted.
+
+Ablations on the fix: **B1** all-pass → RED *"Recorded: [reasoning_correctness]. Measured:
+[protected_material, reasoning_correctness]"*; **B2** → RED *"fail band reaches 0.95 but the
+evaluator PASSES at 0.9"*; **B3** empty the recorded list (the flattering edit) → RED; **B4** every
+fail record in all three files rewritten as a pass → **4 RED**, including *"no fail-direction record
+was checked — the loop asserted nothing"*.
+
+## §73.4 🔴 DEFECT 2 — the d-5 legend printed **"0 delta(s)"** above a delta in scientific notation
+
+The legend fires when a **scenario row OR the mean** is sub-precision, and then counted only the
+rows. Reproduced on run directories the shipped store wrote, two scenarios differing by `+1.0e-04`
+and `-9.0e-05`:
+
+```
+  s1                                          0.5000     0.5001     0.0001
+  s2                                          0.5000     0.4999    -0.0001
+
+  ⚠ 0 delta(s) are NON-ZERO but smaller than four decimal places, and are
+    shown in scientific notation. …
+
+  mean score delta: 5.00e-06  ·  recovered 0  ·  regressed 0
+```
+
+**"0 of them", one line above the only number the legend exists to explain.** Direction: it tells the
+reader there is nothing here, beside a value that is in scientific notation *because there is* — the
+same "no difference" reading d-5 was opened to remove, re-created by the fix for it. `6c8d15a0`
+makes the legend name its subject (*"The mean below is"* / *"1 delta above is"* / *"N deltas above,
+and the mean below, are"*), so it can no longer print a count that excludes what triggered it.
+Ablations: restore the count-only wording → **2 RED**, the message reading `⚠ 0 delta(s) are
+NON-ZERO…`; over-correct by always claiming the mean → **2 RED**, including the control that a clean
+report has NO legend.
+
+## §73.5 🔴 DEFECT 3 — d-5's third rendering has **NO LIVE SUBJECT**
+
+`dac7a137` files d-5 as *"three states, three renderings"* of the report, and its handoff says the
+absence rendering *"changed `NaN` → `n/a`"* there. **It never could:**
+
+```
+MeanScoreDelta is NaN    <=>  Scenarios.Count == 0        (RunComparison)
+Verdict is Incomparable   <==  Scenarios.Count == 0        (first clause of Verdict)
+Render returns at the Incomparable branch BEFORE the table, the legend and the mean line
+```
+
+Executed: two runs sharing no scenario id give `matched : 0`, `❌ INCOMPARABLE`, **exit 13**, and no
+`mean score delta` line anywhere in the output. `FormatDelta(NaN)` is a **defensive branch**, correct
+and worth keeping, but it belongs on §69.11's *wired-path-with-no-live-subject* list — **not** among
+the confusions d-5 removed from the report. Direction: the claim **overstates** the fix; two of the
+three states were reader-visible. `f6024bd9` pins the COUPLING (an ablation deleting the
+`Scenarios.Count == 0` clause turns it red: *"Expected: Incomparable / Actual: Comparable"*) and
+writes the correction where the claim was made.
+
+## §73.6 🔴 DEFECT 4 — §72's proposed **(d-6)** does not reproduce as published, and 25 records are UNDECIDABLE
+
+Re-derived over the whole agentic corpus, dispatched keys only, thresholds read off the evaluators:
+
+| | published by Wave 10 | measured here |
+|---|---|---|
+| `pass` records | 200 | **208** (192 with a declared threshold) |
+| … straddling | **86** | **86** ✅ |
+| … impossible | 0 | **0** ✅ |
+| … self-consistent | 114 | **106** |
+| … **undecidable — the evaluator declares NO threshold** | *not reported* | **16** |
+| `fail` records | 113, *"all self-consistent"* | **123** |
+| … straddling | 0 | **0** ✅ |
+| … self-consistent | 113 | **114** |
+| … **undecidable** | *not reported* | **9** |
+
+Per-key straddle reproduces exactly: `hate_unfairness` 15 · `self_harm` 14 · `sexual` 12 ·
+`system_prompt_leakage` 12 · `indirect_attack` 11 · `violence` 8 · `sensitive_data_leakage` 7 ·
+`direct_injection` 3 · `persona_attack` 3 · `code_vulnerability` 1 — **86**.
+
+🔴 **The 25 undecidables are the finding.** `unsafe_tool_use` (20), `reasoning_correctness` (4) and
+`goal_decomposition_quality` (1) declare no pass threshold on their result, so their records can be
+shown neither consistent nor straddling. Wave 10 counted them as self-consistent and wrote *"all 113
+fail records are self-consistent"*. **An undecidable is not a pass** — and Wave 10's own new test
+says exactly that in a comment (*"A missing threshold is not a satisfied one"*) two files away from
+the census that broke the rule. **(d-6) stays a member of (d)** with the corrected numbers; **0 of
+the 15 records Wave 10 authored straddle in either direction.**
+
+**Also confirmed, unchanged:** 371 agentic golden entries, 363 distinct `scenarioId`s, **8
+collisions** (`cal-ta-001..004`, `cal-ua-001..004`), and **none of Wave 10's 15 collides**.
+
+## §73.7 🆕 (d-7) — `reasoning_correctness` ships a golden set that CANNOT FAIL
+
+Corpus-wide, **39 of 40** dispatched keys carry both verdict directions. `reasoning_correctness`
+carries **4 `pass` records and 0 `fail` records**, so nothing in its golden set can tell that
+evaluator apart from one that always passes. It pre-dates Wave 10 and is **not** fixed here —
+authoring reasoning goldens is corpus work with its own review — but it is now recorded in
+`s_knownOneDirectionKeys`, and a second one cannot appear silently. **No decision, no purchase,
+nothing in front of it ⇒ category (d).**
+
+## §73.8 Everything else re-derived at `f6024bd9`, from a clean tree
+
+* `dotnet build AgentEval.sln --no-incremental` → **0 errors**. Warning identity set **70** by all
+  three arbiters of §72.1's recipe, and `diff` against the set measured at `dac7a137` is **EMPTY** —
+  none of the three commits adds a warning identity. ⚠️ The warning TOTAL read **243** at `dac7a137`
+  and **252** here, on trees differing by three warning-free commits: **the total remains
+  unquotable**; the set is the durable form.
+* **Three TFMs, after a full solution build:** net10.0 **9,948/0/2** of 9,950 · net9.0 **9,730/0/1**
+  of 9,731 · net8.0 **9,730/0/1** of 9,731 — **+6 on every TFM**, exactly the six new tests, and not
+  one existing test's result moved.
+* ⚠️ **A correction to Wave 10's own arithmetic.** Its close-out reads *"+7 per TFM over §72.2's
+  9,928"*. It is **+14** — 7 per COMMIT, two commits. Measured at `dac7a137`: **9,942/9,724/9,724**,
+  which is 9,928 + 14. The per-commit figures inside `53da7df5` and `dac7a137` are right; the
+  summary over both is not.
+* `git diff --numstat main..HEAD -- tests/` → **41** paths, **not one with a non-zero deletion
+  column**. Ninth consecutive taking. `git log --oneline main..HEAD -- strategy/` → **empty**,
+  eighth.
+* **`compare` driven on runs produced this session:** exit **0** on four comparable pairs and exit
+  **13** on a pair sharing no scenario id.
+
+## §73.9 Money and credentials — **zero spend**, proven by summing
+
+* **Five `bench perf latency` runs produced in an isolated workspace**, `EchoAgent` stub, every
+  credential variable unset **in the command**: 5 scenario files, **summed `estimatedCost` = 0.0**.
+  The `bench agentic calibrate` run used `AGENTEVAL_ALLOW_STUB_JUDGE=1` and writes no scenario file.
+  **No chat model was called by anything in this wave.**
+* **Live-credential scan, needles length-checked non-empty first (84 / 35 / 132 characters), no match
+  ever echoed:** the whole `main..HEAD` diff (7,027,632 bytes) → **0**, the three changed files →
+  **0**, the scratchpad → **0**.
+* **Synthetic positive control**, outside the repo, **deleted in the same command**: 6 pattern hits
+  plus the `grep -F` mechanism, and a re-scan of the planted path → **0**.
+* **Repo-wide shape census, reported by COUNT and DATE only:** **5** tracked files contain a string
+  matching a credential shape — 1 `sk-`, 4 `AKIA`, 1 `ghp_` — last committed **2026-06-24**,
+  **2026-07-25**, **2026-07-26** (×2) and **2026-09-06**. **None is in this wave's diff** and **none
+  equals any credential in this environment.** ⚠️ Whether they are placeholders was **not inspected
+  beyond that equality check**. Wave 10's *"one `sk-`-pattern hit"* is right for `sk-` alone; the
+  other four shapes were outside its scan.
+
+## §73.10 What this review does NOT claim
+
+* **It does not claim the 15 Wave-10 golden records are RIGHT.** Two of fifteen (the deterministic
+  `prompt_leak` failures) have their verdict and band checked model-free; the other thirteen have
+  only their PATH checked. Agreement needs a paid calibration run. `53da7df5` said this, and it is
+  restated because a reader citing that commit as *calibration* evidence would be citing corpus and
+  reachability evidence instead.
+* **It does not claim the corpus-wide straddle is harmless.** 86 shipped `pass` records still have a
+  band that can disagree with their own verdict, and this review neither fixed nor gated them.
+* **It does not claim `reasoning_correctness` is the only weak golden set.** One-direction coverage
+  is the only weakness measured; set SIZE, balance and difficulty were not.
+* **It does not claim `--azure-from-env` is safe.** `dac7a137`'s note stands: on `bench perf` it does
+  not gate the judge, and neither `bench perf` nor `bench agentic calibrate` has a dry-run, so
+  RUN_PROTOCOL stage 1 is not executable on either. The only protection used here was scrubbing the
+  environment in the command.
+* **It does not re-verify §72.3–§72.7** (exit codes, the control panel, the snapshot key set). Those
+  were re-derived at `87b2d550`, and nothing in the Wave-10 or Wave-11 commits touches their surface
+  — but that is an inference from the diff, **not** a re-run.
+
+## §73.11 How to re-derive §73 — every command, spending nothing
+
+```bash
+# Ablations: COPY first, restore FROM THE COPY, never `git checkout --`.
+cp tests/AgentEval.Tests/Agentic/Calibration/Golden/*.jsonl                 $W/copies/
+cp tests/AgentEval.Tests/Agentic/Calibration/AgenticGoldenCoverageTests.cs  $W/copies/
+
+T () { env -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_DEPLOYMENT \
+           -u AZURE_OPENAI_JUDGE_API_KEY -u AZURE_OPENAI_JUDGE_ENDPOINT \
+           -u AZURE_OPENAI_JUDGE_DEPLOYMENT -u OPENAI_API_KEY \
+       dotnet test tests/AgentEval.Tests/AgentEval.Tests.csproj -f net10.0 \
+           --filter "$1" -l "console;verbosity=detailed"; }
+# WARNING `dotnet test --no-build` runs a STALE binary after a failed build. Check first, every time:
+#   grep -c ": error" run.log   ->  must be 0   (and note `grep -c` EXITS 1 on zero matches)
+
+# 73.3 - the two gaps, each restored from a copy afterwards
+#   rewrite golden-protected-material's three `fail` records as `pass` [0.90,1.00] -> pre-fix 7 GREEN
+#   raise cal-pm-002's fail band 0.20 -> 0.95                                      -> pre-fix 7 GREEN
+T "FullyQualifiedName~AgenticGoldenCoverageTests"
+
+# 73.4 - two scenarios, +1.0e-04 and -9.0e-05: neither ROW is sub-precision, the MEAN is
+T "FullyQualifiedName~TheLegend_CountsTheMean"
+
+# 73.5 - the coupling that makes `n/a` unreachable
+T "FullyQualifiedName~TheAbsentMeanRendering"
+
+# 73.2 - consumption, by execution. Delete ONE golden and watch `safety` fall 223 -> 218.
+#   Drive BenchAgenticCalibrateCommand.RunAsync(null, outPath, stubJudge) from the TEST HOST,
+#   because CalibrationGoldenAssembly.TryLocate() needs AgentEval.Tests already loaded.
+
+# 73.9 - money. SUM it, never assume it.
+#   python: sum(estimatedCost) over $W/.agenteval/subjects/**/scenarios/*.json   -> 5 files, 0.0
+
+# 73.8 - the warning identity set (72.1's recipe, unchanged) and the three TFMs
+grep -oE '[^ ]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+' build.log | tr '\\' '/' | sort -u | wc -l
+```
