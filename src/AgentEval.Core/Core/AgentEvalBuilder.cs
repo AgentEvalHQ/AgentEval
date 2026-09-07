@@ -135,11 +135,12 @@ public sealed class AgentEvalBuilder
     /// <para>
     /// <b>There is deliberately no floorless overload.</b> The programme's loudest rule — "AE-04
     /// before AE-06" — forbids wiring evals into the agent-evaluation entry point <i>while none of
-    /// them has a chance floor</i>; its condition is measured true on this tree (74 files in
-    /// <c>src/</c> declare an <see cref="IEval"/>, <c>ChanceFloor</c> appears in 4, intersection
-    /// zero). This door does not waive that rule and does not bulk-wire those 74: it makes the
-    /// prohibited state unreachable, one explicit registration at a time. An eval nobody passes
-    /// through here is exactly as unwired as it was before.
+    /// them has a chance floor</i>. This door does not waive that rule and does not bulk-wire the
+    /// library's existing <see cref="IEval"/> implementations: it makes the prohibited state
+    /// unreachable, one explicit registration at a time. An eval nobody passes through here is
+    /// exactly as unwired as it was before. The measurement behind that claim, and the commands that
+    /// re-derive it, live on <see cref="FloorAdmittedEval"/> — stated once, because the same two
+    /// counts written out twice is how they went stale in the first place.
     /// </para>
     /// <para>
     /// <b>A duplicate key is refused.</b> Two results carrying the same <see cref="IEval.Key"/> and

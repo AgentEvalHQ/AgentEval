@@ -333,6 +333,67 @@ public class FloorAdmittedEvalTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    public void AcrossEveryAgentEvalAssembly_TheOnlyIEvalCarryingAChanceFloorIsTheDoor()
+    {
+        // The prose version of this claim shipped with three WRONG numbers (74 IEval files, 4
+        // ChanceFloor files, "intersection zero") because a count in a doc comment goes stale with
+        // nobody watching. This is the same claim as an assertion, so it cannot.
+        var assemblies = LoadedAgentEvalAssemblies();
+
+        var evals = assemblies
+            .SelectMany(SafeTypes)
+            .Where(t => t is { IsAbstract: false, IsInterface: false } && typeof(IEval).IsAssignableFrom(t))
+            .ToList();
+
+        var carryAFloor = evals
+            .Where(t => t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                            .Any(pr => pr.PropertyType == typeof(ChanceFloor))
+                     || t.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                            .Any(f => f.FieldType == typeof(ChanceFloor)))
+            .ToList();
+
+        // ⚠ Positive control FIRST. "Exactly one carries a floor" is also true of a scan that found
+        // one type, or none — the shape that has shipped six times in this repository.
+        Assert.True(evals.Count > 50, $"the scan found only {evals.Count} IEval implementations, so it measured nothing");
+
+        Assert.Equal(new[] { typeof(FloorAdmittedEval) }, carryAFloor);
+    }
+
+    private static List<System.Reflection.Assembly> LoadedAgentEvalAssemblies()
+    {
+        var seen = new Dictionary<string, System.Reflection.Assembly>(StringComparer.Ordinal);
+        var queue = new Queue<System.Reflection.Assembly>();
+        queue.Enqueue(typeof(FloorAdmittedEvalTests).Assembly);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var reference in current.GetReferencedAssemblies())
+            {
+                if (reference.Name is null
+                    || !reference.Name.StartsWith("AgentEval", StringComparison.Ordinal)
+                    || reference.Name.EndsWith(".Tests", StringComparison.Ordinal)
+                    || seen.ContainsKey(reference.Name))
+                {
+                    continue;
+                }
+
+                var loaded = System.Reflection.Assembly.Load(reference);
+                seen[reference.Name] = loaded;
+                queue.Enqueue(loaded);
+            }
+        }
+
+        return seen.Values.ToList();
+    }
+
+    private static IEnumerable<Type> SafeTypes(System.Reflection.Assembly assembly)
+    {
+        try { return assembly.GetTypes(); }
+        catch (System.Reflection.ReflectionTypeLoadException ex) { return ex.Types.Where(t => t is not null)!; }
+    }
+
+    [Fact]
     public void ThisTypeDoesNotLiveInTheMetaNamespace()
     {
         // ADR-030 §3.2: meta-evaluation never implements IEval, enforced by namespace in

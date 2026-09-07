@@ -17,12 +17,22 @@ using AgentEval.Output;
 /// <b>The rule this exists to keep, not to waive.</b> The programme's loudest prohibition is
 /// <i>"AE-04 before AE-06"</i>: wiring <see cref="IEval"/> implementations into the primary
 /// agent-evaluation entry point <b>while none of them has a chance floor</b> takes a contained
-/// problem and makes it the product's front door. Its condition is measured true on this tree —
-/// <c>src/</c> holds 74 files declaring an <see cref="IEval"/>, <c>ChanceFloor</c> appears in 4, and
-/// the intersection is <b>zero</b>. This type does not bulk-wire those 74 and does not exempt them.
-/// It makes the prohibited state <b>unreachable</b>: the only door is
+/// problem and makes it the product's front door. This type does not bulk-wire those implementations
+/// and does not exempt them. It makes the prohibited state <b>unreachable</b>: the only door is
 /// <see cref="Admit(IEval, ChanceFloor)"/>, the door will not open without a floor, and an eval that
 /// never goes through it is exactly as unwired as it was before.
+/// </para>
+/// <para>
+/// <b>The measurement, with its derivation, because a count without one goes stale unnoticed.</b>
+/// Counting files under <c>src/</c> whose type declarations name <see cref="IEval"/> as a base
+/// (<c>grep -rlE "^\s*(public|internal|private|protected|sealed|abstract|partial|static)[^=]*\b(class|record|struct)\b[^=]*[:,]\s*IEval\b" --include=*.cs src/</c>)
+/// against files mentioning <c>ChanceFloor</c> (<c>grep -rl "\bChanceFloor\b" --include=*.cs src/</c>):
+/// <b>79</b> and <b>7</b>, and the intersection is <b>exactly one — this file</b>. Before this type
+/// existed the intersection was <b>zero</b>: not one eval in the library carried a floor. That "one"
+/// is the door itself and not an eval that has been floored, so the count of ADMITTED evals is still
+/// zero until a caller admits one, which is the whole point. The absolute figures move with the
+/// library; the derivation is what makes them checkable, and the intersection is the fact that
+/// matters.
 /// </para>
 /// <para>
 /// <b>Where the floor lands, and why not on the score.</b> ADR-030 §3.2 CUT <c>EvalScore.ChanceFloor</c>
