@@ -109,6 +109,30 @@ public static class TestRunEvalProjection
     /// </summary>
     public const string UnconvertibleResultPrefix = "__tool_result_unconvertible__:";
 
+    /// <summary>
+    /// Prefix marking a call the run records as NOT KNOWN TO HAVE EXECUTED — rejected at the
+    /// approval gate, or gated with no paired result observed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 Without it, a call that never ran is byte-identical to a void-returning call that
+    /// succeeded: both are <c>ToolCall(name, args, null)</c>, and the two records compare EQUAL.
+    /// <see cref="ToolCallRecord.WasExecuted"/> exists to keep them apart and says so — "a void- or
+    /// null-returning tool still executes, so absence of a result value does NOT mean
+    /// non-execution".
+    /// </para>
+    /// <para>
+    /// ⚠ Read from <see cref="ToolCallRecord.ApprovalState"/> and <b>never from
+    /// <see cref="ToolCallRecord.WasExecuted"/> alone.</b> That flag defaults to <c>false</c> and is
+    /// set only by an extractor that matched a paired result, so on a hand-built or non-approval
+    /// record <c>false</c> means UNKNOWN, not "did not execute" — keying off it would mark almost
+    /// every existing producer's calls as unexecuted. <see cref="ToolCallRecord.ApprovalState"/> is
+    /// <see langword="null"/> unless approval-aware extraction ran, so a value there is a positive
+    /// declaration and <see cref="ToolCallRecord.WasExecuted"/> can be trusted beside it.
+    /// </para>
+    /// </remarks>
+    public const string ToolNotExecutedResultPrefix = "__tool_not_executed__:";
+
     // A JSON null, detached from its document by Clone() so it outlives the parse. Used for an
     // argument whose recorded value is null: "the argument was absent" and "the argument was passed
     // as null" are different facts, and IReadOnlyDictionary<string, object> promises a non-null value
@@ -200,7 +224,9 @@ public static class TestRunEvalProjection
     /// <para>
     /// <see cref="TestResult.ToolUsage"/> wins over <see cref="TestResult.Timeline"/> because it
     /// carries structured arguments and the raw result object; the timeline carries pre-stringified
-    /// approximations of both.
+    /// approximations of both — and only the record path can say whether a call actually EXECUTED
+    /// (see <see cref="ToolNotExecutedResultPrefix"/>); <see cref="ToolInvocation"/> has no such
+    /// field, so a timeline invocation is taken at face value.
     /// </para>
     /// </remarks>
     private static IReadOnlyList<ToolCall>? ProjectToolCalls(TestResult result)
@@ -230,7 +256,55 @@ public static class TestRunEvalProjection
     }
 
     private static ToolCall FromRecord(ToolCallRecord record) =>
-        new(record.Name, ArgumentsOf(record.Arguments), ResultOf(record.Result, record.Exception));
+        new(record.Name, ArgumentsOf(record.Arguments), ResultOfRecord(record));
+
+    /// <summary>
+    /// Renders one record's result, leading with the fact that it is not known to have executed when
+    /// the run says so.
+    /// </summary>
+    /// <param name="record">The recorded call.</param>
+    /// <returns>The text, or <see langword="null"/> only for a call that ran, returned nothing and did not fail.</returns>
+    private static string? ResultOfRecord(ToolCallRecord record)
+    {
+        string? rendered = ResultOf(record.Result, record.Exception);
+        string? notExecuted = NotExecutedReason(record);
+
+        // Non-execution outranks both, because it is the stronger fact: whatever is below was
+        // recorded ABOUT a call that may never have run.
+        return notExecuted is null
+            ? rendered
+            : string.IsNullOrEmpty(rendered)
+                ? string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted}")
+                : string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted} | {rendered}");
+    }
+
+    /// <summary>
+    /// Why this call is not known to have executed, or <see langword="null"/> when the run does not
+    /// say it failed to.
+    /// </summary>
+    /// <param name="record">The recorded call.</param>
+    /// <returns>The reason, or <see langword="null"/>.</returns>
+    /// <remarks>
+    /// Every arm requires a non-null <see cref="ToolCallRecord.ApprovalState"/>, so a producer that
+    /// does not use approval-aware extraction is untouched — see
+    /// <see cref="ToolNotExecutedResultPrefix"/> for why <see cref="ToolCallRecord.WasExecuted"/>
+    /// alone is not a usable signal.
+    /// </remarks>
+    private static string? NotExecutedReason(ToolCallRecord record) => record.ApprovalState switch
+    {
+        // "It never executed; a 'failed' result generated for the rejection does not count as one."
+        ToolCallRecord.ApprovalRejected =>
+            "the call was rejected at the approval gate and never executed",
+
+        ToolCallRecord.ApprovalRequested when !record.WasExecuted =>
+            "the call is awaiting human approval; no decision and no paired result were observed",
+
+        // "It executed only if a paired result was also observed."
+        ToolCallRecord.ApprovalApproved when !record.WasExecuted =>
+            "the call was approved but no paired result was observed, so it is not known to have executed",
+
+        _ => null,
+    };
 
     private static ToolCall FromInvocation(ToolInvocation invocation) =>
         new(

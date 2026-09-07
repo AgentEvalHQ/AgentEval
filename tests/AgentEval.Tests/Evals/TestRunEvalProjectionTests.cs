@@ -560,6 +560,113 @@ public class TestRunEvalProjectionTests
         Assert.Contains("boom", projected);
     }
 
+    // ── A call that never ran must not look like one that ran and returned nothing ──
+
+    [Fact]
+    public void ARejectedCall_IsNotByteIdenticalToAVoidReturningSuccess()
+    {
+        // The defect, measured: both projected to ToolCall("delete_account", {}, null) and the two
+        // records compared EQUAL. ToolCallRecord.WasExecuted exists to keep them apart — "a void- or
+        // null-returning tool still executes, so absence of a result value does NOT mean
+        // non-execution" — and the projection read neither it nor ApprovalState.
+        var rejected = new ToolUsageReport();
+        rejected.AddCall(new ToolCallRecord
+        {
+            Name = "delete_account",
+            CallId = "c1",
+            Order = 1,
+            ApprovalState = ToolCallRecord.ApprovalRejected,
+            WasExecuted = false,
+        });
+        var executed = new ToolUsageReport();
+        executed.AddCall(new ToolCallRecord { Name = "delete_account", CallId = "c1", Order = 1, WasExecuted = true });
+
+        var a = FullyPopulatedCase().ToEvalInput(new TestResult { TestName = "n", ToolUsage = rejected }).ToolCalls![0];
+        var b = FullyPopulatedCase().ToEvalInput(new TestResult { TestName = "n", ToolUsage = executed }).ToolCalls![0];
+
+        Assert.NotEqual(a, b);
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, a.Result);
+        Assert.Contains("rejected", a.Result!, StringComparison.Ordinal);
+        Assert.Null(b.Result); // a void-returning tool really did return nothing
+    }
+
+    [Theory]
+    [InlineData(ToolCallRecord.ApprovalRequested)]
+    [InlineData(ToolCallRecord.ApprovalApproved)]
+    public void AGatedCallWithNoPairedResult_IsNotKnownToHaveExecuted(string state)
+    {
+        // "Approved" is not "executed": the record's own docs say it executed only if a paired
+        // result was also observed.
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        { Name = "issue_refund", CallId = "c1", Order = 1, ApprovalState = state, WasExecuted = false });
+
+        string? projected = FullyPopulatedCase()
+            .ToEvalInput(new TestResult { TestName = "n", ToolUsage = usage }).ToolCalls![0].Result;
+
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, projected);
+    }
+
+    [Fact]
+    public void TheOtherDirection_AnApprovedCallThatDidExecute_IsCarriedBare()
+    {
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        {
+            Name = "issue_refund",
+            CallId = "c1",
+            Order = 1,
+            ApprovalState = ToolCallRecord.ApprovalApproved,
+            WasExecuted = true,
+            Result = "refunded",
+        });
+
+        string? projected = FullyPopulatedCase()
+            .ToEvalInput(new TestResult { TestName = "n", ToolUsage = usage }).ToolCalls![0].Result;
+
+        Assert.Equal("refunded", projected);
+    }
+
+    [Fact]
+    public void TheOtherDirection_WasExecutedFalseAloneChangesNothing_BecauseItMeansUnknown()
+    {
+        // ⚠ The guard is keyed on ApprovalState, never on WasExecuted alone. That flag defaults to
+        // false and is set only by an extractor that matched a paired result, so on the ordinary
+        // hand-built record false means UNKNOWN. Keying off it would have marked almost every
+        // existing producer's calls as unexecuted.
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        { Name = "lookup_order", CallId = "c1", Order = 1, WasExecuted = false, Result = "found" });
+
+        string? projected = FullyPopulatedCase()
+            .ToEvalInput(new TestResult { TestName = "n", ToolUsage = usage }).ToolCalls![0].Result;
+
+        Assert.Equal("found", projected);
+    }
+
+    [Fact]
+    public void ARejectedCallThatAlsoCarriesAFailureResult_ReportsBoth()
+    {
+        // A rejection often synthesises a "failed" result. Non-execution leads, because it is the
+        // stronger fact, and nothing recorded is discarded.
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        {
+            Name = "delete_account",
+            CallId = "c1",
+            Order = 1,
+            ApprovalState = ToolCallRecord.ApprovalRejected,
+            Exception = new InvalidOperationException("rejected by policy"),
+        });
+
+        string? projected = FullyPopulatedCase()
+            .ToEvalInput(new TestResult { TestName = "n", ToolUsage = usage }).ToolCalls![0].Result;
+
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, projected);
+        Assert.Contains(TestRunEvalProjection.ToolErrorResultPrefix, projected!, StringComparison.Ordinal);
+        Assert.Contains("rejected by policy", projected!, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AFailedCallThatAlsoRecordedAPayload_StillReportsTheFailure()
     {
