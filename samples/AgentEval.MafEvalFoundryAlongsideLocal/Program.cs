@@ -23,6 +23,7 @@ using AgentEval.Benchmarks;                 // AgenticBenchmark
 using AgentEval.Core;                        // ChatClientEvaluator
 using AgentEval.Core.Evals.Rendering;        // HtmlEvalResultRenderer, EvalResultRenderOptions
 using AgentEval.Evals;                        // EvalResult
+using AgentEval.Evals.Meta;                   // ChanceFloor — the 7.2 root declaration
 using AgentEval.Output;                       // SubjectIdentity, SubjectKind
 using AgentEval.MAF.Evaluators;               // .AsAgentEvaluator / .AsMeaiEvaluator / UnifiedEvalReport / CompositeAgentEvaluator
 
@@ -105,7 +106,17 @@ Console.WriteLine(
     $"('{ThreeDayItineraryEval.EvalKey}', weight {admittedLeaf.Weight:0.00}, floor: " +
     $"{ThreeDayItineraryEval.DeclaredFloor.Kind}), threshold {preset.Threshold:0.00}");
 
-var compositeEvaluator = localComposite.AsMeaiEvaluator();   // -> AgentEvalCompositeEvaluator (captures tree)
+var compositeEvaluator = localComposite.AsMeaiEvaluator(
+    // 7.2 (Q6): the ROOT floor, DECLARED. Not derivable, and the reason is the finding — see
+    //   AgentEvalCompositeEvaluator.DeclaredRootFloor. It is recorded beside the verdict and
+    //   applied to nothing; the evaluator also reports how many LEAVES carry a floor, read off
+    //   the tree that ran rather than off this declaration.
+    ChanceFloor.NotDerivable(
+        "this composite mixes LLM-judged dimensions with one deterministic leaf, and its root score is a "
+    + "WEIGHTED SUM of the two. There is no draw model for that: an arm that understood nothing "
+    + "would score whatever the judge happened to give it, which is not a quantity chance can be "
+    + "asked about. The DETERMINISTIC leaf carries its own derivable-or-declared floor; the root "
+    + "does not, and saying so is the point."));   // -> AgentEvalCompositeEvaluator (captures tree)
 
 IAgentEvaluator local = compositeEvaluator.AsAgentEvaluator(chatConfig);    // conversation-preserving
 

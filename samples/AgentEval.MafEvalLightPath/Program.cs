@@ -43,6 +43,7 @@ using AgentEval.Metrics.RAG;
 using AgentEval.Metrics.Safety;
 using AgentEval.Core.Evals.Rendering;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Output;
 
 using MeaiIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
@@ -197,7 +198,17 @@ internal static class Program
             $"('{ToolFindingsCitedEval.EvalKey}', weight {admittedLeaf.Weight:0.00}, floor: " +
             $"{ToolFindingsCitedEval.DeclaredFloor.Kind}), threshold {preset.Threshold:0.00}");
 
-        var compositeEvaluator = composite.AsMeaiEvaluator();   // AgentEval.MAF: IEval -> MEAI IEvaluator
+        var compositeEvaluator = composite.AsMeaiEvaluator(
+            // 7.2 (Q6): the ROOT floor, DECLARED. Not derivable, and the reason is the finding — see
+            //   AgentEvalCompositeEvaluator.DeclaredRootFloor. It is recorded beside the verdict and
+            //   applied to nothing; the evaluator also reports how many LEAVES carry a floor, read off
+            //   the tree that ran rather than off this declaration.
+            ChanceFloor.NotDerivable(
+                "this composite mixes LLM-judged dimensions with one deterministic leaf, and its root score is a "
+        + "WEIGHTED SUM of the two. There is no draw model for that: an arm that understood nothing "
+        + "would score whatever the judge happened to give it, which is not a quantity chance can be "
+        + "asked about. The DETERMINISTIC leaf carries its own derivable-or-declared floor; the root "
+        + "does not, and saying so is the point."));   // AgentEval.MAF: IEval -> MEAI IEvaluator
 
         // Same MAF-native path: wrap the composite as an IAgentEvaluator and run the native overload.
         var evaluator = compositeEvaluator.AsAgentEvaluator(chatConfig, "AgentEval-Composite");

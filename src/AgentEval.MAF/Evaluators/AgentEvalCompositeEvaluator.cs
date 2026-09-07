@@ -1,10 +1,13 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
+using AgentEval.Output;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
@@ -41,8 +44,77 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     private readonly List<EvalResult> _captured = [];
 
     /// <summary>Creates an MEAI evaluator that runs <paramref name="composite"/> per evaluated item.</summary>
-    public AgentEvalCompositeEvaluator(IEval composite) =>
+    /// <param name="composite">The eval to run per item.</param>
+    public AgentEvalCompositeEvaluator(IEval composite)
+        : this(composite, null) { }
+
+    /// <summary>
+    /// Creates an MEAI evaluator that runs <paramref name="composite"/> and DECLARES a root-level
+    /// chance floor beside its verdict.
+    /// </summary>
+    /// <param name="composite">The eval to run per item.</param>
+    /// <param name="declaredRootFloor">
+    /// What an arm that understood nothing would score on this composite as a whole, or
+    /// <see cref="ChanceFloor.NotDerivable(string)"/> with the reason no such number exists.
+    /// <see langword="null"/> means nobody declared one — a THIRD state, distinct from both.
+    /// </param>
+    /// <exception cref="ArgumentException">A floor was supplied with no derivation.</exception>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>RECORDED, NEVER APPLIED — and that is ADR-030 Q6's answer, not an oversight.</b> Q6 —
+    /// <i>does a chance floor bind a verdict?</i> — was answered <b>yes on the principle, staged in
+    /// execution</b>: the binding test lands in Slice 2.6 under its stated conditions, not at this
+    /// door. So this floor changes no score, flips no verdict and gates nothing. It makes the bar
+    /// VISIBLE beside a number that previously had none.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It is not stamped on the composite's root result.</b> <see cref="FloorAdmittedEval"/>
+    /// refuses a result carrying sub-results, because one floor on a root would certify every
+    /// floorless leaf beneath it. The declaration travels on the MEAI metric this evaluator returns,
+    /// and the per-leaf truth is reported separately by <see cref="FlooredLeafCount"/> /
+    /// <see cref="LeafCount"/> — read off the tree that actually ran, never from what a caller claimed.
+    /// </para>
+    /// </remarks>
+    public AgentEvalCompositeEvaluator(IEval composite, ChanceFloor? declaredRootFloor)
+    {
         _composite = composite ?? throw new ArgumentNullException(nameof(composite));
+
+        if (declaredRootFloor is not null && string.IsNullOrWhiteSpace(declaredRootFloor.Derivation))
+        {
+            throw new ArgumentException(
+                "A chance floor was declared for this composite with NO derivation, so it was refused — "
+                + "the same rule FloorAdmittedEval.Admit applies. A floor's number without its derivation "
+                + "is unusable, and a floor's ABSENCE without its reason is worse: 'nobody could derive "
+                + "one' and 'nobody tried' are different facts, and only the stated reason separates them.",
+                nameof(declaredRootFloor));
+        }
+
+        DeclaredRootFloor = declaredRootFloor;
+    }
+
+    /// <summary>The metric name carrying the floor declaration. Stable, so a renderer can find it.</summary>
+    public const string FloorDeclarationMetricName = "AgentEval chance-floor declaration";
+
+    /// <summary>
+    /// The root-level floor this door was constructed with, or <see langword="null"/> when nobody
+    /// declared one. Recorded beside every verdict; applied to none.
+    /// </summary>
+    public ChanceFloor? DeclaredRootFloor { get; }
+
+    /// <summary>Atomic leaves in the most recently captured tree.</summary>
+    public int LeafCount { get; private set; }
+
+    /// <summary>
+    /// How many of those leaves carry a floor of their own — i.e. went through
+    /// <see cref="FloorAdmittedEval"/>.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ <b>Read off the tree that ran, not off a declaration.</b> A composite whose leaves were
+    /// never admitted reports <c>0</c> here however confidently its root is described, and that
+    /// number is the honest answer to "is anything in this tree comparable to chance?". Before this
+    /// existed, a floorless MAF composite and a fully floored one rendered identically.
+    /// </remarks>
+    public int FlooredLeafCount { get; private set; }
 
     /// <summary>
     /// The <see cref="EvalResult"/> tree(s) produced — one per evaluated item, in call order.
@@ -77,13 +149,56 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
 
         // Flatten to MEAI metrics so MAF's AgentEvaluationResults gets a pass/fail rollup: the
         // composite root carries the overall verdict, and each atomic leaf is surfaced too.
+        var leaves = EnumerateAtomicLeaves(tree).ToList();
+        LeafCount = leaves.Count;
+        FlooredLeafCount = leaves.Count(CarriesItsOwnFloor);
+
         var result = new MEAIEvaluationResult();
         AddMetric(result, tree, isRoot: true);
-        foreach (var leaf in EnumerateAtomicLeaves(tree))
+        foreach (var leaf in leaves)
             if (!ReferenceEquals(leaf, tree))   // an atomic IEval is its own only "leaf" — don't add it twice
                 AddMetric(result, leaf, isRoot: false);
 
+        AddFloorDeclaration(result);
+
         return result;
+    }
+
+    /// <summary>True when this leaf's own result carries a chance-floor record.</summary>
+    /// <remarks>
+    /// Reads the ADR-030 §3.2 convention <see cref="FloorAdmittedEval"/> writes — the
+    /// <c>chance-floor</c> EVIDENCE entry, not the dimension. The dimension is absent for a
+    /// not-derivable floor by design (an absent floor is not a zero floor), so counting dimensions
+    /// would report an eval that was ASKED and could not answer as one nobody asked.
+    /// </remarks>
+    private static bool CarriesItsOwnFloor(EvalResult leaf) =>
+        leaf.Details.Evidence?.Any(e => string.Equals(
+            e.Source, ComparabilityFacts.ChanceFloorEvidenceSource, StringComparison.Ordinal)) == true;
+
+    /// <summary>Puts the floor situation on the result as text a reader cannot miss — never as a gate.</summary>
+    private void AddFloorDeclaration(MEAIEvaluationResult result)
+    {
+        var leafPart = LeafCount == 0
+            ? "no atomic leaf was produced"
+            : $"{FlooredLeafCount} of {LeafCount} leaf/leaves carry a floor of their own";
+
+        var rootPart = DeclaredRootFloor is null
+            ? "no root-level floor was declared for this composite (nobody asked — which is not the same "
+              + "as asked-and-not-derivable)"
+            : DeclaredRootFloor.State is FloorState.Derived
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"declared root floor {DeclaredRootFloor.ComparisonBar:0.0000} ({DeclaredRootFloor.Kind}): {DeclaredRootFloor.Derivation}")
+                : $"root floor NOT DERIVABLE ({DeclaredRootFloor.Kind}): {DeclaredRootFloor.Derivation}";
+
+        var reason = rootPart + ". " + leafPart + ". "
+            + "This floor is RECORDED and NOT APPLIED: it changes no score and gates nothing "
+            + "(ADR-030 Q6 — yes on the principle, staged in execution).";
+
+        result.Metrics[FloorDeclarationMetricName] =
+            new BooleanMetric(FloorDeclarationMetricName, LeafCount > 0 && FlooredLeafCount == LeafCount, reason)
+            {
+                Interpretation = new EvaluationMetricInterpretation(reason: reason),
+            };
     }
 
     private static void AddMetric(MEAIEvaluationResult result, EvalResult node, bool isRoot)
