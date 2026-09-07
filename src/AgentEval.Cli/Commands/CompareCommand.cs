@@ -178,16 +178,25 @@ public static class CompareCommand
         WriteBlindSpots(comparison);
 
         Console.WriteLine("  scenario                                   baseline  candidate     delta");
-        Console.WriteLine("  ---------------------------------------------------------------------");
+        Console.WriteLine("  ------------------------------------------------------------------------");
         foreach (var s in comparison.Scenarios)
         {
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  {Fit(s.ScenarioId, 40),-40}  {s.BaselineScore,8:F4}  {s.CandidateScore,9:F4}  {s.ScoreDelta,+8:F4}"));
+                $"  {Fit(s.ScenarioId, 40),-40}  {s.BaselineScore,8:F4}  {s.CandidateScore,9:F4}  {FormatDelta(s.ScoreDelta),9}"));
+        }
+
+        int subPrecision = comparison.Scenarios.Count(s => IsBelowDisplayPrecision(s.ScoreDelta));
+        if (subPrecision > 0 || IsBelowDisplayPrecision(comparison.MeanScoreDelta))
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  ⚠ {subPrecision} delta(s) are NON-ZERO but smaller than four decimal places, and are");
+            Console.WriteLine("    shown in scientific notation. Smaller than the column can print is not the same");
+            Console.WriteLine("    thing as zero; --json carries the full value.");
         }
 
         Console.WriteLine();
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"  mean score delta: {comparison.MeanScoreDelta:F4}  ·  recovered {comparison.Recovered}  ·  regressed {comparison.Regressed}"));
+            $"  mean score delta: {FormatDelta(comparison.MeanScoreDelta)}  ·  recovered {comparison.Recovered}  ·  regressed {comparison.Regressed}"));
         Console.WriteLine();
         return 0;
     }
@@ -298,6 +307,59 @@ public static class CompareCommand
 
         return true;
     }
+
+    /// <summary>
+    /// Renders one score delta for the human report. The JSON form carries the raw <see cref="double"/>
+    /// and is unaffected by anything here.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ <b>This exists because <c>F4</c> alone printed a MEASURED DIFFERENCE as an exact zero.</b>
+    /// MEASUREMENT_STATUS §72.11: two runs scoring 0.9958026933333333 and 0.9958143866666666 differ
+    /// by 1.1693333333284706e-05, the <c>--json</c> output said so, and the report line read
+    /// <c>0.0000</c> — which a reader takes as "the two runs are identical", the one thing it does
+    /// not mean.
+    /// </para>
+    /// <para>
+    /// <b>Three states, three renderings, and the third is the whole point.</b> An ABSENCE and a
+    /// ZERO must not look alike (this record has four sightings of that confusion), and neither must
+    /// a zero and a number too small to show:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.</item>
+    ///   <item><b>exactly zero</b> — the runs scored identically → <c>0.0000</c>, unchanged.</item>
+    ///   <item><b>non-zero, below four decimal places</b> → scientific, e.g. <c>1.17e-05</c>, keeping
+    ///   both the sign and the magnitude. "Smaller than the display can show" is not "zero".</item>
+    /// </list>
+    /// <para>
+    /// The sub-precision case is decided by FORMATTING FIRST and asking whether the result reads as a
+    /// zero — not by comparing against a hand-picked 5e-05 threshold, which would be a second guess
+    /// about where <c>F4</c> rounds and could disagree with it at the boundary.
+    /// </para>
+    /// </remarks>
+    /// <param name="delta">The delta to render.</param>
+    /// <returns>The rendered delta.</returns>
+    internal static string FormatDelta(double delta)
+    {
+        // ABSENCE. Not a small number, not a zero: there was nothing to average.
+        if (double.IsNaN(delta)) return "n/a";
+
+        // A TRUE zero, including a negative zero — which `F4` renders as "-0.0000", a minus sign in
+        // front of a quantity that has no direction.
+        if (delta == 0.0) return "0.0000";
+
+        string fixedPoint = delta.ToString("F4", CultureInfo.InvariantCulture);
+
+        // Non-zero, but the fixed-point form would claim otherwise.
+        return fixedPoint is "0.0000" or "-0.0000"
+            ? delta.ToString("0.00e+00", CultureInfo.InvariantCulture)
+            : fixedPoint;
+    }
+
+    /// <summary>True when <paramref name="delta"/> is real but too small for the fixed-point column.</summary>
+    private static bool IsBelowDisplayPrecision(double delta) =>
+        !double.IsNaN(delta) && delta != 0.0
+        && delta.ToString("F4", CultureInfo.InvariantCulture) is "0.0000" or "-0.0000";
 
     private static string Fit(string text, int width) =>
         text.Length <= width ? text : text[..(width - 1)] + "…";
