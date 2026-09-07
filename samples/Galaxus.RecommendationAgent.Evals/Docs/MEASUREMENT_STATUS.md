@@ -14400,3 +14400,686 @@ python -c "import socket;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1
 dotnet build AgentEval.sln --no-incremental -v q 2>&1 \
   | grep -oE '[^ ]+[.]cs[(][0-9]+,[0-9]+[)]: warning CS[0-9]+' | sort -u | wc -l                # 70
 ```
+
+---
+
+## §78.0 Wave 12 CLOSED — and **category (d) is EMPTY for the first time in the sequence**, because the last candidate left it by EXECUTION rather than by judgement
+
+Taken at `05e2e0a6` from a clean tree on 2026-09-07, by a party that produced none of the numbers below.
+**Every figure here was executed in this session; none is quoted from §76 or §77.** The approved
+purchase was made: an embedding-only `--real-vectors` half, **700 query calls / 9,607 prompt tokens**,
+order of **USD 0.0002**, and **no chat completion in any phase**.
+
+**Six findings. NONE is a new category-(d) member, and one of them REMOVES the last candidate** — not by
+reclassifying it, but by dispatching it in an ablation and watching it fail for a different reason than
+two consecutive waves recorded.
+
+## §78.1 Build — 0 errors, identity set **70** over **41** files (SEVENTH) — 🔴 and the set is **CS-ONLY**, which has never been said
+
+`dotnet build AgentEval.sln --no-incremental`, credentials unset in the command:
+
+| | measured here |
+|---|---|
+| errors (`grep -c ": error"`) | **0** |
+| warning TOTAL, as MSBuild prints it | 252 |
+| **distinct `file(line,col): warning CS####` identities** | **70** |
+| distinct files carrying them | **41** |
+| **distinct identities counting EVERY analyzer code** | 🔴 **96** |
+
+⚠️ **The total is still not quotable** (226 / 229 / 231 / 243 / 252 / 252). The **CS identity set has now
+been 70 across SIX consecutive close-outs and 41 files across all of them.** The code histogram is
+byte-identical to §76.1's and §77.9's: CS8602 ×26, CS1573 ×13, CS1574 ×12, CS8604 ×3, CS8629 / CS8601 /
+CS1734 / CS0618 ×2 each, and CS9107 · CS8714 · CS7022 · CS1580 · CS1572 · CS0419 · CS0414 · CS0162 ×1
+each. All **three** coordinates §74.1 pinned re-observe at the same line and column
+(`NegativeControls.cs(3164,51)` CS0162, `VerboseLoggingChatClient.cs(24,102)` CS1734,
+`DomainAllowListGate.cs(22,89)` CS1734).
+
+### 🔴 FINDING 1 — the invariant everyone has been calling "the identity set" is the **CS-only** set, and it omits 26 identities
+
+The recipe every close-out since §72 has run is
+`grep -oE '…\.cs\([0-9]+,[0-9]+\): warning CS[0-9]+' | sort -u | wc -l`. **The `CS` in that pattern is
+load-bearing and no section has ever said so.** Widening it to `warning [A-Za-z]+[0-9]+` on the same log
+gives **96** — the 70 CS identities plus **26 xUnit analyzer identities** (xUnit1030 ×1, xUnit1031 ×11,
+xUnit2012 ×1, xUnit2013 ×1, xUnit2029 ×3, xUnit2030 ×1, xUnit2031 ×8).
+
+**Direction: understating, and harmlessly so — but the SET was the thing declared durable.** No published
+number is wrong: 70 is a correct count of CS identities, and the histogram, the three pinned coordinates
+and the "diff the sets" discipline all hold. What is wrong is the NAME: an invariant advertised as
+"every warning identity in the build" is measuring 73% of them, and a new xUnit analyzer warning in a
+shipped file would move the total (which is unquotable) without moving the set (which is quoted).
+**Blast radius: the wording in §72.1, §74.1, §76.1, §77.9 and §0.1's build row — no figure in any of
+them.** §78.15 states both numbers.
+
+Per-file, for the two files Wave 12 touched: `GoldenReachabilityTests.cs` contributes **0** warnings of
+**any** code; `AgenticGoldenCoverageTests.cs` contributes **0 CS** and **1 xUnit2030**, re-observed at
+`(536,9)` — the same coordinate §77.9 published.
+
+## §78.2 Three TFM totals, after a full solution build
+
+| TFM | passed | failed | skipped | total |
+|---|---|---|---|---|
+| **net10.0** | **9,963** | **0** | 2 | 9,965 |
+| **net9.0** | **9,745** | **0** | 1 | 9,746 |
+| **net8.0** | **9,745** | **0** | 1 | 9,746 |
+
+**§77.11's prediction holds to the digit on all three.** Read only after `grep -c ": error"` on the build
+log returned **0** — see §78.14 finding 5, where `--no-build` ran a stale binary in this very session.
+
+Filters, all net10, all green: `Agentic.Calibration` **34 / 34** · `GoldenReachabilityTests`
+**10 / 10** · `AgenticGoldenCoverageTests` **14 / 14** (12 → 14 `[Fact]`s and 44 → 52 `Assert.` since
+`46315e00`, which is the arithmetic behind "no assertion was weakened").
+
+**Corpus, re-derived:** **378** records · **370** distinct `scenarioId`s · **22** `.jsonl` files ·
+**49** distinct `evaluatorKey`s · **40** dispatched · **9** carved out carrying **40** records.
+`comm`-style set difference of registered keys against golden keys: **0 in either direction for the
+dispatched 40** — d-4 stays built.
+
+**Branch invariants:** `git rev-list --count main..HEAD` → **164**; `@{u}..HEAD` → **7**;
+`git log --oneline main..HEAD -- strategy/` → **0** (ELEVENTH consecutive taking); tree clean.
+
+⚠️ **`git diff --numstat main..HEAD -- tests/` reads 45 paths, 0 with a non-zero deletion column — and
+it is BLIND, exactly as the build phase declared.** The within-branch diff `46315e00..HEAD -- tests/`
+shows **17 deleted lines** in `AgenticGoldenCoverageTests.cs`. The file was created on this branch, so
+the branch-vs-`main` diff renders it 100% additions. **The branch-vs-`main` form is not evidence that no
+test assertion was removed; only a `HEAD~n..HEAD` form is**, and §78.15 uses the latter.
+
+## §78.3 Exit codes — **30** commands, both spaces, every one OBSERVED with `$?`, and the real half GENUINELY LIVE
+
+| command | concept (scrubbed) | **`--real-vectors` (LIVE)** |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 1 --dry-run --judge` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** |
+| `-- 4` | 0 | 0 |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| **`-- 7`** | **1** | **1** |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| **`--ci --dry-run`** | **1** | **1** |
+| `agent -- 0` · `0 --offline` · `1 --offline` · `2 --offline` (scrubbed) | 0 · 0 · 0 · 0 | — |
+| stage-2 probe `-- 3 --real-vectors`, run FIRST and ALONE | — | **0** |
+| `init-workspace` (isolated) | **0** | — |
+| `compare` ×7 | **0 · 0 · 0 · 13 · 13 · 2 · 2** | — |
+
+**NOTHING MOVED — TENTH consecutive sweep since `0263141d`, and the SECOND in which the right-hand
+column is the real embedding space rather than a second reading of the concept path.**
+
+`--ci --dry-run` fails on **Eval 07 only**, in both spaces. Tight arbiter
+`grep -cE '^ *. Eval [0-9a-c]+: passed\.$'` → **10** in both; the eleventh member is `Eval 07: FAILED.`
+⚠️ The loose `': passed'` returns **11** — a control's own prose — the **eighth** sighting of the
+`baca28e4` shape.
+
+### ✅ THE REAL HALF DID **NOT** FALL BACK — three arbiters, and one of the three MOVED
+
+**1 — the banner, READ, not inferred from the flag.** `grep -h "queries embedded"` over the thirteen
+`--real-vectors` logs → **13 × `queries embedded LIVE`**; over the thirteen concept logs →
+**13 × `queries embedded offline`**. Banner text identical to §76.3's, including
+`space probe 1.0000 · --real-vectors`.
+
+**2 — the tripping-advisory set, a DISCRIMINATOR between the spaces.** Concept trips **2**
+(`AuthoredQueryPhraseRetrievability`, `SuppressionDetectorExercised`); real trips **3** — the same two
+plus **`DenseLegSaysWhenItRankedNothing`**, whose subject only exists when a query is embedded at search
+time. `diff` of the two sets is exactly that one line. Identical to §72.5 and §76.3.
+
+**3 — the Eval 02 arm panel, and 🔴 this one did not reproduce its absolute value.** The line *"ARM A and
+ARM C are the same source on this run, so their agreement is ONE fact, not two"* appears in
+**2 concept logs (`-- 3` and `--ci --dry-run`) and 0 real logs**. §76.3 read **3 and 0**.
+
+### 🔴 FINDING 2 — the ARM A/ARM C arbiter's COUNT is not reproducible across waves; only its DIRECTION is
+
+Measured here by file (`grep -l`) and by occurrence: **2 files, 2 occurrences, concept; 0 and 0, real.**
+The only two evals that emit it are Eval 03 and the `--ci` roll-up that contains Eval 03; `-- 2 --dry-run`
+contains the string **zero** times, at this HEAD, in either space. §76.3's third concept log is not
+reproducible from this tree.
+
+**Direction: neutral for the conclusion, bad for the arbiter.** The discriminating property — *present in
+the concept half, absent in the real half* — held exactly, and it is the property that detects a
+fallback. The absolute count is not an invariant and must not be quoted as one, which puts it in the
+same class as the warning TOTAL (§76.1) and the `estimatedCost` sum (§76.7): **a number that has been
+printed beside a real inference without being an invariant itself.** **Blast radius: one clause in
+§76.3. The fallback conclusion in §76 is unaffected — its banner and advisory arbiters both reproduce
+here.**
+
+## §78.4 What the live half COST — from the provider's own meter, summed, not assumed
+
+| | query calls | prompt tokens |
+|---|---|---|
+| the 13-command `--real-vectors` sweep | **581** | **8,338** |
+| the stage-2 one-item probe (`-- 3 --real-vectors`, run FIRST and ALONE) | **119** | **1,269** |
+| **wave total** | **700** | **9,607** |
+
+**The sweep half reproduces §72.3's and §76.4's `581 / 8,338` TO THE DIGIT — a THIRD independent taking**,
+and the probe reproduces §76.4's `119 / 1,269` likewise. Per command the meter runs from
+`0 query call(s) … + 1 space-identity probe` on the dry-run lanes to **159** on `--ci`. At
+`text-embedding-3-small` list pricing the wave is on the order of **USD 0.0002**.
+
+**NO CHAT MODEL WAS INVOKED, and the proof is a DIFFERENTIAL, not a grep.** Counting the phrases
+`live model call`, `chat round-trip`, `completion token`, `Live chat` and `gpt-` across the two halves:
+
+| phrase | concept half (no endpoint, no key — cannot spend) | real half |
+|---|---|---|
+| `live model call` | 2 | 2 |
+| `chat round-trip` | 0 | 0 |
+| `completion token` | 2 | 2 |
+| `Live chat` | 0 | 0 |
+| `gpt-` | 4 | 4 |
+
+**Every count is EQUAL, so every hit is prose.** A string that appears the same number of times in a half
+that is physically incapable of spending is not evidence of spend. The judge was a stub throughout —
+`stub judge was asked for 24 verdict(s)` — and no usage line outside the embedding meter exists in any
+of the thirteen real logs.
+
+⚠️ **THREE TRAPS RE-CONFIRMED AND ONE SHARPENED:**
+
+1. **`grep -h "0 live call(s) made"` returns 2 hits in the REAL half**, on runs that demonstrably made
+   581 live embedding calls. Seventh sighting.
+2. **`Config.Model` falls back to a hardcoded `PreferredDeployment` (`gpt-5-mini`)**, so unsetting
+   `AZURE_OPENAI_DEPLOYMENT` is **not** a chat-spend guarantee. The guarantee came from `--dry-run`,
+   `AGENTEVAL_ALLOW_STUB_JUDGE=1`, the differential above, and the meter.
+3. 🔴 **`estimatedCost` is blind again — see §78.7.**
+4. 🆕 **The "exclude the boxed control prose" refinement is ITSELF insufficient.** Two `completion token`
+   hits sit on **unboxed** narrative lines (`Completion tokens read 0 when the provider reports no
+   usage: MAFEvaluationHarness's …`), in **both** halves. Filtering on the `║` box character would have
+   left them looking like spend. **The differential is the arbiter; the box filter is not.**
+
+## §78.5 `compare` — both exit paths and **all three of d-5's renderings**, on runs produced here
+
+Fresh isolated workspace (a bare `git init` is required — `init-workspace` refuses without a solution
+root, and takes no `--root`), exit **0**. **Nine** `bench perf` runs — eight `latency`, one `throughput` —
+made with the credential variables unset in the command and `AGENTEVAL_ALLOW_STUB_JUDGE=1`.
+
+| pair | flags | verdict | **exit** |
+|---|---|---|---|
+| PerfA vs PerfB | — | COMPARABLE | **0** |
+| PerfC vs PerfD | — | COMPARABLE | **0** |
+| PerfA vs itself | — | COMPARABLE | **0** |
+| PerfA vs PerfB | `--strict` | INCOMPARABLE | **13** |
+| PerfA vs ThruA (no shared scenario id) | — | INCOMPARABLE, `matched : 0` | **13** |
+| a missing path · a directory with no scenario files | — | usage error, never a verdict | **2** · **2** |
+
+`0 0 0 13 13 2 2` — identical to §76.5 and §74.4 on a third, freshly produced family of runs.
+
+**All 28 latency pairs were scanned before choosing what to render: 18 of 28 land in the sub-precision
+band `|Δ| < 5e-5`.** All three renderings were then driven on runs made here:
+
+```
+  perf-latency                                0.9958     0.9958   2.99e-05
+  ⚠ 1 delta above, and the mean below, are NON-ZERO but smaller than four decimal places, and shown
+  mean score delta: 2.99e-05  ·  recovered 0  ·  regressed 0
+```
+
+* **d-5's fix is live** — a delta that `F4` would print as `0.0000` renders `2.99e-05`.
+* **§73.4's legend fix is live** — the legend NAMES its subject (*"1 delta above, and the mean below"*),
+  so it cannot print *"0 delta(s)"* over a scientific mean.
+* **The other two renderings, on the same nine runs:** `0.0001` (above `F4`, legend-free, PerfA vs PerfH)
+  and `0.0000` (true zero, PerfA vs itself, legend-free).
+* **§73.5 re-confirmed BY EXECUTION:** the disjoint pair prints `matched : 0`, exit **13**, and **0**
+  occurrences of `mean score delta` and **0** of `n/a`. The absence rendering still has no live subject.
+* **`recovered 0 · regressed 0` on every rendered pair** — (b)'s sixth item, a live specimen of
+  `Recovered`/`Regressed`, is re-confirmed absent for the third consecutive wave.
+
+**Workspace spend: `estimatedCost` summed over all nine produced scenario files = `0.00000000` over 9
+values.**
+
+## §78.6 The control panel and persistence
+
+**Panel — 43 gating + 7 advisory, BY NAME, in both spaces:**
+
+| | concept | `--real-vectors` (LIVE) |
+|---|---|---|
+| gating rows, by distinct NAME | **43** | **43** |
+| `❌ NOT CAUGHT` | **0** | **0** |
+| advisory rows, by distinct NAME | **7** | **7** |
+| advisory rows TRIPPING | **2** | **3** |
+
+`diff` of the gating NAME sets across the spaces: **empty**. `diff` of the advisory NAME sets: **empty**.
+The tripping sets differ by exactly `DenseLegSaysWhenItRankedNothing` (§78.3). Source-side arbiter
+`grep -c '^        rows.Add(' Evals/NegativeControls.cs` → **50 = 43 + 7**.
+
+**Persistence — the KEY SET is 14 and Wave 12 did not change it:**
+
+```
+eval01_integrity            eval02_coverage_ab          eval02_coverage_ab_probe
+eval02b_stated_need         eval02b_stated_need_probe   eval02c_held_out
+eval02c_held_out_probe      eval03_controls             eval04_injection
+eval05_quality              eval06_trajectory           eval07_topology
+eval09_hypothesis_ab        eval09_hypothesis_ab_probe
+```
+
+`diff` of the key set taken before and after the 30-command sweep: **empty**.
+
+**This wave wrote exactly three — `eval03_controls`, `eval04_injection`, `eval07_topology` — established
+three independent ways:**
+
+1. **The write ledger, a COUNT arbiter.** `grep -c "Snapshot saved"` over `--ci --dry-run` → **3**, in
+   both spaces. ⚠️ That line names the **DIRECTORY**, never the keys.
+2. **The key NAMES, from a different line of the same log.** `grep -oE "eval0[0-9][a-c]?_[a-z_]+"`
+   returns exactly those three and nothing else, in both spaces.
+3. **The disk.** Per-key mtimes taken before and after move for exactly those three
+   (`04:09:09Z` / `04:09:09Z` / `04:09:12Z` → `05:36:35Z` / `05:36:35Z` / `05:36:38Z`); **the other
+   eleven are unchanged TO THE SECOND.**
+
+🔒 **All eleven unchanged keys are the model-backed ones,** and both headline records are among them,
+read from the JSON's own `RunAt` rather than an mtime: `eval02b_stated_need` =
+`2026-09-05T17:53:19.8608498Z`, `eval02c_held_out` = `2026-09-05T18:20:12.5118072Z` — **the same digits
+§72.6, §74.6 and §76.6 published**, four waves later, and unchanged across this wave's own sweep.
+
+⚠️ **THE CASING TRAP, CHECKED IN BOTH DIRECTIONS, AND IT FIRED AGAIN.** In the repository store
+`grep -rl '"Comparability"'` → **0** *and* `grep -rl '"comparability"'` → **0**. In the isolated
+workspace the same two greps return **0 and 9**. **The PascalCase grep alone would have reported absence
+where the field is on every one of the nine runs.**
+
+⚠️ **No file count and no byte size is recorded in this section, on purpose** (§42.9, corrected twice).
+
+## §78.7 Money — one approved purchase, and 🔴 `estimatedCost` is blind to it a SECOND time
+
+**What was bought:** 700 query-embedding calls / 9,607 prompt tokens against `text-embedding-3-small`,
+order of **USD 0.0002**, embedding-only, approved.
+**What was NOT bought: any chat completion, in any phase, by anything** (§78.4).
+
+**Build and review phases spent nothing.** Every command outside the fourteen real-vector ones ran with
+the credential variables unset **in the command**. The **eleven** `AZURE_OPENAI_*` / `OPENAI_*` variables
+present in this environment were verified present by NAME AND LENGTH before scrubbing
+(43 / 84 / 7 / 22 / 132 / 7 / 10 / 10 / 22 / 16 / 51 — **values never read**), so the scrubbing does real
+work; the three `_JUDGE_` names, which opt **out**, are absent entirely, which is why
+`AGENTEVAL_ALLOW_STUB_JUDGE=1` was set explicitly on every judge-resolving command.
+
+### 🔴 `estimatedCost` DID NOT MOVE ACROSS A SECOND, INDEPENDENT 700-CALL PURCHASE
+
+| scope | §76.7, after its 700 live calls | **here, after 700 MORE** |
+|---|---|---|
+| `.agenteval/subjects` | `1.09981845` over 613 values | **`1.09981845` over 613 values** |
+| the whole `.agenteval` tree | `4.11598950` over 949 values in 623 files | **`4.11598950` over 949 values in 623 files** |
+
+**Not one digit, across 1,400 live embedding calls in two waves.** §76.7's finding is not a one-off: the
+live embedding path writes no scenario file and stamps no `estimatedCost`, and the only record of the
+purchase is a console meter that is persisted nowhere. **`sum estimatedCost == unchanged` proves no
+scenario-recorded model spend and nothing more.** This close-out reads the meter *and* sums
+`estimatedCost`, and reports both.
+
+## §78.8 Credentials — 0 credential-bearing in tracked files, every hit classified, 0 unclassified
+
+**Loose first, then literal, reported by COUNT and DATE and never by path** (§69.7 — a path listing is a
+print, and so is a grep whose pattern is not a credential pattern). **2,875 tracked files.**
+
+**Needle lengths asserted non-empty first** (endpoint 43, bare host 35, Azure key 84, OpenAI key 132):
+an empty needle makes every zero below it meaningless.
+
+| corpus | bare endpoint host | Azure API key | OpenAI key |
+|---|---|---|---|
+| **tracked files** (`git grep -lF`) | **0** | **0** | **0** |
+| **untracked-or-ignored, whole tree** | **3** | **0** | — |
+
+The three untracked hits are dated **2026-07-11 ×1** and **2026-07-17 ×2** — **unchanged in count and
+date from §75.9 and §76.8**, and all long predating Wave 9.
+⚠️ **The needle matters:** the full 43-character endpoint returns **0** whole-tree hits; the 35-character
+bare host returns **3**. A scan of the URL form alone would have reported a clean tree.
+
+**Loose pattern scan, eight patterns, union 390 hits over 126 files:**
+
+| pattern | hits | files | classification |
+|---|---|---|---|
+| 84-char base64-ish run | 305 | 86 | long identifiers, vector/float data, hashes — **1** is secret-adjacent and it is a C# test METHOD NAME |
+| azure-openai endpoint | 53 | 29 | **all** resolve to nine synthetic subdomains (below) |
+| aws-access-key | 12 | 4 | redaction-test fixtures |
+| generic `secret=`/`token=` assignment | 12 | 10 | test fixtures and documentation |
+| private-key block | 3 | 1 | a PEM built from `new string('M', 2048)` |
+| azure-32hex | 2 | 2 | one md5 digest in this document, one `[InlineData]` |
+| openai-sk / github-pat / bearer-literal | 1 each | 1 each | `[InlineData]` redaction fixtures |
+
+**Every endpoint hit resolves to one of nine obviously-synthetic hosts** — `your-resource` ×14,
+`example` ×11, `synthetic-resource` ×9, `myresource` ×7, `test` ×5, `x` ×3, `xxx` ×2, `my-endpoint` ×1,
+`explicit` ×1 — and **the real host appears 0 times among them**.
+
+**Unclassified hits, anywhere: 0.** Last-commit dates span **2026-02-01 → 2026-09-07**; the four files
+dated today are this document (2 synthetic endpoints + 1 md5) and three `.cs` files whose only hits are
+long identifiers.
+
+**Positive control, executed:** a **synthetic** endpoint host, a **synthetic** `sk-` key and a
+**synthetic** `AKIA` key, written **outside the repository** and deleted **in the same command**, all
+three patterns firing **1/1** and re-scanning to **0/0** with the containing directory removed and the
+outside-the-tree location asserted programmatically. ⚠️ **No real credential was planted**, and the API
+key and endpoint URL are not printed, logged, written, or hashed anywhere in this section.
+
+## §78.9 🔴 FINDING 3 — `f1_score` is a **TRANSPORT** gap, not an authoring gap, and two consecutive waves recorded the wrong reason
+
+**This is the finding that empties (d), and it was settled by an ablation, not by a ruling.**
+
+The Wave-12 build named `f1_score` as the only remaining candidate — *"a should-pass-only golden set
+(2 `pass`, 0 `fail`) … **buildable with no model, since `F1ScoreEval` is pure code, so the band is
+computable exactly**"* — and declined to file it as d-10 only because *"whether §6.3 binds carved-out keys
+is a small judgement someone should make"*. §77.6 upheld that, on the same reasoning.
+
+**The reasoning is wrong, and the correct reason is stronger.** Measured by dispatching the key in an
+ablation (`AgenticEvalRegistration` +1 row, `DispatchedEvaluatorCount` 40 → 41; the file was copied first
+and restored from the copy, never `git checkout --`):
+
+```
+census: 340 dispatched record(s) — Judged=298, JudgedWithoutTheResponse=0,
+        DecidedFromResponse=12, ResponseBlind=5, Skipped=25
+f1_score/pass: all 2 record(s) asserting 'pass' reach NO verdict
+               [cal-quality-019=ResponseBlind, cal-quality-020=ResponseBlind]
+f1_score: NOT ONE golden record asserts the 'fail' verdict — the set is single-direction
+```
+
+**Its two records classify `ResponseBlind`, not `Judged`.** `F1ScoreEval` needs `EvalInput.GroundTruth`;
+`CalibrationRunner` builds `new EvalInput(Query: entry.Input, Response: entry.AgentResponse)` and
+`CalibrationEntry` has **eight fields and no ground-truth column** (`ScenarioId`, `EvaluatorKey`,
+`Input`, `AgentResponse`, `ExpectedVerdict`, `ExpectedScoreMin`, `ExpectedScoreMax`, `Rationale`). With
+ground truth null the evaluator returns `0.0` **before it tokenises the response at all** — so the
+verdict is identical under any response, by construction.
+
+**Therefore authoring an `f1_score` `fail` golden would NOT fix it.** The new record would classify
+`ResponseBlind` too, the key would still have zero reachable evidence in either direction, and the bar
+would still be red. **This is the same class as `unsafe_tool_use`'s missing `ToolCalls`: a shipped-schema
+change with a decision attached — category (a), not (d).**
+
+**Direction of the earlier error: it would have SENT WORK.** A future wave following §77.6 would have
+hand-written nine fields, run the bar, and found it still red for a reason the record cannot address.
+**Blast radius: the rationale sentence in the Wave-12 build's hand-off and in §77.6 — no published
+number.** Nothing was ever overstated by `f1_score` itself: a carved-out key resolves to `null` in
+`CalibrationRunner`, increments `skippedUnknownKey`, and `continue`s **before** `pairs.Add(…)`, so its
+two records feed neither `EntryCount`, `Accuracy`, `CohensKappa` nor `WithinScoreRange`.
+
+⚠️ **And the transport-exemption door now has a second occupant in waiting.** §77's measurement — *"the
+door was measured across all 40 keys; `unsafe_tool_use` is the only key that could occupy it"* — is
+correct **as scoped**, because `f1_score` is the 41st. It becomes the second the day someone deletes one
+line from `s_carveOutKeys`.
+
+## §78.10 🟢 CATEGORY (d) IS **EMPTY** — the census, by execution, one command per row
+
+**Re-derived here by running the evaluators over the corpus, not by reading §76 or §77.**
+
+| # | member | state, MEASURED HERE |
+|---|---|---|
+| **d-4** | three dispatched keys with no golden entry | ✅ **BUILT** — 40 registered keys, **0** without goldens; 49 golden keys against 40 registered, the 9 extra being the declared carve-outs |
+| **d-5** | `compare` renders a non-zero delta as `0.0000` | ✅ **BUILT** — `2.99e-05` with a subject-naming legend, plus `0.0001` and a true `0.0000`, all three on runs produced here (§78.5) |
+| **d-6** | 86 `pass` goldens whose band dips below their evaluator's threshold | ⬜ **(a) — A USER DECISION.** Count **re-derived independently: 86 of 208** dispatched `pass` records with a parsed default threshold. See below |
+| **d-7** | `reasoning_correctness` cannot fail | ✅ **BUILT** — 9 records, **6 `pass` / 3 `fail`**, of which **2 `pass` and 3 `fail` are REACHABLE**; `s_knownOneDirectionKeys` is empty and green |
+| **d-8** | `jailbreak_resistance`'s only `fail` golden is fast-passed at 1.0 | ✅ **BUILT** `940e0027` — 5 records; **reachable evidence 1 `pass` + 1 `fail`**, so both directions are earnable |
+| **d-9** | `goal_decomposition_quality`'s only `fail` golden is skipped and credited free | ✅ **BUILT** `dd1a7450` — 5 records; **reachable evidence 3 `pass` + 1 `fail`** |
+| **d-10?** | `f1_score` is a should-pass-only golden set | ⬜ **(a) BY EXECUTION, not by judgement** — §78.9. Authoring the missing record cannot fix it |
+
+**The bar's own statement, re-derived:** across all **40** dispatched keys, **every one has reachable
+evidence in BOTH verdict directions except `unsafe_tool_use`**, which reaches none at all and is exempt
+only because the test proves both halves — 20 of 20 unreachable through `Input`+`AgentResponse`, and
+reachable the moment `EvalInput.ToolCalls` is supplied. **Zero bar violations at HEAD.**
+
+**Census at HEAD, read off the instrument:** **338** dispatched records — **Judged 298** ·
+`JudgedWithoutTheResponse` **0** · `DecidedFromResponse` **12** · `ResponseBlind` **3** · `Skipped` **25**.
+**310 of 338 (91.7%) can produce a verdict; 28 (8.3%) cannot**, and **11 of those 28 are credited
+anyway** — 9 `within-range` and 2 (`cal-jr-001`, `cal-jr-004`) that additionally take `verdict-match`,
+which is the pair that moves `Accuracy` and `CohensKappa`.
+
+### ⬜ (d-6) — this close-out did NOT move the bands, and it verified the citation itself
+
+`docs/eval-benchmark-architecture.md` §8.2 tabulates the four-stratum set verbatim, including
+`| **Borderline pass** | "pass" | 0.65 – 0.85 | Judge holds the line at the 0.70 pass threshold |`, and
+§8.1 gives the reason: *"Golden datasets should always contain entries the judge is expected to fail and
+entries it should partially pass — that's where the calibration signal lives."* **A `pass` band whose
+minimum sits below the threshold is the specified shape of the borderline-pass stratum**, and setting
+`min := threshold` would delete that stratum. Property 4 (*"once shipped, entries don't move"*) forbids
+it independently. **The 86 are untouched and this close-out adds no band rule of its own.**
+
+⚠️ **THE RESIDUAL OBJECTION IS REAL AND STAYS ON THE RECORD.** §8.2's worked example is **pillar-scoped**
+(*"A pillar-level calibration set…"*, threshold 0.70), and **0.70 is not the threshold of the evaluators
+that carry the 86** — across the **60** evaluator types that declare one, the parsed defaults are
+0.05 ×1, 0.50 ×2, 0.60 ×3, **0.70 ×16**, 0.75 ×8, 0.80 ×10, 0.85 ×6, 0.90 ×6, 0.95 ×8, so a majority of
+the corpus is graded against a bar §8.2 never mentions. §75.6's point, that no *agentic-scoped* document states
+a band rule, is not answered by §8.2 — what §8.2 establishes is that the SHAPE is deliberate, not that
+this corpus's 86 instances were authored under it.
+
+⚠️ 🔴 **AND THE OPEN CONFLICT IS STILL OPEN AND IS NOT RESOLVED HERE.**
+`AgenticGoldenCoverageTests.TheThreeKeysAuthoredForD4_HavePassBandsThatCannotDisagreeWithTheirOwnVerdict`
+enforces the **opposite** of §8.2 — no straddling `pass` band — for `prompt_leak`,
+`escalation_resistance` and `protected_material` (15 entries). Its own comment scopes it: *"asserted only
+for the keys authored here; the shipped corpus predates the rule and is not touched by it."* **Two rules
+about band shape are live in one repository and nobody has ruled.** This close-out follows **neither**:
+it added no band, moved no band and stated no band rule. **The measurement it contributes is that the
+fail direction is clean — 0 dispatched `fail` records have `ExpectedScoreMax >= threshold`** — so the
+straddle is entirely one-sided.
+
+⚠️ **NO MEMBER HERE IS A RECLASSIFICATION AND NONE IS MANUFACTURED, AND THIS IS THE FIRST TIME THE CELL
+HAS READ ZERO.** d-8 and d-9 left by being **BUILT**, and both were verified here by running the
+evaluators rather than by reading their commits. `f1_score` never entered (d) — two waves named it and
+declined; this one settled the open question **by dispatching it**, and the answer moved it to (a) for a
+reason neither wave had. **The remaining findings of this close-out (§78.1, §78.3, §78.4, §78.14) are
+corrections to how things are MEASURED, not buildable items, and are not padded into the list.**
+
+⚠️ **(d) is only ever right immediately after somebody runs the commands. These were run on 2026-09-07.**
+
+## §78.11 The two headline claims — did they move? **NO.** EIGHTH consecutive wave
+
+**Neither instrument was reachable from anything Wave 12 did.** Established two ways, without re-running
+either eval:
+
+1. **Neither was touched.** `git diff --name-only 46315e00..HEAD` lists **five** files — one document,
+   two test files and two golden `.jsonl` appends — **`src/` count 0** — and neither
+   `Eval02b_StatedNeedSatisfaction.cs` nor `Eval02c_HeldOutNextPurchase.cs` is among them. Both were last
+   changed by `046f5425` on **2026-09-06**, before Wave 12's first commit.
+2. **Neither stored record moved** — from the JSON's own `RunAt`, both **2026-09-05**, digits unchanged;
+   and this close-out's own 30-command sweep left both **unchanged to the second**, with nine other
+   model-backed keys beside them (§78.6).
+
+⚠️ **EIGHTH consecutive wave with that answer, and the reason has not changed once, so read it as a
+running cost and not as diligence.** It is **structural**: both claims live in Eval 02b and Eval 02c,
+both are judged cohorts, and the **only** operation that can move either is a paid re-run **with a CHAT
+model**. Wave 12 was commissioned to build category (d) — items that by definition need no money — and
+this close-out was approved for an **embedding-only** purchase.
+
+🔴 **THE PRICE, AND THE RATIO.** Measured prices already on the table: a judged cohort **USD 34.6333**, a
+one-persona probe **USD 1.4725**, the last live Eval 02 cohort **USD 18.56**, the last coverage cohort
+**¤27.1208**. **Moving both headline claims is §0.5's Phase 2 remainder and costs on the order of
+USD 35–55 of chat spend — roughly 200,000× this wave's approved embedding purchase.** The cheap half of
+this suite has now been swept **ten** times; the expensive half has not been touched since **2026-09-05**.
+
+## §78.12 ADR-030 / ADR-031 adoption by the sample — **1 and 0**, and the gap widened a FIFTH time
+
+Measured with the only correct arbiter, the **fully-qualified reference** restricted to `--include=*.cs`:
+
+* `grep -rn "AgentEval\.Evals\.Meta\." $E $A --include=*.cs` → **4 sites, one distinct type,
+  `AgentEval.Evals.Meta.ObservationCensus`**, all four in `NegativeControls.cs` at `:7533`, `:7570`,
+  `:7587`, `:7591` — **the same four coordinates §76.10 published.** **ADR-030 Slice 2 types the sample
+  uses = 1.**
+* `grep -rn "namespace AgentEval.Packs" src/ --include=*.cs` → **0**; `AgentEval.Packs.` in the sample
+  `.cs` → **0**. **ADR-031 types the sample uses = 0.**
+
+⚠️ **The `--include=*.cs` is load-bearing and its cost is now measured a second time:** without it the
+same grep returns **232 sites and 13 distinct types**, because `bin/`, `obj/` XML doc files and this very
+document match. **The unrestricted grep overstates ADR-030 adoption thirteenfold** — and it drifted 231 →
+232 between §76 and here purely because §77 was appended to this file, which is the proof that the
+document itself is inside the denominator.
+
+🔴 **THE GAP WIDENED A FIFTH CONSECUTIVE TIME.** All **twelve** library surfaces added by Waves 8–11
+(`IEvalRegistry`, `EvalRegistry`, `EvalRegistration`, `RunComparison`, `Incomparable`,
+`ComparabilityFacts`, `JudgeFingerprint`, `BaselinePromotion`, `RecordedChanceFloor`,
+`EvaluatorCardRegistry`, `FormatDelta`, `IsBelowDisplayPrecision`) read **0** in the sample by bare name.
+Wave 12 added a thirteenth consumer-less surface — the reachability classifier — and it lives in
+`tests/`, not `src/`, so it is not even a library surface. *"Machinery with one consumer rots in six
+months"* is **Q5's own reviewer objection**, and this is the fifth consecutive wave of evidence **for**
+it.
+
+## §78.13 🔴 AFTER TWELVE WAVES, IS THE GOLDEN CORPUS FIT TO CALIBRATE A JUDGE?
+
+**No — and the decisive fact is not any of the defects. It is that the corpus has never been run against
+a judge at all.**
+
+**Measured here:** there is **no stored agentic calibration report anywhere in the tree**.
+`find` over `.agenteval` returns none; `grep -rl '"cohensKappa"' --include=*.json` over the whole
+repository returns **0 files**. The only `CalibrationReport` artefacts in the tree are API documentation
+YAMLs. **Every one of the twelve waves ran this corpus against `RecordingJudge`, a stub.** So the corpus
+has produced **no Accuracy, no Cohen's kappa and no within-range figure that anyone could quote**, and
+the twelve waves have been building *the instrument that inspects the corpus*, not calibrating a judge
+with it.
+
+**What the corpus CAN support today, and this is real:**
+
+* **A structural readiness claim, and a strong one.** 378 records over 49 keys and 22 files; **every one
+  of the 40 dispatched keys has at least one golden**; **every dispatched key has reachable evidence in
+  both verdict directions** except the one with a proven transport gap; and the fail direction has **no**
+  band that can be simultaneously within-range and labelled pass.
+* **A measured evidence fraction.** **310 of 338 dispatched records (91.7%) can produce a verdict.** That
+  number did not exist before Wave 12 — every earlier wave counted *records*, and a record is not
+  evidence.
+* **Detection of an always-pass judge on 39 of 40 keys** — which is what d-4, d-7, d-8 and d-9 were
+  collectively for.
+
+**What it CANNOT support, stated without softening:**
+
+1. **Any Accuracy or kappa figure.** None has ever been produced. `CohensKappa` is computed per
+   **category**, not per key, so a degenerate single-class key is **masked by pooling** rather than
+   surfaced as `NaN` — the safeguard §8.2 describes fires only if an entire category is single-class.
+2. **A per-key claim on 2 of 49 keys.** `unsafe_tool_use` (20 records, 5.9% of the dispatched corpus)
+   measures **nothing** — 20 of 20 unreachable. `f1_score` (2 records) likewise, if ever dispatched.
+   Both are blocked on the same shipped-schema change, and it is one change: `CalibrationEntry` carries
+   neither `ToolCalls` nor `GroundTruth`.
+3. **An unqualified `WithinScoreRange`.** **11 records are credited without an evaluation having run** —
+   9 `within-range`, and `cal-jr-001` / `cal-jr-004` additionally `verdict-match`, so **2 free agreements
+   would enter Accuracy and kappa the moment either is computed**. They are pinned and disclosed, not
+   removed: removing them needs either an edit to shipped entries (forbidden by property 4) or a change
+   to `JailbreakResistanceEval`'s fast-pass semantics (a decision) — which is why this is (a) and not
+   (d).
+4. **A defensible discrimination claim on the `pass` side.** **86 of 208** dispatched `pass` records have
+   a band that dips below their evaluator's threshold, and **two live rules disagree about whether that
+   is correct** (§78.10). Until that is ruled, `WithinScoreRange` and `Accuracy` can disagree about the
+   same entry by design on 41% of the pass side.
+5. **Anything about the 40 carved-out records.** Nine keys are never reachability-checked; the bar's
+   scope is dispatched keys, declared in the file.
+6. **That a judge USED the response.** `Judged` proves the record's own response was the text handed to
+   the judge on every call. With a stub judge that is the strongest claim available, and §77.10 says so.
+
+**What it would take to make it sound — four things, in order, and only the first costs money:**
+
+1. **Run it once against a real judge.** Until `bench agentic calibrate` executes with a chat model
+   there is no calibration figure to defend, only readiness. This is category **(b)** and it is the same
+   purchase §78.11 prices at USD 35–55.
+2. **Extend `CalibrationEntry` with `ToolCalls` and `GroundTruth`.** One schema change closes both
+   structurally-mute keys — `unsafe_tool_use`'s **20 of 338 dispatched (5.9%)** and `f1_score`'s **2**,
+   which are carved out today and would join them on dispatch — and empties the transport exemption.
+   Category **(a)**, one decision.
+3. **Rule on band shape, once, for the whole corpus.** Either §8.2's borderline-pass stratum is the rule
+   and Wave 10's three-key assertion is narrowed to say so, or the opposite; today both ship.
+   Category **(a)**.
+4. **Decide what the report does with a record that reached no verdict.** Counting it as a credit is the
+   current behaviour and it is wrong in the flattering direction on 11 records; the choice between
+   excluding, failing and skipping moves published numbers, which is what makes it (a) rather than (d).
+
+**The honest summary: the corpus is fit to be RUN, and it is not yet fit to be QUOTED.** Twelve waves
+made the first true and none of them attempted the second, because every wave was commissioned for the
+half of the work that costs nothing.
+
+## §78.14 What this close-out does NOT claim
+
+1. **It does not re-audit the paid layer.** No judged cohort was run; every score-bearing figure is
+   structural or produced by a stub. The two headline claims are **unread**, not re-confirmed.
+2. **It does not decide d-6.** It verified §8.2's citation verbatim, re-derived the 86 independently, and
+   recorded the residual objection and the live rule conflict. It moved no band and added no rule.
+3. **It did not extend the bar to carved-out keys.** The 40 records across 9 keys remain unchecked; the
+   `f1_score` result in §78.9 comes from a temporary ablation, restored from a copy.
+4. **It does not claim the live embedding numbers generalise.** 581 / 8,338 is what THIS sweep cost on
+   THIS corpus; a different query set costs differently.
+5. 🔴 **It records one falsified byte-level prediction, and one accident that proves an old warning.**
+   * **§77.11 predicted "4 of 10 red"** under the withheld-response ablation. **Observed: 5 of 10.** The
+     fifth is `TheClassifier_TellsAllFourClassesApart_OnCasesWhoseClassIsKnownWithoutIt`, the synthetic
+     separation test, which routes through the same `AtomicLlmEval` boundary. Everything else in that
+     prediction held exactly, including the literal `JudgedWithoutTheResponse=298`. **Direction:
+     deflating — the instrument is MORE sensitive than its own author predicted.** No published number
+     changes.
+   * **`--no-build` ran a STALE binary and reported `10/10 GREEN` on a tree whose build had 4 errors**,
+     during the `f1_score` ablation in this session. §76.2's warning is not theoretical: **an ablation
+     that fails to compile reads exactly like an ablation with no effect.** The build log was grepped
+     for `": error"` first on every reading that is quoted here.
+6. **It re-executed no ablation of Waves 9–11.** §77 is the pass that re-executed those. The two
+   ablations run here are its own: the withheld-response probe (finding 5 above) and the `f1_score`
+   dispatch (§78.9). Both files were copied first and restored **from the copies**; `git status` is clean
+   and `git diff HEAD` is empty over `src/`.
+
+## §78.15 Falsifiable prediction, and how to re-derive §78
+
+**Prediction, byte-level, at `05e2e0a6` plus this section:** the build gives **0 errors**, **70** distinct
+`CS` warning identities across **41** files and **96** identities counting every analyzer code; the three
+TFM totals are **9,963 / 0 / 2 of 9,965** and **9,745 / 0 / 1 of 9,746** twice; `Agentic.Calibration`
+gives **34/34**, `GoldenReachabilityTests` **10/10**, `AgenticGoldenCoverageTests` **14/14**; the corpus
+is **378** records / **370** `scenarioId`s / **22** files / **49** keys against **40** registered; the
+census is **338 dispatched — Judged 298, DecidedFromResponse 12, ResponseBlind 3, Skipped 25**, 0 bar
+violations; **86 of 208** dispatched `pass` records straddle their evaluator's threshold and **0** `fail`
+records straddle upward; dispatching `f1_score` classifies **both** its records `ResponseBlind`; and a
+live `--real-vectors` sweep of these thirteen commands costs **581 query calls / 8,338 prompt tokens**
+with a **119 / 1,269** stage-2 probe. Any of these differing means this section is stale, not that the
+reader mis-ran it.
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals ; A=samples/Galaxus.RecommendationAgent
+S=.agenteval/samples/Galaxus.RecommendationAgent.Evals/snapshots
+G=tests/AgentEval.Tests/Agentic/Calibration/Golden
+# The ELEVEN vars present in this environment. The three _JUDGE_ names, which opt OUT, are absent.
+SCRUB="env -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_DEPLOYMENT \
+ -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT_V2 -u AZURE_OPENAI_CREDENTIAL \
+ -u AZURE_OPENAI_DEPLOYMENT_MINI -u AZURE_OPENAI_DEPLOYMENT_NAME -u AZURE_OPENAI_REALTIME_DEPLOYMENT \
+ -u OPENAI_API_KEY -u OPENAI_APIKEY AGENTEVAL_ALLOW_STUB_JUDGE=1"
+
+# 78.1 - build. Compare the SETS, never the totals. NOTE WHICH SET YOU ARE TAKING.
+$SCRUB dotnet build AgentEval.sln --no-incremental > build.log 2>&1 ; grep -c ": error" build.log  # 0
+grep -oE '[^ ]+[.]cs[(][0-9]+,[0-9]+[)]: warning CS[0-9]+'      build.log | sort -u | wc -l        # 70
+grep -oE '[^ ]+[.]cs[(][0-9]+,[0-9]+[)]: warning [A-Za-z]+[0-9]+' build.log | sort -u | wc -l      # 96
+
+# 78.2 - tests. grep the build log for ": error" FIRST: --no-build runs a STALE binary otherwise,
+#        and it DID so in this session, reporting 10/10 GREEN on a 4-error tree.
+for t in net10.0 net9.0 net8.0; do $SCRUB dotnet test tests/AgentEval.Tests --no-build -f $t; done
+git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'   # 0 - AND IT IS BLIND, use:
+git diff --numstat 46315e00..HEAD -- tests/                          # 17 real deletions
+git log --oneline main..HEAD -- strategy/ | wc -l                    # 0
+
+# 78.3 - 26 eval commands both spaces + 4 agent lanes, $? on EVERY one.
+#   ⚠ THE REAL HALF NEEDS AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY PRESENT and IT SPENDS.
+#     Run `-- 3 --real-vectors` ALONE first and read its meter before the other twelve.
+#   ⚠ Config.Model falls back to a HARDCODED gpt-5-mini, so unsetting the chat deployment proves nothing.
+REAL="env -u AZURE_OPENAI_DEPLOYMENT -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT -u OPENAI_API_KEY \
+ -u AZURE_OPENAI_CREDENTIAL -u AZURE_OPENAI_DEPLOYMENT_MINI -u AZURE_OPENAI_DEPLOYMENT_NAME \
+ -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT_V2 -u AZURE_OPENAI_REALTIME_DEPLOYMENT -u OPENAI_APIKEY \
+ AGENTEVAL_ALLOW_STUB_JUDGE=1"
+grep -h "queries embedded" r*.log | sort | uniq -c   # 13 LIVE. 13 offline in the real half == FALLBACK.
+#   TWO more arbiters, because a banner is one: tripping advisories 2 (concept) vs 3 (real, the extra is
+#   DenseLegSaysWhenItRankedNothing); and "ARM A and ARM C are the same source" in the CONCEPT half only.
+#   ⚠ THAT LAST ARBITER'S COUNT IS NOT AN INVARIANT - 3 concept logs at §76.3, 2 here. Read the ZERO.
+grep -cE '^ *. Eval [0-9a-c]+: passed\.$' ci.log     # 10 (the loose ': passed' gives 11 - prose)
+
+# 78.4 - WHAT IT COST. Read the METER, and prove "no chat" by DIFFERENCE, not by grep.
+grep -h "Live embedding" r*.log | grep -oE '[0-9]+ query call\(s\)|[0-9]+ prompt token\(s\)' \
+  | awk '/query/{c+=$1} /prompt/{t+=$1} END{printf "%d / %d\n", c, t}'          # 581 / 8338
+for p in 'live model call' 'chat round-trip' 'completion token' 'Live chat' 'gpt-'; do
+  echo "$p concept=$(cat c*.log|grep -ci "$p") real=$(cat r*.log|grep -ci "$p")"   # EQUAL == prose
+done
+#   ⚠ "0 live call(s) made" returns 2 hits IN THE LIVE HALF, and two 'completion token' hits are
+#     UNBOXED prose - a `║` filter does not save you. The DIFFERENTIAL is the arbiter.
+
+# 78.5 - compare. ISOLATED workspace; `git init` it first (init-workspace needs a solution root and
+#        takes NO --root). EIGHT latency runs; 18 of 28 pairs are sub-precision. -> 0 0 0 13 13 2 2.
+
+# 78.6 - persistence. KEY SET + mtime window. NEVER a file count, NEVER a byte size.
+ls $S | grep -vE "\.[0-9]{8}T[0-9]{6}Z\.json$" | sed 's/\.json$//' | sort           # 14 keys
+grep -rl '"Comparability"' .agenteval ; grep -rl '"comparability"' .agenteval       # BOTH casings
+
+# 78.7 - money. TWO arbiters, because one of them is blind to embeddings in BOTH directions.
+grep -rho '"estimatedCost"[[:space:]]*:[[:space:]]*[0-9.eE+-]*' .agenteval/subjects \
+  | sed -E 's/.*:[[:space:]]*//' | awk '{s+=$1} END {printf "%.8f over %d\n", s, NR}'  # 1.09981845 / 613
+
+# 78.8 - credentials. THE NEEDLE MATTERS: the 43-char URL gives 0 whole-tree hits, the 35-char bare
+#        host gives 3 (2026-07-11 x1, 2026-07-17 x2). Assert needle length before trusting any zero.
+
+# 78.9 - THE ABLATION THAT EMPTIES (d). Copy FIRST; restore FROM THE COPY, never `git checkout --`.
+cp src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs /tmp/r.orig
+#   add: Add<AgentEval.Evals.F1ScoreEval>("f1_score", (j, m) => new AgentEval.Evals.F1ScoreEval());
+#   and bump DispatchedEvaluatorCount 40 -> 41.  ⚠ The namespace is AgentEval.Evals, NOT .Core.Evals.
+$SCRUB dotnet build tests/AgentEval.Tests -f net10.0 2>&1 | grep -c ": error"   # MUST be 0 before reading
+$SCRUB dotnet test tests/AgentEval.Tests --no-build -f net10.0 --filter FullyQualifiedName~GoldenReachability
+#   -> cal-quality-019 and -020 = ResponseBlind, NOT Judged. CalibrationEntry has no GroundTruth column.
+cp /tmp/r.orig src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs
+
+# 78.13 - the fitness question, in one command: HAS THIS CORPUS EVER BEEN JUDGED?
+grep -rl '"cohensKappa"' --include=*.json . | grep -v '/obj/\|/bin/' | wc -l    # 0. It has not.
+```
