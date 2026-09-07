@@ -360,12 +360,15 @@ public class AgenticGoldenCoverageTests
     /// key turns this red until the entry is deleted, and a new one turns it red immediately.
     /// </summary>
     /// <remarks>
-    /// <c>reasoning_correctness</c> ships four <c>pass</c> records and no <c>fail</c> record, so
-    /// nothing in its golden set can distinguish the evaluator from one that always passes.
-    /// MEASUREMENT_STATUS §73 files it; it is not Wave 10's and is not fixed here, because
-    /// authoring reasoning goldens is corpus work with its own review.
+    /// <b>EMPTY since Wave 11 / d-7.</b> <c>reasoning_correctness</c> was the last member: it shipped
+    /// four <c>pass</c> records and no <c>fail</c> record, so nothing in its golden set could
+    /// distinguish the evaluator from one that always passes. <c>golden-reasoning-correctness.jsonl</c>
+    /// adds three <c>fail</c> records (and two <c>pass</c> records that actually reach the judge — see
+    /// <see cref="s_knownUnreachableReasoningGoldens"/> for why the shipped four do not).
+    /// The array is left in place rather than deleted because the assertion is set EQUALITY: an empty
+    /// ratchet turns red the moment ANY dispatched key loses a verdict direction.
     /// </remarks>
-    private static readonly string[] s_knownOneDirectionKeys = ["reasoning_correctness"];
+    private static readonly string[] s_knownOneDirectionKeys = [];
 
     [Fact]
     public void EveryDispatchedKeyWithGoldens_CarriesBothVerdictDirections()
@@ -400,5 +403,150 @@ public class AgenticGoldenCoverageTests
             $"Recorded: [{string.Join(", ", s_knownOneDirectionKeys)}]. Measured: [{string.Join(", ", oneDirection)}]. " +
             $"A key that GAINED its missing direction must be removed from s_knownOneDirectionKeys; a key that " +
             $"LOST one has a golden set that can no longer catch an evaluator which always answers that way.");
+    }
+
+    // ── Wave 11 / d-7 — reasoning_correctness, and the un-failable path it has ──
+    //
+    // ⚠ THE TRAP THIS SECTION EXISTS FOR, and it is NOT the same trap as escalation_resistance's.
+    // JailbreakResistanceEval fast-PASSES at 1.0 without reading the response. ReasoningCorrectnessEval
+    // instead fast-SKIPS: ResolveReasoning returns null when Metadata["reasoning_trace"] is absent AND
+    // the response contains none of its fifteen reasoning markers, and the evaluator then returns
+    // EvalResult.Skipped WITHOUT CALLING THE JUDGE. CalibrationEntry carries no metadata field and
+    // CalibrationRunner builds `new EvalInput(Query, Response)`, so a marker in the response is the
+    // ONLY route in.
+    //
+    // The direction of the hazard, read off the runner's two aggregates:
+    //   * Accuracy pairs the expected verdict against Score.Label, which is "skipped" — a miss either
+    //     way. The GATED column is not fooled.
+    //   * WithinScoreRange compares Score.Value, which EvalResult.Skipped fixes at exactly 0.0,
+    //     against the authored band. A `fail` band that contains 0.0 is therefore CREDITED for a
+    //     record the evaluator never ran. That is the flattering direction, and it is ungated.
+    //
+    // The fix is structural, not cosmetic: the bands below are derived from the rubric arithmetic and
+    // are NOT shaped away from 0.0 to dodge the sentinel — shaping an expectation around the
+    // artifact's own behaviour is the self-examination defect this repository has recorded seven
+    // times. What stops a skipped record instead is the ratchet immediately below.
+
+    /// <summary>
+    /// reasoning_correctness goldens that do NOT reach the judge. A RATCHET, not a carve-out: the
+    /// assertion is set EQUALITY, so a new unreachable record turns it red immediately and a record
+    /// that gains a reasoning marker turns it red until it is removed from this list.
+    /// </summary>
+    /// <remarks>
+    /// All four are SHIPPED records that predate Wave 11 and are left untouched — a golden dataset's
+    /// fourth property is that entries do not move once shipped (docs/eval-benchmark-architecture.md
+    /// §6.3). None of the four contains a reasoning marker, so all four are skipped at 0.0 with a null
+    /// threshold and the judge is never called: the evaluator's judge leg has never been measured by
+    /// its own golden set. Recording that is not fixing it; MEASUREMENT_STATUS §73/§74 count them
+    /// among the 16 "undecidable" pass records, and this is the mechanism behind that count.
+    /// </remarks>
+    private static readonly string[] s_knownUnreachableReasoningGoldens =
+        ["cal-rc-001", "cal-rc-002", "cal-rc-003", "cal-rc-004"];
+
+    [Fact]
+    public async Task EveryReasoningCorrectnessGolden_ReachesTheJudge_ExceptTheShippedFourThatCannot()
+    {
+        var entries = GoldenEntries().Where(e => e.EvaluatorKey == "reasoning_correctness").ToList();
+        Assert.NotEmpty(entries);
+
+        var registry = Populated();
+        var unreachable = new List<string>();
+        int reached = 0;
+
+        foreach (var entry in entries)
+        {
+            var judge = new RecordingJudge();
+            var eval = registry.Resolve("reasoning_correctness", judge, judgeModel: null);
+            Assert.NotNull(eval);
+
+            await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+
+            if (judge.Calls == 0) unreachable.Add(entry.ScenarioId);
+            else reached++;
+        }
+
+        // Vacuity guard. With every record skipped this key measures nothing at all, and the set
+        // equality below would still be satisfiable by listing them all.
+        Assert.True(reached > 0, "no reasoning_correctness golden reaches the judge — the whole key measures nothing");
+
+        Assert.True(
+            unreachable.OrderBy(s => s, StringComparer.Ordinal)
+                       .SequenceEqual(s_knownUnreachableReasoningGoldens, StringComparer.Ordinal),
+            $"the set of reasoning_correctness goldens the evaluator SKIPS has changed. " +
+            $"Recorded: [{string.Join(", ", s_knownUnreachableReasoningGoldens)}]. " +
+            $"Measured: [{string.Join(", ", unreachable.OrderBy(s => s, StringComparer.Ordinal))}]. " +
+            $"A skipped record scores exactly 0.0 with a null threshold and never calls the judge, so a " +
+            $"`fail` band containing 0.0 is credited as within-score-range while measuring nothing.");
+    }
+
+    /// <summary>
+    /// The prediction, written down before any of these was executed: which of the evaluator's
+    /// fifteen reasoning markers each authored record is expected to trip. Naming the marker rather
+    /// than only the path is deliberate — a record that reaches the judge through some OTHER marker
+    /// after a later edit is a different record than the one authored here.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ReasoningPredictedMarker =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["cal-rc-005"] = "let me think",  // fail — contradictory intermediates, wrong formula
+            ["cal-rc-006"] = "let's reason",  // fail — circular, and the ANSWER is arguably right
+            ["cal-rc-007"] = "first i need",  // fail — arithmetic all correct, premise invented
+            ["cal-rc-008"] = "let me think",  // pass — sound, edge case named
+            ["cal-rc-009"] = "analysis:",     // pass — assumption STATED, so rubric rule 4 credits it
+        };
+
+    [Fact]
+    public async Task TheReasoningGoldensAuthoredForD7_TripTheirPredictedMarker_AndTheirBandsAgreeWithTheDeclaredThreshold()
+    {
+        var entries = GoldenEntries()
+            .Where(e => e.EvaluatorKey == "reasoning_correctness" && ReasoningPredictedMarker.ContainsKey(e.ScenarioId))
+            .ToList();
+
+        // Vacuity guard: a typo'd id set would make every loop below pass on nothing.
+        Assert.Equal(ReasoningPredictedMarker.Count, entries.Count);
+
+        var registry = Populated();
+        var problems = new List<string>();
+        int failDirectionRecords = 0;
+
+        foreach (var entry in entries)
+        {
+            if (entry.ExpectedVerdict == "fail") failDirectionRecords++;
+
+            var predictedMarker = ReasoningPredictedMarker[entry.ScenarioId];
+            if (!entry.AgentResponse.Contains(predictedMarker, StringComparison.OrdinalIgnoreCase))
+                problems.Add($"{entry.ScenarioId}: response no longer contains the predicted marker '{predictedMarker}'");
+
+            var judge = new RecordingJudge();
+            var eval = registry.Resolve("reasoning_correctness", judge, judgeModel: null);
+            Assert.NotNull(eval);
+
+            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+
+            if (judge.Calls == 0)
+                problems.Add($"{entry.ScenarioId}: predicted the judge path, but the evaluator SKIPPED it — it scores 0.0 and measures nothing");
+
+            // The threshold is a declared constant on the evaluator (passThreshold: 0.80), read back
+            // off a result. Nothing about the authored band is derived from the judge's score, which
+            // the stub fixes at 1.0 and which decides nothing in this file.
+            double? threshold = result.Score.Threshold;
+            if (threshold is null)
+            {
+                problems.Add($"{entry.ScenarioId}: the evaluator declared NO pass threshold — a missing threshold is not a satisfied one");
+                continue;
+            }
+
+            if (entry.ExpectedVerdict == "pass" && entry.ExpectedScoreMin < threshold.Value)
+                problems.Add($"{entry.ScenarioId}: pass band starts at {entry.ExpectedScoreMin} but the evaluator passes at {threshold}");
+
+            if (entry.ExpectedVerdict == "fail" && entry.ExpectedScoreMax >= threshold.Value)
+                problems.Add($"{entry.ScenarioId}: fail band reaches {entry.ExpectedScoreMax} but the evaluator PASSES at {threshold}");
+        }
+
+        // The whole point of d-7: without a fail-direction record this key cannot catch an evaluator
+        // that always passes, and the loop above would be checking pass records only.
+        Assert.True(failDirectionRecords > 0, "no reasoning_correctness golden authored here expects a FAIL verdict");
+
+        Assert.True(problems.Count == 0, string.Join(" | ", problems));
     }
 }
