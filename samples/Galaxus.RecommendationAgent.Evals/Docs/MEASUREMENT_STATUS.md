@@ -15821,3 +15821,46 @@ directories exits **0**, matching both scenario rows by name, with the named-SKU
 `1.0000 → 0.0000` and the uncatalogued row `1.0000 → 1.0000`. Run directories land under
 `.agenteval/samples/Galaxus.RecommendationAgent.Evals/benchmarks`, which `.gitignore:453` already
 excludes.
+
+## §84 — Wave 6 re-taken after Wave 3 shipped. Nothing regressed, and the census rose where it should (2026-09-07)
+
+The plan runs Wave 6 after every shipped wave. This is the re-take at `d5b5b5fe`, after the owner
+answered all four open questions and Wave 3 was built.
+
+| gate | observed |
+|---|---|
+| strict `IEval` declarers under `src/` | **75** — unchanged |
+| the intersection with `ChanceFloor` | **exactly `FloorAdmittedEval.cs`** — unchanged, and that is half of why Q-A was answered "inside the rule" |
+| files naming `ChanceFloor` under `src/` | **7 → 9**: `AdmittedCheck.cs` (3.1) and `BenchmarkRunner.cs` (3.2). The intended direction |
+| `: IEval` inside `src/AgentEval.Core/Benchmarks/` | **0** — nothing in the new namespace is an eval |
+| `Metadata["agent"]` inside that namespace | **1**, and it is the REFUSAL's own documentation quoting the smuggle it forbids. Live uses: **0**. The same prose-vs-code shape §82.1 recorded for `SyntheticEval` |
+| build (`--no-incremental`) | `: error ` **0** |
+| net10 / net9 / net8 | **10169 / 9951 / 9951**, `Failed: 0`, skipped 2 / 1 / 1 |
+| per-commit `[Fact]`+`[Theory]` under `tests/` | **8036 → 8055**, never falling (deltas 13, 6, 0, 0) |
+| credential scan, delta since the plan began | **0 on all five patterns** |
+
+Sample exit codes, credentials unset in the command, stderr **0 bytes on every row**:
+
+| row | exit |
+|---|---|
+| Galaxus `1 / 2b / 2c --dry-run`, `3`, `4`, **`4d --dry-run`** | 0 |
+| Galaxus `7`, `--ci --dry-run` | 1 — unchanged; Eval 07's GATE B is the only FAILED of eleven |
+| `AgentEval.Samples -- 97`, **`-- 98`** | 0 |
+| `TravelDemo --selftest`, `MafEvalLightPath --selftest`, `MafEvalFoundryAlongsideLocal --selftest` | 0 |
+| `PartnerDeskDemo --offline --selftest` | 0 |
+
+### §84.1 One deviation from the plan's own target column, and it is a deliberate improvement
+
+The plan's reachability table expected 3.4 to add a SECOND `AtomicCodeEval` to
+`samples/AgentEval.Samples`. It reads **1**, because the sample re-expresses the eval M1 already
+ships rather than writing a new one. That is the stronger demonstration — "your existing eval becomes
+a definition with **no changes**" is a claim a bespoke second eval would have made false — and a test
+(`TheSampleUsesTheSHIPPEDEval_Unchanged`) pins it so the sample cannot quietly swap in a copy. The
+`.AddEval(` count is likewise 1 rather than 2: `BenchmarkRunner` admits through the door on the
+sample's behalf, which is the point of the runner existing.
+
+### §84.2 The two broken gates from §82 are unchanged, and still broken
+
+6.4's line-deletion metric and 6.1's `SyntheticEval` expectation still measure the wrong thing —
+nothing in Wave 3 touched either. The per-commit test-METHOD count is what was read above, and it is
+the instrument that answers the question the deletion gate was written to ask.
