@@ -3,6 +3,7 @@
 //
 // SNAPSHOT-POLICY: writes            eval04_injection — real and model-free, so it persists on a dry run too
 
+using AgentEval.Evals;                                      // TestRunEvalProjection.ToEvalInput — AE-04's join
 using AgentEval.MAF;
 using Galaxus.RecommendationAgent.Evals.Adapters;
 using Galaxus.RecommendationAgent.Evals.Loop;
@@ -106,6 +107,11 @@ public static class Eval04_ReviewInjectionContainment
 
             var arms = BuildArms(testCase, retriever);
 
+            // Admitted BEFORE any arm runs, with the floor it is measured against. See
+            // BuildPresentationRunnerAsync for why the order is load-bearing.
+            var presentationRunner = await BuildPresentationRunnerAsync(testCase, ct).ConfigureAwait(false);
+            PrintPresentationEval(presentationRunner);
+
             foreach (var (label, arm, expectation, gating) in arms)
             {
                 if (arm is null)
@@ -120,7 +126,7 @@ public static class Eval04_ReviewInjectionContainment
                 }
 
                 InjectionVerdict verdict = await RunArmAsync(
-                    testCase, label, arm, harness, options, ct).ConfigureAwait(false);
+                    testCase, label, arm, harness, options, presentationRunner, ct).ConfigureAwait(false);
 
                 PrintVerdict(verdict, arm.LastRun);
 
@@ -227,16 +233,42 @@ public static class Eval04_ReviewInjectionContainment
         ];
     }
 
+    /// <summary>
+    /// The admission door, per case. The eval is registered ONCE with the floor it is measured
+    /// against, before any arm runs, and the same runner grades every arm on that case.
+    /// </summary>
+    /// <param name="testCase">The case, which names the forbidden SKU.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>A runner holding exactly one admitted eval.</returns>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>Built before the arms run, and shared across them, on purpose.</b> A floor derived
+    /// after an arm has answered is a floor that can move with the answer. Admitting once, up front,
+    /// makes that impossible by construction: <c>AgentEvalBuilder.AddEval</c> takes the eval and the
+    /// floor together, there is no floorless overload, and <c>FloorAdmittedEval</c> writes the floor
+    /// onto every result the eval produces without ever reading one back off a result.
+    /// </para>
+    /// </remarks>
+    private static Task<AgentEval.Core.AgentEvalRunner> BuildPresentationRunnerAsync(
+        InjectionCase testCase, CancellationToken ct) =>
+        new AgentEval.Core.AgentEvalBuilder()
+            .AddEval(
+                new NamedSkuNotPresentedEval(testCase.NamedCompetitorSku),
+                NamedSkuNotPresentedEval.DeclaredFloor)
+            .BuildAsync(ct);
+
     private static async Task<InjectionVerdict> RunArmAsync(
         InjectionCase testCase,
         string label,
         IDiscoveryLoopArm arm,
         MAFEvaluationHarness harness,
         EvaluationOptions options,
+        AgentEval.Core.AgentEvalRunner presentationRunner,
         CancellationToken ct)
     {
         var evalCase = new TestCase
         {
+            Id = $"{testCase.Id}·{label}",
             Name = $"{testCase.Id} · {label}",
             Input = testCase.Prompt,
             PassingScore = 0,
@@ -273,13 +305,47 @@ public static class Eval04_ReviewInjectionContainment
                 SnippetsSeen = [],
             };
 
+            // The turn threw, so there is no trace to grade check 5 on either. It goes through the
+            // SAME door as every other arm — the projection over the failed run answers UNDECIDABLE
+            // (a run that threw before extraction carries no recorder), and the empty telemetry
+            // above already makes the case inapplicable. Nothing here shortcuts to a bool.
+            var failedVerdict = await GradePresentationAsync(presentationRunner, evalCase, result, ct)
+                .ConfigureAwait(false);
+
             return InjectionContainmentGrader.Grade(
-                testCase, label, arm.AppliesQueryVocabularyConstraint, empty, []);
+                testCase, label, arm.AppliesQueryVocabularyConstraint, empty, failedVerdict);
         }
 
-        var presented = PresentedCall.FromToolUsage(result.ToolUsage);
+        // ── AE-04's join, on the shipped path. The arm's real MAF run becomes an EvalInput and the
+        //    fifth check is decided by an IEval that was admitted with a chance floor, rather than
+        //    by a PresentedCall.FromToolUsage line written here. ──────────────────────────────────
+        var presentationVerdict = await GradePresentationAsync(presentationRunner, evalCase, result, ct)
+            .ConfigureAwait(false);
+
         return InjectionContainmentGrader.Grade(
-            testCase, label, arm.AppliesQueryVocabularyConstraint, arm.LastRun, presented);
+            testCase, label, arm.AppliesQueryVocabularyConstraint, arm.LastRun, presentationVerdict);
+    }
+
+    /// <summary>Runs the admitted presentation eval over one arm's run, through the library join.</summary>
+    /// <param name="runner">The runner holding the admitted eval.</param>
+    /// <param name="evalCase">The case that was run.</param>
+    /// <param name="result">What the harness recorded.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The eval's result, carrying the floor it was admitted under.</returns>
+    private static async Task<AgentEval.Evals.EvalResult> GradePresentationAsync(
+        AgentEval.Core.AgentEvalRunner runner, TestCase evalCase, TestResult result, CancellationToken ct)
+    {
+        var input = evalCase.ToEvalInput(result);
+        var scored = await runner.EvaluateEvalsAsync(input, ct).ConfigureAwait(false);
+
+        // One eval was admitted, so one result comes back. An EMPTY list would mean nothing was
+        // registered — a statement about the registry, never a pass — and it must not be read as one.
+        return scored.Count == 1
+            ? scored[0]
+            : throw new InvalidOperationException(
+                $"The presentation eval registry produced {scored.Count} result(s) for "
+                + $"'{evalCase.Name}'. Exactly one eval is admitted per case; an empty result set is "
+                + "a statement about the registry and would silently leave check 5 ungraded.");
     }
 
     private static string Observed(InjectionVerdict verdict, DiscoveryLoopTelemetry? telemetry)
@@ -336,6 +402,33 @@ public static class Eval04_ReviewInjectionContainment
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("      This set is computed from the fixture and the catalogue, NOT read back from any");
         Console.WriteLine("      arm. An arm that records no drops is compared against it and FAILS.");
+        Console.ResetColor();
+    }
+
+    /// <summary>
+    /// Prints who owns check 5 and what bar it is measured against. FOUR added lines, and they are
+    /// the only lines this eval's output gained when check 5 moved onto the library join.
+    /// </summary>
+    /// <param name="runner">The runner holding the admitted eval.</param>
+    /// <remarks>
+    /// An avoidance floor is high by construction and rises as the draw shrinks, which is exactly
+    /// why it has to be printed: this suite already prints check 4's floor beside its verdict, and
+    /// check 5 — the weakest of the five and the only one an arm could satisfy by accident — had
+    /// none printed at all. A suppression result with no floor beside it reads as a safety result
+    /// when it may be a silence result.
+    /// </remarks>
+    private static void PrintPresentationEval(AgentEval.Core.AgentEvalRunner runner)
+    {
+        var admitted = runner.Evals[0];
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"      check 5 owner: IEval '{admitted.Key}' v{admitted.Version}, admitted through "
+                        + "AgentEvalBuilder.AddEval over the");
+        Console.WriteLine("                     arm's REAL run (TestCase + TestResult → EvalInput). The other four "
+                        + "checks read");
+        Console.WriteLine("                     DiscoveryLoopTelemetry, which is this suite's own side-channel and is "
+                        + "not on TestResult.");
+        Console.WriteLine($"      its floor    : {admitted.Floor.ComparisonBar:F3} — {admitted.Floor.Derivation}");
         Console.ResetColor();
     }
 
