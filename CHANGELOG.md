@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AE-04 — the join from an agent run to an `IEval`.** There was no path from a MAF agent run to a
+  deterministic eval, and the count of evals reachable from the primary entry point was zero. Three
+  pieces close it: `TestRunEvalProjection.ToEvalInput(TestCase, TestResult)` projects a run into an
+  `EvalInput`; `FloorAdmittedEval.Admit(IEval, ChanceFloor)` is the only door, and it will not open
+  without a floor; `AgentEvalBuilder.AddEval(IEval, ChanceFloor)` and
+  `AgentEvalRunner.EvaluateEvalsAsync` run what was admitted. The floor is supplied AT ADMISSION and
+  is never read back off a result — an eval that supplies the bar it is judged against is this
+  repository's most-repeated defect, and the door throws rather than merging such a result.
+- **`ToolCall` carries a three-way tool-call contract.** `EvalInput.ToolCalls` is `null` when no
+  recorder could see the whole run, `[]` when a recorder ran and saw nothing, and non-empty
+  otherwise. "Nobody knows" and "nobody called it" are different facts, and rendering both as zero
+  is how a blindness becomes a measurement. Two result markers rank above any recorded payload:
+  `__tool_not_executed__:` outranks `__tool_error__:`, which outranks the tool's own output.
+- **`TestRunEvalProjection.ToToolCall(ToolCallRecord)` is public**, so a consumer with its own runner
+  gets the same marker rules instead of re-deriving them.
+- **`AgentEval.Benchmarks` definition records** — `BenchmarkDefinition`, `AdmittedCheck`,
+  `BenchmarkArm`, `CheckObservation`, `BenchmarkRun`. Data only: no subject, no judge, no store, so
+  a benchmark can be written down, reviewed and diffed without running it. `TestCase.Id` is optional
+  on the type and REQUIRED here, because the case is the unit of analysis for every floor, pairing
+  and rep collapse, and a display name re-points the join the moment anyone edits a label.
+  Deliberately absent, each because the question is open: a content hash, a controls slot, a judge
+  slot.
+- **`BenchmarkScore`** — `AgainstFloor`, `AgainstReference`, `Census`. Facts about runs in meta-lane
+  terms; nothing in it is an `IEval`, returns an `EvalResult`, or writes a pass. Reps collapse per
+  CASE before any test runs, and a cell whose reps are not all measured collapses to the worst state
+  present rather than to the mean of the survivors.
+- **The meta lane (ADR-030 Slice 2)** — `ChanceFloor`, `ExactTests`, `PairedEvalComparer`,
+  `ObservationCensus`, `RepCollapse`, `Observation`. Defined over a neutral five-field tuple rather
+  than over `EvalResult`, so the layer is adoptable by a consumer that has never heard of AgentEval.
+  A floor at or above 1.0 yields a NaN tail and is undecidable, never a pass; an ABSENT floor is not
+  a floor of 0.0.
+- **Applicability (ADR-030 Slice 1)** — `MeasurementState`, `EvalScore.NotApplicable()`,
+  `CountsTowardAggregate()`, `CensusBucket()`. A mean over 3 of 12 and a mean over 12 of 12 are
+  different facts. Schema v1 now accepts `"inapplicable"` and the `measurement` field, which is
+  written only when non-default, so no produced byte moves for an existing producer.
+- **`IEvalRegistry`** — a factory-shaped registry over the shipped eval keys, so a run can name what
+  it used without the caller holding every constructor.
+- **`agenteval compare`** and `ExitCodes.Incomparable = 13`, for two runs whose comparability facts
+  do not line up. "Not comparable" is a distinct outcome from "no difference found".
+- **`ScenarioResult.StimulusHash`** — a run persists WHAT WAS ASKED and a digest of it, so a
+  comparison can refuse two runs that were not asked the same thing.
+- **`docs/deterministic-evals.md`** — the whole contract in one place: the door and its four
+  refusals, `null` versus `[]`, the two markers, why a 0.0 floor is not "no floor" and a 1.0 floor is
+  undecidable, and what `compare` gates on.
+
 - **`AtomicCodeEval.NotApplicable(reason, evidence?)`** — the undecidable verdict for the
   deterministic lane, mirroring `EvalResult.Skipped` (ADR-030 D13). It keeps three disciplines that
   are easy to get wrong: an undecidable result is never `Passed` and is **not a 0.0 fail** (a 0.0
@@ -19,6 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are different facts.
 
 ### Changed
+
+- **`EvaluatorCardRegistry` moved from Mission Control into `AgentEval.Core`** (ADR-031 C3), so the
+  cards are available to any consumer rather than to one app.
+- **A run now carries the five comparability facts**, and `applicableFraction` is `Measured / Total`.
+  The tempting alternative, `(Total − NotApplicable) / Total`, POOLS "the case could not test the
+  thing" with "the instrument did not run" — different findings, different owners — and reports a
+  broken harness as a well-scoped corpus.
+- **`EvalResultPersistence.ToScenarioResult` gained optional parameters.** Source-compatible,
+  **binary-incompatible**: a caller compiled against 0.34 must be recompiled.
+- **`AgentEval.Testing.AssertionResult` is `[Obsolete]`** in favour of `AgentEval.Output.AssertionResult`,
+  which adds a three-valued `Outcome` — an assertion that could not run is not an assertion that
+  failed.
 
 - **Aggregation no longer requires an `IEval` to carry a weight.** The five strategies gain a static
   `AggregateWeights(results, weights)`; the instance `Aggregate(results, components)` forwards to it.
@@ -37,6 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which is how the test is known not to be vacuous.
 
 ### Fixed
+
+- **The judge fingerprint refused an endpoint on one of its two strings and claimed both.** Both are
+  now checked.
+- **`compare` rendered a non-zero delta as `0.0000`.** A genuine zero still renders as one.
+- **The ordinal stripper ate short leading words**, in both directions at once.
 
 - **A judge that graded nothing is no longer named on the OWASP / NIST / MITRE roots.**
   `Provenance.JudgeModel` recorded `"<family>-judge-passthrough"` whenever an `IEvaluator` was
