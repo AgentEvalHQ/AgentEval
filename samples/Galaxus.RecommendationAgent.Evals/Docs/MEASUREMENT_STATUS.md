@@ -14152,3 +14152,251 @@ cat $G/*.jsonl | grep '"jailbreak_resistance"' | grep -oE '"expectedVerdict":"[^
 #      s_goldensWhoseJudgeFreeVerdictContradictsTheirLabel, i.e. fast-passed at 1.0. THAT IS d-8.
 grep -n "cal-gdq" tests/AgentEval.Tests/Agentic/Calibration/AgenticGoldenCoverageTests.cs  # NOTHING = d-9
 ```
+
+---
+
+## §77.0 Wave 12 REVIEWED — the reachability control certified **88% of the corpus on a call count**
+
+Taken at `dd1a7450` from a clean tree, by a party that produced none of the numbers below.
+**Every figure here was executed in this session.** Nothing is quoted from §76 without re-deriving it.
+
+Wave 12 built the general control the brief asked for — reachability instead of presence — and it is a
+real instrument: it caught d-7 unprompted, it caught a key it was never built against, and it is red on
+degenerate inputs in both operands. **Three defects survived it, and the first is the same shape the
+wave existed to close, moved one boundary further out.**
+
+| # | defect | direction | fixed at |
+|---|---|---|---|
+| **1** | `Judged` granted on `judge.Calls > 0` alone — the response was never proven to reach the judge | **FLATTERING**, 298 of 338 dispatched records | `4b2c0f61` |
+| **2** | the free-credit census filtered to skips, dropping the only 2 credits that move Accuracy and Kappa | **FLATTERING**, 9 recorded vs 11 measured | `1768de77` |
+| **3** | the bar's own failure message counted (key, direction) pairs as KEYS and claimed a measurement it never made | **FLATTERING** — blast radius up to 2x overstated | `18b6a36e` |
+
+## §77.1 THE FRESH MECHANISM — and the control stayed **GREEN** on it
+
+The brief required a reachability failure built by a mechanism *other than* the three known ones
+(fast-pass, skip-on-missing-input, sentinel-in-band). The one constructed here is the fourth:
+**the judge is called and is never shown the response.**
+
+`src/AgentEval.Core/Evals/AtomicLlmEval.cs` line 80 is the single boundary every judged record crosses.
+Replacing `input.Response` with a constant in that one call — so not one evaluation in the corpus shows
+the judge the agent's response — produced:
+
+| surface | under the ablation, BEFORE the fix |
+|---|---|
+| `GoldenReachabilityTests` | **9 / 9 GREEN** |
+| whole `Agentic.Calibration` namespace | **33 / 33 GREEN** |
+| whole net10 suite | 4 red — **all four** in `Cli.Bench{Gdpr,EuAiAct}CommandTests`, a different family catching it incidentally |
+
+**Nothing in the calibration control surface saw it.** The class docstring asserted *"the judge was
+called: it saw the response, so the verdict is a function of it"*; the second clause was never measured.
+The file rejects `judge.Calls` as sufficient for the 15 judge-free records and then relies on it for the
+other 298 — the gate-self-examination shape, in the flattering direction, on 88% of the corpus.
+
+**After `4b2c0f61` the same ablation is RED**: `census: 338 — Judged=0, JudgedWithoutTheResponse=298`,
+74 (key, direction) pairs named, every record named, 4 of 10 tests red.
+
+`Judged` now requires the record's own response to be the agent text the evaluator handed the judge, on
+**every** call — captured off the artifact and compared against our golden text, so the two operands are
+not both ours. The separation is proved on **synthetic** evals in an isolated registry, because no
+shipped evaluator withholds the response today and a classifier validated only where the failure does
+not occur has not been shown to detect it.
+
+## §77.2 Every ablation the build claimed, RE-EXECUTED — all nine reproduce
+
+| # | ablation | claimed | re-executed here |
+|---|---|---|---|
+| A1 | `golden-reasoning-correctness.jsonl` emptied (d-7 pre-fix) | RED, both directions, cal-rc-001..004 | identical |
+| A2 | delete `cal-jr-005` (d-8) | RED, `cal-jr-003=ResponseBlind` | identical, plus the d-8 vacuity guard |
+| A3 | delete `cal-gdq-005` (d-9) | RED, `cal-gdq-002=Skipped` | identical |
+| A6 | `escalation_resistance` fail queries made benign | RED, cal-esc-002/004/005 | identical, 4 tests red |
+| A4 | empty corpus (22 jsonl truncated) | 4 of 9 red, bar among them | **4 of 9**, bar among them |
+| A5 | `Populated()` returns an empty registry | 7 of 9 red, the 2 green assert redness | **7 of 9**, and the 2 green are exactly those |
+| — | wiring guard: re-point `prompt_leak` at `JailbreakResistanceEval` | `Actual: [..., prompt_leak]` | verbatim, 5 tests red |
+| B | move `cal-gdq-002`'s band to [0.20, 0.30] | sentinel ratchet RED | identical |
+| — | **step 1 commit `31717297` is deliberately RED** | 1 test red, 8 of 9 pass | reconstructed with `git show` and re-run: **exactly** 1 red, on `goal_decomposition_quality` and `jailbreak_resistance` and nothing else |
+
+Two new ablations added by this review: **N1** (section 77.1) and **C** — move `cal-jr-001`'s band to
+[0.50, 0.60], and the credit list goes red showing the record losing `within-range` and **keeping**
+`verdict-match`, which is what proves the two credits are measured separately rather than copied.
+
+## §77.3 Defect 2 — the free-credit census kept the flattering half
+
+`CalibrationRunner` hands out **two independent credits** per entry: `WithinScoreRange` (score in band)
+and the `(ExpectedVerdict, Score.Label)` pair that becomes `Accuracy` and `CohensKappa`. The census
+recorded only records classed `Skipped`. Measured:
+
+| record | class | score | label | expected | band | within-range | verdict-match |
+|---|---|---|---|---|---|---|---|
+| `cal-jr-001` | ResponseBlind | 1.0 | pass | pass | [0.90, 1.00] | yes | **yes** |
+| `cal-jr-004` | ResponseBlind | 1.0 | pass | pass | [0.90, 1.00] | yes | **yes** |
+| `cal-gdq-002` + 8 x `cal-utu` | Skipped | 0.0 | skipped | fail | min 0.00 | yes | no |
+
+A skip can **never** take the verdict-match credit — its label is `"skipped"`, which no
+`ExpectedVerdict` equals — so restricting to skips excluded precisely the two records that inflate the
+two headline calibration numbers. **9 recorded, 11 measured, and the 2 omitted were the worse kind.**
+
+**AND THE RECONCILIATION COULD NOT HAVE DISAGREED.** Step 1 offered its 9 as corroborating §76.11's
+"9 free credits". §76.11 defines that figure as *"every skipped `fail` record with `expectedScoreMin`
+0.00"* — so the new, wider instrument was narrowed to the shape of the number it was checked against.
+**§76.11's 9 is correct as §76.11 defines it.** What was wrong is treating agreement with it as evidence
+that the wider instrument was complete. Co-moving operands, and the sixth confirmed shape of the
+gate-self-examination rule.
+
+## §77.4 Defect 3 — the message that sizes the damage
+
+`BarViolations` appends one entry per **(key, direction)** pair; the assertion header called them keys.
+Executed: A1 printed `"2 dispatched key(s)"` for **one** key failing in both directions, and N1 printed
+`"74 dispatched key(s)"` against a **40-key** dispatch table — a count that is not merely wrong but
+impossible, and it printed without anyone noticing. It now reads
+`"2 (key, verdict-direction) pair(s) across 1 dispatched key(s)"`, the two counts derived separately.
+
+Two further corrections in the same commit. The message claimed *"NO golden record can PRODUCE the
+'fail' verdict"* when what is measured is **reachability**; whether the evaluator would produce that
+direction is out of this instrument's reach, because the judge is a stub with a fixed score. And the
+zero-records case and the records-that-cannot-run case are now separate findings, because their fixes
+are different — **author** one versus make one **runnable**.
+
+## §77.5 What the build got RIGHT, and it is most of it
+
+* **The bar is not derived from the artifact.** §6.3 property 2 is the bar; the class is the
+  measurement. Confirmed: there is no per-record allowlist, and both ratchets count their members
+  against the bar.
+* **The transport exemption is proved, not declared, and the door is narrow.** Measured across all 40
+  dispatched keys: `unsafe_tool_use` is the **only** one whose every golden is unreachable through
+  `Input`+`AgentResponse`. Half one is the binding half; no other key can be exempted today.
+* **No shipped entry was edited.** `git diff 46315e00..HEAD` over the golden corpus: **2 added, 0
+  removed**. §6.3 property 4 needs no exception and none is claimed.
+* **No third band rule.** The d-8/d-9 assertions use `ExpectedScoreMax >= threshold` on **fail**-verdict
+  records — byte-for-byte Wave 11's `TheThreeKeysAuthoredForD4_HaveFailBandsThatCannotDisagree...`.
+  §8.2's straddling stratum is **borderline PASS** (0.65-0.85 across a 0.70 threshold) and the new
+  assertions touch no pass band. **The open §8.2-vs-Wave-10 conflict is neither engaged nor resolved.**
+* **The build's own three self-reported findings are all correct**, including the sharpest: the
+  branch-wide "tests/ 0 deleted lines" invariant is **blind** to within-branch deletions. Re-derived:
+  `git diff --numstat main...HEAD -- tests/` reads 0 deletions across **45** paths, while
+  `git diff 46315e00..HEAD` shows **17** deleted lines. Same shape as the blind `estimatedCost`.
+  Those 17 lines are a 1-for-1 replacement with a strictly stronger test, and A6 proves it: the
+  `escalation_resistance` recorded fast-passed set is **empty**, identical in strength to Wave 10.
+* **`f1_score`** is confirmed as the corpus's only one-direction golden set (**2 pass, 0 fail**), and it
+  is a declared Path A' carve-out, so nothing currently rests on it. The build's decision to name it and
+  **not** call it a d-10 is upheld: it is latent, and whether §6.3 binds carved-out keys is a judgement
+  for the commission, not for a wave.
+
+## §77.6 Category (d) after Wave 12
+
+| # | member | state |
+|---|---|---|
+| d-4, d-5, d-7 | | BUILT in earlier waves, re-confirmed green here |
+| **d-6** | 86 straddling pass bands | still **CONTESTED (a)/(d)**, untouched, and this review did not decide it either |
+| **d-8** | `jailbreak_resistance`'s only `fail` is fast-passed | **BUILT** `940e0027` — verified by ablation, not by reading |
+| **d-9** | `goal_decomposition_quality`'s only `fail` is skipped and credited | **BUILT** `dd1a7450` — verified by ablation |
+
+**No tenth member.** The three defects above are defects in the CONTROL, not new buildable corpus items;
+`f1_score` is latent and carved out. **(d) is only ever right immediately after somebody runs the
+commands** — these were run on 2026-09-07.
+
+## §77.7 Money — **zero**, proved by an arbiter that is not `estimatedCost`
+
+No `--real-vectors`, no live command, no model call of any kind in build or review. `estimatedCost` is
+blind to embedding spend (§76.7) and is **not** used here. Four independent arbiters:
+
+1. **BLACKHOLE POSITIVE CONTROL.** The calibration surface re-run with
+   `AZURE_OPENAI_ENDPOINT=https://127.0.0.1:1/` and a **synthetic** key: **34/34 GREEN**. A separate
+   socket probe confirms `127.0.0.1:1` yields `ConnectionRefusedError`, so any call routed there would
+   fail loudly. **Green implies no call was attempted**, and the arbiter is not vacuous.
+2. **No client can be constructed.** `EvalRegistry.Resolve(key, judge, judgeModel)` calls
+   `registration.Factory(judge, judgeModel)` — the judge is a **parameter**. No factory builds a client,
+   and the only `IEvaluator` in play is the local `RecordingJudge`.
+3. **Zero network surface** in the touched files: `HttpClient|Azure|OpenAI|https?://` gives **0** hits in
+   both `GoldenReachabilityTests.cs` and `AgenticGoldenCoverageTests.cs`.
+4. **All 16 `AGENTEVAL_*` gates the suite reads were measured unset** (count per name = 0), and the 11
+   credential-shaped vars present in this shell were unset **in every command**. 9,963 tests in 28 s.
+
+## §77.8 Credentials — 178 hits, **every one classified**, 0 unclassified, with a synthetic control
+
+Eight credential *patterns* over **2,875 tracked files**. **Reported by count and date; no path and no
+token is printed.**
+
+| pattern | hits | files | bucket |
+|---|---|---|---|
+| `azure-84char-key` | 107 | 1 | sample |
+| `azure-openai-endpoint` | 51 | 29 | 22 documentation, 27 test fixture, 2 src |
+| `aws-access-key` | 12 | 4 | test fixture |
+| `private-key-block` | 3 | 1 | test fixture |
+| `azure-32hex-key` | 2 | 2 | 1 documentation, 1 test fixture |
+| `openai-sk-key` / `github-pat` / `bearer-literal` | 1 each | 1 each | test fixture |
+
+**All 178 classify as placeholder/synthetic; unclassified hits in `src/` or elsewhere: 0.** Last-commit
+dates span **2026-02-01 to 2026-09-07**; the 2026-09-07 rows are the calibration golden corpus, whose
+`sensitive_data_leakage` scenarios carry synthetic secrets by design.
+
+**Synthetic positive control**, written outside the repo and deleted in the same command: the scanner
+fires on both a synthetic `sk-` key and a synthetic `*.openai.azure.com` endpoint, so the classifications
+above are not zeros from a dead needle.
+
+## §77.9 Build, TFMs and the branch invariants
+
+| | measured here |
+|---|---|
+| `dotnet build AgentEval.sln --no-incremental` errors | **0** |
+| warning TOTAL as MSBuild prints it | 252 — **still not quotable** (226 / 229 / 231 / 243 / 252) |
+| **distinct `file(line,col): warning CS####` identities** | **70**, over **41** files — **SIXTH** consecutive close-out |
+| identity histogram | byte-identical to §76.1: CS8602 x26, CS1573 x13, CS1574 x12, CS8604 x3, CS0618 / CS1734 / CS8601 / CS8629 x2, eight more x1 |
+| the three coordinates §74.1 pinned | all **RE-OBSERVED** at the same line and column |
+| warnings from `GoldenReachabilityTests.cs` | **0** |
+| warnings from `AgenticGoldenCoverageTests.cs` | **1** (xUnit2030), the same source line as at `46315e00` |
+
+| TFM | passed | failed | skipped | total |
+|---|---|---|---|---|
+| **net10.0** | **9,963** | **0** | 2 | 9,965 |
+| **net9.0** | **9,745** | **0** | 1 | 9,746 |
+| **net8.0** | **9,745** | **0** | 1 | 9,746 |
+
+**+1 on each TFM** against the build phase's 9,962 / 9,744 / 9,744 — exactly the one test added here.
+
+`git log main..HEAD -- strategy/` gives **0 commits**, over the whole branch. Golden corpus this wave:
+**2 added lines, 0 deleted**. Census at HEAD: **338 dispatched records — Judged 298,
+JudgedWithoutTheResponse 0, DecidedFromResponse 12, ResponseBlind 3, Skipped 25**, 40 carved out, 0 bar
+violations. Classification is **deterministic**: every record classified twice, 0 disagreements.
+
+## §77.10 What this review does NOT claim
+
+1. **It does not re-audit the paid layer.** No judged cohort was run; the judge is a stub everywhere.
+   Every score-bearing figure in §76.4 stands untouched and unverified here.
+2. **It does not touch `src/`.** Two source files were ablated and **restored from copies** (never
+   `git checkout --`); `git status` is clean and `git diff HEAD` is empty.
+3. **It does not extend the bar to carved-out keys.** 40 records across 9 keys are still never
+   reachability-checked, `f1_score` among them. That limit is declared in the file, not hidden.
+4. **It does not resolve the §8.2-versus-Wave-10 band conflict**, and adds no third rule about band shape.
+5. **`Judged` now proves the response REACHED the judge, not that the judge USED it.** A judge is a
+   model; that it was shown the text is the strongest claim a stub-driven instrument can make.
+
+## §77.11 Falsifiable prediction, and how to re-derive §77
+
+At `18b6a36e`, on a clean tree, with credentials unset:
+
+* `dotnet build AgentEval.sln --no-incremental` gives **0 errors** and an identity set of **70 over 41
+  files**.
+* net10 **9,963 / 0 / 2**; net9 and net8 **9,745 / 0 / 1**.
+* `Agentic.Calibration` gives **34 / 34**, and `GoldenReachabilityTests` gives **10 / 10**.
+* Editing `src/AgentEval.Core/Evals/AtomicLlmEval.cs` line 80 to pass any constant in place of
+  `input.Response` turns the bar RED with the literal substring `JudgedWithoutTheResponse=298`.
+  **Before `4b2c0f61` that same edit left 9 of 9 green.**
+* `s_creditedWithoutReachingAVerdict` has exactly **11** entries, of which exactly **two** —
+  `cal-jr-001` and `cal-jr-004` — carry `+verdict-match`.
+
+```bash
+# 77.1 - THE ABLATION THAT MATTERS. Copy the file FIRST; restore FROM THE COPY, never `git checkout --`.
+cp src/AgentEval.Core/Evals/AtomicLlmEval.cs /tmp/a.orig
+sed -i '80s/input.Response,/"<WITHHELD>",/' src/AgentEval.Core/Evals/AtomicLlmEval.cs
+dotnet test tests/AgentEval.Tests -f net10.0 --filter FullyQualifiedName~GoldenReachabilityTests
+cp /tmp/a.orig src/AgentEval.Core/Evals/AtomicLlmEval.cs      # 4 of 10 RED at 4b2c0f61+; 0 of 9 before
+
+# 77.7 - money. The blackhole is the arbiter; estimatedCost is NOT used and is blind anyway.
+AZURE_OPENAI_ENDPOINT="https://127.0.0.1:1/" AZURE_OPENAI_API_KEY="sk-SYNTHETIC-CONTROL" \
+  dotnet test tests/AgentEval.Tests -f net10.0 --filter FullyQualifiedName~Agentic.Calibration  # 34/34
+python -c "import socket;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',1))"          # MUST refuse
+
+# 77.9 - the identity set. CS codes only, and the (line,col) IS part of the identity.
+dotnet build AgentEval.sln --no-incremental -v q 2>&1 \
+  | grep -oE '[^ ]+[.]cs[(][0-9]+,[0-9]+[)]: warning CS[0-9]+' | sort -u | wc -l                # 70
+```
