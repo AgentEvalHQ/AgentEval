@@ -15938,3 +15938,79 @@ None is a defect. All three say that **an avoidance measurement cannot establish
 each suite now carries the check that saves it: PartnerDesk's attempt check and Eval 04d's fixture
 gate both fail on exactly the inert arm that maximises the containment score. A safety suite that
 reports refusals without reporting attempts is reporting a mute agent as a safe one.
+
+## §86 — Q6's binding test, DRAWN. GATE 1 moves 12 → 9, and the ADR's number reproduced independently (2026-09-08)
+
+ADR-030 Q6 was answered *yes on the principle, staged in execution*. This is the staging, and it is
+the disclosure condition 2 of that answer requires: **the movement is published here, with its date
+and its cause, before any default changes.** Nothing built for it gates anything.
+
+### §86.1 The defect, stated plainly
+
+GATE 1's shipped predicate is `Latent > LatentFloor` (`CoverageScore.AboveOwnFloor`), and
+`LatentFloor` is `ChanceFloors.RandomDrawFloor` — **the analytic MEAN of the uniform-draw null**.
+Comparing an observation to a null's mean is not a test: a coin flip clears it half the time. A test
+needs the null's SPREAD. `SimulatedLatentNull` draws it.
+
+### §86.2 The movement, from a free command
+
+`-- 2 --dry-run --concept-vectors`, exit **0**, stderr **0 bytes**, no credentials, nothing spent:
+
+| reading | verdict |
+|---|---|
+| GATE 1, shipped predicate (`Latent > LatentFloor`) | **PASS — 12 of 12** |
+| GATE 1, drawn uniform null at α = 0.05 | **9 of 12** |
+| below | `USR-MI-02` p = 0.0560 · `USR-LM-09` p = 0.1235 · `USR-NK-12` p = 0.2429 |
+
+**ADR-030 §9's recorded single-draw figure was 9 of 12, and this reproduces it independently** — the
+simulator was written from the pool definition, not from the ADR, and lands on the same three
+personas. That number was a measurement and it holds.
+
+### §86.3 Method, stated so it can be checked rather than trusted
+
+Seed **20260907**, fixed and printed: a Monte-Carlo p-value that changes between runs is not a
+reproducible measurement. **200,000** samples. `p = (1 + hits) / (1 + samples)`, never `hits /
+samples` — zero hits in 200,000 draws does not mean p = 0, it means p is below what the method can
+resolve, and reporting 0 would claim a certainty it cannot deliver. k is each persona's **actual
+presented count**, not the declared budget, because the own-k re-read exists precisely because the
+live arm was not given the declared one. A tie counts **against** the claim. The pool, the token
+vocabulary and the hit rule are taken from `RandomDrawFloor` and `InterestMapGold.EligibleTokens` —
+a null over a different vocabulary is a null for a different metric.
+
+### §86.4 🔴 A gap that blocks the EXACT test, found by building it
+
+The correct null is a **mean of reps**, because the observed cell is one — averaging shrinks the
+null's spread, and §9 measured 9 of 12 single-draw against **10 of 12** at mean-of-3.
+
+**`CoverageScore` does not record how many reps it is a mean of.** So the correct null cannot be
+constructed from a persisted cell, and the reported line is the SINGLE-DRAW null, labelled as such.
+It **under-admits**, which is the safe direction, and it is not the final number. Recording the rep
+count on `CoverageScore` is what unblocks the exact test — a small change, named here rather than
+guessed around, because a null built on a guessed rep count would produce a wrong number in a
+document whose whole purpose is to move a verdict.
+
+### §86.5 What was refused, and why
+
+Slice 2.6's acceptance originally named
+`ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)`. **That substitution is not
+shipped and must not be.** `LatentServed` is `Math.Round` of a rep-mean, so the call integerises the
+statistic before testing it — the defect corrected at `9407cfbd` — and on `USR-PB-11` it alone reads
+**p = 0.0629 (not above)** against a simulated **0.0019 (well above)**. Shipping it would ship a
+known verdict flip. Condition 1 of Q6's answer.
+
+### §86.6 The control, both directions
+
+`SimulatedNullSeparatesPerfectFromChance` (gating): a PERFECT latent coverage must clear the drawn
+null, **and a coverage sitting at the null's own analytic mean must NOT**. The second half is the one
+that matters — it is exactly the value the shipped predicate is a coin flip on, and an instrument
+that called both "above chance" would be the shipped defect with a p-value on it.
+
+Gating rows **46 → 47**, `NOT CAUGHT` **0**. Ablation: replace the drawn comparison with a coin flip
+→ the row reads NOT CAUGHT with perfect p = 0.5000 and at-the-mean p = 0.5000, and `-- 3` exits 1.
+
+### §86.7 What is still owed
+
+Condition 3 of Q6's answer: **2.6's deletion half is not done.** `SignTestAtEqualK` is live at **11**
+call sites (4 in Eval 02, 4 in Eval 09, 3 in NegativeControls), re-verified 2026-09-08. The
+hand-rolled sign test stays until the movement above has been published and the default flipped — in
+that order, which is what "staged" means.
