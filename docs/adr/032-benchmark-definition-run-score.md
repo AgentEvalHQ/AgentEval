@@ -1,11 +1,17 @@
-﻿# ADR-032: Benchmarks are definitions; runs bind subjects; scores are meta
+# ADR-032: Benchmarks are definitions; runs bind subjects; scores are meta
 
-- **Status:** **Proposed.** Proposed is a gate, not a placeholder (the ADR-026 / ADR-030 precedent).
-  Accepting this document funds **Waves 0 and 1** of §3.3 — three flattering fixes, one release cut,
-  five deletions and three additive helpers — which between them edit **exactly one** existing test
-  file (§5.2). **Wave 2, the benchmark contract itself, is gated on one question only the owner can
-  answer** (§6, Q-A), and this document does not answer it. Nothing here resolves ADR-030's Q4(ii), Q5
-  or Q6; §6 names what each still blocks.
+- **Status:** **Accepted (2026-09-07).** The owner answered §6's Q-A — **inside the rule** — and
+  Wave 2 was then BUILT rather than merely funded: `BenchmarkDefinition` / `AdmittedCheck` /
+  `BenchmarkArm` / `CheckObservation` / `BenchmarkRun` (`c27bb45e`), `BenchmarkScore` (`821b41cd`),
+  `BenchmarkRunner` + the `Metadata` refusal (`b340e829`), the `EvalJoin/02` sample (`e74dcc78`) and
+  one in-repo benchmark converted (`375da551`). ADR-030's Q4(ii), Q5 and Q6 are answered too — see
+  §6's answer table for what each answer refused, **in code and not only in prose**.
+  <br/>⚠ Accepted describes the contract, not the stop rule: Q6 is *yes on the principle, staged in
+  execution*, so `BenchmarkRunner` still applies **no** floor to any verdict.
+  <br/>_Superseded status, kept because the reasoning still holds: **Proposed.** Proposed is a gate,
+  not a placeholder (the ADR-026 / ADR-030 precedent). Accepting this document funds Waves 0 and 1 of
+  §3.3 … Wave 2, the benchmark contract itself, is gated on one question only the owner can answer
+  (§6, Q-A), and this document does not answer it._
 - **Date:** 2026-09-07, written against `d563fd9d` on `joslat/digitec-galaxus`, tree clean
   (`git status --short` → 0 lines). No build, test or paid run was executed for this document. The
   test totals (net10 10,071/0/2; net9 and net8 9,853/0/1) are **carried** from the join wave's
