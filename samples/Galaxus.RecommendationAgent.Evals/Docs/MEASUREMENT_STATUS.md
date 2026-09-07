@@ -15521,10 +15521,37 @@ recorder differently on purpose.
 | `-- 3` | **0**; gating rows **46** by distinct name (was 43); `NOT CAUGHT` **0** |
 | `--ci --dry-run` | **1** — Eval 07 the only FAILED of eleven, unchanged |
 | `AtomicCodeEval` files in the evals project | 1 -> **4** |
-| `.AddEval(` uses | 1 -> **4** |
+| `.AddEval(` uses | 1 -> **5** (published as 4 - see the correction below) |
 
 Credentials were unset **in the command** for every figure above. `--real-vectors` is therefore
 **refused, not run**, and no real-space column is claimed here.
+
+#### CORRECTION (2026-09-07, found by the Wave 6 census)
+
+**Superseded -> corrected.** `.AddEval(` uses in this project: **1 -> 4** (published here and in
+commit `09e52dcc`) is wrong. The true figure at that same commit is **1 -> 5**.
+
+**Direction of the error: it UNDER-declares.** The change was larger than reported, so nothing
+that depended on the number is over-claimed - but the number is still wrong, and an
+under-declaration is the same class of error as an over-declaration.
+
+**Cause.** I counted the three deterministic evals I set out to wire (`Eval01`, `Eval02b`,
+`Eval02c`) on top of the one that already existed (`Eval04`) and stopped. The diff also added a
+fourth new call site: the `ThroughTheDoorAsync` helper in `NegativeControls.cs`, which puts each
+control's eval through the same door the production path uses. That is INTENT scope, not DIFF
+scope - a disclosure enumerates the diff, never the plan.
+
+**Blast radius, bounded.** The figure appears in exactly two places: this table and the body of
+commit `09e52dcc`. It is a reachability count only: no floor, no verdict, no p-value and no gating
+row reads it. The gating-row figures (43 -> 46, `NOT CAUGHT` 0) were counted by distinct name from
+the program's own output and are unaffected. The commit is already published, so it is corrected
+here rather than rewritten.
+
+**Falsifiable prediction.** At commit `09e52dcc`,
+`git grep -c '\.AddEval(' 09e52dcc -- 'samples/Galaxus.RecommendationAgent.Evals/*.cs'` summed over
+files is **5**, and the five sites are `Eval01_CatalogueIntegrity.cs`, `Eval02b_StatedNeedSatisfaction.cs`,
+`Eval02c_HeldOutNextPurchase.cs`, `Eval04_ReviewInjectionContainment.cs` and `NegativeControls.cs`.
+
 
 ### §81.2 The three floors, and why one of them earns no p-value
 
@@ -15566,3 +15593,132 @@ exactly the three new rows read NOT CAUGHT. Restored from a copy: **46 gating, 0
 
 Both directions are asserted inside each control, because an eval that always fails would catch its
 planted defect for the wrong reason.
+
+## §82 — Wave 6: the whole plan re-verified by execution, and TWO of its five gates measure the wrong thing (2026-09-07)
+
+Every command in the plan's §11 re-run at `821b41cd`, with credentials unset **in the command**.
+Nothing was spent, and nothing that needs a credential was run.
+
+### §82.1 6.1 — reachability census
+
+| measurement | expected | observed |
+|---|---|---|
+| strict `IEval` declarers under `src/` | 75 | **75** |
+| files naming `ChanceFloor` under `src/` | 7 | **8** |
+| the intersection | `FloorAdmittedEval.cs` | **exactly that one file** |
+| `private EvalResult Undecidable` in `samples/` | 0 | **0** |
+| `SyntheticEval` / `CapByWorstAggregate` / `judge-passthrough` in `src/` | 0 | **1** |
+
+The `ChanceFloor` rise from 7 to 8 is this plan's own task 3.1 adding
+`Benchmarks/Definitions/AdmittedCheck.cs` — the intended direction. It does not touch the
+intersection, because `AdmittedCheck` pairs an eval with a floor without being one.
+
+Per sample, as `AtomicCodeEval` files / `.AddEval(` calls / `FloorAdmittedEval.Admit(` calls:
+
+| sample | observed |
+|---|---|
+| `AgentEval.Samples` | 1 / 1 / 0 |
+| `Galaxus.RecommendationAgent.Evals` | 4 / **5** / 0 |
+| `AgentEval.TravelDemo.Evals` | 1 / 2 / 0 |
+| `AgentEval.MafEvalLightPath` | 1 / 1 / **1** |
+| `AgentEval.MafEvalFoundryAlongsideLocal` | 1 / 1 / **1** |
+| `AgentEval.PartnerDeskDemo.Evals` | 0 / 0 / 0 |
+
+⚠ **The SyntheticEval gate reads 1, not 0, and the hit is prose.** The single match is a COMMENT at
+`PerformanceBenchmark.cs:510` explaining that the three stubs are gone. Live, non-comment references
+are **0**. This is the same house convention that broke task 1.4's grep — a retraction quotes the
+claim it retracts — so the pattern is right and the expected value is wrong for any repository that
+documents its own removals.
+
+### §82.2 6.2 — three-TFM run
+
+`dotnet build AgentEval.sln --no-incremental`: `: error ` count **0**.
+
+| TFM | passed | failed | skipped |
+|---|---|---|---|
+| net10.0 | 10150 | **0** | 2 |
+| net9.0 | 9932 | **0** | 1 |
+| net8.0 | 9932 | **0** | 1 |
+
+The skipped counts are the §80.2 baseline exactly (2 / 1 / 1); this plan marks nothing
+skipped-by-design. `AgentEval.Memory.Tests` net10: 1185 passed, 0 failed.
+
+⚠ **The warning count is UNATTRIBUTED, not clean.** Distinct warning identities read **111** where
+§80.1 recorded 96. No warning names any file this plan added or edited — checked against the raw
+build log rather than the deduplicated list — but §80.1 kept only its total, not the SET, so the
+movement from 96 cannot be reconciled here. The plan's own instruction, "compare the set, never the
+total", needs the set to have been stored, and it was not.
+
+### §82.3 6.3 — sample exit-code sweep
+
+All 26 Galaxus rows unmoved from §80.3: 24 exit 0, `7` exits 1, `--ci --dry-run` exits 1.
+**stderr was 0 bytes on every one of the 26.**
+
+All 13 `--real-vectors` invocations printed
+`Embedding space: concept (galaxus-concept-v3, 24 dims) · queries embedded offline · --concept-vectors`
+— the real space was **refused, not run**, so no real-space figure is claimed anywhere here. The
+banner was read; the flag's name was not trusted.
+
+Additional rows, all exit 0 with 0 bytes on stderr: `AgentEval.Samples -- 97`,
+`TravelDemo.Evals --selftest`, `PartnerDeskDemo.Evals --offline --selftest`, and the two new
+`MafEvalLightPath --selftest` and `MafEvalFoundryAlongsideLocal --selftest`.
+
+### §82.4 6.4 — 🔴 the per-commit test-deletion gate does not measure test deletion
+
+Predicted: line deletions under `tests/` are 0 on every plan commit except 0.1's.
+Observed: **5 of the 13 commits are non-zero.** Classified, every one of the four unexpected
+non-zeros is an artefact of the metric rather than a removed test:
+
+| commit | deletions | what they actually are |
+|---|---|---|
+| 0.1 | 3 | the predicted rename + flipped assertion, plus the line-1 header |
+| 0.2a | 1 | the line-1 SPDX header being rewritten (BOM churn) |
+| 0.3 | 3 | the same header line, once per file, across three files |
+| 0.2b | 9 | a test **moved** between two files — the receiving file gains 11 |
+| 2.1 | 1 | a `.csproj` line, not a test at all |
+
+`git diff --numstat` counts a MODIFIED line as one deletion, so a header rewrite, a move and a
+project-file edit all fire. The instrument that answers the question the gate was written to ask is
+the per-commit `[Fact]` + `[Theory]` count under `tests/`:
+
+**7972 to 8036 across the 13 commits, never falling on any of them** (deltas 1, 2, 3, 1, 4, 6, 4, 0,
+8, 0, 0, 20, 15).
+
+⚠ It is also **blind to sample-resident controls.** Tasks 2.2 and 2.3 both read delta 0 because
+their controls are negative-control rows and `--selftest` arms inside the samples, not xUnit methods
+under `tests/`. A gate that reads 0 for "added three gating controls" and 0 for "deleted three
+gating controls" cannot tell them apart.
+
+### §82.5 6.5 — credential scan, by count and date
+
+The scanner was proven live **before** any zero was accepted: a synthetic file assembled at run time
+OUTSIDE the repository and deleted in the same command matched **1 on all five patterns**, with
+needle lengths 30 / 32 / 13 / 43 / 52 — long enough to exercise the `{20,}` and `{32}` quantifiers
+rather than passing on a short string.
+
+Tracked-file hits: **2 / 39 / 42 / 29 / 2**. **0 credential-bearing**, classified by match TEXT:
+
+- the `sk_` hit is Stripe's own published documentation key, inside a red-team JSON fixture whose
+  sibling field says the response "uses a hardcoded API key" — it is the planted defect a
+  secret-detection test exists to catch;
+- the `*.openai.azure.com` hits are documentation placeholders (`example.`, `my-endpoint.`,
+  `myresource.`, `test.`, `x.`, `xxx.`) plus a `synthetic-resource.` **endpoint-leak fixture**: the
+  needle a leak test plants, asserted to be REJECTED by a fingerprint field;
+- the 32-hex hits are digests — `judge_prompt_fingerprint`, `ValidHash`, `TamperedHash`,
+  `evidenceClaimedHash`, and JSON digest values;
+- the `api_key` hits are placeholders (`your-api-key`, `<key>`, `<your-key>`), environment reads
+  (`os.environ[...]`) and CI secret references;
+- the `Bearer` hit is a literal alphabet.
+
+**Delta introduced by this plan: 0 on all five patterns** (`69baba46~1` compared with `HEAD`).
+Reported by count and date; no path is named here.
+
+`python tools/check_docs_toc.py` exits **0** — 92 docs reachable, 31 local links resolve.
+
+### §82.6 What Wave 6 changed about the plan
+
+Two of the five verification gates are now known to measure something other than what they claim
+(6.1's SyntheticEval expectation, and 6.4's deletion metric), and one is unreconcilable as written
+(6.2's warning total). None of the three is a defect in the shipped code; all three are defects in
+the **instruments** — the failure mode this repository has recorded most often, and the reason a
+gate's own inputs are never allowed to come from the artifact it grades.
