@@ -517,6 +517,29 @@ public class AgenticGoldenCoverageTests
             if (!entry.AgentResponse.Contains(predictedMarker, StringComparison.OrdinalIgnoreCase))
                 problems.Add($"{entry.ScenarioId}: response no longer contains the predicted marker '{predictedMarker}'");
 
+            // ⚠ WAVE 11 REVIEW — THE HALF THIS TEST WAS MISSING, AND IT FAILED IN THE FLATTERING
+            // DIRECTION. The check above compares the predicted marker against the golden text that
+            // THIS FILE ALSO OWNS, and never against the evaluator's own marker list. Both operands
+            // were ours, so the assertion could not see the artifact under test move: review ablation
+            // A8 deleted "analysis:" from ReasoningCorrectnessEval.ReasoningPrefixes and ALL ELEVEN
+            // tests in this class stayed GREEN — cal-rc-009 still reached the judge, through
+            // "therefore,", so the recorded prediction had silently become false while reading as
+            // verified. That is the gate-self-examination shape this repository has recorded before:
+            // never let the thing under test supply every input to its own pass/fail.
+            //
+            // The probe closes it through the PUBLIC surface only — no reflection on the private
+            // marker array, no assertion about the judge's score. The marker ON ITS OWN must still be
+            // enough to make the evaluator take the judge path; if it is not, the evaluator no longer
+            // recognises it and the prediction beside it is stale whatever the golden text says.
+            var markerProbe = new RecordingJudge();
+            var probeEval = registry.Resolve("reasoning_correctness", markerProbe, judgeModel: null);
+            Assert.NotNull(probeEval);
+            await probeEval!.EvaluateAsync(new EvalInput(Query: "marker probe", Response: predictedMarker));
+            if (markerProbe.Calls == 0)
+                problems.Add($"{entry.ScenarioId}: the evaluator NO LONGER RECOGNISES '{predictedMarker}' as a reasoning marker — " +
+                             $"the recorded prediction is false even though the response still contains the string, and the record " +
+                             $"now reaches the judge (if at all) by some other route than the one authored");
+
             var judge = new RecordingJudge();
             var eval = registry.Resolve("reasoning_correctness", judge, judgeModel: null);
             Assert.NotNull(eval);
