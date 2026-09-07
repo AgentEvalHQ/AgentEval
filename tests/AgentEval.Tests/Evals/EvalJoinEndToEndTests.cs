@@ -25,7 +25,8 @@ namespace AgentEval.Tests.Evals;
 /// function-invocation loop, the tool body, <see cref="MAFAgentAdapter"/>,
 /// <see cref="MAFEvaluationHarness"/>, <c>ToolUsageExtractor</c> over the real
 /// <c>RawMessages</c>, the projection, the admission door, the runner and
-/// <see cref="EvalResultPersistence"/> all execute unmodified. <see cref="TheToolBodyReallyRan"/>
+/// <see cref="EvalResultPersistence"/> all execute unmodified.
+/// <see cref="TheToolBodyReallyRan_SoTheRunIsARunAndNotAFixture"/>
 /// is the control on that claim: it counts side effects the test never produces itself, so a
 /// fixture quietly replacing the run would turn it red.
 /// </para>

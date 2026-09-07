@@ -15218,3 +15218,291 @@ sed -E -e 's/[0-9]{2}:[0-9]{2}:[0-9]{2} UTC/<CLOCK> UTC/g' -e 's/[0-9]{8}T[0-9]{
 #   MEASURE THE NOISE FLOOR FIRST by diffing TWO baseline runs, or the result is unreadable:
 #   it is 0 lines on 3/4/7 and 6 on --ci, and without that number "22 lines" means nothing.
 ```
+
+## §80 — AE-04's join, VERIFIED BY EXECUTION. **26 exit codes unmoved**, and **four published counts did not reproduce** (2026-09-07)
+
+This section verifies the eight-commit AE-04 wave (`10a94755..f1f17b0d`) against the tree, by running
+it. Everything below was observed; nothing was carried over from the build, review or prove reports.
+Where a report's number is quoted it is quoted **in order to be checked**, and four did not survive.
+
+### §80.1 Build — the identity **SET**, and the one identity the wave actually added
+
+`dotnet build AgentEval.sln --no-incremental` → **0 errors**.
+
+| | measured |
+|---|---|
+| distinct warning **codes** | **23** |
+| distinct **(file, line, code)** identities | **96** |
+| warning TOTAL as MSBuild prints it | 252 — **not an invariant, do not quote it** |
+
+The 23 codes: `CS0162 CS0414 CS0419 CS0618 CS1572 CS1573 CS1574 CS1580 CS1734 CS7022 CS8601 CS8602
+CS8604 CS8629 CS8714 CS9107 xUnit1030 xUnit1031 xUnit2012 xUnit2013 xUnit2029 xUnit2030 xUnit2031`.
+
+**🔴 The first reading was 97, and the extra identity was the wave's own.**
+`tests/AgentEval.Tests/Evals/EvalJoinEndToEndTests.cs(28,76): warning CS1574 — cref 'TheToolBodyReallyRan'
+could not be resolved.` The class remark names its own control test, and **the member it names does not
+exist**: the method is `TheToolBodyReallyRan_SoTheRunIsARunAndNotAFixture`. The build report, the review
+and the prove report each published *"build 0 errors"* and **none of the three declared a new warning
+identity**, because all three counted errors and the warning TOTAL — and the total is exactly the number
+this document has recorded as noise at 226/229/231/243/252. Fixed here; the set returns to **96**, and
+**zero** of the 96 identities lives in any of the 12 wave-touched code files.
+
+⚠️ **The total moved 255 → 252 for a one-token change inside an XML doc comment.** A third live specimen
+of §76.1: the warning total is not a measurement of anything.
+
+### §80.2 Three TFM totals, after a full solution build — **no existing test's output moved**
+
+| suite | net10.0 | net9.0 | net8.0 |
+|---|---|---|---|
+| `AgentEval.Tests` | **10071 / 0 / 2** of 10073 | **9853 / 0 / 1** of 9854 | **9853 / 0 / 1** of 9854 |
+| `AgentEval.Memory.Tests` | 1185 / 0 / 0 | 1185 / 0 / 0 | 1185 / 0 / 0 |
+| `AgentEval.PartnerDeskDemo.Tests` | 75 / 0 / 0 | net10-only | net10-only |
+| `AgentEval.NuGetConsumer.Tests` | 0 / 0 / 9 | net10-only | net10-only |
+
+**Against the pre-wave baseline (`45dd4d20`: net10 9963/0/2 of 9965, net9 and net8 9745/0/1 of 9746):
++108 on every TFM, every one new.** Skipped counts **identical** (2 / 1 / 1), failures **0** throughout,
+and `git diff --numstat` deletion column under `tests/` is **0 for all eight commits of the wave**.
+The +108 decomposes exactly as the three reports claimed to add: 79 + 18 + 11.
+
+⚠️ **`dotnet test -f net9.0` and `-f net8.0` exit 1 and that is NOT a failure.** Both print
+*"The test source file … was not found"* for `AgentEval.NuGetConsumer.Tests` and
+`AgentEval.PartnerDeskDemo.Tests`, which are net10-only. Failed-test count is **0** in both. An exit code
+read without its reason would have condemned a green tree.
+
+### §80.3 Exit codes — 26 commands, and 🔴 **the right-hand column is not the real space**
+
+Every command run with the credential variables unset **in the command**, `$?` observed per command.
+
+| command | `--concept-vectors` | `--real-vectors` |
+|---|---|---|
+| `-- 1 --dry-run` | 0 | 0 |
+| `-- 1 --dry-run --judge` | 0 | 0 |
+| `-- 2 --dry-run` | 0 | 0 |
+| `-- 2b --dry-run` | 0 | 0 |
+| `-- 2c --dry-run` | 0 | 0 |
+| `-- 3` | **0** | **0** |
+| `-- 4` | **0** | **0** |
+| `-- 5 --dry-run` | 0 | 0 |
+| `-- 6 --dry-run` | 0 | 0 |
+| **`-- 7`** | **1** | **1** |
+| `-- 8 --dry-run` | 0 | 0 |
+| `-- 9 --dry-run` | 0 | 0 |
+| **`--ci --dry-run`** | **1** | **1** |
+| `AgentEval.Samples -- 97` (M1, the join sample) | **0** | — |
+| `init-workspace` · `bench perf latency` (isolated) | **0** · **0** | — |
+
+**NOTHING MOVED — eleventh consecutive sweep.** `stderr` across all 26 sample invocations: **0 bytes**.
+
+**🔴 But this sweep did not exercise the real embedding space, and saying "both spaces" would be wrong.**
+With the credential variables unset the `--real-vectors` half is **refused, not run**. Read, not inferred:
+
+* **The banner.** `grep -h "queries embedded"` over the 13 `--real-vectors` logs returns
+  **13 × `Embedding space: concept … queries embedded offline · --concept-vectors`** — the flag in the
+  banner has *flipped to* `--concept-vectors`. §78.3's live half returned 13 × `embedded LIVE`.
+* **The refusal is printed in full**, naming the missing variables and stating *"every number below was
+  produced by 24 authored dimensions, NOT by text-embedding-3-small"*.
+* **The tripping-advisory discriminator, an independent arbiter.** §78.3 established that the real space
+  trips **3** advisories and the concept space **2**, differing by exactly
+  `DenseLegSaysWhenItRankedNothing`. Here both columns trip **2**. The discriminator says concept.
+
+**What the 26 rows therefore prove:** the exit-code surface is unmoved *and* the credential-refusal path
+is itself stable under all 13 invocations. **What they do not prove:** anything about the live space.
+The prove report's phrase *"both spaces were run offline"* is the one clause to strike — the real space
+was not run at all.
+
+### §80.4 The control panel — 43 gating, 0 NOT CAUGHT, 7 advisory, by distinct row NAME
+
+| | concept | `--real-vectors` (refused → concept) |
+|---|---|---|
+| gating rows, by distinct NAME | **43** | **43** |
+| `❌ NOT CAUGHT` | **0** | **0** |
+| advisory rows, by distinct NAME | **7** | **7** |
+| advisory rows TRIPPING | 2 | 2 |
+
+`diff` of the gating NAME sets across the columns: **empty**. `diff` of the advisory NAME sets:
+**empty**. Source-side arbiter `grep -c '^        rows.Add(' Evals/NegativeControls.cs` → **50 = 43 + 7**,
+and `NegativeControls.cs` is **not** among the wave's 14 changed files.
+
+### §80.5 Persistence — key set **14**, model-backed keys untouched, and the casing trap fired **both ways**
+
+The key set is unchanged at **14**. The sweep wrote exactly **three** — `eval03_controls`,
+`eval04_injection`, `eval07_topology`, all stamped `2026-09-07T12:32:2x` — and **the other eleven were
+not touched**, their `RunAt` values still dated 2026-09-04 … 2026-09-06.
+
+🔒 **The two headline model-backed records reproduce to the digit, a fifth time**, read from the JSON's
+own `RunAt` and not from an mtime: `eval02b_stated_need` = `2026-09-05T17:53:19.8608498Z`,
+`eval02c_held_out` = `2026-09-05T18:20:12.5118072Z` — **the same digits §72.6, §74.6, §76.6 and §78.6
+published.**
+
+⚠️ **THE CASING TRAP, CHECKED IN BOTH DIRECTIONS, AND IT FIRED AGAIN.** In the repository store and
+across the whole `.agenteval` tree, `grep -rl '"Comparability"'` → **0** *and* `grep -rl '"comparability"'`
+→ **0**. In a freshly built isolated workspace carrying one real `bench perf latency` run: **0 Pascal, 1
+camel.** The library serialises with `JsonNamingPolicy.CamelCase` (`EvalResultPersistence.cs:21`), so
+**the PascalCase grep alone reports absence where the field is present on every run file.**
+
+**🔴 No persisted artifact anywhere carries a floor from the AE-04 door.** Two separate facts:
+
+1. **The Galaxus snapshots are not `EvalResult` records at all.** `eval04_injection.*.json` is the
+   sample's own schema — `Label`, `Controls[]`, `AllControlsTripped`, `RunAt`, `Provenance`. It carries
+   **0** occurrences of `chance_floor` in any casing and **0** of `NamedSkuNotPresented`. Check 5 crosses
+   the join **on the console**; the snapshot never sees it.
+2. **The CLI's own `comparability` block has no floor in it.** The one produced here reads
+   `{"evalKey": "perf_benchmark", "evalVersion": "1.0.0", "effectiveBar": 0.6}` — **no `chanceFloor`
+   key**, which is `ComparabilityFacts.ChanceFloor` correctly rendering its *never-admitted → whole
+   record null* state, because the CLI does not run the eval registry (6.3 is genuinely not built).
+
+Whole-tree `grep '"chance_floor"'` returns **9** files and **all nine are TypedMemEval corpus data** —
+authoring-time floors baked into datasets, not run output.
+
+⚠️ **A live specimen of the unfalsifiable zero, produced by accident and worth keeping.** The first
+attempt at the isolated-workspace control put `AGENTEVAL_ALLOW_STUB_JUDGE=1` **before** the `-u` flags;
+`env` aborted with *"env: '-u': No such file or directory"*, the benchmark never ran — **and the same
+casing grep still returned 0 and 0.** An absence produced by a broken command is byte-identical to an
+absence produced by a measurement. The scan pipeline was therefore direction-controlled before any zero
+in this section was believed (`AgentEval` → 2486 files, `AZURE_OPENAI_API_KEY` → 133, `openai.azure.com`
+→ 38).
+
+### §80.6 Credentials — **0 credential-bearing in tracked files**, every hit classified, 0 unclassified
+
+**The scanner was proven live first**, on a SYNTHETIC secret written outside the repository and deleted
+in the same command: all **5 of 5** patterns fired (`sk-` token, 32-hex run, `api_key` assignment,
+`*.openai.azure.com`, `Bearer` token). ⚠️ One pattern initially read 0 because `grep -E` does not accept
+`(?i)`; a pattern that cannot fire proves nothing, so it was re-proved with `-i`.
+
+**The wave's 14 changed files: 0 hits on all five patterns.**
+
+| corpus | full endpoint URL (43 ch) | bare host (35 ch) | Azure key (84 ch) |
+|---|---|---|---|
+| **tracked files** (2,883) | **0** | **0** | **0** |
+| **whole tree**, untracked and ignored included | **0** | **3** | **0** |
+
+The three whole-tree hits are dated **2026-07-11 ×1** and **2026-07-17 ×2**, and **all three are
+untracked-or-ignored** — unchanged in count and date from §75.9, §76.8 and §78.8.
+⚠️ **The needle-length trap reproduced exactly:** the 43-character URL returns **0**, the 35-character
+bare host returns **3**. Needle lengths were asserted before any zero was accepted.
+
+**Loose scan over all 2,883 tracked files, every hit classified:**
+
+| pattern | hits | files | classification |
+|---|---|---|---|
+| `*.openai.azure.com` | 67 | 38 | **nine obviously-synthetic subdomains**: `your-resource` ×14, `example` ×11, `synthetic-resource` ×9, `myresource` ×7, `test` ×5, `x` ×3, `xxx` ×2, `my-endpoint` ×1, `explicit` ×1 |
+| 32-hex run | 95 | 38 | json/cs/md/yml data, digests and ids; **exactly 1** sits next to a credential word and it is an `InlineData` row labelled *"a 32-char hex key"*, a redaction fixture |
+| `api_key` assignment | 89 | 56 | CI `secrets.*` references ×12, `null` ×10, placeholders (`demo-…`, `<your-key>`, `your-api-key`, `secretone-…`, `secrettwo-…`, `"k"`, `...`), `Environment.GetEnvironmentVariable` ×3, CLI option parse ×2 |
+| `sk-` token | 1 | 1 | the literal `sk-SYNTHETICSYNTHETICSYNTHETIC…` |
+| `Bearer` token | 1 | 1 | the literal `Bearer abcdefghijklmnopqrstuvwxyz0123456789` |
+
+**0 unclassified. 0 credential-bearing.** Reported by count and date, never by path.
+
+### §80.7 🔴 **Four published counts did not reproduce** — the §79.1 lesson, a third consecutive wave
+
+The prove report's reachability census was re-derived with a **character-by-character C# scanner** that
+blanks comments and *every* literal form — normal, verbatim, interpolated and char — while preserving
+line offsets. A bare `grep` and a regex-based stripper both get this wrong, and both were tried first.
+
+| reference | prove report | **re-derived** | verdict |
+|---|---|---|---|
+| `IEval`, code refs in `samples/` | 0 | **0 before, 0 after** | ✅ **confirmed** |
+| `AtomicCodeEval` | 0 → 2 | **0 → 2**, both real base-type declarations | ✅ **confirmed** |
+| `EvalResult` | 38 in 8 → 50 in 12 | **36 in 6 → 47 in 10** | 🔴 **not reproducible** |
+| Galaxus `ToEvalInput` | 2 | **1** | 🔴 **prose double-counted** |
+| Galaxus `AddEval` | 2 | **1** | 🔴 **prose double-counted** |
+
+**Cause, in every case: prose inside string literals.** `AddEval` appears 5 times in `samples/` under a
+naive scan and **only 2 of the 5 are calls** — the other three are a `Console.WriteLine` narrating the
+door, a menu description in `Program.cs`, and a `+ "AgentEvalBuilder.AddEval over the"` continuation.
+`IEval` survives one regex stripper as a false positive for exactly the same reason: it sits inside an
+interpolated string on `Eval04_ReviewInjectionContainment.cs:425`. **Resolving the name to its binding is
+the arbiter; the count never is.**
+
+**The corrected census, after (comments and all literals removed):**
+
+| project | `IEval` | `AtomicCodeEval` | `ToEvalInput` | `AddEval` | `TestRunEvalProjection` | `FloorAdmittedEval` |
+|---|---|---|---|---|---|---|
+| `AgentEval.TravelDemo.Evals` | 0 | 0 | 0 | 0 | 0 | 0 |
+| `AgentEval.PartnerDeskDemo.Evals` | 0 | 0 | 0 | 0 | 0 | 0 |
+| `Galaxus.RecommendationAgent.Evals` | 0 | **1** | **1** | **1** | **1** | 0 |
+| `AgentEval.Samples` (M1) | 0 | **1** | **1** | **1** | **1** | **1** |
+
+**`IEval` is still 0 in `samples/`, before and after, and that is correct rather than a gap:** a sample
+reaches the interface through the `AtomicCodeEval` base type and through the `AddEval(IEval, ChanceFloor)`
+parameter. Nothing needs to name it. **The count that carries the claim is 2 and 2** — two genuine
+`ToEvalInput` call sites and two genuine `AddEval` call sites, in two different sample projects. The
+join executes in samples, not only in tests.
+
+### §80.8 ADR-030 §2.4 — the shipped derivation reproduces **exactly**
+
+`FloorAdmittedEval.cs` ships its counts beside the commands that produce them (the review's fix 5). Run
+verbatim on this tree: files under `src/` whose **type declarations** name `IEval` as a base → **79**;
+files mentioning `ChanceFloor` → **7**; **intersection exactly 1, and it is `FloorAdmittedEval.cs`** —
+the door itself, not a floored eval.
+
+⚠️ **The definition is load-bearing and a looser one gives a different answer.** "Files that *mention*
+`IEval`" is 213, and its intersection with the `ChanceFloor` set is **2**, because `AgentEvalBuilder.cs`
+declares `AddEval(IEval, ChanceFloor)` without implementing anything. The shipped grep says *declares a
+base*, and under that grep the number is 1. A reader who re-derives with a bare `grep -rl IEval` will
+get 2 and think the document is stale; it is not.
+
+### §80.9 What §80 does **NOT** claim
+
+* **Not that the real embedding space still behaves** — it was refused on all 13 invocations (§80.3).
+  The last live measurement of it remains §78.3.
+* **Not that a floor survives to disk** — nothing persisted anywhere carries one (§80.5). The floor is
+  proven to survive *in memory*, read back through the library's own
+  `EvalResultPersistence.ComparabilityOf`, by the M1 sample (*bar 0.125, state Derived, usable as a bar:
+  True*) and by the join tests. Disk is untested because no persisting path runs the eval registry.
+* **Not that `MAFEvaluationHarness` runs evals** — 6.3 and 6.4's enforcement are deliberately not built.
+* **Not that the sweep is a cost measurement.** Nothing was purchased: credentials unset in every
+  command, the Galaxus arms are model-free by `CredentialGuard.DeclareModelFree`, `--ci --dry-run` stubs
+  every model, and M1's only `IChatClient` is the in-process `ScriptedChatClient`. The isolated
+  workspace's summed `estimatedCost` is `0.00000000` over 1 value — ⚠️ and per §78.7 that field is blind
+  to embedding spend, so it corroborates and does not prove.
+
+### §80.10 Falsifiable prediction, and how to re-derive §80
+
+**Prediction.** On this tree, re-running §80.3 produces the identical 26 exit codes and the identical
+banner reading; and `grep -c ': warning CS1574'` scoped to `EvalJoinEndToEndTests.cs` returns **0**.
+If a future wave restores 97 distinct warning identities, the reintroduced one will be a cref.
+
+```bash
+E=samples/Galaxus.RecommendationAgent.Evals
+SCRUB="env -u AZURE_OPENAI_API_KEY -u AZURE_OPENAI_ENDPOINT -u AZURE_OPENAI_DEPLOYMENT \
+       -u AZURE_OPENAI_DEPLOYMENT_NAME -u AZURE_OPENAI_EMBEDDING_DEPLOYMENT -u OPENAI_API_KEY"
+# the wave under test: 45dd4d20 (pre) .. f1f17b0d (post), eight commits
+git log --oneline 45dd4d20..f1f17b0d          # 10a94755 54769757 68a362fd 835adea2
+                                              # 822ad60d 376466ab 9078cab9 f1f17b0d
+
+# 80.1 - the IDENTITY SET. Never the total: it read 255 and 252 across a doc-comment edit.
+$SCRUB dotnet build AgentEval.sln --no-incremental -v m > b.log 2>&1
+grep -oE 'warning [A-Za-z0-9]+' b.log | sed 's/warning //' | sort -u | wc -l          # 23 codes
+grep -E ': warning ' b.log | sed -E 's/^(.*)\[C:.*$/\1/' | sort -u | wc -l            # 96 identities
+
+# 80.2 - deletions. THE BRANCH-VS-main DIFF IS BLIND TO WITHIN-BRANCH DELETIONS.
+for c in 10a94755 54769757 68a362fd 835adea2 822ad60d 376466ab 9078cab9 f1f17b0d; do
+  git diff --numstat ${c}~1..${c} -- tests/ | awk '{s+=$2} END {print s+0}'; done      # 0 x8
+
+# 80.3 - THE REAL HALF IS REFUSED, NOT RUN. Read the banner; do not infer from the flag.
+grep -h "queries embedded" r*.log | sort | uniq -c    # 13 x "offline - --concept-vectors"
+#   the discriminator, independently: advisory rows TRIPPING is 2 here, 3 in a genuinely live half.
+
+# 80.5 - persistence. KEY SET + RunAt from the JSON. NEVER a file count, NEVER a byte size.
+grep -rl '"Comparability"' .agenteval ; grep -rl '"comparability"' .agenteval          # BOTH 0
+#   DIRECTION CONTROL, or the pair above is unfalsifiable: build an isolated workspace, run
+#   'bench perf latency --subject PerfA', repeat the pair -> 0 Pascal, 1 camel.
+#   WATCH THE FLAG ORDER: 'env VAR=1 -u KEY' ABORTS, and the grep still prints 0 and 0.
+
+# 80.6 - credentials. Prove the scanner on a SYNTHETIC secret outside the repo, deleted in the same
+#        command, BEFORE trusting a zero. Then: 43-char URL -> 0 whole-tree, 35-char host -> 3.
+
+# 80.7 - reachability. A BARE GREP AND A REGEX STRIPPER BOTH GET THIS WRONG.
+#   'AddEval' appears 5x in samples/; only 2 are calls. Blank comments AND every literal form
+#   (normal, verbatim, interpolated, char) preserving newlines, THEN count. -> 2 and 2.
+
+# 80.8 - ADR-030 2.4. Use the grep FloorAdmittedEval.cs ships, VERBATIM, not a bare one and not a
+#        "tidied" one. THE \b ARE LOAD-BEARING: dropping them reads 89 instead of 79.
+DECL='^\s*(public|internal|private|protected|sealed|abstract|partial|static)[^=]*\b(class|record|struct)\b[^=]*[:,]\s*IEval\b'
+grep -rlE "$DECL" --include=*.cs src/ | wc -l                                          # 79
+grep -rl "\bChanceFloor\b" --include=*.cs src/ | wc -l                                 # 7
+comm -12 <(grep -rlE "$DECL" --include=*.cs src/|sort) \
+         <(grep -rl "\bChanceFloor\b" --include=*.cs src/|sort)   # 1: FloorAdmittedEval.cs
+#   a bare 'grep -rl IEval src/' gives 213 and an intersection of 2. Different question.
+```
