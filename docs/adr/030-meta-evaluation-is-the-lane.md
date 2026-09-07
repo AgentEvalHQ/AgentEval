@@ -1,4 +1,4 @@
-# ADR-030: Meta-evaluation is the lane. Contract unification is not.
+﻿# ADR-030: Meta-evaluation is the lane. Contract unification is not.
 
 - **Status:** **Accepted (2026-09-05).** Ratification is what funds §8: Slices 1 and 2 are now
   funded. Slice 0 was **already executed** before ratification (see the ratification note) — the gate
@@ -1634,6 +1634,32 @@ the single most valuable thing the controls prevent, and it is unwritable only i
 > the decision is therefore *"fund a lane whose value is demonstrated and whose mechanism is not"*,
 > and that framing is the user's to weigh.
 
+
+> ### ✅ Q5 — ANSWERED 2026-09-07 by the owner: **DEFER the API. Take the cheap version.**
+>
+> `INegativeControl` is **not funded**. The reasoning is this box's own honest framing turned into a
+> decision: four logged instances say the defect class keeps happening, and **three of the four were
+> caught by a human re-reading**, not by any control suite — so the value is demonstrated and the
+> mechanism is not. Funding an API on that evidence buys ceremony, not detection.
+>
+> **The counter-evidence that settled it is a measurement, not an argument.** The Galaxus sample runs
+> **46 gating negative-control rows today with no `INegativeControl` at all**
+> (`samples/Galaxus.RecommendationAgent.Evals/Evals/NegativeControls.cs`, `-- 3` exits 0 with
+> `NOT CAUGHT` = 0). A practice that already works without the abstraction is not waiting on it.
+>
+> **What is funded instead, at no new API cost.** A deliberately-degraded `BenchmarkArm.From(armId, observe)`
+> **IS** a negative control, and `BenchmarkScore.AgainstReference` already scores it against the live
+> arm with the case as the unit. §11's contract therefore ships the control lane as an *arm*, not as
+> an interface.
+>
+> **What stays refused, and this is the load-bearing half:** `BenchmarkDefinition` gets **no controls
+> slot**, `BenchmarkRunner` writes **no `VOID` verdict** and claims **no exit code 12**. A definition
+> that declares controls it does not run is worse than one that declares none. Phase 7.4 and 7.6 stay
+> unbuilt on purpose.
+>
+> **What would reopen this:** a second consumer needing to SHARE controls across definitions. That is
+> the thing an interface buys and an arm does not.
+
 **Q6 — The stop rule (Slice 2.6).** If the Eval 02 retrofit does not delete the hand-rolled sign
 test and the per-persona floor loop, does the programme actually stop, or does it continue with a
 recorded finding? Recommend it actually stops. **A stop rule nobody will honour is worse than no stop
@@ -1778,6 +1804,7 @@ rule.**
 >
 > `MEASUREMENT_STATUS` §44 carries the per-persona table, the simulated p-values and the seed.
 
+> ### ✅ SUPERSEDED 2026-09-07 — §9 has NO open questions left. Q4(ii), Q5 and Q6 were all answered by the owner on that date; the boxes below record the state on 2026-09-06 and are kept for the reasoning, not for the status.
 > ### ⬜ Q5 and Q6 are the only two questions in §9 still open (2026-09-06, Wave 3)
 > Q1, Q3 and Q7 closed at `4d1f1bbc`; **Q2, Q4 and Q8 are answered above.** Q5 and Q6 are left open
 > **on purpose**: both are marked in this document as the user's call, one of them explicitly
@@ -1786,7 +1813,58 @@ rule.**
 > anything that is currently ready to start**: Phase 4 was gated on Q2 and is now unblocked; Phase 7.4
 > is the only item still waiting on Q5.
 >
-> ↪ **Three, not two — §11.2 row 12:** Q4(ii) is also still the owner's.
+> ↪ **Three, not two — §11.2 row 12:** Q4(ii) is also still the owner's.
+
+> ### ✅ Q4(ii) — ANSWERED 2026-09-07 by the owner: **DEFER. Keep the conditional writer.**
+>
+> The unconditional `measurement` writer and the schema `$id` bump are **not taken**. Today's writer
+> emits the field only when non-default, so **no produced byte moves** for an existing producer and
+> every historical artifact stays readable by a current reader. Bumping the `$id` breaks readers for
+> a field that **nothing reads today**.
+>
+> **What would reopen it:** a consumer that genuinely needs to distinguish *absent* from *`Measured`*
+> ON DISK. In memory the distinction already exists and is honoured — `EvalScore.NotApplicable()`,
+> `CountsTowardAggregate()` and `CensusBucket()` — so the deferral costs nothing a consumer can
+> currently observe.
+>
+> **Consequence:** Phase 7.4 stays unbuilt. `BenchmarkRunner`'s summary keeps the schema's single
+> `skipped` bucket for both `NotApplicable` and `NotMeasured`, and says so where it does it, rather
+> than adding a manifest field behind `additionalProperties: false`.
+
+
+
+> ### ✅ Q6 — ANSWERED 2026-09-07 by the owner: **YES on the principle, STAGED in execution, and NOT with the test 2.6 specifies.**
+>
+> **The principle.** A floor that gates nothing is decoration. `rate > floor` is not a test, and
+> 12-of-12 was `rate > floor`. So the stop rule binds: a chance floor recorded beside a verdict must
+> be allowed to decide it.
+>
+> **Three conditions, and the first two come straight out of the measurements above.**
+>
+> **1 · Slice 2.6 must NOT ship `ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)`
+> as written.** `LatentServed` is `Math.Round` of a rep-mean, so that call integerises the statistic
+> before testing it — the identical defect corrected at `9407cfbd`, and on `USR-PB-11` it alone reads
+> **p = 0.0629 (not above)** where the correct null reads **p = 0.0019 (well above)**. Shipping it
+> ships a known verdict-flip. The binding test is the **simulated null at the estimator the cell
+> actually is** — mean of 3 draws — which the box above measured at **10 of 12**.
+>
+> **2 · The movement is DECLARED, not silent.** GATE 1 goes from ✅ 12/12 to ❌ 10/12, on the only
+> Eval 02 run anyone has paid for, and it moves under every candidate test (8 / 9 / 10). That is a
+> re-baseline: keep the advisory `GATE 1 REPLAY` line, land the binding test behind the gate, publish
+> the 12 → 10 movement with its date and its cause, and only then make it the default. A headline gate
+> going red is fine. A headline gate going red without a disclosure is the failure this record exists
+> to prevent.
+>
+> **3 · Both halves of 2.6's deletion are owed.** §11.2 row 11 stands, re-verified 2026-09-07: the
+> document's own command gives **11 `SignTestAtEqualK` call sites**, distributed 4 / 4 / 3 across
+> `Eval02`, `Eval09` and `NegativeControls`, and `grep -rn SignTest src --include=*.cs` → **0**. What
+> was deleted is the unconditioned `SignTest`; the hand-rolled sign test still exists, renamed and
+> conditioned. 2.6's precondition is two deletions, not one.
+>
+> **Consequence for the contract:** Phase 7.2 is unblocked — `AgentEvalCompositeEvaluator` may take a
+> floor. Until 2.6 lands under conditions 1–3, `BenchmarkRunner` still applies **no** floor to any
+> verdict; floors are recorded and unapplied, exactly as `FloorAdmittedEval` records them. Answering
+> Q6 does not retroactively bind a floor that no code applies.
 
 **Q7 — Does the exclusion list (§3.1) go into `docs/adr/030-*.md` as normative text**, so a PR adding
 `contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.

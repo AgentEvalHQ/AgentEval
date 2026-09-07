@@ -1,4 +1,4 @@
-# ADR-032: Benchmarks are definitions; runs bind subjects; scores are meta
+﻿# ADR-032: Benchmarks are definitions; runs bind subjects; scores are meta
 
 - **Status:** **Proposed.** Proposed is a gate, not a placeholder (the ADR-026 / ADR-030 precedent).
   Accepting this document funds **Waves 0 and 1** of §3.3 — three flattering fixes, one release cut,
@@ -712,7 +712,32 @@ Everything else in Waves 0–3 edits **no** existing test file. Wave 4's list is
 | **Q4(ii)** (ADR-030) | Write `measurement` unconditionally and bump `$id` | a typed definition identity and rep index on the manifest (`additionalProperties:false` at `manifest.schema.json:6,12,22,36,54,64,73`); a finer `RunStats` bucket than `skipped`; on-disk visibility of `NotApplicable` rows without reading `label` | Nothing here changes a historical content hash: `NotApplicable` writes `measurement` only when non-default, as the two shipped consumers already do |
 | **Q5** (ADR-030) | Fund negative controls? | any `Controls` slot on `BenchmarkDefinition` (deliberately absent); `VOID`, exit 12 (`ExitCodes.cs:153-154`), a control ledger; whether the join wave's local ablations become durable controls | `PENDING` for a run with nothing measured is "no verdict", not VOID; `grep -rn controlLedger src` → 1 hit, the reservation comment |
 | **Q6** (ADR-030) | Does the stop rule bind — does any `FloorComparison` gate a verdict? | whether `BenchmarkScore` ever gates (today it reports); Slice 2.6's acceptance; Wave 4(b) (`AgentEvalCompositeEvaluator` taking a floor) | `SignTestAtEqualK` is live at `PairedCoverageReport.cs:463` with **11** call sites (`Eval02_LatentInterestCoverage.cs` ×4, `Eval09_HypothesisComparison.cs` ×4, `NegativeControls.cs:1845,:2897,:3320`), so 2.6's precondition is two deletions, not one (ADR-030 §11.2 row 11). `IsUsableAsABar && Passed` with no comparison is now countable and, on this tree, is every admitted pass |
-| **Q8** (ADR-030) | Quotation of the four UNKNOWN figures | nothing here quotes them | unchanged |
+| **Q8** (ADR-030) | Quotation of the four UNKNOWN figures | nothing here quotes them | unchanged |
+
+### ✅ §6 ANSWERED 2026-09-07 — every question in this table now has the owner's answer
+
+| # | Answer | Effect on this ADR |
+|---|---|---|
+| **Q-A** | **INSIDE the rule.** | Wave 2 is funded: D2, D3, `BenchmarkRunner`, the `EvalJoin/02` sample, and this ADR's move to Accepted |
+| **Q4(ii)** | **Defer.** Keep the conditional writer; no `$id` bump | the summary keeps the schema's single `skipped` bucket for both `NotApplicable` and `NotMeasured`, and says so where it does it |
+| **Q5** | **Defer the API; take the arm.** No `INegativeControl` | `BenchmarkDefinition` keeps **no** `Controls` slot; the runner writes **no** `VOID` and claims **no** exit 12. A degraded `BenchmarkArm.From` IS the control, scored by `AgainstReference` |
+| **Q6** | **Yes on the principle, staged in execution** | Phase 7.2 unblocked. Until Slice 2.6 lands, `BenchmarkRunner` applies **no** floor to any verdict — floors are recorded and unapplied |
+| **Q8** | unchanged — a standing quotation obligation, not a gate | nothing here quotes the four |
+
+**Why Q-A is "inside", recorded so a future reader can check the reasoning rather than the verdict.**
+The rule exists to stop floorless evals being bulk-wired at the primary entry point. The runner
+**cannot reach that state**: an `AdmittedCheck` becomes runnable only through
+`FloorAdmittedEval.Admit`, so the census intersection (`IEval` declarers ∩ files naming
+`ChanceFloor`) is unchanged by it and stays at **1** — verified after the runner shipped, not
+predicted. It composes the harness externally, leaves `TestResult.Score` untouched (so it is not
+6.3), and applies no floor to any verdict. The bulk-wiring clause is honoured **by construction**;
+the outcome clause is honoured the way the door already honours it — recorded, unapplied.
+
+⚠ **What this answer does NOT license.** It does not make the runner a place where a floor gates
+anything (that is Q6, and its execution is staged). It does not add a controls slot (Q5). It does
+not add a manifest field (Q4(ii)). Each of those is refused in code, not only in prose, and §5.3's
+acceptance greps are what check it.
+
 
 ---
 
