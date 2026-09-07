@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Core;
@@ -255,9 +255,10 @@ public sealed class AskedCityWasLookedUpEval(string expectedCity)
 
         if (input.ToolCalls is null)
         {
-            return Undecidable(
+            var reason =
                 "no tool recorder ran, so nothing here can say which city was looked up. An absent "
-                + "record is not an empty one and an empty one is not a pass.");
+                + "record is not an empty one and an empty one is not a pass.";
+            return NotApplicable(reason, new EvalEvidence("tool-calls", EvalWithChanceFloor.ToolName, reason));
         }
 
         var lookups = input.ToolCalls
@@ -291,15 +292,4 @@ public sealed class AskedCityWasLookedUpEval(string expectedCity)
         return scored with { Details = scored.Details with { Summary = summary } };
     }
 
-    private EvalResult Undecidable(string reason) => new(
-        Metric: new(Key, Name, Category, Version),
-        // ⚠ EvalScore.NotApplicable, not a 0.0 "fail". A score that is not a measurement can never
-        //   be Passed, and the library guards that on the pair — see EvalScore's remarks.
-        Score: EvalScore.NotApplicable(),
-        Details: new(null, [new EvalEvidence("tool-calls", EvalWithChanceFloor.ToolName, reason)], [reason], null, null)
-        {
-            Summary = reason,
-        },
-        Provenance: new("atomic-code", null, null, null, null, 0, false),
-        EvaluatedAt: DateTimeOffset.UtcNow);
 }

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`AtomicCodeEval.NotApplicable(reason, evidence?)`** — the undecidable verdict for the
+  deterministic lane, mirroring `EvalResult.Skipped` (ADR-030 D13). It keeps three disciplines that
+  are easy to get wrong: an undecidable result is never `Passed` and is **not a 0.0 fail** (a 0.0
+  fail is a *measurement*; this says the eval could not look); the reason is carried **twice**, in
+  `Summary` and `Recommendations`, because renderers read one or the other; and `measurement` is
+  written only via `EvalScore.NotApplicable()`, which serialises the field only when non-default, so
+  Q4(ii) stays untouched. A blank reason is refused — "nobody could decide" and "nobody said why"
+  are different facts.
+
 ### Changed
 
 - **Aggregation no longer requires an `IEval` to carry a weight.** The five strategies gain a static

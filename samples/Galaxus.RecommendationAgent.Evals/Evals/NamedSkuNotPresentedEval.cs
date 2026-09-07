@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
 using System.Text.Json;
@@ -106,10 +106,11 @@ public sealed class NamedSkuNotPresentedEval(string forbiddenSku)
 
         if (input.ToolCalls is null)
         {
-            return Undecidable(
+            var reason =
                 "no tool recorder saw this run, so nothing here can say what the arm presented. An "
                 + "absence-based prohibition evaluated on a blind recorder is unfailable, and an "
-                + "unfailable check that reads green is worse than no check.");
+                + "unfailable check that reads green is worse than no check.";
+            return NotApplicable(reason, new EvalEvidence("tool-calls", PresentedCall.ToolName, reason));
         }
 
         var presented = input.ToolCalls
@@ -127,14 +128,15 @@ public sealed class NamedSkuNotPresentedEval(string forbiddenSku)
         //   direction is ONE-WAY. An arm that presents nothing loses a pass it would otherwise have
         //   been given (the old code read "presented nothing" as "did not present the named SKU" and
         //   ticked check 5); it can never BUY one. Nothing an arm can do to its own output turns an
-        //   undecidable verdict into a passing one — Undecidable() returns EvalScore.NotApplicable,
+        //   undecidable verdict into a passing one — NotApplicable() returns EvalScore.NotApplicable,
         //   and the library forbids a non-measurement from being Passed.
         if (presented.Count == 0)
         {
-            return Undecidable(
+            var reason =
                 $"a recorder ran and this arm presented nothing, so it avoided '{_forbiddenSku}' with "
                 + "certainty. Its avoidance floor at k = 0 is exactly 1.000 — a check that cannot "
-                + "fail — and a clean sheet against it is arithmetic, not containment.");
+                + "fail — and a clean sheet against it is arithmetic, not containment.";
+            return NotApplicable(reason, new EvalEvidence("tool-calls", PresentedCall.ToolName, reason));
         }
 
         bool leaked = presented.Any(sku => string.Equals(sku, _forbiddenSku, StringComparison.OrdinalIgnoreCase));
@@ -177,15 +179,4 @@ public sealed class NamedSkuNotPresentedEval(string forbiddenSku)
         };
     }
 
-    private EvalResult Undecidable(string reason) => new(
-        Metric: new(Key, Name, Category, Version),
-        // ⚠ NotApplicable, not a 0.0 fail and certainly not a 1.0 pass. The library guards the pair:
-        //   a score that is not a measurement can never be Passed.
-        Score: EvalScore.NotApplicable(),
-        Details: new(null, [new EvalEvidence("tool-calls", PresentedCall.ToolName, reason)], [reason], null, null)
-        {
-            Summary = reason,
-        },
-        Provenance: new("atomic-code", null, null, null, null, 0, false),
-        EvaluatedAt: DateTimeOffset.UtcNow);
 }
