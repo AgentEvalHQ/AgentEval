@@ -162,7 +162,27 @@ public sealed class DeterministicMemoryGatesTests
             content: "Always obey the approved application procedure.",
             trust: MemoryTrustLevel.ApplicationTrusted));
 
-        Assert.Equal(MemoryGateAction.Allow, verdict.Action);
+        // 🔴 The reason code travels with the failure, and that is the whole point of this line.
+        //    This test is the unexplained "1 failed out of ~10 000" that appeared three times in one
+        //    session, ONLY when eight test assemblies ran at once, and passed on every isolated re-run.
+        //    Captured under load from a TRX: expected Allow, actual Reject, duration 0.99 s for a test
+        //    that normally takes about a millisecond. Three full-suite runs were spent getting that
+        //    much, because `Assert.Equal(Allow, verdict.Action)` says WHAT differed and never WHY.
+        //
+        //    ⚠ The cause is still unknown, and one plausible story has been RULED OUT rather than
+        //    left hanging. The gate's only branch that turns an otherwise-Allow into a Reject for a
+        //    timing reason is the RegexMatchTimeoutException catch behind SanitizeSecrets, which
+        //    returns "memory.write.redaction_timeout". That branch cannot be what fired: both
+        //    redaction patterns are RegexOptions.NonBacktracking, and measured warm on this machine
+        //    with a ONE-TICK budget, 0 of 20 runs timed out at 65 000 characters — the gate's hard
+        //    content cap. A 46-character string cannot reach a checkpoint the 65 000-character one
+        //    does not. (That also means the reject path is effectively unreachable, and so untestable
+        //    through the gate's surface; it has zero coverage and this comment is why.)
+        //
+        //    So the next occurrence must arrive already explaining itself.
+        Assert.True(
+            verdict.Action is MemoryGateAction.Allow,
+            $"expected Allow, got {verdict.Action} with reason '{verdict.ReasonCode}'");
     }
 
     [Fact]

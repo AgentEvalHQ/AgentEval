@@ -16103,13 +16103,63 @@ An arm that does nothing avoids everything, so no containment rate can clear cha
 assertion in the self-test. If an edit ever makes one of them derivable, the self-test goes red and
 someone has to say what draw model appeared.
 
-### 87.4 ⚠ An unreproduced test failure, recorded because it is not a pass
+### 87.4 🔴 The "unreproduced flake" is named, and my explanation for it is REFUTED
 
-Two solution-wide runs each reported **1 failed** out of ~10 000 — once on net9, once on net10 —
-while every other TFM was green. Both times, re-running that TFM alone was clean (net9 9989/0; net10
-10207/0) and the failing test's name did not survive the run. Isolated runs take ~1 minute; the
-solution-wide runs take ~2m40s, so the shape is consistent with contention rather than a defect in
-the code under test — but **an unreproduced failure is not a passed test**, and the next person to
-see one should know it has now happened twice. A third solution-wide run, with a TRX logger attached
-specifically to capture the name, came back **entirely green** — 10207 / 9989 / 9989 / 1185×3 / 84 / 6,
-0 failed — so the flake did not reproduce and remains unnamed. Two observations, three clean re-runs.
+Three solution-wide runs in this session reported **1 failed out of ~10 000** while every other TFM was
+green — once net9, once net10, once all three at once — and every isolated re-run was clean. It was
+recorded here rather than dropped, on the rule that an unreproduced failure is not a passed test.
+
+A fourth run with a **TRX logger** attached caught it:
+
+| | |
+| --- | --- |
+| test | `DeterministicMemoryGatesTests.WriteGate_ApplicationTrustedInstruction_Allows` |
+| expected / actual | `Allow` / **`Reject`** |
+| duration | **0.99 s**, for a test that normally takes about a millisecond |
+| conditions | only ever with eight test assemblies running concurrently |
+
+#### The hypothesis, and why it is wrong
+
+The gate has exactly one branch that turns an otherwise-`Allow` into a `Reject` for a *timing* reason:
+a `RegexMatchTimeoutException` catch behind `SanitizeSecrets`, returning
+`memory.write.redaction_timeout` (`DeterministicMemoryGates.cs:232`). The duration fit. Every other
+`Reject` path is content-based and would fail on every run, which none do.
+
+So I built the fix: a configurable `RedactionTimeout`, folded into the policy fingerprint, with tests.
+
+**Then I measured, and it does not hold.** Both redaction patterns are `RegexOptions.NonBacktracking`
+— linear-time, and therefore ReDoS-immune, so the budget was never a ReDoS defence in the first place.
+A standalone probe, warm, with a **one-tick** budget:
+
+| input | timeouts | slowest |
+| ---: | ---: | ---: |
+| 16 000 chars | **0 / 20** | 10.260 ms |
+| 16 384 chars | **0 / 20** | 0.413 ms |
+| 65 000 chars (the hard cap) | **0 / 20** | 0.734 ms |
+
+⚠ The earlier reading that made the hypothesis look confirmed was **JIT warm-up**: a cold first call
+threw at 16 384 characters after 7 ms, and I nearly took that for evidence the budget was reachable.
+Warm, it is not. A 46-character string cannot reach a checkpoint that 65 000 characters does not.
+
+Two consequences, both of which outrank the fix I was about to ship:
+
+1. **The cause of the flake is unknown**, not "probably the timeout". Refuted, not merely unconfirmed.
+2. **`memory.write.redaction_timeout` is effectively unreachable** through the gate's own limits, so it
+   has zero coverage and cannot be given coverage from the public surface. `redaction_timeout` appears
+   **once in the whole repository** — in the gate that returns it.
+
+#### What was kept, and what was thrown away
+
+🔴 **The `RedactionTimeout` option was REVERTED.** It was a public API addition on a branch with an open
+PR, justified entirely by a hypothesis I then disproved. Shipping it would have left a permanent
+configuration surface — and a changed policy fingerprint — resting on a refuted premise. Cheap to write
+is not a reason to keep.
+
+What was kept is 21 lines in one test: the assertion now reports `ReasonCode` alongside the action, and
+carries the measurement above so nobody re-runs this investigation. Three full-suite runs were spent
+getting a name, because `Assert.Equal(Allow, verdict.Action)` says *what* differed and never *why*.
+The next occurrence arrives already explaining itself.
+
+⚠ **Still open.** The flake is real, has happened three times, and its cause is not established. It is
+load-dependent, and the leading remaining explanation is something environmental in the concurrent-TFM
+run rather than in this gate. Anyone who sees it again should read the reason code the test now prints.
