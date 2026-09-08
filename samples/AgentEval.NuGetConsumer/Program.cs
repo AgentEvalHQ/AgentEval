@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 //
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -98,7 +98,7 @@ static void PrintUsage()
                          1   = Behavioral Policies
                          2   = Stochastic Model Comparison
                          3   = Semantic Kernel Flight Agent
-                         4   = Run ALL demos
+                         4   = Deterministic benchmark (AE-04 join, from the package)
                          all = Run ALL demos
       --help, -h       Show this help
     

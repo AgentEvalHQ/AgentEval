@@ -22,10 +22,12 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </para>
 /// <para>
 /// AE-04 was a REACHABILITY defect: the library was fine and no path reached it from where a consumer
-/// stood. So the test that it is fixed has to be a consumer holding nothing but the package —
-/// <b>this project has no <c>ProjectReference</c></b>, and every type below is resolved from
-/// <c>PackageReference Include="AgentEval"</c>. Against 0.34.0-beta this file does not compile:
-/// the namespace <c>AgentEval.Evals.Meta</c> does not exist in that assembly.
+/// stood. So the test that it is fixed has to be a consumer holding nothing but the package.
+/// <b>Neither this project nor the sample it references has a <c>ProjectReference</c> to any
+/// AgentEval source project</b> — this one references only <c>AgentEval.NuGetConsumer</c>, which
+/// itself reaches AgentEval solely through <c>PackageReference Include="AgentEval"</c>. Every
+/// type below therefore resolves from the published package. Against 0.34.0-beta this file does
+/// not compile: the namespace <c>AgentEval.Evals.Meta</c> does not exist in that assembly.
 /// </para>
 /// <para>
 /// Nothing here spends: no <c>IChatClient</c>, no agent, no network.
