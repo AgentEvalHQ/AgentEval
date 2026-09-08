@@ -33,6 +33,9 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </remarks>
 public class PackageReachabilityTests
 {
+    /// <summary>The package version this project pins. One place, so the pin and the assertion move together.</summary>
+    private const string ExpectedPackageVersion = "0.35.0-beta";
+
     private sealed class ContainsEval(string needle)
         : AtomicCodeEval("consumer.contains", "Response contains the needle", "test", "1.0.0")
     {
@@ -58,7 +61,20 @@ public class PackageReachabilityTests
             typeof(BenchmarkArm), typeof(BenchmarkRunner), typeof(BenchmarkScore),
         ];
 
-        Assert.All(join, t => Assert.NotNull(t.Assembly.Location));
+        // ⚠ NOT Assert.NotNull(t.Assembly.Location): that assertion cannot fail. Location is a
+        // non-null string for any normally-loaded assembly, so it would have proved only that the
+        // types exist — which the file compiling already proves. A check that cannot fail is the
+        // defect this whole package exists to catch, so it is replaced by one that can.
+        //
+        // The discriminating fact is the VERSION each type's assembly carries. A join type resolved
+        // from a stale local build, a wrong package version, or a ProjectReference someone adds
+        // later carries a different informational version, and this goes red.
+        Assert.All(join, t =>
+        {
+            var version = t.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            Assert.False(string.IsNullOrWhiteSpace(version), $"{t.Name}'s assembly declares no version");
+            Assert.StartsWith(ExpectedPackageVersion, version!, StringComparison.Ordinal);
+        });
 
         // And they come from AgentEval's own assemblies, not from this test project.
         Assert.All(join, t => Assert.StartsWith("AgentEval", t.Assembly.GetName().Name!, StringComparison.Ordinal));
@@ -139,6 +155,6 @@ public class PackageReachabilityTests
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
 
         Assert.False(string.IsNullOrWhiteSpace(info));
-        Assert.StartsWith("0.35.0-beta", info!, StringComparison.Ordinal);
+        Assert.StartsWith(ExpectedPackageVersion, info!, StringComparison.Ordinal);
     }
 }
