@@ -107,21 +107,22 @@ public static class Config
                 : PreferredDeployment;
 
     /// <summary>
-    /// Prints a "Azure target" header block to the console showing the
-    /// endpoint, deployment, and a redacted key fingerprint. Useful at the
+    /// Prints an "Azure target" header block to the console showing the
+    /// resolved deployment. Useful at the
     /// top of demos and evals so the operator sees at a glance which model
     /// (and which Foundry / OpenAI resource) is about to be charged.
     /// </summary>
     /// <remarks>
-    /// The key is never printed in full — only its length and a
-    /// first-4-…-last-4 fingerprint. That's enough to confirm "yes, this
-    /// is the key I expected" without leaking the secret to a screen
-    /// recording, a posted screenshot, or a shoulder-surfer.
+    /// ⚠ The API key is NOT printed at all — not in full, not as a fingerprint, not as a hash. An
+    /// earlier version printed <c>first4…last4</c>, which is eight real characters of the secret, and
+    /// this banner runs at the top of every demo and eval, so those characters reached every
+    /// <c>--log</c> file, terminal scrollback and screenshot of a sample in a public repository. The
+    /// endpoint is reported as set/unset rather than by URL, because the URL names the Azure resource.
+    /// Neither is needed to interpret a result; the deployment name is, and that is what remains.
     /// </remarks>
     public static void PrintAzureTarget()
     {
         var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var key      = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var envDep   = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
         var resolved = Model;
 
@@ -133,18 +134,11 @@ public static class Config
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─── Azure target ────────────────────────────────────────────────────");
         Console.ResetColor();
-        Console.WriteLine($"  Endpoint   : {endpoint ?? "(unset)"}");
+        Console.WriteLine($"  Endpoint   : {(string.IsNullOrEmpty(endpoint) ? "(unset)" : "(set)")}");
         Console.WriteLine($"  Model      : {resolved}  [source: {source}]");
-        Console.WriteLine($"  API key    : {FingerprintKey(key)}");
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────");
         Console.ResetColor();
     }
 
-    private static string FingerprintKey(string? key)
-    {
-        if (string.IsNullOrEmpty(key)) return "(unset)";
-        if (key.Length <= 8)           return $"(set, {key.Length} chars — too short to fingerprint)";
-        return $"{key[..4]}…{key[^4..]} ({key.Length} chars)";
-    }
 }

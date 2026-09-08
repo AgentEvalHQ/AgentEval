@@ -29,6 +29,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions Contain(string substring, bool caseSensitive = false, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(substring);
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         if (!_response.Contains(substring, comparison))
         {
@@ -41,7 +42,7 @@ public class ResponseAssertions
                     suggestions: caseSensitive ? new[] { "Try case-insensitive search with caseSensitive: false" } : null,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response contains all specified substrings.</summary>
@@ -49,7 +50,8 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions ContainAll(params string[] substrings)
     {
-        return ContainAll(null, substrings);
+        using var probe = AgentEvalScope.BeginAssertion();
+        return probe.Complete(ContainAll(null, substrings));
     }
     
     /// <summary>Assert response contains all specified substrings.</summary>
@@ -58,6 +60,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions ContainAll(string? because, params string[] substrings)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         var missing = substrings.Where(s => 
             !_response.Contains(s, StringComparison.OrdinalIgnoreCase)).ToList();
         
@@ -73,7 +76,7 @@ public class ResponseAssertions
                     context: found.Count > 0 ? $"Found: [{string.Join(", ", found.Select(s => $"\"{s}\""))}]" : null,
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response contains any of the specified substrings.</summary>
@@ -81,7 +84,8 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions ContainAny(params string[] substrings)
     {
-        return ContainAny(null, substrings);
+        using var probe = AgentEvalScope.BeginAssertion();
+        return probe.Complete(ContainAny(null, substrings));
     }
     
     /// <summary>Assert response contains any of the specified substrings.</summary>
@@ -90,6 +94,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions ContainAny(string? because, params string[] substrings)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (!substrings.Any(s => _response.Contains(s, StringComparison.OrdinalIgnoreCase)))
         {
             AgentEvalScope.FailWith(
@@ -100,7 +105,7 @@ public class ResponseAssertions
                     actual: "None found",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response does NOT contain a substring.</summary>
@@ -110,6 +115,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions NotContain(string substring, bool caseSensitive = false, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(substring);
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         if (_response.Contains(substring, comparison))
         {
@@ -128,7 +134,7 @@ public class ResponseAssertions
                     context: $"...{foundContext}...",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response matches a regex pattern.</summary>
@@ -138,6 +144,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions MatchPattern(string pattern, RegexOptions options = RegexOptions.IgnoreCase, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(pattern);
         bool matched;
         try
         {
@@ -154,7 +161,7 @@ public class ResponseAssertions
                     actual: "Regex evaluation timed out",
                     suggestions: new[] { "Simplify the regex pattern to avoid catastrophic backtracking" },
                     because: because));
-            return this;
+            return probe.Complete(this);
         }
         if (!matched)
         {
@@ -167,7 +174,7 @@ public class ResponseAssertions
                     suggestions: new[] { "Check regex pattern syntax", "Verify pattern flags (case sensitivity)" },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response has length within a range.</summary>
@@ -177,6 +184,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions HaveLengthBetween(int min, int max, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_response.Length < min || _response.Length > max)
         {
             var position = _response.Length < min ? "below" : "above";
@@ -187,7 +195,7 @@ public class ResponseAssertions
                     actual: $"Length = {_response.Length} ({position} range)",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response has at least N characters.</summary>
@@ -196,6 +204,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions HaveLengthAtLeast(int min, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (_response.Length < min)
         {
             AgentEvalScope.FailWith(
@@ -206,7 +215,7 @@ public class ResponseAssertions
                     suggestions: new[] { "Response may be truncated", "Check if agent provided complete answer" },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response is not empty or whitespace.</summary>
@@ -214,6 +223,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions NotBeEmpty(string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion();
         if (string.IsNullOrWhiteSpace(_response))
         {
             var actual = _response.Length == 0 ? "empty string" : "whitespace only";
@@ -225,7 +235,7 @@ public class ResponseAssertions
                     suggestions: new[] { "Verify agent received and understood the prompt", "Check for API errors" },
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response starts with a prefix.</summary>
@@ -235,6 +245,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions StartWith(string prefix, bool caseSensitive = false, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(prefix);
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         if (!_response.StartsWith(prefix, comparison))
         {
@@ -245,7 +256,7 @@ public class ResponseAssertions
                     actual: $"Starts with \"{Truncate(_response, prefix.Length + 20)}\"",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Assert response ends with a suffix.</summary>
@@ -255,6 +266,7 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions EndWith(string suffix, bool caseSensitive = false, string? because = null)
     {
+        using var probe = AgentEvalScope.BeginAssertion(suffix);
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         if (!_response.EndsWith(suffix, comparison))
         {
@@ -269,7 +281,7 @@ public class ResponseAssertions
                     actual: $"Ends with \"{actualEnd}\"",
                     because: because));
         }
-        return this;
+        return probe.Complete(this);
     }
     
     /// <summary>Get the underlying response for custom assertions.</summary>

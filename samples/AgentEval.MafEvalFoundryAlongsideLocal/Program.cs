@@ -23,10 +23,18 @@ using AgentEval.Benchmarks;                 // AgenticBenchmark
 using AgentEval.Core;                        // ChatClientEvaluator
 using AgentEval.Core.Evals.Rendering;        // HtmlEvalResultRenderer, EvalResultRenderOptions
 using AgentEval.Evals;                        // EvalResult
+using AgentEval.Evals.Meta;                   // ChanceFloor — the 7.2 root declaration
 using AgentEval.Output;                       // SubjectIdentity, SubjectKind
 using AgentEval.MAF.Evaluators;               // .AsAgentEvaluator / .AsMeaiEvaluator / UnifiedEvalReport / CompositeAgentEvaluator
 
 using FoundryEvals = Microsoft.Agents.AI.Foundry.FoundryEvals;
+using AgentEval.MafEvalFoundryAlongsideLocal;   // this sample's own types (top-level statements are global)
+
+// --selftest: the admitted leaf's invariants, offline. It runs BEFORE the first environment read
+// because CreateJudgeChatClient() THROWS when AZURE_OPENAI_* is unset — without this entry point
+// nothing in this sample can be exercised unconfigured.
+if (args.Contains("--selftest", StringComparer.OrdinalIgnoreCase))
+    return await ThreeDayItinerarySelfTest.RunAsync();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Setup — SUT agent, Foundry project, and the AgentEval judge
@@ -62,9 +70,53 @@ string[] queries =
 
 // AgentEval Composite Eval — the multi-dimension, deterministic (temp 0), evidence-bearing grader.
 // AgenticExecution is AgentEval's agentic composite (its CapturedResults hold the full weighted tree).
-var compositeEvaluator = AgenticBenchmark
-    .AgenticExecution(new ChatClientEvaluator(judge), judgeModel: model)   // CompositeEval (IEval)
-    .AsMeaiEvaluator();                                                     // -> AgentEvalCompositeEvaluator (captures tree)
+var preset = AgenticBenchmark.AgenticExecution(new ChatClientEvaluator(judge), judgeModel: model);
+
+// ── The admitted leaf ────────────────────────────────────────────────────────────────────────
+// One DETERMINISTIC check, admitted through AgentEval's floor-gated door and dropped into the
+// preset's component list. Two things this deliberately does NOT do:
+//
+//   · it does not admit the composite ROOT. FloorAdmittedEval refuses a result carrying
+//     sub-results, because one floor stamped on a root would certify every floorless leaf beneath
+//     it. The floor rides on the LEAF and travels up inside the captured tree.
+//   · it does not read its floor back off its own output. The floor is supplied here, before
+//     anything runs.
+//
+// ⚠ WEIGHT is stated, not defaulted. AgenticExecution declares six canonical weights summing to
+// 1.00 (0.25 / 0.20 / 0.20 / 0.15 / 0.10 / 0.10); admitting a leaf at EvalComponent's default of
+// 1.0 would make one boolean structure check outweigh all six judged dimensions combined and
+// quietly change what the preset's number means. 0.10 matches its smallest declared dimension, so
+// the preset keeps its shape. The composite is re-keyed and re-named all the same — a tree with an
+// extra component is not the published preset.
+var admittedLeaf = new EvalComponent(
+    FloorAdmittedEval.Admit(new ThreeDayItineraryEval(), ThreeDayItineraryEval.DeclaredFloor),
+    Weight: 0.10);
+
+var localComposite = new CompositeEval(
+    key: preset.Key + ".with_admitted_leaf",
+    name: preset.Name + " + 1 admitted leaf",
+    category: preset.Category,
+    version: preset.Version,
+    components: [.. preset.Components, admittedLeaf],
+    aggregation: preset.Aggregation,
+    threshold: preset.Threshold);
+
+Console.WriteLine(
+    $"composite: {preset.Components.Count} preset component(s) + 1 admitted leaf " +
+    $"('{ThreeDayItineraryEval.EvalKey}', weight {admittedLeaf.Weight:0.00}, floor: " +
+    $"{ThreeDayItineraryEval.DeclaredFloor.Kind}), threshold {preset.Threshold:0.00}");
+
+var compositeEvaluator = localComposite.AsMeaiEvaluator(
+    // 7.2 (Q6): the ROOT floor, DECLARED. Not derivable, and the reason is the finding — see
+    //   AgentEvalCompositeEvaluator.DeclaredRootFloor. It is recorded beside the verdict and
+    //   applied to nothing; the evaluator also reports how many LEAVES carry a floor, read off
+    //   the tree that ran rather than off this declaration.
+    ChanceFloor.NotDerivable(
+        "this composite mixes LLM-judged dimensions with one deterministic leaf, and its root score is a "
+    + "WEIGHTED SUM of the two. There is no draw model for that: an arm that understood nothing "
+    + "would score whatever the judge happened to give it, which is not a quantity chance can be "
+    + "asked about. The DETERMINISTIC leaf carries its own derivable-or-declared floor; the root "
+    + "does not, and saying so is the point."));   // -> AgentEvalCompositeEvaluator (captures tree)
 
 IAgentEvaluator local = compositeEvaluator.AsAgentEvaluator(chatConfig);    // conversation-preserving
 
@@ -129,6 +181,8 @@ await File.WriteAllBytesAsync("report-hybrid-B.html",
 Console.WriteLine(foundryAvailable
     ? "Done — wrote report-hybrid-B.html with both AgentEval-local and Foundry branches."
     : "Done — AgentEval-local only (set FOUNDRY_PROJECT_ENDPOINT to include the Foundry branch).");
+
+return 0;   // --selftest returns its own exit code above; a completed run is a success
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers (Azure OpenAI–backed judge + fallback SUT agent)

@@ -7,6 +7,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`BenchmarkRunner`** — runs one `BenchmarkDefinition` against one `BenchmarkArm` into one run
+  directory, one row per (case, check). Every check is admitted through the door **before any case is
+  observed**, so a definition carrying a floorless check fails having spent nothing. It applies no
+  floor to any verdict, writes no `VOID`, and adds no manifest field; `EvalInput.Metadata` is data,
+  and an arm that puts an `IEvaluableAgent`, an `IChatClient` or a `Delegate` in it is refused before
+  any check runs.
+- **`EvalInput.Performance`** — the run's wall-clock, time-to-first-token and tokens now survive the
+  projection. A latency is a fact OF the run, not a verdict ABOUT it, and excluding it made a whole
+  family of deterministic checks inexpressible. `null` still means nobody measured.
+- **`PerformanceChecks`** — latency, token-budget and time-to-first-token as admitted
+  `AtomicCodeEval`s, each declining rather than scoring when the measurement is absent. Every floor
+  is `NotDerivable` with its reason: a threshold comparison has no draw model, so chance does not
+  produce a p99.
+- **`RedTeamProbeObservations`** — a red-team scan projected per PROBE into the meta lane, so it can
+  be censused and paired. An errored probe is `NotMeasured` and an inconclusive one is
+  `NotApplicable`; neither folds into "resisted". Its `ResistanceCeilingFloor` is **1.000**: an agent
+  that refuses every input resists every probe, so no resistance rate can be shown above chance.
+- **`EvalInputAgentBinding`** — one owner for the legacy `Metadata["agent"]` convention that four
+  benchmark families each hand-wrote. A containment, not an endorsement: new code binds its subject
+  in a `BenchmarkArm`.
+- **`FileSystemOutputStore.InitializeSolutionAsync`** — a workspace can now be created through the
+  library. The writer existed but was private with no callers, so every non-CLI consumer hand-rolled
+  `solution.json`.
+- **`AgentEvalCompositeEvaluator`** takes an optional declared root chance floor and reports
+  `FlooredLeafCount` / `LeafCount` read off the tree that ran. The floor is **recorded and never
+  applied**. A floorless MAF composite and a fully floored one previously rendered identically.
+- **`IAggregationStrategy.AggregateWeights`** — the weights-only path is on the interface. It was a
+  `public static` per strategy and unreachable polymorphically, which is why four throwing `IEval`
+  stubs existed.
+- **AE-04 — the join from an agent run to an `IEval`.** There was no path from a MAF agent run to a
+  deterministic eval, and the count of evals reachable from the primary entry point was zero. Three
+  pieces close it: `TestRunEvalProjection.ToEvalInput(TestCase, TestResult)` projects a run into an
+  `EvalInput`; `FloorAdmittedEval.Admit(IEval, ChanceFloor)` is the only door, and it will not open
+  without a floor; `AgentEvalBuilder.AddEval(IEval, ChanceFloor)` and
+  `AgentEvalRunner.EvaluateEvalsAsync` run what was admitted. The floor is supplied AT ADMISSION and
+  is never read back off a result — an eval that supplies the bar it is judged against is this
+  repository's most-repeated defect, and the door throws rather than merging such a result.
+- **`ToolCall` carries a three-way tool-call contract.** `EvalInput.ToolCalls` is `null` when no
+  recorder could see the whole run, `[]` when a recorder ran and saw nothing, and non-empty
+  otherwise. "Nobody knows" and "nobody called it" are different facts, and rendering both as zero
+  is how a blindness becomes a measurement. Two result markers rank above any recorded payload:
+  `__tool_not_executed__:` outranks `__tool_error__:`, which outranks the tool's own output.
+- **`TestRunEvalProjection.ToToolCall(ToolCallRecord)` is public**, so a consumer with its own runner
+  gets the same marker rules instead of re-deriving them.
+- **`AgentEval.Benchmarks` definition records** — `BenchmarkDefinition`, `AdmittedCheck`,
+  `BenchmarkArm`, `CheckObservation`, `BenchmarkRun`. Data only: no subject, no judge, no store, so
+  a benchmark can be written down, reviewed and diffed without running it. `TestCase.Id` is optional
+  on the type and REQUIRED here, because the case is the unit of analysis for every floor, pairing
+  and rep collapse, and a display name re-points the join the moment anyone edits a label.
+  Deliberately absent, each because the question is open: a content hash, a controls slot, a judge
+  slot.
+- **`BenchmarkScore`** — `AgainstFloor`, `AgainstReference`, `Census`. Facts about runs in meta-lane
+  terms; nothing in it is an `IEval`, returns an `EvalResult`, or writes a pass. Reps collapse per
+  CASE before any test runs, and a cell whose reps are not all measured collapses to the worst state
+  present rather than to the mean of the survivors.
+- **The meta lane (ADR-030 Slice 2)** — `ChanceFloor`, `ExactTests`, `PairedEvalComparer`,
+  `ObservationCensus`, `RepCollapse`, `Observation`. Defined over a neutral five-field tuple rather
+  than over `EvalResult`, so the layer is adoptable by a consumer that has never heard of AgentEval.
+  A floor at or above 1.0 yields a NaN tail and is undecidable, never a pass; an ABSENT floor is not
+  a floor of 0.0.
+- **Applicability (ADR-030 Slice 1)** — `MeasurementState`, `EvalScore.NotApplicable()`,
+  `CountsTowardAggregate()`, `CensusBucket()`. A mean over 3 of 12 and a mean over 12 of 12 are
+  different facts. Schema v1 now accepts `"inapplicable"` and the `measurement` field, which is
+  written only when non-default, so no produced byte moves for an existing producer.
+- **`IEvalRegistry`** — a factory-shaped registry over the shipped eval keys, so a run can name what
+  it used without the caller holding every constructor.
+- **`agenteval compare`** and `ExitCodes.Incomparable = 13`, for two runs whose comparability facts
+  do not line up. "Not comparable" is a distinct outcome from "no difference found".
+- **`ScenarioResult.StimulusHash`** — a run persists WHAT WAS ASKED and a digest of it, so a
+  comparison can refuse two runs that were not asked the same thing.
+- **`docs/deterministic-evals.md`** — the whole contract in one place: the door and its four
+  refusals, `null` versus `[]`, the two markers, why a 0.0 floor is not "no floor" and a 1.0 floor is
+  undecidable, and what `compare` gates on.
+
+- **`AtomicCodeEval.NotApplicable(reason, evidence?)`** — the undecidable verdict for the
+  deterministic lane, mirroring `EvalResult.Skipped` (ADR-030 D13). It keeps three disciplines that
+  are easy to get wrong: an undecidable result is never `Passed` and is **not a 0.0 fail** (a 0.0
+  fail is a *measurement*; this says the eval could not look); the reason is carried **twice**, in
+  `Summary` and `Recommendations`, because renderers read one or the other; and `measurement` is
+  written only via `EvalScore.NotApplicable()`, which serialises the field only when non-default, so
+  Q4(ii) stays untouched. A blank reason is refused — "nobody could decide" and "nobody said why"
+  are different facts.
+
+### Changed
+
+- **`EvaluatorCardRegistry` moved from Mission Control into `AgentEval.Core`** (ADR-031 C3), so the
+  cards are available to any consumer rather than to one app.
+- **A run now carries the five comparability facts**, and `applicableFraction` is `Measured / Total`.
+  The tempting alternative, `(Total − NotApplicable) / Total`, POOLS "the case could not test the
+  thing" with "the instrument did not run" — different findings, different owners — and reports a
+  broken harness as a well-scoped corpus.
+- **`EvalResultPersistence.ToScenarioResult` gained optional parameters.** Source-compatible,
+  **binary-incompatible**: a caller compiled against 0.34 must be recompiled.
+- **`AgentEval.Testing.AssertionResult` is `[Obsolete]`** in favour of `AgentEval.Output.AssertionResult`,
+  which adds a three-valued `Outcome` — an assertion that could not run is not an assertion that
+  failed.
+
+- **Aggregation no longer requires an `IEval` to carry a weight.** The five strategies gain a static
+  `AggregateWeights(results, weights)`; the instance `Aggregate(results, components)` forwards to it.
+  Nothing in aggregation ever read anything from an `EvalComponent` except its `Weight` — `.Eval` and
+  `.Required` appear **0** times across `src/AgentEval.Core/Evals/Aggregations/` — yet four `IEval`
+  stubs whose `EvaluateAsync` throws existed only to satisfy the `EvalComponent` constructor. All
+  four are deleted (`SyntheticEval`, `OwaspSyntheticEval`, `NistSyntheticEval`,
+  `MitreSyntheticEval`), along with `PerformanceBenchmark`'s private `CapByWorstAggregate`.
+  `IAggregationStrategy` is untouched.
+- **`PerformanceBenchmark` now follows Core's `CountsTowardAggregate` cap rule.** Its private copy
+  excluded only `"skipped"`; Core also excludes `"error"` and `"inapplicable"`. A **rule** change with
+  **no observable behaviour change on perf's inputs**, measured rather than asserted: an equivalence
+  test walks every leaf shape perf can produce — label × severity × passed, cubed, **27,000 triples** —
+  and the two agree on all of them, because perf emits neither `"error"` nor `"inapplicable"`
+  (grep → 0). Adding `"error"` to the enumerated labels makes **29,860 of 64,000** triples disagree,
+  which is how the test is known not to be vacuous.
+
+### Fixed
+
+- **`PerformanceMetrics.TotalTokens` could never be null**, though its type said it could. The body
+  was `(PromptTokens ?? 0) + (CompletionTokens ?? 0)`, so a provider that reported no usage read as a
+  run that used ZERO tokens. Two readers were relying on the promise the body broke:
+  `StochasticResult` filtered on `TotalTokens != null` — a filter that could never remove anything,
+  so unmeasured runs contributed fabricated zeros to `TotalTokenStats` — and `PerformanceAssertions`
+  compared `TotalTokens > max`, so an unmeasured run passed every token budget. Both are correct now
+  without a line changing in either. Partial usage is still usage; only both sides absent means
+  nobody measured.
+- **A skipped compliance result declared `Confidence: 1.0`** at four sites — certainty about a
+  verdict never reached, rendered in the HTML report, persisted as `_lifted.confidence` and served
+  over GraphQL. Now `null`, matching the performance family, which already had it right.
+- **The judge fingerprint refused an endpoint on one of its two strings and claimed both.** Both are
+  now checked.
+- **`compare` rendered a non-zero delta as `0.0000`.** A genuine zero still renders as one.
+- **The ordinal stripper ate short leading words**, in both directions at once.
+
+- **A judge that graded nothing is no longer named on the OWASP / NIST / MITRE roots.**
+  `Provenance.JudgeModel` recorded `"<family>-judge-passthrough"` whenever an `IEvaluator` was
+  supplied, but that evaluator is held and never invoked — `OwaspBenchmark.cs:83-87` says so in its
+  own words, describing the missing test as a "pinning-test teeth gap". The three roots record `null`.
+  - **Superseded → corrected:** `"owasp-judge-passthrough"` / `"nist-…"` / `"mitre-…"` → `null`.
+  - **Direction: flattering.** Every historical red-team row read as *judged* when nothing had graded
+    it, and `BenchOwaspCommand.cs:88-97` always resolves a judge — so the label was present on
+    essentially every CLI run.
+  - **Blast radius:** a run stored before this change compares **Incomparable** (exit 13) against one
+    stored after, on the `judge` axis (`RunComparison.cs:330-332`). No score, verdict or exit code
+    moves; only the provenance label and old-vs-new comparability.
+  - **Falsifiable:** each family supplies a counting `IEvaluator` to a real smoke run and asserts
+    `JudgeModel is null` **and** a call count of **0** — the teeth the gap named, closed in the honest
+    direction. Persisted via `EvalResultPersistence.ToScenarioResult`, the row carries no
+    `Comparability.Judge`; `RunComparisonTests.cs:153` already pins that judged-vs-unjudged is
+    Incomparable.
+  - The `IEvaluator? judge` parameters and `Judge` properties are **unchanged** — public API held by
+    0.34 consumers.
+
+- **A blind tool-call recorder no longer projects as a measured zero.** `TestRunEvalProjection`
+  nulled a `ToolUsageReport` that admits it dropped approval-gated calls, then fell through to
+  `TestResult.Timeline` as a second recorder — but the only producer derives that timeline from the
+  same report (`MAFEvaluationHarness.cs:129 → :599`), so it inherits the blindness and the
+  fall-through returned `[]`. `null` now means *no recorder, or none that could see the whole run*;
+  `[]` means *a complete recorder saw nothing*.
+
+- **A composite result can no longer carry one chance floor** over leaves that were never admitted
+  (`FloorAdmittedEval.Annotate`, ADR-030 §3.2 reason 1).
+
+
 ## [0.34.0-beta] - 2026-09-04
 
 **The tenth vertical, and the taxonomy closes.** Procedural ships at 80 questions and headroom

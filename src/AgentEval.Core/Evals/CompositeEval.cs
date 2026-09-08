@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals.Meta;
+
 namespace AgentEval.Evals;
 
 /// <summary>
@@ -145,22 +147,72 @@ public sealed class CompositeEval : IEval
             .Zip(subs, (c, s) => (Component: c, Sub: s))
             .Any(pair => pair.Component.Required && pair.Sub.Score.Label == "error");
 
+        // ADR-030 Slice 0.1 (defect D-a): a composite none of whose leaves produced a measurement has
+        // nothing to render a verdict on. Every aggregation strategy already excludes "skipped" and
+        // "error" leaves from the score and returns (0, "none") when nothing is left — and that
+        // (0, "none") then fell straight through BOTH verdict paths below: Threshold==null read the
+        // empty severity rollup as "pass", and a Threshold read the placeholder 0.0 as a real "fail"
+        // (or "pass" at threshold 0). A green verdict from an instrument that measured nothing is the
+        // silent-{} shape; the honest label is "skipped" (every leaf skipped) or "error" (nothing
+        // measured and at least one leaf errored — an optional judge that could not speak is still
+        // the only thing that ran).
+        //
+        // ADR-030 Slice 1.2, and a correction to that slice's own acceptance criterion. The criterion
+        // reads "one predicate, five call sites" and names the five aggregation strategies. THIS IS THE
+        // SIXTH SITE, it decides pass/fail, and it carried its own label-only copy of the rule — so
+        // Slice 1.1's new neutral label, "inapplicable", was invisible to it. A composite every leaf of
+        // which was inapplicable counted them as measurements, skipped the branch below, took the
+        // Threshold==null path, read an empty severity rollup as "none" and reported PASS. That is
+        // defect D-a exactly, re-opened by the slice that exists to make undecidability expressible.
+        // Routing through EvalScoreExtensions.CountsTowardAggregate() is what stops the next neutral
+        // state having to be added here a second time.
+        var measuredCount = subs.Count(s => s.Score.CountsTowardAggregate());
+        var nothingMeasured = measuredCount == 0;
+        var erroredCount = subs.Count(s => s.Score.Label == "error");
+        var skippedCount = subs.Count(s => s.Score.Label == "skipped");
+        var inapplicableCount = subs.Count(s => s.Score.CensusBucket() == MeasurementState.NotApplicable);
+
         // Verdict matrix:
         //   Required sub errored -> error (regardless of score/threshold — nothing was actually evaluated)
+        //   No leaf measured     -> error when any leaf errored, else skipped; never pass/fail
         //   Threshold set        -> score >= threshold ? pass : fail
         //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
+        //
+        // The nothing-measured label stays inside schema v1's closed `label` enum
+        // {pass,fail,warn,skipped,error}. An all-inapplicable composite is a CORPUS finding and its
+        // true label is "inapplicable", which the enum does not yet carry — that is the other half of
+        // ADR-030 Slice 1.4, gated by §9 Q4. Until then it reports "skipped" (in the enum, non-passing,
+        // and correct about the one thing that matters here: no verdict) and the note below carries the
+        // attribution the label cannot. This choice is behaviour-identical for every pre-existing label:
+        // all-skipped still yields "skipped", and any errored leaf still yields "error".
         var label = hasRequiredError
             ? "error"
-            : Threshold is { } t
-                ? (score >= t ? "pass" : "fail")
-                : verdictSeverity switch
-                {
-                    "critical" or "high" => "fail",
-                    "medium" => "warn",
-                    _ => "pass"
-                };
+            : nothingMeasured
+                ? (erroredCount > 0 ? "error" : "skipped")
+                : Threshold is { } t
+                    ? (score >= t ? "pass" : "fail")
+                    : verdictSeverity switch
+                    {
+                        "critical" or "high" => "fail",
+                        "medium" => "warn",
+                        _ => "pass"
+                    };
         var passed = label == "pass";
+
+        // Say why in the result itself (mirrors EvalResult.Skipped, which writes its reason to
+        // Recommendations) so a reader of the artifact sees "nothing ran", not a bare 0.0. The three
+        // states have different owners and different fixes — inapplicable is "fix the cases", skipped
+        // and errored are "fix the run" — so the note counts them separately rather than pooling them.
+        string? nothingMeasuredNote = nothingMeasured && !hasRequiredError
+            ? (skippedCount == subs.Length
+                ? $"All {subs.Length} component(s) were skipped; nothing was measured, so no verdict is reported."
+                : inapplicableCount == subs.Length
+                    ? $"All {subs.Length} component(s) were inapplicable — no case could test the thing, " +
+                      "so no verdict is reported. This is a corpus finding, not a run failure."
+                    : $"No component produced a measurement ({erroredCount} errored, " +
+                      $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported.")
+            : null;
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
@@ -168,9 +220,12 @@ public sealed class CompositeEval : IEval
             Details: new(
                 Dimensions: null,
                 Evidence: null,
-                Recommendations: null,
+                Recommendations: nothingMeasuredNote is null ? null : new[] { nothingMeasuredNote },
                 SubResults: subs,
-                AggregationStrategy: Aggregation.Name),
+                AggregationStrategy: Aggregation.Name)
+            {
+                Summary = nothingMeasuredNote,
+            },
             Provenance: new(
                 Type: "composite",
                 JudgeModel: null,

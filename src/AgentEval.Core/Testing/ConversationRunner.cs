@@ -7,6 +7,11 @@ using AgentEval.Core;
 
 namespace AgentEval.Testing;
 
+// This file declares the obsolete AgentEval.Testing.AssertionResult and is its remaining consumer,
+// so CS0618 here is expected rather than actionable. Callers outside this file still get the
+// deprecation warning that points them at AgentEval.Output.AssertionResult.
+#pragma warning disable CS0618
+
 /// <summary>
 /// Result of running a conversational test case.
 /// </summary>
@@ -40,7 +45,43 @@ public class ConversationResult
 /// <summary>
 /// Result of a single assertion check.
 /// </summary>
-public record AssertionResult(string Name, bool Passed, string? Message = null);
+/// <remarks>
+/// <para>
+/// <b>Obsolete alias.</b> The canonical assertion-result type is
+/// <see cref="AgentEval.Output.AssertionResult"/>, which carries the same three members plus a
+/// three-valued <see cref="AgentEval.Output.AssertionOutcome"/> so a check that could not decide
+/// is not reported as one that held. This record stays for source compatibility and converts to
+/// and from the canonical type implicitly, so existing code keeps compiling:
+/// </para>
+/// <code>
+/// AgentEval.Output.AssertionResult canonical = new AssertionResult("Name", true);
+/// AssertionResult legacy = canonical;
+/// </code>
+/// </remarks>
+[Obsolete("Use AgentEval.Output.AssertionResult, which adds a three-valued Outcome " +
+          "(Passed / Failed / Inconclusive). This type converts to and from it implicitly.")]
+public record AssertionResult(string Name, bool Passed, string? Message = null)
+{
+    /// <summary>Converts to the canonical <see cref="AgentEval.Output.AssertionResult"/>.</summary>
+    /// <param name="result">The legacy result. May be <see langword="null"/>.</param>
+    public static implicit operator AgentEval.Output.AssertionResult?(AssertionResult? result)
+        => result is null ? null : new AgentEval.Output.AssertionResult(result.Name, result.Passed, result.Message);
+
+    /// <summary>Converts from the canonical <see cref="AgentEval.Output.AssertionResult"/>.</summary>
+    /// <param name="result">The canonical result. May be <see langword="null"/>.</param>
+    /// <remarks>
+    /// Lossy by construction: this shape has no place to put
+    /// <see cref="AgentEval.Output.AssertionOutcome.Inconclusive"/>, which arrives here as
+    /// <c>Passed == false</c> — the safe direction.
+    /// </remarks>
+    public static implicit operator AssertionResult?(AgentEval.Output.AssertionResult? result)
+        => result is null ? null : new AssertionResult(result.Assertion, result.Passed, result.Message);
+
+    /// <summary>Converts to the canonical type explicitly.</summary>
+    /// <returns>The canonical result.</returns>
+    public AgentEval.Output.AssertionResult ToAssertionResult()
+        => new(Name, Passed, Message);
+}
 
 /// <summary>
 /// Runs scripted multi-turn conversations against an evaluable agent.
@@ -308,3 +349,5 @@ public class ConversationRunnerOptions
     /// <summary>Maximum number of retries per turn.</summary>
     public int MaxRetries { get; set; } = 0;
 }
+
+#pragma warning restore CS0618

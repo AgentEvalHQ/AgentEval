@@ -5,6 +5,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.MAF.Evaluators;
 using Xunit;
 
@@ -75,5 +76,134 @@ public class AgentEvalCompositeEvaluatorTests
 
         Assert.Contains("relevance", result.Metrics.Keys);
         Assert.Contains(result.Metrics.Keys, k => k.StartsWith("relevance #", StringComparison.Ordinal));
+    }
+}
+
+/// <summary>
+/// 7.2 — the MAF door DECLARES a floor and counts the floored leaves; it applies neither.
+/// </summary>
+public class AgentEvalCompositeEvaluatorFloorTests
+{
+    private sealed class Leaf(string key, bool floored) : AtomicCodeEval(key, key, "test", "1.0.0")
+    {
+        protected override EvalResult Evaluate(EvalInput input) => Build(1.0, true, "none");
+
+        public IEval AsAdmitted() => floored
+            ? FloorAdmittedEval.Admit(this, ChanceFloor.UniformChoice(4))
+            : this;
+    }
+
+    private static CompositeEval Composite(params bool[] flooredPerLeaf) =>
+        new("root", "Root", "test", "1.0.0",
+            [.. flooredPerLeaf.Select((f, i) => new EvalComponent(new Leaf($"k{i}", f).AsAdmitted()))],
+            WeightedSumAggregation.Instance);
+
+    private static async Task<AgentEvalCompositeEvaluator> RunAsync(
+        CompositeEval composite, ChanceFloor? rootFloor = null)
+    {
+        var evaluator = new AgentEvalCompositeEvaluator(composite, rootFloor);
+        await evaluator.EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "q")],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "a")));
+        return evaluator;
+    }
+
+    [Fact]
+    public async Task AFloorlessCompositeReportsZeroFlooredLeaves()
+    {
+        // Before 7.2 a floorless MAF composite and a fully floored one rendered identically.
+        var evaluator = await RunAsync(Composite(false, false, false));
+
+        Assert.Equal(3, evaluator.LeafCount);
+        Assert.Equal(0, evaluator.FlooredLeafCount);
+    }
+
+    [Fact]
+    public async Task AFullyFlooredCompositeReportsAllOfThem()
+    {
+        var evaluator = await RunAsync(Composite(true, true));
+
+        Assert.Equal(2, evaluator.LeafCount);
+        Assert.Equal(2, evaluator.FlooredLeafCount);
+    }
+
+    [Fact]
+    public async Task APartlyFlooredCompositeIsNotRoundedEitherWay()
+    {
+        var evaluator = await RunAsync(Composite(true, false, true, false));
+
+        Assert.Equal(4, evaluator.LeafCount);
+        Assert.Equal(2, evaluator.FlooredLeafCount);
+    }
+
+    [Fact]
+    public async Task TheCountIsReadOffTheTree_NotOffTheDeclaration()
+    {
+        // A confident root declaration over leaves nobody admitted must still report 0.
+        var evaluator = await RunAsync(
+            Composite(false, false),
+            ChanceFloor.UniformChoice(2));
+
+        Assert.Equal(0, evaluator.FlooredLeafCount);
+        Assert.NotNull(evaluator.DeclaredRootFloor);
+    }
+
+    [Fact]
+    public async Task TheDeclarationIsRecorded_AndSaysItGatesNothing()
+    {
+        var evaluator = await RunAsync(Composite(true), ChanceFloor.UniformChoice(4));
+        var result = await evaluator.EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "q")],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "a")));
+
+        var metric = result.Metrics[AgentEvalCompositeEvaluator.FloorDeclarationMetricName];
+
+        Assert.Contains("RECORDED and NOT APPLIED", metric.Reason, StringComparison.Ordinal);
+        Assert.Contains("0.2500", metric.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NoDeclaredFloor_IsAThirdState_NotNotDerivable()
+    {
+        // "nobody asked" and "asked and could not answer" are different facts.
+        var evaluator = await RunAsync(Composite(true));
+        var result = await evaluator.EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "q")],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "a")));
+
+        var metric = result.Metrics[AgentEvalCompositeEvaluator.FloorDeclarationMetricName];
+
+        Assert.Null(evaluator.DeclaredRootFloor);
+        Assert.Contains("nobody asked", metric.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("NOT DERIVABLE", metric.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFloorWithNoDerivation_IsRefusedAtConstruction()
+    {
+        var blank = ChanceFloor.UniformChoice(4) with { Derivation = "   " };
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => new AgentEvalCompositeEvaluator(Composite(true), blank));
+
+        Assert.Contains("without its reason", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheScoreIsUNCHANGED_ByTheDeclaration()
+    {
+        // The load-bearing half of "recorded, not applied": the same composite must produce the same
+        // root score with and without a floor. A floor that moved a number would be Q6 answered by
+        // accident.
+        var withoutFloor = await RunAsync(Composite(true, false));
+        var withFloor = await RunAsync(Composite(true, false), ChanceFloor.UniformChoice(2));
+
+        Assert.Equal(
+            withoutFloor.CapturedResults[0].Score.Value,
+            withFloor.CapturedResults[0].Score.Value,
+            12);
+        Assert.Equal(
+            withoutFloor.CapturedResults[0].Score.Passed,
+            withFloor.CapturedResults[0].Score.Passed);
     }
 }

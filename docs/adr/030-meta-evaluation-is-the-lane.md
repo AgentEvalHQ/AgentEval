@@ -1,0 +1,2082 @@
+# ADR-030: Meta-evaluation is the lane. Contract unification is not.
+
+- **Status:** **Accepted (2026-09-05).** Ratification is what funds §8: Slices 1 and 2 are now
+  funded. Slice 0 was **already executed** before ratification (see the ratification note) — the gate
+  it was meant to sit behind did not hold, and saying so is part of accepting the document. Status
+  `Proposed` was a gate, not a placeholder (the ADR-026 precedent); it has now been cleared, and
+  everything in "Deferred until a second team asks" (§8) remains unfunded.
+- **How it got here, which is the useful part:** a four-lane design was produced (contract
+  unification, meta-evaluation, harness bridge, assertions) and put to an adversarial review. The
+  review returned **RETHINK the unification half, SHIP a much smaller meta-evaluation slice**, and it
+  was right on both counts. Two of the design's load-bearing mechanisms — the base class that made
+  the chance-floor defect "unrepresentable", and the guard that made "inapplicable cannot be a pass"
+  structural — **do not work as specified, and one of them does not compile.** This ADR is the
+  design after those rulings were applied, not the design that was reviewed. §7 records what was
+  refuted, including by this document's own earlier draft.
+- **Dates:** authored **2026-09-04** (`a396c5b4`); **ratified 2026-09-05**, with §4.2's guard
+  corrected and §3.3's input claim corrected on the way in — see §0.0. Supersedes
+  `ADR-030-DRAFT_NonLlm_MetaEvaluation.md` (deleted on write).
+- **Decision in one line:** **Adopt meta-evaluation — chance floors, exact tests, paired
+  significance, unit-of-analysis, applicability — as AgentEval's differentiating concern, defined
+  over a framework-neutral observation tuple rather than over `EvalResult`; keep `IEval` as the one
+  evaluation contract by adaptation and not by migration, and say plainly that the reason is
+  migration cost rather than architectural superiority; and reject a deterministic assertion
+  catalogue permanently, by name.**
+- **Relates to:** [ADR-022](022-grading-by-decomposition-composite-sub-evaluators.md)
+  (the composite tree this builds on), [ADR-028](028-typedmemeval-acceptance-on-discrimination.md)
+  (accept on discrimination; chance floors derive per arm), [ADR-025](025-gatekeeper-runtime-fail-closed-enforcement.md)
+  (fail closed rather than silently green-light).
+
+---
+
+## 0.0 RATIFICATION NOTE — 2026-09-05
+
+**Ratified by:** the repository owner (`joslat`), on branch `joslat/digitec-galaxus` at `b57496f2`.
+**Reviewed against the tree, not against the brief.** Four checks were re-run this session; three
+confirmed the decision, one corrected a supporting sentence, and one changed what ratification means.
+
+| Check | Result |
+|---|---|
+| Does the flagship harness reach the good contract, from a consumer's side? | **Confirmed, and harder than §2.2 states.** `samples/Galaxus.RecommendationAgent.Evals` makes **0** references to `IEval` and **59** to `MAFEvaluationHarness`. A consumer with zero `IEval` references cannot be served by anything defined over `EvalResult`. This is the evidence that makes §4.1 (the neutral `Observation` tuple, BCL-only) load-bearing rather than stylistic: it is the only part of this design that a zero-`IEval` consumer can adopt without migrating first. ↪ **Stale since 2026-09-07 — §11.2 row 2: 3 files / 66.** |
+| Is `IEval`'s input gap as large as §3.3 claims? | **No — corrected in §3.3.** `EvalInput` already carries `ToolCalls`, `ToolDefinitions` and `ExpectedActions`. The real gap against `ToolCallRecord` is **three fields** (`WasExecuted`, `ApprovalState`, `Order`) plus one `ToolUsageReport → EvalInput` projection. The bridge is cheaper than the document implied. It stays deferred anyway, because §6.2's reasons for deferring it are **breaking-change** reasons (gates defaulting on; `TestResult.Score` exactness dead by construction), not input-model-cost reasons, and those survive the correction untouched. |
+| Is the §4.2 guard sound? | **No — folded in this ratification.** The D2 fix (guard on `EvalResult`'s primary constructor) is itself bypassable by a `with` clone and sits on the wrong type. Replaced by the backing-field + validating-init-accessor pattern already shipped twice in this repo. See §4.2 and the new §7.1 row **D2b**. |
+| Are §2.3's five defects still shipped and live? | **No. All five are fixed**, in `a396c5b4` — the same commit that added this ADR. |
+
+**What ratification actually funds, stated as a diff and not as an intent.**
+
+- **Slice 0 is DONE, not funded.** All seven items landed in `a396c5b4` ("three-valued
+  `AssertionResult`, assertion→result wiring, ADR-030 Slice 0"), which is also the commit that
+  created this file. §2.3 and §8 Slice 0 therefore describe a tree state that **no longer exists**;
+  they are kept verbatim as the evidence that motivated the decision, and this note is the correction
+  that stops them being read as current. Verified fixed this session: `CompositeEval` all-skipped now
+  reports `label:"skipped"` (`CompositeEval.cs:149-187`); `MAFEvaluationHarness` now reads
+  `EvaluationFailed` (`:635`, `:657`); `ToolInputAccuracyEval`'s two flattering `Build(1.0, true,
+  "none")` sites now skip (`:124`, `:219`); `ToolUsageExtractor` sees `ToolApprovalRequestContent`
+  (5 sites); `MicrosoftEvaluatorAdapter` is `: IMetric, IEval` — the dual-target that §9 Q3
+  recommended; `EvalResultPersistence` populates `ScenarioResult.Assertions` from
+  `AgentEvalScope.Current`.
+- **The ADR's own gate did not hold.** "Nothing in §8 is funded until this document is ratified" was
+  violated in the commit that wrote the sentence. Recorded rather than quietly dropped: a gate that
+  is authored and cleared in one commit is not a gate, and this is the second document in this repo
+  where the artifact under review supplied an input to its own approval.
+- **Slices 1 and 2 are what ratification funds**, and neither exists in `src/` — verified this
+  session: no `MeasurementState`, no `AgentEval.Evals.Meta`, no `ExactTests`, no `EvalInput.CaseId`.
+  The stop rule (Slice 2.6) is therefore still ahead of us, not behind us.
+- **The "Deferred until a second team asks" bucket stays unfunded**, including all three items the
+  review found actually wrong (D1, D8, D10).
+
+**Open questions closed by this ratification:** Q1 **yes** (the honest framing is wanted; the
+demotion stands). Q3 **dual-target**, already implemented that way in `a396c5b4`. Q7 **normative** —
+§3.1's exclusion list is normative text in this ADR and a PR adding `contains` is closed with a link
+to it. **Still open and still gating their own slices:** Q2 (packaging), Q4 (schema v1.1 timing —
+gates Slice 1.4), Q5 (controls — unfunded, which is the answer unless it is revisited), Q6 (the stop
+rule — recommend it actually stops), Q8 (four unverified items; the §5.2 line delta remains an
+attribution estimate and must not be quoted as a measurement).
+
+**Not ratified:** nothing in §8's deferred bucket, and no line-count claim in §5. §5.1's
+"−2,791 (13.7%)" and §5.2's "~−974" are projections of a migration nobody has performed.
+
+---
+
+## 0. READING ORDER, AND THE ONE THING TO TAKE IF YOU READ NOTHING ELSE
+
+The valuable half of this ADR was **§8 Slice 0** — bug fixes, no new public types, every defect
+shipped and live in `src/` when this was written. **They are now fixed** (`a396c5b4`; see §0.0), so
+the valuable half of this ADR *as a plan* is now **Slices 1 and 2**: applicability, and the
+BCL-only statistics module. Everything after those is progressively more speculative and
+progressively less funded, and §2.3 should be read as the case that was made, not as a description
+of the tree.
+
+If the reader takes one sentence: *AgentEval's differentiator is not that it can score a string
+deterministically — every competitor can. It is that it can tell you whether your eval, judge or
+code, could have failed at all. Nobody ships that. That is the lane, and it is about 700 lines.*
+
+---
+
+## 1. CONTEXT AND THE QUESTION ASKED
+
+Two questions arrived together.
+
+**(a) The architectural one, verbatim:** *"what abstractions should we add in AgentEval to have all
+work together inside our evaluation suite by extending — so we do not have to build another
+evaluation harness framework but extend and use AgentEval. That is the goal and the nicest thing to
+do architecturally. Also follows DRY, CLEAN, SOLID and PRAGMATIC."*
+
+**(b) The scope one:** *does non-LLM (deterministic) evaluation belong in AgentEval as a first-class
+concern, and do the non-deterministic (judge) evaluators have a reason to be?*
+
+The forcing evidence is the Galaxus sample: **20,348 lines of C#** (measured this session; 55 `.cs`
+files under `samples/Galaxus.RecommendationAgent.Evals/`, excluding `obj/` and `bin/`) of which the
+large majority is grading machinery the sample had to build because the library could not reach it.
+A second consumer, `AgentEval.TravelDemo.Evals` (2,433 lines), built a smaller copy of the same
+machinery and got it wrong.
+
+The brief for this ADR asserted "~17,400 lines". That undercounts by ~2,900 because Evals 05–09 grew
+after the figure was taken. **20,348 is the measured number; use it.**
+
+---
+
+## 2. THE EVIDENCE
+
+Every number in this section was produced by reading the tree this session. Where a claim is
+inherited rather than measured, it says so.
+
+### 2.1 AgentEval has SIX evaluation contracts, not four
+
+The brief said four. Counted in `src/`:
+
+| # | Contract | Location | Implementations | Result model |
+|---|---|---|---|---|
+| 1 | `IEval` | `src/AgentEval.Abstractions/Evals/IEval.cs`, ns `AgentEval.Evals` | **79 files** declare it | `EvalResult` (nests, versioned schema, provenance) |
+| 2 | `IEvaluator` | `src/AgentEval.Abstractions/Core/IEvaluator.cs`, ns `AgentEval.Core` | 2 real (`ChatClientEvaluator`, `CalibratedEvaluator`) + 2 stubs; **203 references** | `AgentEval.Core.EvaluationResult` |
+| 3 | `IProbeEvaluator` | `src/AgentEval.RedTeam/RedTeam/Core/IProbeEvaluator.cs` | 30 | `AgentEval.RedTeam.EvaluationResult` (`readonly record struct`) |
+| 4 | Assertions | `src/AgentEval.Core/Assertions/*` (16 files, 103+ fluent methods) | n/a | **throws** `AgentEvalAssertionException` — no result object |
+| 5 | **`IMetric`** and its four sub-interfaces | `src/AgentEval.Abstractions/Core/IMetric.cs` | **26 concrete classes** (`IAgenticMetric` 6, `IRAGMetric` 9, `ISafetyMetric` 3+, `IMemoryMetric` 5, `IMetric` direct 1) | `MetricResult` (+ input `EvaluationContext`) |
+| 6 | `IEvaluationHarness` | `src/AgentEval.Abstractions/Core/IEvaluationHarness.cs` | MAF + workflow + others | `TestResult` |
+
+**Correction to the design lanes, which disagreed with each other.** The contract-unification lane
+counted 21 `IMetric` implementations; the adversarial review counted 7. Both are wrong. **26** is the
+count of concrete classes implementing `IMetric` or one of its four derived interfaces
+(`grep "class X : I*Metric"`, excluding interfaces and registries). This matters: it is the
+difference between "fold `IMetric`, it is small" and "do not fold `IMetric`, it is a 26-class
+migration". §3.3 takes the second.
+
+`IMetric` is also the contract the brief missed entirely, and it is load-bearing:
+`AgentEvalBuilder` (`src/AgentEval.Core/Core/AgentEvalBuilder.cs:87,96,105`) exposes
+`AddMetric`/`AddMetrics` and **no `AddEval`**. The public "build a suite" entry point knows contract
+#5 and does not know contract #1, where all 79 evaluators live. Grep for `IEnumerable<IEval>` or
+`IReadOnlyList<IEval>` across `src/`: **zero hits.** There is no runner over a *set* of evals at
+all — `CompositeEval` composes them into one tree, but nothing runs a suite of them and persists it.
+> ↪ **Amended 2026-09-07 — §11.2 row 1:** `AddEval(IEval, ChanceFloor)` exists (`AgentEvalBuilder.cs:151`), `IEnumerable<IEval>` has one hit, and `AgentEvalRunner.EvaluateEvalsAsync` runs a set. The three sentences above are stale.
+
+### 2.2 The flagship harness cannot reach the good contract
+
+`src/AgentEval.MAF/MAF/MAFEvaluationHarness.cs` (759 lines) contains **no reference to `IEval`**.
+Its complete deterministic capability, verbatim from `:174-189` and duplicated byte-for-byte at
+`:390-401`:
+
+```csharp
+// No AI criteria - check for non-empty response and ExpectedOutputContains
+result.Passed = !string.IsNullOrWhiteSpace(response.Text);
+if (result.Passed && !string.IsNullOrEmpty(testCase.ExpectedOutputContains))
+    result.Passed = response.Text.Contains(testCase.ExpectedOutputContains, StringComparison.OrdinalIgnoreCase);
+result.Score = result.Passed ? 100 : 0;
+```
+> ↪ **Still true on 2026-09-07 (§11.2 row 3):** the harness still holds `IEvaluator?` and no `IEval`; the join shipped BESIDE it, not in it.
+
+Non-empty plus one case-insensitive substring, scored binary. Tool usage is captured, costed,
+timelined and printed — and **consulted by no verdict**. The Galaxus sample says so in as many
+words at `Eval01_CatalogueIntegrity.cs:29-32`: *"`TestResult.Passed` is ignored. With no criteria
+the harness sets it to 'the agent produced non-empty text', which would score a refusal as a pass."*
+
+**That is why the sample grew 20,348 lines.** It is the single most important fact in this ADR.
+
+### 2.3 Five defects that are shipped, live, and flattering
+
+> **⚠️ HISTORICAL AS OF 2026-09-05. All five are FIXED**, in `a396c5b4` — the same commit that added
+> this ADR. Kept verbatim because they are the evidence the decision was made on, and because a
+> defect table rewritten after the fix stops being a record of what was actually wrong. Do **not**
+> cite any row here as a current property of `src/`. §0.0 carries the per-item verification.
+
+Each verified by reading the file at the time of writing. Each fails in the direction that makes an
+agent look better than it is — which is the direction that survives review.
+
+| # | Defect | Location | Why it is flattering |
+|---|---|---|---|
+| D-a | A composite where **every leaf skipped** returns `label:"pass", passed:true, score:0.0` | `CompositeEval.cs:148-163` + `MinAggregation.cs:33` (`if (nonSkipped.Count == 0) return (0, "none")`; the `Threshold==null` path reads only severity, and `SeverityRollup.Max(empty)` is `"none"` → `"pass"`) | A green verdict from an instrument that measured nothing. This is the silent-`{}` shape from the standing gate self-examination rule. |
+| D-b | A judge that **failed to produce a verdict** can certify an agent | `ChatClientEvaluator.cs:179,185,201` return `OverallScore = DefaultFailureScore = 50` with `EvaluationFailed = true`; `MAFEvaluationHarness.cs:168` does `result.Passed = evaluation.OverallScore >= testCase.PassingScore` and **never reads `EvaluationFailed`** (grep: 0 hits in that file) | Any `PassingScore <= 50` passes on a judge parse failure. |
+| D-c | Three **perfect scores on absent input** | `ToolInputAccuracyEval.cs:116` (no tool calls), `:129` (no tool definitions), `:214` (`totalCalls == 0`) — all `return Build(1.0, true, "none")`; line 129 ships evidence reading *"schema validation skipped"* **beside a 1.0** | Supply no `ToolDefinitions` and this eval reports perfect, forever. |
+| D-d | `TestCase.ExpectedTools` is written by every loader and read by **no** `MAFEvaluationHarness` path | `CsvDatasetLoader.cs:200`, `JsonDatasetLoader.cs:175`, `JsonlDatasetLoader.cs:122`, `YamlDatasetLoader.cs:124` write it. `DatasetTestCaseExtensions.cs:79` **documents behaviour that does not exist**: *"For tool-call accuracy evaluation, use the ToolUsage metrics which compare against ExpectedTools."* | A dataset declaring expected tools passes on any non-empty string. |
+| D-e | An **approval-gated tool call is invisible**, so `NeverCallTool` has a chance floor of 1.0 | `ToolUsageExtractor.Extract` matches `FunctionCallContent` only. MAF answers an approval-required call with a `ToolApprovalRequestContent` carrying the `FunctionCallContent` in its `.ToolCall` property and **no** `FunctionCallContent` of its own | `NeverCallTool("PlaceOrder")` passes whatever the agent does — zero information — and its permission partner is unpassable, so the pair scores 0.5 for every agent forever. |
+
+**Naming correction, resolved this session.** The brief names the MAF type
+`FunctionApprovalRequestContent`. That type appears **nowhere** in this tree. The type actually used
+is **`ToolApprovalRequestContent`** (with `.ToolCall is FunctionCallContent`), in 20 places across
+`src/AgentEval.MAF/Gatekeeper/`, `samples/AgentEval.Samples/Gatekeeper/` and the Galaxus adapter,
+plus `ToolApprovalResponseContent` for the decision. The maf-doctor registry (MAF 1.3.0, 63 entries)
+reports no known issue for either name, so the tree is the authority and the brief is wrong.
+
+Also verified absent, by grep over `src/` excluding `obj/`: **chance floor / random baseline /
+degenerate policy → 0 hits. Sign test / binomial / p-value / McNemar / Wilcoxon → 0 hits.** The
+library has no significance test of any kind. `DistributionStatistics` computes confidence intervals
+that decide nothing.
+
+`ScenarioResult.Assertions` is hard-coded `Array.Empty<AssertionResult>()` at both and only its
+construction sites (`EvalResultPersistence.cs:70`, `DirectoryExporter.cs:187`). Assertion outcomes
+appear in **no artefact AgentEval writes**. They exist as stack traces.
+
+### 2.4 The ecosystem, and the one gap in it
+
+Surveyed: OpenAI Evals, DeepEval, Ragas, promptfoo, LangSmith, Braintrust, Inspect, HELM,
+`Microsoft.Extensions.AI.Evaluation`.
+
+- **Deterministic assertions are a solved, crowded problem.** promptfoo owns the catalogue outright
+  (~30 assertion types: `equals`, `regex`, `is-json` with schema, `levenshtein`, `f-score`, `bleu`,
+  `rouge-n`, `latency`, `cost`, a full trajectory family). `M.E.AI.Evaluation.NLP` ships
+  BLEU/GLEU/F1 on the **same** `IEvaluator` as its LLM-graded evaluators with `chatConfiguration`
+  nullable — the cleanest unification in the field, in a package this repo **already references**
+  (`Directory.Packages.props:41`, `Microsoft.Extensions.AI.Evaluation.Quality 10.7.0`).
+- **Meta-evaluation is shipped by nobody.** Not one of the nine ships a chance floor, a negative
+  control, or paired significance as machinery. The single artefact in the whole field is a
+  hand-rolled `RandomBaselineSolver` inside two OpenAI Evals directories — a per-eval convention,
+  computed by no harness, carried by no report model, required by nothing. Inspect leads on
+  *variance* (bootstrap stderr, Wilson CIs, clustered stderr) and still answers only "how much does
+  the score move", never "could this eval have produced a bad score at all".
+
+**The evidence, folded in-repo on 2026-09-05.** This table previously lived in
+`strategy/Galaxus/Ecosystem_ChanceFloor_Comparison.md`, which is gitignored and therefore was not
+readable from this repository — a citation nobody could check. That file is deleted; its evidence is
+here. ⚠️ **The sweep itself is still the one performed on 2026-09-04 and was not re-run** (Q8): treat
+every row as of that date, not as of today.
+
+| Framework | Evidence for "no chance-floor / negative-control machinery" |
+|---|---|
+| **HELM** | Metrics docs enumerate ~50 metrics in 7 categories; no random baseline, chance level or null model. Code search `"random baseline" repo:stanford-crfm/helm` → **0 hits** |
+| **Inspect (UK AISI)** | Metrics page lists `accuracy, mean, var, std, stderr, bootstrap_stderr, ci, ci_wilson, frequency, categorical, krippendorff_alpha` — no baseline/chance metric. `"random baseline"`, `"negative control"` → **0**. The nearest artefact is a **test double, not a control**: `mockllm.py`, *"Always returns default_output"*, explicitly **no randomness** |
+| **DeepEval** | `"random baseline"` → **0**; nothing in the metric docs |
+| **Ragas** | Metrics overview has no mention of baselines or chance |
+| **promptfoo** | `"chance level"`, `"negative control"` → **0**. `"random_baseline"` → 1 hit: a **blog post about RLVR**, not a feature |
+| **Braintrust / autoevals** | `"random baseline"`, `"chance level"`, `"negative control"`, `"random_baseline"` → **all 0**. It *does* ship a "baseline experiment" (`base_experiment`) — but that is **a previous run of your own system**, not a degenerate policy |
+| **LangSmith / openevals** | Evaluation-concepts doc covers human / code / LLM-judge / pairwise; **no** baseline, chance, variance or significance |
+| **M.E.AI.Evaluation** | Namespace type list and libraries doc contain **no** baseline or chance concept |
+| **OpenAI Evals — the one exception** | `RandomBaselineSolver`, verbatim: *"A solver that randomly answers `yes` or `no` for any input. We view this baseline as equivalent to randomly guessing."* It exists in `already_said_that/solvers.py` and `track_the_stat/solvers.py` and is registered as a runnable "model" in two YAMLs. **The shape of the exception is the finding: a per-eval, hand-rolled convention inside individual eval directories, not a framework capability.** No harness computes it, no report model carries it, nothing requires it |
+
+**Statistical rigour, for calibration of the claim:** Inspect is in a different league and it is honest to
+say so — `var`, `std`, `stderr`, `bootstrap_stderr` (1000 resamples), `ci`, `ci_wilson`,
+`krippendorff_alpha`, and **clustered standard errors** via `stderr(cluster=...)`. Everyone else stops
+at repetition (Braintrust `trialCount`, LangSmith `num_repetitions`, promptfoo `--repeat`) with **no
+significance testing found in any of them**. **No framework in the set ships paired significance
+testing** — no paired bootstrap, no McNemar, no paired t-test — though four ship pairwise *judging*.
+Outside the set, EleutherAI's `lm-evaluation-harness` reports bootstrap stderr per task, which puts it
+in Inspect's tier.
+
+**Uncertainty flags carried forward, because a 0-hit is not a proof:** GitHub code search indexes the
+default branch and can miss things, and the API rate-limited the sweep mid-run. Confidence is **high**
+for HELM / Inspect / autoevals / DeepEval (0 hits *plus* corroborating doc reads), **medium** for Ragas
+and langsmith-sdk (those queries were rate-limited; doc reads only). "ndcg" was not exhaustively
+grepped — treat MRR/NDCG as *not documented* rather than *absent*.
+
+**The differentiating point, stated plainly:** every framework here answers *"what score did the system
+get?"*. Several answer *"how much does that score move between runs?"*. **None of them answers "could
+this eval have produced a bad score at all?"**
+
+### 2.5 The live-run proof — real money, $6.34, today
+
+This is the part that is not a code-reading argument.
+
+- **Eval 01 live: the agent scored 8/14; the best constant policy scored 10/14.** The agent was
+  **below its own floor**. No analytic floor would have said so — only actually running an
+  input-blind policy did. The chance-floor instrument is the only thing that revealed it.
+- **3 of the agent's 6 failures were one false positive.** `"wahl"` — German for both *election* and
+  *choice* — sat in the special-category blocklist and tripped on every German-language persona.
+  **Invisible offline.** It became visible the moment a floor and a paired comparison existed,
+  because it made the agent lose cases a constant policy won.
+- **Demo 2: 6 of 7 model calls timed out at 60s.** The reported finding *"the loop bought nothing"*
+  came from **timeouts**, not from the reviewer. The eval measured deterministic fallbacks and did
+  not say so loudly enough. This is `MeasurementState.NotMeasured` (an operational finding) being
+  reported as if it were a measurement.
+- **`DetectOptOutBackstop` is the only place in the entire suite that reads a tool RESULT** rather
+  than its arguments. It is covered by no control and reports its own blindness as *"never
+  exercised"* — an instrument that cannot fail, un-flagged.
+
+Two more, recorded by the sample's own comments as measured-and-fixed, both in the flattering
+direction:
+
+- `RuleOfThreeUpperBound` was called with a **clean-case count** and printed *"95% upper bound
+  34.8%"* beside an **observed defect rate of 50%**. A bound below its own observation is not a
+  bound.
+- The constant-policy ceiling was **typed as 8** in a comment and **measured at 10**; the refuser was
+  typed 8 and measured 5. A hand-typed baseline is a baseline someone chose.
+
+### 2.6 One qualification this ADR owes its own claim — we are not quite at zero
+
+*Added 2026-09-05, folded from `strategy/Galaxus/AgentEval_NonLlm_Inventory.md` before that file was
+deleted. §2.4 says meta-evaluation is shipped by nobody. Inside this repository that is very nearly
+true, and the exception has to be named or §3 is arguing against a strawman of our own making.*
+
+**`GateCalibrationHarness` — `AgentEval.Guardrails.Judges` — already does part of it.** It computes a
+full confusion matrix (TP/TN/FP/FN), decisive accuracy, a **dangerous-error (FN) count**, FPR, and κ
+against gold; promotion is **fail-closed**, requiring `PromotionCriteriaConfigured && SufficientData`;
+and it carries an optional **deterministic-baseline comparison**:
+
+```csharp
+beatsBaseline = judgeAccuracy > baselineAccuracy && fn <= bfn;
+```
+
+**That is the only place in this library that asks "does the judge beat a deterministic detector?"** —
+which is a meta-evaluation question, not a scoring question. Three things keep it from refuting §2.4
+and all three are the point:
+
+1. It is a **judge**-scoring instrument. It answers *"is this judge good?"*, never *"could this eval
+   have failed?"* — no chance floor, no applicability, no unit-of-analysis collapse.
+2. It emits a `CalibrationReport`, **never an `EvalResult`**, and is wired to nothing else. It is a
+   seventh result shape in all but name, which is exactly what §3.2 forbids the meta lane from
+   becoming.
+3. Its baseline is *supplied*, not *derived*. `baselineAccuracy` is whatever the caller hands it.
+
+**Consequence, binding on Slice 2.** `AgentEval.Evals.Meta` **must reconcile with this harness or
+state in writing why not.** Shipping a second, unconnected meta-evaluation instrument beside it is the
+fork this ADR exists to refuse, and it would be a fork in the one place §3.2 says a fork is worst.
+`FloorComparison`/`PairedEvalComparer` and `beatsBaseline` are answering neighbouring questions; if the
+former cannot express the latter, that is a finding about the design, not about the harness.
+> ↪ **Discharged in writing 2026-09-07 — §11.2 row 6:** declared unreconciled, with the reason (the harness's rule has a paired false-negative bound the meta lane cannot express).
+
+**Two smaller corrections from the same inventory, recorded so nobody re-derives them wrong:**
+
+- **`PerformanceBenchmark` has the `IEval` signature and is not an `IEval`.** It exposes
+  `EvaluateAsync(EvalInput, CancellationToken) → EvalResult` and builds a real three-leaf
+  `CapByWorst` composite, but is declared `public class PerformanceBenchmark` with no interface, and
+  carries a `SyntheticEval : IEval` **stub whose only method throws**, present purely to satisfy an
+  `EvalComponent` constructor. `OwaspBenchmarkRun` / `NistBenchmarkRun` / `MitreBenchmarkRun` use the
+  identical duck-typed + throwing-stub pattern. That is four real measurement families that cannot be
+  composed — the §2.2 reachability gap one layer further down, and **not counted in §5's line delta**.
+  > ↪ **Sharpened 2026-09-07 — §11.2 row 14:** 4 ducks + 8 runner-only families; the root cause is the aggregation contract, ruled in ADR-032 D6.
+- **`CalibratedEvaluator` (§2.1, contract #2) is a naming trap.** It is not statistical calibration; it
+  is multi-LLM consensus voting (`judges.Select(j => (IEvaluator)new ChatClientEvaluator(j.Client))`).
+  **It adds cost, not determinism.** One of contract #2's "2 real implementations" is this.
+
+---
+
+## 3. THE DECISION
+
+### 3.1 The lane: meta-evaluation, YES. Deterministic assertion catalogue, NO — permanently.
+
+**Adopt as first-class:** chance floors, exact small-sample tests, paired comparison with
+unit-of-analysis collapse, and the applicability distinction (measured / not-applicable /
+not-measured).
+
+Three reasons, in order of strength:
+
+1. **Nobody ships it** (§2.4), and it is the half of Composite Judges we have been missing. A code
+   eval fails loudly. A judge's failure mode is *a plausible number that would have appeared
+   anyway* — which is exactly what a floor and a control detect.
+2. **Our own history is the evidence.** 78.2% of V3 probe answers were empty and counted as passes.
+   69 unearned V2 passes from a bar the artefact supplied. Procedural V6 printed 77/80 that was
+   flattering because an absent chance floor is not a zero floor. Every one is a meta-evaluation
+   failure and the library has no machinery that would have caught any of them.
+3. **It is small.** The funded slices are ~700 production lines.
+
+**Positioning:** *AgentEval is the library that tells you whether your eval — judge or code — could
+have failed.*
+
+#### The exclusion list. Normative. By name. Permanently.
+
+AgentEval will not ship, and any PR adding one is closed with a link to this subsection:
+
+- a string-matching assertion catalogue — `equals`, `contains`, `starts-with`, `regex`, `is-json`,
+  `levenshtein`, or a schema-validation assertion type;
+- BLEU, ROUGE, GLEU, METEOR, chrF, or any n-gram overlap metric;
+- exact-match scoring as a shipped eval;
+- NDCG, MRR, recall@k as *new* work (the two that already exist are
+  `src/AgentEval.Core/Metrics/Retrieval/MRRMetric.cs` and `RecallAtKMetric.cs` — **named here on
+  2026-09-05 because the inventory that fed this ADR wrongly claimed neither existed**; they stay
+  where they are and they are not
+  extended);
+- an assertion DSL, YAML-configured or otherwise;
+- **a deterministic `IEvaluator` implementation** (see §3.3).
+
+`AtomicCodeEval` is public and a `contains` eval is 30 lines. For NLP metrics, depend on
+`Microsoft.Extensions.AI.Evaluation.NLP`. The realistic failure mode here is not "we added a chance
+floor"; it is that having added a floor, `contains` looks free, then `regex`, then a schema
+validator, then a DSL — and eighteen months later we are a worse promptfoo maintained by fewer
+people. The list is the mitigation.
+
+### 3.2 The load-bearing rule
+
+> **Meta-evaluation never implements `IEval`.**
+> A floor is a property *of a comparison*. A control is a *run of* an eval. A comparison is a
+> *function of* results. Nothing in `AgentEval.Evals.Meta` returns `EvalResult` as its own verdict.
+>
+> ↪ **Amended 2026-09-07 — §11.2 row 4:** "never implements `IEval` **as a leaf**". `FloorAdmittedEval : IEval`, a decorator, is ratified by name; the composite refusal that keeps reason 1 below true is ADR-032 D4.
+
+This is what prevents a seventh result model, and the seventh would be the one holding pass/fail
+authority — the worst possible place for a fork. It is not expressible in the type system, so it is
+enforced by an architecture test (§4.6).
+
+**Ruling applied (was `EvalScore.ChanceFloor`, now deleted).** The draft said *"a floor is a FIELD ON
+A SCORE"*. The review refuted it and the refutation holds:
+
+1. **A composite has a `Score` and cannot have a floor.** The node consumers actually read — the
+   root of the tree, the row in `results.jsonl` — would carry `chanceFloor: null` forever. The field
+   would be null precisely where it is wanted.
+2. **The number without its derivation is unusable.** `0.44` means nothing without `k`, `poolSize`,
+   `Kind` and the derivation sentence. Those go into `Details.Dimensions` and `Details.Evidence`
+   regardless — so `Score.ChanceFloor` would be a duplicate of data that already has a home, and
+   duplicated data drifts.
+3. **It buys the design's only avoidable schema break.** `Details.Dimensions` is
+   `additionalProperties`-open and already has a reserved-key convention (`_lifted.*` in
+   `EvalResultPersistence.cs:46-56`). `chance_floor` fits with **zero** schema change.
+
+So: floors live in `Details.Dimensions["chance_floor*"]` plus one
+`EvalEvidence("chance-floor", kind, derivation)`. The typed floor object lives at the **suite**
+level, in `FloorComparison`, where the derivation, the interval and the pool are all in scope
+together — which is where the exact test needs them anyway.
+
+### 3.3 Which contract survives, and what happens to the other five
+
+**`IEval` survives.** And the honest reason must be stated first, because the review is right that
+dressing it up as a design preference will cost the document its credibility with the first reviewer
+who knows `M.E.AI.Evaluation`:
+
+> **`IEval` survives because it already has 79 implementations, a JSON schema, an evaluator-card
+> registry, a persistence layer, a CLI and MissionControl. This ADR is not choosing a contract; it
+> is declining to migrate 79 evaluators. That is a legitimate reason and it is the actual one.**
+
+The secondary reasons are real but are claims about AgentEval's current assets, not comparative wins:
+
+- It is the only contract whose result can express **"not applicable"** —
+  `EvalResult.Skipped(eval, reason)` produces `label:"skipped"`, and four of the five aggregation
+  strategies already exclude it from the denominator (`WeightedSumAggregation.cs:34`,
+  `MinAggregation.cs:33`, `WeightedMedianAggregation.cs:35`, `MajorityVoteAggregation.cs:37`).
+  *(Inconsistency to log: `CapByWorstAggregation.cs:37-40` filters `"skipped"` but not `"error"`. It
+  is safe today only because error leaves carry severity `"none"`. Unintended; fix in Slice 1.)*
+- It carries **how-was-this-produced as data** (`EvalProvenance.Type`, `JudgeModel`, `PromptHash`,
+  `TokensUsed`, `EstimatedCost`, `CacheHit`).
+- It **nests** (`EvalDetails.SubResults`, depth-capped at 32). A suite is a tree.
+
+**The honest caveat that shapes everything else:** `IEval` wins on output, composition, provenance
+and applicability. It **loses on input** — but by less than this document originally claimed, and the
+correction is recorded rather than absorbed.
+
+> **Corrected at ratification (2026-09-05).** The sentence here read *"`IMetric`'s
+> `EvaluationContext` already carries `ToolUsage`, `Timeline`, `Performance` and `ExpectedTools`;
+> `EvalInput` carries none of them."* **The second clause is false.** `EvalInput` already carries
+> `ToolCalls` (`IReadOnlyList<ToolCall>`, with a chronological-ordering contract), `ToolDefinitions`
+> and `ExpectedActions` — verified at `src/AgentEval.Abstractions/Evals/EvalInput.cs`. What it
+> genuinely lacks, measured against `ToolCallRecord`
+> (`src/AgentEval.Abstractions/Models/ToolCallRecord.cs`), is **three fields on `EvalInput.ToolCall`
+> — `WasExecuted`, `ApprovalState`, `Order`** — plus a `ToolUsageReport → EvalInput` projection.
+> `Timeline` and `Performance` remain genuinely absent.
+>
+> **This makes the bridge cheaper than the document implied, and it does not reopen the decision.**
+> The bridge is deferred in §8 for the reasons in §6.2 — two gates that default ON and flip
+> dataset-driven consumers pass→fail on a minor, and a `TestResult.Score` exactness guarantee that is
+> dead by construction. Those are breaking-change reasons. They are unaffected by how few fields the
+> input gap is, and they are why the bridge is deferred rather than cheap-and-therefore-funded. What
+> the correction does change: **"`EvalInput` cannot carry tool data" must not be cited as a reason
+> for anything**, by this document or by any document depending on it.
+
+The residual input gap is still *why* 26 structural metrics were written against `IMetric`:
+`EvaluationContext` hands a metric a whole `ToolUsageReport` with timing, ordering and execution
+state already joined, and `EvalInput` hands it three plain fields per call.
+
+| Contract | Disposition | Funded when |
+|---|---|---|
+| **`IEval`** | Survives. **Interface untouched — no member added, ever, in this programme.** | — |
+| **`IEvaluator`** | **Stays, retyped in DOCUMENTATION ONLY** as the LLM-judge transport. Already bridged by the shipped `AtomicLlmEval`. See below. | Slice 0 (doc) |
+| **`IMetric`** (26 impls) | **Stays. Not folded.** The one genuine deletion available is retargeting `MicrosoftEvaluatorAdapter` from `IMetric` to `IEval` — 1 class, ~40 lines — so first-party M.E.AI evaluators stop entering through the second-class contract. | Slice 0 |
+| **`IProbeEvaluator`** (30) | Stays. Struct stays (5 fields, zero heap allocation; `EvalResult` is a floor of 5 allocations, and a campaign evaluates tens of thousands of pairs). `ProbeEval` adapter **deferred**. | Deferred |
+| **Assertions** (16 files) | Stay throwing. `AssertionRecorder`/`AssertionEval` **deferred**. Slice 0 stops the lie in `ScenarioResult.Assertions`. | Deferred |
+| **`IEvaluationHarness`** | Bug fixes only in the funded slices. `EvaluationOptions.Evals` and `MAFEvaluationHarnessOptions` **deferred**. | Deferred ↪ **§11.2 row 5: the bridge shipped as `AgentEvalRunner.Evals` + `ToEvalInput` (`10a94755`); the harness half stays deferred.** |
+
+**Why `IEvaluator` must not be widened — the answer to "should judge evaluators exist?"**
+
+Yes, and widening `IEvaluator` to cover deterministic scoring would manufacture a Liskov violation
+with a named victim in this codebase. `EvaluationResult` has three members whose *documented*
+contract only a judge can satisfy:
+
+- `EvaluationFailed` — documented at `IEvaluator.cs:44-52` as *"the judge returned no JSON,
+  malformed JSON, or no recognisable score field… an INFRASTRUCTURE failure"*. A deterministic
+  implementation can never truthfully enter that state, and `AtomicLlmEval` **branches on it**
+  (sets `value=0, passed=false, label="error"` and replaces all evidence). A deterministic subtype
+  makes a branch the caller depends on provably dead.
+- `InputTokenCount` / `OutputTokenCount` — documented *"`null` when the evaluator did not invoke a
+  chat model"*. A deterministic substitute is therefore **indistinguishable from a judge whose
+  provider dropped usage reporting**, and silently zeroes the cost rollup.
+- `OverallScore` on failure *"carries the conventional failure-score fallback but should not be read
+  as a real grade"* — a sentinel only a judge produces.
+
+So `IEvaluator` is correctly typed as an **LLM-judge transport**. The fix is a doc change, not a code
+change: amend the summary from *"Provides AI-powered response evaluation"* to say plainly that it is
+the judge transport, that deterministic scoring belongs on `IEval`/`AtomicCodeEval`, and that
+`AtomicLlmEval` is the sanctioned bridge — **which already ships.**
+
+And the judge earns its place precisely where a code leaf cannot reach: *was the refusal
+appropriate*, *is the justification faithful to the retrieved evidence*. After the bridge (deferred)
+it is just a leaf carrying `Provenance.Type = "atomic-llm"`, a real `EstimatedCost` and an `"error"`
+label when it fails to speak. It does not need a seventh contract; it needs to stop being the *only*
+contract the flagship harness can reach.
+
+### 3.4 What this decision explicitly is NOT
+
+**It is not a unification.** Counted honestly:
+
+| | before | after (full design) | after (funded slices) |
+|---|---|---|---|
+| Evaluation contracts | 6 | 6 | 6 |
+| Verdict-bearing result models | 9 | 9 | 9 |
+| Adapters | 2 | 7 | 2 (1 retargeted) |
+| New non-verdict record types | ~0 | ~20 | ~6 |
+
+Not one contract is deprecated; not one implementation migrates. **A unification that deletes no
+contract, migrates no implementation and deprecates no API is not a unification — it is a
+compatibility layer with a unification's budget.** The review said this and it is correct. The
+headline is therefore demoted: this ADR is *meta-evaluation plus bug fixes*, and the word
+"unification" does not appear in its title.
+
+---
+
+## 4. THE ABSTRACTIONS
+
+Namespaces, signatures, and where each lands. Everything here is additive; every existing call site
+keeps compiling. Where a change is **not** non-breaking, §6.2 names it.
+
+### 4.1 The neutral observation tuple — the single most important design ruling
+
+Chance floors, controls, sign tests and rep collapse operate on a five-tuple and nothing more.
+Binding them to `EvalResult` was the draft's mistake, and it costs the ADR its best card: the meta
+layer is the **only** part of this work with no prior art in any surveyed framework. Defined over a
+neutral tuple it is a ~600-line module that AgentEval, `Microsoft.Extensions.AI.Evaluation`, and a
+future Python port can all consume — and that could be **contributed upstream** as
+`Microsoft.Extensions.AI.Evaluation.Meta`, which is a far better outcome for this project than owning
+a private copy. Defined over `EvalResult` it is an AgentEval internal nobody else can adopt.
+
+```csharp
+namespace AgentEval.Evals.Meta;   // BCL-only. No reference to AgentEval.Abstractions.
+
+/// <summary>One collapsed observation: a case, an arm, a number, and whether that number is real.</summary>
+/// <remarks>
+/// The unit of analysis is the CASE, not the rep. Everything in this namespace consumes
+/// <see cref="Observation"/> and nothing else, so the whole module is testable without
+/// constructing an eval tree, and portable to any framework that can produce a tuple.
+/// </remarks>
+public readonly record struct Observation(
+    string CaseId,
+    string ArmId,
+    double Value,
+    MeasurementState State);
+```
+
+Adapters `EvalResult → Observation`, `MetricResult → Observation`, and
+`Microsoft.Extensions.AI.Evaluation.EvaluationResult → Observation` live in `AgentEval.Core` and are
+one-way, per §3.2.
+
+`MeasurementState` is the one type that must live in **both** worlds (it is a field on `EvalScore`
+and on `Observation`). It is a BCL-only enum; declare it in `AgentEval.Evals.Meta` and have
+`AgentEval.Abstractions` reference the meta project, which is the bottom of the dependency graph.
+*(`AgentEval.Abstractions.csproj` has **zero** `PackageReference` entries and `IsPackable=false` —
+verified — so it is already BCL-only and this ordering is available. Packaging consequences are
+an open question, §9 Q2.)*
+
+### 4.2 Applicability — the third state
+
+The draft proposed `bool? Applicable`. **Rejected:** a tri-state `bool?` is exactly the silent-`{}`
+shape — `null` reads as "nobody set it" and the first consumer writes `score.Applicable ?? true`.
+The default must be a real, named value.
+
+```csharp
+namespace AgentEval.Evals.Meta;
+
+public enum MeasurementState
+{
+    /// <summary>A real measurement. Default, so every existing call site is unchanged.</summary>
+    Measured = 0,
+
+    /// <summary>
+    /// The CASE could not test the thing: empty gold, no distractor, no tool definitions supplied,
+    /// a chance floor of 1.0. A CORPUS/DESIGN finding — fix the cases.
+    /// <para>
+    /// Never a pass and never a zero. Excluded from means, counted in its own column.
+    /// <b>"The agent answered nothing" is NOT this state — that is a FAIL.</b>
+    /// Applicability is a property of the CASE, never of the ANSWER.
+    /// </para>
+    /// </summary>
+    NotApplicable = 1,
+
+    /// <summary>
+    /// The INSTRUMENT did not run: skipped, timed out, errored, budget-filtered. An OPERATIONAL
+    /// finding — fix the run. Distinct from NotApplicable because they have different owners and
+    /// different fixes; pooling them hides which one you have. Demo 2's six 60-second timeouts are
+    /// this state, and reporting them as measurements is what produced a wrong finding.
+    /// </summary>
+    NotMeasured = 2,
+}
+```
+
+It lands **on `EvalScore` as a non-positional init-only property** — the `EvalDetails.Summary`
+precedent, so positional construction and deconstruction are unaffected. The full declaration is
+below, after the guard ruling, because the guard is what determines how the property is declared.
+
+**Where the guard goes, and why it took three attempts.** The invariant is one sentence — *a score
+that is not a measurement can never be `Passed`* — and it has now been placed wrongly twice. Both
+wrong placements are recorded, because the second one was this document's own fix for the first.
+
+**Attempt 1 (the draft, and the meta lane): a throwing initializer on `Measurement` itself.**
+Refuted twice over, and both refutations are decisive:
+
+1. **It does not compile.** `Value`/`Threshold`/`Confidence` could self-validate in an initializer
+   because they are *positional parameters* — the initializer reads the primary-constructor
+   parameter. `Measurement` is not a parameter, so `Measurement is …` inside its own initializer is
+   **CS0236**.
+2. **Even if it compiled it could never fire.** A non-positional init-only property is set by an
+   object initializer or `with`, which runs **after** the property initializer. The initializer
+   would always observe `default` = `Measured`. The one invariant the entire applicability design
+   rests on would have had no enforcement point.
+
+**Attempt 2 (recorded as D2's fix): move the guard to `EvalResult`'s primary constructor.**
+**Also insufficient — established by a compiled probe at ratification, and this is the correction
+being folded in.** Two independent failures:
+
+1. **A `with` clone skips it.** `EvalResult.Score`'s *initializer* runs on the constructor path only.
+   `result with { Score = someNotApplicableScoreThatClaimsPassed }` invokes the **init accessor**,
+   and an auto-property's accessor validates nothing. This is bit-for-bit the shape of **AE-01**
+   (`AssertionResult.Passed`) and **AE-08** (`EvalScore.Value`) — both already found and fixed in
+   this repo, both by the same reasoning, and the guard was written a third time in the form both
+   fixes exist to forbid.
+2. **It is on the wrong type.** The invariant's two operands, `Measurement` and `Passed`, both live
+   on `EvalScore`. `EvalScore` is public and is read directly by all five aggregation strategies;
+   guarding at `EvalResult` leaves every un-wrapped `EvalScore` unguarded and makes "was it wrapped
+   yet?" load-bearing.
+
+**Attempt 3, and the one to implement: a private backing field plus a validating `init` accessor on
+each operand.** This is the pattern the repo has shipped **twice**; copy it, do not invent a third:
+
+- `src/AgentEval.Abstractions/Output/AssertionResult.cs` — `Passed` declared explicitly with
+  `private readonly bool _passed` and a validating `init`, so a `with { Passed = true }` copy of an
+  `Inconclusive` result is refused (AE-01).
+- `src/AgentEval.Abstractions/Evals/EvalScore.cs` — `Value` / `Threshold` / `Confidence` on
+  `private readonly` fields with validating `init` accessors, so `with { Value = double.NaN }` is
+  refused (AE-08).
+
+Mirror their tests too: `tests/AgentEval.Tests/Assertions/AssertionResultWithExpressionTests.cs`
+and `tests/AgentEval.Tests/Evals/EvalScoreWithExpressionTests.cs`.
+
+```csharp
+// src/AgentEval.Abstractions/Evals/EvalScore.cs
+// The 7 positional parameters are UNTOUCHED. Passed is REDECLARED (it stays positional; only its
+// storage and its accessor change) because it is one of the invariant's two operands and a `with`
+// can set it from either side.
+public sealed record EvalScore(
+    double Value, int? Ordinal, string Label, bool Passed,
+    double? Threshold, string Severity, double? Confidence)
+{
+    // ── existing AE-08 fields, unchanged ────────────────────────────────────────────────────────
+    private readonly double _value = EnsureFinite(Value, nameof(Value));
+    private readonly double? _threshold = EnsureFiniteOrNull(Threshold, nameof(Threshold));
+    private readonly double? _confidence = EnsureFiniteOrNull(Confidence, nameof(Confidence));
+
+    // ── new. Declared BEFORE _passed so the ctor path reads a settled Measurement. ──────────────
+    // Measured is default(MeasurementState) = 0, so on the constructor path the pair is always
+    // (Measured, Passed) and there is nothing to validate; Measurement can only become non-Measured
+    // via an object initializer or a `with`, both of which run AFTER the field initialisers.
+    private readonly MeasurementState _measurement = MeasurementState.Measured;
+    private readonly bool _passed = Passed;
+
+    /// <summary>
+    /// Whether the eval decided and the thing held. Positional, so every existing call site and
+    /// every persisted artifact is unchanged.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to <see langword="true"/> on a copy whose <see cref="Measurement"/> is not
+    /// <see cref="MeasurementState.Measured"/>. The primary constructor cannot reach that state —
+    /// <see cref="Measurement"/> is still <c>Measured</c> while the field initialisers run — so the
+    /// constructor path assigns directly and only the copy path validates.
+    /// </exception>
+    public bool Passed
+    {
+        get => _passed;
+        init
+        {
+            EnsureDecidable(_measurement, value, nameof(Passed));
+            _passed = value;
+        }
+    }
+
+    /// <summary>
+    /// Whether this score is a real measurement. Non-positional and init-only, so positional
+    /// construction and deconstruction are unaffected and the default is <c>Measured</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when set to a non-measured state on a score whose <see cref="Passed"/> is
+    /// <see langword="true"/> — on an object initializer, a <c>with</c> copy, and deserialisation
+    /// alike, since all three route through this accessor.
+    /// </exception>
+    public MeasurementState Measurement
+    {
+        get => _measurement;
+        init
+        {
+            EnsureDecidable(value, _passed, nameof(Measurement));
+            _measurement = value;
+        }
+    }
+
+    /// <summary>The only sanctioned way to build a not-applicable score.</summary>
+    /// <remarks>The REASON does not live here — it goes to <c>EvalDetails.Summary</c> (and
+    /// <c>Recommendations</c>), per D13. A bare <c>n/a</c> with no reason is the blank cell the
+    /// rendering rule exists to forbid.</remarks>
+    public static EvalScore NotApplicable(string severity = "none") =>
+        new(0.0, null, "inapplicable", false, null, severity, null)
+        { Measurement = MeasurementState.NotApplicable };
+
+    // One predicate, both accessors. The guard is on the PAIR, so it cannot be satisfied by
+    // arriving at the bad state from the other side.
+    private static void EnsureDecidable(MeasurementState measurement, bool passed, string member)
+    {
+        if (measurement is not MeasurementState.Measured && passed)
+        {
+            throw new ArgumentException(
+                $"A score whose Measurement is '{measurement}' cannot be Passed. The case had " +
+                "nothing to fire against, or the instrument did not run; undecidable is not a pass. " +
+                $"Use {nameof(EvalScore)}.{nameof(NotApplicable)}(...) or EvalResult.Skipped(...).",
+                member);   // the member the caller actually assigned, so the ParamName is testable
+        }
+    }
+}
+```
+
+**Why this closes the hole the constructor guard left open**, spelled out because the failure is
+order-dependent and a reviewer will want to check it:
+
+- The record's compiler-generated **copy constructor copies every field first**, then the `with`
+  block's init accessors run in source order. So each accessor sees the *other* operand's copied
+  value, and **both orderings are caught**: `score with { Passed = true, Measurement = NotApplicable }`
+  throws on the second assignment, and `score with { Measurement = NotApplicable, Passed = true }`
+  throws on the second assignment too.
+- `EvalScore.NotApplicable() with { Passed = true }` — the exact bypass that defeated attempt 2 —
+  throws.
+- **Deserialisation is covered and fails closed.** `System.Text.Json` fills positional members
+  through the constructor and init-only members after, so an artifact carrying
+  `{"passed": true, "measurement": "NotApplicable"}` throws when `Measurement` is set. That is the
+  ADR-025 direction: refuse the artifact rather than load a pass that was never earned.
+- **`EvalResult` needs no guard at all.** A bad `EvalScore` is now unconstructable, so pass/fail
+  authority stops depending on whether the score happened to be wrapped yet.
+
+**All of the above was compiled and run**, not reasoned about: a 16-assertion probe on `net8.0`
+exercised every path in this subsection — both `with` orderings, the object-initializer path,
+positional deconstruction, the surviving AE-08 `NaN` guard, a legal round-trip, and the hostile
+artifact. All 16 hold. Two results worth carrying into the implementation:
+
+- **`Measurement` participates in record equality** (it is a field), so
+  `EvalScore.NotApplicable() != new EvalScore(0.0, null, "inapplicable", false, null, "none", null)`.
+  That is correct — an inapplicable score and a fabricated look-alike are different facts — but any
+  test or cache keyed on `EvalScore` equality will see new inequalities the day Slice 1 lands.
+- **The escape hatch, declared rather than discovered later.**
+  `notApplicableScore with { Measurement = MeasurementState.Measured, Passed = true }` **succeeds**.
+  It is a deliberate two-step re-declaration — the author must assert *both* "this is a real
+  measurement" *and* "it passed" in the same expression — and there is no way to forbid it without
+  making `Measurement` immutable after construction, which would break the legal
+  `NotMeasured`-on-a-timeout path. It fails in the flattering direction, so: the architecture test
+  that bans `Measurement = …` outside `EvalScore.NotApplicable()` must also flag
+  `Measurement = MeasurementState.Measured` appearing in any `with` block, and that grep is the only
+  thing standing between this hatch and someone using it to clear an inconvenient `n/a`.
+
+**Residual, declared:** the guard binds `Measurement` to `Passed`, not to `Label`. A score with
+`Label = "inapplicable"` and `Measurement = Measured` is still spellable. That asymmetry is
+deliberate — `Label` is a free string that historical artifacts round-trip through, and a second
+guard on it would reject documents that are merely old rather than wrong. The canonical mapping
+table below is normative for producers; `CountsTowardAggregate()` reads **both**, so a mislabelled
+score cannot leak into an aggregate through the label alone.
+
+An **architecture test** still bans `Measurement = MeasurementState.NotApplicable` in object
+initializers outside `EvalScore.NotApplicable()`, but it is now a style rule, not the enforcement
+point — the accessor is.
+
+The assertions lane proposed the same invariant as `AssertionResult.Applicability` and would have
+had the same non-enforcement bug. It no longer can: `AssertionResult` **shipped** in `a396c5b4` with
+the three-valued `AssertionOutcome` and the correct pattern (AE-01), and it is now the precedent this
+subsection copies rather than a lane waiting on this ruling.
+
+Canonical mapping, normative:
+
+| `Measurement` | `Label` | `Passed` | `Value` | In the mean? | In the denominator? |
+|---|---|---|---|---|---|
+| `Measured` | `pass`/`fail`/`warn` | real | real | yes | yes |
+| `NotApplicable` | `inapplicable` | **always false** | 0.0, never read | **no** | **no — own column** |
+| `NotMeasured` | `skipped`/`error` | false | 0.0, never read | no (already) | no |
+
+**One predicate, one home.** All five aggregation strategies today repeat
+`r.Score.Label is not ("skipped" or "error")` in five files with two different comment vintages.
+Route them through one extension so the new neutral state is added once:
+
+```csharp
+namespace AgentEval.Evals;
+
+public static class EvalScoreExtensions
+{
+    /// <summary>The SINGLE authority on whether a score contributes to an aggregate.</summary>
+    public static bool CountsTowardAggregate(this EvalScore score) =>
+        score.Measurement == MeasurementState.Measured
+        && score.Label is not ("skipped" or "error" or "inapplicable");
+}
+```
+
+This also fixes the `CapByWorstAggregation` asymmetry noted in §3.3 as a side effect.
+
+**And every mean must print its denominator:**
+
+```csharp
+namespace AgentEval.Evals.Meta;
+
+/// <summary>What went into a number. A mean over 3 of 12 and a mean over 12 of 12 are different
+/// facts and must not render identically.</summary>
+public sealed record ObservationCensus(int Measured, int NotApplicable, int NotMeasured)
+{
+    public int Total => Measured + NotApplicable + NotMeasured;
+
+    /// <summary>Nothing was measurable. The aggregate is VOID — not perfect, not zero.</summary>
+    public bool Void => Measured == 0 && Total > 0;
+
+    /// <summary>Extreme values are wiring faults until proven otherwise, in BOTH directions.
+    /// NotApplicable == 0 across a suite is as suspicious as == Total: an inapplicability ledger
+    /// that reads clean is usually a ledger nothing writes to.</summary>
+    public bool ExtremeAndUnexamined => Total > 0 && (NotApplicable == 0 || NotApplicable == Total);
+}
+```
+
+Rendering rules, normative for every renderer:
+
+- `NotApplicable` renders **`n/a` plus the reason** — never `0.00`, never a blank cell, never a dash.
+- Every mean prints its denominator: **`0.62 (8 of 12 measured, 3 n/a, 1 not measured)`**. A bare
+  `0.62` is not renderable.
+- `Census.Void` renders **`VOID — nothing measurable`**, not `0.00`.
+
+**Blocking sub-defect (D13), must be fixed with this:** `EvalResult.Skipped` puts its reason in
+`Details.Recommendations`, not `Details.Summary` (verified: `EvalResult.cs:20`,
+`Details: new(null, null, new[] { reason }, null, null)`). Any renderer reading `Summary` prints a
+bare `n/a` with no reason — the blank cell the rule exists to forbid. Write the reason to both.
+
+### 4.3 Chance floors — four static functions and a plain record
+
+No `IChanceFloor` interface, no `FloorGatedCodeEval`, no `PoolMismatch`. See §7 for why all three
+were cut.
+
+```csharp
+namespace AgentEval.Evals.Meta;   // BCL-only
+
+/// <summary>Whether a chance floor exists, and if not, why not. Never collapses to a number.</summary>
+public enum FloorState { Derived = 0, NotDerivable = 1 }
+
+/// <summary>
+/// What an arm that understands nothing scores. Derived from the corpus and the arm's DECLARED
+/// budget; it never sees a measurement.
+/// </summary>
+/// <remarks>
+/// <b>An absent floor is not a zero floor.</b> <see cref="Value"/> THROWS when the floor is not
+/// derived, so a caller cannot average an absence into a mean. A chance floor ABSENT is not zero —
+/// that is how a metric gets condemned at p = 0.70.
+/// <para>
+/// <b>An estimated floor carries its own uncertainty.</b> Analytic floors leave
+/// <see cref="IntervalHigh"/> null. Empirical floors carry a Clopper-Pearson upper bound, and
+/// comparisons must clear THAT, not <see cref="Value"/> — comparing an observed rate to a point
+/// estimate computed from the same corpus is the co-moving-operands failure.
+/// </para>
+/// </remarks>
+public sealed record ChanceFloor(
+    string Kind,                 // "hypergeometric-at-least-one" | "hypergeometric-avoids-all"
+                                 // | "uniform-choice" | "prior-rate" | "empirical-policy" | "not-derivable"
+    FloorState State,
+    double RawValue,
+    double? IntervalHigh,        // null when exact
+    int Draws,
+    int PoolSize,
+    string Derivation)           // one sentence naming the pool, the favourable set and k. Never empty.
+{
+    public double Value => State is FloorState.Derived
+        ? RawValue
+        : throw new InvalidOperationException($"Chance floor not derived: {Derivation}");
+
+    /// <summary>The number a comparison must clear: the interval's upper bound when estimated.</summary>
+    public double ComparisonBar => IntervalHigh ?? Value;
+
+    // ── factories; there is no public ctor path that skips Derivation ────────────────────────
+    public static ChanceFloor AtLeastOneHit(int poolSize, int favourable, int draws);
+    public static ChanceFloor AvoidsAll(int poolSize, int forbidden, int draws);
+    public static ChanceFloor UniformChoice(int alternatives);
+    public static ChanceFloor PriorRate(int positives, int total);
+
+    /// <summary>
+    /// A floor MEASURED by running an input-blind policy. <paramref name="policiesConsidered"/> is
+    /// MANDATORY: "the best constant policy" is a MAXIMUM over a family, and a maximum selected on
+    /// the same corpus the agent is scored on is optimistically biased. With more than one policy
+    /// considered, <paramref name="heldOutFrom"/> must name the split the constant was chosen on,
+    /// or the call throws. The Galaxus ceiling was TYPED as 8 and MEASURED at 10 — selection over a
+    /// family on the scored corpus is how you get 10.
+    /// </summary>
+    public static ChanceFloor Empirical(int successes, int trials,
+                                        int policiesConsidered, string? heldOutFrom = null);
+
+    /// <summary>Not derivable. <paramref name="reason"/> is mandatory and prints where the floor would have.</summary>
+    public static ChanceFloor NotDerivable(string reason);
+}
+```
+
+**`k` comes from the arm's DECLARED budget, never from its observed output.** This is the recorded
+Galaxus defect: a deliberately implausible two-product dry-run stub read **above its own floor on 3
+of 12 personas** while a real arm at the identical 0.333 read below at k=12 — *the arm sized its own
+null*. Fixed-k is not the answer either (Nadia's floor is 0.129 @ k=1, 0.491 @ k=5, 0.655 @ k=8;
+scoring a 12-item arm against a 5-item arm's floor is wrong the other way). The fix is **provenance
+on k**, and it is a convention plus a review checklist, not a base class:
+
+```csharp
+/// <param name="DeclaredDrawBudget">k — from a prompt constraint, a tool schema maxItems, a config key.</param>
+/// <param name="BudgetSource">Where the number came from. A k with no provenance is a k someone tuned.</param>
+public sealed record ArmProfile(string ArmId, int DeclaredDrawBudget, string BudgetSource);
+```
+
+An arm that **exceeds** its declared budget is a control condition, not a floor question. Silently
+re-deriving at the larger observed k is the defect.
+
+**A floor must be TESTED, not point-compared.** A per-case `value > floor` is a disposition; the
+suite runs the exact test:
+
+```csharp
+public sealed record FloorComparison(
+    string ArmId, int Successes, int Trials,
+    double FloorUsed,            // ChanceFloor.ComparisonBar — the interval bound when estimated
+    bool FloorWasEstimated,
+    double PValue,               // one-sided binomial upper tail against FloorUsed
+    (double Low, double High) ObservedRate,
+    int NotApplicableCases,
+    double MinimumAttainableP)
+{
+    /// <summary>No observation at this n could have reached alpha.</summary>
+    public bool UnderpoweredByConstruction => MinimumAttainableP > 0.05;
+
+    /// <summary>A DIRECTION, never a verdict.</summary>
+    public bool AboveFloor => PValue <= 0.05 && !UnderpoweredByConstruction;
+}
+
+public static FloorComparison CompareToFloor(IReadOnlyList<Observation> obs, ChanceFloor floor);
+```
+
+### 4.4 Exact tests — the best-shaped thing in this document
+
+Five pure static functions. No ceremony, trivially testable, deterministic across machines.
+
+```csharp
+namespace AgentEval.Evals.Meta;   // BCL-only
+
+public static class ExactTests
+{
+    /// <summary>
+    /// Exact two-sided binomial p at p = 0.5: 2 * P(X >= max(wins, n-wins)), clamped to 1.
+    /// Returns 1.0 when <paramref name="nonTied"/> is 0 — every case tied is "no detectable
+    /// difference", never a win.
+    /// </summary>
+    /// <remarks>
+    /// Accumulated in LOG space (exp(logC(n,i) - n*ln2)). The naive form divides a sum of binomial
+    /// coefficients by Math.Pow(2, n), which is +Infinity past n ~ 1030 and returns NaN — silently,
+    /// in the direction of "no result". The sample ships THREE independent binomial-coefficient
+    /// implementations; this replaces all three.
+    /// </remarks>
+    public static double TwoSidedSignP(int wins, int nonTied);
+
+    /// <summary>
+    /// The smallest two-sided p this n could EVER produce: min(1, 2 * 0.5^n). Computed from the
+    /// NON-TIED count, because that is the n the exact test runs on — using the full paired count
+    /// understates it, since discarding ties costs power.
+    /// </summary>
+    public static double MinimumAttainableP(int nonTied);
+
+    /// <summary>One-sided binomial tail against a FLOOR. This — not <c>rate &gt; floor</c> — is what
+    /// "beats chance" means. Pass an estimated floor's upper bound.</summary>
+    public static double BinomialTailP(int successes, int trials, double floor);
+
+    /// <summary>Exact (Clopper-Pearson) interval by bisecting the exact tail sums, log-space pmf.</summary>
+    public static (double Low, double High) ClopperPearson(int successes, int trials, double alpha = 0.05);
+
+    /// <summary>
+    /// The one-sided upper bound given <paramref name="events"/> events in <paramref name="trials"/>:
+    /// 1 - alpha^(1/n), the exact form of the "rule of three".
+    /// </summary>
+    /// <remarks>
+    /// <b>There is deliberately no overload taking only <paramref name="trials"/>.</b> The rule holds
+    /// ONLY at zero events; the recorded bug was calling it with a CLEAN-CASE count and printing a
+    /// "95% upper bound of 34.8%" beside an OBSERVED defect rate of 50%. A bound below its own
+    /// observation is not a bound, and it failed in the flattering direction. Requiring the event
+    /// count makes the misuse unspellable: when events > 0 the result is NotApplicable and carries
+    /// the Clopper-Pearson interval around the observed rate instead.
+    /// </remarks>
+    public static ZeroEventBound ZeroEventUpperBound(int events, int trials, double alpha = 0.05);
+}
+
+public sealed record ZeroEventBound(
+    bool IsApplicable, double? UpperBound, (double Low, double High)? ObservedRateInterval, string Reason);
+```
+
+**No new `ConfidenceInterval` type.** `ClopperPearson` returns a named tuple. The shipped
+`AgentEval.Comparison.ConfidenceInterval(Lower, Upper, Level)`
+(`src/AgentEval.Abstractions/Comparison/StochasticResult.cs:228`) stays the one interval type in the
+library; renderers wrap the tuple. The meta lane's proposed `(Low, High, Alpha, Method)` would have
+been a **binary and source break** on a shipped positional record, contradicting its own
+non-breaking premise. If `Method` is wanted for rendering, add it to the shipped record as a
+non-positional init-only property.
+
+### 4.5 Paired comparison and the unit of analysis
+
+```csharp
+namespace AgentEval.Evals.Meta;   // BCL-only
+
+/// <summary>
+/// How N repetitions of the same (case, arm) become ONE observation.
+/// </summary>
+/// <remarks>
+/// <b>The unit of analysis is the case, not the rep.</b> Treating 3 reps of 12 cases as 36
+/// independent observations adds no information — the reps share a case, a prompt and a corpus row —
+/// but it shrinks every standard error by sqrt(3) and every p-value with it. The collapse is
+/// MANDATORY and its strategy is DECLARED, because different strategies encode different claims and
+/// the flattering one must be visible in the code.
+/// </remarks>
+public enum RepCollapse
+{
+    Mean = 0,
+    Median = 1,       // robust to one pathological rep (a timeout, a truncated stream)
+    All = 2,          // "it does this every time" — a reliability claim
+    Majority = 3,
+
+    /// <summary>Any rep passed. <b>The flattering strategy</b> — it measures best-of-N, which is a
+    /// different claim, and it rises with N for free. Permitted, always labelled "best-of-N".</summary>
+    Any = 4,
+}
+
+public sealed record ObservationUnit(int Cases, int TotalReps, double MeanRepsPerCase, RepCollapse Strategy)
+{
+    /// <summary>sqrt(mean reps per case) — the factor by which standard errors would have been
+    /// understated had reps been counted as independent. A number on the page, not a paragraph in a
+    /// design doc.</summary>
+    public double PseudoReplicationInflation => Math.Sqrt(MeanRepsPerCase);
+}
+
+public sealed record PairedComparison(
+    string Reference, string Challenger,
+    int Wins, int Losses, int Ties,
+    double PValue,
+    double MinimumAttainableP,
+    double MeanDelta,
+    ObservationCensus Census,
+    ObservationUnit Unit,
+    string? RuleHash)            // the pre-registered rule that was in force, stamped for diffing
+{
+    public int EffectiveN => Wins + Losses;
+    public bool UnderpoweredByConstruction => MinimumAttainableP > 0.05;
+
+    /// <summary>A DIRECTION, NOT A RESULT. Must never gate a build.</summary>
+    public bool ChallengerLeads => Wins > Losses;
+}
+
+public sealed class PairedEvalComparer
+{
+    public PairedEvalComparer(RepCollapse collapse);
+
+    public void Record(Observation observation);        // reps accumulate; collapsed at Compare time
+    public void DeclareAbsent(string armId, string reason);   // declared-absent RENDERS; missing does not
+    public PairedComparison Compare(string reference, string challenger);
+}
+```
+
+Rules baked in, each with a recorded reason:
+
+- **Ties discarded and counted**; `PValue = 1.0` when everything ties.
+- **`MinimumAttainableP` from the non-tied n**, so an underpowered comparison says so instead of
+  quoting a p as though it could have been significant.
+- **Reps collapse before pairing.** There is no code path that pairs raw reps.
+- **A `NotApplicable` observation on either side excludes the pair** and increments
+  `Census.NotApplicable`. It is never a loss and never a tie.
+- **Bootstrap is not shipped.** The sample suppresses it below n=6 for a good reason (*"a percentile
+  bootstrap over three deltas resamples three numbers and reports their spread, which is not a
+  confidence interval for a population"*); at the n's an eval suite works at, Clopper-Pearson is
+  exact and the bootstrap adds a seed to record and nothing else.
+
+**On pre-registration.** `PreRegisteredRule` with a `RegisteredAt` timestamp and a
+`RegisteredAfterData` verdict is **cut**. It detects only within-process ordering; the failure it
+claims to prevent — a rule written after the author saw the numbers — happens between runs, in an
+editor, and is invisible to it. A gate that catches the accident and not the incentive provides
+false assurance. What survives is the part that works: **a `RuleHash` stamped into the persisted
+artefact**, so a rule change is visible in a diff across runs, which is the only place it is
+actually detectable.
+
+### 4.6 The rule, enforced
+
+```csharp
+[Fact]
+public void MetaTypes_NeverImplement_IEval()
+{
+    var offenders = typeof(Observation).Assembly.GetTypes()
+        .Concat(typeof(EvalResult).Assembly.GetTypes())
+        .Where(t => t.Namespace?.StartsWith("AgentEval.Evals.Meta", StringComparison.Ordinal) == true)
+        .Where(t => typeof(IEval).IsAssignableFrom(t))
+        .ToList();
+
+    // A floor is a property OF a comparison. A control is a RUN OF an eval. A comparison is a
+    // FUNCTION OF results. The moment one returns EvalResult as its OWN verdict, AgentEval has a
+    // seventh result model and it is the one holding pass/fail authority.
+    Assert.Empty(offenders);
+}
+```
+
+### 4.7 Case identity — two properties, without which half of this is unimplementable
+
+Verified: `EvalInput` has **no** `Id`. `TestCase` has `Name`, not an id — and the Galaxus harness
+sets `Name = $"{c.Id} — {c.Group}"`, i.e. **a display string used as a join key**. Yet
+`Observation.CaseId`, `PairedEvalComparer.Record`, `FloorComparison` and any shuffled-gold control
+all require stable per-case identity.
+
+```csharp
+// src/AgentEval.Abstractions/Evals/EvalInput.cs   — non-positional init-only, additive
+public string? CaseId { get; init; }
+
+// src/AgentEval.Abstractions/Models/EvaluationModels.cs — TestCase is a plain class
+public string? Id { get; set; }
+```
+
+---
+
+## 5. THE GALAXUS MIGRATION — THE WORKED PROOF, AND THE LINE DELTA THAT DOES NOT FLATTER
+
+### 5.1 Under the FULL four-lane design: the sample shrinks 13.7% and the library grows more
+
+| area | before | after | Δ |
+|---|---|---|---|
+| `Graders/` | 2,219 | 1,520 | −699 |
+| `Evals/` | 11,345 | 9,867 | −1,478 |
+| root infrastructure | 2,275 | 1,945 | −330 |
+| `Controls/` | 1,229 | 1,094 | −135 |
+| `Adapters/` | 709 | 560 | −149 |
+| `Cases/` + `Loop/` | 2,571 | 2,571 | 0 |
+| **total** | **20,348** | **17,557** | **−2,791 (13.7%)** |
+
+Against an estimated library growth of **~3,800 production lines (~7,300 with tests)**.
+
+**Say it plainly: on line count alone, the full design loses.** A 13.7% shrink of one sample against
+a 2.2% growth of a 170,619-line library is a weak trade if the second consumer never arrives, and
+machinery with one consumer rots in about six months.
+
+### 5.2 Under the FUNDED slices only: roughly break-even, plus five live bug fixes
+
+Attributing the migration lane's per-cause table to Slices 0–2 (an **estimate**, derived by
+attribution rather than measured by doing the migration — labelled as such):
+
+| cause | Δ sample | in slice |
+|---|---|---|
+| statistics engine (sign test, Clopper-Pearson, rule-of-three, `MinimumAttainableP`, 3× binomial coefficient) | −248 | 2 |
+| `IntegrityRunReport`'s statistics half | ~−90 | 2 |
+| chance-floor combinatorics | −55 | 2 |
+| applicability discipline (63 `double.IsNaN` guards, 55 `NaN` literals, 4 duplicate `Format(double)`) | −180 | 1 |
+| approval-visibility adapter deleted | −149 | 0 |
+| Eval09's per-criterion paired report | ~−190 | 2 |
+| Eval08 binomial duplication | ~−30 | 2 |
+| rep collapse | −32 | 2 |
+| **estimated total** | **~−974 (≈4.8%)** | |
+
+Against **~700 production lines** of library. **That is roughly break-even on lines, and it buys
+five shipped defects fixed.** It is the honest trade and it is the one being proposed.
+
+### 5.3 The argument that actually carries — the deleted lines are the wrong ones
+
+Every defect the sample's own comments record as measured-and-fixed sits inside the deleted lines,
+and ten of the twelve failed in the flattering direction:
+
+| recorded defect | absorbed by |
+|---|---|
+| rule-of-three printed a **34.8% bound beside a 50% observation** | `ExactTests.ZeroEventUpperBound(events, trials)` — misuse unspellable |
+| `tripped = d1==0 && d5>0 && (d3>0 \|\| d4>0)` — a dead D3 detector still prints a tick | deferred (controls); the *rule* is recorded here |
+| constant-policy ceiling **typed 8, measured 10**; refuser typed 8, measured 5 | `ChanceFloor.Empirical(..., policiesConsidered)` |
+| fixed-k floor: Nadia 0.129 @ k=1, 0.491 @ k=5, 0.655 @ k=8 | `ArmProfile.DeclaredDrawBudget` + `BudgetSource` |
+| mean-vs-mean gate **passed** an arm scoring 0.000/1.000/1.000 while below floor on 2 of 3 | `FloorComparison` per case |
+| a control criterion **clamped to 1.000** — a bar nothing could fail | deferred (controls) |
+| score computed **before** `result.HasError` — an errored turn averaged in as 0.000 | `MeasurementState.NotMeasured` |
+| `signTests[0]` positional index silently re-pointed a **gate** at a different comparison | `Compare(reference, challenger)` **by name** |
+| `EvaluationFailed` discarded → judge score 50 read as a grade whenever `PassingScore <= 50` | Slice 0 item 2, **not optional** |
+| `NeverCallTool("PlaceOrder")` chance floor **1.0** | Slice 0 item 5 |
+| **"wahl"** (German: *election* AND *choice*) in the blocklist, tripping de-language personas | found **only** because a floor and a paired comparison existed |
+
+And the duplication *inside a single sample*, counted rather than asserted: **3 independent binomial
+coefficient implementations**; **6 chance-floor declarations with 0 shared type** (one of which,
+`TrajectoryCase.ChanceFloor`, is a **`string`** — prose, not a number); **7 independent spellings of
+`MeasurementState`**; **4 hand-rolled "both directions" controls**; **5 cost/token rollups**;
+**4 assertion-to-result shims**.
+
+`AgentEval.TravelDemo.Evals` is consumer #2, it already exists, and it is already wrong in the exact
+way this design forbids: `EvalPrinter.cs:577-578` prints **`HYPOTHESIS CONFIRMED`** on
+`workflow.LlmScore > agent.LlmScore || workflow.CriteriaMetCount > agent.CriteriaMetCount` — an OR of
+two one-sided comparisons with no test of any kind. (Two more `HYPOTHESIS CONFIRMED` sites exist in
+the same sample, at `EvalPrinter.cs:676` and `Eval01_TravelAgentEvals.cs:198`; they were not audited.)
+
+**Sell it as "the machinery every consumer gets wrong stops being writable", not as "the sample gets
+much smaller". If it is sold on line count it will disappoint.**
+
+### 5.4 The one worked eval
+
+`Eval01_CatalogueIntegrity.cs` is 599 lines and shrinks to ~507 (−92, 15%). The 507 that remain are
+catalogue lookups, six defect classes, fourteen authored cases, persona prompts and console panels —
+**Galaxus**. What leaves is AgentEval. Specifically:
+
+- `RunFluentAssertions` (41 lines) returns a **`string?`**, produces **no record on a pass**, and
+  returns `null` when the trace is null — making every prohibition **vacuously true**. Under the
+  deferred assertions lane it becomes a scored result with a declared floor; under the funded slices
+  it at minimum stops being invisible, because Slice 0 makes the extractor see approval-gated calls.
+- `PrintDerivedFloors` (29 lines) is **nine hand-typed prose floors**, one of which carries the
+  comment *"an earlier version of this line said 8, which was wrong by two in the flattering
+  direction"*. It becomes 7 lines rendered from `ChanceFloor.Derivation`.
+- `ApprovalAwareAgentAdapter` (149 lines) is **deleted entirely** — and that deletion is the check
+  that Slice 0 item 5 landed at the right altitude.
+  > ↪ **Unmet on 2026-09-07 — §11.2 row 8:** 8 Galaxus files still reference `ApprovalAwareAgentAdapter`.
+
+---
+
+## 6. CONSEQUENCES
+
+### 6.1 What gets better
+
+- Five shipped, flattering defects stop being shipped (§2.3).
+- "Undecidable" becomes expressible. Today the only things that compile are `0.0` (reads as a
+  genuine zero and averages as one) and `Skipped` (reads as "not run"). Both are wrong, and the
+  `0.0` path fails in the *un*flattering direction, which makes it harder to notice and easier to
+  defend as conservative. It is not conservative; it is wrong.
+- The library gains the ability to say **"this eval could not have failed"** — which no competitor
+  ships and which our own release history repeatedly needed.
+- First-party M.E.AI evaluators stop entering through the second-class contract.
+
+### 6.2 What gets worse, and the honest breaking-change list
+
+**The non-breaking claim in the design lanes is false in three specific ways. All three are handled
+by the funded plan; naming them is not optional.**
+
+1. **Two proposed gates default ON.** `EnforceExpectedTools = true` and `OutputCheckPolicy.Always`
+   would flip every dataset-driven consumer from pass to fail on a *minor* version:
+   `AgentEval.Cli/Commands/EvalCommand.cs:284-285`, `samples/AgentEval.NuGetConsumer.Tests/*`
+   (7 harness sites), `samples/AgentEval.Samples/*` (12+ sites), TravelDemo, PartnerDesk.
+   *"Pass → fail only"* is not a safety argument — it is the definition of a breaking change for a
+   test harness. **Ruling: both default OFF for one minor release, with a one-line warning printed
+   when `ExpectedTools`/`ExpectedOutputContains` is present and unenforced. Flip at the next major.**
+   Both are in the deferred bucket regardless.
+2. **`TestResult.Score` would stop being binary on the deterministic path**, and the proposed
+   exactness guarantee is dead by construction: the single-judge passthrough fires only when
+   `real.Count == 1`, but the non-empty leaf never skips and output checks default on, so
+   `real.Count >= 2` **always** and every judge score round-trips `87 → 0.87 → 86.999…`.
+   `samples/AgentEval.NuGetConsumer.Tests/ResponseValidationTests.cs:53` asserts `Score >= 70` and is
+   directly exposed. Deferred with the bridge; when it lands, compute `Score` from the judge leaf
+   whenever a judge leaf exists, independent of leaf count.
+3. **Schema v1 has `additionalProperties: false` on `score` and a closed `label` enum** — verified in
+   `src/AgentEval.DataLoaders/Output/Schema/v1/eval-result.schema.json`. Adding `measurement` and
+   `"inapplicable"` **is** a schema change. Enforcement is soft on the write path
+   (`FileSystemOutputStore.cs:352-380` logs and writes anyway) and strict on `agenteval doctor`'s
+   read path. **Every historical run's `ScenarioResult` content hash changes at this boundary**, and
+   cross-version comparison in MissionControl silently splits unless the release note carries a
+   byte-level prediction. **Ship exactly one schema change in this entire programme.** That is why
+   `EvalScore.ChanceFloor` was cut (§3.2) — the budget is spent on `measurement`, which genuinely
+   cannot be expressed any other way.
+
+   *(Related: the contract lane says `provenance.type` is a closed enum and `"atomic-probe"` must not
+   be invented; the assertions lane proposes `"atomic-code.assertions"` into the same closed enum and
+   calls it additive. **Two lanes shipping opposite rules for one field is how a schema rots.**
+   Ruling: the enum stays closed; sub-kind is carried in `Category`.)*
+
+**Other honest negatives:**
+
+- **Nothing is deleted.** 6 contracts before, 6 after. The count moves to 5 only if `IMetric` is
+  eventually folded, and that is a **26-class** migration, not a 7-class one. Not funded.
+- **Dashboards that count passes will see the number drop** when `NotApplicable` lands. Direction:
+  pass → not-a-pass. Declared, and it is the correction, not a regression.
+- **`MicrosoftEvaluatorAdapter`'s retarget is a breaking change** for anyone consuming it as
+  `IMetric`. See §9 Q3.
+- **A wrong floor is worse than no floor**, because it launders a pass into evidence. The sample
+  proves the mechanism: a per-arm floor let a *deliberately implausible* stub read above it on 3 of
+  12 personas, and the printed claim *"a stub that presents the same two products for every persona
+  cannot beat a random draw"* was refuted **by the same run that printed it**.
+- **A three-way split on where structural context lives** must be resolved before any code. The
+  contract lane adds typed `EvalInput.Workflow`; the bridge lane routes it through
+  `Metadata["__workflowExecution__"]`; the assertions lane states flatly that no slot exists.
+  **Three lanes, three answers, one field.** In six months there will be evals reading each, and a
+  run where the typed property is null because the producer filled the metadata key.
+  **Ruling: typed properties win** (Eval07 reads `exec.Steps`, `exec.Graph.TraversedEdges` and
+  `exec.RoutingDecisions` in one method — that is the evidence), **one lane owns `EvalInput`**, and
+  the bridge stops proposing metadata keys for payloads that have properties. Not funded now; the
+  ruling is recorded so it cannot drift.
+- **Approvals: the bridge's shape wins over the contract lane's.** `ToolCallRecord.ApprovalState`
+  joined to the call beats a parallel `EvalInput.ApprovalEvents` list re-paired by `Order` — Eval06's
+  `CountApprovalGatedCalls` filters `!c.WasExecuted && CommitToolNames.Contains(c.Name)`, which needs
+  the state on the call.
+- **A control asserting a quantity nobody measures is the element-missing gate shape.** The proposed
+  `NoModelNoCostControl` asserts `tokens_reported == 0` for arms with no judge model — but
+  `DiscoveryModelCall` discards `response.Usage`, so `TestResult.Performance` reports **zero tokens
+  for a turn that made seven model calls**. The control would pass vacuously on every arm.
+  **The library cannot currently measure spend**, which is why the sample built
+  `Eval09TokenLedger` + `MeteredChatClient`. No lane proposes fixing it. Recorded as a gap.
+
+### 6.3 What gets harder
+
+- Every renderer must print a denominator. That is a rule with no enforcement mechanism today,
+  because **the library ships HTML and PDF renderers and no console renderer** — `EvalPrinter` is
+  892 lines of the sample. Every consumer will re-implement "print the denominator" and half will
+  forget.
+- One more concept for contributors: `Measured` / `NotApplicable` / `NotMeasured` is a distinction
+  people get wrong, and the wrong answer ("the agent said nothing, so mark it n/a") is the exact
+  defect this exists to prevent.
+- The meta module being BCL-only means adapters, and adapters mean a place for the two worlds to
+  drift.
+
+---
+
+## 7. THE COUNTER-ARGUMENT, AT FULL STRENGTH — AND IT WINS HALF
+
+> **"Don't build this. Depend on `Microsoft.Extensions.AI.Evaluation`. You already reference it."**
+
+Stated properly, because it is the strongest objection and the ADR is worse if it strawmans it.
+
+**Where M.E.AI wins outright.** Its `IEvaluator.EvaluateAsync(messages, response, chatConfiguration,
+additionalContext, ct)` with `chatConfiguration` **nullable** is a *better-shaped* version of exactly
+what this design is reaching for: one interface, deterministic and judged side by side;
+`EvaluationMetric` subtypes (`NumericMetric` / `BooleanMetric` / `StringMetric` /
+**`MetricWithNoValue`**); `EvaluationMetricInterpretation(Rating, Failed, Reason)`; `Diagnostics`
+with severities; a metadata bag. **`MetricWithNoValue` + `EvaluationRating.Unknown` already express
+most of `MeasurementState`.** It ships a result store, a response cache, a report generator and a
+CLI. It is first-party, versioned by Microsoft, and this repo **already depends on it**
+(`Directory.Packages.props:41`).
+
+**So why not just depend on it? The honest answers, in order:**
+
+1. **`IEval` already exists with 79 implementations, a JSON schema, an evaluator-card registry, a
+   persistence layer, a CLI and MissionControl.** This ADR is not choosing a contract; it is
+   declining to migrate 79 evaluators. **That is the real reason and it is stated as the real
+   reason.** The four-point case for `IEval` (applicability, provenance, persistence, nesting) is
+   accurate about AgentEval's current assets and is mostly *not* a comparison with M.E.AI.
+2. **Composition.** M.E.AI has no `CompositeEval` / `IAggregationStrategy` /
+   `EvalComponent(Required, Weight)` tree. For compliance work (`AgentEval.Compliance.Gdpr`,
+   `.EuAiAct` — required-article rollup with severity propagation) that tree is load-bearing and
+   would have to be rebuilt on top of M.E.AI anyway.
+3. **The input model is a narrower win for M.E.AI than it first looks.** Its input is a chat
+   transcript plus `EvaluationContext` subclasses. A workflow graph, routing decisions, approval
+   events and retrieval provenance would ride in as context subclasses — a *typed* bag, better than
+   AgentEval's `Metadata["__x__"]` string keys, but still the same architecture the contract lane
+   proposed to fix with typed `EvalInput` properties.
+
+**Two concessions, both recorded as rulings:**
+
+- **The contract-unification half of this ADR spends a large budget to arrive at a contract that is
+  not better than one already in `Directory.Packages.props`.** If this were greenfield, M.E.AI wins.
+  That is why the unification half is **demoted from the headline to "bridge + bug fixes"** and why
+  the word does not appear in the title.
+- **`MicrosoftEvaluatorAdapter : IMetric` is a live bug against this ADR's own thesis** — first-party
+  evaluators enter through the contract the design treats as second-class. Retargeting it to `IEval`
+  is ~40 lines and is the single highest-leverage item in the programme for *"make everything work
+  together"*. It is Slice 0 item 4.
+
+**Where AgentEval genuinely wins, and it is the whole reason to proceed:** M.E.AI ships **no** chance
+floors, **no** negative controls, **no** paired significance, **no** unit-of-analysis rule, and no
+applicability-versus-silence distinction. Neither does anyone else. **That is the ADR.** And it is
+precisely the part §4.1 insists must not be welded to `EvalResult` — because if it stays portable it
+can be contributed upstream as `Microsoft.Extensions.AI.Evaluation.Meta`, which is a better outcome
+for this project than owning a private copy.
+
+**Verdict: the objection does not kill the ADR. It kills the ADR's unification half as a headline,
+and it makes the neutral-tuple ruling (§4.1) non-negotiable.**
+
+### 7.1 What the adversarial review refuted, and what was done about it
+
+Recorded so the reversals are visible rather than quietly absorbed. Fifteen findings from the
+adversarial review, of which **eleven changed the design**; plus **D2b**, added at ratification,
+which refuted D2's own fix. Sixteen rows, twelve reversals.
+
+| # | Finding | Ruling taken |
+|---|---|---|
+| D1 | `FloorGatedCodeEval` **does not prevent the defect it exists to prevent** — `FloorDerivationContext.Input` is a full `EvalInput`, so `int k = ctx.Input.ToolCalls!.Count(...)` spells the exact Galaxus defect inside `DeriveFloor`. Worse than the convention it replaces, because a reviewer would trust it. | **CUT.** Not in any funded slice. Rebuild only with a *redacted* context (`Query`, `GroundTruth`, `Context`, `ToolDefinitions`, `ExpectedActions`, `ArmProfile` — nothing the arm produced), and only if a second consumer asks. Until then: convention + review checklist, same protection, 200 fewer lines. ↪ **§11.2 row 7: `FloorAdmittedEval` is NOT this type returning — no `DeriveFloor`, no input access.** |
+| D2 | The `NotApplicable ⇒ !Passed` guard **does not compile** (CS0236, self-reference in a non-positional initializer) **and could never fire** (property initializers run before object initializers). | **FIXED, then the fix was itself refuted — see D2b.** The original ruling moved the guard to `EvalResult`'s primary constructor. **That ruling is SUPERSEDED**; the diagnosis was right and the placement was wrong. |
+| **D2b** | **D2's own fix is insufficient.** The guard on `EvalResult`'s primary constructor is an *initializer*, which runs on the constructor path only: `result with { Score = aNotApplicableScoreClaimingPassed }` invokes the init accessor and an auto-property's accessor validates nothing. It is also on the wrong type — both operands of the invariant live on `EvalScore`, which is public and read directly by all five aggregation strategies, so an un-wrapped `EvalScore` was never covered. **Found at ratification by a compiled probe**, not by review. Same class as **AE-01** (`AssertionResult.Passed`) and **AE-08** (`EvalScore.Value`): both already found and fixed in this repo by the same reasoning, and the guard was written a third time in the form both fixes exist to forbid. | **FIXED (2026-09-05)** — the guard is now a private backing field plus a validating `init` accessor on **both** `EvalScore.Passed` and `EvalScore.Measurement`, so the clone path validates too. Full code and the 16-assertion probe result in §4.2. `EvalResult` carries no guard at all. **Standing rule this makes explicit: in this repo, a record invariant enforced by a property *initializer* is not enforced. Only an `init` accessor over a backing field is.** |
+| D3 | Two verdicts in one artifact, free to disagree: the composite's `Threshold==null` path reads only severity, so an all-skipped composite is `passed:true, value:0.0` **today**. | **Slice 0 item 1** fixes the shipped bug. The bridge's competing verdict is deferred; when it lands, the harness reads the tree's verdict rather than recomputing. |
+| D4 | The non-breaking claim is false in three ways (gates on by default; `Score` exactness dead by construction; schema `additionalProperties:false`). | **ACCEPTED** — §6.2, all three named, gates deferred and defaulted off when they land. |
+| D5 | The meta layer is welded to `EvalResult`, foreclosing its only strong strategic option. | **ACCEPTED, non-negotiable** — §4.1, neutral `Observation` tuple, BCL-only. |
+| D6 | A floor is **not** a field on a score (composites can't carry one; the number without derivation is unusable; it buys the only avoidable schema break). | **ACCEPTED** — `EvalScore.ChanceFloor` cut (§3.2). |
+| D7 | `PoolMismatch` is the gate-self-examination shape *inside the design that exists to prevent it* — two free strings compared for equality, written by the same author ten lines apart; only a typo can trip it, and a typo **rejects a correct floor** while two genuinely different pools carelessly labelled alike match silently and flatteringly. | **CUT** — `PoolIdentity` and `FloorState.PoolMismatch` removed from §4.3. |
+| D8 | `SealedRun<T>` + gating `Unwitnessed` will be switched off within a month; the first `NumbersDespiteVoid("CI needs a number")` makes the audit grep a permanent hit everyone scrolls past — **worse than nothing**, because the artefact still looks disciplined. | **CUT.** Voiding is reserved for a gating control that *ran and failed to trip* (a positive observation, never an absence), carried as a `MetaVerdict` field plus a non-zero exit code. |
+| D9 | The empirical floor is a **selected maximum with no correction** — the ADR's own co-moving-operands failure one level up. | **FIXED** — `ChanceFloor.Empirical(..., policiesConsidered, heldOutFrom)`, throws when >1 policy without a held-out split (§4.3). |
+| D10 | `PreRegisteredRule.RegisteredAt` detects only within-process ordering; the failure happens in an editor between runs. | **CUT** — `RuleHash` stamped in the artefact survives (§4.5). |
+| D11 | **No case identity anywhere.** `EvalInput` has no `Id`; the sample joins on a formatted display string. Half the meta API is unimplementable without it. | **FIXED** — §4.7, Slice 1. ↪ **§11.2 row 13: shipped; `CaseId` is `TestCase.Id` only (`TestRunEvalProjection.cs:186`), no name fallback.** |
+| D12 | Controls conflate *perturbing a recording* with *running a different arm*; `ScrambledInputControl` needs an agent and the signature has none, so it is silently degenerate. | **ACCEPTED**, deferred with the controls. When built: `IObservationControl` (no agent) and `IArmControl` (re-runs) are two interfaces. |
+| D13 | `EvalResult.Skipped` puts its reason in `Recommendations`, not `Summary` — so the mandated *"n/a plus the reason"* renders as a bare `n/a`. | **FIXED** — §4.2, Slice 1. |
+| D14 | `ConfidenceInterval` already exists and does not match; the proposed shape is a binary+source break. | **FIXED** — no new interval type; `ClopperPearson` returns a tuple (§4.4). |
+| D15 | ISP/LSP analysis is correct. Two residuals: `MetricEval.NormaliseKey` turns a **display name** into a persisted join key (rename a metric and every historical comparison silently splits); `AggregateWithCensus` as a default interface method is not callable through a concrete type. | **ACCEPTED** — require an explicit key; add the member to all five aggregations rather than using a DIM. Both deferred with their lanes. |
+
+**Also refuted, by this document's own earlier draft:** the draft claimed *"No schema break;
+`eval-result.schema.json` v1 already permits all four."* That is true for `threshold`/`dimensions`/
+`evidence`/`provenance.type` and **false** for the new score properties and the new label. The
+correction is §6.2 item 3.
+
+---
+
+## 8. IMPLEMENTATION PLAN
+
+Ranked by (value × cheapness). **Slices 0–2 are what is proposed for funding. Everything after is
+deferred until a second team asks**, and the three items the review found actually wrong (D1, D8,
+D10) are all in the deferred bucket.
+
+### Slice 0 — bug fixes. ~1 week. Zero new public types, no ADR needed, no schema change.
+
+> **✅ DONE — shipped in `a396c5b4` (2026-09-04 21:29), before this ADR was ratified.** All seven
+> items landed, and 0.4 landed as the **dual-target** `MicrosoftEvaluatorAdapter : IMetric, IEval`
+> that §9 Q3 recommended. The table below is retained as the acceptance record; the "fails today"
+> notes were true when written and are not any more. **The gate this slice was meant to sit behind —
+> "nothing in §8 is funded until this document is ratified" — was authored and cleared in one
+> commit.** That is recorded in §0.0 rather than dropped.
+
+Each item fixed a defect that was **shipped and live**.
+
+| # | Change | Acceptance criterion | The test that would prove it |
+|---|---|---|---|
+| 0.1 | `CompositeEval` all-skipped → `label:"skipped"`, not `"pass"` with `score 0.0` (`CompositeEval.cs:148-163`, `MinAggregation.cs:33`) | A composite whose every leaf is skipped reports `passed:false, label:"skipped"` | `AllLeavesSkipped_DoesNotReportPass()` — build a 3-leaf composite of `EvalResult.Skipped`, assert `label == "skipped"`. **Fails today.** |
+| 0.2 | `MAFEvaluationHarness` must not pass on `EvaluationResult.EvaluationFailed`. **Non-optional, no opt-out.** | A judge returning `EvaluationFailed=true, OverallScore=50` yields `Passed=false` at any `PassingScore` | `JudgeParseFailure_NeverPasses()` — stub an `IEvaluator` returning the `ChatClientEvaluator` failure shape, run with `PassingScore=40`, assert `!Passed`. **Fails today.** |
+| 0.3 | `ToolInputAccuracyEval`'s three `Build(1.0, true, "none")` (lines 116, 129, 214) → `EvalResult.Skipped(...)`. Version 1.0.0 → 2.0.0 | No `ToolDefinitions` yields `label:"skipped"`, not 1.0 | `NoToolDefinitions_DoesNotScorePerfect()`. **Fails today**, and line 129 currently ships evidence saying "schema validation skipped" beside a 1.0. |
+| 0.4 | Retarget `MicrosoftEvaluatorAdapter` from `IMetric` to `IEval` (~40 lines) | A first-party M.E.AI quality evaluator produces an `EvalResult` with `Provenance.Type == "atomic-llm"` and a real `EstimatedCost` | `MicrosoftEvaluator_ProducesEvalResult()` |
+| 0.5 | `MafToolUsageExtractor` reading `ToolApprovalRequestContent.ToolCall` (+ `ToolApprovalResponseContent` → `ToolCallRecord.ApprovalState`), **opt-in**, plus a **warning logged whenever the default extractor sees and drops one** | An approval-gated `PlaceOrder` appears with `WasExecuted=false, ApprovalState=Requested`; the default extractor logs rather than silently dropping | `ApprovalGatedCall_IsVisible()`. Opt-in because this is the one change that can turn a red test **green** (`NeverCallTool` can now fail, `MustCallTool` can now pass) — do not change anyone's numbers silently; make the blindness loud instead. |
+| 0.6 | `IEvaluator` doc: "AI-powered response evaluation" → **LLM-judge transport**, with the `AtomicLlmEval` bridge named | Doc only | n/a |
+| 0.7 | Stop the lie in `ScenarioResult.Assertions` — either populate it or delete the field. An always-`Array.Empty` slot in a persisted artefact is worse than an absent one. | The field is honest | `PersistedScenario_AssertionsAreNotFabricated()` |
+
+### Slice 1 — applicability. ~1 week. **Exactly one schema change, ever.**
+> ✅ **SHIPPED 2026-09-05 (`878e5da4`); 1.4(i) shipped 2026-09-06 (`e34d9614`); 1.4(ii) is Q4(ii), the owner's. Banner added 2026-09-07 — §11.2 row 9.**
+
+| # | Change | Acceptance criterion | Test |
+|---|---|---|---|
+| 1.1 | `MeasurementState` enum + `EvalScore.Measurement` init-only + `EvalScore.NotApplicable()` factory, **guard as a backing field + validating `init` accessor on both `EvalScore.Passed` and `EvalScore.Measurement`** — the AE-01/AE-08 pattern, §4.2 as folded 2026-09-05. **No guard on `EvalResult`.** | `EvalScore.NotApplicable() with { Passed = true }` throws, **and so does** `measuredPassingScore with { Measurement = MeasurementState.NotApplicable }` — the invariant is on the pair, so neither side can reach the bad state | `NotApplicableScore_CannotBePassed()` + a `…WithExpressionTests` file mirroring `EvalScoreWithExpressionTests.cs`, covering **both** `with` orderings, the object-initializer path, and a hostile `{"passed":true,"measurement":"NotApplicable"}` artifact failing deserialisation closed |
+| 1.2 | `EvalScoreExtensions.CountsTowardAggregate()`; all five aggregations route through it (fixes the `CapByWorst` asymmetry) | One predicate, five call sites | `InapplicableLeaf_DoesNotEqual_ZeroScoredLeaf()` — a composite `{0.8, 0.8, n/a}` scores **0.80**; `{0.8, 0.8, 0.0}` scores **0.533**; assert not equal |
+| 1.3 | `ObservationCensus` + the rule that no mean renders without its denominator | `0.62 (8 of 12 measured, 3 n/a, 1 not measured)`; `Census.Void` renders `VOID`, never `0.00` | `VoidAggregate_DoesNotRenderAsZero()` |
+| 1.4 | Schema **v1.1**: `score.measurement`, `label` enum gains `"inapplicable"`. **Not `chanceFloor`.** `$id` bumped; `ContentHasher` canonical converter updated. ⛔ **The acceptance beside this row is WRONG AS SPECIFIED — see the Q4 correction of 2026-09-06.** The two schema edits are strictly permissive and change **no** historical hash (measured: 949 documents, 841 valid under both, **0** regressed); the break belongs to the *writer* half alone and this row prices them as one | ~~v1.1 documents validate; the release note carries the **byte-level prediction** that every historical `ScenarioResult` content hash changes at this boundary~~ → **split in two**: (i) v1.1 accepts an inapplicable score **and every currently-valid document stays valid** — no prediction is owed, nothing moves; (ii) the writer starts emitting `measurement` and `$id` bumps — *that* is where the byte-level prediction belongs | `SchemaV1_1_AcceptsInapplicable()` + `SchemaV1_1_RejectsNothingV1Accepted()` (the widening is only safe if it rejects nothing v1 accepted, and that must be asserted rather than reasoned) + a golden-hash test pinning the new value, **on the writer half only** |
+| 1.5 | `EvalResult.Skipped` writes its reason to `Details.Summary` as well as `Recommendations` (D13) | A skipped leaf renders `n/a` **with** its reason | `SkippedResult_ExposesReasonInSummary()` |
+| 1.6 | `EvalInput.CaseId` + `TestCase.Id` (D11) | Both present, both nullable, both additive | compile-only + one round-trip test |
+
+### Slice 2 — statistics. ~1 week. BCL-only, zero coupling.
+
+> **✅ 2.1–2.5 SHIPPED 2026-09-06 (Wave 5). ⬜ 2.6 NOT BUILT — it is gated on Q6, which is the
+> user's.** Five new types in `AgentEval.Evals.Meta` (`Observation`, `ExactTests` +
+> `ZeroEventBound`, `ChanceFloor` + `FloorState` + `ArmProfile` + `FloorComparison`, `RepCollapse` +
+> `ObservationUnit`, `PairedComparison` + `PairedEvalComparer`) and one adapter class
+> (`ObservationAdapters`, in `AgentEval.Core` — deliberately **not** in the meta namespace, so the
+> meta lane stays BCL-only). **+51 tests on every TFM (9,648 → 9,699 net10; 9,430 → 9,481 net9/net8),
+> zero existing test files edited, 0 build errors.**
+>
+> ⚠️ **What is NOT built, and what gates it — stated rather than worked around.** **2.6 is the stop
+> rule**, and its acceptance criterion is *"the retrofit deletes the hand-rolled sign test and the
+> per-persona floor loop outright"*. Whether that deletion happens **is Q6**, and Q6 is a preference
+> question marked as the user's in §9. Building 2.6 would be answering it. §9's Q6 box now carries
+> the measurement that was missing — the deletion turns Eval 02's GATE 1 from ✅ 12 of 12 to ❌, under
+> every replacement test considered — so the decision has its evidence; it does not have an answer,
+> and this wave did not invent an acceptance criterion to unblock itself.
+>
+> ⚠️ **Q2's ruling (a) — a separate BCL-only `AgentEval.Meta` project — was NOT executed here, and
+> that is deliberate.** 2.1's acceptance is about the **namespace**, not the assembly: *"the namespace
+> references nothing outside the BCL; the architecture test in §4.6 passes"*, and both hold with the
+> files where they are, inside `AgentEval.Abstractions` (itself BCL-only, zero `PackageReference`).
+> The project extraction is a **packaging** change that edits `src/AgentEval/AgentEval.csproj`, the
+> one shipping package, and §4.1's standing note reserves it: *"moving these files to that project
+> later changes no namespace and therefore no consumer source."* Doing it in the same commit as five
+> new statistical types would have widened the blast radius of a change nothing else needed.
+>
+> ⚠️ **One thing the implementation added that the table does not name, because building it found the
+> need.** `FloorComparison.Compute` **refuses a fractional measured value** rather than rounding it
+> into a success count. That is not defensive tidiness: measured on this repository's own coverage
+> corpus, a per-case rep-mean of 0.778 tested as "2 of 3" reads p = 0.063 (not above) where the
+> correct null reads p = 0.002 (well above) — a per-case verdict flip caused entirely by the
+> rounding. The library refuses the exact substitution §9 Q6's own naive form would have made.
+
+| # | Change | Acceptance criterion | Test |
+|---|---|---|---|
+| 2.1 | `AgentEval.Evals.Meta` over `Observation`: `ExactTests` (5 functions), `RepCollapse` + `PairedEvalComparer`, `ChanceFloor` (5 factories + `NotDerivable`), `ObservationCensus`, `ObservationUnit` | The namespace references nothing outside the BCL; the architecture test in §4.6 passes | `MetaNamespace_HasNoNonBclDependencies()` + `MetaTypes_NeverImplement_IEval()` |
+| 2.2 | Adapters `EvalResult → Observation`, `MetricResult → Observation`, `M.E.AI EvaluationResult → Observation`, in `AgentEval.Core` | One-way, per §3.2 | `Adapters_AreOneWay()` (reflection: no `Observation → EvalResult`) — ⚠️ **as first shipped this test scanned `typeof(Observation).Assembly` and `typeof(EvalResult).Assembly`, which are the SAME assembly (`AgentEval.Abstractions`), and so never read `AgentEval.Core` where the adapters are.** A literal `Observation → EvalResult` added to `ObservationAdapters` left it GREEN. Corrected in the Wave-5 review; `MEASUREMENT_STATUS` §45.6b |
+| 2.3 | `ExactTests` correctness | `TwoSidedSignP(8, 18)` matches R's `binom.test`; log-space form returns a finite p at n = 4,000 where the naive form returns NaN | `SignP_MatchesReference()` + `SignP_SurvivesLargeN()` |
+| 2.4 | `ZeroEventUpperBound` misuse is unspellable | `ZeroEventUpperBound(events: 7, trials: 14)` returns `IsApplicable=false` with the observed-rate interval, **not** a bound below its own observation | `RuleOfThree_RefusesNonZeroEvents()` — this is the recorded 34.8%-vs-50% defect |
+| 2.5 | `ChanceFloor.Empirical` refuses an uncorrected selected maximum (D9) | `Empirical(10, 14, policiesConsidered: 4)` with no `heldOutFrom` **throws** | `SelectedFloor_RequiresHeldOutSplit()` |
+| 2.6 | **The stop rule.** Retrofit **exactly one** Galaxus eval — Eval 02, which has the mean-vs-mean floor gate that passed an arm scoring 0.000/1.000/1.000 (mean 0.667 > floor 0.462) while below floor on 2 of 3 | The retrofit **deletes** the hand-rolled sign test and the per-persona floor loop outright | If it does not, **the programme stops there.** That is the acceptance criterion. |
+
+### Deferred until a second team asks
+
+`FloorGatedCodeEval` (D1 — rebuild only with a redacted context), `INegativeControl` /
+`ControlSuite` / `WitnessLedger` (D8, D12), `SealedRun<T>`, `PreRegisteredRule` (D10),
+`MetricEval`, `ProbeEval`, `AssertionRecorder` / `AssertionEval`, `MAFEvaluationHarnessOptions`
+and `EvaluationOptions.Evals`, typed `EvalInput.ToolUsage`/`.Workflow`/`.RetrievedDocuments`, and
+all three CLI flags (`--require-controls`, `--require-floors`, `--strict-unit` — three flags for a
+feature with zero adopters; ship none until one team asks).
+
+Every one is defensible. None is urgent. Three of them are wrong as specified.
+
+**The one thing worth saying about the deferred controls:** their highest-value first application is
+`AgentEval.Compliance.*`, which is 100% `AtomicLlmEval` and **has never been shown able to fail**.
+And the rule that must travel with them: **if the control suite finds nothing there, that is a wiring
+fault in the control suite, not a clean bill of health** — extreme values are wiring faults until
+proven otherwise — and the programme stops until the controls are shown able to fail.
+
+---
+
+## 9. OPEN QUESTIONS — RATIFICATION REQUIRED
+
+Nothing in §8 starts before these are answered.
+
+**Q1 — Is the demotion accepted?** This ADR says the unification half loses to
+`Microsoft.Extensions.AI.Evaluation` on the merits and survives only on migration cost (§7). That is
+a weaker claim than the brief's framing and it is deliberately weaker. **Confirm the honest framing
+is wanted over the flattering one.**
+
+**Q2 — Packaging of `AgentEval.Evals.Meta`.** §4.1 requires it to be BCL-only and portable so it can
+be contributed upstream. Options: **(a)** a new BCL-only project `AgentEval.Meta` at the bottom of
+the dependency graph, which `AgentEval.Abstractions` references — clean, but `AgentEval.Abstractions`
+is `IsPackable=false` and **I have not traced how it reaches consumers**, so the packaging
+consequence is unverified; **(b)** a namespace inside `AgentEval.Core`, giving up portability and the
+upstream option. Recommend (a). **Needs a packaging check before it is chosen.**
+
+> ✅ **ANSWERED 2026-09-06 (Wave 3) — the packaging path is TRACED AND MEASURED, and the premise of
+> the doubt was wrong.** The check is `dotnet pack src/AgentEval/AgentEval.csproj -c Release` followed
+> by reading the `.nupkg`, and it was run:
+>
+> - **`IsPackable=false` does not keep a type away from consumers.** Fifteen of the sixteen projects
+>   under `src/` are `IsPackable=false`; exactly two ship — `AgentEval` and `AgentEval.Cli`.
+>   `src/AgentEval/AgentEval.csproj` references every sub-project with `PrivateAssets="all"` and its
+>   `IncludeSubProjectDlls` target copies each `ProjectReference` output into `BuildOutputInPackage`.
+>   **Measured in `AgentEval.0.34.0-beta.nupkg`: `lib/net8.0/` holds 14 DLLs, and
+>   `AgentEval.Abstractions.dll` is one of them.** So `AgentEval.Abstractions`' public types are
+>   already on a consumer's compile surface today, through the `AgentEval` package.
+> - **The route for (a) is one line**: a `ProjectReference … PrivateAssets="all"` in
+>   `src/AgentEval/AgentEval.csproj`. No new `PackageId`, no second package to version in lockstep.
+> - **And the packaging check finds the real argument for (a), which is not portability.**
+>   `PrivateAssets="all"` suppresses transitive dependency propagation, so **every external
+>   `PackageReference` of every sub-project has to be re-declared by hand** in `AgentEval.csproj`.
+>   Measured: the packed nuspec's `net8.0` group carries **11** such hand-mirrored dependencies, and
+>   the file itself records that one of them (`OpenTelemetry.Api`, floor 1.15.3) exists only because
+>   omitting it let consumers resolve a vulnerable version — i.e. this list has already failed once,
+>   in a security-relevant way. **A BCL-only `AgentEval.Meta` adds ZERO entries to that list. A
+>   namespace in `AgentEval.Core` inherits four.** That is a measured property of this repo's
+>   packaging, not a preference.
+> - ⚠️ **One consequence to declare, because it narrows what "portable" buys.** A DLL that arrives via
+>   `BuildOutputInPackage` has **no NuGet identity**: nobody can reference `AgentEval.Meta` alone,
+>   they take all of `AgentEval`. Under this scheme the meta lane is portable **as source** — which
+>   is what an upstream contribution needs — and is *not* separately consumable. If separate
+>   consumability is ever wanted, that is a second `PackageId`, and it is a different decision from
+>   this one.
+>
+> **Ruling: (a).** It is a one-line packaging change, it is the only option that adds no entry to a
+> hand-maintained dependency mirror that has already failed once, and Slice 1's two existing types
+> (`MeasurementState`, `ObservationCensus`) move with it under the standing "a later file move
+> changes no namespace" note. **Q2 no longer blocks Phase 4.**
+
+**Q3 — `MicrosoftEvaluatorAdapter` retarget (Slice 0.4).** Hard break (`IMetric` → `IEval`), or keep
+both with the `IMetric` path `[Obsolete]` for one minor? Recommend dual-target with `[Obsolete]`;
+it costs ~20 lines and removes the only breaking change from Slice 0.
+
+**Q4 — Schema v1.1 timing (Slice 1.4).** Accept the historical-content-hash break now, or hold
+applicability until a v2 that batches other changes? Recommend now: the defect it fixes is live, and
+batching means the break lands anyway but later and larger. **The release note must carry the
+byte-level prediction either way.**
+
+> ⛔ **CORRECTION 2026-09-06 (Wave 2, MEASURED). This question is framed on a break that two of the
+> three parts of 1.4 do not cause.** 1.4 bundles a **schema widening** with a **writer change** and
+> prices them as one. Measured over **949 eval-result documents on disk**, against schema v1 and
+> against a v1.1 candidate carrying exactly the two edits 1.4 names — `score.measurement` added to
+> `score.properties`, `"inapplicable"` added to the `label` enum:
+>
+> | | v1 | v1.1 candidate |
+> |---|---|---|
+> | valid | **841** | **841** |
+> | **regressed (v1 accepted, v1.1 rejects)** | — | **0** |
+> | newly valid | — | 0 |
+> | an inapplicable score (`label: "inapplicable"`, `measurement: "notApplicable"`) | rejected | **accepted** |
+>
+> Both edits are **strictly permissive** — adding a member to `properties` under
+> `additionalProperties: false`, and adding a member to a closed `enum`, only ever widen what
+> validates. **No document on disk is invalidated and no stored content hash moves**, because
+> `EvalScore.Measurement` is `JsonIgnore(WhenWritingDefault)` and no shipped producer can currently
+> make it non-default. What *does* move bytes is the **write path** — emitting `measurement`
+> unconditionally — and the **`$id` bump**, and both are separable from the widening.
+>
+> **So Q4 is two questions, and only the second is a break.**
+> **(i)** Widen the schema so an honest artifact is *accepted* — free, reversible, moves nothing.
+> **(ii)** Start *writing* the field and bump `$id` — the historical-hash break this row describes.
+>
+> ⚠️ **Neither was shipped in Wave 2, and the reason is not effort.** Q4 is a user decision and still
+> gates the row; and landing even (i) requires editing `InapplicableSchemaBoundaryTests.cs` and
+> `EvalScoreMeasurementWithExpressionTests.cs`, whose entire purpose is to record what schema v1 does
+> **today** — which that wave's rules forbid. Those two files say so themselves: *"the day the schema
+> bumps, they are the tests that have to change on purpose."* Re-derive with `MEASUREMENT_STATUS.md`
+> §25.3(c).
+>
+> ✅ **ANSWERED 2026-09-06 (Wave 3), and the answer is that Q4 is no longer what blocks Slice 1.4.**
+> On the merits, with the measurement above in hand: **(i) is APPROVED — do the widening now.** It is
+> free, reversible, regresses **0 of 949** documents on disk, moves no stored content hash, and the
+> defect it fixes (an honest inapplicable artifact being *rejected* by our own schema) is live.
+> **(ii) — writing the field unconditionally and bumping `$id` — is DEFERRED to the next major**, and
+> the release note carries the byte-level prediction that every historical `ScenarioResult` content
+> hash changes at that boundary. Splitting them costs nothing and buys the whole of (i) immediately;
+> batching them, as the original recommendation proposed, prices the free half at the breaking half's
+> rate.
+>
+> ⚠️ **But (i) still did not ship, and the blocker has CHANGED IDENTITY without anybody recording it.**
+>
+> ↪ **STALE as of 2026-09-07 — §11.2 row 10:** (i) SHIPPED in `e34d9614` with both named test files edited in the same commit. Only (ii) remains, and it is the owner's.
+> It is no longer Q4. Widening the schema makes
+> `tests/AgentEval.Tests/Evals/InapplicableSchemaBoundaryTests.cs` and
+> `EvalScoreMeasurementWithExpressionTests.cs` fail **by design** — they exist to pin what v1 refuses
+> — and every wave since Wave 2 has run under a standing rule that no existing test file may be
+> edited. So **Slice 1.4 is blocked by a process rule, not by an open question**, and it will stay
+> blocked for as long as that rule holds, no matter how Q4 is answered. ⚠ Written as a bare "1.4" in
+> the first revision and corrected 2026-09-06 by review: the delivery plan's **item 1.4** is a different
+> thing entirely and it SHIPPED the same day (`9407cfbd`, the exact binomial), so an unqualified "1.4"
+> here read as "the thing that shipped is blocked". Whoever funds Slice 1.4 must fund the edit
+> to those two files *in the same change* and say so up front; that is the whole remaining cost, and
+> it is about twenty lines. Recording this is the point: an item parked under the wrong blocker never
+> comes up for the decision that would actually release it.
+
+**Q5 — Slice 3 (negative controls): funded, or genuinely deferred?** The review's position is that
+machinery with one consumer rots in six months and controls are the most ceremony-heavy part. My
+position is that the `(d3 > 0 || d4 > 0)` defect — a dead detector printing a tick behind an OR — is
+the single most valuable thing the controls prevent, and it is unwritable only if the API exists.
+**These conflict. The user decides.**
+
+> ⬜ **STILL THE USER'S — but the review's half of the conflict has weakened twice since it was
+> written, and both movements are measured.** The objection is *"machinery with one consumer rots in
+> six months"*, and when it was written the only consumer was the library's own retrofit.
+> **(1)** Phase 2.7 is a second consumer and it is not a test — six threshold values selected across
+> two embedding spaces is `ChanceFloor.Empirical(…, policiesConsidered: 6)` exactly, which §4.5 makes
+> throw without a named held-out split. **(2)** Wave 3 added a third instance of the defect class the
+> controls exist to prevent, found the same way the other two were — by adversarial re-reading rather
+> than by the suite: Eval 07's per-case expectation named a mechanism its own run refutes on **3 of 3**
+> looping cases (`MEASUREMENT_STATUS` §28). That is **four** logged instances (§20.11 items 3 and 7,
+> 2.7, §28), none of which any automated check caught.
+> ⚠️ **This is evidence about frequency, not about the API.** It says the defect keeps happening; it
+> does not say `INegativeControl` is what would have caught it — three of the four were caught by a
+> human reading, and no control suite has been shown able to catch any of them. The honest framing of
+> the decision is therefore *"fund a lane whose value is demonstrated and whose mechanism is not"*,
+> and that framing is the user's to weigh.
+
+
+> ### ✅ Q5 — ANSWERED 2026-09-07 by the owner: **DEFER the API. Take the cheap version.**
+>
+> `INegativeControl` is **not funded**. The reasoning is this box's own honest framing turned into a
+> decision: four logged instances say the defect class keeps happening, and **three of the four were
+> caught by a human re-reading**, not by any control suite — so the value is demonstrated and the
+> mechanism is not. Funding an API on that evidence buys ceremony, not detection.
+>
+> **The counter-evidence that settled it is a measurement, not an argument.** The Galaxus sample runs
+> **46 gating negative-control rows today with no `INegativeControl` at all**
+> (`samples/Galaxus.RecommendationAgent.Evals/Evals/NegativeControls.cs`, `-- 3` exits 0 with
+> `NOT CAUGHT` = 0). A practice that already works without the abstraction is not waiting on it.
+>
+> **What is funded instead, at no new API cost.** A deliberately-degraded `BenchmarkArm.From(armId, observe)`
+> **IS** a negative control, and `BenchmarkScore.AgainstReference` already scores it against the live
+> arm with the case as the unit. §11's contract therefore ships the control lane as an *arm*, not as
+> an interface.
+>
+> **What stays refused, and this is the load-bearing half:** `BenchmarkDefinition` gets **no controls
+> slot**, `BenchmarkRunner` writes **no `VOID` verdict** and claims **no exit code 12**. A definition
+> that declares controls it does not run is worse than one that declares none. Phase 7.4 and 7.6 stay
+> unbuilt on purpose.
+>
+> **What would reopen this:** a second consumer needing to SHARE controls across definitions. That is
+> the thing an interface buys and an arm does not.
+
+**Q6 — The stop rule (Slice 2.6).** If the Eval 02 retrofit does not delete the hand-rolled sign
+test and the per-persona floor loop, does the programme actually stop, or does it continue with a
+recorded finding? Recommend it actually stops. **A stop rule nobody will honour is worse than no stop
+rule.**
+
+> ⬜ **STILL THE USER'S, and deliberately left open 2026-09-06 (Wave 3) — but the price is now known
+> and it is lower than when the question was written.** Wave 1 **deleted** `SignTest` outright from
+> `PairedCoverageReport` (correction ⑪) and `GraderSanity` now refuses, by reflection, any pairing
+> method without a `CoverageMetric`. So one of the two things 2.6's acceptance requires to be deleted
+> is *already gone*, deleted for an unrelated reason, and what remains under test is the per-persona
+> floor loop alone. That halves the thing the stop rule would have to stop for, and it is evidence
+> the deletion is achievable rather than aspirational. **Answering YES costs nothing today and is
+> expensive to renege on later; that asymmetry is the decision, and it is the user's to take.**
+>
+> ↪ **Overstated — §11.2 row 11:** `SignTestAtEqualK` is live at `PairedCoverageReport.cs:463` with 11 call sites; both halves of 2.6's deletion remain.
+
+> ### ⬜ Q6 — the remaining half's PRICE, measured 2026-09-06 (Wave 4). Still the user's; still not answered here.
+> Wave 3 said the deletion looks *"achievable rather than aspirational"* and offered no number. Here is
+> the number. **`grep` over `samples/`, excluding build output: 22 references to `AboveOwnFloor` /
+> `AbovePrecisionFloor` / `EveryPersonaAboveOwnFloor`, across six files**, and they are not 22 of the
+> same thing:
+>
+> | what the site is | how many | where |
+> |---|---|---|
+> | the two computed predicates themselves (`rate > floor`, null when either side is undefined) | **2** | `Graders/CoverageScore.cs:118,125` |
+> | the per-persona loop and its companion "which personas were below" list | **2** | `Graders/PairedCoverageReport.cs:332,352` |
+> | **a GATE** — the only one | **1** | `Eval02_LatentInterestCoverage.cs:563` |
+> | reporting (Eval 09's below-own list) | **1** | `Eval09_HypothesisComparison.cs:953` |
+> | ▲/▼/? markers in printed panels | **8** | `EvalPrinter.cs` |
+> | comments and control text naming them | **8** | `ExactBinomial.cs`, `NegativeControls.cs`, `EvalPrinter.cs:859` |
+>
+> **So "delete the per-persona floor loop" is mechanically: two properties, one loop, one list helper,
+> one gate call and one report call — six members — plus eight rendering markers that need a
+> replacement symbol.** It is not a rewrite of the eval.
+>
+> **And the replacement already ships.** `ExactBinomial.AboveChance(successes, trials, chance)` exists
+> (plan item 1.4), is already the decision for three other ▲ sites, and is held by Eval 03's gating
+> row `AboveChanceIsAnExactTest`. `CoverageScore` already carries the exact operands it needs —
+> `LatentServed` / `LatentTotal` / `LatentFloor` — so the substitution is expressible today.
+>
+> ⚠️ **What this does NOT establish, and it is the half that matters for a stop rule.** Nobody has
+> measured how many ▲ markers *survive* an exact test at α = 0.05, and Eval 02's **GATE 1 verdict may
+> move** — §4.0h ranks that as its own item, and it explicitly requires a *declared* GATE 1 movement.
+> **A cheap deletion whose verdict effect is unknown is not the same as a cheap deletion.** The price
+> of the mechanics is now measured; the price of the *answer changing* is not, and Q6 should not be
+> answered on the first without the second.
+
+> ### ⬜ Q6 — THE SECOND HALF, MEASURED 2026-09-06 (Wave 5). **The verdict MOVES. Still the user's; still not answered here.**
+>
+> Wave 4 left the deciding fact open: *"nobody has measured how many ▲ markers survive an exact test,
+> and Eval 02's GATE 1 verdict may move."* It was measured, by **executing**, and the answer is not
+> ambiguous.
+>
+> **YES. GATE 1 goes ✅ → ❌, on the only cells on which it has ever been ✅.**
+>
+> | GATE 1, on the persisted live run of 2026-09-06 02:56 UTC | verdict | personas above their own floor |
+> |---|---|---|
+> | **shipped rule** — `Latent > LatentFloor`, per persona | ✅ **PASS** | **12 of 12** |
+> | replaced by `ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)` | ❌ **FAIL** | **8 of 12** — below: `USR-MI-02`, `USR-LM-09`, `USR-PB-11`, `USR-NK-12` |
+>
+> **How it was run, and why it did not cost $27.** The gate's own live arm is a stub under
+> `--dry-run`, and a stub is ❌ before anything is changed — so ablating the floor rule there moves
+> nothing and *"no movement"* would be indistinguishable from *"nobody ran it"*. Eval 02 therefore
+> now prints a **GATE 1 REPLAY** line: the same predicate, through the same
+> `PairedCoverageReport.EveryPersonaAboveOwnFloor` loop, over the live cells the own-k re-read already
+> loads from the persisted paid run. **Advisory — it gates nothing**, because a snapshot on disk must
+> never decide today's exit code. Both readings above come out of `dotnet run … -- 2 --dry-run`, free,
+> and reproduce **identically in both embedding spaces** (the live cells are the snapshot's; only the
+> predicate changed).
+>
+> **The movement is ROBUST to the choice of test — which is the part that actually decides Q6.** The
+> obvious objection to the table above is that `AboveChance` is the *wrong* test here: this file's
+> own `ExactBinomial` remarks say so (latent coverage is a mean over gold tokens whose null is not
+> binomial), and `LatentServed` is a **rounded rep-mean**, not a count of Bernoulli successes. So the
+> correct null was **simulated** instead — 200,000 uniform k-draws without replacement from each
+> persona's actual eligible pool (the same pool `ChanceFloors.RandomDrawFloor` derives its floor
+> from), scored by the same token-hit rule, at the k the persona actually received:
+>
+> | test | personas above at α = 0.05 | GATE 1 |
+> |---|---|---|
+> | shipped `rate > floor` | 12 of 12 | ✅ |
+> | exact binomial on `served/total` | 8 of 12 | ❌ |
+> | simulated null, one k-draw | 9 of 12 | ❌ |
+> | simulated null, **mean of 3 draws** (the estimator the cell actually is) | **10 of 12** | ❌ |
+>
+> **Every candidate replacement fails the gate**, and two personas — `USR-LM-09` (1 of 4 interests
+> covered, p ≥ 0.08 under every test) and `USR-NK-12` (1 of 4, p ≥ 0.21) — are below under **all
+> three**. So the answer to *"does the verdict move?"* does not depend on getting the test right
+> first: it moves under the naive substitution, under a better one, and under the best one available.
+>
+> ⚠️ **One reasoning error found by measuring, and its direction was flattering to the argument being
+> made.** Before simulating, the expectation written down was that the binomial would be
+> *anti-conservative* (token hits are positively correlated, one product carries several tokens, so
+> the true tail is fatter) and that the correct test would therefore admit **fewer** than 8. Measured:
+> it admits **more** — 9, and 10 once the rep-averaging is modelled, because averaging three draws
+> shrinks the null's spread far more than the correlation fattens it. The correlation effect is real
+> and visible (`USR-RB-10`, `USR-DF-14`: binomial p 0.0035 against a simulated 0.0110, understated 3×)
+> — it is simply not the dominant term. **The number that would have been published from the argument
+> alone was wrong in the direction that made the argument stronger.**
+>
+> ⚠️ **And the naive substitution carries a defect this repository has already fixed once.**
+> `LatentServed` is `Math.Round` of the rep-mean, so feeding it to a binomial test integerises the
+> statistic before testing it — the same shape as the forced-choice panel's `Math.Floor(rate × n)`,
+> corrected at `9407cfbd`. It is not a rounding nicety: on `USR-PB-11` the binomial reads
+> **p = 0.0629 (not above)** where the simulation reads **p = 0.0019 (well above)**, a verdict flip on
+> one persona caused entirely by 0.7778 being tested as 2 of 3. **If 2.6's retrofit ships the
+> `AboveChance` substitution as written, it ships that defect into GATE 1.**
+>
+> **What this means for the stop rule, stated without answering it.** 2.6's acceptance is *"the
+> retrofit deletes the hand-rolled per-persona floor loop"*. That deletion is now known to be
+> **cheap mechanically** (Wave 4: six members plus eight rendering markers) and **expensive in
+> verdicts**: it turns this repository's headline Eval-02 gate from green to red, on the paid run, and
+> it does so under every replacement test considered. The two facts point opposite ways, and which one
+> governs is exactly the preference Q6 asks about:
+>
+> * **Answering YES** (the programme stops if the deletion does not happen) now costs a visible ❌ on
+>   the only Eval 02 run anyone has paid for. It is the honest reading — 12 of 12 was `rate > floor`
+>   on 3-token and 4-token denominators — but it is not free any more.
+> * **Answering NO** keeps 12 of 12 and keeps a gate whose bar is *"beat a point estimate"*, on a
+>   metric whose own oracle scores 1.000 with zero model calls.
+>
+> ⚠️ **Nothing here is a recommendation and nothing here changes a shipped number.** The replacement
+> was applied on a **scratch basis and reverted**; `CoverageScore.AboveOwnFloor` is untouched on the
+> tree, GATE 1 still reads `rate > floor`, and the only committed change is the advisory replay line
+> that makes the measurement re-runnable. Re-derive:
+>
+> ```bash
+> E=samples/Galaxus.RecommendationAgent.Evals
+> dotnet run --project $E -- 2 --dry-run | grep -A4 "GATE 1 REPLAY"     # PASS — 12 of 12
+> dotnet run --project $E -- 2 --dry-run --real-vectors | grep -A4 "GATE 1 REPLAY"   # identical
+>
+> # the ablation — Graders/CoverageScore.cs, AboveOwnFloor:
+> #   double.IsNaN(Latent) || double.IsNaN(LatentFloor) || LatentTotal <= 0 ? null
+> #   : ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor).Above;
+> #   -> GATE 1 REPLAY: FAIL — 8 of 12; below USR-MI-02, USR-LM-09, USR-PB-11, USR-NK-12 (both spaces)
+> #
+> # the POSITIVE CONTROL, because an unmoved gate proves nothing on its own:
+> #   ... ? null : Latent >= 0.0;
+> #   -> the STUB-fed GATE 1 (the one that gates the exit code) goes ❌ 9-of-12-below -> ✅ 12 of 12.
+> #      The gating path is live and movable; the ❌ under the ablation is not a stuck value.
+> ```
+>
+> `MEASUREMENT_STATUS` §44 carries the per-persona table, the simulated p-values and the seed.
+
+> ### ✅ SUPERSEDED 2026-09-07 — §9 has NO open questions left. Q4(ii), Q5 and Q6 were all answered by the owner on that date; the boxes below record the state on 2026-09-06 and are kept for the reasoning, not for the status.
+> ### ⬜ Q5 and Q6 are the only two questions in §9 still open (2026-09-06, Wave 3)
+> Q1, Q3 and Q7 closed at `4d1f1bbc`; **Q2, Q4 and Q8 are answered above.** Q5 and Q6 are left open
+> **on purpose**: both are marked in this document as the user's call, one of them explicitly
+> (*"These conflict. The user decides."*), and answering a preference question on the owner's behalf
+> is not the same as discharging a factual one. What Wave 3 changed is that **neither of them blocks
+> anything that is currently ready to start**: Phase 4 was gated on Q2 and is now unblocked; Phase 7.4
+> is the only item still waiting on Q5.
+>
+> ↪ **Three, not two — §11.2 row 12:** Q4(ii) is also still the owner's.
+
+> ### ✅ Q4(ii) — ANSWERED 2026-09-07 by the owner: **DEFER. Keep the conditional writer.**
+>
+> The unconditional `measurement` writer and the schema `$id` bump are **not taken**. Today's writer
+> emits the field only when non-default, so **no produced byte moves** for an existing producer and
+> every historical artifact stays readable by a current reader. Bumping the `$id` breaks readers for
+> a field that **nothing reads today**.
+>
+> **What would reopen it:** a consumer that genuinely needs to distinguish *absent* from *`Measured`*
+> ON DISK. In memory the distinction already exists and is honoured — `EvalScore.NotApplicable()`,
+> `CountsTowardAggregate()` and `CensusBucket()` — so the deferral costs nothing a consumer can
+> currently observe.
+>
+> **Consequence:** Phase 7.4 stays unbuilt. `BenchmarkRunner`'s summary keeps the schema's single
+> `skipped` bucket for both `NotApplicable` and `NotMeasured`, and says so where it does it, rather
+> than adding a manifest field behind `additionalProperties: false`.
+
+
+
+> ### ✅ Q6 — ANSWERED 2026-09-07 by the owner: **YES on the principle, STAGED in execution, and NOT with the test 2.6 specifies.**
+>
+> **The principle.** A floor that gates nothing is decoration. `rate > floor` is not a test, and
+> 12-of-12 was `rate > floor`. So the stop rule binds: a chance floor recorded beside a verdict must
+> be allowed to decide it.
+>
+> **Three conditions, and the first two come straight out of the measurements above.**
+>
+> **1 · Slice 2.6 must NOT ship `ExactBinomial.AboveChance(LatentServed, LatentTotal, LatentFloor)`
+> as written.** `LatentServed` is `Math.Round` of a rep-mean, so that call integerises the statistic
+> before testing it — the identical defect corrected at `9407cfbd`, and on `USR-PB-11` it alone reads
+> **p = 0.0629 (not above)** where the correct null reads **p = 0.0019 (well above)**. Shipping it
+> ships a known verdict-flip. The binding test is the **simulated null at the estimator the cell
+> actually is** — mean of 3 draws — which the box above measured at **10 of 12**.
+>
+> **2 · The movement is DECLARED, not silent.** GATE 1 goes from ✅ 12/12 to ❌ 10/12, on the only
+> Eval 02 run anyone has paid for, and it moves under every candidate test (8 / 9 / 10). That is a
+> re-baseline: keep the advisory `GATE 1 REPLAY` line, land the binding test behind the gate, publish
+> the 12 → 10 movement with its date and its cause, and only then make it the default. A headline gate
+> going red is fine. A headline gate going red without a disclosure is the failure this record exists
+> to prevent.
+>
+> **3 · Both halves of 2.6's deletion are owed.** §11.2 row 11 stands, re-verified 2026-09-07: the
+> document's own command gives **11 `SignTestAtEqualK` call sites**, distributed 4 / 4 / 3 across
+> `Eval02`, `Eval09` and `NegativeControls`, and `grep -rn SignTest src --include=*.cs` → **0**. What
+> was deleted is the unconditioned `SignTest`; the hand-rolled sign test still exists, renamed and
+> conditioned. 2.6's precondition is two deletions, not one.
+>
+> ### ✅ Q6 CONDITION 2 DISCHARGED 2026-09-08 — the movement is PUBLISHED, and it reproduced
+>
+> `SimulatedLatentNull` draws the null instead of comparing to its mean, and Eval 02 now prints the
+> result beside the shipped verdict as an ADVISORY line that gates nothing. Observed on a free
+> command (`-- 2 --dry-run`, exit 0, credentials unset): the shipped predicate reads **PASS, 12 of
+> 12**; the drawn null reads **9 of 12** at α = 0.05, below being `USR-MI-02` p = 0.0560,
+> `USR-LM-09` p = 0.1235, `USR-NK-12` p = 0.2429.
+>
+> **That is this box's own single-draw figure, reproduced INDEPENDENTLY** — the simulator was written
+> from the pool definition rather than from this document, and lands on the same three personas. The
+> number recorded above was a measurement, not a claim, and it holds. `MEASUREMENT_STATUS` §86
+> carries the method, the seed and the sample count.
+>
+> **Condition 1 honoured:** `ExactBinomial.AboveChance(LatentServed, …)` is NOT shipped, for the
+> reason recorded above — it integerises a rounded rep-mean.
+>
+> ⚠ **A gap that blocks the EXACT test, found by building it.** The correct null is a mean of REPS,
+> and `CoverageScore` does not record how many reps it is a mean of. The line therefore reports the
+> single-draw null and says so; it under-admits, which is the safe direction. Recording the rep count
+> is what unblocks the mean-of-3 figure this box measured at 10 of 12.
+>
+> **Condition 3 is still owed:** `SignTestAtEqualK` remains live at 11 call sites. The deletion waits
+> until the default flips, which waits on this publication having been read.
+>
+> **Consequence for the contract:** Phase 7.2 is unblocked — `AgentEvalCompositeEvaluator` may take a
+> floor. Until 2.6 lands under conditions 1–3, `BenchmarkRunner` still applies **no** floor to any
+> verdict; floors are recorded and unapplied, exactly as `FloorAdmittedEval` records them. Answering
+> Q6 does not retroactively bind a floor that no code applies.
+
+### §11.6 — every number in §11 RE-TAKEN 2026-09-07, and three of the COMMANDS are what moved
+
+Plan task 5.2. Re-run against the tree at `9ce3f50f`, after Waves 0–3, 6 and 7.1/7.2/7.5 shipped.
+**No stated figure was found wrong.** What was found wrong is three of the commands that verify them.
+
+| §11 claim | command re-run | now reads | verdict |
+|---|---|---|---|
+| row 2 — Galaxus references `IEval` 0 times | `grep -rl '\bIEval\b' <galaxus> --include=*.cs \| wc -l` | **4** | **superseded by design.** Wave 2.2 and 3.5 put four admitted evals in that sample; the row records the state the join was built to change |
+| row 2 — …and `MAFEvaluationHarness` 59 times | `grep -ro MAFEvaluationHarness <galaxus> \| wc -l` | **67** | moved with the sample, not a defect |
+| row 8 — `ApprovalAwareAgentAdapter` deleted | `grep -rl ApprovalAwareAgentAdapter <galaxus> \| wc -l` | **8** | unchanged from §11's own reading; the row's point stands |
+| row 11 — `SignTestAtEqualK` at 11 sites | the row's own command | **11** | ✅ exact, and `grep -rn SignTest src` is still **0** |
+| row 14 — the four ducks | `TryGetValue("agent")` outside the new owner | **0** | 7.1 closed it; the ducks now share one keyed read |
+| — | strict `IEval` declarers in `src/` | **75** | ✅ unchanged across every wave |
+
+**🔴 The finding: three verifying commands cannot return their stated value in a repository that
+documents its own decisions.** All three are the same shape, and this record has now hit it four
+times (§82.1 for `SyntheticEval`, task 1.4's grep, and twice here):
+
+1. `grep -rn '\.Eval\b' src/AgentEval.Core/Evals/Aggregations/` is quoted in §11 and in each of the
+   five aggregation strategies as returning **0**. It returns **5** — and all five hits are *the doc
+   comment quoting the grep*. The claim is true of the CODE and false of the FILE, because the file
+   states the claim. I wrote four of those five myself in task 1.1 and then repeated the claim in
+   7.1's new `IAggregationStrategy` documentation.
+2. `grep -rn controlLedger src` is quoted as **0**. It returns **5**: one real source hit
+   (`ExitCodes.cs:154`, a comment explaining that exit 12 belongs to S4 and is therefore *not* taken)
+   and four copies in generated `bin/` and `obj/` XML. The command is unscoped — it never said
+   `--include=*.cs`.
+3. `grep -c 'agenteval compare\|Incomparable\|exit 13' CHANGELOG.md` is quoted as **0** as a
+   pre-edit precondition. It now reads **3**, correctly: the 0.35.0-beta notes disclose the feature.
+
+None of the three is a defect in the code. All three are gates that a reader re-running them today
+would read as regressions, which is worse than a stale number — a stale number is inert, and a
+self-refuting command sends the next reader looking for a bug that is not there.
+
+**The rule this yields, stated so it can be applied rather than admired:** a verifying grep must
+exclude the document that quotes it, or be scoped narrowly enough that quoting it cannot satisfy it
+(`--include=*.cs` plus a path that excludes `bin`/`obj` is usually enough). Where neither is
+possible, state the expected value as *"0 live references; N prose"* rather than as *"0"*.
+
+**Q7 — Does the exclusion list (§3.1) go into `docs/adr/030-*.md` as normative text**, so a PR adding
+`contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.
+
+**Q8 — Unverified items to check before executing**, not decisions but they gate execution:
+- the ecosystem sweep (§2.4) was **not re-run this session** — its per-framework evidence was folded
+  into §2.4 in-repo on 2026-09-05, so the claim is now *checkable*, but it is still not *re-checked*;
+- the funded-slice line delta (§5.2, ~−974) is an **attribution estimate, not a measurement**;
+- `AgentEval.Abstractions`' packaging path (Q2);
+- the `~3,800` full-design library-growth figure is the migration lane's estimate at this repo's
+  density and was not independently derived.
+
+> ✅ **DISCHARGED 2026-09-06 (Wave 3) — one of the four is now MEASURED, and the other three are
+> marked UNKNOWN in this text, which is what this question asked for.** Q8's acceptance was *"either
+> re-derived or marked UNKNOWN in the ADR text"*, and marking is the honest half of it: an estimate
+> that reads like a measurement is the defect, not the estimate.
+>
+> | # | Item | Status |
+> |---|---|---|
+> | 1 | ecosystem sweep (§2.4) | 🔶 **UNKNOWN — not re-run.** It needs network access to current releases of five frameworks; nothing offline can settle it. §10 item 1 is the standing trigger for re-running it, and until then §2.4's *"nobody in the ecosystem ships it"* is a **checkable claim that has not been re-checked**, dated 2026-09-05 |
+> | 2 | funded-slice delta ~−974 (§5.2) | 🔶 **UNKNOWN — an attribution estimate.** It cannot become a measurement until Phase 5.2 lands and `git diff --stat` exists (= Phase 5.3). Do not quote −974 as a measured number anywhere |
+> | 3 | `AgentEval.Abstractions`' packaging path | ✅ **MEASURED** — see the Q2 box above: packed, opened, `AgentEval.Abstractions.dll` present in `lib/net8.0/`, 11 hand-mirrored dependencies counted |
+> | 4 | `~3,800` library growth | 🔶 **UNKNOWN — not independently derived.** It is the *full four-lane* design's figure, and the full design is not funded (§8), so it is an estimate of work nobody has agreed to do. Its only current use is rhetorical; treat it as such |
+>
+> **The rule this leaves behind:** three of these four figures are quoted elsewhere in the programme.
+> Where they are, they must carry UNKNOWN with them. **Q8 no longer gates execution** — it gates
+> *quotation*, which is a standing obligation rather than a milestone.
+
+---
+
+## 10. WHAT WOULD CHANGE THIS DECISION
+
+1. **`M.E.AI.Evaluation` (or Inspect, the only framework in the same tier statistically) ships chance
+   floors or negative-control machinery.** The differentiation evaporates and we adopt theirs rather
+   than compete. Today neither ships either.
+2. **The Eval 02 retrofit does not delete the hand-rolled statistics** (Slice 2.6). Then the
+   abstraction is wrong, not the sample.
+3. **A real consumer needs `contains`/`regex`/schema gating at volume** and will not subclass
+   `AtomicCodeEval`. Even then the answer is to depend on `Microsoft.Extensions.AI.Evaluation.NLP`
+   and document the pattern — not to build the catalogue.
+4. **The controls, when eventually run against `AgentEval.Compliance.*`, find nothing.** That is a
+   wiring fault in the control suite, not a clean bill of health, and the programme stops until the
+   controls are shown able to fail.
+
+---
+
+## §11 — Amendment 2026-09-07: the join shipped, the census moved, and the ADR did not know
+
+**Tree:** `d563fd9d` on `joslat/digitec-galaxus`, clean (`git status --short` → 0 lines).
+**Rule of this section:** every number below was re-taken by the command beside it on that tree;
+nothing is copied from §0–§10 or from any other document. Where an earlier section disagrees with
+this one, the earlier section is the record of what was believed when it was written and this section
+is what is true on the tree. Nothing above §11 is rewritten; each stale sentence carries a one-line
+pointer here. **Line references of the form `:N` into this file are to it as of `d563fd9d`, before
+the pointer lines this amendment inserts** (each pointer shifts every later line by one or two);
+`path:line` references into `src/`, `samples/` and `tests/` are unaffected. The decisions this
+amendment does *not* take are in [ADR-032](032-benchmark-definition-run-score.md).
+
+### 11.1 What changed about the premises — AE-04, in two commits
+
+Between ratification and this amendment, the harness bridge this ADR deferred (§3.3 table, the
+`IEvaluationHarness` row; §8 "Deferred until a second team asks") **shipped in a different shape from
+the one deferred**:
+
+| Shipped | Where | Commit |
+|---|---|---|
+| `AgentEvalBuilder.AddEval(IEval eval, ChanceFloor floor)` — the only overload; there is no floorless one | `src/AgentEval.Core/Core/AgentEvalBuilder.cs:151` | `10a94755` (2026-09-07 13:01) |
+| `AgentEvalRunner` (`:356`, same file) with `Evals` (`IReadOnlyList<FloorAdmittedEval>`, `:404`) and `EvaluateEvalsAsync` (`:422`) | same file | same |
+| `FloorAdmittedEval : IEval` — the door. `Admit(IEval, ChanceFloor)` refuses a null eval, a floor with no derivation and a bar outside `[0,1]`; `Annotate` writes §3.2's exact convention and refuses a result that arrives already carrying its own `chance_floor` | `src/AgentEval.Abstractions/Evals/FloorAdmittedEval.cs:70`, `:128-160`, `:186-197` | same |
+| `TestRunEvalProjection.ToEvalInput(this TestCase, TestResult)` — the projection is `(TestCase, TestResult) → EvalInput`; `CaseId` is `TestCase.Id` and nothing else | `src/AgentEval.Abstractions/Evals/TestRunEvalProjection.cs:152`, `:186` (rule at `:60-65`) | same; the thrown-run fix in `9078cab9` (14:19) |
+
+The goal named the projection `TestResult → EvalInput`; the types refuted it — `TestResult` carries no
+query — so the join takes the pair. Repeated here because the §3.3 correction box names "one
+`ToolUsageReport → EvalInput` projection" and a reader will otherwise look for that.
+
+**The census this ADR and its consumers gate on moved, and the door itself documents the grep:**
+
+```
+grep -rlE "^\s*(public|internal|private|protected)?\s*(sealed\s+|abstract\s+|static\s+|partial\s+)*(class|record|struct)\b[^=]*[:,]\s*IEval\b" src --include=*.cs | grep -v /obj/ | wc -l   # 79
+grep -rl '\bChanceFloor\b' src --include=*.cs | grep -v /obj/ | wc -l                                                                                                  # 7
+comm -12 <(…first list, sorted…) <(…second list, sorted…)                                                                          # src/AgentEval.Abstractions/Evals/FloorAdmittedEval.cs
+```
+
+**79 / 7 / 1.** The intersection is the door and nothing else. A looser regex
+(`\b(class|record)\b[^=]*\bIEval\b`) gives 80; the difference is regex spread, not code, and the strict
+form is the one `FloorAdmittedEval.cs:28` publishes. `tests/AgentEval.Tests/Evals/FloorAdmittedEvalTests.cs:336`
+(`AcrossEveryAgentEvalAssembly_TheOnlyIEvalCarryingAChanceFloorIsTheDoor`) asserts the same claim by
+reflection — because, its own comment says, the prose version of this census shipped three wrong numbers.
+
+### 11.2 Corrections of record
+
+House form: what was published · what is true on the tree · direction of the error · blast radius.
+
+| # | Where | Superseded (what was published) | Corrected (what is true on `d563fd9d`) | Direction | Blast radius |
+|---|---|---|---|---|---|
+| 1 | §2.1 `:145-149` | "`AgentEvalBuilder` … exposes `AddMetric`/`AddMetrics` and **no `AddEval`**"; "`IEnumerable<IEval>` … across `src/`: **zero hits**"; "There is no runner over a *set* of evals at all" | `AddEval` at `AgentEvalBuilder.cs:151`; `MicrosoftEvaluatorAdapter.CreateAllQualityEvals` returns `IEnumerable<IEval>` (`src/AgentEval.Core/Adapters/MicrosoftEvaluatorAdapter.cs:516`) and was added in `a396c5b4` — this ADR's own commit — so "zero hits" was wrong at birth; `AgentEvalRunner.EvaluateEvalsAsync` (`:422`) runs the admitted set and `EvalResultPersistence.ToScenarioResult` persists each row | Understated the tree; the sentence is the one the local plan's Phase 6 rows quote as "0 occurrences" | Any reader deciding whether the bridge exists. Nothing on disk. |
+| 2 | §0.0 `:40` (and ADR-031 `:7`, which repeats it) | Galaxus makes **0** references to `IEval` and **59** to `MAFEvaluationHarness` | `grep -rl '\bIEval\b' samples/Galaxus.RecommendationAgent.Evals --include=*.cs \| wc -l` → **3**; `grep -ro MAFEvaluationHarness … \| wc -l` → **66**. The one eval, `NamedSkuNotPresentedEval`, derives from `AtomicCodeEval` (so it is absent from the strict declaration census) and is Eval 04's fifth check; `.AddEval(` is called once in that sample | Stale, not wrong when written | §0.0 row 1's *conclusion* — that a zero-`IEval` consumer can adopt only the neutral tuple — no longer holds as stated: the consumer adopted the door before the tuple. §4.1's case for the tuple (portability, upstream) stands on its own and not on this row. |
+| 3 | §2.2 `:153` | The flagship harness "contains **no reference to `IEval`**" | **Still true of the harness.** `MAFEvaluationHarness` takes `IEvaluator?` (`src/AgentEval.MAF/MAF/MAFEvaluationHarness.cs:18`, `:42`) and cannot run an `IEval`; the deferred names `EvaluationOptions.Evals` / `MAFEvaluationHarnessOptions` occur **0** times in `src/`. What shipped is a join *beside* the harness (`ToEvalInput`), consumed by `AgentEvalRunner`. The local plan's Phase 6 row 6.3 ("the harness runs an `IEval`") is **not** shipped by AE-04 | none — confirmed and sharpened | §2.2's "single most important fact" survives the join intact. |
+| 4 | §3.2 `:382-384` | "**Meta-evaluation never implements `IEval`.**" | `FloorAdmittedEval : IEval` (namespace `AgentEval.Evals`, not `AgentEval.Evals.Meta`) carries a `ChanceFloor` and writes §3.2's exact `Dimensions["chance_floor"]` + `EvalEvidence("chance-floor", …)` convention (`FloorAdmittedEval.cs:39-40`). It passes §4.6's test by namespace (`tests/AgentEval.Tests/Evals/Meta/MetaLaneArchitectureTests.cs:24`, `MetaNamespace = "AgentEval.Evals.Meta"`). **Ruling, taken here:** the rule's load-bearing content is *never a LEAF* — a floor must not be a sibling in an aggregation (it would bypass `Annotate`'s self-supplied guard at `:190-197`, let `WeightedSum` average the instrument into the subject, and make `ObservationCensus` count itself). A **decorator** that returns the wrapped verdict unaltered and records the floor beside it is *admission*, not meta-evaluation, and is inside the rule. §3.2's sentence now reads "never implements `IEval` **as a leaf**"; §4.6's test is unchanged because it already enforces exactly that boundary | The old wording was stricter than the tree; applied literally it refuses the door | `FloorAdmittedEval` is ratified by name. Reason 1 of the `EvalScore.ChanceFloor` ruling (`:393-395`, "a composite has a `Score` and cannot have a floor") **stands because ADR-032 D4 has the door refuse a composite.** On `d563fd9d` it does not: `grep -n 'is FloorAdmittedEval\|SubResults' FloorAdmittedEval.cs` → 0, so `Admit` accepts a `CompositeEval` and a second admission of an already-admitted door, and the root floor `Annotate` would write on a composite is precisely the `chanceFloor` reason 1 said cannot exist. Both refusals are ADR-032 Wave 0. |
+| 5 | §3.3 `:464`, §8 `:1476-1477` | `IEvaluationHarness`: "`EvaluationOptions.Evals` and `MAFEvaluationHarnessOptions` **deferred**" | Neither name exists in `src/` (0 hits). The bridge that shipped is `AgentEvalRunner.Evals` + `ToEvalInput`; the harness half (6.3) and the default-on gates (§6.2 item 1) are still deferred, and §6.2's breaking-change reasons for deferring them are untouched by the join | The deferral was right; the *shape* deferred is not the shape that shipped | The row is stale by shape only. Nothing it deferred was un-deferred. |
+| 6 | §2.6 `:315-319` | "`AgentEval.Evals.Meta` **must reconcile with** `GateCalibrationHarness` **or state in writing why not**" — binding on Slice 2 | Slice 2 shipped (2.1–2.5, `:1431`) and did neither; 0 cross-references in either direction. **Discharged in writing here:** `src/AgentEval.Core/Guardrails/Judges/GateCalibrationHarness.cs:43` is `beatsBaseline = judgeAccuracy > baselineAccuracy.Value && fn <= bfn` — a **two-condition** rule with a paired false-negative bound. The meta lane has no paired false-negative test (`src/AgentEval.Abstractions/Evals/Meta/` holds `ChanceFloor`, `ExactTests`, `MeasurementState`, `Observation`, `ObservationCensus`, `PairedEvalComparer`, `RepCollapse` — 7 files; none tests an FN count). A one-way `CalibrationReport → Observation` adapter would drop the second condition, which is the dangerous-error half this repository's grader motto exists to keep. **Declared unreconciled, with that reason** — the outcome §2.6's own wording permits | The obligation was silently missed, in the flattering direction (an unstated gap reads as no gap) | Slice 2's acceptance is unchanged; the reconciliation is a named hole (§11.4). |
+| 7 | §4.3 `:835`, §7.1 D1 `:1367` | "No `IChanceFloor` interface, no `FloorGatedCodeEval`"; D1: a floor-deriving base class lets the arm size its own null | `FloorAdmittedEval` is **not** `FloorGatedCodeEval` returning: it has no `DeriveFloor`, never sees an `EvalInput` at derivation time, and takes a floor already derived by the caller — D1's defect (`int k = ctx.Input.ToolCalls!.Count(…)`) is unspellable in it. Said here because D1's reader will otherwise read the door as the cut type resurrected | none | none |
+| 8 | §5.4 `:1206-1207` | "`ApprovalAwareAgentAdapter` (149 lines) is **deleted entirely** — and that deletion is the check that Slice 0 item 5 landed at the right altitude" | `grep -rl ApprovalAwareAgentAdapter samples/Galaxus.RecommendationAgent.Evals --include=*.cs \| wc -l` → **8**. The named check for 0.5 is **unmet**; 0.5 itself shipped (§0.0) | Understated the remaining work | §5's line-delta projections, already marked UNKNOWN by Q8. |
+| 9 | §8 Slice 1 `:1418` | No status banner (Slices 0 and 2 both carry one) | Slice 1 **shipped** in `878e5da4` (2026-09-05 08:34); 1.4(i) — the schema widening — shipped in `e34d9614` (2026-09-06 07:58): `src/AgentEval.DataLoaders/Output/Schema/v1/eval-result.schema.json:26` carries `"inapplicable"`, `:29` carries `measurement`, `$id` (`:3`) is still v1; `git show --stat e34d9614` lists both `InapplicableSchemaBoundaryTests.cs` and `EvalScoreMeasurementWithExpressionTests.cs` | The record under-reports what shipped | none |
+| 10 | §9 Q4 `:1591-1603` | "(i) still did not ship, and the blocker has CHANGED IDENTITY … blocked by a process rule" | (i) shipped in `e34d9614`, three hours *before* this ADR's last edit, with the two "blocked" test files edited in the same commit. The process-rule exception was taken and not recorded here. **What is still the owner's is Q4(ii)** — the unconditional `measurement` writer and the `$id` bump — and only that | Stale in the "more is blocked than is" direction | §11.4 restates what Q4 still blocks. |
+| 11 | §9 Q6 `:1634-1635` | "Wave 1 **deleted** `SignTest` outright from `PairedCoverageReport`" — so "one of the two things 2.6's acceptance requires to be deleted is *already gone*" | `grep -rn SignTest src --include=*.cs \| wc -l` → 0, but the sample is where 2.6 lives: `samples/Galaxus.RecommendationAgent.Evals/Graders/PairedCoverageReport.cs:463` `public SignTestOutcome SignTestAtEqualK(…)`, called from `Evals/Eval02_LatentInterestCoverage.cs:577,580,617,620`, `Evals/Eval09_HypothesisComparison.cs:624,625,626,632` and `Evals/NegativeControls.cs:1845,2897,3320` — **11 call sites** (`grep -rn --include=*.cs 'SignTestAtEqualK(' samples/Galaxus.RecommendationAgent.Evals \| grep -v 'public SignTestOutcome' \| wc -l`; the first revision of this row said 8, having missed the three control rows). What was deleted was the *unconditioned* `SignTest`; the hand-rolled sign test still exists, renamed and conditioned on `CoverageMetric`. **2.6's precondition is therefore worse than this box records: both halves of the deletion remain** | Flattering — it halved the stop rule's price on paper | Q6's evidence, not its answer. The GATE 1 measurement (`:1672-1767`) is unaffected: `Graders/CoverageScore.cs:118` `AboveOwnFloor` and `Eval02:646` `EveryPersonaAboveOwnFloor` are as that box left them, and the advisory replay at `:669-674` still prints. |
+| 12 | §9 `:1769` | "Q5 and Q6 are the only two questions in §9 still open" | Three: **Q4(ii)** is open and the owner's (row 10). Q8 is a standing quotation obligation, not a gate, as `:1800-1802` already says | Under-counts what is the owner's | §11.4. |
+| 13 | §7.1 D11 `:1378`, §4.7 | "`EvalInput.CaseId` + `TestCase.Id` … FIXED" | Confirmed and sharpened: the projection sets `CaseId = testCase.Id` (`TestRunEvalProjection.cs:186`) and **refuses** a name-shaped fallback by design (`:60-65`) — a non-null `CaseId` on every case would say "pairable" about cases nobody keyed | none | none |
+| 14 | §2.6 `:323-329` | "four real measurement families that cannot be composed — the §2.2 reachability gap one layer further down" | Four ducks is right — `src/AgentEval.Evals.Performance/PerformanceBenchmark.cs:14` (no base type) with `EvaluateAsync` at `:470`; under `src/AgentEval.RedTeam/RedTeam/Compliance/`: `OwaspBenchmarkRun.cs:128`, `NistBenchmarkRun.cs:79`, `MitreBenchmarkRun.cs:132` — each with a throwing `*SyntheticEval : IEval` stub (`:748`, `:326`, `:238`, `:358`). But "one layer down" is wider than four: **12** families register with `BenchmarkFamilyRegistry` (`src/AgentEval.Core/Benchmarks/`, not the CLI); **4** supply `evaluateAsync:`, **8** pass `evaluateAsync: null`, **9** set `runnerFactory:` (`grep -rn 'evaluateAsync:\|runnerFactory:' src --include=*.cs`) | Under-counted the gap | The stubs' root cause is one line — `IAggregationStrategy.Aggregate(results, IReadOnlyList<EvalComponent>)` reads only `.Weight` (`grep -rn '\.Eval\b' src/AgentEval.Core/Evals/Aggregations/` → 0; `'\.Required\b'` → 0) — and it is ADR-032 D6. |
+| 15 | §4.1 `:548-553`, §9 Q2 `:1536-1539`, §8 Slice-2 banner `:1447-1454` | Three locations for the meta namespace: "have `AgentEval.Abstractions` reference the meta project"; ruling (a) "a new BCL-only project `AgentEval.Meta`"; "inside `AgentEval.Abstractions`" | Tree: `src/AgentEval.Abstractions/Evals/Meta/` (7 files); no `src/AgentEval.Meta` project. The Slice-2 banner's "not executed, and that is deliberate" is the current state; Q2's ruling is a *future* file move that changes no namespace | none — three descriptions of one deliberate non-move | Q2 stays answered; this row only stops a reader looking for a project that is not there. |
+
+### 11.3 What this amendment does not change
+
+- **The decision (§3).** Meta-evaluation is the lane; `IEval` is kept by adaptation; the six contracts
+  stay six; the exclusion list is normative. The join added no contract and migrated no implementation —
+  it is the "bridge + bug fixes" half arriving, in a shape that puts a floor on the door.
+- **§4.2's guard, §4.3's floor record, §4.4's exact tests, §4.5's paired comparison** — on the tree as
+  ratified (Slice 2 banner `:1431`). One property built beyond the table: `FloorComparison.Compute`
+  refuses a fractional measured value (`src/AgentEval.Abstractions/Evals/Meta/ChanceFloor.cs:345-353`),
+  the substitution Q6's naive form would make. `Compute` has **0** callers in `src/` outside its own
+  file — the door records a floor and nothing applies it, which is Q6 by construction (§11.4).
+- **§8's deferred bucket.** Still unfunded; nothing here funds any of it. What the join showed is that
+  one item in it — the bridge — could be built *without* the two default-on gates, by not touching
+  `TestResult.Score` at all.
+
+### 11.4 What remains blocked, and on what
+
+Named as gates. Not resolved here: **Q4(ii), Q5 and Q6 are the owner's**, and this amendment only
+sharpens their evidence.
+
+| Gate | What it still blocks | Sharpened evidence |
+|---|---|---|
+| **Q4(ii)** — write `measurement` unconditionally and bump `$id` | The writer half of Slice 1.4; any typed definition identity or rep index on the run manifest (`manifest.schema.json` is `additionalProperties:false` at 7 sites — `:6,:12,:22,:36,:54,:64,:73`); a finer `RunStats` bucket than `skipped` (`summary.schema.json:13-22` closes `stats` to `total/passed/failed/warnings/skipped`); on-disk visibility of `NotApplicable` rows without reading `label` | The door changes no historical byte: `NotApplicable` writes `measurement` only when non-default (`EvalScore.cs:163-164`), exactly as the two shipped consumers do (`NamedSkuNotPresentedEval.cs:184`). External consumers hold zero run files under the post-0.28 schema, because none of it has shipped in a package (§11.5). |
+| **Q5** — negative controls | A `Controls` slot on any definition (ADR-032 deliberately gives it none); the `VOID` verdict, `controlLedger`, exit 12 (`src/AgentEval.Cli/ExitCodes.cs:153-154` reserves 12 and names S4/Q5 as the reason); whether the join wave's local ablations become durable controls | The join's ablations were run and reverted locally, not kept. `grep -rn controlLedger src` → 1 hit, the reservation comment. |
+| **Q6** — the stop rule | Whether `FloorComparison` binds any verdict (the door records, `CompareCommand.cs:245` warns, nothing gates); Slice 2.6's acceptance; ADR-032's Wave 2 gate — whether iterating 6.1+6.2 over a definition's cases is inside the local plan's "AE-04 before AE-06" rule (`strategy/Galaxus/MASTER_PLAN.md:1048` — gitignored, not readable from this repository, and not in this ADR: `grep -c 'AE-04' docs/adr/030-*.md` → 0 before this amendment); `AgentEvalCompositeEvaluator` (`src/AgentEval.MAF/Evaluators/AgentEvalCompositeEvaluator.cs:38`, ctor `(IEval composite)` at `:44`, its own two-field `EvalInput` at `:74`, 9 referencing files) — a pre-existing floorless MAF entry for any `IEval`, which takes a floor only if Q6 says a recorded-and-unapplied floor at that door is wanted | Row 11: `SignTestAtEqualK` live at 11 sites, so 2.6's precondition is *two* deletions, not one. `IsUsableAsABar && Passed` with no comparison is now a countable quantity and, on this tree, is every admitted pass. |
+| **Q8** | Quotation, not execution (`:1800-1802`) | Unchanged. |
+
+### 11.5 Why none of this is testable from outside yet
+
+No published package carries the join. nuget.org `0.34.0-beta` corresponds to `40647d24` (= `origin/main`,
+tagged `v0.34.0-beta`); `git rev-list --count origin/main..HEAD` → **175**; `Directory.Build.props:42`
+still reads `0.34.0-beta`; `CHANGELOG.md:8` `[Unreleased]` is empty; `grep -c 'agenteval compare\|Incomparable\|exit 13' CHANGELOG.md`
+→ 0; `grep -rl 'AddEval\|ToEvalInput\|FloorAdmittedEval' docs --include=*.md | grep -v /adr/ | wc -l` → **0**.
+The cut, and what it must declare, is ADR-032 D12.
+
+### 11.6 Pointer
+
+The decisions this amendment does *not* take — the aggregation change that deletes the four stubs, the
+door's two refusals, the projection's timeline rule, the three phantom judge labels, and the benchmark
+definition/run/score contract — are **ADR-032** (Proposed = gate). ADR-032 supersedes ADR-017
+Convention 2 and rules on the four ducks' fate, which §3.4 lists as what this ADR is NOT; an Accepted
+ADR's correction table cannot host a decision the owner has not yet gated.

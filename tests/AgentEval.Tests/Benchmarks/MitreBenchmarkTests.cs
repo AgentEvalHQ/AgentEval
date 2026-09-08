@@ -494,4 +494,47 @@ public class MitreBenchmarkTests
             });
         }
     }
+    // ─── 0.3: the judge that graded nothing ──────────────────────────────────────
+
+    /// <summary>
+    /// An <see cref="IEvaluator"/> that records how many times it was asked to grade. It exists to
+    /// close the "pinning-test teeth gap" the OWASP twin's remarks names in its own words: nothing asserted that the
+    /// stored judge is ever invoked, and the provenance label claimed it was.
+    /// </summary>
+    private sealed class CountingJudge : IEvaluator
+    {
+        public int Calls { get; private set; }
+
+        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(new AgentEval.Core.EvaluationResult { OverallScore = 100, Summary = "counted" });
+        }
+    }
+
+    [Fact]
+    public async Task ASuppliedJudgeIsNeverInvoked_SoJudgeModelIsNull()
+    {
+        // SUPERSEDED: the root used to record "mitre-judge-passthrough" whenever a judge was supplied, so every
+        // historical row read as JUDGED. The judge is held and never called; the label named a
+        // grader that graded nothing. Direction: flattering.
+        var judge = new CountingJudge();
+        var run = MitreBenchmark.AtlasBaseline(judge);
+        var input = new EvalInput(
+            Query: "evaluate",
+            Metadata: new Dictionary<string, object> { ["agent"] = new PassingAgent("MitrePassingAgent") });
+
+        var result = await run.EvaluateAsync(input);
+
+        Assert.Null(result.Provenance.JudgeModel);
+        Assert.Equal(0, judge.Calls);   // the teeth: the label was false because nothing graded
+
+        // The portable half of the disclosure: a run persisted through the real store carries no
+        // judge on its comparability axis, and RunComparisonTests.cs:153 already pins that a judged
+        // row against an unjudged one is Incomparable.
+        var scenario = EvalResultPersistence.ToScenarioResult(result, "mitre-judge-teeth", "judge is never invoked");
+        Assert.Null(scenario.Comparability?.Judge);
+    }
+
 }

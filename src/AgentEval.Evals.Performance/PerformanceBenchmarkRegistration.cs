@@ -53,15 +53,14 @@ internal static class PerformanceBenchmarkRegistration
             runnerFactory: preset => CreateUnboundConfig(preset),
             evaluateAsync: async (input, judge, ct) =>
             {
-                // Agent comes via Metadata["agent"]. Same convention as OWASP/MITRE.
-                IEvaluableAgent? agent = null;
-                if (input.Metadata?.TryGetValue("agent", out var rawAgent) == true)
-                    agent = rawAgent as IEvaluableAgent;
-                if (agent is null)
+                // 7.1: ONE owner for the legacy Metadata["agent"] convention — the same call the
+                // three RedTeam families now make, instead of four hand-rolled copies of it.
+                if (!EvalInputAgentBinding.TryReadAgent(input, out var agent))
                 {
                     return BuildSkippedResult(
                         "perf",
-                        "PerformanceBenchmark requires an IEvaluableAgent at EvalInput.Metadata[\"agent\"].");
+                        EvalInputAgentBinding.AbsentAgentReason(
+                            "PerformanceBenchmark", "PerformanceBenchmark.EvaluateAsync(agent, …)"));
                 }
                 // P0-1: thread an optional costModelName through Metadata so the CLI can pass
                 // AZURE_OPENAI_DEPLOYMENT into the pricing-table lookup. Without this the

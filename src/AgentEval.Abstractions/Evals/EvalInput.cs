@@ -49,4 +49,72 @@ public sealed record EvalInput(
     /// (both in <c>AgentEval.Core</c>, namespace <c>AgentEval.Evals</c>).
     /// </summary>
     public const string TraceMetadataKey = "__agentTrace__";
+
+    /// <summary>
+    /// Stable identity for the case this input represents. Optional, non-positional and init-only,
+    /// so every existing construction site and every deconstruction is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-030 §4.7, Slice 1.6 (defect D11). The unit of analysis for a floor, a paired comparison
+    /// or a shuffled-gold control is the CASE, and none of them is implementable without a stable
+    /// per-case key. There was none: <see cref="EvalInput"/> had no identity at all, and the
+    /// flagship sample joined on <c>$"{c.Id} — {c.Group}"</c> — a formatted <i>display string</i>
+    /// used as a join key, which silently re-points the moment anyone edits the label.
+    /// </para>
+    /// <para>
+    /// Deliberately a plain nullable string with no generated default. An id that the library
+    /// invents is an id that changes between runs, and a join key that changes between runs is
+    /// worse than an absent one because it fails silently. <see langword="null"/> means "this
+    /// producer has not declared case identity" and the meta layer must say so rather than guess.
+    /// </para>
+    /// </remarks>
+    public string? CaseId { get; init; }
+
+    /// <summary>
+    /// What the run COST to produce: wall-clock, time-to-first-token, tokens. Optional,
+    /// non-positional and init-only, so every existing construction site is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>An observation, not a verdict — and that distinction is the whole reason this is
+    /// carried when <c>TestResult.Passed</c>, <c>Score</c> and <c>AssertionResults</c> are not.</b>
+    /// <see cref="TestRunEvalProjection"/> refuses to feed a prior verdict to the eval about to
+    /// produce one; that is the gate-self-examination shape. A latency is not a verdict about the
+    /// run, it is a fact of the run — the same category as <see cref="ToolCalls"/>, which is carried
+    /// for exactly this reason. It was previously grouped with the verdicts because of where it sits
+    /// on <c>TestResult</c> rather than because of what it is, and that grouping made a whole family
+    /// of deterministic checks — latency, token budget, cost — inexpressible as an
+    /// <c>AtomicCodeEval</c>.
+    /// </para>
+    /// <para>
+    /// ⚠ <b><see langword="null"/> means nobody measured, never "it was instant".</b> A check that
+    /// reads a missing measurement as a zero duration turns an unmeasured run into the best possible
+    /// one. Every check over this field must decline rather than score when it is absent, which is
+    /// what <c>AtomicCodeEval.NotApplicable</c> is for. The harness only populates it when
+    /// <c>EvaluationOptions.TrackPerformance</c> is on.
+    /// </para>
+    /// </remarks>
+    public AgentEval.Models.PerformanceMetrics? Performance { get; init; }
+
+    /// <summary>
+    /// The model the SUBJECT ran on, when the producer knows it. Optional, non-positional and
+    /// init-only, so every existing construction site and every deconstruction is unchanged.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-031 §0.1's <c>judgeIsSubjectModel</c> follow-on. It exists for exactly one question:
+    /// <b>is the judge the same model as the thing it is grading?</b> That is the
+    /// gate-self-examination failure at its purest — the artifact under test supplying the
+    /// measurement — and it cannot be answered from the result alone, because an
+    /// <c>EvalProvenance</c> records the JUDGE's model and nothing about the subject's.
+    /// </para>
+    /// <para>
+    /// ⚠ <see langword="null"/> yields <see cref="AgentEval.Output.JudgeSubjectRelation.Unknown"/>,
+    /// never <c>DifferentModel</c>. "Nobody declared the subject's model" and "the judge is a
+    /// different model" are different facts, and collapsing them answers the self-examination
+    /// question with a reassuring "no" that nobody checked.
+    /// </para>
+    /// </remarks>
+    public string? SubjectModel { get; init; }
 }

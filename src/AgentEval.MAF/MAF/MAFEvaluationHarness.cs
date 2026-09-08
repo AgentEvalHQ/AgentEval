@@ -67,6 +67,18 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         var metrics = options.TrackPerformance ? new PerformanceMetrics { WasStreaming = false } : null;
         var timeline = ToolCallTimeline.Create(testCase.Name);
 
+        // 🔴 Whether a tool RECORDER actually ran, which is not the same fact as "a timeline object
+        // exists". The timeline is constructed unconditionally (it also carries the turn's timing),
+        // and it used to be attached to the result unconditionally too — so a run with
+        // `TrackTools = false`, and a run that THREW before extraction, both handed back an EMPTY
+        // ToolCallTimeline. Downstream that is read as a positive declaration: TestRunEvalProjection
+        // maps "a timeline is attached" to `ToolCalls = []`, documented as "a recorder ran and the
+        // agent called nothing" — a MEASURED zero. An absence-based policy (NeverCallTool) then
+        // evaluates cleanly against a recorder that never recorded, in the flattering direction, on
+        // a safety question. Only the block below earns that declaration; nothing else may make it.
+        var toolsRecorded = false;
+        WarnIfExpectedToolsUnenforced(testCase);
+
         try
         {
             _logger.LogDebug($"📥 Input: \"{Truncate(testCase.Input, 100)}\"");
@@ -92,7 +104,18 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             // Extract tool usage if tracking
             if (options.TrackTools && response.RawMessages != null)
             {
-                result.ToolUsage = ToolUsageExtractor.Extract(response.RawMessages);
+                toolsRecorded = true;
+                result.ToolUsage = ToolUsageExtractor.Extract(response.RawMessages, options.IncludeApprovalGatedToolCalls);
+
+                // ADR-030 Slice 0.5: the default extraction is blind to approval-gated calls. Never drop one
+                // silently — a report missing the calls a human was asked to approve makes NeverCallTool unfailable.
+                if (result.ToolUsage.DroppedApprovalRequestCount > 0)
+                {
+                    _logger.LogWarning(DefaultToolUsageExtractor.FormatDropWarning(
+                        result.ToolUsage.DroppedApprovalRequestCount,
+                        ToolUsageExtractor.ApprovalGatedToolNames(response.RawMessages),
+                        optInHint: $"{nameof(EvaluationOptions)}.{nameof(EvaluationOptions.IncludeApprovalGatedToolCalls)} = true"));
+                }
 
                 // Glass Box Part 2 (P2.A2 activation): back-fill real per-tool execution timing from the
                 // supplied Glass Box trace, so the duration assertions evaluate instead of silently skipping.
@@ -156,19 +179,16 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             _logger.LogDebug($"📤 Output: {Truncate(response.Text, 200)}");
 
             // Evaluate with AI if criteria provided and evaluator available
+            EvaluationResult? evaluation = null;
             if (options.EvaluateResponse && _evaluator != null && testCase.EvaluationCriteria?.Any() == true)
             {
-                var evaluation = await _evaluator.EvaluateAsync(
+                evaluation = await _evaluator.EvaluateAsync(
                     testCase.Input,
                     response.Text,
                     testCase.EvaluationCriteria,
                     cancellationToken);
 
-                result.Score = evaluation.OverallScore;
-                result.Passed = evaluation.OverallScore >= testCase.PassingScore;
-                result.Details = evaluation.Summary;
-                result.Suggestions = evaluation.Improvements.ToList();
-                result.CriteriaResults = evaluation.CriteriaResults.ToList();
+                ApplyJudgeVerdict(result, testCase, evaluation);
             }
             else
             {
@@ -193,12 +213,13 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             }
 
             result.ActualOutput = response.Text;
-            result.Timeline = timeline;
-            
+            // ⚠ null, not an empty timeline, when nothing recorded. See `toolsRecorded`.
+            result.Timeline = toolsRecorded ? timeline : null;
+
             // Build failure report if test failed
             if (!result.Passed)
             {
-                result.Failure = BuildFailureReport(result, testCase, timeline);
+                result.Failure = BuildFailureReport(result, testCase, timeline, evaluation);
                 LogFailure(result);
             }
         }
@@ -217,7 +238,12 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             result.Details = $"Error: {ex.Message}";
             result.Error = ex;
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
-            result.Timeline = timeline;
+            // ⚠ The throw is the commonest way to reach this with nothing recorded: the agent failed
+            //   BEFORE extraction, so `toolsRecorded` is false and an attached empty timeline would
+            //   report a failed run as one where the agent cleanly called no tool. The failure report
+            //   below still carries the timeline — it is a diagnostic bundle, not a declaration an
+            //   eval reads.
+            result.Timeline = toolsRecorded ? timeline : null;
 
             // Build failure report for exception
             result.Failure = BuildExceptionFailureReport(ex, testCase, timeline);
@@ -240,6 +266,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
         var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = options.ModelName };
+        WarnIfExpectedToolsUnenforced(testCase);
         var toolCalls = new Dictionary<string, ToolCallRecord>();
         var responseText = new System.Text.StringBuilder();
         var isFirstToken = true;
@@ -371,19 +398,16 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             _logger.LogDebug($"📤 Output: {Truncate(responseText.ToString(), 200)}");
 
             // Evaluate with AI if criteria provided
+            EvaluationResult? evaluation = null;
             if (options.EvaluateResponse && _evaluator != null && testCase.EvaluationCriteria?.Any() == true)
             {
-                var evaluation = await _evaluator.EvaluateAsync(
+                evaluation = await _evaluator.EvaluateAsync(
                     testCase.Input,
                     responseText.ToString(),
                     testCase.EvaluationCriteria,
                     cancellationToken);
 
-                result.Score = evaluation.OverallScore;
-                result.Passed = evaluation.OverallScore >= testCase.PassingScore;
-                result.Details = evaluation.Summary;
-                result.Suggestions = evaluation.Improvements.ToList();
-                result.CriteriaResults = evaluation.CriteriaResults.ToList();
+                ApplyJudgeVerdict(result, testCase, evaluation);
             }
             else
             {
@@ -409,11 +433,11 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             }
 
             result.ActualOutput = responseText.ToString();
-            
+
             // Build failure report if test failed
             if (!result.Passed)
             {
-                result.Failure = BuildFailureReport(result, testCase, timeline);
+                result.Failure = BuildFailureReport(result, testCase, timeline, evaluation);
                 LogFailure(result);
             }
         }
@@ -592,13 +616,69 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         }
     }
     
-    private static FailureReport BuildFailureReport(TestResult result, TestCase testCase, ToolCallTimeline timeline)
+    /// <summary>
+    /// ADR-030 defect D-d / tracker AE-02: <see cref="TestCase.ExpectedTools"/> is populated by every dataset
+    /// loader and enforced by nothing on this harness. Enforcement is deferred to the <c>IEval</c> bridge
+    /// (AE-04, blocked on AE-06 by ADR-030 §6 Step 5); until it lands, §6.2 rules the field must not be
+    /// <i>silently</i> unenforced — one warning per run naming the case and the tools.
+    /// </summary>
+    private void WarnIfExpectedToolsUnenforced(TestCase testCase)
+    {
+        if (testCase.ExpectedTools is not { Count: > 0 } expected) return;
+        _logger.LogWarning(
+            $"⚠️ Test '{testCase.Name}' declares {nameof(TestCase.ExpectedTools)} [{string.Join(", ", expected)}], " +
+            $"which are NOT ENFORCED by {nameof(MAFEvaluationHarness)}: the verdict ignores whether these tools were called " +
+            "(ADR-030 defect D-d / AE-02; enforcement lands with the IEval bridge). " +
+            $"Assert on {nameof(TestResult)}.{nameof(TestResult.ToolUsage)} with the fluent tool-usage assertions to check them.");
+    }
+
+    /// <summary>
+    /// Applies a judge's <see cref="EvaluationResult"/> to <paramref name="result"/>. Shared by the
+    /// streaming and non-streaming paths so the one rule that matters here cannot drift between them:
+    /// <b>a judge that failed to produce a verdict never passes.</b>
+    /// </summary>
+    /// <remarks>
+    /// ADR-030 Slice 0.2 (defect D-b). <c>ChatClientEvaluator</c> returns
+    /// <c>OverallScore = EvaluationDefaults.DefaultFailureScore</c> (50) with
+    /// <see cref="EvaluationResult.EvaluationFailed"/> set when the judge returned no JSON, malformed JSON or
+    /// no recognisable score field. That 50 is a sentinel, documented as "should not be read as a real grade"
+    /// — but this harness compared it against <see cref="TestCase.PassingScore"/> and never read the flag, so
+    /// every test case with <c>PassingScore &lt;= 50</c> passed on a judge parse failure. Non-optional and
+    /// without opt-out: the sentinel is discarded (score 0, the same shape the harness already uses for an
+    /// agent exception), <c>Passed</c> is false, and the failure report names the judge as the cause so it is
+    /// distinguishable from a genuinely low-scoring agent.
+    /// </remarks>
+    private static void ApplyJudgeVerdict(TestResult result, TestCase testCase, EvaluationResult evaluation)
+    {
+        if (evaluation.EvaluationFailed)
+        {
+            result.Score = 0;
+            result.Passed = false;
+            result.Details = "The judge produced no verdict (evaluation failed): " +
+                             (string.IsNullOrWhiteSpace(evaluation.Summary) ? "no parseable judgement was returned" : evaluation.Summary) +
+                             ". This is an evaluation-infrastructure failure, not a grade — the fallback score was discarded.";
+            result.Suggestions = evaluation.Improvements.ToList();
+            result.CriteriaResults = evaluation.CriteriaResults.ToList();
+            return;
+        }
+
+        result.Score = evaluation.OverallScore;
+        result.Passed = evaluation.OverallScore >= testCase.PassingScore;
+        result.Details = evaluation.Summary;
+        result.Suggestions = evaluation.Improvements.ToList();
+        result.CriteriaResults = evaluation.CriteriaResults.ToList();
+    }
+
+    private static FailureReport BuildFailureReport(TestResult result, TestCase testCase, ToolCallTimeline timeline, EvaluationResult? evaluation = null)
     {
         // Determine the primary failure reason for the headline
-        var headline = result.Score < testCase.PassingScore
-            ? $"Test '{testCase.Name}' scored {result.Score}/100 (threshold: {testCase.PassingScore})"
-            : $"Test '{testCase.Name}' did not meet passing criteria";
-        
+        var judgeFailed = evaluation?.EvaluationFailed == true;
+        var headline = judgeFailed
+            ? $"Test '{testCase.Name}' could not be graded: the judge produced no verdict"
+            : result.Score < testCase.PassingScore
+                ? $"Test '{testCase.Name}' scored {result.Score}/100 (threshold: {testCase.PassingScore})"
+                : $"Test '{testCase.Name}' did not meet passing criteria";
+
         var report = new FailureReport
         {
             WhyItFailed = headline,
@@ -606,9 +686,21 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             Score = result.Score,
             Timeline = timeline
         };
-        
+
+        // A judge that did not speak is the primary reason — name it before the score, so a reader does not
+        // root-cause a "0/100" onto the agent (ADR-030 Slice 0.2).
+        if (judgeFailed)
+        {
+            report.AddReason("Judge",
+                "The evaluator failed to produce a usable judgement (no JSON, malformed JSON, or no score field): " +
+                (string.IsNullOrWhiteSpace(evaluation!.Summary) ? "no details" : evaluation.Summary) +
+                ". The fallback score was discarded; re-run the evaluation or inspect the judge model / prompt.",
+                FailureSeverity.Critical);
+            report.AddSuggestion("Check Judge", "Inspect the judge model's raw response and the evaluation prompt; the agent was not graded.", 0.9);
+        }
+
         // Add score-related reason
-        if (result.Score < testCase.PassingScore)
+        if (!judgeFailed && result.Score < testCase.PassingScore)
         {
             report.AddReason("Score", $"Score {result.Score} below passing threshold {testCase.PassingScore}", FailureSeverity.Error);
         }

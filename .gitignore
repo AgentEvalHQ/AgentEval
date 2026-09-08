@@ -456,6 +456,18 @@ samples/AgentEval.Samples/output/
 # MafEvalLightPath sample emits its HTML reports here at runtime.
 samples/AgentEval.MafEvalLightPath/output/
 
+# Galaxus sample: raw console transcripts of live agent runs, one file per command.
+# They are EVIDENCE for MEASUREMENT_STATUS / SUITE_SUMMARY and they are local-only — this is a
+# public repository and these are unredacted console output from paid runs.
+#
+# ⚠ The `*.log` rule above already caught 53 of the 54 files in there, which is why nobody noticed
+#   that nothing protected the 54th: EXITCODES.txt is not a .log, and one `git add <dir>` put it in
+#   a commit on 2026-09-06. Incidental protection that looks total is worse than none, because the
+#   next artefact written beside the logs — a .csv, a .json, a .md — inherits no rule at all.
+#   Plan item 8.24, and the claim it was filed on ("both run directories are untracked AND
+#   un-ignored") was itself wrong: `git check-ignore` names `.gitignore`'s `*.log` for every log.
+samples/Galaxus.RecommendationAgent.Evals/Docs/runs/
+
 # TypedMemEval probe runner: a local response cache so an interrupted probe run resumes
 # instead of re-paying for calls it already made. Reference-model output, not a deliverable —
 # the probe *records* ship in each corpus's .meta.json.

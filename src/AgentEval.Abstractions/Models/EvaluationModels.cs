@@ -11,6 +11,24 @@ namespace AgentEval.Models;
 /// </summary>
 public class TestCase
 {
+    /// <summary>
+    /// Stable identity for this case. Optional and additive.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ADR-030 §4.7, Slice 1.6 (defect D11). <see cref="Name"/> is a display string — harnesses
+    /// format it (<c>$"{id} — {group}"</c> is the recorded example) and reports render it — so
+    /// joining runs on it re-points the join the moment anyone edits a label. Anything that pairs
+    /// results across arms or runs needs a key that is allowed to be ugly and forbidden to change.
+    /// </para>
+    /// <para>
+    /// Declared <c>init</c> rather than the <c>set</c> ADR-030 §4.7 sketches, to match every other
+    /// member of this type: an identity that can be reassigned after construction is an identity
+    /// that can be reassigned between the run and the report.
+    /// </para>
+    /// </remarks>
+    public string? Id { get; init; }
+
     /// <summary>Name of the test case.</summary>
     public required string Name { get; init; }
     
@@ -27,8 +45,19 @@ public class TestCase
     public int PassingScore { get; init; } = EvaluationDefaults.DefaultPassingScore;
     
     /// <summary>Expected tools to be called.</summary>
+    /// <remarks>
+    /// <b>Not enforced by <c>MAFEvaluationHarness</c>.</b> Every dataset loader populates this field, but the
+    /// agent harness that runs a <see cref="TestCase"/> does not read it — a case declaring expected tools
+    /// passes or fails on its text checks alone (ADR-030 defect D-d, tracker AE-02). The harness logs a
+    /// warning naming the case and the tools whenever the field is present, so the silence is not mistaken
+    /// for enforcement. Enforcement lands with the <c>IEval</c> bridge (AE-04). The two harnesses that
+    /// <i>do</i> enforce their own expected-tools fields are <c>ConversationRunner</c>
+    /// (<c>ConversationalTestCase.ExpectedTools</c>) and <c>WorkflowEvaluationHarness</c>
+    /// (<c>WorkflowTestCase.ExpectedTools</c>); use them, or assert on <see cref="TestResult.ToolUsage"/>
+    /// with the fluent tool-usage assertions.
+    /// </remarks>
     public IReadOnlyList<string>? ExpectedTools { get; init; }
-    
+
     /// <summary>Ground truth response (for accuracy metrics).</summary>
     public string? GroundTruth { get; init; }
     
@@ -72,7 +101,19 @@ public class TestResult
     
     /// <summary>Individual criteria results.</summary>
     public IReadOnlyList<CriterionResult>? CriteriaResults { get; set; }
-    
+
+    /// <summary>
+    /// Outcomes of the fluent assertions run against this test — passes, failures and checks that
+    /// could not decide.
+    /// </summary>
+    /// <remarks>
+    /// Populate this from an eval-mode assertion scope
+    /// (<c>AgentEvalScope.Collecting()</c> → <c>scope.Results</c>) to get assertion outcomes into
+    /// the exported artifacts. Before AE-01 there was nowhere to put them and the exported
+    /// <c>ScenarioResult.Assertions</c> was always empty.
+    /// </remarks>
+    public IReadOnlyList<Output.AssertionResult>? AssertionResults { get; set; }
+
     /// <summary>Exception if the test errored.</summary>
     public Exception? Error { get; set; }
     

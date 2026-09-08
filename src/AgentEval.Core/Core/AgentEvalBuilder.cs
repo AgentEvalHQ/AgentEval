@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Core;
@@ -17,6 +19,7 @@ public sealed class AgentEvalBuilder
     private readonly List<IAgentEvalPlugin> _plugins = new();
     private readonly List<IMetric> _metrics = new();
     private readonly List<IResultTransformer> _transformers = new();
+    private readonly List<FloorAdmittedEval> _evals = new();
     private readonly Dictionary<string, object?> _configuration = new();
     private IChatClient? _evaluatorClient;
     private IAgentEvalLogger _logger = new ConsoleAgentEvalLogger();
@@ -108,6 +111,60 @@ public sealed class AgentEvalBuilder
         {
             AddMetric(metric);
         }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds an <see cref="IEval"/> to the pipeline — <b>only</b> with the chance floor it is to be
+    /// measured against.
+    /// </summary>
+    /// <param name="eval">The eval to admit.</param>
+    /// <param name="floor">
+    /// What an arm that understands nothing would score on this eval. An eval that needs no floor
+    /// passes <c>ChanceFloor.NotDerivable(reason)</c> — the reason is mandatory and is what makes
+    /// "no floor is derivable here" different from "nobody asked".
+    /// </param>
+    /// <returns>This builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="eval"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// No floor was offered, the floor carries no derivation, its derived bar is not a probability,
+    /// or an eval with the same <see cref="IEval.Key"/> was already admitted. Every message names the
+    /// eval.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <b>There is deliberately no floorless overload.</b> The programme's loudest rule — "AE-04
+    /// before AE-06" — forbids wiring evals into the agent-evaluation entry point <i>while none of
+    /// them has a chance floor</i>. This door does not waive that rule and does not bulk-wire the
+    /// library's existing <see cref="IEval"/> implementations: it makes the prohibited state
+    /// unreachable, one explicit registration at a time. An eval nobody passes through here is
+    /// exactly as unwired as it was before. The measurement behind that claim, and the commands that
+    /// re-derive it, live on <see cref="FloorAdmittedEval"/> — stated once, because the same two
+    /// counts written out twice is how they went stale in the first place.
+    /// </para>
+    /// <para>
+    /// <b>A duplicate key is refused.</b> Two results carrying the same <see cref="IEval.Key"/> and
+    /// different floors cannot be told apart once persisted — <c>ComparabilityFacts</c> is keyed on
+    /// exactly that pair.
+    /// </para>
+    /// </remarks>
+    public AgentEvalBuilder AddEval(IEval eval, ChanceFloor floor)
+    {
+        var admitted = FloorAdmittedEval.Admit(eval, floor);
+
+        foreach (var existing in _evals)
+        {
+            if (string.Equals(existing.Key, admitted.Key, StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"An eval with key '{admitted.Key}' is already registered. Two evals sharing a key produce "
+                    + "results that cannot be told apart once persisted, and the floor recorded against that key "
+                    + "would be whichever one ran last.",
+                    nameof(eval));
+            }
+        }
+
+        _evals.Add(admitted);
         return this;
     }
 
@@ -206,7 +263,8 @@ public sealed class AgentEvalBuilder
             _transformers,
             _evaluatorClient,
             _logger,
-            _defaultThreshold);
+            _defaultThreshold,
+            _evals.ToList());
     }
 
     /// <summary>
@@ -303,6 +361,7 @@ public sealed class AgentEvalRunner : IAsyncDisposable
     private readonly IChatClient? _evaluatorClient;
     private readonly IAgentEvalLogger _logger;
     private readonly double _defaultThreshold;
+    private readonly IReadOnlyList<FloorAdmittedEval> _evals;
 
     internal AgentEvalRunner(
         MetricRegistry registry,
@@ -310,7 +369,8 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         IReadOnlyList<IResultTransformer> transformers,
         IChatClient? evaluatorClient,
         IAgentEvalLogger logger,
-        double defaultThreshold)
+        double defaultThreshold,
+        IReadOnlyList<FloorAdmittedEval> evals)
     {
         _registry = registry;
         _plugins = plugins;
@@ -318,6 +378,7 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         _evaluatorClient = evaluatorClient;
         _logger = logger;
         _defaultThreshold = defaultThreshold;
+        _evals = evals;
     }
 
     /// <summary>
@@ -334,6 +395,44 @@ public sealed class AgentEvalRunner : IAsyncDisposable
     /// Gets the evaluator client.
     /// </summary>
     public IChatClient? EvaluatorClient => _evaluatorClient;
+
+    /// <summary>
+    /// The evals admitted through <see cref="AgentEvalBuilder.AddEval"/>, each carrying the chance
+    /// floor it was admitted under. Empty when none were registered — which is not the same fact as
+    /// "the evals that ran had no floors".
+    /// </summary>
+    public IReadOnlyList<FloorAdmittedEval> Evals => _evals;
+
+    /// <summary>
+    /// Runs every admitted eval against one input.
+    /// </summary>
+    /// <param name="input">The stimulus — build one from an agent run with <c>TestCase.ToEvalInput(TestResult)</c>.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>
+    /// One result per admitted eval, in registration order, each carrying the floor its eval was
+    /// admitted under. <b>Empty when no eval was registered</b> — an empty result set is a statement
+    /// about the registry, never a pass.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="input"/> is null.</exception>
+    /// <remarks>
+    /// This is the far end of AE-04's join: agent run → <c>EvalInput</c> → <c>EvalResult</c> with its
+    /// floor recorded in ADR-030 §3.2's convention, which <c>EvalResultPersistence.ToScenarioResult</c>
+    /// then reads straight back into <c>ComparabilityFacts.ChanceFloor</c> without a schema change.
+    /// </remarks>
+    public async Task<IReadOnlyList<EvalResult>> EvaluateEvalsAsync(
+        EvalInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var results = new List<EvalResult>(_evals.Count);
+        foreach (var eval in _evals)
+        {
+            results.Add(await eval.EvaluateAsync(input, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
+    }
 
     /// <summary>
     /// Runs a single metric by name.

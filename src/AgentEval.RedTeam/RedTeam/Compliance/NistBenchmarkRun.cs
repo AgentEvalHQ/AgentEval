@@ -80,14 +80,14 @@ public sealed class NistBenchmarkRun
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        IEvaluableAgent? agent = null;
-        if (input.Metadata?.TryGetValue("agent", out var rawAgent) == true)
-            agent = rawAgent as IEvaluableAgent;
-
-        if (agent is null)
-            return BuildSkippedComposite(
-                "NIST AI RMF adapter requires an IEvaluableAgent at EvalInput.Metadata[\"agent\"]. " +
-                "Use NistBenchmarkRun.ScanAsync(agent) directly, or wrap the agent into Metadata[\"agent\"].");
+        // 7.1: ONE owner for the legacy Metadata["agent"] convention. The read, the key and the
+        // refusal used to be written out by hand in four families — one convention with four
+        // implementations, four messages and four chances to diverge.
+        if (!EvalInputAgentBinding.TryReadAgent(input, out var agent))
+        {
+            return BuildSkippedComposite(EvalInputAgentBinding.AbsentAgentReason(
+                "NIST AI RMF", "NistBenchmarkRun.ScanAsync(agent)"));
+        }
 
         var redTeamResult = await _pipeline.ScanAsync(agent, ct);
         return BuildEvalResult(redTeamResult);
@@ -109,10 +109,10 @@ public sealed class NistBenchmarkRun
 
         var leaves = report.Controls.Select(c => BuildLeaf(c, attacksByName)).ToList();
 
-        var components = leaves
-            .Select(l => new EvalComponent(new NistSyntheticEval(l.Metric.Key, l.Metric.Name)))
-            .ToList();
-        var (compositeScore, compositeSeverity) = MinAggregation.Instance.Aggregate(leaves, components);
+        // Weights only: aggregation reads nothing else from a component, so no throwing
+        // IEval stub is needed to carry one. Every leaf weighs the same here.
+        var (compositeScore, compositeSeverity) =
+            MinAggregation.AggregateWeights(leaves, [.. Enumerable.Repeat(1.0, leaves.Count)]);
 
         var testedLeaves = leaves.Where(l => l.Score.Label != "skipped").ToList();
         string compositeLabel;
@@ -156,7 +156,8 @@ public sealed class NistBenchmarkRun
                 Recommendations: report.Recommendations.Count > 0 ? report.Recommendations.ToList() : null,
                 SubResults: leaves,
                 AggregationStrategy: "Min"),
-            Provenance: new("composite", Judge is null ? null : "nist-judge-passthrough", null, null, null, 0.0, false),
+            // JudgeModel is NEVER a judge name: the IEvaluator this run holds is never invoked.
+            Provenance: new("composite", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -179,7 +180,12 @@ public sealed class NistBenchmarkRun
 
         return new EvalResult(
             Metric: new($"nist.{PresetName.ToLowerInvariant()}", $"NIST AI RMF — {PresetName}", "compliance.nist", "1.0.0"),
-            Score: new(0.0, null, "skipped", false, 1.0, "none", null),
+            Score: new(0.0, null, "skipped", false, null, "none", null),   // 7.1: Confidence was 1.0 on a
+                //     result that measured NOTHING. Confidence means "deterministic, no sampling
+                //     uncertainty" (F1ScoreEval.cs:34) and it is rendered, persisted as
+                //     _lifted.confidence, and served over GraphQL. Declaring certainty about a
+                //     verdict never reached is the flattering direction; the perf family already
+                //     wrote null here (PerformanceBenchmark.cs:707).
             Details: new(null, null, new[] { reason }, leaves, "Min"),
             Provenance: new("skipped", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
@@ -234,14 +240,4 @@ public sealed class NistBenchmarkRun
         return leaf;
     }
 
-    /// <summary>Lightweight <see cref="IEval"/> stub to satisfy <see cref="EvalComponent"/> for <see cref="MinAggregation"/>.</summary>
-    private sealed class NistSyntheticEval(string key, string name) : IEval
-    {
-        public string Key => key;
-        public string Name => name;
-        public string Category => "compliance.nist";
-        public string Version => "1.0.0";
-        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
-            => throw new NotSupportedException("NistSyntheticEval is a stub — call NistBenchmarkRun.EvaluateAsync instead.");
-    }
 }

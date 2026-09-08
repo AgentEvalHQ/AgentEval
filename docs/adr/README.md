@@ -37,7 +37,7 @@ Each ADR follows this structure:
 | [014](014-dataset-pipeline-two-model-architecture.md) | Dataset Pipeline — Two-Model Architecture | Accepted | 2026-02-24 |
 | [015](015-extension-registration-manual-vs-auto-discovery.md) | Extension Registration — Manual vs Auto-Discovery | Accepted | 2026-02-25 |
 | [016](016-monolith-modularization.md) | Monolith Modularization | Accepted | 2026-02-26 |
-| [017](017-unified-benchmarks-namespace.md) | Unified Benchmarks Namespace (Convention 1-4) | Implemented (v0.10.0-beta) | 2026-05-17 |
+| [017](017-unified-benchmarks-namespace.md) | Unified Benchmarks Namespace (Convention 1-4) | Implemented (v0.10.0-beta) — Convention 2 is **superseded by ADR-032, accepted 2026-09-07**; Convention 3 stands as a catalog | 2026-05-17 |
 | [018](018-compliance-core-and-shared-extractions.md) | Compliance.Core and Cross-Cutting Shared Extractions | Accepted | 2026-05-31 |
 | [019](019-chat-boundary-two-layer-recording.md) | Chat-Boundary Tracing and the Two-Layer Recording Model (Glass Box) | Accepted | 2026-05-31 |
 | [020](020-agenttrace-v1_1-schema.md) | AgentTrace v1.1 Schema (Glass Box additive fields) | Accepted | 2026-05-31 |
@@ -50,7 +50,9 @@ Each ADR follows this structure:
 | [027](027-typedmemeval-semantic-temporal-bitemporal.md) | TypedMemEval — Semantic, Temporal and Bitemporal Verticals (design) | Proposed (design only; generation gated) | 2026-08-18 |
 | [028](028-typedmemeval-acceptance-on-discrimination.md) | TypedMemEval — accept a shape on measured discrimination, not a coverage proxy | Proposed | 2026-08-31 |
 | [029](029-procedural-memory-declarative-and-enacted.md) | Procedural memory — a finding, and a request to reopen a bilateral agreement | Accepted, then REVERSED by its own §10–§12: the Procedural vertical is built (80q, headroom +0.81) and released standalone | 2026-09-03 |
-
+| [030](030-meta-evaluation-is-the-lane.md) | Meta-evaluation is the lane; contract unification is not — chance floors, exact tests, applicability as first-class; `IEval` kept by adaptation; deterministic assertion catalogue rejected by name | Accepted (Slice 0 shipped in `a396c5b4`; Slices 1–2 shipped; **§11 amendment 2026-09-07** records the AE-04 join, the 79 / 7 / 1 census and 15 corrections of record; Q4(ii), Q5, Q6 remain the owner's) | 2026-09-05 |
+| [031](031-eval-packs-ship-reduced.md) | Eval Packs — adversarial verdict DON'T BUILD as scoped; SHIP REDUCED to five items on the existing `subjects/` tree, no new format | Rejected as scoped; SHIP REDUCED — S2 and S5 shipped, S3 half-shipped (writer half = Q4(ii)), S1 deferred, **S4 CLOSED by Q5’s answer (2026-09-07): defer the API, a degraded `BenchmarkArm` is the control** (§0.1; **§12 amendment 2026-09-07**) | 2026-09-05 |
+| [032](032-benchmark-definition-run-score.md) | Benchmarks are definitions; runs bind subjects; scores are meta — aggregation stops demanding an `IEval` per weight (four stubs deleted); the floor door refuses composites; a deterministic benchmark contract over AE-04's join, `IOutputStore` and `agenteval compare` unchanged; no new verb, package or schema field | **Accepted (2026-09-07)** — Q-A answered INSIDE the rule and Wave 2 BUILT (definition records, `BenchmarkScore`, `BenchmarkRunner`, the `EvalJoin/02` sample, one in-repo benchmark converted); Q4(ii)/Q5 deferred and Q6 answered *yes-but-staged*, each refused in code | 2026-09-07 |
 ---
 
 *Template based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)*

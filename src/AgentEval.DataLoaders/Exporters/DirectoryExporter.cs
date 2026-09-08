@@ -184,7 +184,7 @@ public sealed class DirectoryExporter : IResultExporter
                 Passed: result.Passed,
                 Score: result.Score,
                 Metrics: result.MetricScores,
-                Assertions: Array.Empty<AssertionResult>(),
+                Assertions: BuildAssertions(result),
                 Duration: TimeSpan.FromMilliseconds(result.DurationMs),
                 EstimatedCost: 0);
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
@@ -196,6 +196,20 @@ public sealed class DirectoryExporter : IResultExporter
         var summary = new RunSummary("1.0", manifest.Run.RunId, verdict, stats, metrics);
         await store.CompleteRunAsync(manifest, summary, ct);
     }
+
+    /// <summary>
+    /// Carries a test's assertion outcomes into the persisted <see cref="ScenarioResult"/>.
+    /// </summary>
+    /// <remarks>
+    /// AE-01: this slot used to be <c>Array.Empty&lt;AssertionResult&gt;()</c>, so assertion
+    /// outcomes reached no artifact AgentEval wrote — they existed only as stack traces. The rows
+    /// come from <see cref="TestResultSummary.Assertions"/>, which a harness fills from an
+    /// eval-mode <c>AgentEvalScope</c>.
+    /// </remarks>
+    private static IReadOnlyList<AssertionResult> BuildAssertions(TestResultSummary result)
+        => result.Assertions.Count == 0
+            ? Array.Empty<AssertionResult>()
+            : result.Assertions.ToArray();
 
     private static IReadOnlyDictionary<string, double> ComputeMetricMeans(EvaluationReport report)
     {

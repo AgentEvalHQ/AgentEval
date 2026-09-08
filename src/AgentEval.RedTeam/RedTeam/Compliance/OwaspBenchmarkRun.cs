@@ -133,16 +133,13 @@ public sealed class OwaspBenchmarkRun
         // The OWASP pipeline drives the agent itself (it generates and sends
         // its own probes), so EvaluateAsync needs an IEvaluableAgent reference
         // somewhere on the input. Convention: input.Metadata["agent"].
-        IEvaluableAgent? agent = null;
-        if (input.Metadata?.TryGetValue("agent", out var rawAgent) == true)
-            agent = rawAgent as IEvaluableAgent;
-
-        if (agent is null)
+        // 7.1: ONE owner for the legacy Metadata["agent"] convention. The read, the key and the
+        // refusal used to be written out by hand in four families — one convention with four
+        // implementations, four messages and four chances to diverge.
+        if (!EvalInputAgentBinding.TryReadAgent(input, out var agent))
         {
-            return BuildSkippedComposite(
-                "OWASP adapter requires an IEvaluableAgent at EvalInput.Metadata[\"agent\"]. " +
-                "Use OwaspBenchmarkRun.ScanAsync(agent) directly for low-level access, " +
-                "or wrap the agent into Metadata[\"agent\"] before calling EvaluateAsync.");
+            return BuildSkippedComposite(EvalInputAgentBinding.AbsentAgentReason(
+                "OWASP", "OwaspBenchmarkRun.ScanAsync(agent)"));
         }
 
         // ── Run the underlying pipeline ──────────────────────────────────────
@@ -190,11 +187,10 @@ public sealed class OwaspBenchmarkRun
         }
 
         // MinAggregation over non-skipped leaves (security-gate semantics).
-        var components = leaves
-            .Select(l => new EvalComponent(new OwaspSyntheticEval(l.Metric.Key, l.Metric.Name)))
-            .ToList();
+        // Weights only: aggregation reads nothing else from a component, so no throwing
+        // IEval stub is needed to carry one. Every leaf weighs the same here.
         var (compositeScore, compositeSeverity) =
-            MinAggregation.Instance.Aggregate(leaves, components);
+            MinAggregation.AggregateWeights(leaves, [.. Enumerable.Repeat(1.0, leaves.Count)]);
 
         // Composite label: "fail" if any tested leaf is fail; "warn" if any warn but no fail;
         // "pass" if all tested leaves pass; "skipped" if all leaves are skipped.
@@ -266,7 +262,10 @@ public sealed class OwaspBenchmarkRun
                 AggregationStrategy: "Min"),
             Provenance: new(
                 Type: "composite",
-                JudgeModel: Judge is null ? null : "owasp-judge-passthrough",
+                // NEVER a judge name: the IEvaluator this run holds is never invoked
+                // (OwaspBenchmark.cs:83-87 says so in its own words). Naming one made every
+                // row read as judged; the parameter stays because 0.34 consumers pass it.
+                JudgeModel: null,
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
@@ -284,7 +283,12 @@ public sealed class OwaspBenchmarkRun
                 Name: $"OWASP LLM Top 10 — {PresetName}",
                 Category: "compliance.owasp",
                 Version: "1.0.0"),
-            Score: new(0.0, null, "skipped", false, 1.0, "none", null),
+            Score: new(0.0, null, "skipped", false, null, "none", null),   // 7.1: Confidence was 1.0 on a
+                //     result that measured NOTHING. Confidence means "deterministic, no sampling
+                //     uncertainty" (F1ScoreEval.cs:34) and it is rendered, persisted as
+                //     _lifted.confidence, and served over GraphQL. Declaring certainty about a
+                //     verdict never reached is the flattering direction; the perf family already
+                //     wrote null here (PerformanceBenchmark.cs:707).
             Details: new(
                 Dimensions: null,
                 Evidence: null,
@@ -320,25 +324,4 @@ public sealed class OwaspBenchmarkRun
             "owasp", "compliance.owasp", categoryId, categoryId,
             "Not tested — no agent supplied.", includeDimensions: false);
 
-    /// <summary>Lightweight <see cref="IEval"/> stub used to satisfy
-    /// <see cref="EvalComponent"/> constructor requirements when calling
-    /// <see cref="MinAggregation"/>.</summary>
-    private sealed class OwaspSyntheticEval : IEval
-    {
-        public string Key      { get; }
-        public string Name     { get; }
-        public string Category { get; }
-        public string Version  { get; }
-
-        public OwaspSyntheticEval(string key, string name)
-        {
-            Key = key;
-            Name = name;
-            Category = "compliance.owasp";
-            Version = "1.0.0";
-        }
-
-        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
-            => throw new NotSupportedException("OwaspSyntheticEval is a stub — call OwaspBenchmarkRun.EvaluateAsync instead.");
-    }
 }

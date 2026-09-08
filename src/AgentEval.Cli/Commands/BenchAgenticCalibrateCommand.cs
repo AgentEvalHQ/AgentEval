@@ -6,16 +6,8 @@ using System.Reflection;
 using System.Text;
 using AgentEval.Core;
 using AgentEval.Evals;
-using AgentEval.Evals.Agentic.Adversarial;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Calibration;
-using AgentEval.Evals.Agentic.Memory;
-using AgentEval.Evals.Agentic.MultiTurn;
-using AgentEval.Evals.Agentic.Process;
-using AgentEval.Evals.Agentic.Quality;
-using AgentEval.Evals.Agentic.Reasoning;
-using AgentEval.Evals.Agentic.Safety;
-using AgentEval.Evals.Agentic.System;
-using AgentEval.Evals.Agentic.UX;
 
 namespace AgentEval.Cli.Commands;
 
@@ -239,123 +231,51 @@ public static class BenchAgenticCalibrateCommand
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
-        // ── Build evaluator dispatch table ───────────────────────────────────
-        // Maps each evaluator key string to a concrete IEval instance.
+        // ── Resolve the evaluator dispatch table from IEvalRegistry ──────────
+        // ADR-031 C1. The 40-entry hand-authored `Dictionary<string, IEval>`
+        // that used to live here now lives beside the evaluators it names, in
+        // `AgentEval.Evals.Agentic/AgenticEvalRegistration.cs`, registered as
+        // FACTORIES (`Key → Func<IEvaluator?, string?, IEval>`) so the judge can
+        // be supplied here, at resolution time, rather than at registration
+        // time when it does not yet exist. C1's filed `Key → IEval` signature
+        // could not hold these entries; MEASUREMENT_STATUS §67.6 records the
+        // correction and ADR-031 C1 now carries it.
         //
-        // Path A' (v1.1): trimmed from 49 → 40 entries by carving out 9 more
-        // evaluators whose grading semantics structurally don't fit single-turn
-        // calibration entries (5 multi-turn memory + 3 trace-dependent reasoning
-        // + f1_score deterministic). See s_carveOutKeys below for the full
-        // 20-entry carve-out list and per-bucket rationale.
+        // Path A' (v1.1) scope is unchanged: 40 dispatched keys across 9
+        // categories (system 5, process 6, ux 3, adversarial 5, reasoning 2,
+        // calibration 2, memory 0, quality 6, safety 11). s_carveOutKeys below
+        // still holds the 20-key carve-out list and its rationale, because the
+        // calibration report reads the carve-outs from here.
         //
-        // Dispatched 40 organised into 9 categories: system (5), process (6),
-        // ux (3), adversarial (5), reasoning (2 surviving — reasoning_correctness
-        // + goal_decomposition_quality), calibration (2), memory (0 — fully
-        // carved), quality (6 — f1_score carved), safety (11).
-        //
-        // Stub-argument note: dispatch-table evaluators receive only `judge` and
-        // `judgeModelName` — additional constructor args (custom regex patterns,
-        // IContentSafetyClient, IPolicyResolver, etc.) are left at their defaults
-        // so the table reflects "calibrate this evaluator's LLM judge", not the
-        // full production wiring. ProhibitedActionsEval is the one Safety eval
-        // that cannot satisfy this contract (it requires IPolicyResolver +
-        // subjectId) so it is dispatched via a no-op IEval shim that returns
-        // SKIPPED — keeping the 11-Safety count for routing tests without
-        // forcing a stub-policy resolver into the calibration pipeline.
-        //
-        // The ToolCallAccuracyAggregateEval uses the convenience single-judge overload.
-        var evalRegistry = new Dictionary<string, IEval>(StringComparer.OrdinalIgnoreCase)
+        // Registration is explicit rather than left to [ModuleInitializer]
+        // timing: `Register()` is idempotent, so calling it after the module
+        // initializer has already fired is a no-op.
+        AgenticEvalRegistration.Register();
+
+        // One instance per key per run — the dictionary this replaced built all
+        // 40 up front and handed the same instance to every entry of a dataset,
+        // and CalibrationRunner calls the resolver once per ENTRY. Without this
+        // cache a 500-entry dataset would construct 500 evaluators.
+        var resolved = new Dictionary<string, IEval?>(StringComparer.OrdinalIgnoreCase);
+
+        IEval? Resolver(string key)
         {
-            // ── System evaluators (5) ──────────────────────────────────────────
-            ["task_completion"]           = new TaskCompletionEval(judge, judgeModel: judgeModelName),
-            ["task_adherence"]            = new TaskAdherenceEval(judge, judgeModel: judgeModelName),
-            ["intent_identification"]     = new IntentIdentificationEval(judge, judgeModel: judgeModelName),
-            ["intent_resolution"]         = new IntentResolutionEval(judge, judgeModel: judgeModelName),
-            ["task_navigation_efficiency"] = new TaskNavigationEfficiencyEval(judge, judgeModel: judgeModelName),
+            if (!resolved.TryGetValue(key, out var eval))
+            {
+                eval = EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
+                resolved[key] = eval;
+            }
+            return eval;
+        }
 
-            // ── Process evaluators (6) ─────────────────────────────────────────
-            ["tool_selection"]            = new ToolSelectionEval(judge, judgeModel: judgeModelName),
-            ["tool_input_accuracy"]       = new ToolInputAccuracyEval(judge, judgeModel: judgeModelName),
-            ["tool_output_utilization"]   = new ToolOutputUtilizationEval(judge, judgeModel: judgeModelName),
-            ["tool_call_success"]         = new ToolCallSuccessEval(judge, judgeModel: judgeModelName),
-            ["tool_efficiency"]           = new ToolEfficiencyEval(judge, judgeModel: judgeModelName),
-            ["tool_call_accuracy"]        = new ToolCallAccuracyAggregateEval(judge, judgeModel: judgeModelName),
-
-            // ── UX evaluators (3) ──────────────────────────────────────────────
-            ["verbosity_appropriateness"] = new VerbosityAppropriatenessEval(judge, judgeModel: judgeModelName),
-            ["tone_appropriateness"]      = new ToneAppropriatenessEval(judge, judgeModel: judgeModelName),
-            ["refusal_quality"]           = new RefusalQualityEval(judge, judgeModel: judgeModelName),
-
-            // ── Adversarial-resistance evaluators (5) ──────────────────────────
-            // `prompt_leak` and `escalation_resistance` are calibration-only keys:
-            // the prompt_leak key dispatches to SystemPromptLeakageEval (same
-            // operational concept, shorter calibration-table key); escalation_
-            // resistance dispatches to JailbreakResistanceEval as a functional
-            // alias (privilege-escalation prompts are jailbreak variants).
-            ["direct_injection"]          = new DirectInjectionEval(judge, judgeModel: judgeModelName),
-            ["persona_attack"]            = new PersonaAttackEval(judge, judgeModel: judgeModelName),
-            ["jailbreak_resistance"]      = new JailbreakResistanceEval(judge, judgeModel: judgeModelName),
-            ["prompt_leak"]               = new SystemPromptLeakageEval(judge, judgeModel: judgeModelName),
-            ["escalation_resistance"]     = new JailbreakResistanceEval(judge, judgeModel: judgeModelName),
-
-            // ── Reasoning evaluators (2 — Path A' carved out the 3 trace-dependent) ──
-            // intermediate_step_hallucination + plan_formulation_quality +
-            // self_correction_quality were removed in v1.1 Path A' (R4) because they
-            // require agent-reasoning-trace data the calibration entry shape doesn't
-            // carry. See s_carveOutKeys for the full rationale. Re-add when T3.15
-            // extends the entry schema with trace_steps[].
-            ["reasoning_correctness"]          = new ReasoningCorrectnessEval(judge, judgeModel: judgeModelName),
-            ["goal_decomposition_quality"]     = new GoalDecompositionQualityEval(judge, judgeModel: judgeModelName),
-
-            // ── Confidence-calibration evaluators (2) ──────────────────────────
-            // Plan flags these as inherently noisier than other categories — the
-            // override map below relaxes the threshold to acknowledge the
-            // calibration-of-calibration meta loop.
-            ["confidence_calibration"]    = new ConfidenceCalibrationEval(judge, judgeModel: judgeModelName),
-            ["uncertainty_acknowledgment"]= new UncertaintyAcknowledgmentEval(judge, judgeModel: judgeModelName),
-
-            // ── Memory / multi-turn evaluators (0 — Path A' fully carved) ──────
-            // All 5 (memory_recall_accuracy, turn_coherence, goal_tracking,
-            // clarification_appropriateness, long_conversation_coherence) were
-            // removed in v1.1 Path A' (R2): they grade multi-turn recall, but a
-            // calibration entry is single-turn with no prior-context. Measured
-            // 14.3% accuracy (below random) pre-carve-out confirmed the judge
-            // has no signal. T3.13 follow-up extends entry schema with
-            // conversation_history[] to re-enable.
-
-            // ── Quality / RAG evaluators (6 — Path A' carved out f1_score) ─────
-            // f1_score was removed in v1.1 Path A' because it's pure token-overlap
-            // math (no LLM judge) — same "no-LLM" rule applied to the 6 telemetry
-            // evaluators. The remaining 6 are still LLM-judged; per R3, the
-            // category bucket mixes incompatible grading semantics (groundedness
-            // ≠ fluency) — per-evaluator overrides (T3.14) will replace this
-            // category-level override.
-            ["groundedness"]              = new GroundednessEval(judge, judgeModel: judgeModelName),
-            ["relevance"]                 = new RelevanceEval(judge, judgeModel: judgeModelName),
-            ["coherence"]                 = new CoherenceEval(judge, judgeModel: judgeModelName),
-            ["fluency"]                   = new FluencyEval(judge, judgeModel: judgeModelName),
-            ["similarity"]                = new SimilarityEval(judge, judgeModel: judgeModelName),
-            ["response_completeness"]     = new ResponseCompletenessEval(judge, judgeModel: judgeModelName),
-
-            // ── Safety / content-classifier evaluators (11) ────────────────────
-            // Pass null for IContentSafetyClient on hate/self-harm/sexual/violence
-            // — calibration runs use only the LLM-judge path, not the Azure
-            // Content Safety API (which would add cost and require auth).
-            ["system_prompt_leakage"]     = new SystemPromptLeakageEval(judge, judgeModel: judgeModelName),
-            ["indirect_attack"]           = new IndirectAttackEval(judge, judgeModel: judgeModelName),
-            ["unsafe_tool_use"]           = new UnsafeToolUseEval(judge, judgeModel: judgeModelName),
-            ["hate_unfairness"]           = new HateUnfairnessEval(judge, contentSafetyClient: null, judgeModel: judgeModelName),
-            ["self_harm"]                 = new SelfHarmEval(judge, contentSafetyClient: null, judgeModel: judgeModelName),
-            ["sexual"]                    = new SexualEval(judge, contentSafetyClient: null, judgeModel: judgeModelName),
-            ["violence"]                  = new ViolenceEval(judge, contentSafetyClient: null, judgeModel: judgeModelName),
-            ["code_vulnerability"]        = new CodeVulnerabilityEval(judge, judgeModel: judgeModelName),
-            ["ungrounded_attributes"]     = new UngroundedAttributesEval(judge, judgeModel: judgeModelName),
-            ["sensitive_data_leakage"]    = new SensitiveDataLeakageEval(judge, judgeModel: judgeModelName),
-            ["protected_material"]        = new ProtectedMaterialEval(judge, judgeModel: judgeModelName),
-        };
-
-        IEval? Resolver(string key) =>
-            evalRegistry.TryGetValue(key, out var eval) ? eval : null;
+        var dispatchedKeyCount = EvalRegistry.Shared.All.Count;
+        if (dispatchedKeyCount == 0)
+        {
+            Console.Error.WriteLine(
+                "No evaluator keys are registered in EvalRegistry. Expected " +
+                $"{AgenticEvalRegistration.DispatchedEvaluatorCount} from AgentEval.Evals.Agentic.");
+            return 1;
+        }
 
         // ── Load calibration datasets from the test assembly ─────────────────
         IReadOnlyList<AgentEval.Evals.Agentic.Calibration.CalibrationDataset> datasets;

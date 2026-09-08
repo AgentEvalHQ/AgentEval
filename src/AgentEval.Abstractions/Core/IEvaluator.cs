@@ -5,8 +5,31 @@
 namespace AgentEval.Core;
 
 /// <summary>
-/// Provides AI-powered response evaluation.
+/// The <b>LLM-judge transport</b>: hands an (input, output, criteria) triple to a language model
+/// acting as judge and returns its verdict as an <see cref="EvaluationResult"/>.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This is a judge contract, not a general scoring contract. Its result type has three members whose
+/// documented meaning only a judge can satisfy: <see cref="EvaluationResult.EvaluationFailed"/> ("the
+/// judge returned no JSON, malformed JSON, or no recognisable score field"),
+/// <see cref="EvaluationResult.InputTokenCount"/> / <see cref="EvaluationResult.OutputTokenCount"/>
+/// ("<c>null</c> when the evaluator did not invoke a chat model"), and an
+/// <see cref="EvaluationResult.OverallScore"/> that on failure "carries the conventional failure-score
+/// fallback but should not be read as a real grade". A deterministic implementation can never truthfully
+/// enter the first state, is indistinguishable from a judge whose provider dropped usage reporting in the
+/// second, and has no sentinel to emit for the third — so <b>deterministic scoring does not belong here</b>.
+/// It belongs on <c>AgentEval.Evals.IEval</c> (typically via <c>AtomicCodeEval</c>).
+/// </para>
+/// <para>
+/// The sanctioned bridge from this transport into the unified eval tree is <c>AgentEval.Evals.AtomicLlmEval</c>,
+/// which wraps an <see cref="IEvaluator"/> as an <c>IEval</c> leaf carrying <c>Provenance.Type == "atomic-llm"</c>,
+/// a real <c>EstimatedCost</c> from the token counts, and an <c>"error"</c> label — never a pass — when
+/// <see cref="EvaluationResult.EvaluationFailed"/> is set. Consumers of this interface directly (e.g. the
+/// MAF evaluation harness) must likewise read <see cref="EvaluationResult.EvaluationFailed"/> before the score.
+/// </para>
+/// <para>Retyped in documentation only by ADR-030 §3.3; no member changed.</para>
+/// </remarks>
 public interface IEvaluator
 {
     /// <summary>
@@ -25,7 +48,9 @@ public interface IEvaluator
 }
 
 /// <summary>
-/// Result of an AI-powered evaluation.
+/// Result of an LLM-judge evaluation (the <see cref="IEvaluator"/> transport). Read
+/// <see cref="EvaluationFailed"/> before <see cref="OverallScore"/>: when it is set the score is a
+/// sentinel, not a grade.
 /// </summary>
 public class EvaluationResult
 {

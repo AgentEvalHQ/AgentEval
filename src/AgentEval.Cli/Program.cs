@@ -778,6 +778,7 @@ rootCmd.Add(RedTeamCommand.Create());         // redteam — low-level red-team 
 rootCmd.Add(initWorkspaceCmd);
 rootCmd.Add(doctorCmd);
 rootCmd.Add(migrateCmd);
+rootCmd.Add(CompareCommand.Create());         // compare — ADR-031 S5; refuses deltas across incomparable runs (exit 13)
 rootCmd.Add(benchCmd);
 rootCmd.Add(complianceCmd);
 rootCmd.Add(renderBenchCmd);

@@ -22,6 +22,13 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
     public string Name => "MajorityVote";
 
     /// <inheritdoc/>
+    /// <remarks>Forwards to the static of the same name, so the interface and the direct call
+    /// cannot diverge.</remarks>
+    (double Score, string Severity) IAggregationStrategy.AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights) => AggregateWeights(results, weights);
+
+    /// <inheritdoc/>
     public (double Score, string Severity) Aggregate(
         IReadOnlyList<EvalResult> results,
         IReadOnlyList<EvalComponent> components)
@@ -31,10 +38,29 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         if (results.Count != components.Count)
             throw new InvalidOperationException("Results and components must align 1:1.");
 
+        return AggregateWeights(results, components.Select(c => c.Weight).ToArray());
+    }
+
+    /// <summary>
+    /// The weights-only entry point. Aggregation reads nothing from an <see cref="EvalComponent"/>
+    /// except its <see cref="EvalComponent.Weight"/> — verified across all five strategies:
+    /// <c>grep -rn '\.Eval\b|\.Required\b' src/AgentEval.Core/Evals/Aggregations/ | grep -v '///'</c> returns 0 — so a
+    /// caller that has weights but no evals does not need a throwing <c>IEval</c> stub to carry them.
+    /// Four such stubs existed only to satisfy the <see cref="EvalComponent"/> constructor.
+    /// </summary>
+    public static (double Score, string Severity) AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(weights);
+        if (results.Count != weights.Count)
+            throw new InvalidOperationException("Results and weights must align 1:1.");
+
         // 17: exclude "error" leaves too (transient provider failure, severity "none" by construction), not
         // just "skipped" — an "error" leaf never counts as a pass/warn/fail vote (its label matches none of
         // them), but WITHOUT this exclusion its placeholder score still polluted the returned meanScore below.
-        var voting = results.Where(r => r.Score.Label is not ("skipped" or "error")).ToList();
+        var voting = results.Where(r => r.Score.CountsTowardAggregate()).ToList();
         if (voting.Count == 0) return (0, "none");
 
         var passCount = voting.Count(r => r.Score.Label == "pass");

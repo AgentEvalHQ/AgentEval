@@ -23,9 +23,10 @@
       "additionalProperties": false,
       "properties": {
         "value":      { "type": "number", "minimum": 0, "maximum": 1 },
-        "label":      { "enum": ["pass", "fail", "warn", "skipped", "error"] },
+        "label":      { "enum": ["pass", "fail", "warn", "skipped", "error", "inapplicable"] },
         "passed":     { "type": "boolean" },
         "severity":   { "enum": ["none", "low", "medium", "high", "critical"] },
+        "measurement": { "enum": ["measured", "notApplicable", "notMeasured"] },
         "ordinal":    { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
         "threshold":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }

@@ -17,6 +17,12 @@ public class CompositeEvalsServiceExtensionsTests
         public (double Score, string Severity) Aggregate(
             IReadOnlyList<EvalResult> r,
             IReadOnlyList<EvalComponent> c) => (0, "none");
+
+        // 7.1: the weights-only path is on the interface now, so a strategy that has weights and no
+        // evals is reachable polymorphically. This fake answers the same way on both.
+        public (double Score, string Severity) AggregateWeights(
+            IReadOnlyList<EvalResult> r,
+            IReadOnlyList<double> w) => (0, "none");
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────

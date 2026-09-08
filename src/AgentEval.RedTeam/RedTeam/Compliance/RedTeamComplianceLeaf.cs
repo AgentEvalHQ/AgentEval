@@ -166,7 +166,12 @@ internal static class RedTeamComplianceLeaf
                 Name: displayName,
                 Category: categoryLabel,
                 Version: "1.0.0"),
-            Score: new(0.0, null, "skipped", false, 1.0, "none", null),
+            Score: new(0.0, null, "skipped", false, null, "none", null),   // 7.1: Confidence was 1.0 on a
+                //     result that measured NOTHING. Confidence means "deterministic, no sampling
+                //     uncertainty" (F1ScoreEval.cs:34) and it is rendered, persisted as
+                //     _lifted.confidence, and served over GraphQL. Declaring certainty about a
+                //     verdict never reached is the flattering direction; the perf family already
+                //     wrote null here (PerformanceBenchmark.cs:707).
             Details: new(
                 Dimensions: includeDimensions ? new Dictionary<string, double>() : null,
                 Evidence: new[] { new EvalEvidence(keyPrefix, id, evidenceMessage) },

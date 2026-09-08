@@ -137,6 +137,46 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     // ─── Solution lifecycle ──────────────────────────────────────────────────
 
+    /// <summary>
+    /// Creates this workspace's <c>solution.json</c> if it does not exist, and returns the solution
+    /// either way. Idempotent.
+    /// </summary>
+    /// <param name="name">The solution name, used only for display.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The existing solution, or the one just written.</returns>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>This exists because the writer had no caller.</b> <c>WriteSolutionAsync</c> shipped
+    /// private and marked "not yet exposed", so a consumer holding a
+    /// <see cref="FileSystemOutputStore"/> could READ a workspace and WRITE runs into it but could
+    /// not CREATE one — <see cref="EnsureSolutionAsync"/> throws "run <c>agenteval init</c> first".
+    /// Every non-CLI caller therefore hand-rolled the file: this repository's own test helper writes
+    /// the three fields by hand, which is a second, unvalidated copy of a schema'd format that
+    /// nothing keeps in step.
+    /// </para>
+    /// <para>
+    /// The same reachability shape as AE-04: the capability existed and no path reached it. The fix
+    /// is the path, not another copy.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT on <see cref="IOutputStore"/>. Adding a member to a shipped public interface
+    /// breaks every external implementer, and initialising a workspace is a file-system concept that
+    /// an in-memory store answers differently.
+    /// </para>
+    /// </remarks>
+    public async Task<SolutionInfo> InitializeSolutionAsync(string name, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!File.Exists(_layout.SolutionFile))
+        {
+            Directory.CreateDirectory(_layout.Root);
+            await WriteSolutionAsync(Guid.NewGuid(), name, ct).ConfigureAwait(false);
+        }
+
+        return await EnsureSolutionAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default)
     {
         if (_cachedSolution is not null) return _cachedSolution;
@@ -457,6 +497,9 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     public async Task SaveBaselineAsync(SubjectIdentity subject, RunSummary summary, string? versionTag = null, CancellationToken ct = default)
     {
+        // ADR-031 §5.3. Refused BEFORE the path is chosen, so a refusal never half-writes.
+        BaselinePromotion.EnsurePromotable(summary);
+
         var path = versionTag is not null
             ? _layout.PinnedBaselineFile(subject, versionTag)
             : _layout.BaselineFile(subject);
@@ -1044,7 +1087,6 @@ public sealed class FileSystemOutputStore : IOutputStore
         return $"{ts}_{hex}";
     }
 
-    // Private write-only helper (not yet exposed but included for completeness)
     private async Task WriteSolutionAsync(Guid id, string name, CancellationToken ct)
     {
         var dto = new SolutionFileV1("1.0", id, name);

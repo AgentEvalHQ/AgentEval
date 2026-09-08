@@ -17,6 +17,10 @@
          of the scenario to drift. The ProjectReference also lands the demo's binary next to this one so the
          real PartnerIntel MCP server can be started as a child process. -->
     <ProjectReference Include="..\AgentEval.PartnerDeskDemo\AgentEval.PartnerDeskDemo.csproj" />
+    <!-- 4.3: the four containment checks reach AgentEval through the door — AtomicCodeEval,
+         AdmittedCheck and BenchmarkArm. Abstractions carries the join; Core carries the base. -->
+    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -21,6 +21,13 @@ public sealed class CapByWorstAggregation : IAggregationStrategy
     public string Name => "CapByWorst";
 
     /// <inheritdoc/>
+    /// <remarks>Forwards to the static of the same name, so the interface and the direct call
+    /// cannot diverge.</remarks>
+    (double Score, string Severity) IAggregationStrategy.AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights) => AggregateWeights(results, weights);
+
+    /// <inheritdoc/>
     public (double Score, string Severity) Aggregate(
         IReadOnlyList<EvalResult> results,
         IReadOnlyList<EvalComponent> components)
@@ -30,14 +37,43 @@ public sealed class CapByWorstAggregation : IAggregationStrategy
         if (results.Count != components.Count)
             throw new InvalidOperationException("Results and components must align 1:1.");
 
-        // Start from the standard weighted-sum
-        var (rawScore, severity) = WeightedSumAggregation.Instance.Aggregate(results, components);
+        return AggregateWeights(results, components.Select(c => c.Weight).ToArray());
+    }
 
-        // Cap rule — skipped results are neither pass nor fail; exclude them from cap evaluation.
+    /// <summary>
+    /// The weights-only entry point. Aggregation reads nothing from an <see cref="EvalComponent"/>
+    /// except its <see cref="EvalComponent.Weight"/> — verified across all five strategies:
+    /// <c>grep -rn '\.Eval\b|\.Required\b' src/AgentEval.Core/Evals/Aggregations/ | grep -v '///'</c> returns 0 — so a
+    /// caller that has weights but no evals does not need a throwing <c>IEval</c> stub to carry them.
+    /// Four such stubs existed only to satisfy the <see cref="EvalComponent"/> constructor.
+    /// </summary>
+    public static (double Score, string Severity) AggregateWeights(
+        IReadOnlyList<EvalResult> results,
+        IReadOnlyList<double> weights)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(weights);
+        if (results.Count != weights.Count)
+            throw new InvalidOperationException("Results and weights must align 1:1.");
+
+        // Start from the standard weighted-sum
+        var (rawScore, severity) = WeightedSumAggregation.AggregateWeights(results, weights);
+
+        // Cap rule — only scores that count toward the aggregate can trigger the cap. ADR-030 Slice 1.2:
+        // this test used to read `Label != "skipped"` alone, so an "error" leaf — an infrastructure or
+        // judge failure, not a real low score — could cap the whole composite at 0.40. That asymmetry
+        // was safe only because every "error" leaf in the tree happens to carry severity "none"; nothing
+        // enforced it, and the strategy disagreed with the other four for no stated reason.
+        // DIRECTION OF THE CHANGE, declared: an "error" or "inapplicable" leaf carrying a
+        // critical/high severity no longer caps the composite, so a composite containing one can now
+        // score HIGHER than before. That is the flattering direction, and it is deliberate — the honest
+        // reading of a leaf that never produced a measurement is that it caps nothing. CompositeEval
+        // already reports "error" at the verdict level whenever a REQUIRED component errored, so the
+        // signal is not lost, it moves to where it is true.
         bool hasCritFail = results.Any(r =>
-            r.Score.Label != "skipped" && r.Score.Severity == "critical" && !r.Score.Passed);
+            r.Score.CountsTowardAggregate() && r.Score.Severity == "critical" && !r.Score.Passed);
         bool hasHighFail = results.Any(r =>
-            r.Score.Label != "skipped" && r.Score.Severity == "high" && !r.Score.Passed);
+            r.Score.CountsTowardAggregate() && r.Score.Severity == "high" && !r.Score.Passed);
 
         if (hasCritFail) return (Math.Min(rawScore, 0.40), "critical");
         if (hasHighFail) return (Math.Min(rawScore, 0.69), "high");

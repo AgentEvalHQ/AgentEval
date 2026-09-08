@@ -37,6 +37,20 @@ public static class AgentEvaluatorExtensions
     public static AgentEvalCompositeEvaluator AsMeaiEvaluator(this IEval composite) => new(composite);
 
     /// <summary>
+    /// Wraps <paramref name="composite"/> and DECLARES a root-level chance floor beside its verdict.
+    /// </summary>
+    /// <param name="composite">The eval to run per item.</param>
+    /// <param name="declaredRootFloor">
+    /// What an arm that understood nothing would score on the composite as a whole, or
+    /// <c>ChanceFloor.NotDerivable(reason)</c>. <b>Recorded, never applied</b> — ADR-030 Q6 is
+    /// answered <i>yes on the principle, staged in execution</i>, so nothing here gates.
+    /// </param>
+    /// <returns>The MEAI evaluator, carrying the declaration.</returns>
+    public static AgentEvalCompositeEvaluator AsMeaiEvaluator(
+        this IEval composite, AgentEval.Evals.Meta.ChanceFloor? declaredRootFloor) =>
+        new(composite, declaredRootFloor);
+
+    /// <summary>
     /// Wraps a MAF <see cref="MafIAgentEvaluator"/> (e.g. an Azure AI Foundry <c>FoundryEvals</c> instance)
     /// as an AgentEval <see cref="IEval"/> leaf, so a provider's evaluator can be a <b>weighted component
     /// inside an AgentEval <c>CompositeEval</c></b> — the inverse of <see cref="AsAgentEvaluator"/>. See
