@@ -110,6 +110,9 @@ public sealed class Broken06_ConstraintBlindRecommender : IEvaluableAgent
         ArgumentNullException.ThrowIfNull(pool);
 
         var copy = pool.ToArray();
+        // DevSkim: ignore all
+        // A deliberately-degraded CONTROL arm. Its draw is seeded so the control is reproducible
+        // across runs — that is what makes it usable as a baseline. Not a security function.
         var rng = new Random(StableSeed(salt, rep));
         int take = Math.Min(k, copy.Length);
 

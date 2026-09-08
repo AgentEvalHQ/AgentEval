@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 
 namespace Galaxus.RecommendationAgent.Agents;

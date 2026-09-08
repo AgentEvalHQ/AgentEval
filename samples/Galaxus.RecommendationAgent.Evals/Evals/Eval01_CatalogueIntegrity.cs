@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval01_integrity — the defect ledger every later comparison reads

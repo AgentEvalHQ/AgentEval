@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galaxus Interview Demo
 //
 // SNAPSHOT-POLICY: writes            eval03_controls — real and model-free, so it persists on a dry run too

@@ -153,6 +153,9 @@ public class ComparabilityFactsTests
     [Theory]
     [InlineData("https://synthetic-resource.openai.azure.com/", "a URL")]
     [InlineData("synthetic-resource.openai.azure.com", "an endpoint host")]
+    // DevSkim: ignore all — a PLANTED needle. This test asserts the fingerprint REFUSES anything
+    // shaped like a secret, so a scanner reading it as a leak is reading a leak-detector's own
+    // fixture as a leak. Synthetic, asserted to THROW, and asserted not to reach the message.
     [InlineData("sk-SYNTHETICSYNTHETICSYNTHETICSYNTHETICSYNTHETIC", "an API key prefix")]
     [InlineData("0123456789abcdef0123456789abcdef", "a 32-char hex key")]
     [InlineData("SYNTHETICsyntheticSYNTHETICsyntheticSYNTHETICsynth", "a 49-char opaque token")]
@@ -237,6 +240,9 @@ public class ComparabilityFactsTests
     }
 
     [Theory]
+    // DevSkim: ignore all — a DIGEST, not a token. A rubric identity is a sha256 of the rubric
+    // text, and this test exists to prove the fingerprint ACCEPTS one while refusing the secrets
+    // above. Reading a 64-hex hash as a key is the same shape §82.5 recorded for the corpora.
     [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]  // bare sha256
     [InlineData("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
     [InlineData("rubric-v3")]

@@ -617,6 +617,10 @@ public sealed class PairedCoverageReport
     {
         if (deltas.Count == 0) return (double.NaN, double.NaN);
 
+        // DevSkim: ignore all
+        // A bootstrap resample, seeded so the interval it produces is reproducible. Not a security
+        // function; a cryptographic RNG would make the same data yield a different confidence
+        // interval on every run.
         var rng = new Random(BootstrapSeed);
         var means = new double[BootstrapResamples];
 

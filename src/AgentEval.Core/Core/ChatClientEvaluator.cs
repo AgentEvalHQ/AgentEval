@@ -43,6 +43,11 @@ public class ChatClientEvaluator : IEvaluator
         IEnumerable<string> criteria,
         CancellationToken cancellationToken = default)
     {
+        // A null here used to surface later, during materialisation, as a NullReferenceException
+        // from inside a LINQ frame — three layers from the caller that supplied it. Named here
+        // instead, at the boundary, where the parameter name is still in scope.
+        ArgumentNullException.ThrowIfNull(criteria);
+
         // Materialise once: the rendered block below and the re-anchoring at the end of this method
         // must see the SAME list, and `criteria` is an IEnumerable a caller may only be able to
         // enumerate once.

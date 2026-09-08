@@ -4,6 +4,16 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- This file is a RECORD of an external consumer's project, not a project of this
+         repository: the README says "a standalone console app referencing the published
+         AgentEval package. Point the PackageReference at the candidate version, dotnet run".
+         An external consumer does not inherit our Directory.Packages.props, so it pins its own
+         version — which is illegal under Central Package Management and made every repo-wide
+         restore fail with NU1008, including the one GitHub's dependency-submission bot runs.
+         Opting out here is not a workaround; it is the fixture telling the truth about what it
+         is. The version pin below is the point of the record and must stay. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AgentEval" Version="0.23.0-beta" />

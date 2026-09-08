@@ -120,6 +120,11 @@ public static class SimulatedLatentNull
             carriers[i] = [.. latent.Select(tokens.Contains)];
         }
 
+        // DevSkim: ignore all
+        // Deterministic by REQUIREMENT, not by oversight. This is a Monte-Carlo null for a
+        // statistical test, not a security function: a cryptographic RNG would make the p-value
+        // change between runs, and a p-value that changes between runs is not a measurement. The
+        // seed is a published constant for exactly that reason (see Seed's remarks).
         var random = new Random(Seed);
         var indices = Enumerable.Range(0, pool.Count).ToArray();
         var covered = new bool[latent.Count];

@@ -1,4 +1,4 @@
-﻿# AgentEval Architecture
+# AgentEval Architecture
 
 > **Understanding the component structure and design patterns of AgentEval**
 

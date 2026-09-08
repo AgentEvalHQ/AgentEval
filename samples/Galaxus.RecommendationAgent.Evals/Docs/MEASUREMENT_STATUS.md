@@ -1,4 +1,4 @@
-﻿# MEASUREMENT_STATUS — what this eval suite can and cannot support
+# MEASUREMENT_STATUS — what this eval suite can and cannot support
 
 **Last measured: 2026-09-04.** Two dated layers: §§1–9 were measured after the Eval 02 corpus extension (§4);
 §§0a–0c and §10 were added when Evals 05–09 joined the suite and the credential rule was made uniform. Every
