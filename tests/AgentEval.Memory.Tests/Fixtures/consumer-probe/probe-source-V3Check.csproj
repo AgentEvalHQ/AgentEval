@@ -16,6 +16,13 @@
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <!-- ⚠ DO NOT BUMP THIS TO TRACK THE LATEST RELEASE. 0.23.0-beta is not a dependency to
+         keep current; it is the version the recorded output in this folder WAS PRODUCED AT.
+         README.md describes within-question-probe.json as "full probe output on the five v3
+         corpora (AgentEval 0.23.0-beta, published package)", so raising the pin without
+         re-running the probe would leave the project claiming one version and the evidence
+         beside it another. Re-point it when you RUN the probe against a candidate, and write
+         the new output next to the new pin. Nothing builds or tests this file. -->
     <PackageReference Include="AgentEval" Version="0.23.0-beta" />
   </ItemGroup>
 </Project>
