@@ -69,12 +69,12 @@ public static class CriterionText
     /// word eaten because it happened to be short and hyphenated.
     /// </para>
     /// <para>
-    /// Ported from the retail-recommendation sample's Eval 05 repair of 2026-09-05 (that sample has
-    /// since been removed; see <c>docs/findings/MEASUREMENT_STATUS.md</c>) so the rule lives in one
-    /// place instead
-    /// of once per consumer — the sample's copy CALLS this method now rather than keeping a second
-    /// one that could drift. It accepts upper-case labels as well as lower-case; on lower-cased
-    /// input the two are identical.
+    /// Ported from the retail-recommendation sample's Eval 05 repair of 2026-09-05 so the rule lives
+    /// in one place instead of once per consumer. That sample was removed on 2026-09-08 — its copy
+    /// CALLED this method rather than keeping a second one that could drift, which is why the rule
+    /// outlived it; the measurement it came from is in <c>docs/findings/MEASUREMENT_STATUS.md</c>.
+    /// It accepts upper-case labels as well as lower-case; on lower-cased input the two are
+    /// identical.
     /// </para>
     /// </remarks>
     /// <param name="text">The text to strip. Not null.</param>
