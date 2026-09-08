@@ -14,6 +14,9 @@ Individual docs/adr/*.md files are intentionally excluded — they're indexed vi
 table (a hub-page pattern), not listed individually in toc.yml; that's a deliberate, reasonable structure,
 not a gap. See docs/adr/README.md's "## Index" table.
 
+docs/findings/*.md is excluded for the same reason and by the same pattern — see docs/findings/README.md's
+"## Index" table. Those files are measurement records kept as evidence for the ADRs, not site pages.
+
 Deliberately ONE-DIRECTIONAL for the index.md check: every local link index.md makes must resolve to a page
 that's also in toc.yml, but NOT every toc.yml entry needs a matching index.md link — most nav pages (every
 individual benchmark's getting-started.md, ADRs, etc.) are never meant to be landing-page-highlighted, so
@@ -36,7 +39,11 @@ def find_hrefs(toc_path: pathlib.Path) -> set[str]:
 
 
 def find_doc_files(docs_dir: pathlib.Path) -> set[str]:
-    excluded_dir_names = {"_site", "templates", "adr"}
+    # "findings" joins "adr" on the same hub-page precedent: docs/findings/README.md carries the
+    # index table. They are measurement RECORDS (one is ~16 000 lines and cites branch names and
+    # commit shas), not pages a site reader navigates to, and listing them individually in toc.yml
+    # would put an internal evidence log into the public sidebar.
+    excluded_dir_names = {"_site", "templates", "adr", "findings"}
     files = set()
     for path in docs_dir.rglob("*.md"):
         rel = path.relative_to(docs_dir)
