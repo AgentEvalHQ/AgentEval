@@ -16160,6 +16160,80 @@ carries the measurement above so nobody re-runs this investigation. Three full-s
 getting a name, because `Assert.Equal(Allow, verdict.Action)` says *what* differed and never *why*.
 The next occurrence arrives already explaining itself.
 
-⚠ **Still open.** The flake is real, has happened three times, and its cause is not established. It is
-load-dependent, and the leading remaining explanation is something environmental in the concurrent-TFM
-run rather than in this gate. Anyone who sees it again should read the reason code the test now prints.
+#### Round two, 2026-09-08 — the elimination argument, and what it leaves
+
+Re-opened on the question *"is this a defect that must be fixed before the plan can be closed?"*
+The gate was read line by line rather than reasoned about.
+
+`MemoryWriteAdmissionGate.InspectAsync` is **pure, synchronous and stateless**: no fields but the
+options, no clock, no I/O, no shared mutable state, and `MemoryGateVerdict.Allow(...)` stores a
+validated `Action` that cannot be anything but `Allow`. Enumerating every `Reject` it can return,
+against the test's fixed input (46 chars, `Fact`, `ApplicationTrusted`, provenance present, default
+options):
+
+| reject path | reachable for this input? |
+| --- | --- |
+| `content_missing` | no — content is non-null |
+| `content_too_large` | no — 46 < 16 384 |
+| `category_excluded` | no — default excluded set is empty |
+| `provenance_missing` | no — `User` + `RootLineageId` present |
+| `unsafe_characters` | no — plain ASCII |
+| `redaction_timeout` | **the only timing-dependent one** |
+
+Every other reject is input-determined, and the input is a constant. So by elimination the observed
+`Reject` had to be `redaction_timeout` — which is what made it worth measuring properly rather than
+leaving at "cause unknown".
+
+**The starvation probe, and it closes the door the elimination opened.** The first probe only showed
+the budget is unreachable when the machine is *idle*. This one saturates it: 24–80 busy threads at
+highest priority on 20 cores, the gate's real 300 ms budget, the real 47-character input.
+
+> **0 timeouts in 12 418 311 matches — while the slowest single match took 726.4 ms.**
+
+A match ran for **2.4× the budget and did not throw.** For an input this short, `NonBacktracking`
+consults the clock *not at all* — the timeout is not merely hard to hit, it is never checked. So
+`redaction_timeout` cannot fire here however starved the thread.
+
+🔴 **Which leaves a contradiction, stated rather than resolved:** every reject path is unreachable
+for this input, and yet a reject was observed, with a TRX naming the test and `line 165` — verified
+against the file as it stood at `2ee2637d`, where line 165 is exactly
+`Assert.Equal(MemoryGateAction.Allow, verdict.Action)` inside that test. The report is internally
+consistent; the code says it is impossible.
+
+**Ruled out along the way:**
+
+- *A stale `AgentEval.MAF.dll` serving an older gate.* `DeterministicMemoryGates.cs` has exactly
+  **one** commit in its whole history (`128837c5`) — there is no older behaviour to serve.
+- *Test-name misattribution.* The TRX carries the file and line, and they match.
+- *Shared state between tests.* xUnit constructs the class per test; the gate holds none.
+- *A time-dependent fixture.* `Now` is a frozen constant and this test passes no `recordMetadata`.
+
+**Reproduction attempts on the current tree: 9 consecutive full-solution runs, all green** (10207 /
+9989 / 9989 / 1185×3 / 84 / 6 each time, 0 failed).
+
+| condition | runs | failures |
+| --- | ---: | ---: |
+| sequential, otherwise-idle machine | 6 | **0** |
+| **under deliberate CPU saturation** — 24 busy threads on 20 cores for the whole run | 3 | **0** |
+
+The three original occurrences all happened while builds ran concurrently with the suite, so load
+was the leading trigger hypothesis — and **forcing that condition did not reproduce it**. That
+weakens the load explanation without replacing it, and it is **not** evidence the anomaly is fixed:
+nothing was changed that could fix it. Nine clean runs bound the frequency, they do not explain it.
+
+#### Disposition: NOT a blocker for closing the plan, and here is the reasoning to disagree with
+
+1. It is **confined to a test assertion**. No product code path is implicated: the gate is pure and
+   its reject paths are input-determined.
+2. It is **not in the plan's blast radius**. `DeterministicMemoryGatesTests` predates this branch
+   and no wave touched the memory gates; the plan's own three-TFM gate (6.2) reads `Failed: 0`,
+   which it does on every run of the current tree.
+3. The **diagnostic is in place**: the assertion now prints `ReasonCode`, so the next occurrence
+   distinguishes `redaction_timeout` (contradicting the measurement above) from any other reason
+   (contradicting the elimination) — either way it names the wrong assumption immediately.
+
+⚠ **What would change this disposition:** a recurrence whose reason code is NOT
+`memory.write.redaction_timeout`, which would mean a reject path fires on an input that cannot
+reach it — a genuine correctness problem in the gate rather than a test artefact. Until then this
+is an open, low-frequency, test-only anomaly with a named subject and a live instrument, recorded
+rather than closed.
