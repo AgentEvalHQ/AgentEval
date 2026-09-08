@@ -83,6 +83,7 @@ public static class Program
 
         var results = new List<ArmResult>();
         var cancelled = false;
+        IReadOnlyList<string> checkFailures = [];
         await using (var evaluator = new PartnerDeskEvaluator(factory, outbox, register, judge, Console.WriteLine))
         {
             try
@@ -94,6 +95,22 @@ public static class Program
                         .ConfigureAwait(false));
                     Console.WriteLine();
                 }
+
+            // The four admitted checks, RUN — not merely declared. Offline only: their expectations are
+            // about the scripted model, and a live model would fail them for the right reasons.
+            if (selfTest)
+            {
+                Console.WriteLine("--- Admitted checks (AgentEval BenchmarkRunner) ---");
+                checkFailures = await AdmittedChecksSelfTest.RunAsync(
+                    evaluator,
+                    StandardQuestionText,
+                    cts.Token).ConfigureAwait(false);
+                Console.WriteLine(
+                    checkFailures.Count == 0
+                        ? "  4 checks x 4 arms ran; every expectation held."
+                        : $"  {checkFailures.Count} expectation(s) failed.");
+                Console.WriteLine();
+            }
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -124,7 +141,7 @@ public static class Program
 
         if (selfTest)
         {
-            return RunSelfTestAssertions(run);
+            return RunSelfTestAssertions(run, checkFailures);
         }
 
         // A non-self-test run reports; it does not fail on the model-dependent compromised arm.
@@ -138,9 +155,9 @@ public static class Program
     /// Deterministic invariants for the offline (scripted) path: the harness itself must produce the expected
     /// aggregates. This is the eval's own CI gate, and it asserts over the aggregated metrics, not printed text.
     /// </summary>
-    private static int RunSelfTestAssertions(EvalRun run)
+    private static int RunSelfTestAssertions(EvalRun run, IReadOnlyList<string> checkFailures)
     {
-        var failures = new List<string>();
+        var failures = new List<string>(checkFailures);
 
         void Expect(bool condition, string message)
         {
