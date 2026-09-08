@@ -376,7 +376,7 @@ public class ComparabilityFactsTests
         // …and the negative direction is not vacuous: the store DOES write the block when it is set.
         // Without this, a store that dropped the member entirely would pass the test above.
         using var temp = TempWorkspace.Create("ComparabilitySet");
-        var facts = new ComparabilityFacts("galaxus.eval02b", "3.1.0")
+        var facts = new ComparabilityFacts("retail.eval02b", "3.1.0")
         {
             EffectiveBar = 0.8,
             ChanceFloor = RecordedChanceFloor.From(ChanceFloor.UniformChoice(4)),
@@ -388,7 +388,7 @@ public class ComparabilityFactsTests
 
         Assert.True(doc.RootElement.TryGetProperty("comparability", out var block));
         Assert.Equal(11, doc.RootElement.EnumerateObject().Count());
-        Assert.Equal("galaxus.eval02b", block.GetProperty("evalKey").GetString());
+        Assert.Equal("retail.eval02b", block.GetProperty("evalKey").GetString());
         Assert.Equal("3.1.0", block.GetProperty("evalVersion").GetString());
         Assert.Equal(0.8, block.GetProperty("effectiveBar").GetDouble(), 12);
         Assert.Equal(0.25, block.GetProperty("chanceFloor").GetProperty("bar").GetDouble(), 12);

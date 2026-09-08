@@ -1,5 +1,21 @@
 # MEASUREMENT_STATUS — what this eval suite can and cannot support
 
+> ### ⚠ The sample this records was REMOVED from the repository
+>
+> `samples/Galaxus.RecommendationAgent{,.Evals}` (~71 000 lines) was deleted on 2026-09-08. It had no
+> dependents, and every pattern it demonstrated is taught better elsewhere: `AgentEval.Samples/EvalJoin`
+> for the deterministic-code-eval pattern (including `MinimumAttainableP` and the paired control arm),
+> `AgentEval.PartnerDeskDemo.Evals` for ceiling floors, `AgentEval.TravelDemo.Evals` for `AtLeastOneHit`.
+> The realistic end-to-end case now lives in the standalone VITRINE repository, which replaced this
+> sample's bespoke eval stack with a bounded declarative integration over AgentEval.
+>
+> **This document is kept, and kept UNDER ITS ORIGINAL NAME, because it is a record.** Every figure
+> below was measured on a sample called Galaxus, on a branch called `joslat/digitec-galaxus`. Renaming
+> the subject of a measurement record does not tidy it — it makes it claim something that never
+> happened. The brand is gone from all live code, the solution, and `.gitignore`; it survives here and
+> in ADR-030/031/032 as history, which is the only place it is still true.
+
+
 **Last measured: 2026-09-04.** Two dated layers: §§1–9 were measured after the Eval 02 corpus extension (§4);
 §§0a–0c and §10 were added when Evals 05–09 joined the suite and the credential rule was made uniform. Every
 number below was produced by running the code in this project, not read off the design document. Where the

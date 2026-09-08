@@ -1,5 +1,21 @@
 # RUN_PROTOCOL — verify small and live before every full run
 
+> ### ⚠ The sample this records was REMOVED from the repository
+>
+> `samples/Galaxus.RecommendationAgent{,.Evals}` (~71 000 lines) was deleted on 2026-09-08. It had no
+> dependents, and every pattern it demonstrated is taught better elsewhere: `AgentEval.Samples/EvalJoin`
+> for the deterministic-code-eval pattern (including `MinimumAttainableP` and the paired control arm),
+> `AgentEval.PartnerDeskDemo.Evals` for ceiling floors, `AgentEval.TravelDemo.Evals` for `AtLeastOneHit`.
+> The realistic end-to-end case now lives in the standalone VITRINE repository, which replaced this
+> sample's bespoke eval stack with a bounded declarative integration over AgentEval.
+>
+> **This document is kept, and kept UNDER ITS ORIGINAL NAME, because it is a record.** Every figure
+> below was measured on a sample called Galaxus, on a branch called `joslat/digitec-galaxus`. Renaming
+> the subject of a measurement record does not tidy it — it makes it claim something that never
+> happened. The brand is gone from all live code, the solution, and `.gitignore`; it survives here and
+> in ADR-030/031/032 as history, which is the only place it is still true.
+
+
 **Standing rule, set 2026-09-06. Applies to every wave of the plan, and to anyone picking this up later.**
 
 ## The rule

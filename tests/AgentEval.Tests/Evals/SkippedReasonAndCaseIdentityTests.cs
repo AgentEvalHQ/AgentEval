@@ -78,9 +78,9 @@ public class SkippedReasonAndCaseIdentityTests
         // between runs is worse than an absent one because it fails silently.
         Assert.Null(new EvalInput("q").CaseId);
 
-        var input = new EvalInput("q", "r") { CaseId = "galaxus/persona-nadia/case-07" };
+        var input = new EvalInput("q", "r") { CaseId = "retail/persona-nadia/case-07" };
 
-        Assert.Equal("galaxus/persona-nadia/case-07", input.CaseId);
+        Assert.Equal("retail/persona-nadia/case-07", input.CaseId);
         Assert.Equal("q", input.Query);
         Assert.Equal("r", input.Response);
     }
