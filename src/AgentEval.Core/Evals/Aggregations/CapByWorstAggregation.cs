@@ -43,7 +43,7 @@ public sealed class CapByWorstAggregation : IAggregationStrategy
     /// <summary>
     /// The weights-only entry point. Aggregation reads nothing from an <see cref="EvalComponent"/>
     /// except its <see cref="EvalComponent.Weight"/> — verified across all five strategies:
-    /// <c>grep '\.Eval|\.Required' src/AgentEval.Core/Evals/Aggregations/</c> returns 0 — so a
+    /// <c>grep -rn '\.Eval\b|\.Required\b' src/AgentEval.Core/Evals/Aggregations/ | grep -v '///'</c> returns 0 — so a
     /// caller that has weights but no evals does not need a throwing <c>IEval</c> stub to carry them.
     /// Four such stubs existed only to satisfy the <see cref="EvalComponent"/> constructor.
     /// </summary>
