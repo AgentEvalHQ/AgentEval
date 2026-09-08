@@ -1,5 +1,13 @@
 # ADR-030: Meta-evaluation is the lane. Contract unification is not.
 
+
+> ⚠ **`samples/Galaxus.RecommendationAgent{,.Evals}` was deleted on 2026-09-08** (no dependents; its
+> patterns are taught by `AgentEval.Samples/EvalJoin` and `AgentEval.PartnerDeskDemo.Evals`, its realistic
+> case by the standalone VITRINE repository). References to it below are **historical and deliberately
+> unchanged** — they record what was measured, and where. The findings it produced moved to
+> `docs/findings/`.
+
+
 - **Status:** **Accepted (2026-09-05).** Ratification is what funds §8: Slices 1 and 2 are now
   funded. Slice 0 was **already executed** before ratification (see the ratification note) — the gate
   it was meant to sit behind did not hold, and saying so is part of accepting the document. Status

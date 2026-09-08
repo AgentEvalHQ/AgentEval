@@ -148,6 +148,25 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
         return $"  Phase {(int)phase}  run {index,2}/{total}  {verdict}  {summary}";
     }
 
+    /// <summary>
+    /// Runs ONE phase and returns what it recorded, for callers that score the outcome themselves.
+    /// </summary>
+    /// <param name="phase">The gate configuration.</param>
+    /// <param name="question">The officer's request.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The phase outcome.</returns>
+    /// <remarks>
+    /// <see cref="EvaluateArmAsync"/> aggregates into an <see cref="ArmResult"/> and keeps no outcome, so
+    /// a caller that wants to project the phase into an <c>EvalInput</c> cannot reach one through it. This
+    /// is that reach — the SAME runner, no second scenario implementation, and deliberately no retry:
+    /// a caller scoring individual phases needs to see the error, not a silently skipped run.
+    /// </remarks>
+    public Task<PhaseOutcome> RunPhaseAsync(
+        DemoPhase phase,
+        string question,
+        CancellationToken cancellationToken = default) =>
+        _runner.RunAsync(phase, question, cancellationToken);
+
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _runner.DisposeAsync();
 }

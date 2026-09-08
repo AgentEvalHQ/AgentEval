@@ -98,7 +98,7 @@ static void PrintUsage()
                          1   = Behavioral Policies
                          2   = Stochastic Model Comparison
                          3   = Semantic Kernel Flight Agent
-                         4   = Run ALL demos
+                         4   = Deterministic benchmark (AE-04 join, from the package)
                          all = Run ALL demos
       --help, -h       Show this help
     
@@ -157,7 +157,14 @@ static async Task RunAutomated(bool useMock, string demoChoice)
             case "3":
                 await SemanticKernelDemo.RunAsync();
                 break;
-            case "4" or "all":
+            case "4":
+                // 4.2: the AE-04 join, exercised from OUTSIDE against the published package.
+                // Offline and free in either mode — no agent, no IChatClient, no network.
+                await DeterministicBenchmarkFromThePackage.RunAsync();
+                Console.WriteLine();
+                await DeterministicBenchmarkFromThePackage.RunAsync(brokenArm: true);
+                break;
+            case "all":
                 await Demos.RunCompleteExample(useMock);
                 Console.WriteLine("\n" + new string('═', 80) + "\n");
                 await Demos.RunBehavioralPoliciesDemo(useMock);
@@ -168,9 +175,11 @@ static async Task RunAutomated(bool useMock, string demoChoice)
                     Demos.ShowStochasticExplanation();
                 Console.WriteLine("\n" + new string('═', 80) + "\n");
                 await SemanticKernelDemo.RunAsync();
+                Console.WriteLine("\n" + new string('═', 80) + "\n");
+                await DeterministicBenchmarkFromThePackage.RunAsync();
                 break;
             default:
-                Console.WriteLine($"Unknown demo: {demoChoice}. Use 0, 1, 2, 3, or 'all'");
+                Console.WriteLine($"Unknown demo: {demoChoice}. Use 0, 1, 2, 3, 4, or 'all'");
                 Environment.Exit(1);
                 break;
         }

@@ -1,5 +1,13 @@
 # ADR-032: Benchmarks are definitions; runs bind subjects; scores are meta
 
+
+> ⚠ **`samples/Galaxus.RecommendationAgent{,.Evals}` was deleted on 2026-09-08** (no dependents; its
+> patterns are taught by `AgentEval.Samples/EvalJoin` and `AgentEval.PartnerDeskDemo.Evals`, its realistic
+> case by the standalone VITRINE repository). References to it below are **historical and deliberately
+> unchanged** — they record what was measured, and where. The findings it produced moved to
+> `docs/findings/`.
+
+
 - **Status:** **Accepted (2026-09-07).** The owner answered §6's Q-A — **inside the rule** — and
   Wave 2 was then BUILT rather than merely funded: `BenchmarkDefinition` / `AdmittedCheck` /
   `BenchmarkArm` / `CheckObservation` / `BenchmarkRun` (`c27bb45e`), `BenchmarkScore` (`821b41cd`),

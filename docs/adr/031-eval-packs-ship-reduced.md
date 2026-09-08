@@ -1,5 +1,13 @@
 # ADR-031 (draft) — Eval Packs: a portable, versioned eval suite keyed by subject × use case
 
+
+> ⚠ **`samples/Galaxus.RecommendationAgent{,.Evals}` was deleted on 2026-09-08** (no dependents; its
+> patterns are taught by `AgentEval.Samples/EvalJoin` and `AgentEval.PartnerDeskDemo.Evals`, its realistic
+> case by the standalone VITRINE repository). References to it below are **historical and deliberately
+> unchanged** — they record what was measured, and where. The findings it produced moved to
+> `docs/findings/`.
+
+
 > **Location note (superseded 2026-09-05):** the two companion documents this ADR used to defer to — `EvalPacks_Design.md` (the reduced-scope design) and `EvalPack_Galaxus_WorkedExample.md` (the worked evidence) — lived in `strategy/Galaxus/`, which is gitignored and local-only, so **no reader of this repository could ever open them.** Both were **deleted on 2026-09-05** and everything this ADR depended on them for is now stated in-repo: **S1–S5 in §0.1**, the findings **V1–V7 in §0.2**, and the portability verdict in **§0.3**. This ADR no longer points outside the repository for anything load-bearing.
 
 **Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.** ↪ *(one name with the README index: §12.3)*

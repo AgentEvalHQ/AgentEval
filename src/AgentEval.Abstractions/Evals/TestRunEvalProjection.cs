@@ -15,7 +15,7 @@ using AgentEval.Models;
 /// <remarks>
 /// <para>
 /// <b>Why this exists.</b> Three independent evals projects (<c>TravelDemo.Evals</c>,
-/// <c>Galaxus.Evals</c>, <c>PartnerDeskDemo.Evals</c> — the third in a different repository) use
+/// <c>PartnerDeskDemo.Evals</c>, and a third in a different repository) use
 /// <see cref="IEval"/> exactly <b>zero</b> times each. Three authors, three codebases, no adoption.
 /// The cause is not taste: there was no path from a MAF agent run to an <see cref="EvalInput"/>, so
 /// each author wrote a private harness instead. This is the path.

@@ -21,6 +21,9 @@
          AdmittedCheck and BenchmarkArm. Abstractions carries the join; Core carries the base. -->
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <!-- InMemoryOutputStore, for the admitted-checks self-check. In a consuming repository this
+         arrives inside the AgentEval package, which carries AgentEval.DataLoaders.dll. -->
+    <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
   </ItemGroup>
 
   <ItemGroup>
