@@ -152,6 +152,7 @@ def score_shape(vertical, shape, blk, exempt):
     """Returns (passed, applicable, [(criterion, ok_or_None, detail)])."""
     key = '%s/%s' % (vertical, shape)
     is_exempt = key in exempt
+    is_absence = key in ABSENCE_SHAPES
     rows = []
 
     h = blk.get('headroom_perfect_selector')
@@ -160,8 +161,23 @@ def score_shape(vertical, shape, blk, exempt):
     else:
         rows.append(('C1 discriminates', h >= DISCRIMINATION_FLOOR, 'headroom %.3f' % h))
 
+    # C2 USES THE CEILING §88.16 DECLARED. For an ABSENCE shape V1 is not a valid ceiling -- gold
+    # cannot hold an absence -- so scoring "answerable" on V1 fails a shape for a statistic this
+    # file itself says does not apply to it. §88.29 applied that rule to mean_headroom and NOT here,
+    # which left `forgetting/still-valid` (V1 13/15, V8 15/15) and `prospective/not-yet-true`
+    # (V1 5/6, V8 6/6) failing a criterion they pass on the ceiling that applies.
+    #
+    # ⚠ THIS MOVES SCORES UP (forgetting 7.50 -> 10.00, prospective 9.47 -> 10.00), which is the
+    # flattering direction. It is applied because the rule is independently established and keyed on
+    # the QUESTION, not because of where it moves the number -- and the underlying V1 figure is
+    # still printed so the reader sees both.
     v1n, v1p = blk.get('v1_applicable'), blk.get('v1_passed')
-    if v1n:
+    v8n, v8p = blk.get('v8_applicable'), blk.get('v8_passed')
+    if is_absence and v8n:
+        rows.append(('C2 answerable', v8p / v8n >= V1_FLOOR,
+                     'V8 %d/%d (absence shape; V1 %s/%s does not apply)'
+                     % (v8p, v8n, v1p, v1n)))
+    elif v1n:
         rows.append(('C2 answerable', v1p / v1n >= V1_FLOOR, 'V1 %d/%d' % (v1p, v1n)))
     else:
         rows.append(('C2 answerable', None, 'no V1 (no gold)'))

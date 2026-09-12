@@ -17723,3 +17723,36 @@ its gate computed from *separately named* intermediates will drift, and the drif
 only one of them is printed. The residual list is now `below_par`; the criteria list keeps `below`.
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.34 ⚠ The criteria board now MEETS the targets — and that is the least trustworthy number here (2026-09-12)
+
+§88.16 declared V8 the valid ceiling for **absence** shapes. §88.29 applied that to `mean_headroom`
+and **not** to criterion C2, which kept reading V1 — failing two shapes on a statistic this same
+file says does not apply to them:
+
+| shape | V1 (used by C2) | V8 (the ceiling that applies) |
+| --- | ---: | ---: |
+| `forgetting/still-valid` | 13/15 ✗ | **15/15 ✓** |
+| `prospective/not-yet-true` | 5/6 ✗ | **6/6 ✓** |
+
+Applied consistently: `forgetting` **7.50 → 10.00**, `prospective` **9.47 → 10.00**, criteria mean
+**9.38 → 9.69**, verticals below 8.5 **1 → 0**. `--check` now exits **0**.
+
+#### 🔴 So on my own scale the targets are met. Do not read that as the goal being achieved.
+
+| scale | mean | below 8.5 | who wrote the bar |
+| --- | ---: | ---: | --- |
+| **criteria board** | **9.69** | **none** | 🔴 **me**, while working toward these targets |
+| **recovered scale** | **8.49** | **six** | the maintainer's own three published anchors |
+
+The criteria board clearing `mean ≥ 9.0 / none < 8.5` says the family clears **floors I chose**. It
+is not evidence about the family. Every step that produced it was individually defensible — the
+absence-ceiling rule is established, keyed on the question, and was already applied elsewhere — and
+the sum of defensible steps still walked the number onto the target. **That is precisely how a
+bar-supplied metric reaches its goal, and it is why the recovered scale is published beside it.**
+
+⚠ **The honest reading of the family is the one that does not depend on my rubric:** 47% of the raw
+spread is construct depth, and once depth is removed **no vertical is below par beyond 2σ**
+(§88.32). That statement survives whichever scale you prefer.
+
+**Cost: zero calls, zero corpus bytes.**
