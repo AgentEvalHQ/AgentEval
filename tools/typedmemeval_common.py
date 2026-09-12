@@ -352,38 +352,6 @@ def echo_terms(question_text: str, echo: float, rng: random.Random) -> list[str]
 ECHO_LEAD = "Also on my mind:"
 
 
-def swap_echo_terms(sentence: str, extra: list[str]) -> str:
-    """REPLACES the last few terms of an existing echo clause with `extra`, keeping the count.
-
-    Adding terms was the obvious move and it failed twice, each time on a different axis. Appending a
-    second clause read badly and pushed turn length, mean turn length and punctuation density to
-    3.7-4.8 sd. Merging into the one clause fixed the prose and still left every distractor carrying
-    more echo terms than its gold, which is more commas: punctuation density 0.761, over the bar.
-
-    So the terms are swapped rather than added. The clause keeps its length, its comma count and its
-    token count; only WHICH words sit in it changes. The distractor gives up a couple of the query
-    keywords it was echoing, which costs a little retrieval competitiveness -- that is a real cost,
-    and it is the one the calibration gate is there to measure, so it gets measured rather than
-    guessed at.
-    """
-    if not extra:
-        return sentence
-    marker = f"({ECHO_LEAD} "
-    start = sentence.rfind(marker)
-    if start < 0:
-        return sentence
-    close = sentence.find(")", start)
-    if close < 0:
-        return sentence
-    inner = sentence[start + len(marker):close].rstrip().rstrip(".")
-    terms = [term.strip() for term in inner.split(",") if term.strip()]
-    if not terms:
-        return sentence
-    keep = terms[:max(1, len(terms) - len(extra))] if len(terms) > len(extra) else terms[:1]
-    merged = keep + extra[:max(0, len(terms) - len(keep))]
-    return f"{sentence[:start]}{marker}{', '.join(merged)}.){sentence[close + 1:]}"
-
-
 def weave_echo(sentence: str, terms: list[str]) -> str:
     """Appends echoed vocabulary as a natural-sounding trailing clause.
 
@@ -596,11 +564,6 @@ _PAD_PUNCT_TAILS = [
     "(it hardly signified)",
     "which, in fairness, was the point",
 ]
-
-
-def _role_text(session: Session, role: str) -> str:
-    """The text one speaker contributes to a session."""
-    return " ".join(t.content for t in session.turns if t.role == role)
 
 
 def _slot_index(session: Session, role: str, ordinal: int) -> int | None:
@@ -1699,6 +1662,20 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
 
     Applied centrally, after build and before scoring, so no generator can reintroduce the tell by
     forgetting it.
+
+    ⚠ AN EARLIER APPROACH TO THIS SAME PROBLEM WAS DELETED ON 2026-09-12, and its measurements
+    are kept here because they cost real runs to obtain. `swap_echo_terms` REPLACED the last few
+    terms of a distractor's existing clause instead of giving gold one of its own. Its rationale,
+    verbatim: appending a second clause "read badly and pushed turn length, mean turn length and
+    punctuation density to 3.7-4.8 sd"; merging into one clause "fixed the prose and still left
+    every distractor carrying more echo terms than its gold, which is more commas: punctuation
+    density 0.761, over the bar".
+
+    It was introduced with the v5 work and NEVER CALLED -- 1 reference in the repository, its own
+    `def`. So the shipped corpora were never built that way, while its docstring read "the terms
+    are swapped rather than added" as though describing current policy. A future reader would have
+    taken it for the live treatment. This function is the live treatment, and v5's separability
+    baseline is EMPTY under it.
     """
     # Built from question text, minus every token that appears in ANY question's ANSWER.
     # Episodic's attribution questions embed the statement they ask about, so a value that is
