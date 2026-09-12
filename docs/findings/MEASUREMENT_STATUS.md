@@ -17508,6 +17508,8 @@ the shape of a bar being supplied.
 
 ### 88.30 🔴 THE CALIBRATION GATE IS TUNED ON AN OPERAND THAT DOES NOT SET HEADROOM (2026-09-12)
 
+> ⚠ **PARTLY CORRECTED BY 88.31, same day.** The operand finding below stands. The conclusion drawn from it — that `bitemporal` and `workingmemory` carry a *defect* because their gold depth is 1.00 — is **WRONG**: depth 1 is their declared **construct**. Acting on it would have broken two working verticals. Read 88.31.
+
 Every vertical in the family is calibrated to the same target: **mean realised coverage 0.70**
 (`BAND_TARGET`, `typedmemeval_common.py`). Under the identity `headroom ≈ 1 − ALLgold` (§88.12)
 that should make every vertical's headroom ≈ 0.30. Measured, mean headroom ranges **0.258 to
@@ -17568,5 +17570,62 @@ to test — and the score follows as a consequence rather than as the motive.
 share. On ALLgold the family's *best* discriminators sit at 0.15–0.20 (conjunction, procedural),
 which the old floor would reject as "unanswerable noise". Re-deriving the band on the right operand
 is a separate, larger decision and is **not** taken here.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.31 ✅ Depth is the CONSTRUCT, not a defect — and the residual is the real quality signal (2026-09-12)
+
+🔴 **§88.30 drew the wrong conclusion from a right measurement, and I nearly acted on it.**
+It called mean gold depth 1.00 a defect in `bitemporal` and `workingmemory`. It is not. Each
+vertical's depth is what its own generator declares it must be:
+
+| vertical | depth | why that depth IS the construct |
+| --- | ---: | --- |
+| `workingmemory` | 1.00 | *"recall of a **stable** profile fact as a function of **distance**"* — one fact, held across N sessions of interference. Depth >1 would destroy the independent variable. |
+| `bitemporal` | 1.00 | *"what the record said **as of** an instant"* — a belief at a point in time is one session by definition. |
+| `forgetting` | 2.00 | the docstring **declares `G=2`**: statement + invalidation. |
+| `conjunction` / `arithmetic` | 4.35 / 4.50 | multi-hop joins and sums over many sessions — depth is the task. |
+
+**I was one step from running arcs that would have raised depth on two verticals whose value
+depends on not having it.** That is the "fix that outran the diagnosis" shape, and the thing that
+stopped it was checking what the shape claims to measure before changing it.
+
+#### The sharpened finding: the score penalises a vertical for its construct
+
+> **headroom = 0.299 + 0.090 × depth, R² = 0.468**
+
+**47% of the spread between verticals is construct depth alone.** `conjunction` scores 9.40 and
+`workingmemory` 7.78 substantially because of *what they measure*, not *how well*. Requiring every
+vertical to clear one uniform bar asks a distance-ladder to behave like a multi-hop join.
+
+#### ✅ Removing depth leaves the part that IS about quality
+
+| vertical | depth | headroom | expected for its depth | **residual** |
+| --- | ---: | ---: | ---: | ---: |
+| procedural | 2.50 | 0.800 | 0.525 | **+0.275** |
+| conjunction | 4.35 | 0.754 | 0.693 | +0.061 |
+| bitemporal | 1.00 | 0.431 | 0.390 | +0.041 |
+| prospective | 1.66 | 0.461 | 0.449 | +0.012 |
+| temporal | 3.42 | 0.606 | 0.608 | −0.002 |
+| workingmemory | 1.00 | 0.383 | 0.390 | −0.007 |
+| episodic | 2.74 | 0.522 | 0.547 | −0.025 |
+| arithmetic | 4.50 | 0.639 | 0.706 | −0.067 |
+| **semantic** | 2.40 | 0.383 | 0.516 | **−0.133** |
+| **forgetting** | 2.00 | 0.325 | 0.480 | **−0.155** |
+
+Six of ten sit within ±0.07 of what their construct predicts — **at par, nothing to fix**. That
+includes `workingmemory` (−0.007) and `bitemporal` (+0.041), the two §88.30 accused.
+
+🔴 **Two verticals are genuinely below par for their own construct: `forgetting` (−0.155) and
+`semantic` (−0.133).** That is a defect statement that survives the depth confound, and it is the
+first justification in this session for funding an arc on either.
+
+#### ⚠ What this says about the `none < 8.5` target
+
+The target asks every vertical to clear a bar on a scale that is **47% construct**. A
+distance-ladder vertical cannot reach a multi-hop vertical's headroom without ceasing to be a
+distance ladder. **So the target is not reachable without breaking constructs — and that is a
+property of the target, not a failure of the corpora.** A depth-adjusted bar (residual ≥ some
+threshold) is reachable and means something; a uniform bar on raw headroom does not.
 
 **Cost: zero calls, zero corpus bytes.**
