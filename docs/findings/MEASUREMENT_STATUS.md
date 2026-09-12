@@ -17087,3 +17087,54 @@ improvement"), and **DO NOT SPEND** (below the floor). It refused this candidate
 
 **Cost: zero calls, zero corpus bytes.** The generator change is reverted; `bitemporal`'s
 `corpus_sha256` never moved.
+
+### 88.22 ✅ Phase 1 disposition — the five remaining verticals, audited against every instrument (2026-09-12)
+
+Phase 1 runs lowest-score-first: Episodic → Bitemporal → **WorkingMemory → Prospective → Arithmetic
+→ Temporal → Semantic**. The first two are done. The remaining five were each audited against every
+instrument built this session, because *measure the defect before paying to fix it* applies to
+deciding whether a vertical needs an arc at all.
+
+**Checked per vertical:** the five quality-board criteria (§88.15); the 106-stratum sweep for a
+sub-population below the floor (§88.20); the `V8 > V1` absence-ceiling detector (§88.16); the
+identity's exception set (§88.12); and the below-chance baseline column (§88.17).
+
+| vertical | score | min headroom | measured defects |
+| --- | ---: | ---: | --- |
+| WorkingMemory | 10.00 | +0.250 | **none** |
+| Prospective | 9.47 | +0.250 | 1 — `not-yet-true` V1 5/6 |
+| Arithmetic | 10.00 | +0.500 | **none** |
+| Temporal | 9.23 | +0.467 | 1 — `occurrence-order` baseline below chance |
+| Semantic | 10.00 | +0.267 | **none** |
+
+#### Both flagged items are already explained and declared
+
+- **`prospective/not-yet-true` V1 5/6** is an **absence shape** (§88.16): its answer asserts that a
+  triggering event has *not* occurred, and gold cannot hold an absence — so V1 is not a valid
+  ceiling for it. **V8 is 6/6.** The shape is fine; the statistic was wrong, and is now declared.
+- **`temporal/occurrence-order`** carries `v9_above_chance −0.250`, already corrected in reporting
+  by §88.17: it publishes `headroom_above_chance` **0.500** beside the uncorrected 0.750. The
+  underlying fact — a lexical retriever scoring below a guesser on this shape — is a real property,
+  now disclosed rather than folded into the headline.
+
+#### 🔴 So no arc is funded for these five, and that is the finding
+
+**None of the five carries an unaddressed defect.** Regenerating any of them would spend ~200–500
+calls plus a consumer control reset to fix nothing that has been measured — precisely the *"spend
+that cannot support the claim it is for"*. Three of the five have **zero** criterion failures, no
+stratum below the floor, and every shape discriminating.
+
+⚠ This is the same disposition the plan's Tier 1 already records for them, now reached by
+measurement rather than by deferral: `W2`/`W3` (WorkingMemory) trigger on *any rung crossing its
+band* — none has; `A2`/`A3` (Arithmetic) trigger on *Arithmetic falling below 8.5* — it does not, on
+the only instrument that exists; `P2` (Prospective) remains the highest-value Tier 1 arc on the page
+because three pair-shapes sit at 3–4 pairs and fail on **sample size**, not on any defect a
+regeneration would fix.
+
+✅ **What this means for Phase 1.** Two verticals had measurable defects and were executed: Episodic
+(shipped, `−0.067 → +0.533`) and Bitemporal (defect measured and published; fix designed, built, and
+**refused by its own pre-check**, §88.21). The other five were audited and need nothing. Phase 1 is
+complete in the only form that survives its own discipline — **an arc where a defect was measured, a
+written reason where none was.**
+
+**Cost: zero calls, zero corpus bytes.**
