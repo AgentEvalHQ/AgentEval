@@ -17029,3 +17029,61 @@ defect, not a family-wide reporting gap.
 
 **Cost: zero calls, zero corpus bytes** — the re-probe ran fully from cache (`calls=0
 cached=16,326`) and only sidecars moved. `AgentEval.Memory.Tests` 1190/1190 on all three TFMs.
+
+### 88.21 ✅ The Bitemporal fix REFUSED by its own pre-check — and the confound that nearly hid it (2026-09-12)
+
+§88.20 measured a real defect: `belief-at-instant/valid` runs headroom **0.056**, below the floor, on
+18 questions the shape publishes as discriminating. I designed a fix, and **did not ship it.**
+
+#### What was tried
+
+Raise `corrections` 1 → 3 on `belief-at-instant` and 2,3,4 → 3,4,5 on `correction-depth`, on the
+reading that more retroactive corrections put more lexically identical sessions in competition for
+the top-K budget. The shipped rungs appeared to support it: at 2 corrections ALLgold was **1.000**
+and headroom **0.000**; at 3–4 it was 0.50–0.75 and the rungs worked.
+
+**The separability gate refused the first attempt outright** — a 3-correction chain clamps against
+the end of the haystack, and the valid arm's gold is the LAST correction, so `position_in_haystack`
+separated gold perfectly in 22% of questions (13 against 6.0 by chance, 3.0 sd). Fixed with a tail
+reserve. The generator then passed.
+
+#### 🔴 Then the pre-check refused it, and the reason generalises
+
+| stratum | shipped ALLgold | candidate | predicted headroom | |
+| --- | ---: | ---: | ---: | --- |
+| `belief-at-instant/valid` | 0.889 | 0.833 | **+0.167** | MARGINAL |
+| `correction-depth/valid` | 0.667 | **0.833** | **+0.167** | MARGINAL — **worse** |
+
+**Regenerating re-searches the ECHO knob**, which weaves question vocabulary into distractors so
+they compete. Echo drives ALLgold directly — *lower echo → weaker distractors → gold easier to
+retrieve → higher ALLgold* — and it moved **0.6406 → 0.3750**. So the candidate differs from its
+predecessor in **two** variables, not one.
+
+The operand settles it: `correction-depth/valid` at correction-rung **3** reads ALLgold **0.500**
+shipped and **0.750** candidate — *the same rung*, moved by echo alone. Read as a rung effect that
+would have been a **fabricated mechanism**. And the shipped rung pattern I built the design on is
+**n=4 per cell**: 1.000 against 0.500 is two questions.
+
+✅ **Not spent.** This is the fourth filed item to turn out smaller than filed or wrong to fix.
+
+#### ⚠ The same confound applies retrospectively to `E1-b` — and its conclusion survives
+
+Episodic's echo moved **0.6667 → 0.3333** across that arc, so its pre-check was confounded too.
+**The confound runs AGAINST the change looking good**: a lower echo *raises* ALLgold, so a candidate
+clearing the floor despite it clears it conservatively, and the design's true effect is at least
+what was measured. E1-b's ALLgold fell **1.00 → 0.27** through that headwind and the arc delivered
+**+0.533** measured headroom. The conclusion stands; what changes is that the margin, not just the
+direction, now has a stated reason to be trusted.
+
+🔴 **A marginal pass, by contrast, is not attributable.** An echo delta alone is easily 0.15 of
+ALLgold, which is the entire margin bitemporal showed.
+
+#### The gate is now a shipped instrument rather than a scratch script
+
+`tools/typedmemeval_precheck.py <vertical> <candidate-root>` prints both echo knobs, flags any
+stratum that got **worse**, and returns three distinct verdicts: **PASS** (clears with margin),
+**NOT ESTABLISHED** (within 0.10 of the floor — "not shown to work", explicitly *not* "a small
+improvement"), and **DO NOT SPEND** (below the floor). It refused this candidate at exit 3.
+
+**Cost: zero calls, zero corpus bytes.** The generator change is reverted; `bitemporal`'s
+`corpus_sha256` never moved.
