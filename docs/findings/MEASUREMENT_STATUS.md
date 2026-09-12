@@ -16439,3 +16439,36 @@ Mean **8.45**, Episodic **7.5**, **33 of 36** shapes, open triage **20**. None m
 have: every commit was free by construction. Moving them needs a corpus regeneration and a re-probe —
 which resets a consumer's controls — and, for Episodic, a **new question form** for
 `participant-attribution` that E1 already attempted once. That is design work, not a parameter change.
+
+### 88.10 🔴 A design of mine, falsified by a free test before it cost anything (2026-09-12)
+
+`participant-attribution` is 30% of Episodic at −0.067 headroom and blocks the vertical reaching
+8.5. I diagnosed it as **the question quoting the claim it asks about**, designed `E1-b` around that
+(identify the statement by its consequence, not its content), and wrote a falsifiable prediction:
+V9 **1.000 → ≤ 0.500**.
+
+Then I tested the mechanism with BM25 alone — `tmc.bm25_rank` is a pure function, so **zero model
+calls** — and both halves of the diagnosis failed.
+
+| shape | gold in BM25 top-5 | headroom | discriminates |
+| --- | ---: | ---: | --- |
+| `participant-attribution` | **15 of 15 (100%)** | −0.067 | **False** |
+| `list-order` | **15 of 15 (100%)** | **0.733** | True |
+| `assistant-stated` | 14 of 20 (70%) | 0.300 | True |
+
+`list-order` has **identical** retrieval and discriminates fine, so "BM25 finds gold" cannot be the
+cause. And stripping the quoted statement moves retrieval only **15/15 → 12/15**, three questions,
+so `E1-b` would not have reached its own predicted 0.500.
+
+**The real mechanism:** retrieving gold and being able to ANSWER are different things, and this shape
+collapses them. `list-order` needs reasoning over what was retrieved; `participant-attribution`'s
+answer is **a structural property of the retrieved session** — which role's turn carries the sentence
+— so retrieval IS the answer. That is why re-forming the wording (E1) did not help: **the leak is the
+role structure, not the vocabulary.**
+
+✅ **What this saved.** Running the Episodic arc on `E1-b` would have cost **2,100–3,200 calls** to
+produce a result that fails its own stated prediction. The prediction is what made that checkable in
+advance; a design without one would have shipped and been argued about afterwards. This is the
+"measure the defect before paying to fix it" rule catching **my own** proposed remedy, which is the
+first time in this record it has been applied against something I authored rather than something I
+inherited.
