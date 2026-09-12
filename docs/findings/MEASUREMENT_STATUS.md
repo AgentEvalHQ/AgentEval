@@ -16253,3 +16253,189 @@ nothing was changed that could fix it. Nine clean runs bound the frequency, they
 reach it — a genuine correctness problem in the gate rather than a test artefact. Until then this
 is an open, low-frequency, test-only anomaly with a named subject and a live instrument, recorded
 rather than closed.
+
+---
+
+## §88 — Phase 0 re-taken against `e4322e0d`: three items closed, three defects found, **0 corpus bytes** (2026-09-12)
+
+Every figure below was measured against the tree at `e4322e0d`, free. **No corpus file changed in any
+of the nine commits** — checked, not assumed:
+
+```
+git diff --name-only dc5369b1..HEAD -- src/AgentEval.Memory/Data/typedmemeval/   ->  0
+procedural corpus_sha256, dc5369b1 vs now                                         ->  IDENTICAL
+```
+
+So no `probed_corpus_sha256` moved and **no consumer control resets**. Every measurement in the
+quality board still binds.
+
+### 88.1 `C-F` — the filed question conflated two different floors
+
+`CalibratedFloorMean` is the corpus's **calibrated BM25 mean coverage** — a competent algorithm's
+performance. `ChanceFloor` is *"k, the arm's DECLARED draw budget"* — what luck alone yields, applied
+at an admission door. Typing the first as the second would let **"beat word matching" masquerade as
+"cleared chance"**, which is a far stronger claim. Refused, with the reason in the code.
+
+**But the real floor never crossed at all, and it is material.** Measured at any nesting depth (a
+first count said 0 of 565 because the extension key was guessed as `extension`; it is `typedmemeval`):
+
+| vertical | declares a floor | E[correct from luck] | share of vertical |
+| --- | ---: | ---: | ---: |
+| **procedural** | **80 / 80** | **27.2** | **34.1%** |
+| conjunction | 30 / 65 | 12.5 | 19.2% |
+| semantic | 15 / 50 | 5.0 | 10.0% |
+| the other seven | none | — | — |
+
+Floors in use: `0.3333` ×96, `0.5` ×23, `0.2` ×5, `0.25` ×1.
+
+A consumer receives **aggregate counts only** — no per-question results — so "correct 35 of 80" on
+Procedural reads as 44% understanding when luck supplies 27 of those 35. `TypedMemEvalGuessingBaseline`
+now ships it per vertical, printed directly beneath `correct`.
+
+⚠ **An upper bound on free score, never a subtraction.** It assumes the system answers every
+closed-choice question; one that abstains scores below it without being worse.
+
+### 88.2 `B3` — one cause, not three, and the corpus was never the problem
+
+| shape | clock | n | regressed | rate |
+| --- | --- | ---: | ---: | ---: |
+| `belief-at-instant` | **transaction** | 18 | **3** | **16.7%** |
+| `belief-at-instant` | valid | 18 | 0 | 0.0% |
+| `correction-depth` | transaction | 12 | 0 | 0.0% |
+| `correction-depth` | valid | 12 | 0 | 0.0% |
+
+All three regressions sit in one cell of eighteen: the sub-shape asking what the record showed **as of
+a date before a correction**, with that correction in the haystack. Valid time conflated with
+transaction time — the one thing bitemporal exists to test. **Not a defect; the vertical working.**
+
+🔴 **The defect was the reporting.** `interference_cost 0.05` is a mean over a structured population,
+understating by **3.3×** and hiding that the other 42 questions show no interference at all.
+`by_shape` could not see it either: the split is **within** a shape, on a `clock` field the corpus
+already declares and no arm was reading.
+
+**Consequence for `B1`** (filed as "add a third shape"): bitemporal already behaves as three.
+
+### 88.3 `F2` — closed as not worth doing, and it would have changed nothing
+
+| shape | pairs | headroom | floor | sep sd | verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `bitemporal/belief-at-instant` | 18 | 0.5556 | 0.2542 | 4.74 | PASS |
+| `bitemporal/correction-depth` | 12 | 0.5833 | 0.25 | 4.09 | PASS |
+| `prospective/due-window` | 9 | 1.0 | 0.1667 | 13.77 | PASS |
+| `prospective/due-later-reminder` | 4 | 0.25 | 0.2625 | 1.09 | fail |
+| `prospective/expiring-validity` | 3 | 0.3333 | 0.25 | 1.19 | fail |
+| `prospective/not-yet-true` | 3 | 0.3333 | 0.175 | 1.19 | fail |
+
+An exact correction can only **lower** the floor. Drive it to **zero** and all three failures stand:
+each fails on **separation** at ~1.1–1.2 sd, on three or four pairs. Their problem is sample size —
+`P2` — not the floor. And correcting the amplification from the observed data would be the artifact
+supplying its own bar.
+
+🔴 **The docstring arguing for F2 quoted a retired verdict** — "belief-at-instant 0.167 against 0.275
+… about 1.7 sd", from a superseded corpus. That shape now reads **0.5556 against 0.2542 at 4.74 sd**
+and passes comfortably. The one example offered as evidence that the conservative floor costs
+something was, on the current corpora, an example of nothing.
+
+### 88.4 Two instrument defects found by sweeping, both latent
+
+**`_discrimination` keyed its silence on the RESULT, not the INPUT.** `rate()` returns `None` both
+when an arm is undefined **by design** (no gold) and when every draw went **silent**; `{}` was
+returned for both. And `discriminates` is the field behind "N of 36 shapes rank two systems" — so a
+silenced shape would **vanish from that count rather than fail it**, leaving N and M both smaller and
+the ratio flattering.
+
+⚠ Shape **5b**: `_abstention` carries the identical rule thirty lines below — *"APPLICABILITY IS KEYED
+ON THE QUESTIONS, NOT ON THE RESULTS"* — written after the same hole was found there once. It never
+travelled. Latent: all 36 shapes publish a verdict today.
+
+**`swap_echo_terms` documented a policy that never ran.** It closed with *"So the terms are swapped
+rather than added"*, present tense, after a detailed measured rationale (3.7–4.8 sd on turn length;
+punctuation density 0.761). **One reference in the repository: its own `def`.** The live treatment is
+`equalise_echo`, which solves it from the other side, and under which v5's separability baseline reads
+`"blocked": {}`. Deleted; the measurements moved onto the function they are true of.
+
+### 88.5 Episodic measured before paying — and `E2` is mis-specified
+
+`E2` is filed as "35 of 50 questions are single-gold". **Measured: 30 of 50 (60%).**
+
+| gold depth | n | V1 | V9 | headroom | ceiling at K_ref=5 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 30 | 0.967 | 0.800 | **0.167** | 1.0 |
+| 2 | 5 | 1.000 | 1.000 | 0.000 | 1.0 |
+| 4 | 4 | 1.000 | 0.750 | 0.250 | 1.0 |
+| 5 | 4 | 1.000 | 0.250 | **0.750** | 1.0 |
+| 6 | 3 | 1.000 | 0.000 | 1.000 | **0.8333** |
+| 7 | 4 | 1.000 | 0.000 | 1.000 | **0.7143** |
+
+🔴 **The obvious fix would buy an artifact, and the corpus says so itself.** `ceiling.by_g` carries
+`structural_below_one: true`: at G=6–7 a perfect retriever **cannot hold all the gold inside
+K_ref=5**, so part of that 1.000 headroom is the budget, not the question. **G=5 is the sweet spot** —
+ceiling 1.0, BM25 still only 0.250.
+
+> **`E2` re-specified:** move single-gold to **G=4–5, never beyond**; hold K_ref=5; declare the
+> existing G=6/7 questions as structurally capped rather than counting them as headroom.
+
+**And depth is not the vertical's real problem:**
+
+| shape | n | V1 | V9 | headroom | median gold | discriminates |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `assistant-stated` | 20 | 1.000 | 0.700 | 0.300 | 1 | True |
+| `list-order` | 15 | 1.000 | 0.267 | **0.733** | **5** | True |
+| `participant-attribution` | 15 | 0.933 | 1.000 | **−0.067** | 1 | **False** |
+
+**30% of Episodic sits in a shape that cannot rank anything** — V9 *beats* a perfect gold-only
+selector, the signature of a question form that leaks its own answer. That is why the vertical scores
+7.5, and no amount of gold depth fixes it.
+
+⚠ A `gold=2` anomaly was filed here as a new finding and **is not one** — all five are
+`participant-attribution`, i.e. E1's known cap re-found under a different label. Checked before
+claiming.
+
+### 88.6 The discrimination exceptions were not declared
+
+Of the three shapes that do not rank two systems, only `forgetting/never-known` was declared — the
+probe tool emits its reason automatically because it has zero gold. `episodic/participant-attribution`
+and `forgetting/still-valid` **have gold and measurably fail**, which is a different thing, and nothing
+said so. **An undeclared exception is indistinguishable from a regression nobody noticed.**
+
+All three now carry written reasons plus a drift check that runs **both ways**: declared-True must
+still discriminate (a regression), declared-False must still not (a **stale declaration**). The second
+direction matters as much: a rebuilt shape that starts ranking would otherwise keep the headline at
+33 of 36 when the truth is 34 — good news suppressed by the instrument meant to keep the family honest.
+
+### 88.7 🔴 "No tag without a §0 entry" has now failed FIVE times
+
+§0w is titled *"three tags shipped unlogged"* and exists to close this. **`v0.32.0-beta` and
+`v0.33.0-beta` then shipped unlogged too**, after the rule was written — both moving corpora (14 and
+17 files), so both reset consumer controls. Logged retroactively as §0x-b.
+
+§0w's own diagnosis was right and did not save it: *"the CHANGELOG never drifted because CI READS IT;
+this doc drifted because nothing does."* A fifth recurrence is a missing check, not a discipline
+problem. `tools/check_tag_has_status_entry.py` is now that reader — scoped by tag date (26 of 45 tags
+predate the rule), and it **fails rather than skips** when the doc is absent, because a check that
+cannot see its subject must not report a pass.
+
+### 88.8 `C-E` — narrowed to what is purchasable, and blocked on credits
+
+| judge source | state |
+| --- | --- |
+| Anthropic / Google / Mistral | no key configured |
+| OpenAI (`o1`, `o3`, `o4-mini`) | key present, **account has no credits** (`429 insufficient_quota`) |
+| Azure `gpt-5.5` | works, and **is the shipped judge** |
+
+The claim is narrowed twice and named exactly: **not** "judge-family bias is bounded", **nor** the
+fallback "deployment variance within one family" — o3/o4-mini are a different **model line**, so that
+wording would have *understated* what the run shows — but *"two judges on a different model line, same
+vendor, agree with the shipped judge at X"*, **unpurchased**.
+
+⚠ The frame is **5,344** live verdicts, not 16,013: the cache is content-keyed, so two thirds are
+orphaned by superseded corpora. And the 50-case sample is balanced on the shipped judge's own verdict,
+which **over-samples the rare class** — v2 is 0.3% yes in the frame and 57% in the sample — so any raw
+rate it produces is not a population rate and must be re-weighted per cell.
+
+### 88.9 What this session did NOT move, stated plainly
+
+Mean **8.45**, Episodic **7.5**, **33 of 36** shapes, open triage **20**. None moved, and none could
+have: every commit was free by construction. Moving them needs a corpus regeneration and a re-probe —
+which resets a consumer's controls — and, for Episodic, a **new question form** for
+`participant-attribution` that E1 already attempted once. That is design work, not a parameter change.
