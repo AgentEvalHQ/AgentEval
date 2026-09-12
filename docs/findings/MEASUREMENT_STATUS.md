@@ -16442,6 +16442,8 @@ which resets a consumer's controls — and, for Episodic, a **new question form*
 
 ### 88.10 🔴 A design of mine, falsified by a free test before it cost anything (2026-09-12)
 
+> 🔴 **REVERSED BY 88.13, same day. `E1-b` is NOT falsified.** Both the table and the counterfactual below are **ANY-gold** retrieval, the operand 88.12 shows is anti-predictive. Re-taken on ALL-gold, `list-order` is **4/15**, not 15/15 — the contrast that falsified the design does not exist, and the counterfactual predicts headroom **+0.400** against the 0.150 it needed. Read 88.13.
+
 `participant-attribution` is 30% of Episodic at −0.067 headroom and blocks the vertical reaching
 8.5. I diagnosed it as **the question quoting the claim it asks about**, designed `E1-b` around that
 (identify the statement by its consequence, not its content), and wrote a falsifiable prediction:
@@ -16599,3 +16601,55 @@ down. Every depth-2 shape in the family sits at ALLgold **0.00–0.55**. So:
 🔴 **If the regenerated corpus does not drop ALLgold below 1.00, do not run the probe** — the
 identity says the headroom cannot move, and the calls would buy a number already known. That is a
 gate the earlier design could not state.
+
+### 88.13 🟢 `E1-b` un-falsified — the counterfactual that killed it used the broken operand too (2026-09-12)
+
+88.10 marked `E1-b` **FALSIFIED** and concluded *"the leak is the role structure, not the
+vocabulary."* Its table and its counterfactual are both **ANY-gold** measurements. 88.12 shows
+that operand runs at slope **−0.803** against the V9 rate it was standing in for. Re-taken with
+**ALL-gold**, which tracks V9 at a median residual of 0.000:
+
+| shape | ANYgold | **ALLgold** | published V9 | headroom | discriminates |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `participant-attribution` | 15/15 | **15/15** | 1.00 | −0.067 | **False** |
+| `list-order` | 15/15 | **4/15** | 0.27 | 0.733 | True |
+| `assistant-stated` | 14/20 | **14/20** | 0.70 | 0.300 | True |
+
+The falsifying contrast **does not exist**. On the operand that predicts V9, the two shapes are
+1.00 against 0.27 — and `list-order`'s 4/15 = 0.267 *is* its published V9 rate, to the question.
+
+#### The counterfactual, re-taken
+
+| | ANYgold | **ALLgold** |
+| --- | ---: | ---: |
+| question QUOTES the statement (shipped) | 15/15 | **15/15** |
+| statement REMOVED | 12/15 | **9/15** |
+| movement | −0.20 | **−0.40** |
+
+88.10 read the ANYgold row — three questions — and concluded the design could not reach its own
+target. On ALLgold the crude proxy moves **six**, and since `headroom ≈ 1 − ALLgold` that alone
+predicts headroom **+0.400** against the **0.150** `E1-b` needs.
+
+⚠ Stripping the clause is only a PROXY: it deletes text and keeps everything else. `E1-b` also
+adds a consequence session, moving gold depth **1 → 2**, and every depth-2 shape in the family sits
+at ALLgold **0.00–0.55** — so the real design should land at or below the proxy, not above it.
+
+#### ✅ REVERSED: `E1-b` is restored as the live design for `participant-attribution`
+
+**Direction of the error.** 88.10's mistake was **conservative** — it killed a design that works,
+rather than shipping one that does not. That is the cheaper direction and it spent nothing, but it
+is still wrong: acted on, it would have left Episodic blocked indefinitely behind a conclusion the
+corpus does not support, and it stood for exactly as long as it took to check the operand.
+
+**And 88.10's replacement mechanism goes with it.** *"The leak is the role structure, not the
+vocabulary"* was inferred from the same broken table and has no support: the identity says the leak
+is that gold is depth-1 **and** lexically adjacent to the question. Vocabulary is precisely the
+lever, which is what `E1-b` moves.
+
+⚠ **What 88.10 got right, and keeps.** The discipline. Testing a design before paying for it is
+what made both the false negative **and** its correction free — nothing was spent either time, and
+the total cost of getting this wrong and then right was zero calls.
+
+🔴 **The refusal stands, with a number attached.** Regenerate Episodic, then run
+`tools/typedmemeval_shape_profile.py` against the candidate corpus **before** probing. If ALLgold
+on `participant-attribution` has not fallen below **0.85**, do not spend the run.
