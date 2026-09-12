@@ -17408,3 +17408,58 @@ score, which is the standard §88.22 applied when it declined to fund five verti
 Checked: three-stage protocol; corpus regenerated deterministically to the sha the pinned-echo
 pre-check passed; discrimination drift clean at 34/36; identity gate clean; `AgentEval.Memory.Tests`
 **1190/1190** on net10.0.
+
+### 88.28 ✅ Phase 1 CLOSED — no measured defect remains anywhere in the family (2026-09-12)
+
+The stratum sweep re-taken against the final tree, after both arcs shipped:
+
+> **49 strata scanned across all ten verticals at n≥6. NOT ONE is below the 0.15 floor.**
+
+That is the last defect-shaped thing this family had. Taken with the rest:
+
+| check | state |
+| --- | --- |
+| shapes that rank two systems | **34 of 36**, the 2 exceptions declared with reasons and a two-way drift check |
+| strata below the floor | **none**, on any declared axis |
+| shapes answerable from their own gold | all, except 2 **absence shapes** where V1 is the wrong ceiling and V8 is used (§88.16) |
+| floor-declaring shapes | all publish `headroom_above_chance` (§88.17) |
+| unmeasured corpora | impossible to leave silently — two gates now fail on them (§88.25) |
+
+🔴 **So there is no defect-justified arc left to fund.** Every remaining gap to the numeric targets
+is *score*-shaped, and funding a corpus arc on a score alone is exactly what §88.22 refused for five
+verticals and §88.24 refused for Episodic. Doing it now would make the rule "fund what is closest to
+a target" rather than "fund what is measurably broken", which is how a benchmark starts optimising
+its own headline.
+
+#### Both scales, final, re-taken against the tree
+
+| vertical | criteria score | recovered score | min headroom |
+| --- | ---: | ---: | ---: |
+| forgetting | 7.50 | **7.23** | +0.067 |
+| semantic | 10.00 | **7.78** | +0.267 |
+| workingmemory | 10.00 | **7.78** | +0.250 |
+| bitemporal | 10.00 | **7.98** | +0.361 |
+| prospective | 9.47 | **8.12** | +0.250 |
+| episodic | 10.00 | **8.38** | +0.300 |
+| temporal | 9.23 | 8.75 | +0.467 |
+| arithmetic | 10.00 | 8.89 | +0.500 |
+| conjunction | 8.75 | 9.40 | +0.400 |
+| procedural | 8.89 | 9.60 | +0.650 |
+| **family mean** | **9.38** | **8.39** | |
+
+⚠ The two scales **disagree by design and are both published**: the criteria score asks *is every
+declared floor cleared* (and is **bar-supplied** — I wrote it), the recovered scale asks *how much
+room does a better system have* (and is anchored on the maintainer's own three published numbers).
+Neither is "the" answer and the tool prints both with that caveat attached.
+
+#### 🔴 The two numeric targets, unmet and honestly costed
+
+**`mean ≥ 9.0` needs family mean headroom 0.663 against 0.517 today. `none < 8.5` needs every
+vertical at ≥0.549; six are below.** On the recovered scale that is roughly every vertical brought to
+Conjunction's level — a corpus programme across six verticals, each needing a *defect* to justify it,
+and none of them has one.
+
+✅ **What the two arcs did buy**, on the maintainer's own scale: Episodic **7.51 → 8.38** (+0.87),
+Bitemporal **7.50 → 7.98** (+0.48). Both funded on measured strata below the floor, both
+pre-registered with falsifiers, both predictions held in direction and over-predicted in magnitude.
+**Total live spend across both: 966 calls.**
