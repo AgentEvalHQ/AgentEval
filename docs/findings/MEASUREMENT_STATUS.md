@@ -17360,3 +17360,51 @@ machine with headroom picks up where this left off: re-apply the generator diff 
 `python tools/run_typedmemeval_probes.py bitemporal`.
 
 **Cost: 0 further calls.**
+
+### 88.27 ✅ The Bitemporal arc COMPLETED — chunked past the memory wall, prediction held (2026-09-12)
+
+§88.26 recorded the arc as blocked: three full re-probes killed by system memory, two diagnoses of
+mine refuted. The workaround was to stop asking for the whole run at once. **`--limit N` warms the
+content-keyed cache incrementally**, and a fully-cached run is light enough to finish and write the
+sidecar — which is the step all three monolithic attempts died before reaching.
+
+Ladder: 12 → 24 → 36 → 48 → 50 → 52 → 54 → 56 → 58 → 60, then the full run at **`calls=0`**. Every
+killed attempt had banked its work, so the chunks mostly replayed cache (`calls=0` on 7 of 10 rungs).
+**Total live spend on the whole arc: 38 calls.**
+
+#### The pre-registered check, and it PASSED
+
+| | |
+| --- | ---: |
+| `belief-at-instant/valid` before | **0.0556** — below the floor |
+| predicted (§88.25, before the run) | 0.222 |
+| **measured after** | **0.1667** ✅ |
+
+⚠ **I over-predicted by 0.055, and it clears the 0.15 floor by 0.0167 — three questions.** The
+defect is repaired, not comfortably. The identity's usual over-prediction shows up here as it did on
+`E1-b` (+0.733 predicted, +0.533 measured).
+
+| stratum | before | after |
+| --- | ---: | ---: |
+| `belief-at-instant/valid` | **0.0556** | **0.1667** |
+| `belief-at-instant/transaction` | 0.5556 | 0.5556 |
+| `correction-depth/valid` | 0.3333 | 0.2500 |
+| `correction-depth/transaction` | 0.3333 | **0.7500** |
+
+**`strata_below_floor` is now empty on both shapes.** Shape headroom: `belief-at-instant`
+0.3056 → **0.3611**, `correction-depth` 0.3333 → **0.5000**. V1 stays perfect (36/36, 24/24), so
+nothing was made unanswerable. `corpus_sha256` **`abf2f3f43219` → `cdc27b225033`**.
+
+⚠ **`correction-depth/valid` regressed** 0.3333 → 0.2500, disclosed rather than netted out. It
+remains well above the floor, and the arc's purpose was the stratum that was below it.
+
+#### What it does and does not move
+
+On the recovered scale (§88.23) bitemporal goes **7.50 → 7.98** — a real **+0.48**, and still below
+8.5. Family mean **8.34 → 8.39**. 🔴 **The `mean ≥ 9.0 / none < 8.5` target remains unmet** and this
+arc was never going to meet it: it was funded on a **measured stratum below the floor**, not on the
+score, which is the standard §88.22 applied when it declined to fund five verticals with no defect.
+
+Checked: three-stage protocol; corpus regenerated deterministically to the sha the pinned-echo
+pre-check passed; discrimination drift clean at 34/36; identity gate clean; `AgentEval.Memory.Tests`
+**1190/1190** on net10.0.

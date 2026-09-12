@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking — the `bitemporal` corpus changed bytes
+
+**`corpus_sha256` `abf2f3f43219` → `cdc27b225033`.** Compare on the sha, never on `question_id`:
+all 60 ids survive and `corpus_id`/`revision` do not move, but every question’s haystack changed.
+
+**Why.** `belief-at-instant` published headroom **0.3056** and `discriminates: True` while, split on
+the `clock` axis the corpus already declares, its `valid` half ran headroom **0.0556** — below the
+0.15 floor. **18 of 60 questions ranked nothing and the shape said they did.** `correction-depth`
+had a second dead rung at `corrections=2` (V9 4/4, headroom exactly 0.000).
+
+Both had one cause: with one or two retroactive corrections the final amendment is trivially the
+answer. The correction chain is raised (`belief-at-instant` 1→3, `correction-depth` 2,3,4→3,4,5) so
+several lexically identical amendments compete for the top-K budget, plus a tail reserve so gold is
+never the last session (position was separating gold at 3.0 sd).
+
+| stratum | before | after |
+| --- | ---: | ---: |
+| `belief-at-instant/valid` | **0.0556** | **0.1667** |
+| `belief-at-instant/transaction` | 0.5556 | 0.5556 |
+| `correction-depth/valid` | 0.3333 | 0.2500 |
+| `correction-depth/transaction` | 0.3333 | **0.7500** |
+
+`strata_below_floor` is now **empty on both shapes**. ⚠ The repaired stratum clears the floor by
+**0.0167 — three questions**; it is fixed, not comfortable.
+
+**Also:** every shape whose corpus declares a second axis now publishes `by_stratum` and
+`strata_below_floor`, and every floor-declaring shape publishes `headroom_above_chance`.
+
 ### Breaking — the `episodic` corpus changed bytes
 
 **`corpus_sha256` `bfb35552ec82` → `a50846277e29`.** The other nine corpora are byte-identical;
