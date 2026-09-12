@@ -17138,3 +17138,73 @@ complete in the only form that survives its own discipline — **an arc where a 
 written reason where none was.**
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.23 ✅ The published scale RECOVERED — it was never arbitrary, and the target is further off than it looked (2026-09-12)
+
+§88.15 established that the published quality score had **no rubric, table or tool**, and I left
+re-anchoring as the maintainer's call. That was one step short. The score had no *written* rubric,
+but it was **not arbitrary** — and its basis is recoverable from its own published numbers.
+
+#### Only three per-vertical scores are sourced anywhere
+
+🔴 **RETRACTION FIRST.** I stated repeatedly this session that *"four verticals sit at 8.0
+(Bitemporal, WorkingMemory, Prospective, Arithmetic)"*. **That is unsourced.** It appears in no
+document, and with mean 8.45 and three known values the other seven are **not recoverable**
+(they sum to 58.0). I was repeating a reconstruction as if it were a record. The sourced set is:
+
+| vertical | published | mean headroom |
+| --- | ---: | ---: |
+| Episodic (pre-`E1-b`) | **7.5** — lowest | 0.322 |
+| Conjunction | **9.5** — highest | 0.754 |
+| Procedural | **9.5** — highest | 0.800 |
+
+#### The basis is mean headroom, and it fits all three anchors within 0.10
+
+> **score = 6.106 + 4.362 × mean_headroom**
+
+predicting **7.51 / 9.40 / 9.59** against the published 7.5 / 9.5 / 9.5. The original was tracking
+**how much room a better system has to win** — it simply never wrote that down.
+
+#### ⚠ And it inverts my own rubric, which is the useful part
+
+The criteria score of §88.15 ranks Episodic **8th of 10** and Conjunction **2nd** — exactly reversing
+the published order. Both instruments are defensible and they answer different questions:
+
+| | asks | penalises |
+| --- | --- | --- |
+| criteria score (§88.15, **bar-supplied**) | is every declared floor cleared? | below-chance baselines, which is where Conjunction and Procedural fail |
+| recovered scale (**anchored on published numbers**) | how much room does a better system have? | thin headroom, which is where Episodic and Bitemporal fail |
+
+#### 🔴 On the recovered scale the target is further off than the published board suggested
+
+| vertical | mean headroom | recovered score |
+| --- | ---: | ---: |
+| forgetting | 0.258 | **7.23** |
+| bitemporal | 0.319 | **7.50** |
+| semantic / workingmemory | 0.383 | **7.78** |
+| prospective | 0.461 | **8.12** |
+| **episodic** | 0.522 | **8.38** |
+| temporal / arithmetic | 0.606 / 0.639 | 8.75 / 8.89 |
+| conjunction / procedural | 0.754 / 0.800 | 9.40 / 9.60 |
+
+**Recovered family mean 8.34. SIX verticals below 8.5, not four.**
+
+✅ **What `E1-b` actually bought, on the maintainer's own scale:** Episodic **7.51 → 8.38**, a real
+**+0.87** — and still **short of 8.5**. That is the honest verdict on the one arc that shipped, and
+it is only statable because the scale was recovered.
+
+#### What the target would now cost, stated rather than estimated
+
+- **mean ≥ 9.0** needs family mean headroom **0.663**, against **0.512** today.
+- **none < 8.5** needs *every* vertical at mean headroom **≥ 0.549**; six are below.
+
+That is a large, real lift — roughly every vertical brought to Conjunction's level — and it is a
+**corpus** programme, not a reporting one.
+
+⚠ **Fragility, stated.** Three anchors but only **two distinct values** (7.5 and 9.5), so this is
+effectively a two-point fit. It also under-predicts the published family mean (**8.25**
+reconstructed against **8.45** published), so mean headroom explains the ordering and the anchors
+but is not the whole story. Best available reconstruction of the published scale — not a validated
+rubric, and not a licence to re-declare the target met.
+
+**Cost: zero calls, zero corpus bytes.**

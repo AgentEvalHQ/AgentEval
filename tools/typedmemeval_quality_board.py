@@ -108,6 +108,37 @@ ABSENCE_SHAPES = {
 }
 
 
+#: THE PUBLISHED SCALE, RECOVERED. Anchored to the maintainer's own numbers, NOT to anything I chose.
+#:
+#: The published board (mean 8.45, Episodic 7.5 lowest, Conjunction/Procedural 9.5 highest) had no
+#: written rubric -- but it was not arbitrary. Regressing the three SOURCED per-vertical scores
+#: against each vertical's MEAN HEADROOM reproduces all three within 0.10:
+#:
+#:     episodic (pre-E1-b) 0.322 -> 7.51   published 7.5
+#:     conjunction         0.754 -> 9.40   published 9.5
+#:     procedural          0.800 -> 9.59   published 9.5
+#:
+#:     score = 6.106 + 4.362 x mean_headroom
+#:
+#: This matters because the criteria score above is BAR-SUPPLIED and this is not: its calibration
+#: points are the maintainer's published judgements. The two disagree sharply -- the criteria score
+#: ranks Episodic 8th of 10 and Conjunction 2nd, exactly inverting the published order -- because they
+#: answer different questions. The criteria score asks "is every declared floor cleared"; the
+#: recovered scale asks "how much room does a better system have", which is what the original tracked.
+#:
+#: ⚠ FRAGILITY, stated: three anchors but only TWO distinct published values, so this is effectively
+#: a two-point fit. It also under-predicts the published family mean (8.25 reconstructed against 8.45
+#: published), so mean headroom explains the ORDERING and the anchors but is not the whole story.
+#: Treat it as the best available reconstruction of the published scale, not as a validated rubric.
+RECOVERED_INTERCEPT = 6.106
+RECOVERED_SLOPE = 4.362
+
+
+def recovered_score(mean_headroom):
+    """The published scale, reconstructed from its own anchors. See RECOVERED_INTERCEPT."""
+    return RECOVERED_INTERCEPT + RECOVERED_SLOPE * mean_headroom
+
+
 def exempt_shapes():
     """Shapes the family has already declared non-discriminating, with written reasons."""
     if not os.path.exists(BASELINE):
@@ -183,9 +214,12 @@ def board():
                 beaten[shape] = (p1 / n1, p8 / n8, p9 / n9)
         hs = [b.get('headroom_perfect_selector') for b in by_shape.values()
               if b.get('headroom_perfect_selector') is not None]
+        mean_h = (sum(hs) / len(hs)) if hs else None
         out[vertical] = {'score': 10.0 * tp / ta if ta else float('nan'),
                          'passed': tp, 'applicable': ta, 'shapes': shapes,
                          'beaten': beaten,
+                         'mean_headroom': mean_h,
+                         'recovered': recovered_score(mean_h) if mean_h is not None else None,
                          'min_headroom': min(hs) if hs else None}
     return out
 
@@ -219,6 +253,30 @@ def main():
 
     mean = sum(scores) / len(scores)
     below = [v for v, d in b.items() if d['score'] < MIN_VERTICAL]
+
+    # THE SECOND READING: the published scale, recovered from its own anchors rather than chosen.
+    print()
+    print('  THE PUBLISHED SCALE, RECOVERED (score = %.3f + %.3f x mean headroom; anchors within 0.10)'
+          % (RECOVERED_INTERCEPT, RECOVERED_SLOPE))
+    print('  %-15s %14s %10s' % ('vertical', 'mean headroom', 'recovered'))
+    rec = []
+    for vert, d in sorted(b.items(), key=lambda kv: (kv[1]['recovered'] is None,
+                                                     kv[1]['recovered'] or 0)):
+        if d['recovered'] is None:
+            continue
+        rec.append(d['recovered'])
+        print('  %-15s %14.3f %10.2f %s'
+              % (vert, d['mean_headroom'], d['recovered'],
+                 '' if d['recovered'] >= MIN_VERTICAL else '*** BELOW %.1f ***' % MIN_VERTICAL))
+    if rec:
+        rbelow = [v for v, d in b.items()
+                  if d['recovered'] is not None and d['recovered'] < MIN_VERTICAL]
+        print('  recovered mean %.2f (target >=%.1f); below %.1f: %s'
+              % (sum(rec) / len(rec), MIN_MEAN, MIN_VERTICAL,
+                 ', '.join(sorted(rbelow)) if rbelow else 'none'))
+        print("  ^ NOT bar-supplied: calibrated on the maintainer's own published numbers. It")
+        print('    disagrees sharply with the criteria score above because they ask different')
+        print('    questions -- floors cleared, versus room a better system has.')
     print()
     print('  mean %.2f over %d verticals   |   below %.1f: %s'
           % (mean, len(scores), MIN_VERTICAL, ', '.join(sorted(below)) if below else 'none'))
