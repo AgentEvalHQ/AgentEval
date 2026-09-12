@@ -17505,3 +17505,68 @@ harder — a rule whose first application happens to clear a target it was not d
 the shape of a bar being supplied.
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.30 🔴 THE CALIBRATION GATE IS TUNED ON AN OPERAND THAT DOES NOT SET HEADROOM (2026-09-12)
+
+Every vertical in the family is calibrated to the same target: **mean realised coverage 0.70**
+(`BAND_TARGET`, `typedmemeval_common.py`). Under the identity `headroom ≈ 1 − ALLgold` (§88.12)
+that should make every vertical's headroom ≈ 0.30. Measured, mean headroom ranges **0.258 to
+0.800**. That anomaly has one cause.
+
+#### `realised_coverage` returns the SHARE of gold retrieved, not whether ALL of it was
+
+- what the gate measures: `len(gold & retrieved) / len(gold)` — the **share**
+- what the V9 arm needs: `gold.issubset(retrieved)` — **all** of it
+
+For a **depth-1** shape these coincide. For **depth-2+** they come apart completely — share 0.70
+can mean *half the gold on most questions* or *all of it on 70%*, and only the second lets V9
+score.
+
+| quantity | spread across the 10 verticals | correlation with headroom |
+| --- | ---: | ---: |
+| **SHARE** — the quantity the gate controls | 0.183 | **−0.176** |
+| **ALLgold** — the quantity that sets headroom | **0.463** | **−0.915** |
+
+**The gate controls a number that does not determine what it is calibrating for.** It is the same
+class of error as §88.12's ANY-gold operand, now found in the mechanism that shapes **every corpus
+in the family**.
+
+#### 🔴 So the published quality score substantially ranks GOLD DEPTH, not quality
+
+| vertical | mean gold depth | mean headroom |
+| --- | ---: | ---: |
+| bitemporal | **1.00** | 0.431 |
+| workingmemory | **1.00** | 0.383 |
+| prospective | 1.66 | 0.461 |
+| forgetting | 2.00 | 0.258 |
+| semantic | 2.40 | 0.383 |
+| procedural | 2.50 | 0.800 |
+| episodic | 2.74 | 0.522 |
+| temporal | 3.42 | 0.606 |
+| conjunction | 4.35 | 0.754 |
+| arithmetic | 4.50 | 0.639 |
+
+**r(mean gold depth, mean headroom) = +0.662.** Deeper gold ⇒ lower ALLgold at the same calibrated
+share ⇒ more headroom ⇒ a higher score. A vertical does not score low because it is worse; it
+scores low because its questions need fewer sessions.
+
+#### ✅ What this changes, and it is the whole disposition
+
+§88.22 and §88.28 declined to fund arcs because no *stratum* was below the floor. That reasoning
+was sound on the evidence then available and is now **superseded**: there is a real, named,
+measured defect in the low verticals after all, and it is not a score —
+
+> 🔴 **`bitemporal` and `workingmemory` have mean gold depth 1.00.** Every question is
+> answerable from a **single session**. For a *memory* benchmark that is a lookup test, not a test
+> of memory integration, and it is exactly what ADR-026 built multi-session gold to avoid.
+
+`prospective` (1.66) and `forgetting` (2.00) are the next shallowest. **Raising gold depth on these
+is a corpus improvement on its own terms** — it makes the questions test what the vertical claims
+to test — and the score follows as a consequence rather than as the motive.
+
+⚠ **The band values do NOT transfer.** `BAND_LOW 0.50` / `BAND_HIGH 0.90` were chosen against
+share. On ALLgold the family's *best* discriminators sit at 0.15–0.20 (conjunction, procedural),
+which the old floor would reject as "unanswerable noise". Re-deriving the band on the right operand
+is a separate, larger decision and is **not** taken here.
+
+**Cost: zero calls, zero corpus bytes.**
