@@ -220,7 +220,26 @@ def board():
                 beaten[shape] = (p1 / n1, p8 / n8, p9 / n9)
         hs = [b.get('headroom_perfect_selector') for b in by_shape.values()
               if b.get('headroom_perfect_selector') is not None]
-        mean_h = (sum(hs) / len(hs)) if hs else None
+        # MEAN HEADROOM APPLIES THE ABSENCE-SHAPE CEILING (§88.16). For a shape whose answer asserts
+        # an absence, V1 is not a valid ceiling -- gold cannot hold an absence -- so V1-V9 understates
+        # it and V8-V9 is the statistic that applies. The rule was declared and then NOT applied
+        # here, which left `forgetting` and `prospective` reported against a ceiling this file itself
+        # says is wrong for them.
+        #
+        # ⚠ THIS CORRECTION MOVES THE HEADLINE UP (family 8.39 -> 8.43, forgetting 7.23 -> 7.52,
+        # prospective 8.12 -> 8.26), which is the FLATTERING direction and therefore the one to
+        # justify hardest. It is applied because the rule is independently established and keyed on
+        # the QUESTION, not because of where it moves the number -- and it changes NO verdict: six
+        # verticals are below 8.5 before and after.
+        ceil = []
+        for shape, b in by_shape.items():
+            h = b.get('headroom_perfect_selector')
+            if h is None:
+                continue
+            hr = b.get('headroom_reachable')
+            key = '%s/%s' % (vertical, shape)
+            ceil.append(hr if (key in ABSENCE_SHAPES and hr is not None) else h)
+        mean_h = (sum(ceil) / len(ceil)) if ceil else None
         out[vertical] = {'score': 10.0 * tp / ta if ta else float('nan'),
                          'passed': tp, 'applicable': ta, 'shapes': shapes,
                          'beaten': beaten,

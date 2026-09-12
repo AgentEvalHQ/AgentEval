@@ -17463,3 +17463,45 @@ and none of them has one.
 Bitemporal **7.50 → 7.98** (+0.48). Both funded on measured strata below the floor, both
 pre-registered with falsifiers, both predictions held in direction and over-predicted in magnitude.
 **Total live spend across both: 966 calls.**
+
+### 88.29 ⚠ A rule I declared and did not apply — and the correction FLATTERS my own number (2026-09-12)
+
+§88.16 established that **V1 is not a valid ceiling for a shape whose answer asserts an absence** —
+gold can hold what IS, never what ISN'T — and that `headroom_reachable` (V8−V9) is the statistic
+that applies. The rule was declared, gated, and then **not applied where it feeds a published
+number**: the quality board's `mean_headroom`, which drives the recovered scale, still used V1−V9
+for those shapes.
+
+| vertical | shape | V1−V9 (used) | V8−V9 (applies) |
+| --- | --- | ---: | ---: |
+| forgetting | `still-valid` | 0.0667 | **0.2000** |
+| prospective | `not-yet-true` | 0.5000 | **0.6667** |
+
+Both show `V8 > V1`, the signature of the class, so the wrong ceiling was **understating** them.
+
+| | before | after |
+| --- | ---: | ---: |
+| forgetting | 7.23 | **7.52** |
+| prospective | 8.12 | **8.26** |
+| **family mean** | 8.39 | **8.43** |
+| verticals below 8.5 | 6 | **6** |
+
+#### 🔴 This moves the headline UP, which is why it needs the hardest justification
+
+A correction that improves the corrector's own number is the one to distrust. Three things make it
+defensible rather than convenient:
+
+1. **The rule predates the correction and was established for a different reason** — §88.16 found it
+   by chasing an impossible number (V8 beating V1), not by looking for score.
+2. **Applicability is keyed on the QUESTION, not the measurement.** `ABSENCE_SHAPES` lists the three
+   shapes with the phrase in each that makes it an absence claim; `V8 > V1` is printed only as a
+   diagnostic. Keying the rule on the signature would be gate shape 7.
+3. **No verdict moves.** Six verticals are below 8.5 before and after, and no shape's `discriminates`
+   changes. It is a magnitude correction to a scale, not a re-ranking.
+
+⚠ **And it does not rescue the target.** `mean ≥ 9.0` still fails at **8.43**, and the same six
+verticals sit below 8.5. Had it closed the gap, the right move would have been to distrust it
+harder — a rule whose first application happens to clear a target it was not derived for is exactly
+the shape of a bar being supplied.
+
+**Cost: zero calls, zero corpus bytes.**
