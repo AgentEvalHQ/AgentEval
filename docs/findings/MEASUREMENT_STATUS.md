@@ -16891,3 +16891,36 @@ re-ranking, and keying the verdict on a reporting change would have made it one.
 (`calls=0 cached=16,326` across all ten verticals) and only **sidecars** changed — every
 `corpus_sha256` is untouched, so **no consumer control resets**. `AgentEval.Memory.Tests` 1190/1190
 on all three TFMs.
+
+### 88.18 ✅ Phase 0 closed — the gate self-examination sweep, all nine shapes (2026-09-12)
+
+**Tier 0 is empty.** `C-F` (`7b725632`), `B3` (`3d4b822f`) and `F2` (`d767cb9c`) are all closed;
+the triage plan still listed `F2` as *open* and has been re-taken. Every tag in scope has a §0 entry
+(`check_tag_has_status_entry.py`: 45 tags, 26 predate the log, 19 in scope, **all named**).
+
+| # | shape | status against the tree as it stands |
+| --- | --- | --- |
+| 1 | element-missing | ✅ nothing in a pass/fail path is supplied by the artifact under test |
+| 2 | **bar-supplied** | 🔴 **FOUND, in my own work** — I built the quality-board rubric while working toward the targets it grades (§88.15). Declared in the tool's docstring and printed on every run; re-anchoring is the maintainer's call |
+| 3 | diluted-denominator | ✅ **measured**: 0 of 36 shapes have an arm whose `applicable` differs from the shape's question count |
+| 4 | **floor-below-chance** | 🔴 **FOUND** — 5 of 11 floor-declaring shapes counted the chance floor as retrieval room (§88.17). Fixed: `headroom_above_chance` now published on **all** floor-declaring shapes, 0 missing |
+| 5 | co-moving operands | ✅ `_discrimination` no longer keys silence on the RESULT (`a68d7141`) |
+| 6 | **claim-without-instrument** | 🔴 **FOUND** — the family's headline quality score had no rubric, table or tool (§88.15). Instrument built |
+| 7 | silent-`{}` / applicability from the result | ✅ **actively avoided this session**: the absence-ceiling rule keys on the QUESTION, never on its `V8 > V1` signature (§88.16) |
+| 8 | declared-not-reached | ✅ every declared arm is applied — **after I corrected my own reading**, see below |
+| 9 | fix-outran-diagnosis | ✅ the E1-b arc measured the mechanism first and gated the spend on it (§88.13–14) |
+
+#### ⚠ Shape 8 nearly became a fabricated defect, for the third time this session
+
+My first sweep reported **"v2, v6, v10, v11: NEVER REACHED on 0 of 36 shapes"** — which would have
+been a serious finding. It was wrong: those arms are not reported under `by_shape` at all. `v2` and
+`v6` live at the **vertical** level (`v2_non_inferability`, `v6_leave_one_out`) and `v10`/`v11` in
+the per-shape **`abstention`** block. The probe run had printed `V2 50/50` and `V6 30/30` on screen
+minutes earlier.
+
+🔴 **That is the third "zero finding" this session produced by reading the wrong location** — after
+the wrong extension key (`extension` vs `typedmemeval`, "0 of 565 declare a chance floor") and the
+`:judge` suffix conflation (186 "unparseable" verdicts that were `commit`/`abstain`). All three were
+caught by asking *where is this actually written* before publishing. **A zero is a claim about a
+location as much as about a population**, and it needs a positive control proving the location is
+the right one — which is the rule this record has now paid for three times.
