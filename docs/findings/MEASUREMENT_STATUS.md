@@ -17311,3 +17311,52 @@ measured. ⚠ If the re-probe does not lift that stratum above the 0.15 floor, t
 must not ship as an improvement.
 
 **Cost: 19 calls, zero corpus bytes retained.**
+
+### 88.26 🔴 The Bitemporal arc is BLOCKED on the environment — three attempts, two diagnoses refuted (2026-09-12)
+
+The arc is designed, validated and pre-registered (§88.25). It has now failed to **run** three times,
+each killed by system memory pressure with no results produced:
+
+| attempt | workers | other tasks running | outcome |
+| --- | ---: | --- | --- |
+| 1 | 8 (default) | 2 waiters + recent `dotnet test` | killed |
+| 2 | 2 | 1 waiter | killed |
+| 3 | 4 | **none** | killed |
+
+Every attempt reached *"resuming with 53,933 cached completions / bitemporal: probing 60 questions"*
+and died there. Total spent across all three: **19 calls** (one staged real item), zero retained.
+
+#### Two hypotheses, both REFUTED by measurement rather than abandoned
+
+**1 · "The probe tool's cache has grown until it no longer fits."** Plausible — the cache is
+content-keyed and only grows. **Measured: 5.9 MB on disk, 53,933 entries, ~10 MB in heap.** Nothing
+there kills a run. The tool has no memory-scaling defect, and I nearly recorded one it does not have.
+
+**2 · "My own concurrent background tasks caused the contention."** I had spawned two polling
+waiters alongside the probe on attempts 1–2, after a three-TFM `dotnet test`. Attempt 3 ran **alone**
+with a clean tree. **Killed identically.**
+
+🔴 **So I do not know the cause.** What is established is narrow and worth stating exactly: the run
+is not executable in this environment at any concurrency tried, the failure is independent of the
+probe tool's cache and of task contention, and **nothing about the corpus, the design, or the
+prediction is implicated** — the process never reached a model call beyond the staged one.
+
+#### What survives, and it is the whole arc bar the run
+
+- the generator change is **deterministic and reproducible**: regenerating gives `cdc27b22503397b3`
+  three times over, **byte-identical to the candidate the pinned-echo pre-check passed**, so the
+  validated artifact and the artifact to be probed are provably the same;
+- the comparison is **controlled** — echo pinned at 0.6406 on both sides;
+- the prediction is **pre-registered with a falsifier**: `belief-at-instant/valid` ALLgold
+  0.889 → 0.778, predicted headroom **0.222** against **0.056** measured. ⚠ **If the re-probe does
+  not lift that stratum above the 0.15 floor, the design is wrong and must not ship as an
+  improvement.**
+
+✅ **The corpus is reverted after every attempt.** `bitemporal`'s `corpus_sha256` has never moved,
+and no unmeasured corpus is left in the tree — the rule §88.25 established, applied three times.
+
+⚠ **Resuming costs almost nothing.** The probe cache is unaffected by the kills, so a run on a
+machine with headroom picks up where this left off: re-apply the generator diff (§88.25), regenerate,
+`python tools/run_typedmemeval_probes.py bitemporal`.
+
+**Cost: 0 further calls.**
