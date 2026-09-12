@@ -1,0 +1,159 @@
+{
+  "_comment": [
+    "Declared discrimination state per shape. Checked BOTH ways by --check:",
+    "  declared True  -> must still discriminate (catches a regression)",
+    "  declared False -> must still not          (catches a STALE declaration)",
+    "A shape that starts discriminating is good news the family must not keep publishing as",
+    "an exception. Deleting an entry to make the check pass is the one thing this file must",
+    "never be used for -- change the corpus, re-probe, then rebuild this deliberately."
+  ],
+  "shapes": {
+    "arithmetic/count": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "arithmetic/delta": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "arithmetic/duration": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "arithmetic/sum": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "bitemporal/belief-at-instant": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "bitemporal/correction-depth": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "conjunction/alias-then-count": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "conjunction/conditional-branch": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "conjunction/order-then-value": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "conjunction/value-then-count": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "episodic/assistant-stated": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "episodic/list-order": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "episodic/participant-attribution": {
+      "discriminates": false,
+      "basis": "headroom",
+      "reason": "STRUCTURAL, and re-forming it once did not lift it. The question quotes the statement it asks about (\"Earlier, about the corner pharmacy, someone said that it shuts for an hour ...\"), so a lexical retriever is handed the session containing that exact text. Measured: V1 0.933, V9 1.000, headroom -0.067 -- the retriever BEATS a perfect gold-only selector, which is the signature of a question form that leaks its own answer. E1 re-formed the shape and the cap survived; the triage plan's verdict is 'new forms, not new knobs'. Remains declared until the question form changes."
+    },
+    "forgetting/invalidated": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "forgetting/never-known": {
+      "discriminates": null,
+      "basis": "abstention",
+      "reason": "Exempt by construction: every question has zero gold sessions, so V1/V8/V9 are undefined and V1-V9 cannot be formed. Scored on abstention (V10/V11) instead. The probe tool emits this reason itself as `discrimination_exempt_reason`."
+    },
+    "forgetting/still-valid": {
+      "discriminates": false,
+      "basis": "headroom",
+      "reason": "Headroom 0.0667, below the 0.15 floor. This is the CONTROL arm of a pair: its job is catching over-forgetting -- a system reporting a still-valid fact as superseded -- which is a property of the PAIR, not of either arm's retrieval headroom. Read `paired_arms` instead, where pair headroom is 0.4667 against a scaled floor of 0.24 at 3.68 sd. The arm alone is not supposed to discriminate and is not a defect."
+    },
+    "procedural/amended-step": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "procedural/precondition": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "procedural/retired-step": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "procedural/step-order": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "prospective/due-later-reminder": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "prospective/due-window": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "prospective/expiring-validity": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "prospective/not-yet-true": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "prospective/seed-carry-over": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "semantic/co-reference": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "semantic/current-value": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "semantic/source-attribution": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "temporal/interval-position": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "temporal/occurrence-order": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "temporal/recency": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "workingmemory/distance-15": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "workingmemory/distance-25": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "workingmemory/distance-40": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "workingmemory/distance-60": {
+      "discriminates": true,
+      "basis": "headroom"
+    },
+    "workingmemory/distance-8": {
+      "discriminates": true,
+      "basis": "headroom"
+    }
+  }
+}
