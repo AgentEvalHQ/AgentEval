@@ -1767,6 +1767,31 @@ def _discrimination(group: list[dict]) -> dict:
 
     v1, v8, v9 = rate("v1"), rate("v8"), rate("v9")
     if v1 is None or v9 is None:
+        # APPLICABILITY ON THE INPUT, NOT THE RESULT -- the same rule `_abstention` carries thirty
+        # lines below, which was never carried up to here. `rate` returns None both when an arm is
+        # undefined BY DESIGN (the shape has no gold, so V1 cannot exist) and when every draw went
+        # SILENT. Returning {} for both publishes nothing either way, and a reader cannot tell
+        # "correctly nothing to say" from "we failed to measure and said nothing" -- while
+        # `discriminates` is the field behind the family's headline "N of 36 shapes rank two
+        # systems", so a silenced shape would drop out of that count entirely rather than fail it.
+        #
+        # LATENT, NOT LIVE: all 36 shipped shapes currently publish a verdict, so this has never
+        # fired. It is fixed because the identical hole was found once already on the abstention
+        # arm, and the correction did not travel.
+        silenced = sorted({arm for record in group
+                          for arm in record.get("silent_arms", []) if arm in ("v1", "v9")})
+        if silenced:
+            return {
+                "discrimination_not_measured": True,
+                "unmeasured_arms": silenced,
+                "questions": len(group),
+                "reading": (
+                    "This shape HAS gold, so a discrimination verdict is defined for it -- but the "
+                    "arms named above returned nothing on every question, so none could be "
+                    "computed. Read as NOT MEASURED, never as 'this shape does not discriminate' "
+                    "and never as 'this shape has nothing to measure'. It is excluded from any "
+                    "'N of M shapes discriminate' count, and M must shrink with it."),
+            }
         return {}
 
     headroom = v1 - v9
