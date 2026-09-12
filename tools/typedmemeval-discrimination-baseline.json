@@ -57,9 +57,8 @@
       "basis": "headroom"
     },
     "episodic/participant-attribution": {
-      "discriminates": false,
-      "basis": "headroom",
-      "reason": "STRUCTURAL, and re-forming it once did not lift it. The question quotes the statement it asks about (\"Earlier, about the corner pharmacy, someone said that it shuts for an hour ...\"), so a lexical retriever is handed the session containing that exact text. Measured: V1 0.933, V9 1.000, headroom -0.067 -- the retriever BEATS a perfect gold-only selector, which is the signature of a question form that leaks its own answer. E1 re-formed the shape and the cap survived; the triage plan's verdict is 'new forms, not new knobs'. Remains declared until the question form changes."
+      "discriminates": true,
+      "basis": "headroom"
     },
     "forgetting/invalidated": {
       "discriminates": true,

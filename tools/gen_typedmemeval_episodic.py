@@ -165,6 +165,101 @@ STATEMENTS = [
     ("the laundrette", "the big machines take tokens rather than coins"),
 ]
 
+#: E1-b. THE CONSEQUENCE OF EACH CLAIM, and the phrase the question uses to point at it.
+#:
+#: The shipped form quoted the claim it asked about, which made the question a search query for its
+#: own answer: BM25's top-5 held ALL the gold on 15 of 15 questions -- the ONLY shape in the family
+#: at ALLgold = 1.00 -- so V9 saturated and headroom went negative (MEASUREMENT_STATUS §88.12).
+#: Since `headroom ≈ 1 - ALLgold`, the fix has to make the claim session lexically unreachable from
+#: the question, and that is what identifying a statement by its CONSEQUENCE does:
+#:
+#:     gold A   the claim, uttered by one role or both   <- the ANSWER lives here
+#:     gold B   a later session that ACTS on the claim    <- what the QUESTION points at
+#:
+#: The question shares vocabulary with B and none with A, so retrieving B answers *what happened*
+#: and cannot answer *who said it*; reaching A requires going through B's topic. Attribution becomes
+#: a join, which is what an episodic question was always supposed to be.
+#:
+#: AUTHORING RULE, and it is checkable rather than aspirational: `ref` must share no content word
+#: with its own `statement`. `check_episodic` enforces it, because this is exactly the kind of
+#: constraint that erodes the next time someone edits a line for readability.
+CONSEQUENCES = {
+    "the Marrow Lane depot": (
+        "We rolled up late and I had to tap my bank app at the desk instead of paying cash.",
+        "that late run where I tapped the bank app instead of paying cash"),
+    "the west stairwell": (
+        "The landing went dark on us and I had to flip a separate switch in the cupboard.",
+        "the evening the landing went dark and I flipped a switch in the cupboard"),
+    "the wheelie bin round": (
+        "I left ours on the kerb and they sat there untouched until the following Tuesday.",
+        "when ours sat untouched on the kerb until the following Tuesday"),
+    "the canal gate": (
+        "We had to double back round the towpath and come at it from behind.",
+        "the time we doubled back round the towpath and came at it from behind"),
+    "the bulk-buy account": (
+        "I had to chase Priya for a countersign or the whole order would have stalled.",
+        "when I chased Priya for a countersign to stop the order stalling"),
+    "the hall projector": (
+        "We swapped the cable over to the other socket and it came on almost straight away.",
+        "when we swapped the cable to the other socket and it came on at once"),
+    "the corner pharmacy": (
+        "We turned up at half twelve and ended up killing time in the cafe opposite.",
+        "the day we killed time in the cafe opposite, turning up at half twelve"),
+    "the loft hatch": (
+        "I took the weight on my shoulders first and it gave without a fight.",
+        "when I took the weight on my shoulders first and it gave without a fight"),
+    "the station car park": (
+        "I had a pocket full of shrapnel and still ended up using the app upstairs.",
+        "the morning I had a pocket of shrapnel and still used the app upstairs"),
+    "the community fridge": (
+        "I dropped the crate round first thing so it would not be turned away.",
+        "when I dropped the crate round first thing so it would not be turned away"),
+    "the tool library": (
+        "I gave up on the website in the end and walked down there in person.",
+        "the afternoon I gave up on the website and walked down there in person"),
+    "the low bend on the river path": (
+        "We went the long way round by the fields rather than risk our boots.",
+        "when we went the long way round by the fields rather than risk our boots"),
+    "the print shop": (
+        "I exported the whole thing as a single image and only then sent it over.",
+        "when I exported the whole thing as a single image and then sent it"),
+    "the allotment tap": (
+        "I ended up hauling a couple of cans down from the house every visit.",
+        "the stretch where I hauled cans down from the house on every visit"),
+    "the bus replacement": (
+        "We crossed over and waited by the parade of shops instead.",
+        "when we crossed over and waited by the parade of shops"),
+    "the side entrance": (
+        "I slipped in behind the crates without buzzing anyone at all.",
+        "when I slipped in behind the crates without buzzing anyone"),
+    "the laundrette": (
+        "I queued at the desk for a handful of brass discs before starting.",
+        "when I queued at the desk for a handful of brass discs"),
+}
+
+#: Function words the E1-b overlap check ignores. A shared "the" or "it" is not a lexical route from
+#: the question to the claim; a shared "breaker" or "tokens" is. Deliberately SHORT -- every word
+#: added here is a word the check stops protecting, so it holds only closed-class items that carry no
+#: topic or claim content, and never a noun or verb.
+_QUESTION_STOPWORDS = frozenset((
+    "the", "a", "an", "it", "its", "is", "was", "were", "be", "been", "that", "this", "those",
+    "and", "or", "but", "of", "to", "in", "on", "at", "for", "with", "from", "by", "as", "than",
+    "we", "us", "our", "i", "me", "my", "you", "your", "they", "them", "their", "he", "she",
+    "not", "no", "do", "does", "did", "had", "has", "have", "will", "would", "there", "then",
+    "what", "when", "where", "who", "whose", "which", "how", "all", "any", "both", "one",
+))
+
+#: Neutral acknowledgements for the consequence session. They must carry NO attribution signal --
+#: the consequence records what was DONE, never who advised it, or it would answer the question by
+#: itself and re-collapse the join the shape exists to create.
+_CONSEQUENCE_ACKS = (
+    "That sounds like the sensible way round it.",
+    "Good that it worked out in the end.",
+    "Well, at least it is sorted now.",
+    "Glad that did the trick.",
+    "That would have been the way to do it.",
+)
+
 # Same-domain, same-register filler: ordinary household chat between the same two
 # speakers, carrying no value, no list item and no attributable claim about any gold
 # topic. V3's "plausible, not a strawman" -- the calibration gate then layers echoed
@@ -451,8 +546,22 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
         # chance-aware thresholds, so changing it needs its own measured arc -- and no shipped
         # question currently trips the comma case, making the bug latent rather than live. Writing
         # the alternatives with repeated "or" gets k=3 out of the detector as it stands.
-        question_text = (f"Earlier, about {topic}, someone said that {statement}. "
-                         f"Was that me or you or both of us?")
+        #
+        # E1-b: the question points at the CONSEQUENCE, never the claim. It names neither the topic
+        # nor the statement, so the claim session is not lexically reachable from the question and
+        # a single-shot lexical retriever cannot hold both gold sessions at once.
+        # KEPT SHORT ON PURPOSE, and the reason is a real coupling rather than style.
+        # `closed_choice_k` only reads a trailing "or" clause on questions UNDER 160 CHARACTERS.
+        # The first cut of this frame ran 145-172 and tripped that bound on 10 of 15 questions, so
+        # the shape published a 1/3 chance floor on 5 of them and none on the other 10 -- a
+        # SPLIT-WITHIN-A-SHAPE, which is the shape of defect B3 already cost this family a
+        # re-probe to find. The choice clause also has to stay at the TAIL: `_YESNO_Q` returns
+        # k=2 for anything STARTING with "Was", which would publish a 0.50 floor on a 3-way
+        # question. `check_episodic` asserts k == 3 on every question here, so neither bound can
+        # be crossed again silently.
+        consequence_text, consequence_ref = CONSEQUENCES[topic]
+        question_text = (f"Thinking back to {consequence_ref} — whose earlier point were we "
+                         f"going on? Me or you or both of us?")
 
         # The statement clause is byte-identical across the two variants; only the role
         # carrying it moves. Anything else that differed would be a cue.
@@ -474,15 +583,30 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
                                 tmc.Turn("assistant", said, has_answer=True)],
                                BASE, is_gold=True, tag="attribution")
 
+        # THE CONSEQUENCE SESSION -- gold, because the question is unanswerable without it, but it
+        # carries NO answer-bearing turn: `has_answer` stays False on both turns, so the role
+        # derivation below (and the independent read in `check_episodic`) sees only the claim.
+        #
+        # The role that REPORTS the action alternates on offset parity, independent of the speaker
+        # being asked about. Parking the report on one role would tilt every answer toward the
+        # other, which is the echo defect this shape has already been bitten by twice.
+        def consequence() -> tmc.Session:
+            ack = _CONSEQUENCE_ACKS[offset % len(_CONSEQUENCE_ACKS)]
+            if offset % 2 == 0:
+                turns = [tmc.Turn("user", consequence_text), tmc.Turn("assistant", ack)]
+            else:
+                turns = [tmc.Turn("user", ack), tmc.Turn("assistant", consequence_text)]
+            return tmc.Session(turns, BASE, is_gold=True, tag="consequence")
+
         if speaker == "user":
-            golds = [user_said()]
+            golds = [user_said(), consequence()]
         elif speaker == "assistant":
-            golds = [assistant_said()]
+            golds = [assistant_said(), consequence()]
         else:
             # Both arms carry the SAME statement text, exactly as the single-speaker arms do --
             # the only thing that differs anywhere in this shape is which role utters it. Two
             # sessions rather than one turn-pair, so finding either is not finding both.
-            golds = [user_said(), assistant_said()]
+            golds = [user_said(), assistant_said(), consequence()]
 
         # THE ECHO DRAWS FROM THE TOPIC, NOT THE WHOLE QUESTION, and this is a real leak rather
         # than a tidy-up.
@@ -560,9 +684,28 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
 
         # Roles balanced WITHIN each kind, so neither kind tilts the answer toward a speaker --
         # the same defect as the echo leak, one level down.
+        # E1-b MOVES WHERE THE COMPETITION HAS TO COME FROM, and this is the half that is easy to
+        # get wrong. The question no longer contains the topic OR the statement, so the old
+        # "same claim, other topic" near-miss competes on vocabulary the question stopped carrying
+        # and would be dead weight. The two kinds that matter now are:
+        #
+        #   other topics' CONSEQUENCES   compete for the question's own words, so finding gold B
+        #                                is a real retrieval, not a walkover
+        #   same TOPIC, other claims     compete for gold A once the topic is known, so the second
+        #                                hop of the join is contested too
+        #
+        # Both kept role-balanced in pairs, for the same reason as before: a near-miss concentrated
+        # on one role tilts the answer toward the other.
+        def consequence_near(tp: str, as_user_turn: bool) -> tmc.Session:
+            text, _ = CONSEQUENCES[tp]
+            ack = _CONSEQUENCE_ACKS[(offset + 2) % len(_CONSEQUENCE_ACKS)]
+            turns = ([tmc.Turn("user", text), tmc.Turn("assistant", ack)] if as_user_turn
+                     else [tmc.Turn("user", ack), tmc.Turn("assistant", text)])
+            return tmc.Session(turns, BASE, is_gold=False, tag="near-miss")
+
         near_miss = [
             as_user(topic, near_claims[0]), as_assistant(topic, near_claims[1]),
-            as_user(near_topics[0], statement), as_assistant(near_topics[1], statement),
+            consequence_near(near_topics[0], True), consequence_near(near_topics[1], False),
         ]
 
         # INSIDE the haystack budget, not on top of it. Adding them pushed H to 26-27 against a
@@ -583,7 +726,10 @@ def _attribution_questions(rng: random.Random, echo: float, start: int) -> list[
         out.append(tmc.Question(
             f"tme-epi-{start + offset:03d}", TYPE_ATTRIB, question_text, answer,
             _asked_after(sessions), sessions,
-            {"shape": SHAPE_ATTRIB, "attributed_speaker": role},
+            # `attributed_statement` is what the E1-b overlap check reads. Recorded on the question
+            # rather than looked up from the table, so the check tests THIS question's claim.
+            {"shape": SHAPE_ATTRIB, "attributed_speaker": role,
+             "attributed_statement": statement, "consequence_topic": topic},
         ))
     return out
 
@@ -685,9 +831,44 @@ def check_episodic(questions: list[tmc.Question]) -> list[str]:
             if role != q.extension["attributed_speaker"]:
                 failures.append(f"{q.question_id}: answer key says {q.extension['attributed_speaker']} "
                                 f"but the answer-bearing turns are {roles}")
-            if q.extension["attributed_speaker"] == "both" and len(q.gold_indices) != 2:
-                failures.append(f"{q.question_id}: a `both` question has {len(q.gold_indices)} gold "
-                                f"sessions; finding one must not be finding the other")
+            # E1-b: claim + consequence for a single speaker, both claims + consequence for `both`.
+            expected_gold = 3 if q.extension["attributed_speaker"] == "both" else 2
+            if len(q.gold_indices) != expected_gold:
+                failures.append(f"{q.question_id}: a `{q.extension['attributed_speaker']}` question "
+                                f"has {len(q.gold_indices)} gold sessions, expected {expected_gold}; "
+                                f"finding one must not be finding the others")
+
+            # Exactly one consequence session, and it must carry NO answer-bearing turn -- if it
+            # did, the question would be answerable from the session it already points at and the
+            # join E1-b exists to create would collapse back to a single hop.
+            cons = [i for i in q.gold_indices if q.sessions[i].tag == "consequence"]
+            if len(cons) != 1:
+                failures.append(f"{q.question_id}: {len(cons)} consequence sessions, expected 1")
+            for i in cons:
+                if any(t.has_answer for t in q.sessions[i].turns):
+                    failures.append(f"{q.question_id}: the consequence session carries an "
+                                    f"answer-bearing turn; it must not")
+
+            # THE CLOSED-CHOICE FLOOR MUST SURVIVE THE QUESTION FORM. Imported rather than
+            # re-implemented: a second copy of the 160-character bound would drift from the one
+            # that actually runs, and this shape has already published a floor on 5 of 15
+            # questions and nothing on the other 10 because the frame grew past it.
+            from run_typedmemeval_probes import closed_choice_k
+            k = closed_choice_k(q.question)
+            if k != 3:
+                failures.append(f"{q.question_id}: closed_choice_k reads k={k}, expected 3 "
+                                f"(len={len(q.question)}; the detector ignores an 'or' tail at or "
+                                f"above 160 chars, and returns 2 for a question starting 'Was')")
+
+            # THE AUTHORING RULE, ENFORCED. E1-b works only while the question shares no vocabulary
+            # with the claim. Checked against the emitted question rather than the table, so an
+            # edit for readability cannot quietly restore the leak that made this shape the only
+            # one in the family at ALLgold 1.00.
+            claim_words = set(tmc.tokenize(q.extension.get("attributed_statement", "")))
+            leaked = (claim_words & set(tmc.tokenize(q.question))) - _QUESTION_STOPWORDS
+            if leaked:
+                failures.append(f"{q.question_id}: the question shares {sorted(leaked)} with the "
+                                f"claim it asks about -- E1-b requires it to share nothing")
 
     # (c) The shape mix is the vertical's design, and the report surface reads per shape:
     # a corpus that silently drifted to 25/10/15 would still pass every other check here
@@ -719,7 +900,11 @@ if __name__ == "__main__":
         structure=tmc.StructureSpec(
             # 2 added with the `both` arm of participant-attribution: that arm has one gold
             # session per speaker, so finding either is not finding both.
-            h_min=15, h_max=25, g_values={1, 2, 4, 5, 6, 7}, gold_position_shuffled=True,
+            #
+            # 3 added with E1-b: every attribution question now carries a CONSEQUENCE session as
+            # gold alongside its claim, so the single-speaker arms moved 1 -> 2 and `both` moved
+            # 2 -> 3. G=1 drops by the same 10 questions it gains at G=2.
+            h_min=15, h_max=25, g_values={1, 2, 3, 4, 5, 6, 7}, gold_position_shuffled=True,
             no_absolute_dates=False,
         ),
         generator_tool="tools/gen_typedmemeval_episodic.py",

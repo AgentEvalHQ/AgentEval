@@ -16653,3 +16653,72 @@ the total cost of getting this wrong and then right was zero calls.
 🔴 **The refusal stands, with a number attached.** Regenerate Episodic, then run
 `tools/typedmemeval_shape_profile.py` against the candidate corpus **before** probing. If ALLgold
 on `participant-attribution` has not fallen below **0.85**, do not spend the run.
+
+### 88.14 🟢 `E1-b` BUILT AND PROBED — Episodic's blocking shape now discriminates (2026-09-12)
+
+The first corpus change of this arc, and the first spend. `participant-attribution` went from
+**−0.067** headroom — its lexical arm *beating* a perfect selector — to **+0.533**.
+
+| `participant-attribution` | before | after |
+| --- | ---: | ---: |
+| V1 perfect selector | 14/15 | **15/15** |
+| V8 full haystack | 15/15 | 13/15 |
+| V9 BM25 top-5 | **15/15** | **7/15** |
+| headroom (V1−V9) | **−0.067** | **+0.533** |
+| headroom reachable (V8−V9) | — | +0.400 |
+| declared chance floor | 0.333 | 0.333 |
+| **discriminates** | **False** | ✅ **True** |
+
+All three Episodic shapes now rank two systems, and family-wide the count moves **33 → 34 of 36**
+with two declared exceptions left, both in Forgetting (`never-known`, exempt by construction;
+`still-valid`, the control arm of a pair). `corpus_sha256` **`bfb35552ec82` → `a50846277e29`**.
+
+#### The design, and why it was chosen from a measurement rather than a guess
+
+The question now identifies the claim by its **consequence**: gold A states it, gold B acts on it
+without restating it, and the question shares vocabulary only with **B**. Attribution becomes a
+two-hop join. Gold depth moves 1 → 2, and 2 → 3 on the `both` arm, so the vertical's G distribution
+is now `{1:20, 2:10, 3:5, 4:4, 5:4, 6:3, 7:4}`.
+
+✅ **The free gate worked exactly as §88.13 promised.** `headroom ≈ 1 − ALLgold` is computable with
+zero model calls, so the candidate corpus was measured **before** any spend: ALLgold **1.00 → 0.27**,
+predicted headroom **+0.73** against a required 0.15. Measured after the run: **+0.533**. The
+prediction was high by 0.20 and right about the decision, which is what it was for.
+
+#### 🔴 Two defects I introduced, both caught by instruments rather than by reading
+
+**1 · The question outgrew the chance-floor detector.** `closed_choice_k` only reads a trailing
+"or" clause on questions **under 160 characters**. My first frame ran 145–172, so **10 of 15**
+questions published **no chance floor at all** and the other 5 published 0.333 — a split *within a
+shape*, which is the exact shape of defect `B3` cost this family a re-probe to find. Caught by
+`TypedMemEvalDiscriminationTests`, not by me. The frame is now bounded and `check_episodic` asserts
+`closed_choice_k == 3` on every question, ablated 0/15 → 15/15.
+
+**2 · Shortening it to fit broke answerability.** Trimming to *"whose earlier point was that?"*
+dropped **V1 from 15/15 to 9/15** — "that" reads as the consequence rather than the earlier claim,
+so the shape became 40% unanswerable *with perfect gold selection*. Restoring the wording that had
+measured 15/15 and buying the length back from the reference text instead returned V1 to **15/15**.
+
+⚠ **Both cost a re-probe each.** Three runs, **960 calls**, where one would have done. The
+detector's 160-character bound is a real coupling between question wording and published floor, and
+nothing warned me about it in advance — which is why it is now an assertion in the generator.
+
+#### What was checked
+
+| check | result |
+| --- | --- |
+| three-stage protocol | `--dry-run` all 50 (0 calls) → one real item → full run |
+| candidate built outside the repo | generator run against a scratch `DATA_ROOT`; positive control reproduced the **shipped** corpus byte-for-byte first |
+| E1-b overlap rule | ablated — 0 failures as authored, 1 naming the exact leaked words when a `ref` is re-pointed at its own claim |
+| closed-choice floor | ablated — 0 failures as authored, 15 under over-long refs |
+| discrimination drift | the baseline **refused** as a STALE DECLARATION (declared False, observed True) and was rebuilt deliberately |
+| `AgentEval.Memory.Tests` | **1190/1190** on net8.0, net9.0 and net10.0 |
+| other nine corpora | byte-identical; only `episodic` moved |
+
+#### ⚠ A refinement tested and REFUTED, recorded so it is not re-proposed
+
+V9 on this shape lands at **0.467** against ALLgold 0.27, and `ALLgold + (1−ALLgold)×floor` predicts
+0.511 — close enough to look like a law. Tested family-wide it fits **worse** than the plain
+identity (median residual **0.042** against **0.000**), because most shapes that declare a floor
+score at ALLgold *exactly*: the models **fail** rather than guess. One shape's near-agreement is a
+coincidence. The plain identity stands unchanged.

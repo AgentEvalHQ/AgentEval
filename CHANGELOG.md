@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking — the `episodic` corpus changed bytes
+
+**`corpus_sha256` `bfb35552ec82` → `a50846277e29`.** The other nine corpora are byte-identical;
+this is not a family re-probe.
+
+🔴 **Compare on the sha, never on `question_id`, `corpus_id` or `revision`.** All 50 question ids
+survive unchanged, `corpus_id` (`agenteval-typedmemeval-episodic-v5`) and `revision` (`v5`) do not
+move, and **15 of the 50 carry different question text and a different gold session set** —
+`tme-epi-036`–`050`, the `participant-attribution` shape. A cache, leaderboard row or regression
+baseline keyed on `question_id` will **silently mis-grade** rather than fail loudly. The other 35
+questions (`assistant-stated`, `list-order`) are byte-identical.
+
+**Why.** `participant-attribution` published headroom **−0.067**: its BM25 arm *beat* a perfect
+gold-only selector, so the shape could not rank two retrievers at all. It was the only shape of 35
+in the family where BM25's top-5 held **all** the gold on **every** question, because the question
+quoted the claim it was asking about.
+
+Questions now identify the claim by its **consequence** — one gold session states it, a second acts
+on it without restating it, and the question shares vocabulary only with the second — so
+attribution is a two-hop join. Gold depth moves 1 → 2, and 2 → 3 on the `both` arm; the vertical’s
+G distribution is now `{1:20, 2:10, 3:5, 4:4, 5:4, 6:3, 7:4}`.
+
+| `participant-attribution` | before | after |
+| --- | ---: | ---: |
+| V1 perfect selector | 14/15 | **15/15** |
+| V9 BM25 top-5 | **15/15** | **7/15** |
+| headroom | **−0.067** | **+0.533** |
+| discriminates | **False** | **True** |
+
+Family-wide the discriminating count moves **33 → 34 of 36**, leaving two declared exceptions, both
+in Forgetting. Full record, including two defects introduced and caught during the arc, in
+`docs/findings/MEASUREMENT_STATUS.md` §88.14.
+
+
 ### Added
 
 - **`BenchmarkRunner`** — runs one `BenchmarkDefinition` against one `BenchmarkArm` into one run

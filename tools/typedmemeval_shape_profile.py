@@ -71,10 +71,20 @@ EXCEPTIONS = {
         'sits below the discrimination floor for a DIFFERENT reason than participant-attribution.',
 }
 
-#: NOT an exception, and deliberately recorded as such: `temporal/occurrence-order` sits at residual
-#: exactly +0.20, i.e. ON the tolerance boundary and therefore inside it. I declared it at first and
-#: --check rejected the declaration as stale, which is the gate doing its job against its own author.
-#: It is the shape most likely to cross on any corpus revision, so expect it here first.
+#: NOT exceptions, and deliberately recorded as such -- the two shapes sitting ON the boundary:
+#:
+#:   temporal/occurrence-order        residual exactly +0.20. I declared it at first and --check
+#:                                    rejected the declaration as STALE, the gate doing its job
+#:                                    against its own author.
+#:   episodic/participant-attribution residual +0.197 after the E1-b revision. It fits, but by
+#:                                    three thousandths.
+#:
+#: These two are where the next corpus revision will show up first, so expect them here before
+#: anything else. ⚠ A tempting refinement was tested and REFUTED rather than adopted: modelling the
+#: arm as guessing on what it fails to retrieve, V9 = ALLgold + (1-ALLgold)*floor, fits WORSE
+#: family-wide (median residual 0.042 against the plain form's 0.000) because most shapes that
+#: declare a floor score at ALLgold exactly -- the models fail rather than guess.
+#: participant-attribution's near-exact agreement with that formula is a coincidence of one shape.
 
 
 def session_text(session):
