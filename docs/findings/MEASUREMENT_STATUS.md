@@ -17208,3 +17208,55 @@ but is not the whole story. Best available reconstruction of the published scale
 rubric, and not a licence to re-declare the target met.
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.24 ✅ The second Episodic arc, considered and REFUSED — the gap is inside the ruler's error (2026-09-12)
+
+On the recovered scale (§88.23) Episodic reads **8.38** against a **≥8.5** target. The gap is
+**0.12**, and `assistant-stated` — the vertical's thinnest shape at headroom 0.300 — is exactly what
+`E2` was filed to fix. I designed the change (two details per question, two gold sessions, gold depth
+1 → 2, predicted ALLgold 0.70 → ~0.40 and headroom → ~0.60) and **did not build it.** Two independent
+reasons, either sufficient:
+
+#### 1 · The gap is smaller than the scale's own systematic error
+
+| | |
+| --- | ---: |
+| reconstructed family mean at the anchor era | **8.25** |
+| published family mean | **8.45** |
+| systematic under-prediction | **0.20** |
+| Episodic's gap to the target | **0.12** |
+
+The recovered scale is a fit on **two distinct anchor values** that misses the published mean by
+0.20. Spending a re-probe to move a number by **0.12** on that scale is chasing a difference the
+instrument cannot resolve — and "the measured improvement was inside the measurement error" is a
+result this record should not have to publish twice.
+
+#### 2 · It would contradict the disposition published one commit earlier
+
+`episodic/assistant-stated` has **zero criterion failures**: headroom 0.300 is above the 0.15 floor,
+V1 20/20, no stratum below the floor, no absence-ceiling problem, no below-chance baseline. §88.22
+declined to fund WorkingMemory, Arithmetic and Semantic on **exactly that standard**. Funding
+Episodic's thinnest-but-passing shape while refusing three verticals in the same condition would
+make the rule "fund what is closest to a target" rather than "fund what is measurably broken" —
+which is how a benchmark starts optimising its own headline.
+
+⚠ **What I would do differently, stated plainly.** `E2` should have ridden in the `E1-b` arc
+(`0cf3eb0a`). The plan's own rule is *one arc per vertical, one re-probe, never two fixes shipped
+separately*, and I shipped E1-b while explicitly deferring E2. Had they been batched, Episodic would
+very likely have cleared 8.5 for the same single spend. **That is a process error of mine, and the
+cost of correcting it now — a second full re-probe — is precisely what the rule exists to prevent.**
+Paying it to recover 0.12 of an unresolvable scale would compound the error rather than fix it.
+
+#### Where the targets actually stand
+
+| target | state |
+| --- | --- |
+| Tier 0 empty, Tier 1 ≤3 with triggers | ✅ met |
+| 36/36 **or** each exception declared with a drift check | ✅ met via clause 2 — 34/36, both exceptions in Forgetting, written reasons, two-way check |
+| judge bias bounded **or** narrowed in writing | ✅ met via clause 2 — narrowed (§88.8) **and** measured within that scope (§88.19) |
+| CHANGELOG carries every corpus revision; §0 entry per tag | ✅ met |
+| every number re-taken against the final tree | ✅ met — and the headline's scale recovered rather than asserted |
+| lowest vertical Episodic ≥ 8.5 | ⚠ **8.38** — moved **+0.87** by `E1-b`, short by less than the scale's error |
+| mean ≥ 9.0, none < 8.5 | 🔴 **unmet: 8.34, six below.** Needs family mean headroom **0.663** against **0.512** — a corpus programme across six verticals, not one more arc |
+
+**Cost of this entry: zero calls, zero corpus bytes.**
