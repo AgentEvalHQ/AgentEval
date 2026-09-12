@@ -478,3 +478,10 @@ samples/Galaxus.RecommendationAgent/
 # the probe *records* ship in each corpus's .meta.json.
 tools/.typedmemeval_probe_cache.json
 tools/__pycache__/
+
+# C-E judge-agreement sample and results. The SAMPLER ships (tools/ce/build_judge_sample.py) and is
+# deterministic from seed 20260912 plus the probe cache, so the data is regenerable and does not
+# need to be committed. The sample carries model RESPONSES from paid runs; the rule elsewhere in
+# this file about run output applies here too — ignore the directory, not an extension.
+tools/ce/judge-sample-50.json
+tools/ce/judge-agreement-results.json
