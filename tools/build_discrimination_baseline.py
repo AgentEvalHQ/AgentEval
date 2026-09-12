@@ -54,7 +54,14 @@ REASONS = {
         "catching over-forgetting -- a system reporting a still-valid fact as superseded -- which "
         "is a property of the PAIR, not of either arm's retrieval headroom. Read `paired_arms` "
         "instead, where pair headroom is 0.4667 against a scaled floor of 0.24 at 3.68 sd. The arm "
-        "alone is not supposed to discriminate and is not a defect.",
+        "alone is not supposed to discriminate and is not a defect. "
+        "ADDED 2026-09-12: the 0.0667 is ALSO an artefact of the wrong ceiling. This shape's answer "
+        "asserts an ABSENCE -- 'nothing has cancelled it' -- and gold cannot hold an absence, so V1 "
+        "is not a valid ceiling for it: V8 (15/15) BEATS V1 (13/15), which is impossible when gold "
+        "suffices. Measured against the ceiling that applies, V8-V9 = 0.200 CLEARS the 0.15 floor "
+        "on its own. So the arm is exempt because it is a control, NOT because it cannot rank two "
+        "systems -- it can. See MEASUREMENT_STATUS 88.16 and ABSENCE_SHAPES in "
+        "tools/typedmemeval_quality_board.py.",
     ('forgetting', 'never-known'):
         "Exempt by construction: every question has zero gold sessions, so V1/V8/V9 are undefined "
         "and V1-V9 cannot be formed. Scored on abstention (V10/V11) instead. The probe tool emits "

@@ -16791,3 +16791,67 @@ floor, so it measures *whether* a shape clears each declared threshold, never *b
 shape at 0.16 headroom and one at 0.90 both pass C1. Six verticals clear every floor with a
 thinnest shape under 0.35, so `min headroom` is printed beside every score — a 10.00 means **no
 floor is breached**, never **comfortable margin**.
+
+### 88.16 🔴 V1 is not a valid ceiling for a shape whose answer asserts an ABSENCE (2026-09-12)
+
+The derived quality board (§88.15) failed two shapes on **C2 answerable** — `V1 >= 0.90`. Chasing
+the first one found a defect in how the family measures a whole class of shape.
+
+#### The impossible number
+
+| shape | V1 gold only | V8 full haystack |
+| --- | ---: | ---: |
+| `forgetting/still-valid` | **13/15** | **15/15** |
+| `prospective/not-yet-true` | **5/6** | **6/6** |
+
+**V8 beating V1 should be impossible.** Gold is a subset of the haystack, so a selector handed
+*only the right sessions* cannot be beaten by one handed *everything* — unless the answer needs
+information that is not in gold.
+
+#### The cause, and it is a class not an accident
+
+Both questions assert an **absence**. `still-valid` asks to *"say whether that is still current"*
+— the answer claims **nothing in the record cancelled it**. `not-yet-true` asks whether something
+has happened **yet**. Gold holds the statement and its reaffirmation; **it cannot hold the absence
+of a later cancellation**, because an absence is established only by the whole record.
+
+The paired arm proves it. `forgetting/invalidated` asks the same question where something *did*
+cancel — so the cancellation IS in gold — and it runs **V1 20/20**. Same vertical, same generator,
+same question frame; the only difference is whether the answer is a presence or an absence.
+
+#### ✅ What it changes: an exemption that is an artefact, not a property
+
+`forgetting/still-valid` is declared non-discriminating on `V1−V9 = 0.067`. Against the ceiling
+that actually applies:
+
+> **V8 − V9 = 0.200**, which **clears** the 0.15 floor.
+
+So the shape **can** rank two systems. It stays exempt — it is the control arm of a pair and is not
+*supposed* to carry the pair's discrimination — but the declared **reason was wrong about why**,
+and a reader comparing 0.067 against the floor would conclude the shape is broken. The baseline's
+reason now carries both halves.
+
+⚠ This also re-reads §88.12's exception list: `still-valid` sits there as an identity exception
+with residual +0.27, described as "answerable from partial gold". That was the right observation
+with the wrong cause — it is answerable from the **haystack**, which is a different thing and the
+reason its V9 outruns its ALLgold.
+
+#### The rule, and how it is applied
+
+> **A shape whose answer asserts an absence must be ceilinged on V8, never V1.**
+
+🔴 **Declared from the QUESTION, never from the measurement.** `V8 > V1` is this class's
+signature and the board prints it as a diagnostic — but keying the *rule* on it would take
+applicability from the **result** instead of the **input**, which is gate self-examination shape 7,
+the silent-`{}` defect this family has already shipped once. `ABSENCE_SHAPES` in
+`tools/typedmemeval_quality_board.py` lists the three affected shapes with the phrase in each
+question that makes it an absence claim. A shape that belongs there but stops showing `V8 > V1`
+**stays declared**: that would mean the model got lucky, not that the ceiling became valid. A shape
+showing `V8 > V1` that is NOT declared prints a red warning telling the reader to go and read the
+question rather than add it to silence the line.
+
+⚠ **`forgetting/never-known` is the same phenomenon at its limit** — it asks about a fact never
+stated, has **zero gold**, and is already scored on abstention instead. What looked like a special
+case of one shape is the extreme end of a three-shape class.
+
+**Cost: zero calls, zero corpus bytes.** Both the finding and its fix are declarations.

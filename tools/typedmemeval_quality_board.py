@@ -82,6 +82,31 @@ V1_FLOOR = 0.90
 MIN_VERTICAL = 8.5               # the goal's per-vertical target
 MIN_MEAN = 9.0                   # the goal's family target
 
+#: SHAPES WHOSE ANSWER ASSERTS AN ABSENCE, declared here rather than detected from the run.
+#:
+#: For these, V1 (gold only) is NOT a valid ceiling. Gold can contain what IS; it cannot contain what
+#: ISN'T, and an absence is established only by the whole record. So `headroom_perfect_selector`
+#: (V1-V9) understates the shape and `headroom_reachable` (V8-V9) is the statistic that applies.
+#:
+#: ⚠ DECLARED FROM THE QUESTION, NEVER FROM THE MEASUREMENT. `V8 > V1` is the signature of this
+#: class and is printed below as a diagnostic, but keying the RULE on it would take applicability
+#: from the RESULT instead of the INPUT -- gate self-examination shape 7, the silent-`{}` defect this
+#: family has already shipped once. The reason each shape is here is readable off its own question
+#: text. A shape whose question asserts an absence and which does NOT show V8 > V1 stays declared:
+#: that would mean the model got lucky, not that the ceiling became valid.
+ABSENCE_SHAPES = {
+    'forgetting/still-valid':
+        'asks "say whether that is still current" -- the answer asserts that NOTHING in the record '
+        'cancelled the fact. Gold holds the statement and its reaffirmation; it cannot hold the '
+        'absence of a later cancellation.',
+    'forgetting/never-known':
+        'asks about a fact never stated. The extreme case: it has NO gold at all, which is why it '
+        'is scored on abstention (V10/V11) instead. Same phenomenon, taken to its limit.',
+    'prospective/not-yet-true':
+        'asks whether something has become true YET -- the answer asserts the triggering event has '
+        'not occurred anywhere in the record.',
+}
+
 
 def exempt_shapes():
     """Shapes the family has already declared non-discriminating, with written reasons."""
@@ -149,10 +174,18 @@ def board():
             shapes[shape] = (p, a, rows)
             tp += p
             ta += a
+        beaten = {}
+        for shape, blk in sorted(by_shape.items()):
+            n1, p1 = blk.get('v1_applicable'), blk.get('v1_passed')
+            n8, p8 = blk.get('v8_applicable'), blk.get('v8_passed')
+            n9, p9 = blk.get('v9_applicable'), blk.get('v9_passed')
+            if n1 and n8 and n9 and p8 / n8 > p1 / n1 + 1e-9:
+                beaten[shape] = (p1 / n1, p8 / n8, p9 / n9)
         hs = [b.get('headroom_perfect_selector') for b in by_shape.values()
               if b.get('headroom_perfect_selector') is not None]
         out[vertical] = {'score': 10.0 * tp / ta if ta else float('nan'),
                          'passed': tp, 'applicable': ta, 'shapes': shapes,
+                         'beaten': beaten,
                          'min_headroom': min(hs) if hs else None}
     return out
 
@@ -201,6 +234,31 @@ def main():
                     print('        %-22s %-4s %s' % (name, mark, detail))
 
     print()
+    # THE DIAGNOSTIC for C2 failures: a perfect gold selector BEATEN by the full haystack is
+    # impossible unless the answer needs information gold cannot hold.
+    beaten = [(v, shape) + vals
+              for v, d in sorted(b.items())
+              for shape, vals in sorted(d.get('beaten', {}).items())]
+    if beaten:
+        print()
+        print('  V8 > V1 -- the full haystack BEATS a perfect gold selector. Impossible unless the')
+        print('  answer needs what gold cannot hold, so V1 is not a valid ceiling for these shapes:')
+        for vertical, shape, r1, r8, r9 in beaten:
+            key = '%s/%s' % (vertical, shape)
+            declared = key in ABSENCE_SHAPES
+            print('      %-13s %-20s V1 %.3f  V8 %.3f  |  V1-V9 %+.3f  V8-V9 %+.3f'
+                  % (vertical, shape, r1, r8, r1 - r9, r8 - r9))
+            if not declared:
+                print('        🔴 NOT declared in ABSENCE_SHAPES -- either the question asserts an')
+                print('           absence and belongs there, or something else is wrong. Do not')
+                print('           add it to silence this line; read the question first.')
+            elif (r1 - r9) < DISCRIMINATION_FLOOR <= (r8 - r9):
+                print('        ⚠ declared non-discriminating on V1-V9 = %.3f, but V8-V9 = %.3f'
+                      % (r1 - r9, r8 - r9))
+                print('          CLEARS the %.2f floor. The exemption is an artefact of the wrong'
+                      % DISCRIMINATION_FLOOR)
+                print('          ceiling, not a property of the shape.')
+
     thin = sorted((v, d['min_headroom']) for v, d in b.items()
                   if d.get('min_headroom') is not None and d['min_headroom'] < 0.35)
     if thin:
