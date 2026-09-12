@@ -400,8 +400,14 @@ def main():
             elif z >= 2:
                 tag = '  best-in-class for its construct'
             print('  %-15s %7.2f %10.3f %+9.3f %7.2f%s' % (v, dd, hh, r, z, tag))
-        below = [v for v, r in resid if (r / sig if sig else 0) <= -2]
-        print('  below par beyond 2 sigma: %s' % (', '.join(sorted(below)) if below else 'NONE'))
+        # NAMED `below_par`, never `below`. The first version of this block called it `below` and
+        # SHADOWED the criteria-score list built above -- so `--check` read the residual list
+        # (empty) and printed "every vertical >= 8.5" while `forgetting` sat at 7.50. A gate turned
+        # green by a variable name, introduced by the block that was meant to make the board more
+        # honest. Caught because the headline and the check disagreed in the same run.
+        below_par = [v for v, r in resid if (r / sig if sig else 0) <= -2]
+        print('  below par beyond 2 sigma: %s'
+              % (', '.join(sorted(below_par)) if below_par else 'NONE'))
 
     thin = sorted((v, d['min_headroom']) for v, d in b.items()
                   if d.get('min_headroom') is not None and d['min_headroom'] < 0.35)

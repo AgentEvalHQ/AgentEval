@@ -17694,3 +17694,32 @@ Both are the same shape of error: **reading a number against a shape whose desig
 not produce that number.**
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.33 🔴 I turned a gate green with a variable name, ten minutes after writing it (2026-09-12)
+
+The depth-adjusted block added in §88.32 ended with:
+
+    below = [v for v, r in resid if r / sig <= -2]
+
+`below` was **already bound**, forty lines earlier, to the list of verticals under the 8.5 criteria
+score. The residual list (empty — nothing is below par) **shadowed** it, and `--check` then read the
+empty one:
+
+| | before the fix | after |
+| --- | --- | --- |
+| headline | `below 8.5: forgetting` | `below 8.5: forgetting` |
+| `--check` | **`OK: every vertical >= 8.5`, exit 0** | `FAIL: 1 vertical below 8.5`, exit 2 |
+
+🔴 **A gate reported a pass because a later block reused a variable name.** The block that caused it
+was the one written to make the board more honest, and it shipped in the same commit as a finding
+about reading numbers against the wrong thing.
+
+✅ **What caught it:** the headline and the check **disagreed in the same run**, and I read both
+instead of the one that agreed with me. Nothing else would have — no test covers this tool, and the
+exit code was the flattering one.
+
+⚠ **The general form, and it is the fourth instrument defect of mine this session:** a summary and
+its gate computed from *separately named* intermediates will drift, and the drift is invisible when
+only one of them is printed. The residual list is now `below_par`; the criteria list keeps `below`.
+
+**Cost: zero calls, zero corpus bytes.**
