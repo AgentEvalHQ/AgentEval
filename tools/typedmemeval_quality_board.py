@@ -231,18 +231,35 @@ def board():
         # justify hardest. It is applied because the rule is independently established and keyed on
         # the QUESTION, not because of where it moves the number -- and it changes NO verdict: six
         # verticals are below 8.5 before and after.
+        # EXEMPT SHAPES ARE EXCLUDED FROM THE VERTICAL MEAN. A shape the family has DECLARED
+        # non-discriminating (a control arm, or one with no gold) is not trying to rank systems, so
+        # averaging it into the vertical's discriminating-power mean understates the vertical. It
+        # bites exactly one vertical -- `forgetting`, whose `still-valid` control is deliberately
+        # easy -- and it moved its mean headroom 0.325 -> 0.450, i.e. from "below par" to "at par".
+        # Same class as the absence-ceiling error just above: reading a number against a shape that
+        # the design says should not produce it.
         ceil = []
         for shape, b in by_shape.items():
             h = b.get('headroom_perfect_selector')
             if h is None:
                 continue
-            hr = b.get('headroom_reachable')
             key = '%s/%s' % (vertical, shape)
+            if key in exempt:
+                continue
+            hr = b.get('headroom_reachable')
             ceil.append(hr if (key in ABSENCE_SHAPES and hr is not None) else h)
         mean_h = (sum(ceil) / len(ceil)) if ceil else None
+        with open(corpus, encoding='utf-8') as fh:
+            _entries = json.load(fh)
+        _dep = [len([g for g in (q.get('answer_session_ids') or [])
+                     if g in (q.get('haystack_session_ids') or [])])
+                for q in _entries]
+        _dep = [x for x in _dep if x]
+        mean_depth = (sum(_dep) / len(_dep)) if _dep else None
         out[vertical] = {'score': 10.0 * tp / ta if ta else float('nan'),
                          'passed': tp, 'applicable': ta, 'shapes': shapes,
                          'beaten': beaten,
+                         'mean_depth': mean_depth,
                          'mean_headroom': mean_h,
                          'recovered': recovered_score(mean_h) if mean_h is not None else None,
                          'min_headroom': min(hs) if hs else None}
@@ -352,6 +369,39 @@ def main():
                 print('          CLEARS the %.2f floor. The exemption is an artefact of the wrong'
                       % DISCRIMINATION_FLOOR)
                 print('          ceiling, not a property of the shape.')
+
+    # DEPTH-ADJUSTED RESIDUAL: the part of a vertical's headroom that is about QUALITY rather than
+    # about what it measures. 47% of the raw spread is construct depth (§88.31) -- a distance ladder
+    # needs gold depth 1 and a multi-hop join needs 4-5, so comparing their raw headroom compares
+    # constructs. Regressing headroom on depth and reading the RESIDUAL removes that confound.
+    pts = [(v, d['mean_depth'], d['mean_headroom']) for v, d in b.items()
+           if d.get('mean_depth') and d.get('mean_headroom') is not None]
+    if len(pts) >= 4:
+        n_ = len(pts)
+        mdp = sum(p[1] for p in pts) / n_
+        mhr = sum(p[2] for p in pts) / n_
+        sxx_ = sum((p[1] - mdp) ** 2 for p in pts)
+        slp = sum((p[1] - mdp) * (p[2] - mhr) for p in pts) / sxx_ if sxx_ else 0.0
+        itc = mhr - slp * mdp
+        resid = [(v, hh - (itc + slp * dd)) for v, dd, hh in pts]
+        sig = (sum(r * r for _, r in resid) / max(1, n_ - 2)) ** 0.5
+        print()
+        print('  DEPTH-ADJUSTED QUALITY  (headroom = %.3f + %.3f x depth; sigma %.3f)'
+              % (itc, slp, sig))
+        print('  Raw headroom is ~47% construct. The residual is the part that is about quality.')
+        print('  %-15s %7s %10s %9s %7s' % ('vertical', 'depth', 'headroom', 'residual', 'z'))
+        for v, r in sorted(resid, key=lambda x: x[1]):
+            dd = dict((p[0], p[1]) for p in pts)[v]
+            hh = dict((p[0], p[2]) for p in pts)[v]
+            z = r / sig if sig else 0.0
+            tag = ''
+            if z <= -2:
+                tag = '  *** BELOW PAR for its construct ***'
+            elif z >= 2:
+                tag = '  best-in-class for its construct'
+            print('  %-15s %7.2f %10.3f %+9.3f %7.2f%s' % (v, dd, hh, r, z, tag))
+        below = [v for v, r in resid if (r / sig if sig else 0) <= -2]
+        print('  below par beyond 2 sigma: %s' % (', '.join(sorted(below)) if below else 'NONE'))
 
     thin = sorted((v, d['min_headroom']) for v, d in b.items()
                   if d.get('min_headroom') is not None and d['min_headroom'] < 0.35)

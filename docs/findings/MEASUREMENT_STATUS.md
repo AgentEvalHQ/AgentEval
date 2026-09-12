@@ -17629,3 +17629,68 @@ property of the target, not a failure of the corpora.** A depth-adjusted bar (re
 threshold) is reachable and means something; a uniform bar on raw headroom does not.
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.32 ✅ NO vertical is below par for its construct — the target is construct-blind (2026-09-12)
+
+§88.31 left `forgetting` (−0.155) and `semantic` (−0.133) looking below par. Both dissolved under
+the next two checks, and the result closes the question the whole session has been circling.
+
+#### 1 · `forgetting` was dragged down by a shape declared not to discriminate
+
+`forgetting/still-valid` is the **control arm of a pair**. Its generator says so in as many words:
+*"the control exists to catch over-forgetting, and a system that finds either mention has the
+evidence it needs"*, and it is declared `gold_components_redundant: True` and exempt in the
+discrimination baseline. **It is designed to be easy.** Averaging it into the vertical's
+*discriminating-power* mean is reading a number against a shape the design says should not
+produce it — the same class as the absence-ceiling error in §88.29.
+
+> Excluding exempt shapes: `forgetting` mean headroom **0.325 → 0.450**, residual
+> **−0.155 → −0.050**. **At par.** It is the only vertical this touches.
+
+#### 2 · `semantic` is inside the scatter, not below par
+
+The depth fit has **σ = 0.114** on 10 points and 2 parameters. Semantic's −0.150 is **z = −1.32**.
+Calling that a defect would be the §88.20 `difficulty=3` error again — banking a marginal flag
+because it points the way I was looking.
+
+| vertical | depth | headroom | residual | z |
+| --- | ---: | ---: | ---: | ---: |
+| semantic | 2.40 | 0.383 | −0.150 | −1.32 |
+| arithmetic | 4.50 | 0.639 | −0.069 | −0.61 |
+| forgetting | 2.00 | 0.450 | −0.050 | −0.44 |
+| episodic | 2.74 | 0.522 | −0.039 | −0.34 |
+| workingmemory | 1.00 | 0.383 | −0.033 | −0.29 |
+| temporal | 3.42 | 0.606 | −0.012 | −0.11 |
+| bitemporal | 1.00 | 0.431 | +0.014 | +0.12 |
+| prospective | 1.66 | 0.494 | +0.023 | +0.20 |
+| conjunction | 4.35 | 0.754 | +0.059 | +0.52 |
+| **procedural** | 2.50 | 0.800 | **+0.259** | **+2.27** |
+
+> 🔴 **Below par beyond 2σ: NONE.** The single significant outlier is `procedural`, and it is
+> **above** par — best-in-class for its construct.
+
+#### ✅ The answer to "why are six verticals below 8.5"
+
+**Because the bar is construct-blind.** 47% of the raw spread is gold depth, which each vertical's
+own generator fixes: a distance ladder needs depth 1, a multi-hop join needs 4–5. Once depth is
+removed, **every vertical sits within 1.4σ of par**. Nothing is measurably broken.
+
+So `mean ≥ 9.0 / none < 8.5` on **raw** headroom cannot be met without changing what the low
+verticals measure — and §88.31 came within one step of doing exactly that to `workingmemory` and
+`bitemporal`, which are at par (−0.033, +0.014).
+
+⚠ **A depth-adjusted bar is reachable and means something.** `residual ≥ −2σ` is satisfied by all
+ten verticals today, and it is a statement about quality rather than about construct. The quality
+board now prints the residual and its z beside every score.
+
+#### Two more reporting defects of mine, fixed here
+
+- the vertical mean averaged in **exempt** shapes (control arms, no-gold shapes), understating
+  `forgetting` by 0.125 of headroom;
+- it used V1−V9 for **absence** shapes despite §88.16 declaring V8 the valid ceiling (fixed in
+  §88.29).
+
+Both are the same shape of error: **reading a number against a shape whose design says it should
+not produce that number.**
+
+**Cost: zero calls, zero corpus bytes.**
