@@ -2025,15 +2025,38 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     holds when the arms are INDEPENDENT. They are not: both arms read the same haystack, and on the
     shipped corpus pair-V9 came in at 14/18 = 0.778 against the 0.735 independence predicts, so the
     arms are positively correlated and the true amplification is SMALLER than (V1 + V9). The scaled
-    floor is therefore conservative -- it can fail a shape that would survive an exact correction,
-    and the verdict on belief-at-instant turns on precisely that margin (0.167 against 0.275, where
-    the unscaled floor would have passed it).
+    floor is therefore conservative -- it can in principle fail a shape that would survive an exact
+    correction. On the CURRENT corpora it fails none: see the table below, measured 2026-09-12.
 
-    SO THE FLOOR IS NOT WHAT CARRIES THE belief-at-instant VERDICT, and it should not be quoted as
-    though it were. What carries it is the raw separation: 3 pairs out of 18, against a binomial
-    standard error near 1.75 pairs -- about 1.7 sd, which no reading of the amplification rescues.
-    A shape whose entire discrimination is three pairs on n=18 cannot rank two systems whatever
-    floor it is compared against, and the sample size is itself worth revisiting.
+    SO THE FLOOR IS NOT WHAT CARRIES ANY VERDICT, and it should not be quoted as though it were.
+    What carries one is the raw separation, which assumes nothing about correlation.
+
+    F2 -- "replace the assumption with an empirical correction" -- IS CLOSED AS NOT WORTH DOING,
+    2026-09-12, on two grounds, the second measured.
+
+    1. It would be the artifact supplying its own bar. The only data available to estimate the
+       arm correlation is the same data being graded, and a gate whose threshold is derived from
+       the observations it judges is the defect this family keeps finding.
+
+    2. IT WOULD CHANGE NO VERDICT. Every shape carrying a pair block, from the shipped sidecars:
+
+         bitemporal/belief-at-instant   18 pairs  headroom 0.5556  floor 0.2542  4.74 sd  PASS
+         bitemporal/correction-depth    12 pairs  headroom 0.5833  floor 0.25    4.09 sd  PASS
+         prospective/due-window          9 pairs  headroom 1.0     floor 0.1667 13.77 sd  PASS
+         prospective/due-later-reminder  4 pairs  headroom 0.25    floor 0.2625  1.09 sd  fail
+         prospective/expiring-validity   3 pairs  headroom 0.3333  floor 0.25    1.19 sd  fail
+         prospective/not-yet-true        3 pairs  headroom 0.3333  floor 0.175   1.19 sd  fail
+
+       An exact correction can only LOWER the floor (the true amplification is smaller). Drive
+       the floor to ZERO and all three failures stand: each is failed by separation at ~1.1-1.2
+       sd, on THREE OR FOUR PAIRS. Their problem is sample size, not the floor -- which is P2
+       (rebalance shape sizes) and costs a re-probe, not a heuristic.
+
+    ⚠ THE EXAMPLE THAT USED TO SIT HERE WAS STALE, and it argued the opposite. It read
+    "belief-at-instant 0.167 against 0.275 ... 3 pairs out of 18 ... about 1.7 sd", from a corpus
+    since superseded; that shape now reads 0.5556 against 0.2542 at 4.74 sd and passes
+    comfortably. A live comment citing a retired verdict is worse than no comment, because it is
+    quoted with the authority of code.
     """
     paired = [(r, arms.get(r["question_id"], (None, None))) for r in group]
     pairs: dict[str, dict[str, dict]] = {}
