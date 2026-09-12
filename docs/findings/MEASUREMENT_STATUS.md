@@ -16475,6 +16475,8 @@ inherited.
 
 ### 88.11 🔴 THREE mechanisms proposed for one defect, THREE falsified — and I still do not know (2026-09-12)
 
+> ⚠ **CORRECTED BY 88.12, same day.** The cause IS known. One of the three falsifications below was run against an operand of mine that is anti-predictive (r = −0.525 against the quantity it was meant to explain). Read 88.12 first; what survives here is hypothesis 2 and the discipline, not the verdict "unknown".
+
 `participant-attribution` (episodic, 15 questions, headroom **−0.067**) is what blocks Episodic
 reaching 8.5. I proposed three explanations and measured each, free. All three are wrong.
 
@@ -16504,3 +16506,96 @@ shapes, and it is what any fourth hypothesis should be tested against before it 
 ⚠ **Kept as a negative result on purpose.** Three refuted hypotheses recorded is worth more than a
 fourth guess shipped, and the next person to look at this shape should start knowing which three
 roads are closed.
+
+### 88.12 🟢 The mechanism, found — and 88.11's "cause unknown" was my own broken operand (2026-09-12)
+
+88.11, committed earlier today, said three mechanisms had been proposed for
+`episodic/participant-attribution` (headroom **−0.067**) and all three falsified, cause unknown.
+**That entry is corrected here.** The cause is known, and one of the three refutations was run
+against an operand of mine that is anti-predictive.
+
+#### The identity
+
+Across all 35 headroom-bearing shapes, the published V9 pass rate **equals** the rate at which
+BM25's top-K_ref holds **ALL** of a question's gold sessions — not merely one of them:
+
+| statistic | value |
+| --- | ---: |
+| median \|V9 − ALLgold\| | **0.000** |
+| mean \|V9 − ALLgold\| | 0.045 |
+| exact matches (<0.005) | **27 of 35 shapes** |
+| least squares | slope **+0.887**, intercept +0.069, R² **0.818** |
+
+So V9 is not measuring reasoning under a lexical baseline. It measures whether a fixed `K_ref`
+budget happened to hold the whole gold set. V1 sits at or near 1.0 on nearly every shape, so
+
+> **headroom = V1 − V9  ≈  1 − ALLgold_retrieval**
+
+Headroom is a statement about the **retrieval budget** first, and about shape design only second.
+
+#### The defect, explained
+
+`participant-attribution` is the **only shape in the family at ALLgold = 1.00**. BM25 with K=5
+already holds every gold session on all 15 questions, so V9 saturates at 1.00 and there is nothing
+for a better retriever to win; V1's single miss (14/15) then makes the gap negative. One shape of
+35 is saturated and it is exactly the one that does not discriminate.
+
+#### 🔴 The operand that was wrong was mine
+
+| | operand | vs the published V9 rate |
+| --- | --- | --- |
+| superseded | `bool(gold & top_k)` — **ANY** gold session retrieved | slope **−0.803**, R² 0.276 — anti-predictive |
+| corrected | `gold.issubset(top_k)` — **ALL** gold retrieved | slope **+0.887**, R² 0.818, median residual **0.000** |
+
+**Direction of the error:** it **flattered retrieval**. For a shape needing 4 sessions, holding 1
+is a failure my operand scored as a success — overstating by ≥0.30 on **18 of 35** shapes, and by a
+full **1.00** on `conditional-branch` and `step-order`.
+
+**Blast radius, bounded:** the ANY-gold column lived only in an uncommitted scratch script and in
+88.11's reasoning. It never reached a corpus, a sidecar, a published number, or the probe runner —
+`run_typedmemeval_probes.py` has always recorded `v9_gold_in_context` as a **count**, which is
+correct. **No published number moves.** What moves is 88.11's conclusion.
+
+#### Which of the three hypotheses actually survives
+
+| # | hypothesis | 88.11 verdict | corrected verdict |
+| --- | --- | --- | --- |
+| 1 | the question quotes the claim, so it is a search query for its own answer | falsified | ✅ **substantially right**, now sharpened into the identity |
+| 2 | one retrieved session settles the answer | falsified | ✅ falsification **stands** — both shapes are depth 1, so sufficiency cannot separate them |
+| 3 | retrieval==1 **and** sufficiency==1 | falsified | ⚠ **untested** — it was run against the broken operand |
+
+H1 was refuted by observing that `list-order` "also retrieves gold 15/15". Under the correct
+operand `list-order` is at ALLgold **0.27** against `participant-attribution`'s **1.00**: the
+contrast that killed the hypothesis does not exist.
+
+#### Four shapes do not fit, and are declared rather than smoothed
+
+`order-then-value` (+0.40), `still-valid` (+0.27), `not-yet-true` (−0.33). A **positive** residual
+means the shape is answerable from **partial** gold; the one negative means holding gold is not
+sufficient. ⚠ `still-valid` is the family's *other* non-discriminating shape and it fails for this
+different reason — so the two low outliers were never one phenomenon, and a single fix was never
+going to address both. `temporal/occurrence-order` sits at residual exactly +0.20, on the
+boundary: I declared it, and `--check` rejected the declaration as **stale**, which is the gate
+working against its own author.
+
+#### ✅ What this buys, and it is the point
+
+`headroom ≈ 1 − ALLgold` is computable from a corpus with **zero model calls**. A proposed shape
+revision can therefore be checked for discriminating power **before it is generated and before a
+probe run is paid for** — which converts the Episodic arc from a ~2,100–3,200-call gamble into a
+free pre-check followed by a run that already knows its answer.
+`tools/typedmemeval_shape_profile.py --check` gates the identity and its exception set in both
+directions.
+
+**`E1-b` now has a quantitative prediction rather than a hope.** The design raises gold depth
+1 → 2 and moves the question's vocabulary onto the consequence session, both of which push ALLgold
+down. Every depth-2 shape in the family sits at ALLgold **0.00–0.55**. So:
+
+| quantity | now | predicted after `E1-b` | how it is checked |
+| --- | ---: | ---: | --- |
+| ALLgold retrieval | **1.00** | **≤ 0.55** | free, before generation |
+| headroom | **−0.067** | **≥ 0.45** | the re-probe |
+
+🔴 **If the regenerated corpus does not drop ALLgold below 1.00, do not run the probe** — the
+identity says the headroom cannot move, and the calls would buy a number already known. That is a
+gate the earlier design could not state.
