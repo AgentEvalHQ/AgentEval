@@ -144,12 +144,26 @@ def main():
               % (len(below), FLOOR))
         return 2
     if marginal:
-        print('  VERDICT: NOT ESTABLISHED. %d stratum/strata land within %.2f of the floor'
-              % (len(marginal), MARGIN))
-        print('           (%s).' % ', '.join(v[0] for v in marginal))
-        print('           With the echo knob moved, that margin is not attributable to the design')
-        print('           change. Treat as "not shown to work", NOT as a small improvement.')
-        return 3
+        names = ', '.join(v[0] for v in marginal)
+        if e_ship != e_cand:
+            # The echo moved, so a thin margin cannot be attributed to the design at all.
+            print('  VERDICT: NOT ESTABLISHED. %d stratum/strata land within %.2f of the floor (%s).'
+                  % (len(marginal), MARGIN, names))
+            print('           The echo knob ALSO moved, so that margin is not attributable to the')
+            print('           design change. Treat as "not shown to work", NOT a small improvement.')
+            return 3
+        # Echo pinned: the comparison IS controlled, so a thin margin is real but small. Saying
+        # "not attributable" here would be false -- it is attributable, and modest.
+        print('  VERDICT: ATTRIBUTABLE BUT THIN. The echo knob is PINNED (%s), so this is a'
+              % e_cand)
+        print('           controlled comparison and the movement IS the design change. %d'
+              % len(marginal))
+        print('           stratum/strata still land within %.2f of the floor (%s).'
+              % (MARGIN, names))
+        print('           Judge it on the DEFECT it repairs, not on the margin it leaves: a')
+        print('           stratum measured BELOW the floor being lifted above it is a real fix;')
+        print('           a stratum already above the floor gaining a little is not worth a run.')
+        return 4
     print('  VERDICT: PASS. Every stratum clears the floor with margin; the spend is justified.')
     return 0
 

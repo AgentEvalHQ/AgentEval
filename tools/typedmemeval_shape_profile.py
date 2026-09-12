@@ -91,8 +91,10 @@ def session_text(session):
     return ' '.join(t.get('content', '') for t in session)
 
 
-def profile():
+def profile(unmeasured=None):
     rows = []
+    if unmeasured is None:
+        unmeasured = []
     for corpus in sorted(glob.glob(os.path.join(ROOT, '*', '*-v5.json'))):
         vertical = os.path.basename(os.path.dirname(corpus))
         meta = corpus.replace('-v5.json', '-v5.meta.json')
@@ -102,6 +104,12 @@ def profile():
             entries = json.load(fh)
         with open(meta, encoding='utf-8') as fh:
             by_shape = (json.load(fh).get('probes') or {}).get('by_shape') or {}
+        if not by_shape:
+            # NEVER SILENTLY SKIP a vertical whose corpus exists but carries no probe results. This
+            # file used to omit it and report "identity holds" over the survivors -- a check that
+            # cannot see its subject must not report a pass.
+            unmeasured.append(vertical)
+            continue
 
         groups = collections.defaultdict(list)
         for e in entries:
@@ -154,7 +162,13 @@ def fit(xs, ys):
 
 def main():
     check = '--check' in sys.argv
-    rows = profile()
+    unmeasured = []
+    rows = profile(unmeasured)
+    if unmeasured:
+        print('🔴 UNMEASURED VERTICALS -- corpus present, NO probe results in the sidecar: %s'
+              % ', '.join(sorted(unmeasured)))
+        print('   The identity below is computed over the rest and is NOT a family statement.')
+        print()
     if not rows:
         print('no headroom-bearing shapes found under %s' % ROOT)
         return 1
@@ -229,6 +243,11 @@ def main():
             print()
             print('FAIL: median |V9 - ALLgold| rose to %.3f; the identity no longer holds.'
                   % dev[len(dev) // 2])
+            rc = 2
+        if unmeasured:
+            print()
+            print('FAIL: %d vertical(s) carry a corpus with NO probe results: %s'
+                  % (len(unmeasured), ', '.join(sorted(unmeasured))))
             rc = 2
         if rc == 0:
             print()

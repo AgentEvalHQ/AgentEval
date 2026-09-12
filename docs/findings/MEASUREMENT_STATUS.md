@@ -17260,3 +17260,54 @@ Paying it to recover 0.12 of an unresolvable scale would compound the error rath
 | mean ≥ 9.0, none < 8.5 | 🔴 **unmet: 8.34, six below.** Needs family mean headroom **0.663** against **0.512** — a corpus programme across six verticals, not one more arc |
 
 **Cost of this entry: zero calls, zero corpus bytes.**
+
+### 88.25 🔴 A killed run left an UNMEASURED corpus in the tree — and two of my own gates passed it (2026-09-12)
+
+§88.21 refused the Bitemporal fix because the echo knob moved and made the comparison uncontrolled.
+I then ran the experiment I had named but not performed: **regenerate with the echo PINNED**.
+
+| stratum | shipped ALLgold | candidate | |
+| --- | ---: | ---: | --- |
+| `belief-at-instant/transaction` | 0.667 | 0.556 | |
+| `belief-at-instant/valid` | 0.889 | **0.778** | predicts **0.222** against **0.056 measured** |
+| `correction-depth/transaction` | 0.750 | **0.333** | |
+| `correction-depth/valid` | 0.667 | 0.750 | worse, still above floor |
+
+Echo held at **0.6406 on both sides**, so the movement IS the design change. The mechanism holds in
+3 of 4 strata, and the shape measured below the floor is lifted above it. The spend was justified on
+the defect, not on a target.
+
+**The full re-probe was then KILLED by system memory pressure**, after `--dry-run` (0 calls) and one
+real item (19 calls). No results were produced.
+
+#### 🔴 What that exposed, which is worth more than the arc
+
+Generation **wipes the probe records**, so the tree briefly held a bitemporal corpus (`cdc27b22`)
+whose sidecar carried a `probes` block with **no `by_shape`, no `run_at`, no
+`probed_corpus_sha256`** — a corpus with no measurements behind it. Running every gate against that
+state:
+
+| gate | verdict | |
+| --- | --- | --- |
+| discrimination baseline | **exit 1** — *"declared but NOT FOUND in any sidecar"* | ✅ caught it |
+| quality board | **exit 2**, printing *"mean 9.32 over **9** verticals"* | 🔴 **silently dropped it** |
+| shape profiler | **exit 0**, *"identity holds"* | 🔴 **silently dropped it** |
+
+Two instruments I built this session computed a family number **over the survivors** and reported a
+pass with a tenth of the family unmeasured. That is the diluted-denominator defect (gate shape 3)
+inside the tools written to catch it, and it breaks the rule this record already states: **a check
+that cannot see its subject must not report a pass.**
+
+✅ **Both now fail loudly**, naming the vertical and saying that any figure printed is computed over
+the remainder and is not a family number. Verified against the broken state before it was reverted.
+
+#### Disposition
+
+The corpus and the generator change are **reverted** — `bitemporal`'s `corpus_sha256` never moved,
+and an unmeasured corpus must not sit in the tree. The pre-check result above stands as a
+**pre-registered prediction** for whoever runs the arc: echo pinned at 0.6406,
+`belief-at-instant/valid` ALLgold 0.889 → 0.778, predicted headroom **0.222** against **0.056**
+measured. ⚠ If the re-probe does not lift that stratum above the 0.15 floor, the design is wrong and
+must not ship as an improvement.
+
+**Cost: 19 calls, zero corpus bytes retained.**

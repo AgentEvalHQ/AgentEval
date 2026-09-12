@@ -197,6 +197,12 @@ def board():
             continue
         by_shape = (json.load(open(meta, encoding='utf-8')).get('probes') or {}).get('by_shape') or {}
         if not by_shape:
+            # NEVER SILENTLY SKIP. A vertical whose sidecar carries no probe results used to drop
+            # out of this board entirely, and the mean was then computed over the SURVIVORS -- it
+            # printed "mean 9.32 over 9 verticals" with a tenth vertical sitting unmeasured in the
+            # tree. That is the diluted-denominator defect in the instrument that exists to catch it.
+            # Recorded as unmeasured so the caller must deal with it.
+            out[vertical] = {'unmeasured': True}
             continue
         shapes = {}
         tp = ta = 0
@@ -231,6 +237,17 @@ def main():
     if not b:
         print('no probed sidecars found under %s' % ROOT)
         return 1
+
+    unmeasured = sorted(v for v, d in b.items() if d.get('unmeasured'))
+    b = {v: d for v, d in b.items() if not d.get('unmeasured')}
+    if unmeasured:
+        print('🔴 UNMEASURED VERTICALS -- corpus present, NO probe results in the sidecar:')
+        for v in unmeasured:
+            print('     %s' % v)
+        print('   Every figure below is computed over the REMAINING %d verticals and is not a'
+              % len(b))
+        print('   family number. Re-probe before quoting anything here.')
+        print()
 
     print('TYPEDMEMEVAL QUALITY BOARD, derived  (0 model calls)')
     print('  score = 10 x (criteria passed / criteria applicable); rubric in this file\'s docstring')
@@ -338,6 +355,9 @@ def main():
 
     if check:
         problems = []
+        if unmeasured:
+            problems.append('%d vertical(s) carry a corpus with NO probe results: %s'
+                            % (len(unmeasured), ', '.join(unmeasured)))
         if below:
             problems.append('%d vertical(s) below %.1f: %s'
                             % (len(below), MIN_VERTICAL, ', '.join(sorted(below))))
