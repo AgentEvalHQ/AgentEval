@@ -16722,3 +16722,72 @@ V9 on this shape lands at **0.467** against ALLgold 0.27, and `ALLgold + (1−AL
 identity (median residual **0.042** against **0.000**), because most shapes that declare a floor
 score at ALLgold *exactly*: the models **fail** rather than guess. One shape's near-agreement is a
 coincidence. The plain identity stands unchanged.
+
+### 88.15 🔴 The family's most-cited number had no instrument at all (2026-09-12)
+
+TypedMemEval publishes a per-vertical **quality score** — *"mean **8.45**, range 7.5 (Episodic) to
+9.5 (Conjunction, Procedural)"* — in the plan, the README and the status-and-plan-forward doc. It
+is the headline a reader is most likely to quote, and it is the number the current goal is written
+against.
+
+**Searched on 2026-09-12: there is no rubric, no score table with a derivation, and no tool that
+computes any of it.** The scores exist only as prose assertions. Nothing in `tools/`, the sidecars,
+the ADRs or the plan defines what a 9.5 is or what separates it from an 8.0.
+
+That is claim-without-instrument (gate shape 6) sitting on the family's headline figure — in a
+family whose entire purpose is that a published number be traceable to a measurement.
+
+#### The instrument, built: `tools/typedmemeval_quality_board.py`
+
+Each shape is scored on the criteria that apply to it. Every criterion is binary, reads a field the
+probe run already writes, and states its threshold:
+
+| | criterion | threshold | what it catches |
+| --- | --- | --- | --- |
+| C1 | discriminates | `headroom >= 0.15` | a shape that cannot rank two systems |
+| C2 | answerable | `V1 >= 0.90` | a shape asking what its own gold cannot settle |
+| C3 | reachable | `headroom_reachable >= 0.15` | headroom only a *perfect* selector can win |
+| C4 | floor disclosed | closed-choice publishes `chance_floor` | an undeclared guessing floor |
+| C5 | headroom is skill | `v9_above_chance >= 0` | headroom that is partly floor, not retrieval |
+
+`score = 10 × (criteria passed / criteria applicable)`. Shapes already declared exempt in the
+discrimination baseline are excluded from C1/C3 **with their reason**, never silently passed.
+
+#### What it reads — and it inverts the published ranking
+
+| vertical | derived | min headroom | failing |
+| --- | ---: | ---: | --- |
+| forgetting | **7.50** | +0.067 | `still-valid` C2 (**V1 13/15**) |
+| conjunction | 8.75 | +0.400 | `alias-then-count`, `conditional-branch` C5 |
+| procedural | 8.89 | +0.650 | `retired-step`, `step-order` C5 |
+| temporal | 9.23 | +0.467 | `occurrence-order` C5 |
+| prospective | 9.47 | +0.250 | `not-yet-true` C2 (V1 5/6) |
+| arithmetic / bitemporal / episodic / semantic / workingmemory | 10.00 | +0.250–+0.500 | — |
+
+**Mean 9.38; one vertical below 8.5.** The published board called Episodic the family's *worst* at
+7.5 and never flagged Forgetting; derived, Episodic meets every criterion and **Forgetting is the
+only vertical below the line** — on a shape whose 2 unanswerable questions nothing was reporting.
+
+#### 🔴🔴 This does NOT mean the targets are met, and the reason is the point
+
+**The rubric is bar-supplied.** The targets (*mean ≥ 9.0, none < 8.5*) were calibrated against the
+old hand-assigned numbers, and I replaced the measuring device — then reported that the new device
+clears them. That is exactly the failure this family exists to catch: *never let the artifact under
+test supply any input to its own pass mark* ([[reference_gate_self_examination_rule]], shape 2).
+A 9.38 from a ruler I built while wanting 9.0 is not evidence of anything about the family.
+
+What the work legitimately establishes is narrower, and stands on its own:
+
+- ✅ **the published board had no instrument** — a defect independent of any score;
+- ✅ **the named criterion failures are real** whatever the scale: `forgetting/still-valid` is 2
+  questions short of answerable with a *perfect* selector, `prospective/not-yet-true` 1, and five
+  shapes carry a lexical baseline scoring below chance.
+
+⚠ **Re-anchoring the numeric targets is the maintainer's call, not mine.** The tool says so in its
+docstring and prints it on every run, so the caveat cannot be separated from the number.
+
+⚠ **And the rubric's own limitation, stated rather than papered over:** every criterion is a binary
+floor, so it measures *whether* a shape clears each declared threshold, never *by how much*. A
+shape at 0.16 headroom and one at 0.90 both pass C1. Six verticals clear every floor with a
+thinnest shape under 0.35, so `min headroom` is printed beside every score — a 10.00 means **no
+floor is breached**, never **comfortable margin**.

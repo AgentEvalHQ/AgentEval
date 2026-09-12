@@ -1,0 +1,240 @@
+# -*- coding: utf-8 -*-
+"""The quality board, DERIVED. Every vertical score computed from measured fields. 0 model calls.
+
+WHY THIS EXISTS. The family publishes a per-vertical "quality score" -- mean 8.45, Episodic 7.5,
+Conjunction and Procedural 9.5 -- and cites it as the headline in the plan, the README and the
+status-and-plan-forward doc. Searched on 2026-09-12: there is **no rubric, no score table with a
+derivation, and no tool that computes any of it**. The numbers exist only as prose assertions.
+
+That is the family's most-cited figure resting on nothing an instrument produced -- claim-without-
+instrument, on the one number a reader is most likely to quote. This file is that instrument.
+
+WHAT IT DOES NOT DO. It does not try to reproduce 8.45. A rubric tuned until it re-derived the
+hand-assigned numbers would be fitted to them, and would inherit whatever they were worth. The
+criteria below were chosen for being measurable and load-bearing, then computed once. **The scores
+this prints are NOT comparable to the published ones and supersede them.**
+
+THE RUBRIC. Each shape is scored on the criteria that apply to it. Every criterion is binary, reads
+a field the probe run already writes, and states its own threshold:
+
+  C1 discriminates        headroom_perfect_selector >= 0.15  -- the shape can rank two systems.
+                          ADR-028's floor; the whole point of a shape.
+  C2 answerable           v1_passed / v1_applicable >= 0.90  -- a perfect selector can answer it.
+                          Below this the shape is asking something its own gold cannot settle.
+  C3 reachable            headroom_reachable >= 0.15         -- a REAL retriever can win some of the
+                          headroom, not only a perfect one. Separates retrieval-limited from
+                          reasoning-limited, which V1-V9 alone cannot.
+  C4 floor disclosed      a closed-choice shape publishes chance_floor. Applies only where the
+                          corpus declares one; open questions are NOT penalised for lacking it.
+  C5 headroom is skill,   v9_above_chance >= 0. Applies only where a floor exists. A lexical
+     not floor            baseline scoring BELOW guessing means part of the published headroom is
+                          the floor rather than retrieval skill. ⚠ Failing C5 is NOT a corpus
+                          defect -- the sidecar already discloses it via `v9_above_chance` and
+                          `chance_floor_reading`. It is a CAVEAT on the headroom figure, scored
+                          because the goal is that every published number be defensible, and a
+                          headroom that is partly floor cannot be quoted bare.
+
+  vertical score = 10 x (criteria passed / criteria applicable)
+
+A shape declared exempt in the discrimination baseline (no gold, or a control arm) is excluded from
+C1/C3 with its reason, never silently scored as a pass.
+
+🔴 THE RUBRIC'S OWN LIMITATION, stated rather than papered over. Every criterion is a BINARY floor,
+so it measures "does this shape clear every declared threshold" and NOT "by how much". A shape at
+headroom 0.16 and one at 0.90 both pass C1 identically. That is deliberate -- the thresholds are
+declared elsewhere (ADR-028) and this file must not invent new ones to manufacture a spread -- but it
+means a 10.00 says *no floor is breached*, never *there is comfortable margin*. The `min headroom`
+column carries the margin so a reader sees both, and the per-shape distribution lives in
+`typedmemeval_shape_profile.py`. Do not read this score as a quality ranking between two verticals
+that both clear every floor.
+
+🔴🔴 READ THIS BEFORE QUOTING THE MEAN. **This rubric is bar-supplied.** The family's targets
+("mean >= 9.0, none < 8.5") were written against the OLD hand-assigned numbers, and this file
+replaces the measuring device those targets were calibrated on. A score from it clearing those
+thresholds therefore **does NOT mean the targets are met** -- it means a different instrument,
+written by the same agent that wanted them met, reports a different number. That is precisely the
+gate self-examination failure this family exists to catch: never let the artifact under test supply
+any input to its own pass mark.
+
+What this file legitimately establishes is narrower and still worth having:
+  * the published board had **no instrument at all**, which is a defect independent of any score;
+  * these specific, named criterion failures are real and actionable whatever the scale
+    (`forgetting/still-valid` V1 13/15; five shapes whose lexical baseline scores below chance).
+**Re-anchoring the numeric targets is the maintainer's call, not this tool's.**
+
+Usage:  python tools/typedmemeval_quality_board.py [--check] [-v]
+        --check exits non-zero if any vertical is below MIN_VERTICAL or the mean below MIN_MEAN.
+        ⚠ --check is a REGRESSION guard against this rubric's own thresholds; it is not evidence
+        that the family's declared goals are satisfied. See the bar-supplied warning above.
+"""
+import collections
+import glob
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(os.path.dirname(HERE), 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
+BASELINE = os.path.join(HERE, 'typedmemeval-discrimination-baseline.json')
+
+DISCRIMINATION_FLOOR = 0.15      # ADR-028
+V1_FLOOR = 0.90
+MIN_VERTICAL = 8.5               # the goal's per-vertical target
+MIN_MEAN = 9.0                   # the goal's family target
+
+
+def exempt_shapes():
+    """Shapes the family has already declared non-discriminating, with written reasons."""
+    if not os.path.exists(BASELINE):
+        return {}
+    shapes = json.load(open(BASELINE, encoding='utf-8'))['shapes']
+    return {k: v.get('reason', '') for k, v in shapes.items()
+            if v.get('discriminates') is not True}
+
+
+def score_shape(vertical, shape, blk, exempt):
+    """Returns (passed, applicable, [(criterion, ok_or_None, detail)])."""
+    key = '%s/%s' % (vertical, shape)
+    is_exempt = key in exempt
+    rows = []
+
+    h = blk.get('headroom_perfect_selector')
+    if is_exempt or h is None:
+        rows.append(('C1 discriminates', None, 'exempt: %s' % (exempt.get(key, 'no gold') or '')[:60]))
+    else:
+        rows.append(('C1 discriminates', h >= DISCRIMINATION_FLOOR, 'headroom %.3f' % h))
+
+    v1n, v1p = blk.get('v1_applicable'), blk.get('v1_passed')
+    if v1n:
+        rows.append(('C2 answerable', v1p / v1n >= V1_FLOOR, 'V1 %d/%d' % (v1p, v1n)))
+    else:
+        rows.append(('C2 answerable', None, 'no V1 (no gold)'))
+
+    hr = blk.get('headroom_reachable')
+    if is_exempt or hr is None:
+        rows.append(('C3 reachable', None, 'exempt or undefined'))
+    else:
+        rows.append(('C3 reachable', hr >= DISCRIMINATION_FLOOR, 'reachable %.3f' % hr))
+
+    floor = blk.get('chance_floor')
+    ac = blk.get('v9_above_chance')
+    if floor is None:
+        rows.append(('C4 floor disclosed', None, 'open question, no floor to declare'))
+        rows.append(('C5 baseline >= chance', None, 'no floor'))
+    else:
+        rows.append(('C4 floor disclosed', True, 'floor %.3f' % floor))
+        rows.append(('C5 baseline >= chance', (ac is not None and ac >= 0),
+                     'v9_above_chance %s' % ('%+.3f' % ac if ac is not None else 'MISSING')))
+
+    passed = sum(1 for _, ok, _ in rows if ok is True)
+    applicable = sum(1 for _, ok, _ in rows if ok is not None)
+    return passed, applicable, rows
+
+
+def board():
+    exempt = exempt_shapes()
+    out = {}
+    for corpus in sorted(glob.glob(os.path.join(ROOT, '*', '*-v5.json'))):
+        vertical = os.path.basename(os.path.dirname(corpus))
+        meta = corpus.replace('-v5.json', '-v5.meta.json')
+        if not os.path.exists(meta):
+            continue
+        by_shape = (json.load(open(meta, encoding='utf-8')).get('probes') or {}).get('by_shape') or {}
+        if not by_shape:
+            continue
+        shapes = {}
+        tp = ta = 0
+        for shape, blk in sorted(by_shape.items()):
+            p, a, rows = score_shape(vertical, shape, blk, exempt)
+            shapes[shape] = (p, a, rows)
+            tp += p
+            ta += a
+        hs = [b.get('headroom_perfect_selector') for b in by_shape.values()
+              if b.get('headroom_perfect_selector') is not None]
+        out[vertical] = {'score': 10.0 * tp / ta if ta else float('nan'),
+                         'passed': tp, 'applicable': ta, 'shapes': shapes,
+                         'min_headroom': min(hs) if hs else None}
+    return out
+
+
+def main():
+    check = '--check' in sys.argv
+    verbose = '-v' in sys.argv or '--verbose' in sys.argv
+    b = board()
+    if not b:
+        print('no probed sidecars found under %s' % ROOT)
+        return 1
+
+    print('TYPEDMEMEVAL QUALITY BOARD, derived  (0 model calls)')
+    print('  score = 10 x (criteria passed / criteria applicable); rubric in this file\'s docstring')
+    print()
+    print('  %-15s %7s %10s %8s %9s   %s'
+          % ('vertical', 'score', 'passed', 'shapes', 'min head', 'failing criteria'))
+    scores = []
+    for vertical, d in sorted(b.items(), key=lambda kv: kv[1]['score']):
+        fails = []
+        for shape, (p, a, rows) in sorted(d['shapes'].items()):
+            for name, ok, detail in rows:
+                if ok is False:
+                    fails.append('%s %s (%s)' % (shape, name.split()[0], detail))
+        scores.append(d['score'])
+        mh = d.get('min_headroom')
+        print('  %-15s %7.2f %10s %8d %9s   %s'
+              % (vertical, d['score'], '%d/%d' % (d['passed'], d['applicable']),
+                 len(d['shapes']), ('%+.3f' % mh) if mh is not None else '-',
+                 '; '.join(fails[:2]) + ('; ...' if len(fails) > 2 else '')))
+
+    mean = sum(scores) / len(scores)
+    below = [v for v, d in b.items() if d['score'] < MIN_VERTICAL]
+    print()
+    print('  mean %.2f over %d verticals   |   below %.1f: %s'
+          % (mean, len(scores), MIN_VERTICAL, ', '.join(sorted(below)) if below else 'none'))
+
+    if verbose:
+        for vertical, d in sorted(b.items()):
+            print()
+            print('  %s' % vertical)
+            for shape, (p, a, rows) in sorted(d['shapes'].items()):
+                print('    %-24s %d/%d' % (shape, p, a))
+                for name, ok, detail in rows:
+                    mark = {True: 'pass', False: 'FAIL', None: ' -- '}[ok]
+                    print('        %-22s %-4s %s' % (name, mark, detail))
+
+    print()
+    thin = sorted((v, d['min_headroom']) for v, d in b.items()
+                  if d.get('min_headroom') is not None and d['min_headroom'] < 0.35)
+    if thin:
+        print()
+        print('  ⚠ MARGIN, which the score cannot show: these clear every floor but not by much.')
+        for v, m in thin:
+            print('      %-15s thinnest shape headroom %+.3f (floor %.2f)'
+                  % (v, m, DISCRIMINATION_FLOOR))
+    print()
+    print('  ⚠ These scores are DERIVED and supersede the hand-assigned board (mean 8.45, Episodic')
+    print('    7.5, Conjunction/Procedural 9.5), which no rubric, table or tool ever produced. They')
+    print('    are NOT comparable to it: this rubric was not fitted to reproduce those numbers.')
+    print()
+    print('  🔴 BAR-SUPPLIED. This rubric was written by the same agent working toward the targets')
+    print('     it is measured against, and it replaces the device those targets were calibrated on.')
+    print("     Clearing them here is NOT evidence the family's goals are met. What IS established:")
+    print('     the published board had no instrument, and the named criterion failures above are')
+    print("     real whatever the scale. Re-anchoring the targets is the maintainer's call.")
+
+    if check:
+        problems = []
+        if below:
+            problems.append('%d vertical(s) below %.1f: %s'
+                            % (len(below), MIN_VERTICAL, ', '.join(sorted(below))))
+        if mean < MIN_MEAN:
+            problems.append('mean %.2f is below the %.1f target' % (mean, MIN_MEAN))
+        print()
+        if problems:
+            for p in problems:
+                print('FAIL: %s' % p)
+            return 2
+        print('OK: every vertical >= %.1f and mean %.2f >= %.1f' % (MIN_VERTICAL, mean, MIN_MEAN))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
