@@ -186,6 +186,40 @@ public sealed class TypedMemEvalCoverageSummary
 /// <see cref="ExternalBenchmarkResult.OverallAccuracy"/> stays populated for tooling compatibility
 /// and is not a TypedMemEval score.
 /// </remarks>
+/// <summary>
+/// How much of a score this corpus hands out for guessing, from the floors it declares itself.
+/// </summary>
+/// <remarks>
+/// 🔴 <b><c>Correct</c> is not interpretable without this on three of the ten verticals.</b>
+/// Procedural declares a chance floor on <b>all 80</b> of its questions, summing to <b>27.2</b>: a
+/// reader told "Correct 35 of 80" reads 44%, and luck alone supplies 27 of those 35. Conjunction
+/// is 12.5 of 65, Semantic 5.0 of 50, and the remaining seven declare none — so this is reported
+/// per vertical and never folded into a score.
+/// <para>
+/// ⚠ <b>An upper bound on free score, not an expectation, and never a subtraction.</b> It assumes
+/// the system answers every closed-choice question; one that abstains scores below it without
+/// being worse.
+/// </para>
+/// </remarks>
+public sealed class TypedMemEvalGuessingBaseline
+{
+    /// <summary>Questions in this vertical that declare a chance floor.</summary>
+    public required int QuestionsWithDeclaredFloor { get; init; }
+
+    /// <summary>Questions in the vertical, declared or not — the denominator for the share below.</summary>
+    public required int QuestionsTotal { get; init; }
+
+    /// <summary>
+    /// The summed floors: at most this many <c>Correct</c> are available without understanding
+    /// anything.
+    /// </summary>
+    public required double MaximumCorrectFromGuessing { get; init; }
+
+    /// <summary>That maximum as a share of the whole vertical.</summary>
+    public double ShareOfVertical =>
+        QuestionsTotal == 0 ? 0 : MaximumCorrectFromGuessing / QuestionsTotal;
+}
+
 public sealed class TypedMemEvalReport
 {
     /// <summary>The vertical this run measured.</summary>
@@ -205,6 +239,12 @@ public sealed class TypedMemEvalReport
 
     /// <summary>Outcome counts across the whole run.</summary>
     public required TypedMemEvalOutcomeCounts Outcomes { get; init; }
+
+    /// <summary>
+    /// How much of <see cref="Outcomes"/>'s <c>Correct</c> this corpus gives away for guessing.
+    /// Null when the vertical declares no chance floor on any question.
+    /// </summary>
+    public TypedMemEvalGuessingBaseline? Guessing { get; init; }
 
     /// <summary>
     /// Outcome counts per diagnostic stratum. These are diagnostics, not claims: the ADR's

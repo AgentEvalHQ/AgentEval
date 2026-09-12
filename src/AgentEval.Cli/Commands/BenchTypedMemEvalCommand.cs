@@ -251,6 +251,8 @@ public static class BenchTypedMemEvalCommand
                 // percentage key here is exactly what a dashboard would chart as the headline.
                 ["typed_n"] = typed.Outcomes.N,
                 ["typed_correct"] = typed.Outcomes.Correct,
+                ["typed_correct_free_upper_bound"] =
+                    typed.Guessing?.MaximumCorrectFromGuessing ?? 0,
                 ["typed_wrong"] = typed.Outcomes.Wrong,
                 ["typed_abstained"] = typed.Outcomes.Abstained,
                 ["typed_missed"] = typed.Outcomes.Missed,
@@ -330,6 +332,16 @@ public static class BenchTypedMemEvalCommand
         Console.WriteLine();
         Console.WriteLine($"   Outcomes (n={typed.Outcomes.N})");
         Console.WriteLine($"     correct        {typed.Outcomes.Correct}");
+        if (typed.Guessing is { } guessing)
+        {
+            // Printed HERE, beside correct, not in a footnote: this is the line that stops
+            // "correct 35 of 80" being read as 44% understanding when 27 of it is free.
+            // Procedural declares a chance floor on all 80 of its questions.
+            Console.WriteLine(
+                $"       of which free   <= {guessing.MaximumCorrectFromGuessing:0.0}   "
+              + $"({guessing.QuestionsWithDeclaredFloor} of {guessing.QuestionsTotal} closed-choice; "
+              + "guessing every one scores this much)");
+        }
         Console.WriteLine($"     wrong          {typed.Outcomes.Wrong}");
         Console.WriteLine($"     abstained      {typed.Outcomes.Abstained}");
         Console.WriteLine($"     missed         {typed.Outcomes.Missed}");

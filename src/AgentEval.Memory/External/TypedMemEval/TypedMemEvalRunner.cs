@@ -329,7 +329,15 @@ public sealed class TypedMemEvalRunner
             descriptor, options, facade, results, details, unrunReasons,
             runStopwatch.Elapsed, executionLabel, projectionReport, totalInCorpus,
             TypedMemEvalCorpus.Sha256(vertical),
-            TypedMemEvalCorpus.CalibratedFloorMean(vertical));
+            TypedMemEvalCorpus.CalibratedFloorMean(vertical),
+            TypedMemEvalCorpus.GuessingBaseline(vertical) is { } baseline
+                ? new TypedMemEvalGuessingBaseline
+                {
+                    QuestionsWithDeclaredFloor = baseline.Declared,
+                    QuestionsTotal = baseline.Total,
+                    MaximumCorrectFromGuessing = baseline.Guessing,
+                }
+                : null);
     }
 
     private string? InjectHistory(

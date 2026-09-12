@@ -34,10 +34,12 @@ internal static class TypedMemEvalReportBuilder
         OracleProjectionReport? oracleProjection,
         int totalQuestionsInCorpus,
         string corpusSha256,
-        double? calibratedFloorMean)
+        double? calibratedFloorMean,
+        TypedMemEvalGuessingBaseline? guessing)
     {
         var typed = BuildTypedReport(
-            descriptor, results, details, unrunReasons, corpusSha256, calibratedFloorMean);
+            descriptor, results, details, unrunReasons, corpusSha256, calibratedFloorMean,
+            guessing);
 
         var perType = results
             .GroupBy(q => q.QuestionType)
@@ -143,7 +145,8 @@ internal static class TypedMemEvalReportBuilder
         IReadOnlyDictionary<string, TypedMemEvalQuestionDetail> details,
         IReadOnlyDictionary<string, string> unrunReasons,
         string corpusSha256,
-        double? calibratedFloorMean)
+        double? calibratedFloorMean,
+        TypedMemEvalGuessingBaseline? guessing)
     {
         var ordered = results
             .Select(r => details.TryGetValue(r.QuestionId, out var d) ? d : null)
@@ -227,6 +230,7 @@ internal static class TypedMemEvalReportBuilder
                 Maximum = observed.Length > 0 ? observed.Max(d => d.RealisedGoldCoverage!.Value) : null,
                 CalibratedFloorMean = calibratedFloorMean
             },
+            Guessing = guessing,
             UnrunReasons = unrunReasons,
             JudgePromptFingerprint = TypedMemEvalJudge.PromptFingerprint
         };

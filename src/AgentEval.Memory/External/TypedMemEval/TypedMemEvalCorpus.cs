@@ -131,6 +131,119 @@ public static class TypedMemEvalCorpus
         return values.Length > 0 ? values.Average() : null;
     }
 
+    /// <summary>
+    /// What a system that GUESSES on every closed-choice question would score, summed from the
+    /// floors the corpus itself declares. Null when this vertical declares none.
+    /// </summary>
+    /// <param name="vertical">The vertical.</param>
+    /// <returns>Declared-floor count, question count, and the summed guessing score.</returns>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>This exists because <c>Correct</c> is not interpretable without it.</b> 125 of the
+    /// family's 565 questions are closed-choice and say so in their own extension
+    /// (<c>chance_floor</c>), and the concentration is extreme: <b>Procedural declares one on all 80</b>,
+    /// summing to <b>27.2</b>. A reader told "Correct 35 of 80" reads 44%; luck alone supplies 27 of
+    /// those 35. Conjunction 12.5 of 65, Semantic 5.0 of 50, and the other seven verticals declare
+    /// none at all — so this cannot be applied as a blanket correction, which is exactly why it is
+    /// reported per vertical rather than folded into a score.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>It is an UPPER bound on free score, not an expectation.</b> It assumes the system
+    /// answers every one of those questions. A system that abstains scores <i>below</i> it without
+    /// being worse, because abstention is not a wrong answer here — see
+    /// <see cref="TypedMemEvalOutcomeCounts.Abstained"/>. Read it as "at most this much was free",
+    /// never as "subtract this".
+    /// </para>
+    /// <para>
+    /// This is deliberately NOT an <c>AgentEval.Evals.Meta.ChanceFloor</c>. That type models an
+    /// <i>arm's declared draw budget</i> (k, with provenance) and is applied at an admission door;
+    /// this is a per-question property of a corpus, aggregated. And it is emphatically not
+    /// <see cref="CalibratedFloorMean"/>, which is BM25 retrieval coverage — a competent baseline,
+    /// not a null model. Conflating the two would let "beat word matching" masquerade as "cleared
+    /// chance", which is a far stronger claim.
+    /// </para>
+    /// </remarks>
+    internal static (int Declared, int Total, double Guessing)? GuessingBaseline(
+        TypedMemEvalVertical vertical)
+    {
+        using var document = JsonDocument.Parse(ReadJson(vertical));
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        int declared = 0, total = 0;
+        double guessing = 0;
+        foreach (var entry in document.RootElement.EnumerateArray())
+        {
+            total++;
+            if (!entry.TryGetProperty("typedmemeval", out var extension))
+            {
+                continue;
+            }
+
+            // A question may declare a floor at more than one depth (a shape-level default and a
+            // per-component override). Take the LARGEST: it is the most generous to chance, so the
+            // baseline never understates how much score was free.
+            var largest = LargestDeclaredFloor(extension);
+            if (largest is not { } floor)
+            {
+                continue;
+            }
+
+            declared++;
+            guessing += floor;
+        }
+
+        return declared == 0 ? null : (declared, total, guessing);
+    }
+
+    /// <summary>The largest <c>chance_floor</c> declared anywhere beneath <paramref name="node"/>.</summary>
+    /// <param name="node">A question's extension block.</param>
+    /// <returns>The floor, or null when none is declared.</returns>
+    /// <remarks>
+    /// ⚠ <b>Internal so it can be tested DIRECTLY.</b> No shipped corpus declares two floors on
+    /// one question — measured: 0 of 565 — so this rule is a no-op on real data and an ablation
+    /// through <see cref="GuessingBaseline"/> cannot make it fail. A guard no test can exercise is
+    /// a guard nobody has checked, so the test constructs the nested case itself.
+    /// </remarks>
+    internal static double? LargestDeclaredFloor(JsonElement node)
+    {
+        double? best = null;
+        switch (node.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in node.EnumerateObject())
+                {
+                    if (property.NameEquals("chance_floor") &&
+                        property.Value.ValueKind == JsonValueKind.Number)
+                    {
+                        var value = property.Value.GetDouble();
+                        best = best is { } b && b >= value ? b : value;
+                        continue;
+                    }
+
+                    if (LargestDeclaredFloor(property.Value) is { } nested)
+                    {
+                        best = best is { } b && b >= nested ? b : nested;
+                    }
+                }
+                break;
+
+            case JsonValueKind.Array:
+                foreach (var item in node.EnumerateArray())
+                {
+                    if (LargestDeclaredFloor(item) is { } nested)
+                    {
+                        best = best is { } b && b >= nested ? b : nested;
+                    }
+                }
+                break;
+        }
+
+        return best;
+    }
+
     private static string ReadResource(string suffix)
     {
         lock (s_gate)
