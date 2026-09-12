@@ -1314,8 +1314,31 @@ def _retrieval_headroom(records: list[dict]) -> dict:
     }
 
 
-def _interference(records: list[dict]) -> dict:
-    """V1 vs V8 on the questions both are defined on, and the gap between them."""
+def _interference(records: list[dict], strata: dict[str, tuple] | None = None) -> dict:
+    """V1 vs V8 on the questions both are defined on, and the gap between them.
+
+    `strata` maps question_id -> a tuple of the DECLARED sub-population keys (shape, and any
+    second axis the corpus declares, e.g. bitemporal's `clock`). When it splits the corpus into
+    more than one cell, the per-cell rates are reported beside the mean.
+
+    WHY (B3, measured 2026-09-12). Bitemporal published `interference_cost 0.05` over 60
+    questions, which reads as a small, diffuse effect. It is neither. All three regressions sit
+    in ONE cell of eighteen:
+
+        belief-at-instant / transaction   3 of 18   16.7%
+        belief-at-instant / valid         0 of 18    0.0%
+        correction-depth  / transaction   0 of 12    0.0%
+        correction-depth  / valid         0 of 12    0.0%
+
+    That cell is the one asking what the record showed AS OF a date BEFORE a correction, with
+    the correction present in the haystack -- valid time versus transaction time, the single
+    thing bitemporal exists to test. The mean understates it by 3.3x and hides that the other
+    42 questions show no interference at all. `by_shape` could not see it either: the split is
+    WITHIN one shape.
+
+    This is the family's own "read the shapes, never the mean" rule applied one level further
+    down, to the sub-shape the corpus already declares and no arm was reading.
+    """
     both = [r for r in records if r.get("v1") is not None and r.get("v8") is not None]
     if not both:
         return {"applicable": 0, "v1_passed": 0, "v8_passed": 0, "interference_cost": None,
@@ -1347,7 +1370,36 @@ def _interference(records: list[dict]) -> dict:
         "reading": ("V1 minus V8 as a share of the questions both are defined on. 0.0 means a "
                     "perfect retriever and no retriever produce the same answers here, so no two "
                     "retrievers can be distinguished on this corpus."),
+        **({"by_stratum": _interference_by_stratum(both, strata)} if strata else {}),
     }
+
+
+def _interference_by_stratum(both: list[dict], strata: dict[str, tuple]) -> dict:
+    """Interference per declared sub-population, so a concentrated effect cannot read as a mean.
+
+    Returns nothing when the corpus declares only one cell -- a "breakdown" with a single row is
+    noise that makes a reader think they have checked something.
+    """
+    cells: dict[tuple, list[dict]] = {}
+    for record in both:
+        key = strata.get(record["question_id"])
+        if key is None:
+            continue
+        cells.setdefault(key, []).append(record)
+
+    if len(cells) < 2:
+        return {}
+
+    out = {}
+    for key, group in sorted(cells.items(), key=lambda kv: [str(x) for x in kv[0]]):
+        regressed = [r for r in group if r["v1"] and not r["v8"]]
+        out["/".join("-" if k is None else str(k) for k in key)] = {
+            "questions": len(group),
+            "regressed": len(regressed),
+            "interference_cost": round(len(regressed) / len(group), 4),
+            "question_ids": sorted(r["question_id"] for r in regressed),
+        }
+    return out
 
 
 def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
@@ -1374,6 +1426,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # entire argument for having one.
     arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
                                  (e.get("typedmemeval") or {}).get("arm")) for e in entries}
+    # The sub-populations the corpus itself declares. `clock` is bitemporal's second axis and
+    # splits `belief-at-instant` into two behaviourally different instruments -- see B3 in
+    # `_interference`. Verticals that declare no second axis fall back to shape alone, and a
+    # single-cell breakdown is suppressed rather than printed.
+    strata = {e["question_id"]: tuple(
+        v for v in ((e.get("typedmemeval") or {}).get("shape"),
+                    (e.get("typedmemeval") or {}).get("clock")) if v is not None)
+        for e in entries}
     # WHAT A GUESSER SCORES, from either of the two places a closed choice can live.
     #
     # These were two mechanisms for one concept, which is the two-spellings-of-one-rule defect this
@@ -1615,7 +1675,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # scaled floor of 0.24 and 3.68 sd of separation, so the capability the vertical is about
         # is comfortably measurable while `still-valid` alone reads 0.0667.
         **({"paired_arms": _cross_shape_pairs} if _cross_shape_pairs else {}),
-        "v8_full_haystack": _interference(records),
+        "v8_full_haystack": _interference(records, strata),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
             shape: {
