@@ -16974,3 +16974,58 @@ bound must never round, so the tool now prints five decimals and says **"NOT 1.0
 figure above 0.9995 that still carries a disagreement.
 
 **Cost: 101 calls** (1 staged + 100 full), zero corpus bytes.
+
+### 88.20 🔴 A shape that publishes `discriminates: True` while half of it ranks nothing (2026-09-12)
+
+`bitemporal/belief-at-instant` publishes headroom **0.3056** and **`discriminates: True`**. Split on
+`clock` — an axis the **corpus already declares**, and the same axis `B3` found the interference
+concentrated on — it is two different instruments:
+
+| stratum | n | V1 | V9 | headroom | |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `clock = transaction` | 18 | 18/18 | 8/18 | **0.556** | discriminates |
+| `clock = valid` | 18 | 18/18 | **17/18** | **0.056** | 🔴 **below the 0.15 floor** |
+
+**18 questions — 30% of the vertical — cannot tell two systems apart, and the published number says
+they can.** This is the mean-satisfiable-by-averaging defect the family already fixed for Arithmetic
+and Episodic at the SHAPE level, one level further down: a mean over strata hides a dead half exactly
+as well as a mean over shapes.
+
+#### The fix, and what it deliberately does not touch
+
+Every shape whose corpus declares a second axis now publishes **`by_stratum`**, plus
+**`strata_below_floor`** naming any stratum that fails on its own. ⚠ The shape-level `discriminates`
+is **NOT** changed by this: moving a published verdict on a reporting change is how a reporting fix
+becomes a silent re-ranking. What changes is that the split is now visible beside the verdict.
+
+#### A second dead stratum, on a different axis
+
+`correction-depth` (headroom 0.3333, discriminates) splits on `corrections`:
+
+| `corrections` | n | V1 | V9 | headroom |
+| ---: | ---: | ---: | ---: | ---: |
+| **2** | 8 | 8/8 | **8/8** | **0.000** |
+| 3 | 8 | 8/8 | 3/8 | 0.625 |
+| 4 | 8 | 8/8 | 5/8 | 0.375 |
+
+At one correction the lexical baseline is **already perfect** — V9 8/8 — so the rung is saturated,
+the same pattern that made `participant-attribution` unrankable. Against 3/8 and 5/8 on the
+neighbouring rungs this is a structural difference, not a marginal flag.
+
+#### ✅ And one flag DECLARED AS NOISE rather than banked
+
+The sweep covered **106 strata** across every candidate axis in all ten verticals. At n=6–8 a
+stratum sits about **one question** from the floor, so isolated marginal flags are expected by
+chance. `belief-at-instant` split on `difficulty` shows rung 3 at 0.125 — below the floor — while
+rungs 1, 2, 4 and 5 all pass. **That is noise and is recorded as noise:** one question (V9 7/8 → 6/8)
+moves it above the line, `difficulty` is an ordinal dial rather than two instruments, and a single
+dipping middle rung among five is what 106 comparisons produce.
+
+⚠ Reporting it as a finding would have been the flattering direction — a third defect discovered —
+which is exactly why the multiplicity was counted before the list was written.
+
+**Nine of ten verticals show no stratum below the floor at n≥6.** This is a Bitemporal-specific
+defect, not a family-wide reporting gap.
+
+**Cost: zero calls, zero corpus bytes** — the re-probe ran fully from cache (`calls=0
+cached=16,326`) and only sidecars moved. `AgentEval.Memory.Tests` 1190/1190 on all three TFMs.

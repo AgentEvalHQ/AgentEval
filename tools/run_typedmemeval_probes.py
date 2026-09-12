@@ -1710,7 +1710,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
                     "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
-                **_discrimination_and_floor(group, floors),
+                **_discrimination_and_floor(group, floors, strata),
                 **_abstention(group),
                 **_pair_discrimination(group, arm_of),
             }
@@ -1810,7 +1810,73 @@ def _discrimination(group: list[dict]) -> dict:
     return row
 
 
-def _discrimination_and_floor(group: list[dict], floors: dict) -> dict:
+def _discrimination_by_stratum(group: list[dict], strata: dict) -> dict:
+    """Headroom per DECLARED sub-population, so a stratum that cannot rank systems cannot hide.
+
+    THE DEFECT THIS EXISTS FOR, measured. `bitemporal/belief-at-instant` publishes headroom 0.3056
+    and `discriminates: True`. Split on `clock` -- an axis the corpus already declares, and the same
+    axis `B3` found the interference concentrated on -- it is two different instruments:
+
+        clock=transaction   18q   V1 18/18   V9  8/18   headroom 0.556   discriminates
+        clock=valid         18q   V1 18/18   V9 17/18   headroom 0.056   BELOW THE 0.15 FLOOR
+
+    So 18 questions -- 30% of the vertical -- cannot tell two systems apart, and the shape-level
+    number says they can. This is the mean-satisfiable-by-averaging defect the family already fixed
+    for Arithmetic and Episodic at the SHAPE level, one level further down: a mean over strata is
+    just as capable of hiding a dead half as a mean over shapes.
+
+    ⚠ This reports; it does NOT change `discriminates`. The shape-level verdict stays keyed on the
+    shape-level headroom, because moving a published verdict on a reporting change is how a
+    reporting fix turns into a silent re-ranking. What changes is that the reader can now SEE the
+    split, and `discriminates_by_stratum` names any stratum that fails on its own.
+
+    Returns nothing when the corpus declares only one cell for this shape -- a one-row "breakdown"
+    invites a reader to think they have checked something.
+    """
+    cells: dict[tuple, list[dict]] = {}
+    for record in group:
+        key = strata.get(record["question_id"])
+        if key is not None:
+            cells.setdefault(key, []).append(record)
+    if len(cells) < 2:
+        return {}
+
+    def rate(rows, arm):
+        n = sum(1 for r in rows if r.get(arm) is not None)
+        return (sum(1 for r in rows if r.get(arm) is True) / n, n) if n else (None, 0)
+
+    out, failing = {}, []
+    for key, rows in sorted(cells.items(), key=lambda kv: [str(x) for x in kv[0]]):
+        (v1, n1), (v9, n9) = rate(rows, "v1"), rate(rows, "v9")
+        if v1 is None or v9 is None:
+            continue
+        name = "/".join("-" if k is None else str(k) for k in key)
+        h = v1 - v9
+        out[name] = {
+            "questions": len(rows),
+            "v1_passed": sum(1 for r in rows if r.get("v1") is True), "v1_applicable": n1,
+            "v9_passed": sum(1 for r in rows if r.get("v9") is True), "v9_applicable": n9,
+            "headroom_perfect_selector": round(h, 4),
+            "discriminates": h >= DISCRIMINATION_FLOOR,
+        }
+        if h < DISCRIMINATION_FLOOR:
+            failing.append(name)
+
+    if not out:
+        return {}
+    return {
+        "by_stratum": out,
+        "discriminates_by_stratum": not failing,
+        "strata_below_floor": failing,
+        "by_stratum_reading": (
+            "Headroom recomputed inside each sub-population the CORPUS declares. A shape whose "
+            "strata disagree is two instruments reported as one, and its shape-level headroom is a "
+            "mean that can hide a stratum which ranks nothing. The shape-level `discriminates` is "
+            "deliberately NOT changed by this block: read `strata_below_floor` beside it."),
+    }
+
+
+def _discrimination_and_floor(group: list[dict], floors: dict, strata: dict | None = None) -> dict:
     """Merge the floor block and the discrimination block, then correct the headroom against chance.
 
     THE DEFECT THIS FIXES. `headroom_perfect_selector` is V1 - V9, and on a closed-choice shape V9
@@ -1837,6 +1903,8 @@ def _discrimination_and_floor(group: list[dict], floors: dict) -> dict:
     """
     floor_block = _chance_floor(group, floors)
     row = {**floor_block, **_discrimination(group)}
+    if strata:
+        row.update(_discrimination_by_stratum(group, strata))
 
     floor = floor_block.get("chance_floor")
     headroom = row.get("headroom_perfect_selector")

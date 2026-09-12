@@ -739,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-12T17:08:15Z",
+    "run_at": "2026-09-12T17:27:21Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -948,6 +948,31 @@
         "headroom_reachable": 0.2222,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "by_stratum": {
+          "belief-at-instant/transaction": {
+            "questions": 18,
+            "v1_passed": 18,
+            "v1_applicable": 18,
+            "v9_passed": 8,
+            "v9_applicable": 18,
+            "headroom_perfect_selector": 0.5556,
+            "discriminates": true
+          },
+          "belief-at-instant/valid": {
+            "questions": 18,
+            "v1_passed": 18,
+            "v1_applicable": 18,
+            "v9_passed": 17,
+            "v9_applicable": 18,
+            "headroom_perfect_selector": 0.0556,
+            "discriminates": false
+          }
+        },
+        "discriminates_by_stratum": false,
+        "strata_below_floor": [
+          "belief-at-instant/valid"
+        ],
+        "by_stratum_reading": "Headroom recomputed inside each sub-population the CORPUS declares. A shape whose strata disagree is two instruments reported as one, and its shape-level headroom is a mean that can hide a stratum which ranks nothing. The shape-level `discriminates` is deliberately NOT changed by this block: read `strata_below_floor` beside it.",
         "pairs": 18,
         "pair_v1_both_arms": "18/18",
         "pair_v9_both_arms": "8/18",
@@ -994,6 +1019,29 @@
         "headroom_reachable": 0.3333,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "by_stratum": {
+          "correction-depth/transaction": {
+            "questions": 12,
+            "v1_passed": 12,
+            "v1_applicable": 12,
+            "v9_passed": 8,
+            "v9_applicable": 12,
+            "headroom_perfect_selector": 0.3333,
+            "discriminates": true
+          },
+          "correction-depth/valid": {
+            "questions": 12,
+            "v1_passed": 12,
+            "v1_applicable": 12,
+            "v9_passed": 8,
+            "v9_applicable": 12,
+            "headroom_perfect_selector": 0.3333,
+            "discriminates": true
+          }
+        },
+        "discriminates_by_stratum": true,
+        "strata_below_floor": [],
+        "by_stratum_reading": "Headroom recomputed inside each sub-population the CORPUS declares. A shape whose strata disagree is two instruments reported as one, and its shape-level headroom is a mean that can hide a stratum which ranks nothing. The shape-level `discriminates` is deliberately NOT changed by this block: read `strata_below_floor` beside it.",
         "pairs": 12,
         "pair_v1_both_arms": "12/12",
         "pair_v9_both_arms": "5/12",
