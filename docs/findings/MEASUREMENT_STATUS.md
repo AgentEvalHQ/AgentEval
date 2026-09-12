@@ -16472,3 +16472,35 @@ advance; a design without one would have shipped and been argued about afterward
 "measure the defect before paying to fix it" rule catching **my own** proposed remedy, which is the
 first time in this record it has been applied against something I authored rather than something I
 inherited.
+
+### 88.11 🔴 THREE mechanisms proposed for one defect, THREE falsified — and I still do not know (2026-09-12)
+
+`participant-attribution` (episodic, 15 questions, headroom **−0.067**) is what blocks Episodic
+reaching 8.5. I proposed three explanations and measured each, free. All three are wrong.
+
+| # | proposed mechanism | falsified by |
+| --- | --- | --- |
+| 1 | "the question QUOTES the claim, so it is a search query for its own answer" | `list-order` retrieves gold **15/15** too and discriminates at **0.733** |
+| 2 | "one retrieved session settles the answer" | `assistant-stated` is **100%** single-session sufficient and discriminates at **0.300** |
+| 3 | "retrieval==1 AND sufficiency==1 together" | **no shape** in the family has both at ceiling, so the rule never fires; and both non-discriminating shapes HAVE an escape route |
+
+The converse check is what kills #3: `forgetting/still-valid` has **both** escapes (retrieval 0.80,
+sufficiency 0.00) and still fails at 0.067; `prospective/seed-carry-over` has nearly the same profile
+as `participant-attribution` (sufficiency 0.67) and reaches **+0.333**. The shape is an outlier even
+within its own band.
+
+**So the honest state is: the cause is unknown.** Three diagnoses, three refutations, no theory.
+
+✅ **What this settles about the spend.** Regenerating Episodic now would be a corpus change made
+with no working theory of the defect it is meant to fix — the "fix that outran the diagnosis" shape
+(§87.4, gate shape 9) that this record already carries once, at a cost of a reverted public API.
+Doing it again at 2,100–3,200 calls and a consumer control reset would be worse.
+
+**What survives is an instrument, not an answer.** `two_factor.py` computes, for all 35 headroom-
+bearing shapes, BM25 retrieval rate and single-session sufficiency from the corpora alone — no model
+calls. It did not explain this defect, but it is the first family-wide structural profile of the
+shapes, and it is what any fourth hypothesis should be tested against before it is built.
+
+⚠ **Kept as a negative result on purpose.** Three refuted hypotheses recorded is worth more than a
+fourth guess shipped, and the next person to look at this shape should start knowing which three
+roads are closed.
