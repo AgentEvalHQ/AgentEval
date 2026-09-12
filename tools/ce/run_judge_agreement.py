@@ -58,23 +58,59 @@ PROMPT = (
 DRY_STUB = 'DRY-RUN-STUB'
 
 
-def ask(model, question, gold, response, dry):
-    """One equivalence judgment. Returns the raw text."""
+#: Azure api-version, matching run_typedmemeval_probes.py so the second judges are reached exactly
+#: the way the shipped judge is. A different api-version would be a second uncontrolled variable.
+AZURE_API_VERSION = '2024-12-01-preview'
+
+
+def ask(model, question, gold, response, dry, provider='openai'):
+    """One equivalence judgment. Returns the raw text.
+
+    Two providers, because the claim this instrument can support depends entirely on which judges
+    are actually reachable:
+
+      openai  o3 / o4-mini -- a different MODEL LINE, same vendor. Needs credits; currently 429
+              insufficient_quota, so this path is unpurchased.
+      azure   a second DEPLOYMENT of the same model family as the shipped judge. Weaker, and named
+              weaker: "deployment variance within one family". This is the fallback the plan names
+              for exactly this situation, and it is reachable today.
+    """
     if dry:
         return DRY_STUB
+    content = PROMPT.format(question=question, gold=gold, response=response)
+
+    if provider == 'azure':
+        endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT', '').rstrip('/')
+        key = os.environ.get('AZURE_OPENAI_API_KEY', '')
+        if not (endpoint and key):
+            raise SystemExit('AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY are not set; '
+                             'refusing to guess a credential.')
+        # Temperature deliberately unset: this deployment family rejects explicit values, and the
+        # shipped judge is sampled at the provider default too.
+        req = urllib.request.Request(
+            f'{endpoint}/openai/deployments/{model}/chat/completions'
+            f'?api-version={AZURE_API_VERSION}',
+            data=json.dumps({'messages': [{'role': 'user', 'content': content}],
+                             'max_completion_tokens': 2000}).encode('utf-8'),
+            headers={'Content-Type': 'application/json', 'api-key': key})
+        return _send(req)
+
     key = os.environ.get('OPENAI_API_KEY', '')
     if not key:
         raise SystemExit('OPENAI_API_KEY is not set; refusing to guess a credential.')
     body = {
         'model': model,
-        'messages': [{'role': 'user',
-                      'content': PROMPT.format(question=question, gold=gold, response=response)}],
+        'messages': [{'role': 'user', 'content': content}],
         'max_completion_tokens': 2000,
     }
     req = urllib.request.Request(
         'https://api.openai.com/v1/chat/completions',
         data=json.dumps(body).encode('utf-8'),
         headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'})
+    return _send(req)
+
+
+def _send(req):
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=180) as r:
@@ -103,10 +139,19 @@ def main():
                     help='stub every call; exercises the real path and writes nothing')
     ap.add_argument('--one', action='store_true', help='one real call, then stop')
     ap.add_argument('--models', default=','.join(SECOND_JUDGES))
+    ap.add_argument('--provider', choices=('openai', 'azure'), default='openai',
+                    help="'openai' = o3/o4-mini, a different MODEL LINE (needs credits). "
+                         "'azure' = a second DEPLOYMENT of the shipped judge's own family, "
+                         'which supports only the weaker "deployment variance within one '
+                         'family" claim. The provider chosen CHANGES WHAT MAY BE CLAIMED and is '
+                         'recorded in the results file.')
     args = ap.parse_args()
 
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
     models = [m for m in args.models.split(',') if m]
+    claim = ('two judges on a different MODEL LINE, same vendor' if args.provider == 'openai'
+             else 'deployment variance within ONE model family (the weaker fallback)')
+    print('provider=%s  ->  claim supported: %s' % (args.provider, claim))
     print('cases=%d  second judges=%s  %s'
           % (len(cases), ','.join(models),
              'DRY RUN (nothing written)' if args.dry_run else ('ONE REAL CALL' if args.one else 'FULL RUN')))
@@ -116,7 +161,8 @@ def main():
     for i, case in enumerate(cases):
         row = {k: case[k] for k in ('cache_key', 'arm', 'vertical', 'judge1')}
         for model in models:
-            raw = ask(model, case['question'], case['gold'], case['response'], args.dry_run)
+            raw = ask(model, case['question'], case['gold'], case['response'], args.dry_run,
+                      provider=args.provider)
             calls += 0 if args.dry_run else 1
             row[model] = verdict(raw)
             row[model + '_raw'] = raw[:80]
@@ -133,7 +179,8 @@ def main():
               % (len(cases), len(models)))
         return
 
-    json.dump({'models': models, 'cases': results}, open(OUT, 'w', encoding='utf-8'),
+    json.dump({'models': models, 'provider': args.provider, 'claim_supported': claim,
+               'cases': results}, open(OUT, 'w', encoding='utf-8'),
               ensure_ascii=False, indent=2)
     print('calls=%d  written: %s' % (calls, OUT))
 

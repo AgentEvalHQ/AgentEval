@@ -16924,3 +16924,53 @@ the wrong extension key (`extension` vs `typedmemeval`, "0 of 565 declare a chan
 caught by asking *where is this actually written* before publishing. **A zero is a claim about a
 location as much as about a population**, and it needs a positive control proving the location is
 the right one — which is the rule this record has now paid for three times.
+
+### 88.19 ✅ `C-E` RUN — in the weakest form that was purchasable, and named as such (2026-09-12)
+
+§88.8 left `C-E` narrowed in writing but **unpurchased**: OpenAI returns `429 insufficient_quota`,
+so the o-series second judges were unreachable. The plan names a fallback for exactly this —
+*"narrow the claim yourself to deployment variance within one family, rename it, publish honestly"*
+— and that fallback turned out to be **runnable**: three distinct Azure deployments are configured
+(`gpt-5.5`, the shipped judge; `gpt-5-chat`; `gpt-5-mini`).
+
+| | |
+| --- | --- |
+| claim **NOT** supported | "judge-family bias is bounded at X" |
+| claim **NOT** supported | "two judges on a different model LINE agree at X" (still unpurchased) |
+| claim this run **does** support | **"two other deployments of the shipped judge's own model family agree with it at X"** |
+
+#### The numbers, re-weighted
+
+| second judge | raw sample | **re-weighted to the live frame** |
+| --- | ---: | ---: |
+| `gpt-5-chat` | 49/50 = 0.980 | **0.99953** |
+| `gpt-5-mini` | 49/50 = 0.980 | **0.99963** |
+
+The two second judges agree **with each other** on 48 of 50, and there are **0 cases where both
+agree with each other and differ from the shipped judge**. Co-directional disagreement is the only
+pattern that would be signal about the shipped judge, and none is visible at this sample size.
+
+✅ **The re-weighting is the whole point and it moved the number.** The sample is balanced on the
+shipped judge's own yes/no, so `v2` is ~0.3% yes in the frame and ~57% yes in the sample. Every
+figure is computed **per cell** — (arm, shipped verdict) — then weighted by that cell's true share
+of the **5,344** live verdicts. The rebuilt frame is asserted against the `drawn_from` recorded when
+the sample was drawn; a drift fails loudly rather than producing a confident number.
+
+#### 🔴 What this canNOT do, stated first because it is the important half
+
+**Both second judges are the same vendor AND the same model family as the judge under test.** A bias
+shared by the whole family is **invisible to this design** — all three would express it together and
+agree perfectly. So 0.9995 is close to the *weakest possible* version of this check, and a high
+number here is largely evidence that the three deployments are consistent with each other, not that
+the shipped judge is unbiased.
+
+⚠ **A cross-vendor bound remains unpurchased and is still the thing that would settle it.** This
+result narrows the open question; it does not close it.
+
+⚠ **And one rounding defect in my own reporting, caught before it shipped:** the re-weighted figure
+printed as **`1.000`** at three decimals while real disagreements existed — they had landed in cells
+worth 0.19% and 0.07% of the frame. A bound that rounds toward *perfect* is the one direction a
+bound must never round, so the tool now prints five decimals and says **"NOT 1.0"** beside any
+figure above 0.9995 that still carries a disagreement.
+
+**Cost: 101 calls** (1 staged + 100 full), zero corpus bytes.
