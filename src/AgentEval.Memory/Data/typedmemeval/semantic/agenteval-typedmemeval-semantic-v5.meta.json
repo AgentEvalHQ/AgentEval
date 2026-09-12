@@ -765,7 +765,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T17:40:17Z",
+    "run_at": "2026-09-12T17:08:15Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -845,73 +845,73 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 404,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 16460,
+        "calls": 4050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 1433,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4519,
-        "empty": 9,
-        "rate": 0.002,
-        "judge_calls": 1392,
+        "calls": 1086,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 380,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 4621,
+        "calls": 1195,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 2553,
+        "judge_calls": 632,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 405,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 405,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1630,
+        "judge_calls": 395,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -925,7 +925,29 @@
         "tme-sem-024"
       ],
       "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
+      "by_stratum": {
+        "co-reference": {
+          "questions": 15,
+          "regressed": 1,
+          "interference_cost": 0.0667,
+          "question_ids": [
+            "tme-sem-024"
+          ]
+        },
+        "current-value": {
+          "questions": 20,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "source-attribution": {
+          "questions": 15,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        }
+      }
     },
     "v9_reference_retrieval": {
       "applicable": 50,
@@ -976,7 +998,9 @@
         "discriminates": true,
         "headroom_reachable": 0.5333,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "headroom_above_chance": 0.5333,
+        "headroom_above_chance_reading": "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the lexical retriever and a guesser, because a guesser scores the floor for free. Where this is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads where guessing does not -- and the difference is floor, not retrieval room. Quote this figure, not the uncorrected one, when claiming how much better retrieval can make a system. `discriminates` is deliberately still keyed on the uncorrected headroom so the verdict does not move under a reporting change; on every shipped shape both agree."
       },
       "current-value": {
         "questions": 20,

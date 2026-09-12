@@ -16855,3 +16855,39 @@ stated, has **zero gold**, and is already scored on abstention instead. What loo
 case of one shape is the extreme end of a three-shape class.
 
 **Cost: zero calls, zero corpus bytes.** Both the finding and its fix are declarations.
+
+### 88.17 🔴 Five published headroom figures counted the chance floor as retrieval room (2026-09-12)
+
+`headroom_perfect_selector` is **V1 − V9**. On a closed-choice shape V9 can land **below** the chance
+floor — measured on **5 of 11** floor-declaring shapes — because a lexical retriever holding *part*
+of the gold is actively misled where a guesser is not (§88.12). When that happens the published
+headroom counts the stretch between *worse than guessing* and *guessing* as room a better retriever
+could win. **A coin already covers it.**
+
+| shape | published | vs `max(V9, floor)` | overstated by |
+| --- | ---: | ---: | ---: |
+| `conjunction/alias-then-count` | 0.867 | **0.500** | −0.367 |
+| `conjunction/conditional-branch` | **1.000** | **0.667** | −0.333 |
+| `procedural/step-order` | **1.000** | **0.667** | −0.333 |
+| `temporal/occurrence-order` | 0.750 | **0.500** | −0.250 |
+| `procedural/retired-step` | 0.800 | 0.667 | −0.133 |
+
+⚠ **The family's two largest headroom figures were each overstated by a third**, and both are shapes
+a reader would reach for first precisely because they looked strongest.
+
+#### The fix, and what it deliberately does not touch
+
+Every shape now publishes **`headroom_above_chance`** = `V1 − max(V9, chance_floor)` with a reading
+that says which figure to quote. Both numbers ship: the uncorrected one because every prior release
+quoted it and removing it would silently break comparisons, the corrected one because it is the
+defensible figure.
+
+✅ **`discriminates` is still keyed on the UNCORRECTED headroom, on purpose.** All five corrected
+shapes still clear the 0.15 floor, so **no verdict moves** — checked, not assumed, and the
+discrimination drift check passes unchanged at 34 of 36. This is a magnitude correction, not a
+re-ranking, and keying the verdict on a reporting change would have made it one.
+
+✅ **Cost: zero calls and zero corpus bytes.** The re-probe ran fully from cache
+(`calls=0 cached=16,326` across all ten verticals) and only **sidecars** changed — every
+`corpus_sha256` is untouched, so **no consumer control resets**. `AgentEval.Memory.Tests` 1190/1190
+on all three TFMs.

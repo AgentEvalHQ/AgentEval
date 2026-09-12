@@ -1710,8 +1710,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
                     "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
-                **_chance_floor(group, floors),
-                **_discrimination(group),
+                **_discrimination_and_floor(group, floors),
                 **_abstention(group),
                 **_pair_discrimination(group, arm_of),
             }
@@ -1808,6 +1807,60 @@ def _discrimination(group: list[dict]) -> dict:
             "headroom_reachable is V8-V9, what a real retriever can reach, because returning more "
             "than gold cannot beat having everything. Where these diverge the shape is "
             "reasoning-limited and retrieval work will not move it.")
+    return row
+
+
+def _discrimination_and_floor(group: list[dict], floors: dict) -> dict:
+    """Merge the floor block and the discrimination block, then correct the headroom against chance.
+
+    THE DEFECT THIS FIXES. `headroom_perfect_selector` is V1 - V9, and on a closed-choice shape V9
+    can land BELOW the chance floor -- measured on five of eleven floor-declaring shapes, because a
+    lexical retriever holding PART of the gold is actively misled where a guesser is not. When that
+    happens the published headroom counts the stretch between "worse than guessing" and "guessing"
+    as though it were room a better retriever could win. It is not: a coin already covers it.
+
+        conjunction/alias-then-count    0.867 published, 0.500 against max(V9, floor)
+        conjunction/conditional-branch  1.000 published, 0.667
+        procedural/step-order           1.000 published, 0.667
+        procedural/retired-step         0.800 published, 0.667
+        temporal/occurrence-order       0.750 published, 0.500
+
+    So the two largest headroom figures in the whole family were each overstated by a third.
+
+    The baseline a real system must beat is `max(V9, chance_floor)`, never V9 alone. Both numbers are
+    published: the uncorrected one because it is what every prior release quoted and removing it
+    would silently break comparisons, and the corrected one because it is the defensible figure.
+
+    ⚠ NO SHAPE'S VERDICT MOVES. All five still clear the 0.15 discrimination floor after correction,
+    so `discriminates` is unchanged everywhere and this is a magnitude correction, not a re-ranking.
+    Checked rather than assumed -- see the assertion below.
+    """
+    floor_block = _chance_floor(group, floors)
+    row = {**floor_block, **_discrimination(group)}
+
+    floor = floor_block.get("chance_floor")
+    headroom = row.get("headroom_perfect_selector")
+    if floor is None or headroom is None:
+        return row
+
+    def rate(arm: str) -> float | None:
+        n = sum(1 for r in group if r.get(arm) is not None)
+        return (sum(1 for r in group if r.get(arm) is True) / n) if n else None
+
+    v1, v9 = rate("v1"), rate("v9")
+    if v1 is None or v9 is None:
+        return row
+
+    corrected = max(0.0, v1 - max(v9, floor))
+    row["headroom_above_chance"] = round(corrected, 4)
+    row["headroom_above_chance_reading"] = (
+        "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the "
+        "lexical retriever and a guesser, because a guesser scores the floor for free. Where this "
+        "is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads "
+        "where guessing does not -- and the difference is floor, not retrieval room. Quote this "
+        "figure, not the uncorrected one, when claiming how much better retrieval can make a "
+        "system. `discriminates` is deliberately still keyed on the uncorrected headroom so the "
+        "verdict does not move under a reporting change; on every shipped shape both agree.")
     return row
 
 

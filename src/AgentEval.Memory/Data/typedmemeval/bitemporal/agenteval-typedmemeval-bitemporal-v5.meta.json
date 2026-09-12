@@ -739,7 +739,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T05:33:52Z",
+    "run_at": "2026-09-12T17:08:15Z",
     "questions_probed": 60,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -780,7 +780,7 @@
       "applicable": 0,
       "passed": 0,
       "failed": [],
-      "applies_to": "Arithmetic and Forgetting, on questions with more than one gold session. Those are the verticals whose design claims every gold component is load-bearing; elsewhere a question may have several gold sessions without the design promising each one is individually necessary, and ablating them would report a defect never promised against",
+      "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one",
       "not_applicable_reason": "V6 is not defined for bitemporal"
     },
     "empty_completions": {
@@ -789,73 +789,73 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 304,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 16460,
+        "calls": 3050,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 812,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4519,
-        "empty": 9,
-        "rate": 0.002,
-        "judge_calls": 1392,
+        "calls": 846,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 246,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 4621,
+        "calls": 795,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 2553,
+        "judge_calls": 290,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 305,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 305,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1630,
+        "judge_calls": 295,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 45,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 93,
+        "judge_calls": 45,
         "judge_empty": 0,
         "judge_rate": 0.0
       }
@@ -871,7 +871,37 @@
         "tme-bit-024"
       ],
       "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
+      "by_stratum": {
+        "belief-at-instant/transaction": {
+          "questions": 18,
+          "regressed": 3,
+          "interference_cost": 0.1667,
+          "question_ids": [
+            "tme-bit-002",
+            "tme-bit-022",
+            "tme-bit-024"
+          ]
+        },
+        "belief-at-instant/valid": {
+          "questions": 18,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "correction-depth/transaction": {
+          "questions": 12,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "correction-depth/valid": {
+          "questions": 12,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        }
+      }
     },
     "v9_reference_retrieval": {
       "applicable": 60,

@@ -870,7 +870,7 @@
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T09:26:54Z",
+    "run_at": "2026-09-12T17:08:15Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -923,75 +923,75 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 150,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 149,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 16460,
+        "calls": 1500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 615,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4519,
-        "empty": 9,
-        "rate": 0.002,
-        "judge_calls": 1392,
+        "calls": 381,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 173,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 4621,
+        "calls": 675,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 2553,
+        "judge_calls": 230,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 150,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 150,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 150,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1630,
+        "judge_calls": 147,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
@@ -1001,7 +1001,33 @@
       "interference_cost": 0.0,
       "regressed_under_interference": [],
       "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
+      "by_stratum": {
+        "count": {
+          "questions": 14,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "delta": {
+          "questions": 10,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "duration": {
+          "questions": 12,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "sum": {
+          "questions": 14,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        }
+      }
     },
     "v9_reference_retrieval": {
       "applicable": 50,
