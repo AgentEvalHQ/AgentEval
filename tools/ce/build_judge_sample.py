@@ -101,7 +101,26 @@ for arm in sorted(by_arm):
     sample.extend(take_y + take_n)
 
 rng.shuffle(sample)  # DevSkim: ignore DS148264
+# TRUNCATION USED TO BE ABLE TO EMPTY A CELL. The arms are balanced first and then all selected
+# rows were shuffled and cut to 50, so an arbitrary trim could remove an entire arm -- or every
+# `yes` or every `no` within one -- while the file still called itself stratified and the
+# direction-flip check it exists for became unobservable. Found in review of PR #238.
+#
+# Asserted rather than re-engineered: the allocation above is what should decide the composition,
+# so the check names the cell it lost instead of silently rebalancing behind the caller.
+_before = {}
+for row in sample:
+    _before.setdefault(row.get('arm'), set()).add(row.get('expected'))
 sample = sample[:50]
+_after = {}
+for row in sample:
+    _after.setdefault(row.get('arm'), set()).add(row.get('expected'))
+if _before != _after:
+    raise SystemExit(
+        'trimming to 50 dropped a stratum: arms/verdicts went %r -> %r. The sample is labelled '
+        'stratified and the direction-flip check depends on every cell surviving.'
+        % ({k: sorted(v) for k, v in sorted(_before.items())},
+           {k: sorted(v) for k, v in sorted(_after.items())}))
 
 print('SAMPLE DRAWN  n = %d   seed = %d' % (len(sample), SEED))
 comp = collections.Counter((r['arm'], r['judge1']) for r in sample)
