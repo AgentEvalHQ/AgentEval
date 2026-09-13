@@ -18021,3 +18021,72 @@ layer, chunking, reranking or query rewriting — none of which were inspected (
 artifact-vs-system rule). And it is `1 - ALLgold`, a predictor with R² 0.853, not a probe run.
 
 **Cost: ~15,400 embeddings, zero judge calls, zero corpus bytes.**
+
+### 88.39 🔴 The retrieval BUDGET is the second monoculture, and it is the bigger one (2026-09-13)
+
+§88.38 measured the retriever. The identity names the other variable in the same sentence:
+
+> *"Headroom is a statement about the K_ref BUDGET first and shape design second."*
+
+`K_REF = 5`, and **every headroom figure the family publishes is that one point.** Same rankings,
+sliced at other budgets — free, because the orderings were already computed:
+
+| K | share of median haystack | RANDOM | BM25 | DENSE | predicted headroom BM25 / DENSE |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 5% | 0.017 | 0.105 | 0.210 | 0.895 / 0.790 |
+| 3 | 14% | 0.051 | 0.264 | 0.379 | 0.736 / 0.621 |
+| **5** | **23%** | 0.100 | **0.416** | 0.540 | **0.584** / 0.460 |
+| 10 | 45% | 0.227 | 0.647 | 0.792 | 0.353 / **0.208** |
+| 20 | 91% | 0.698 | 0.895 | 0.951 | 0.105 / 0.049 |
+
+⚠ **The K=20 row is arithmetic, not a finding.** The family's median haystack is 22 sessions, so
+a 20-session budget returns 91% of it and V9 converges on V8 by construction. It is included
+because leaving it out would invite someone to extrapolate the trend past where it means
+anything. **K=10 is the informative row**: 45% of a median haystack is a realistic budget, not
+"retrieve everything".
+
+#### 🔴 At a modern configuration — dense retriever, K=10 — 21 of 35 shapes fall below the floor
+
+| configuration | shapes below the 0.15 discrimination floor |
+| --- | ---: |
+| BM25, K=5 (**what we publish**) | **2 of 35** |
+| dense, K=5 | 8 of 35 |
+| BM25, K=10 | 9 of 35 |
+| **dense, K=10** | **21 of 35** |
+
+#### ✅ And the fourteen that survive are a coherent set, which is the useful part
+
+| vertical | shapes still ranking at dense/K=10 |
+| --- | --- |
+| `procedural` | **4 of 4** — `step-order` 0.950, `retired-step` 0.600, `amended-step` 0.400, `precondition` 0.250 |
+| `conjunction` | **3 of 4** — `conditional-branch` 0.867, `value-then-count` 0.350, `order-then-value` 0.333 |
+| `prospective` | `due-window` 0.667 |
+| `temporal` | `occurrence-order` 0.650 |
+| `semantic` | `co-reference` 0.400 |
+| `workingmemory` | all four remaining rungs, marginal at 0.167 |
+
+> **The family's discriminating power under a modern retrieval stack concentrates in the
+> multi-hop, ordering and windowed constructs.** Every one of those asks for a SET or a
+> SEQUENCE, and no retriever scoring documents independently against a query gets a set right by
+> being more similar. The lookup shapes — find the one session that states a thing — are the ones
+> a better retriever solves outright.
+
+#### What this changes in how the family should be read
+
+The published "33 of 36 shapes rank two systems" is true **at BM25 and K=5**, and that pairing
+has never been stated as a condition of the claim. It should be. A consumer running embeddings at
+K=10 — an ordinary configuration — is looking at a benchmark where **most shapes cannot rank
+their system**, and nothing we publish tells them which ones.
+
+That is not a corpus defect and it is not fixed by a re-probe. It is a **reporting** defect: the
+measurement was always conditional and the condition was left implicit.
+
+#### A bug this found in the tool, worth recording because it produces a plausible answer
+
+`--k 10` ran a **one-row `--k-sweep`** and printed a K_ref table beside it. argparse accepts
+unambiguous prefixes, `--k` is a prefix of `--k-sweep`, and the output looked like a per-shape
+table at K=10 because it WAS a per-shape table — at K=5. Renamed to `--budget`. A flag that
+silently resolves to a different flag is the argument-parsing form of reading the right number
+off the wrong artifact.
+
+**Cost: zero calls, zero embeddings, zero corpus bytes — the rankings were already bought.**

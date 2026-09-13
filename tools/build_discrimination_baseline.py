@@ -67,8 +67,16 @@ REASONS = {
         "because F2 had measured these pair-shapes failing on SAMPLE SIZE rather than on any "
         "floor. The old value was sampling noise; this one is the shape's actual behaviour. V9 "
         "runs 12/14 with a 95% interval of [0.60, 0.96], so 'at the floor' is the honest reading "
-        "and 'below it' overstates the precision. TRIGGER: a design that lowers ALLgold on a "
-        "depth-1 prospective shape, or another growth to n>=25 that narrows the interval.",
+        "and 'below it' overstates the precision. "
+        "\u26a0 CORRECTED THE SAME DAY: this entry originally gave the trigger as 'another "
+        "growth to n>=25 that narrows the interval'. MEASUREMENT_STATUS 88.38 measured the "
+        "shape against a DENSE retriever and it reaches ALLgold 1.000 -- every gold session "
+        "found on every question -- so its headroom is zero outside the lexical baseline we "
+        "publish against, and a bigger n would only tighten an interval around a shape a "
+        "modern retriever saturates. TRIGGER: a QUESTION FORM that does not name the entity "
+        "it asks about, which is the E1-b move that rescued episodic/participant-attribution "
+        "-- and which, measured under the same dense retriever, still ranks (0.133 -> 0.467) "
+        "while its unchanged sibling assistant-stated collapses to 1.000.",
     ('prospective', 'not-yet-true'):
         "Headroom 0.1429 at n=14, same story and same arc as `expiring-validity`: it reported "
         "0.5000 at n=6 and 0.1429 at n=14. Two shapes moving from different noisy values to the "
@@ -76,7 +84,9 @@ REASONS = {
         "V9 11/14, 95% interval [0.52, 0.92]. ALSO an ABSENCE shape (MEASUREMENT_STATUS 88.16): "
         "its answer asserts a triggering event has not occurred, so V1 is not a valid ceiling for "
         "it and V8-V9 = 0.2143 is the statistic that applies -- which clears the floor. Declared "
-        "on the uncorrected number because `discriminates` is keyed on it. TRIGGER: as above.",
+        "on the uncorrected number because `discriminates` is keyed on it. TRIGGER: as above -- a "
+        "new question form, NOT a bigger n. It too reaches ALLgold 1.000 under a dense "
+        "retriever.",
     ('forgetting', 'never-known'):
         "Exempt by construction: every question has zero gold sessions, so V1/V8/V9 are undefined "
         "and V1-V9 cannot be formed. Scored on abstention (V10/V11) instead. The probe tool emits "

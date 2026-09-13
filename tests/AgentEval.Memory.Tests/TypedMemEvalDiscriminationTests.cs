@@ -77,8 +77,26 @@ public class TypedMemEvalDiscriminationTests
     /// <para>
     /// They are declared rather than fixed because 0.1429 is <b>0.007 below</b> the floor — one
     /// question at n=14 — and V9's 95% Wilson interval runs [0.60, 0.96]. "At the floor" is the
-    /// honest reading; "below it" claims a precision 14 questions do not carry. Growing them again
-    /// is the next move, not a new question form.
+    /// honest reading; "below it" claims a precision 14 questions do not carry.
+    /// </para>
+    /// <para>
+    /// 🔴 <b>The last sentence of this note used to read "growing them again is the next move,
+    /// not a new question form", and that was WRONG — corrected the same day it was written.</b>
+    /// MEASUREMENT_STATUS §88.38 measured both shapes against a dense retriever and both reach
+    /// ALLgold <b>1.000</b>: a modern retriever finds all of their gold on every question, so
+    /// their headroom is not thin, it is <b>zero</b> outside the lexical baseline we happen to
+    /// publish against. Growing them to n≥25 would buy a tighter interval around a shape an
+    /// embedding retriever saturates completely — paying to measure more precisely something
+    /// that should not exist in this form.
+    /// </para>
+    /// <para>
+    /// <b>A new question form IS the move.</b> Both shapes name the entity they ask about, which
+    /// is the structural property that capped <c>episodic/participant-attribution</c> until E1-b
+    /// re-formed it to identify a claim by its CONSEQUENCE. That worked example is in the same
+    /// family and can be read against a control: under a dense retriever the re-formed shape
+    /// holds (ALLgold 0.133 → 0.467, still ranking) while its unchanged sibling
+    /// <c>episodic/assistant-stated</c> collapses to 1.000. The remedy is demonstrated, not
+    /// hypothesised.
     /// </para>
     /// <para>
     /// The two entries this list once held — <c>temporal/occurrence-order</c> and
@@ -112,6 +130,11 @@ public class TypedMemEvalDiscriminationTests
             // from different directions -- 0.3333 and 0.5000 at n=6, 0.1429 apiece at n=14 -- and
             // both sit 0.007, one question, under the floor. See the remarks above for why that
             // reads as "at the floor" rather than "below it".
+            //
+            // DO NOT "FIX" THESE BY GROWING THEM. Measured against a dense retriever the same
+            // day (MEASUREMENT_STATUS 88.38), both reach ALLgold 1.000 -- headroom zero outside
+            // the lexical baseline. They need a question form that does not name its own target,
+            // which is the E1-b move and a separate, larger arc.
             [(TypedMemEvalVertical.Prospective, "expiring-validity")] = 0.1429,
 
             // Also an ABSENCE shape: its gold answer asserts that a triggering event has NOT

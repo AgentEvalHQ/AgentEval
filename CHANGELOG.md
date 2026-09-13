@@ -187,6 +187,41 @@ in Forgetting. Full record, including two defects introduced and caught during t
 `docs/findings/MEASUREMENT_STATUS.md` §88.14.
 
 
+### Added — every headroom figure is conditional on (BM25, K=5), and the sidecars now say so
+
+The retrieval BUDGET is the second monoculture and the larger one. `K_REF = 5` is 23% of a median
+22-session haystack, and every published headroom number is that single point:
+
+| K | RANDOM | BM25 | DENSE | predicted headroom BM25 / DENSE |
+| ---: | ---: | ---: | ---: | ---: |
+| 3 | 0.051 | 0.264 | 0.379 | 0.736 / 0.621 |
+| **5** | 0.100 | **0.416** | 0.540 | **0.584** / 0.460 |
+| 10 | 0.227 | 0.647 | 0.792 | 0.353 / **0.208** |
+
+🔴 **At a dense retriever and K=10 — 45% of a median haystack, an ordinary configuration — 21
+of 35 shapes fall below the 0.15 discrimination floor.** The fourteen that survive are
+`procedural` (4 of 4), `conjunction` (3 of 4), `prospective/due-window`,
+`temporal/occurrence-order`, `semantic/co-reference` and WorkingMemory’s ladder: every one asks
+for a SET or a SEQUENCE, which no retriever scoring documents independently gets right by being
+more similar.
+
+This is a **reporting** defect rather than a corpus one — the measurement was always conditional
+and the condition was implicit. Each sidecar now carries `probes.retriever_sensitivity`: per
+shape, ALLgold under both retrievers, the predicted headroom under each, and
+`discriminates_under_dense`. **No `corpus_sha256` moved and no corpus file changed**, so no
+consumer control resets. `--stamp` refuses anything but a full-family run at K_ref, because a
+partial stamp is a claim about shapes it never measured.
+
+### Fixed — a declared reason that pointed the next author at the wrong remedy
+
+`prospective/expiring-validity` and `not-yet-true` were declared this same day with the trigger
+*"another growth to n≥25 that narrows the interval"*. Measured against a dense retriever both
+reach ALLgold **1.000** — headroom zero outside the lexical baseline — so a bigger n would only
+tighten an interval around a shape a modern retriever saturates. The trigger is now a **question
+form that does not name its own target**, the `E1-b` move, which under the same dense retriever
+is shown to work: `episodic/participant-attribution` still ranks (0.133 → 0.467) while its
+unchanged sibling `assistant-stated` collapses to 1.000.
+
 ### Added — the retriever monoculture, measured for the first time
 
 `tools/typedmemeval_dense_retrieval.py`. Every headroom figure the family publishes is `V1 - V9`,

@@ -263,6 +263,62 @@ def render_one(session, date) -> str:
     return f"### Session 1 ({date})\n{turns}"
 
 
+def _stamp(by_shape, args, k: int) -> None:
+    """Write `retriever_sensitivity` into every measured vertical's sidecar.
+
+    REFUSES A PARTIAL RUN. `--limit` or `--vertical` or a non-K_ref budget would stamp a claim
+    about shapes this run never measured, or measure them at a budget the family does not
+    publish at -- and a sidecar is the one place a consumer takes a number at face value. The
+    corpus bytes do not move, so `corpus_sha256` is unchanged and no consumer control resets;
+    only the measurement block grows.
+    """
+    if args.limit or args.vertical or k != tmc.K_REF or args.dry_run:
+        raise SystemExit('--stamp needs a full-family run at K_ref with real embeddings; this run was partial, and a partial stamp is a claim about shapes it never measured')
+
+    per_vertical = collections.defaultdict(dict)
+    for (vertical, shape), c in by_shape.items():
+        n = c['n']
+        bm25, dense = c['bm25_all'] / n, c['dense_all'] / n
+        per_vertical[vertical][shape] = {
+            'questions': n,
+            'allgold_bm25': round(bm25, 4),
+            'allgold_dense': round(dense, 4),
+            'predicted_headroom_bm25': round(1 - bm25, 4),
+            'predicted_headroom_dense': round(1 - dense, 4),
+            'discriminates_under_dense': (1 - dense) >= 0.15,
+        }
+
+    reading = (
+        "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a "
+        "CONDITION of every headroom figure in this sidecar and was left implicit until "
+        "2026-09-13. This block states it. `allgold_dense` is the same measurement with an "
+        "embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts "
+        "headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's "
+        "published figures, over-stating by +0.032. A shape with "
+        "`discriminates_under_dense: false` can still rank two systems for a BM25 consumer and "
+        "cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and "
+        "it says nothing about any consumer's chunking, reranking or query rewriting.")
+
+    for vertical, shapes in sorted(per_vertical.items()):
+        path = os.path.join(CORPORA, vertical,
+                            'agenteval-typedmemeval-%s-v5.meta.json' % vertical)
+        if not os.path.exists(path):
+            continue
+        meta = json.loads(open(path, encoding='utf-8-sig').read())
+        meta.setdefault('probes', {})['retriever_sensitivity'] = {
+            'reference_retriever': tmc.RETRIEVER_ID,
+            'reference_k': tmc.K_REF,
+            'dense_retriever': 'azure-openai-embeddings, cosine, same documents and budget',
+            'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
+            'reading': reading,
+            'by_shape': dict(sorted(shapes.items())),
+        }
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump(meta, fh, indent=2, ensure_ascii=False)
+            fh.write('\n')
+        print('  stamped %s (%d shapes)' % (vertical, len(shapes)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dry-run', action='store_true',
@@ -270,6 +326,14 @@ def main():
     ap.add_argument('--vertical', help='one vertical instead of the family')
     ap.add_argument('--limit', type=int, help='first N questions per vertical')
     ap.add_argument('--seed', type=int, default=20260913)
+    # --budget rather than --k. argparse accepts unambiguous PREFIXES, and `--k 10` matches
+    # `--k-sweep` -- it ran a one-row sweep and printed a K_ref table, which looks like a result.
+    ap.add_argument('--stamp', action='store_true',
+                    help='write the per-shape sensitivity into each sidecar. Refuses unless the run covered the whole family at K_ref, because a partial stamp is a claim about shapes it never measured.')
+    ap.add_argument('--budget', type=int, default=tmc.K_REF,
+                    help='retrieval budget for the per-shape table (default K_REF=5)')
+    ap.add_argument('--k-sweep', metavar='K,K,...',
+                    help='also report ALLgold at these retrieval budgets. K_ref=5 is a single point, and the identity makes headroom a statement about the BUDGET first.')
     args = ap.parse_args()
 
     rng = random.Random(args.seed)  # DevSkim: ignore DS148264 - a control arm, not a secret
@@ -281,8 +345,10 @@ def main():
     if not paths:
         raise SystemExit('no corpora matched')
 
-    k = tmc.K_REF
+    k = args.budget
+    sweep = sorted({int(x) for x in args.k_sweep.split(",")}) if args.k_sweep else []
     by_shape = collections.defaultdict(lambda: collections.Counter())
+    by_k = collections.defaultdict(lambda: collections.Counter())
     total_questions = 0
 
     # ONE VERTICAL AT A TIME. Holding the family's vectors at once is what made the first
@@ -328,16 +394,24 @@ def main():
 
         for q in questions:
             docs, gold = q['docs'], q['gold']
-            arms = {
-                'random': set(rng.sample(range(len(docs)), min(k, len(docs)))),
-                'bm25': set(tmc.bm25_rank(q['question'], docs)[:k]),
-                'dense': set(cosine_rank(q['question'], docs)[:k]),
-            }
+            # RANK ONCE, SLICE MANY. Re-ranking per budget would be the same ordering computed
+            # again, and any drift between the two would be an artefact of this loop rather
+            # than of the budget.
+            ranked = {'bm25': tmc.bm25_rank(q['question'], docs),
+                      'dense': cosine_rank(q['question'], docs)}
+            shuffled = list(range(len(docs)))
+            rng.shuffle(shuffled)
+            ranked['random'] = shuffled
             cell = by_shape[(vertical, q['shape'])]
             cell['n'] += 1
-            for arm, top in arms.items():
+            for arm, order in ranked.items():
+                top = set(order[:k])
                 cell[arm + '_all'] += 1 if gold.issubset(top) else 0
                 cell[arm + '_share'] += len(gold & top) / len(gold)
+                for budget in sweep:
+                    wide = set(order[:budget])
+                    by_k[budget]['n' if arm == 'bm25' else 'skip'] += 1
+                    by_k[budget][arm + '_all'] += 1 if gold.issubset(wide) else 0
         total_questions += len(questions)
 
     if not total_questions:
@@ -347,6 +421,10 @@ def main():
     print()
 
     print('ALLgold = the rate at which top-%d holds ALL of a question\'s gold.' % k)
+    if k != tmc.K_REF:
+        print('\u26a0 BUDGET K=%d, NOT the published K_ref=%d. Every headroom figure this'
+              % (k, tmc.K_REF))
+        print('  family publishes is the K_ref point; this table is a different budget.')
     print('SS88.12: V9\'s pass rate EQUALS this, so 1 - ALLgold predicts headroom.')
     print()
     print('%-14s %-24s %4s   %-17s %-17s %-17s' %
@@ -390,6 +468,23 @@ def main():
     else:
         print('  dense clearly beats random, so the comparison below is about retrievers.')
     print()
+
+    if sweep:
+        print('THE SECOND MONOCULTURE: retrieval BUDGET')
+        print('  K_ref is 5 and every published headroom figure is that one point. ALLgold at')
+        print('  other budgets, same rankings sliced wider:')
+        print()
+        print('    %5s  %8s  %8s  %8s   predicted headroom (BM25 / DENSE)'
+              % ('K', 'RANDOM', 'BM25', 'DENSE'))
+        for budget in sweep:
+            row = by_k[budget]
+            m = row['n'] or 1
+            print('    %5d  %8.3f  %8.3f  %8.3f       %.3f / %.3f'
+                  % (budget, row['random_all'] / m, row['bm25_all'] / m, row['dense_all'] / m,
+                     1 - row['bm25_all'] / m, 1 - row['dense_all'] / m))
+        print()
+    if args.stamp:
+        _stamp(by_shape, args, k)
 
     print('WHAT IT MEANS FOR PUBLISHED HEADROOM  (prediction, not measurement)')
     print('  predicted headroom = 1 - ALLgold      BM25 %.3f   ->   DENSE %.3f'

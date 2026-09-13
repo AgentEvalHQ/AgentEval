@@ -1950,6 +1950,31 @@
         "v11": true
       }
     },
-    "probed_corpus_sha256": "2aaa0a41fc92fb25a2d6ad0a5041b48e1bf87f45ac271f47c9666e26bacd38af"
+    "probed_corpus_sha256": "2aaa0a41fc92fb25a2d6ad0a5041b48e1bf87f45ac271f47c9666e26bacd38af",
+    "retriever_sensitivity": {
+      "reference_retriever": "bm25-okapi-k1.5-b0.75",
+      "reference_k": 5,
+      "dense_retriever": "azure-openai-embeddings, cosine, same documents and budget",
+      "operand": "ALLgold -- gold.issubset(top_k), the quantity V9 tracks",
+      "reading": "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a CONDITION of every headroom figure in this sidecar and was left implicit until 2026-09-13. This block states it. `allgold_dense` is the same measurement with an embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's published figures, over-stating by +0.032. A shape with `discriminates_under_dense: false` can still rank two systems for a BM25 consumer and cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and it says nothing about any consumer's chunking, reranking or query rewriting.",
+      "by_shape": {
+        "invalidated": {
+          "questions": 20,
+          "allgold_bm25": 0.55,
+          "allgold_dense": 0.9,
+          "predicted_headroom_bm25": 0.45,
+          "predicted_headroom_dense": 0.1,
+          "discriminates_under_dense": false
+        },
+        "still-valid": {
+          "questions": 15,
+          "allgold_bm25": 0.4667,
+          "allgold_dense": 0.6667,
+          "predicted_headroom_bm25": 0.5333,
+          "predicted_headroom_dense": 0.3333,
+          "discriminates_under_dense": true
+        }
+      }
+    }
   }
 }
