@@ -17922,3 +17922,102 @@ here — it is recorded at the `DESIGNATIONS` entry itself and in `V6Ratchet`, w
 places the next author will be standing.
 
 **Cost: zero calls.**
+
+### 88.38 🔴 EIGHT of 35 shapes stop discriminating under a DENSE retriever (2026-09-13)
+
+Every headroom figure this family publishes is `V1 - V9`, and V9 hands the model the top-K_ref
+sessions **a plain BM25 retriever returns**. `realised_coverage` has said the rest out loud since
+the beginning:
+
+> *"This is the **floor proxy** of ADR §4: a stronger (embedding) retriever will exceed it."*
+
+**By how much had never been measured** — claim-without-instrument (§88.18 shape 6) on the single
+most consequential assumption in the family, and on the question every consumer actually has,
+because almost none of them retrieve with BM25.
+
+`tools/typedmemeval_dense_retrieval.py` measures it: the same documents V9 ranks, the same K=5
+budget, the same ALLgold operand, three arms.
+
+#### The predictor was re-validated before its dense column was read
+
+§88.12's identity is re-derived here from a different code path, against the published headroom
+of all 35 scored shapes:
+
+> **slope +0.905, intercept +0.023, R² 0.853, median |residual| 0.000.** It over-states by
+> **+0.032** on the family mean.
+
+So `1 - ALLgold` is a good predictor of headroom and a slightly generous one. That is what
+licenses reading the dense column at all — and it is still a PREDICTION. The measurement is a V9
+re-run against dense top-5.
+
+#### The family headline: most headroom survives
+
+| arm | ALLgold | predicted headroom |
+| --- | ---: | ---: |
+| RANDOM (control) | 0.094 | — |
+| **BM25** (what we publish) | **0.416** | **0.584** |
+| **DENSE** | **0.540** | **0.460** |
+
+A dense retriever closes **21%** of the room BM25 leaves open. **79% of published headroom is not
+a lexical artifact.** The control is what makes that sentence worth anything: dense beats random
+by **+0.446** on ALLgold, so the comparison is between retrievers rather than between a retriever
+and a broken API call.
+
+#### 🔴 But the mean hides the finding, as it always does here
+
+**Eight of 35 shapes fall below the 0.15 discrimination floor under dense retrieval.** For a
+consumer retrieving with embeddings the family is **27 of 35**, not 33 of 36.
+
+| shape | published (BM25) | dense-predicted |
+| --- | ---: | ---: |
+| `episodic/assistant-stated` | 0.4000 | **0.000** |
+| `prospective/due-later-reminder` | 0.4286 | **0.000** |
+| `prospective/expiring-validity` | 0.1429 | **0.000** |
+| `prospective/not-yet-true` | 0.1429 | **0.000** |
+| `semantic/source-attribution` | 0.2667 | **0.000** |
+| `prospective/seed-carry-over` | 0.4167 | 0.083 |
+| `workingmemory/distance-40` | 0.5000 | 0.083 |
+| `forgetting/invalidated` | 0.4500 | 0.100 |
+
+#### ✅ And the split is by CONSTRUCT, which is the part worth keeping
+
+Every shape in that table is a **single-fact lookup**: find the one session that states a thing.
+Semantic similarity finds it where lexical overlap did not, and the gap closes completely.
+
+The shapes that HOLD are the multi-hop and ordering constructs — and several get **harder**:
+
+| shape | BM25 ALLgold | dense ALLgold |
+| --- | ---: | ---: |
+| `conjunction/order-then-value` | 0.200 | **0.000** |
+| `conjunction/value-then-count` | 0.250 | **0.050** |
+| `procedural/amended-step` | 0.350 | **0.150** |
+| `procedural/retired-step` | 0.200 | 0.150 |
+| `procedural/step-order` | 0.000 | 0.000 |
+| `conjunction/conditional-branch` | 0.000 | 0.000 |
+| `prospective/due-window` | 0.056 | **0.000** |
+
+> **Retrieving ALL of a four-session chain is not a similarity problem.** Embeddings rank each
+> session against the query independently, and a query that describes a JOIN resembles no single
+> one of its links. Where the task is "find the fact", dense wins; where it is "find every link",
+> dense is no better and sometimes worse.
+
+#### Two declarations this settles, in opposite directions
+
+- ✅ **`prospective/due-window` is vindicated.** §88.36 declared it out of band on the argument
+  that a date-window query shares no vocabulary with the sessions answering it. Dense reads
+  **0.000** against BM25's 0.056 — it is not a lexical artifact, it is hard for any retriever,
+  and the declaration was right for the stated reason rather than by luck.
+- 🔴 **The two prospective shapes declared in `PendingRedesign` are weaker than declared.** They
+  were argued as *sample-size* cases sitting one question under the floor. Under dense retrieval
+  both reach ALLgold **1.000** — predicted headroom **zero**. Growing them to n≥25 would sharpen
+  an interval around a shape that a modern retriever saturates completely. **That arc should not
+  be funded**; the honest fix is a question form that does not name its own target, which is
+  exactly the `E1-b` move that rescued `episodic/participant-attribution`.
+
+#### What this does NOT say
+
+It is our corpus measured against two retrievers, not a statement about any consumer's memory
+layer, chunking, reranking or query rewriting — none of which were inspected (§the
+artifact-vs-system rule). And it is `1 - ALLgold`, a predictor with R² 0.853, not a probe run.
+
+**Cost: ~15,400 embeddings, zero judge calls, zero corpus bytes.**

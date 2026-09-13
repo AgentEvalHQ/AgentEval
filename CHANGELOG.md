@@ -187,6 +187,25 @@ in Forgetting. Full record, including two defects introduced and caught during t
 `docs/findings/MEASUREMENT_STATUS.md` §88.14.
 
 
+### Added — the retriever monoculture, measured for the first time
+
+`tools/typedmemeval_dense_retrieval.py`. Every headroom figure the family publishes is `V1 - V9`,
+and V9 uses a plain BM25 retriever; `realised_coverage` has always said it is a *floor proxy* a
+stronger retriever will exceed. By how much was never measured.
+
+Measured over the same documents, budget and ALLgold operand, with a random-selection control:
+BM25 ALLgold **0.416**, dense **0.540**, random **0.094**. A dense retriever closes **21%** of the
+room BM25 leaves open, so **79% of published headroom is not a lexical artifact**.
+
+🔴 **The mean hides the finding.** Eight of 35 shapes fall below the 0.15 discrimination floor
+under dense retrieval — for a consumer retrieving with embeddings the family is **27 of 35**. All
+eight are single-fact lookups. The multi-hop and ordering shapes (`conjunction`, `procedural`)
+hold, and several get HARDER: retrieving ALL of a four-session chain is not a similarity problem.
+
+This is a prediction from `1 - ALLgold`, re-validated here against published headroom at slope
++0.905 / R² 0.853 / median residual 0.000, and it over-states by +0.032. The measurement would be
+a V9 re-run against dense top-5. See `MEASUREMENT_STATUS` §88.38.
+
 ### Fixed — `v0.35.0-beta` had no CHANGELOG section, and nothing was checking
 
 Its notes stayed in `[Unreleased]`, where this release would have shipped them a second time

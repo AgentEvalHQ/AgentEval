@@ -477,6 +477,10 @@ samples/Galaxus.RecommendationAgent/
 # instead of re-paying for calls it already made. Reference-model output, not a deliverable —
 # the probe *records* ship in each corpus's .meta.json.
 tools/.typedmemeval_probe_cache.json
+# Embedding vectors for the dense-retrieval arm. A DIRECTORY, not an extension: the shards are
+# .json like everything else in tools/, and ignoring by extension would take the baselines with
+# them. ~46 MB of float16 that regenerates from the endpoint and belongs in no repository.
+tools/.typedmemeval_embeddings/
 tools/__pycache__/
 
 # C-E judge-agreement sample and results. The SAMPLER ships (tools/ce/build_judge_sample.py) and is
