@@ -125,7 +125,18 @@ DESIGNATIONS = (
     # else in this vertical currently needs. The next semantic corpus change should carry it: a
     # replacement needs an asked name that does not identify the KIND of its referent, which is
     # the property the other five have and this one lacks. See V6Ratchet in TypedMemEvalCorpusTests.
-    ("the blue estate car", "the runaround", "The runaround is the blue estate car."),
+    # WAS ("the blue estate car", "the runaround"). Retired 2026-09-13, and the reason is in the
+    # pair rather than in the corpus: "the runaround" is ordinary English for a small car and the
+    # blue estate car was the ONLY vehicle among the six stated designations, so the hop this
+    # shape exists to measure could be taken from world knowledge. V6 caught it -- drop the link
+    # session on tme-sem-024 and the reader still answered, 3 of 3 -- and the previous corpus
+    # passed 15/15 only because the model HEDGED ("If by 'the runaround' you mean the blue
+    # estate car..."), which the resolution grader scored as declining.
+    #
+    # The replacement has the property the other five have and it lacked: the ASKED name carries
+    # no information about the KIND of thing it names, so nothing outside these conversations
+    # connects the two halves.
+    ("the house at Tolley Cross", "the quiet one", "The quiet one is the house at Tolley Cross."),
     ("the cottage at Wray Head", "the weekend place",
      "The weekend place is the cottage at Wray Head."),
     ("the Peverel building", "the annexe", "The annexe is the Peverel building."),
@@ -190,6 +201,61 @@ SOURCE_TOPICS = (
     ("the window quote", "scaffolding is charged separately"),
     ("the fence dispute", "the boundary follows the old wall"),
 )
+
+#: belief -> (what FOLLOWED from it, how the question refers to that).
+#:
+#: E1-b, ported from `episodic/participant-attribution`. The question used to quote the belief
+#: verbatim, so gold was the one session containing the query string and a retriever could not
+#: fail: dense ALLgold 1.000, V9 15/15, headroom ZERO (MEASUREMENT_STATUS 88.40).
+#:
+#: Each consequence is a thing the speaker DID because the belief was true, worded so that no
+#: content word is shared with the belief -- `check_semantic` asserts that, so a future edit
+#: cannot quietly reopen the lexical route. Finding the source now costs two hops that only
+#: MEANING connects: the consequence names no topic, and the topic session states the belief
+#: without mentioning the consequence.
+SOURCE_CONSEQUENCES = {
+    "the guttering has to be done at the same time":
+        ("I ended up booking both crews for a single visit instead of two.",
+         "that day I booked both crews for a single visit"),
+    "the excess doubles if a claim is made twice":
+        ("I paid for the small dent out of pocket rather than go through them.",
+         "when I paid for the small dent out of pocket"),
+    "the permit does not cover the visitor bay":
+        ("My sister had to leave her car on the road when she stayed over.",
+         "the weekend my sister left her car on the road"),
+    "the old line stays live for a month":
+        ("I kept the handset plugged in well after the new box arrived.",
+         "when I kept the handset plugged in after the new box arrived"),
+    "glass is taken on a different week":
+        ("I stopped putting the bottles out with everything else.",
+         "when I stopped putting the bottles out with everything else"),
+    "the warranty lapses if a service is missed":
+        ("I put a standing note in the calendar every autumn.",
+         "the standing note I put in the calendar every autumn"),
+    "scaffolding is charged separately":
+        ("The final bill came in well over what I had budgeted.",
+         "when the final bill came in over what I had budgeted"),
+    "the boundary follows the old wall":
+        ("I moved my new posts a good foot back before digging.",
+         "when I moved my new posts a foot back before digging"),
+}
+
+#: Replies on a consequence session. It is gold because the question cannot be answered without
+#: it, but it carries NO answer-bearing turn -- the cited source is the topic session.
+_CONSEQUENCE_ACKS = (
+    "Noted.", "Right, I have that.", "Understood.", "Logged.",
+    "That is on the record.", "Got it.",
+)
+
+#: Function words the overlap check ignores: a shared "the" is not a lexical route to gold.
+_OVERLAP_STOPWORDS = frozenset((
+    "the", "a", "an", "of", "in", "on", "at", "to", "is", "was", "were", "are", "be", "been",
+    "that", "this", "it", "for", "and", "or", "with", "as", "by", "from", "what", "when",
+    "who", "which", "how", "did", "do", "does", "i", "you", "my", "your", "me", "we", "us",
+    "not", "no", "yes", "about", "had", "has", "have", "out", "up", "off", "over", "there",
+    "they", "them", "their", "her", "his", "she", "he", "am", "been", "being", "if", "so",
+))
+
 
 #: Conversations that COULD have carried the belief but did not. These are the competitors for
 #: source-attribution: each is a plausible citation, so naming the right one requires reading.
@@ -451,10 +517,30 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
     topic, belief = SOURCE_TOPICS[index % len(SOURCE_TOPICS)]
     candidates = 2 + (index % 3)   # how many conversations plausibly could have carried it
     qid = f"tme-sem-{CURRENT_QUESTIONS + COREF_QUESTIONS + index + 1:03d}"
-    ask = f"What were we discussing when I told you that {belief}?"
+    # ASK BY CONSEQUENCE, NOT BY QUOTING THE BELIEF. The old frame was
+    #     f"What were we discussing when I told you that {belief}?"
+    # and the gold session literally contained {belief}, so the question was a search query for
+    # its own answer. See SOURCE_CONSEQUENCES above for the measurement that condemned it.
+    consequence_text, consequence_ref = SOURCE_CONSEQUENCES[belief]
+    ask = f"What were we discussing when {consequence_ref} came about?"
     echoed = tmc.echo_terms(ask, echo, random.Random(f"{qid}:{index}"))  # DevSkim: ignore DS148264 - deterministic corpus generation
 
-    golds = [_gold(f"About {topic} -- {belief}.", _reply(rng), rng, "source")]
+    # TWO gold sessions now, and the question is unanswerable without both: the consequence
+    # session is the only route from the question to anything, and the source session is the
+    # only thing that names the topic. Gold depth 1 -> 2, so ALLgold requires BOTH in the
+    # top-K -- which is what a dense retriever found trivial when there was only one.
+    #
+    # The consequence carries NO answer-bearing turn: the cited source is the topic session, and
+    # `has_answer` marks where the answer actually lives.
+    ack = _CONSEQUENCE_ACKS[index % len(_CONSEQUENCE_ACKS)]
+    if index % 2 == 0:
+        consequence_turns = [tmc.Turn("user", consequence_text), tmc.Turn("assistant", ack)]
+    else:
+        consequence_turns = [tmc.Turn("user", ack), tmc.Turn("assistant", consequence_text)]
+    golds = [
+        _gold(f"About {topic} -- {belief}.", _reply(rng), rng, "source"),
+        tmc.Session(turns=consequence_turns, timestamp=_BASE, is_gold=True, tag="consequence"),
+    ]
 
     decoys = []
     for offset in range(candidates - 1):
@@ -465,6 +551,22 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
             turns=[tmc.Turn("user", f"{rng.choice(OPENERS)} About {decoy} -- nothing decided yet."),
                    tmc.Turn("assistant", _reply(rng))],
             timestamp=_BASE, is_gold=False, tag="decoy"))
+
+    # RIVAL CONSEQUENCES. Measured BEFORE adding them: the re-formed question cleared the floor
+    # against a dense retriever by 0.200 against 0.150 -- one question at n=15. The mechanism
+    # was visible rather than guessed: the question refers to a consequence and NOTHING else in
+    # the haystack was one, so the first hop was free and only the second cost anything.
+    #
+    # Other beliefs' consequences now compete for the question's own words. They are non-gold:
+    # each followed from a DIFFERENT belief, so a reader matching "a thing the speaker did"
+    # rather than the specific act named is left choosing among several.
+    others = [b for b in SOURCE_CONSEQUENCES if b != belief]
+    for offset in range(min(3, len(others))):
+        rival_text, _ = SOURCE_CONSEQUENCES[others[(index + offset) % len(others)]]
+        rival_ack = _CONSEQUENCE_ACKS[(index + offset + 2) % len(_CONSEQUENCE_ACKS)]
+        decoys.append(tmc.Session(
+            turns=[tmc.Turn("user", rival_text), tmc.Turn("assistant", rival_ack)],
+            timestamp=_BASE, is_gold=False, tag="rival-consequence"))
 
     # Decoys are non-gold, so they count toward H. Draw the filler budget against the declared
     # range MINUS the decoys rather than on top of them, or H silently exceeds what the corpus
@@ -480,7 +582,10 @@ def _source_attribution(index: int, echo: float, rng: random.Random) -> tmc.Ques
         question_date=_BASE + timedelta(
             days=(CURRENT_QUESTIONS + COREF_QUESTIONS + index) * 37 + 60),
         sessions=sessions,
-        extension={"shape": SHAPE_SOURCE, "candidate_sources": candidates, "source_topic": topic})
+        extension={"shape": SHAPE_SOURCE, "candidate_sources": candidates, "source_topic": topic,
+                   # The belief is recorded so the overlap check reads the REAL operand
+                   # rather than one re-derived from the question it is checking.
+                   "source_belief": belief, "gold_components_load_bearing": True})
 
 
 def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS148264 - deterministic corpus generation
@@ -573,6 +678,22 @@ def check_semantic(questions: list[tmc.Question]) -> list[str]:
         if shape == SHAPE_SOURCE:
             if "we were discussing" not in q.answer.lower():
                 problems.append(f"{q.question_id}: source-attribution answer does not name a source")
+            # E1-b OVERLAP CHECK. The whole point of asking by consequence is that no content
+            # word carries the reader from the question to the belief. Asserted rather than
+            # trusted, because the previous frame WAS the leak and nothing caught it for the
+            # shape's entire life.
+            belief_words = {w for w in tmc.tokenize(q.extension.get("source_belief", ""))
+                            if w not in _OVERLAP_STOPWORDS}
+            leaked = belief_words & {w for w in tmc.tokenize(q.question)
+                                     if w not in _OVERLAP_STOPWORDS}
+            if leaked:
+                problems.append(
+                    f"{q.question_id}: the question shares {sorted(leaked)} with the belief it "
+                    f"asks about, so a lexical retriever can reach gold without the hop")
+            if sum(1 for s in q.sessions if s.tag == "consequence") != 1:
+                problems.append(
+                    f"{q.question_id}: source-attribution needs exactly one consequence session "
+                    f"-- it is the only route from the question to the chain")
             decoys = sum(1 for s in q.sessions if s.tag == "decoy")
             if decoys != q.extension["candidate_sources"] - 1:
                 problems.append(
