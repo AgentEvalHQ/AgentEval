@@ -4,7 +4,16 @@
 WHAT IT IS FOR. `headroom ~= 1 - ALLgold_retrieval` (MEASUREMENT_STATUS 88.12: median residual 0.000
 across 35 shapes) is computable from a corpus alone. So a proposed revision can be checked for
 discriminating power BEFORE it is generated into the repo and BEFORE a probe run is paid for. This
-converts a ~200-500 call gamble into a free measurement plus a run that already knows its answer.
+converts a ~200-500 call gamble into a free measurement plus a run whose RETRIEVAL result is
+already known.
+
+🔴 IT DOES NOT KNOW WHETHER THE CORPUS STILL WORKS, and that distinction cost a corpus.
+ALLgold measures how hard gold is to FIND. A change that makes gold harder to find and a change
+that makes the answer impossible to DERIVE move it in the same direction, so this gate reports both
+as progress. Only V1 -- the gold-only ceiling, which costs model calls -- says the questions are
+still answerable. On 2026-09-13 an E1-b re-form of semantic/source-attribution passed here at
+0.733 -> 0.200 and the probe then read V1 15/15 -> 10/15: five questions had become unanswerable,
+and part of the improvement this tool reported was the corpus breaking (MEASUREMENT_STATUS 88.42).
 
 Usage:
     python tools/typedmemeval_precheck.py <vertical> <candidate-root>
@@ -30,14 +39,24 @@ In the bitemporal candidate `correction-depth/valid` at correction-rung 3 read A
 and 0.750 candidate -- the SAME rung, moved by echo alone. Read as a rung effect it would have been a
 fabricated mechanism.
 
-WHY THE GATE IS STILL SAFE FOR A *GO* DECISION. The confound pushes ALLgold UP, i.e. it works
-AGAINST the change looking good. A candidate that clears the floor DESPITE a lower echo clears it
-conservatively, and the true effect of the design change is at least what was measured. That is why
-E1-b's pre-check (ALLgold 1.00 -> 0.27) was trustworthy and its arc succeeded.
+WHY THE CONFOUND IS SAFE FOR A *GO* DECISION -- and note the scope of that claim. The confound
+pushes ALLgold UP, i.e. it works AGAINST the change looking good. A candidate that clears the floor
+DESPITE a lower echo clears it conservatively, and the true RETRIEVAL effect of the design change is
+at least what was measured. Episodic's E1-b pre-check (ALLgold 1.00 -> 0.27) was trustworthy in
+exactly that sense and its arc succeeded.
 
-WHAT IT CANNOT DO. A MARGINAL pass cannot be attributed. If the candidate lands near the floor, the
-honest reading is "not established", not "small improvement" -- the echo delta is easily that large
-on its own. This tool prints both echoes and refuses to call a marginal result a pass.
+⚠ Safe against the ECHO confound is not the same as safe to ship. Semantic's re-form was equally
+clean on this axis -- the echo fell 0.667 -> 0.292, so the pass was conservative -- and it was still
+the wrong corpus. The two statements are about different things and this file used to run them
+together.
+
+WHAT IT CANNOT DO.
+  1. A MARGINAL pass cannot be attributed. If the candidate lands near the floor, the honest reading
+     is "not established", not "small improvement" -- the echo delta is easily that large on its
+     own. This tool prints both echoes and refuses to call a marginal result a pass.
+  2. It cannot see ANSWERABILITY at all, for the reason above. A PASS here licenses the SPEND and
+     nothing after it: V1, V8 and V6 are what decide whether the candidate ships, and all three
+     cost calls.
 """
 import collections
 import json
