@@ -330,7 +330,15 @@ public sealed class TypedMemEvalRunner
             runStopwatch.Elapsed, executionLabel, projectionReport, totalInCorpus,
             TypedMemEvalCorpus.Sha256(vertical),
             TypedMemEvalCorpus.CalibratedFloorMean(vertical),
-            TypedMemEvalCorpus.GuessingBaseline(vertical) is { } baseline
+            // Scoped to the questions this run actually asked. `entries` is already sampled by
+            // MaxQuestions / the composition options and `Outcomes` is built from it, so a baseline
+            // summed over the whole vertical would put a sample's Correct beside a corpus's
+            // free-score bound and denominator — the diluted-denominator defect, in the one figure
+            // that exists to make Correct interpretable.
+            TypedMemEvalCorpus.GuessingBaseline(
+                    vertical,
+                    entries.Select(e => e.QuestionId).ToHashSet(StringComparer.Ordinal))
+                is { } baseline
                 ? new TypedMemEvalGuessingBaseline
                 {
                     QuestionsWithDeclaredFloor = baseline.Declared,

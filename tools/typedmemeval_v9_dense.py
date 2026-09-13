@@ -120,10 +120,16 @@ def main():
             date = entry['question_date']
             known = '%s %s' % (question, date)
             needs_value = probes.negative_gold_requires_value(gold, known)
-            must_name = ((entry.get('typedmemeval') or {}).get('answer_must_name') or '')
 
             docs = [dense.render_one(sess, d) for sess, d in
                     zip(entry['haystack_sessions'], entry['haystack_dates'])]
+            # EMBED WHAT THIS QUESTION NEEDS BEFORE RANKING IT. The embedding shards are not
+            # committed, so on any checkout but the one that built them `cosine_rank` indexed an
+            # empty cache and raised KeyError -- including on the documented --dry-run. It worked
+            # here only because the cache was already warm, which is the definition of a result
+            # that does not reproduce. `embed_all` is a no-op for anything already cached, so a
+            # warm run still costs nothing.
+            dense.embed_all([question] + docs, args.dry_run)
             ranked = sorted(dense.cosine_rank(question, docs)[:tmc.K_REF])
 
             key = probes.question_key(entry)
@@ -133,9 +139,13 @@ def main():
             if not answer:
                 cell['silent'] += 1
                 continue
+            # NO must_name. `resolved_to_entity` says in its own docstring that it is FOR
+            # ABLATION ARMS ONLY, and the published V9 call omits it -- only V3 and V6 pass it.
+            # Passing it here added a second grading gate the arm being compared against does
+            # not have, so the run would have changed the RETRIEVER and the GRADING POLICY
+            # together and neither could be attributed. Caught in review of PR #237.
             if probes.produced_gold(question, gold, answer, '%s:v9dense:judge' % key,
-                                    require_distinctive=needs_value, already_known=known,
-                                    must_name=must_name):
+                                    require_distinctive=needs_value, already_known=known):
                 cell['passed'] += 1
         print('  %s done' % vertical, flush=True)
 

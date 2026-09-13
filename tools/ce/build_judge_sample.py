@@ -18,7 +18,11 @@ import json
 import os
 import random
 
-ROOT = r'C:\git\joslat\AgentEval'
+# Derived, not hard-coded. This was an absolute path to one machine's checkout, so the first
+# cache read below failed everywhere else -- including in the repository it ships in. The line
+# immediately under it already used __file__, which is how the defect survived review: the correct
+# idiom was sitting next to the broken one.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CACHE = os.path.join(ROOT, 'tools', '.typedmemeval_probe_cache.json')
 CORPORA = os.path.join(ROOT, 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'judge-sample-50.json')

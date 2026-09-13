@@ -77,8 +77,14 @@ ROOT = os.path.join(os.path.dirname(HERE), 'src', 'AgentEval.Memory', 'Data', 't
 #: identity and must be declared individually. Chosen as ~2 questions on the smallest shapes (n=6).
 FIT_TOLERANCE = 0.20
 
-#: The four that do not fit, with the reason each is exempt. Anything entering or leaving this set is
-#: a drift that --check reports: the identity is a published claim, so its exceptions are too.
+#: The shapes that do not fit, with the reason each is exempt. Anything entering or leaving this
+#: set is a drift that --check reports: the identity is a published claim, so its exceptions are too.
+#:
+#: This said "the four that do not fit" while holding TWO, because two shapes came back inside
+#: tolerance and the prose was not re-taken with the dict. A hand-written count beside the thing it
+#: counts is a claim-without-instrument in miniature, so it is now stated as a property rather than
+#: a number: --check prints the live count, and the two shapes that left are recorded in the body
+#: below rather than in a total nobody recomputes.
 EXCEPTIONS = {
     ('conjunction', 'order-then-value'):
         'V9 0.60 vs ALLgold 0.20. The order half is answerable from the value half alone, so the '

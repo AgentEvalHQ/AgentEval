@@ -163,8 +163,16 @@ public static class TypedMemEvalCorpus
     /// chance", which is a far stronger claim.
     /// </para>
     /// </remarks>
+    /// <param name="vertical">The vertical.</param>
+    /// <param name="selectedQuestionIds">
+    /// When supplied, only these questions are counted. A sampled run reports <c>Correct</c> over
+    /// the questions it actually asked, and a baseline summed over the WHOLE vertical beside it is
+    /// a diluted denominator — the reader compares a sample's numerator against a corpus's bound.
+    /// Null counts everything, which is correct only for a full run.
+    /// </param>
     internal static (int Declared, int Total, double Guessing)? GuessingBaseline(
-        TypedMemEvalVertical vertical)
+        TypedMemEvalVertical vertical,
+        IReadOnlySet<string>? selectedQuestionIds = null)
     {
         using var document = JsonDocument.Parse(ReadJson(vertical));
         if (document.RootElement.ValueKind != JsonValueKind.Array)
@@ -176,6 +184,14 @@ public static class TypedMemEvalCorpus
         double guessing = 0;
         foreach (var entry in document.RootElement.EnumerateArray())
         {
+            if (selectedQuestionIds is not null
+                && (!entry.TryGetProperty("question_id", out var id)
+                    || id.GetString() is not { } questionId
+                    || !selectedQuestionIds.Contains(questionId)))
+            {
+                continue;
+            }
+
             total++;
             if (!entry.TryGetProperty("typedmemeval", out var extension))
             {

@@ -126,6 +126,19 @@ def main():
              '' if e_ship == e_cand else '<== TWO VARIABLES MOVED, see the confound note below'))
     print()
     print('  %-36s %10s %11s %14s' % ('stratum', 'shipped', 'candidate', 'pred headroom'))
+    # FAIL CLOSED ON A MISSING STRATUM. `_allgold` returns a defaultdict, so a shipped stratum
+    # absent from the candidate used to materialise as [0, 0] -> b = nan -> and EVERY later
+    # comparison against nan is False, so no floor flag fired and the tool printed PASS for a
+    # candidate corpus that had dropped a whole stratum. A go/no-go gate whose job is to decide
+    # whether to spend thousands of calls must refuse what it cannot see, not wave it through.
+    missing = sorted(set(ship) - set(cand), key=str)
+    if missing:
+        raise SystemExit(
+            'DO NOT SPEND: the candidate is missing %d stratum/strata the shipped corpus has -- %s. '
+            'A comparison cannot be made over questions that are not there, and the previous '
+            'behaviour was to report PASS.'
+            % (len(missing), ', '.join('/'.join(str(k) for k in m if k is not None) for m in missing)))
+
     verdicts = []
     for key in sorted(set(ship) | set(cand), key=str):
         a = ship[key][0] / ship[key][1] if ship[key][1] else float('nan')

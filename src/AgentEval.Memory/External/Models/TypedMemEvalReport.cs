@@ -220,6 +220,16 @@ public sealed class TypedMemEvalGuessingBaseline
         QuestionsTotal == 0 ? 0 : MaximumCorrectFromGuessing / QuestionsTotal;
 }
 
+/// <summary>
+/// One TypedMemEval run: the typed outcome vector, its provenance, and the bounds a reader
+/// needs before quoting any of it.
+/// </summary>
+/// <remarks>
+/// This declaration had NO documentation of its own until 2026-09-13. The block above it
+/// belongs to <see cref="TypedMemEvalGuessingBaseline"/>, which sits between the report
+/// remarks and this class, so generated API docs described the wrong public type and
+/// omitted the report contract entirely. Found in review of PR #237.
+/// </remarks>
 public sealed class TypedMemEvalReport
 {
     /// <summary>The vertical this run measured.</summary>
