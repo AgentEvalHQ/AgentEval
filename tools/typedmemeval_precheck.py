@@ -197,12 +197,15 @@ def main():
         print('           stratum measured BELOW the floor being lifted above it is a real fix;')
         print('           a stratum already above the floor gaining a little is not worth a run.')
         return 4
-    print('  VERDICT: PASS. Every stratum clears the floor with margin, so the SPEND is justified -- 
-        and nothing after it. This reads ALLgold, which is retrieval difficulty: a change 
-        that makes gold harder to FIND and one that makes the answer impossible to DERIVE 
-        move it the same way. Only the probe sees V1. On 2026-09-13 a re-form passed here 
-        at 0.733 -> 0.200 and the probe then read V1 15/15 -> 10/15 (MEASUREMENT_STATUS 
-        88.42).')
+    print('  VERDICT: PASS. Every stratum clears the floor with margin, so the SPEND is')
+    print('           justified -- and nothing after it.')
+    print()
+    print('           This reads ALLgold, which is RETRIEVAL DIFFICULTY. A change that makes')
+    print('           gold harder to FIND and a change that makes the answer impossible to')
+    print('           DERIVE move it the same way, so this gate reports both as progress.')
+    print('           Only the probe sees V1, and V1 is whether the corpus still works.')
+    print('           On 2026-09-13 a re-form passed here at 0.733 -> 0.200 and the probe')
+    print('           then read V1 15/15 -> 10/15 (MEASUREMENT_STATUS 88.42).')
     return 0
 
 
