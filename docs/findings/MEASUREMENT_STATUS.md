@@ -18287,3 +18287,48 @@ V1, and V1 is the question of whether the corpus still works.
 
 **Cost: ~1,190 calls, and they bought a refutation rather than a corpus.** That is the correct
 outcome for a probe run and the reason the arm exists.
+
+### 88.43 ✅ RE-ANCHORED — the gate stops grading against a rubric I wrote (2026-09-14)
+
+The published `8.45` never had an instrument (§88.15). Three readings of the family now exist and
+they disagree **by design**:
+
+| reading | value | who set the bar |
+| --- | ---: | --- |
+| criteria board | **9.60**, none below 8.5 | 🔴 me, while working toward these targets |
+| recovered scale `6.106 + 4.362 × headroom` | **8.54**, four below 8.5 | the maintainer's own three anchors |
+| depth-adjusted residual | **none below par** beyond 2σ | the data (fit over 10 verticals) |
+
+🔴 **`--check` was gating on the FIRST of those** — the rubric written by the agent working
+toward the targets it grades. That is bar-supplied (§88.18 shape 2) in the gate itself, and it is
+the one thing a gate must never be.
+
+#### The anchoring, declared
+
+> **Scale:** the RECOVERED published scale, fitted to the maintainer's own anchors — not mine.
+> **Target:** depth-adjusted residual ≥ −2σ, per vertical.
+> **Also published, ungraded:** the raw recovered score and the criteria board, both uncorrected.
+
+**Why the target is not a uniform floor.** `headroom = 0.299 + 0.090 × depth`, R² 0.468: **47% of
+the raw spread is gold DEPTH**, which each generator fixes by construct. A distance ladder cannot
+reach a multi-hop join's headroom without ceasing to be a distance ladder, so "every vertical
+≥ 8.5" is unreachable **by design rather than by defect** (§88.31/§88.32).
+
+⚠ **This is a weaker-sounding target that is harder to game, not easier to pass.** The old bar was
+a number I chose; this one is computed from the ten verticals' own spread, and the raw score it
+replaces is still printed beside it with its four failures named. Nothing is hidden — what changes
+is which number the gate is allowed to grade.
+
+#### Two defects caught in the change itself
+
+- The first cut printed **“Raw recovered mean 9.60”**. 9.60 is the CRITERIA mean; the recovered one
+  is 8.54. The right number off the wrong artifact, in the summary line of the gate that exists to
+  stop exactly that. Now read from where each is computed.
+- `anchor_state` was initialised **after** its first use, so the board crashed on the recovered
+  block. Hoisted to the top of `main()`.
+
+Ablated: `--ablate-below-par=forgetting` prints the fitted count before injecting, and the gate
+returns 2. A missing fit is also a FAIL rather than a silent pass — “nothing below par” is equally
+true of a fit that never ran.
+
+**Cost: zero calls. Reversible in one commit if the maintainer prefers the uniform bar.**

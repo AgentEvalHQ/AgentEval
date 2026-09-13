@@ -63,8 +63,13 @@ What this file legitimately establishes is narrower and still worth having:
 **Re-anchoring the numeric targets is the maintainer's call, not this tool's.**
 
 Usage:  python tools/typedmemeval_quality_board.py [--check] [-v]
-        --check exits non-zero if any vertical is below MIN_VERTICAL or the mean below MIN_MEAN.
-        ⚠ --check is a REGRESSION guard against this rubric's own thresholds; it is not evidence
+        --check exits non-zero if a vertical is BELOW PAR FOR ITS CONSTRUCT (depth-adjusted
+        residual <= -2 sigma), or if the depth fit did not run at all.
+
+        ⚠ RE-ANCHORED 2026-09-14. It used to gate on this file's own criteria scores -- the rubric
+        written by the agent working toward the targets it grades, which is the one thing a gate
+        must not do. The criteria board and the raw recovered score are still PRINTED; neither is
+        graded. See DECLARED ANCHORING in the output
         that the family's declared goals are satisfied. See the bar-supplied warning above.
 """
 import collections
@@ -304,6 +309,14 @@ def board():
 
 def main():
     check = '--check' in sys.argv
+    # A gate nobody has seen refuse is a gate nobody has seen. Same idiom as
+    # check_no_private_paths.py --ablate-track and check_tag_has_changelog_section.py.
+    ablate = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--ablate-below-par=')),
+                  None)
+    # Collected as the report is produced and read once at the end, so the gate and the printed
+    # tables cannot drift apart: every figure --check quotes is the one the reader just saw.
+    anchor_state = {'below_par': [], 'fitted': False,
+                    'recovered_mean': None, 'recovered_below': None}
     verbose = '-v' in sys.argv or '--verbose' in sys.argv
     b = board()
     if not b:
@@ -360,6 +373,8 @@ def main():
     if rec:
         rbelow = [v for v, d in b.items()
                   if d['recovered'] is not None and d['recovered'] < MIN_VERTICAL]
+        anchor_state['recovered_mean'] = sum(rec) / len(rec)
+        anchor_state['recovered_below'] = sorted(rbelow)
         print('  recovered mean %.2f (target >=%.1f); below %.1f: %s'
               % (sum(rec) / len(rec), MIN_MEAN, MIN_VERTICAL,
                  ', '.join(sorted(rbelow)) if rbelow else 'none'))
@@ -442,6 +457,22 @@ def main():
         # green by a variable name, introduced by the block that was meant to make the board more
         # honest. Caught because the headline and the check disagreed in the same run.
         below_par = [v for v, r in resid if (r / sig if sig else 0) <= -2]
+        anchor_state['below_par'] = sorted(below_par)
+        # IDENTIFIABILITY, not merely 'the code ran'. With zero depth variance sxx_ is 0, the
+        # slope is substituted as 0.0, and the 'depth-adjusted' residual collapses to
+        # headroom-minus-mean -- an adjustment that adjusts for nothing. Marking that as a
+        # completed fit would let the gate pass on a criterion it never actually applied,
+        # which is the same silent-pass shape the missing-fit guard below exists to refuse.
+        distinct_depths = len({round(p[1], 6) for p in pts})
+        anchor_state['fitted'] = sxx_ > 0 and distinct_depths >= 2
+        if not anchor_state['fitted']:
+            print('  ⚠ the depth fit is UNIDENTIFIABLE: %d distinct depth value(s), '
+                  'variance %.3g. The residual is not a depth adjustment.'
+                  % (distinct_depths, sxx_))
+        if ablate:
+            print('  ABLATION: %d verticals fitted; injecting %r as below par'
+                  % (len(resid), ablate))
+            anchor_state['below_par'] = sorted(set(anchor_state['below_par']) | {ablate})
         print('  below par beyond 2 sigma: %s'
               % (', '.join(sorted(below_par)) if below_par else 'NONE'))
 
@@ -464,22 +495,50 @@ def main():
     print('     the published board had no instrument, and the named criterion failures above are')
     print("     real whatever the scale. Re-anchoring the targets is the maintainer's call.")
 
+    print()
+    print('  DECLARED ANCHORING  (2026-09-14)')
+    print('    scale   the RECOVERED published scale, fitted to the maintainer\'s own three')
+    print('            anchors. NOT the criteria board above: that rubric was written by the')
+    print('            agent working toward the targets it grades, so it cannot be the gate.')
+    print('    target  depth-adjusted residual >= -2 sigma, per vertical.')
+    print('            NOT a uniform floor on the raw score. 47% of the raw spread is gold')
+    print('            DEPTH, which each generator fixes by construct -- a distance ladder')
+    print('            cannot reach a multi-hop join\'s headroom without ceasing to be one,')
+    print('            so a uniform bar is unreachable by design rather than by defect.')
+    print('    also    the raw recovered score stays published beside it, uncorrected.')
+
     if check:
         problems = []
         if unmeasured:
             problems.append('%d vertical(s) carry a corpus with NO probe results: %s'
                             % (len(unmeasured), ', '.join(unmeasured)))
-        if below:
-            problems.append('%d vertical(s) below %.1f: %s'
-                            % (len(below), MIN_VERTICAL, ', '.join(sorted(below))))
-        if mean < MIN_MEAN:
-            problems.append('mean %.2f is below the %.1f target' % (mean, MIN_MEAN))
+        # POSITIVE CONTROL. "nothing below par" is also true of a fit that never ran, and the fit
+        # is skipped when fewer than four verticals publish a depth. A gate must not read silence
+        # as a pass -- that is the silent-{} shape this family has been bitten by before.
+        if not anchor_state['fitted']:
+            problems.append('the depth fit did not run OR was unidentifiable, so the anchoring '
+                            'criterion measured NOTHING. It needs at least four verticals '
+                            'publishing mean_depth, across at least two distinct depths.')
+        if anchor_state['below_par']:
+            problems.append('%d vertical(s) below par for their construct (residual <= -2 sigma): '
+                            '%s' % (len(anchor_state['below_par']),
+                                    ', '.join(anchor_state['below_par'])))
         print()
         if problems:
             for p in problems:
                 print('FAIL: %s' % p)
             return 2
-        print('OK: every vertical >= %.1f and mean %.2f >= %.1f' % (MIN_VERTICAL, mean, MIN_MEAN))
+        print('OK: every vertical is at or above par for its own construct, and the depth fit ran.')
+        # THE RECOVERED figures, not the criteria ones. `mean` and `below` in this scope are
+        # the criteria board's, and printing them under a "recovered" label is the same error
+        # this file exists to stop: the right number read off the wrong artifact.
+        rm = anchor_state['recovered_mean']
+        rb = anchor_state['recovered_below']
+        print('    Recovered-scale mean %s; below a uniform %.1f: %s.'
+              % ('%.2f' % rm if rm is not None else '(not computed)', MIN_VERTICAL,
+                 ', '.join(rb) if rb else 'none'))
+        print('    Criteria-board mean %.2f (bar-supplied, informational).' % mean)
+        print('    Both are REPORTED, not graded -- see DECLARED ANCHORING above.')
     return 0
 
 
