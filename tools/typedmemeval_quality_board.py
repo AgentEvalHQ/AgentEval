@@ -458,7 +458,17 @@ def main():
         # honest. Caught because the headline and the check disagreed in the same run.
         below_par = [v for v, r in resid if (r / sig if sig else 0) <= -2]
         anchor_state['below_par'] = sorted(below_par)
-        anchor_state['fitted'] = True
+        # IDENTIFIABILITY, not merely 'the code ran'. With zero depth variance sxx_ is 0, the
+        # slope is substituted as 0.0, and the 'depth-adjusted' residual collapses to
+        # headroom-minus-mean -- an adjustment that adjusts for nothing. Marking that as a
+        # completed fit would let the gate pass on a criterion it never actually applied,
+        # which is the same silent-pass shape the missing-fit guard below exists to refuse.
+        distinct_depths = len({round(p[1], 6) for p in pts})
+        anchor_state['fitted'] = sxx_ > 0 and distinct_depths >= 2
+        if not anchor_state['fitted']:
+            print('  ⚠ the depth fit is UNIDENTIFIABLE: %d distinct depth value(s), '
+                  'variance %.3g. The residual is not a depth adjustment.'
+                  % (distinct_depths, sxx_))
         if ablate:
             print('  ABLATION: %d verticals fitted; injecting %r as below par'
                   % (len(resid), ablate))
@@ -506,8 +516,9 @@ def main():
         # is skipped when fewer than four verticals publish a depth. A gate must not read silence
         # as a pass -- that is the silent-{} shape this family has been bitten by before.
         if not anchor_state['fitted']:
-            problems.append('the depth fit did not run, so the anchoring criterion measured '
-                            'NOTHING. It needs at least four verticals publishing mean_depth.')
+            problems.append('the depth fit did not run OR was unidentifiable, so the anchoring '
+                            'criterion measured NOTHING. It needs at least four verticals '
+                            'publishing mean_depth, across at least two distinct depths.')
         if anchor_state['below_par']:
             problems.append('%d vertical(s) below par for their construct (residual <= -2 sigma): '
                             '%s' % (len(anchor_state['below_par']),
