@@ -103,6 +103,7 @@ def main():
         wanted = dict(by_vertical[vertical])
         dense._cache.clear()
         dense._load_cache([vertical])
+        embedded: list[str] = []
 
         for entry in entries:
             shape = (entry.get('typedmemeval') or {}).get('shape')
@@ -130,6 +131,7 @@ def main():
             # that does not reproduce. `embed_all` is a no-op for anything already cached, so a
             # warm run still costs nothing.
             dense.embed_all([question] + docs, args.dry_run)
+            embedded.extend(dense._key(t) for t in [question] + docs)
             ranked = sorted(dense.cosine_rank(question, docs)[:tmc.K_REF])
 
             key = probes.question_key(entry)
@@ -147,6 +149,11 @@ def main():
             if probes.produced_gold(question, gold, answer, '%s:v9dense:judge' % key,
                                     require_distinctive=needs_value, already_known=known):
                 cell['passed'] += 1
+        # PERSIST WHAT THIS VERTICAL BOUGHT. Without this an interrupted run re-embedded every
+        # text on restart, which is exactly the resumability the shard design exists to provide --
+        # the probe cache is separate and covers only the model calls. Found in review of PR #238.
+        if not args.dry_run and embedded:
+            dense._save_shard(vertical, embedded)
         print('  %s done' % vertical, flush=True)
 
     print()

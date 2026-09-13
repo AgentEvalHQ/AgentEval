@@ -174,19 +174,6 @@ public sealed class TypedMemEvalCoverageSummary
 }
 
 /// <summary>
-/// What a TypedMemEval run measured. Attached to
-/// <see cref="ExternalBenchmarkResult.TypedOutcomes"/>.
-/// </summary>
-/// <remarks>
-/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v4 (AgentEval)".
-/// TypedMemEval results are not LongMemEval results and must never be presented as, summed with,
-/// or averaged with LongMemEval numbers. The twelve Prospective questions seeded from the
-/// time-grounded probe exist in both corpora; a report that runs both must not double-count them.
-/// The typed vector below is the citable form of this result —
-/// <see cref="ExternalBenchmarkResult.OverallAccuracy"/> stays populated for tooling compatibility
-/// and is not a TypedMemEval score.
-/// </remarks>
-/// <summary>
 /// How much of a score this corpus hands out for guessing, from the floors it declares itself.
 /// </summary>
 /// <remarks>
@@ -225,10 +212,21 @@ public sealed class TypedMemEvalGuessingBaseline
 /// needs before quoting any of it.
 /// </summary>
 /// <remarks>
-/// This declaration had NO documentation of its own until 2026-09-13. The block above it
-/// belongs to <see cref="TypedMemEvalGuessingBaseline"/>, which sits between the report
-/// remarks and this class, so generated API docs described the wrong public type and
-/// omitted the report contract entirely. Found in review of PR #237.
+/// <b>Citation rule.</b> Cite results as "TypedMemEval-&lt;Vertical&gt; v4 (AgentEval)".
+/// TypedMemEval results are not LongMemEval results and must never be presented as, summed with,
+/// or averaged with LongMemEval numbers. The twelve Prospective questions seeded from the
+/// time-grounded probe exist in both corpora; a report that runs both must not double-count them.
+/// The typed vector below is the citable form of this result —
+/// <see cref="ExternalBenchmarkResult.OverallAccuracy"/> stays populated for tooling compatibility
+/// and is not a TypedMemEval score.
+/// <para>
+/// ⚠ This block spent time attached to the WRONG TYPE. It sat above
+/// <see cref="TypedMemEvalGuessingBaseline"/> with no blank line between the two, so the compiler
+/// merged both into one doc on the baseline and the report had none. The 2026-09-13 fix gave the
+/// report a summary and left the orphan in place, which fixed half of it: the baseline still
+/// carried two summaries, and the CITATION RULE — the one sentence here a reader must not miss —
+/// was still filed under the wrong class. Found in review of PR #238.
+/// </para>
 /// </remarks>
 public sealed class TypedMemEvalReport
 {

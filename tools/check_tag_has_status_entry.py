@@ -81,7 +81,23 @@ def main():
                               cwd=ROOT, capture_output=True, text=True).stdout.strip()
         (in_scope if when >= LOG_BEGINS else pre_rule).append(tag)
 
-    missing = [t for t in in_scope if t not in text]
+    # MATCH INSIDE A §0 HEADING, NOT ANYWHERE IN THE DOCUMENT. `t not in text` passed on a tag
+    # merely MENTIONED in narrative prose, and on any tag that is a prefix of another (no pair
+    # collides today -- checked -- but "no collision currently exists" is not a property a gate
+    # should depend on). The rule is "no tag without a §0 ENTRY", so the lookup now reads the
+    # headings it is about, with a boundary so a prefix cannot satisfy a longer tag.
+    # A §0 SECTION -- not a heading, and not the whole document.
+    #
+    # `t not in text` passed a tag merely MENTIONED in narrative prose elsewhere in the plan,
+    # and passed any tag that is a prefix of another. Tightening it to headings went too far and
+    # the tags said so immediately: §0w is ONE entry written deliberately to cover v0.29, v0.30
+    # and v0.31 together, so a heading-per-tag rule failed four releases that ARE logged.
+    #
+    # The section is the unit the rule is actually about: 'no tag without a §0 ENTRY'.
+    sections = re.split(r'^(?=## 0[a-z-]*\.)', text, flags=re.MULTILINE)[1:]
+    logged = {t for section in sections for t in in_scope
+              if re.search(r'(?<![\w.-])%s(?![\w.-])' % re.escape(t), section)}
+    missing = [t for t in in_scope if t not in logged]
     print('%d tags total; %d predate the §0 log (%s) and are out of scope; %d in scope; %d §0 headings'
           % (len(all_tags), len(pre_rule), LOG_BEGINS, len(in_scope), len(headings)))
     if missing:
