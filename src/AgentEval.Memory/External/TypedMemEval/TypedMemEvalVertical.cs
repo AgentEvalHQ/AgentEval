@@ -172,7 +172,14 @@ public static class TypedMemEvalVerticals
             Slug = "prospective",
             Abbreviation = "pro",
             DisplayName = "TypedMemEval-Prospective",
-            QuestionCount = 50,
+            // 50 -> 72 at P2 (2026-09-13), and the vertical GREW rather than
+            // redistributing. Three of its four pair-shapes sat at 3-4 pairs (6-8
+            // questions), and a re-probe measured them failing the discrimination floor on
+            // SAMPLE SIZE -- roughly 1.1 sd -- rather than on any property of the shape.
+            // At 7 pairs each, the capacity of the smallest source bank, two of the three
+            // settled on the same value from different noisy ones, which is what a
+            // sampling artefact looks like once it is gone.
+            QuestionCount = 72,
             // The vertical's whole premise is that dates are not printed anywhere, so the
             // timestamps have to arrive through the typed channel or nothing is being measured.
             RequiredGrounding = TemporalGroundingMode.TimestampsOnly,

@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-forgetting-v5",
   "vertical": "forgetting",
-  "revision": "v5+be14b81ae4e2",
+  "revision": "v5+2aaa0a41fc92",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e",
+  "corpus_sha256": "2aaa0a41fc92fb25a2d6ad0a5041b48e1bf87f45ac271f47c9666e26bacd38af",
   "generator": {
     "tool": "tools/gen_typedmemeval_forgetting.py",
     "version": "1.0.0",
@@ -20,7 +20,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6857,
+    "mean_realised": 0.6143,
     "echo": 0.1667,
     "iterations": 36,
     "search_trace": [],
@@ -34,27 +34,27 @@
       "tme-for-007": 1.0,
       "tme-for-008": 0.0,
       "tme-for-009": 0.0,
-      "tme-for-010": 0.5,
+      "tme-for-010": 0.0,
       "tme-for-011": 0.0,
       "tme-for-012": 1.0,
       "tme-for-013": 1.0,
-      "tme-for-014": 0.5,
-      "tme-for-015": 0.5,
+      "tme-for-014": 0.0,
+      "tme-for-015": 0.0,
       "tme-for-016": 1.0,
       "tme-for-017": 1.0,
       "tme-for-018": 1.0,
       "tme-for-019": 1.0,
       "tme-for-020": 1.0,
       "tme-for-021": 1.0,
-      "tme-for-022": 0.0,
+      "tme-for-022": 0.5,
       "tme-for-023": 1.0,
       "tme-for-024": 0.5,
       "tme-for-025": 1.0,
       "tme-for-026": 1.0,
       "tme-for-027": 1.0,
-      "tme-for-028": 0.5,
+      "tme-for-028": 0.0,
       "tme-for-029": 0.5,
-      "tme-for-030": 1.0,
+      "tme-for-030": 0.0,
       "tme-for-031": 0.0,
       "tme-for-032": 1.0,
       "tme-for-033": 1.0,
@@ -82,9 +82,10 @@
       "still-valid": 0.125
     },
     "per_shape_realised": {
-      "invalidated": 0.7,
-      "still-valid": 0.6667
-    }
+      "invalidated": 0.625,
+      "still-valid": 0.6
+    },
+    "per_shape_out_of_band": []
   },
   "ceiling": {
     "k_ref": 5,
@@ -106,7 +107,7 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": false,
     "empty_turns": {
-      "count": 237,
+      "count": 254,
       "of_turns": 5545,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
@@ -327,40 +328,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5805,
+        "session_length_chars": 0.5306,
         "turn_count": 0.5,
         "position_in_haystack": 0.5688,
         "digit_density": 0.5,
-        "uppercase_density": 0.5089,
-        "sentence_count": 0.608,
-        "punctuation_density": 0.5065,
+        "uppercase_density": 0.5279,
+        "sentence_count": 0.5643,
+        "punctuation_density": 0.608,
         "em_dash_density": 0.5151,
-        "mean_turn_chars": 0.5805,
-        "type_token_ratio": 0.5567,
-        "first_user_length_chars": 0.5591,
-        "first_user_uppercase_density": 0.5581,
-        "first_user_sentence_count": 0.5038,
-        "first_assistant_length_chars": 0.6716,
-        "first_assistant_uppercase_density": 0.5447,
-        "first_assistant_sentence_count": 0.5533,
-        "user_slot1_length_chars": 0.5031,
+        "mean_turn_chars": 0.5306,
+        "type_token_ratio": 0.5492,
+        "first_user_length_chars": 0.5843,
+        "first_user_uppercase_density": 0.5395,
+        "first_user_sentence_count": 0.5378,
+        "first_assistant_length_chars": 0.6475,
+        "first_assistant_uppercase_density": 0.5227,
+        "first_assistant_sentence_count": 0.6028,
+        "user_slot1_length_chars": 0.5272,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5512,
-        "assistant_slot2_length_chars": 0.5282,
+        "assistant_slot1_length_chars": 0.5151,
+        "assistant_slot2_length_chars": 0.5193,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5574,
-        "user_uppercase_density": 0.5629,
-        "user_sentence_count": 0.5,
-        "user_punctuation_density": 0.5021,
-        "user_type_token_ratio": 0.5282,
-        "user_mean_turn_chars": 0.5574,
-        "assistant_length_chars": 0.6523,
-        "assistant_uppercase_density": 0.5327,
-        "assistant_sentence_count": 0.6104,
-        "assistant_punctuation_density": 0.5172,
-        "assistant_type_token_ratio": 0.5853,
-        "assistant_mean_turn_chars": 0.6523,
+        "user_length_chars": 0.522,
+        "user_uppercase_density": 0.5488,
+        "user_sentence_count": 0.5557,
+        "user_punctuation_density": 0.5296,
+        "user_type_token_ratio": 0.5616,
+        "user_mean_turn_chars": 0.522,
+        "assistant_length_chars": 0.5722,
+        "assistant_uppercase_density": 0.512,
+        "assistant_sentence_count": 0.6197,
+        "assistant_punctuation_density": 0.5681,
+        "assistant_type_token_ratio": 0.5203,
+        "assistant_mean_turn_chars": 0.5722,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -370,15 +371,15 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.5877,
+        "gold_marker_ngram": 0.5688,
         "boilerplate_ngram": 0.588
       },
       "worst_refused_feature": "first_assistant_length_chars",
-      "worst_refused_auc": 0.6716,
+      "worst_refused_auc": 0.6475,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
       "worst_gold_marker_ngram": "i",
-      "gold_marker_ngram_auc": 0.5877,
+      "gold_marker_ngram_auc": 0.5688,
       "worst_boilerplate_ngram": "noted",
       "boilerplate_ngram_auc": 0.588,
       "gold_exclusive_ngrams": [],
@@ -419,11 +420,11 @@
           "z": -0.55
         },
         "sentence_count": {
-          "share": 0.0,
+          "share": 0.0286,
           "chance": 0.0087,
-          "observed": 0,
+          "observed": 1,
           "expected": 0.3,
-          "z": -0.55
+          "z": 1.27
         },
         "punctuation_density": {
           "share": 0.0,
@@ -447,11 +448,11 @@
           "z": -0.55
         },
         "type_token_ratio": {
-          "share": 0.0286,
+          "share": 0.0,
           "chance": 0.0087,
-          "observed": 1,
+          "observed": 0,
           "expected": 0.3,
-          "z": 1.27
+          "z": -0.55
         },
         "first_user_length_chars": {
           "share": 0.0,
@@ -489,11 +490,11 @@
           "z": 1.27
         },
         "first_assistant_sentence_count": {
-          "share": 0.0,
+          "share": 0.0571,
           "chance": 0.0087,
-          "observed": 0,
+          "observed": 2,
           "expected": 0.3,
-          "z": -0.55
+          "z": 3.09
         },
         "user_slot1_length_chars": {
           "share": 0.0,
@@ -517,11 +518,11 @@
           "z": -0.55
         },
         "assistant_slot1_length_chars": {
-          "share": 0.0286,
+          "share": 0.0,
           "chance": 0.0087,
-          "observed": 1,
+          "observed": 0,
           "expected": 0.3,
-          "z": 1.27
+          "z": -0.55
         },
         "assistant_slot2_length_chars": {
           "share": 0.0,
@@ -545,11 +546,11 @@
           "z": -0.55
         },
         "user_uppercase_density": {
-          "share": 0.0,
+          "share": 0.0286,
           "chance": 0.0087,
-          "observed": 0,
+          "observed": 1,
           "expected": 0.3,
-          "z": -0.55
+          "z": 1.27
         },
         "user_sentence_count": {
           "share": 0.0,
@@ -566,11 +567,11 @@
           "z": -0.55
         },
         "user_type_token_ratio": {
-          "share": 0.0286,
+          "share": 0.0,
           "chance": 0.0087,
-          "observed": 1,
+          "observed": 0,
           "expected": 0.3,
-          "z": 1.27
+          "z": -0.55
         },
         "user_mean_turn_chars": {
           "share": 0.0,
@@ -580,32 +581,32 @@
           "z": -0.55
         },
         "assistant_length_chars": {
-          "share": 0.0286,
+          "share": 0.0,
           "chance": 0.0087,
-          "observed": 1,
+          "observed": 0,
           "expected": 0.3,
-          "z": 1.27
+          "z": -0.55
         },
         "assistant_uppercase_density": {
+          "share": 0.0,
+          "chance": 0.0087,
+          "observed": 0,
+          "expected": 0.3,
+          "z": -0.55
+        },
+        "assistant_sentence_count": {
+          "share": 0.0571,
+          "chance": 0.0087,
+          "observed": 2,
+          "expected": 0.3,
+          "z": 3.09
+        },
+        "assistant_punctuation_density": {
           "share": 0.0286,
           "chance": 0.0087,
           "observed": 1,
           "expected": 0.3,
           "z": 1.27
-        },
-        "assistant_sentence_count": {
-          "share": 0.0,
-          "chance": 0.0087,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
-        },
-        "assistant_punctuation_density": {
-          "share": 0.0,
-          "chance": 0.0087,
-          "observed": 0,
-          "expected": 0.3,
-          "z": -0.55
         },
         "assistant_type_token_ratio": {
           "share": 0.0,
@@ -615,11 +616,11 @@
           "z": -0.55
         },
         "assistant_mean_turn_chars": {
-          "share": 0.0286,
+          "share": 0.0,
           "chance": 0.0087,
-          "observed": 1,
+          "observed": 0,
           "expected": 0.3,
-          "z": 1.27
+          "z": -0.55
         },
         "position_0_is_user": {
           "share": 0.0,
@@ -689,27 +690,25 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e"
+      "probed_corpus_sha256": "2aaa0a41fc92fb25a2d6ad0a5041b48e1bf87f45ac271f47c9666e26bacd38af"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-12T17:27:21Z",
+    "run_at": "2026-09-12T22:28:45Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 35,
-      "passed": 33,
+      "passed": 34,
       "failed": [
-        "tme-for-021",
-        "tme-for-023"
+        "tme-for-024"
       ]
     },
     "v1_pair_flip": {
       "pairs": 15,
-      "passed": 13,
+      "passed": 14,
       "failed": [
-        "tme-for-p01",
-        "tme-for-p03"
+        "tme-for-p04"
       ]
     },
     "ablation_samples_per_question": 3,
@@ -769,55 +768,55 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 245,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 244,
+        "judge_calls": 35,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 2450,
+        "calls": 350,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 812,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 666,
+        "calls": 105,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 246,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 795,
+        "calls": 120,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 290,
+        "judge_calls": 60,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 245,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 245,
+        "judge_calls": 35,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 245,
+        "calls": 35,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 235,
+        "judge_calls": 28,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
@@ -851,17 +850,19 @@
       },
       "v11_reference_retrieval": {
         "applicable": 15,
-        "passed": 15,
-        "failed": []
+        "passed": 14,
+        "failed": [
+          "tme-for-042_abs"
+        ]
       }
     },
     "paired_arms": {
       "pairs": 15,
-      "pair_v1_both_arms": "13/15",
+      "pair_v1_both_arms": "14/15",
       "pair_v9_both_arms": "6/15",
-      "pair_headroom": 0.4667,
+      "pair_headroom": 0.5333,
       "pair_floor_scaled": 0.24,
-      "pair_separation_sd": 3.68,
+      "pair_separation_sd": 4.206,
       "pair_separation_floor_sd": 2.0,
       "pair_discriminates": true,
       "pair_v8_both_arms": "15/15",
@@ -869,9 +870,9 @@
     },
     "v8_full_haystack": {
       "applicable": 35,
-      "v1_passed": 33,
+      "v1_passed": 34,
       "v8_passed": 35,
-      "interference_cost": -0.0571,
+      "interference_cost": -0.0286,
       "regressed_under_interference": [],
       "failures_with_no_captured_answer": [],
       "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
@@ -892,11 +893,11 @@
     },
     "v9_reference_retrieval": {
       "applicable": 35,
-      "v1_gold_only": 33,
+      "v1_gold_only": 34,
       "v8_full_haystack": 35,
-      "v9_bm25_top_k": 23,
-      "headroom_over_lexical_retrieval": 0.2857,
-      "headroom_unlimited_context_over_lexical": 0.3429,
+      "v9_bm25_top_k": 22,
+      "headroom_over_lexical_retrieval": 0.3429,
+      "headroom_unlimited_context_over_lexical": 0.3714,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "by_shape": {
@@ -976,7 +977,7 @@
           "questions": 15
         },
         "abstention_reference_retrieval": {
-          "clean_sweeps": 15,
+          "clean_sweeps": 14,
           "questions": 15
         },
         "abstention_ci95": {
@@ -985,27 +986,31 @@
             1.0
           ],
           "v11": [
-            0.7961,
-            1.0
+            0.7018,
+            0.9881
           ]
         },
-        "retrieval_cost_to_calibration": 0.0,
-        "reading": "A question counts as a clean sweep only if the reader abstained on EVERY draw; one commit in three is a reader that will invent an answer here. retrieval_cost_to_calibration is V10-V11: how much of the reference model's abstention survives being handed a BM25-selected context instead of everything. Positive means a real selector makes it confabulate more. A failure in either arm is a statement about the REFERENCE MODEL, not about the corpus: the corpus claim -- that no evidence for the asked thing exists -- is certified model-free by check_forgetting, which refuses at generation if the asked noun appears anywhere in the haystack. The corpus-relevant subset is `answers_drawn_from_haystack`."
+        "retrieval_cost_to_calibration": 0.0667,
+        "reading": "A question counts as a clean sweep only if the reader abstained on EVERY draw; one commit in three is a reader that will invent an answer here. retrieval_cost_to_calibration is V10-V11: how much of the reference model's abstention survives being handed a BM25-selected context instead of everything. Positive means a real selector makes it confabulate more. A failure in either arm is a statement about the REFERENCE MODEL, not about the corpus: the corpus claim -- that no evidence for the asked thing exists -- is certified model-free by check_forgetting, which refuses at generation if the asked noun appears anywhere in the haystack. The corpus-relevant subset is `answers_drawn_from_haystack`.",
+        "answers_drawn_from_haystack": [
+          "tme-for-042_abs"
+        ],
+        "answers_drawn_reading": "The reader committed to an answer whose distinctive tokens appear in the haystack. A TRIAGE SIGNAL, not a verdict: the haystack states the same KIND of fact about other nouns by design, so mis-attributing one of those scores here while the corpus is exactly as intended. Over-flagging is the intended direction -- a false alarm costs one read, a miss ships a question whose premise is false."
       },
       "still-valid": {
         "questions": 15,
         "v1_applicable": 15,
-        "v1_passed": 13,
+        "v1_passed": 14,
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
         "v8_passed": 15,
         "v9_applicable": 15,
-        "v9_passed": 12,
+        "v9_passed": 11,
         "ci95": {
           "v1": [
-            0.6212,
-            0.9626
+            0.7018,
+            0.9881
           ],
           "v3": [
             0.7961,
@@ -1016,15 +1021,15 @@
             1.0
           ],
           "v9": [
-            0.5481,
-            0.9295
+            0.4805,
+            0.891
           ]
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 2,
-        "headroom_perfect_selector": 0.0667,
-        "discriminates": false,
-        "headroom_reachable": 0.2,
+        "headroom_perfect_selector": 0.2,
+        "discriminates": true,
+        "headroom_reachable": 0.2667,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
         "pairs": 0,
@@ -1053,9 +1058,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "The only car named is the **Orrindale Vantage**.\n\nThat is **not still current**: on 2026/01/31 you said the car had gone and you had sold it to a dealer up the coast. The conversations do not say what, if anything, you are driving now.",
+        "v8_answer": "The only named car is **Orrindale Vantage**.\n\nIt is **not still current**: on 2026/01/31 you said the car had gone and you sold it to a dealer up the coast. The conversations do not name any replacement you are driving now.",
         "v9": true,
-        "v9_answer": "The only named car is **Orrindale Vantage**.\n\nThat is **not still current**: you said on 2026/01/31 that “the car has gone” and you sold it to a dealer. The conversations do not say what, if anything, you are driving now.",
+        "v9_answer": "The car named in the conversations was the **Orrindale Vantage**.\n\nThat is **not still current**: on 2026/01/31 you said the car had gone and you had sold it to a dealer up the coast. The conversations do not say what, if anything, you are driving now.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1072,9 +1077,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Halbury Vantage — but it is no longer current; you cancelled the gym membership outright.",
+        "v8_answer": "Your gym membership was with **Halbury Vantage**.\n\nIt is **not still current** — you cancelled it outright on 2026/02/10.",
         "v9": false,
-        "v9_answer": "The conversations do not say which gym the membership was with.\n\nThey do say that on 2026/02/10 you cancelled the gym membership outright, so it is not still current.",
+        "v9_answer": "The conversations do not say which gym the membership was with.\n\nThey do say the membership is **not still current**: you said on 2026/02/10 that you “cancelled the membership outright.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1091,9 +1096,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You registered with **Ulverston Reverie**.\n\nThat is **not still current**: later you said the dentist was off your list because you came off their books when the practice closed.",
+        "v8_answer": "You registered with **Ulverston Reverie**.\n\nThat is **not still current**: later you said you came off their books when the practice closed.",
         "v9": false,
-        "v9_answer": "Ulverston Reverie. As far as the conversations say, that is still current — there’s no later mention of changing dentists.",
+        "v9_answer": "You are registered with **Ulverston Reverie**.\n\nAs far as these conversations show, that is **still current**; there is no later mention of changing dentist or deregistering.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1110,9 +1115,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Your broadband provider was **Pellow Reverie**.\n\nThat is **not still current**: on 2026/02/01 you said you left the provider mid-contract after the third outage. No replacement provider is mentioned in the conversations.",
+        "v8_answer": "Your broadband provider was **Pellow Reverie**.\n\nThat is **not still current**: on **2026/02/01** you said you **left the provider mid-contract after the third outage**. No later replacement provider is recorded in these conversations.",
         "v9": true,
-        "v9_answer": "Your broadband provider was **Pellow Reverie**.\n\nThat is **not still current**: on 2026/02/01 you said you left the provider mid-contract after the third outage. No later broadband provider is mentioned.",
+        "v9_answer": "Your broadband provider was **Pellow Reverie**.\n\nThat is **not still current**: you said on 2026/02/01 that you left the provider mid-contract after the third outage.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1129,7 +1134,7 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Orrindale Quartz was the letting agent, but that is no longer current. You took the flat off them and manage it yourself now.",
+        "v8_answer": "Orrindale Quartz was the letting agent, but that is no longer current — you took the flat off them and manage it yourself now.",
         "v9": true,
         "v9_answer": "Orrindale Quartz was the letting agent, but that is no longer current. You took the flat off them and now manage it yourself.",
         "v9_gold_in_context": 2,
@@ -1148,9 +1153,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Brackmoor Reverie held the boxes, but that is no longer current: the storage unit was emptied and the account was closed.",
+        "v8_answer": "Brackmoor Reverie held the boxes, but that is no longer current: the storage unit was emptied and the account closed.",
         "v9": false,
-        "v9_answer": "Brackmoor Reverie.\n\nAs far as the conversations show, that is still current; no later change is mentioned.",
+        "v9_answer": "Brackmoor Reverie.\n\nAs far as these conversations show, that is still current; there is no later update changing the storage place.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1167,9 +1172,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You were riding a **Ryhope Vantage**.\n\nThat is **not still current**: you later said the bike was stolen from outside the library and was never replaced, so there is no bike now.",
+        "v8_answer": "Ryhope Vantage — but it is not still current. You later said the bike was stolen from outside the library and never replaced, so you are not riding one now.",
         "v9": true,
-        "v9_answer": "Ryhope Vantage — but that is no longer current. You said it was stolen from outside the library and never replaced, so you are not currently riding it.",
+        "v9_answer": "Ryhope Vantage — but that is not still current. You later said it was stolen from outside the library and never replaced, so you are not currently riding it.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1186,9 +1191,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Trellick Meridian did your accounts, but that is no longer current. You ended the engagement after the filing mess, and the accounts are now unattended.",
+        "v8_answer": "Trellick Meridian did your accounts/returns, but that is **not current** — you ended the engagement after the filing mess, and the accounts are now unattended.",
         "v9": false,
-        "v9_answer": "The conversations do not say who does your accounts, or whether that arrangement is still current.",
+        "v9_answer": "I don’t know from these conversations. They mention “accounts” being on your mind, but they do not say who does them or whether that arrangement is still current.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1205,9 +1210,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You were on **Vantoro Solace** for your phone/number tariff.\n\nIt is **not still current** — you later said **that tariff is finished** and you **let it lapse when the handset died**.",
+        "v8_answer": "You were on **Vantoro Solace**.\n\nIt is **not still current**: later you said, “That tariff is finished” and that you “let it lapse when the handset died.”",
         "v9": false,
-        "v9_answer": "The conversations do not say which phone tariff you are on.\n\nThey mention “tariff” in passing, but give no tariff name and no indication that any named phone tariff is still current.",
+        "v9_answer": "The conversations do not say which phone tariff you are on, so I can’t give a tariff name or confirm whether it is still current.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1224,10 +1229,10 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "The flat was insured with **Quarrell Solace**, but that is **not still current**: later you said the policy had run out and you did not renew, so the flat is currently **uninsured**.",
+        "v8_answer": "Quarrell Solace was the named home insurer, but it is **not still current**. The latest record says the flat is **uninsured** because the policy was allowed to run out and was not renewed.",
         "v9": false,
-        "v9_answer": "No one insures the flat. The record says: “The flat is uninsured. I let the policy run out and did not renew.”\n\nNo insurer name is given. As far as these conversations show, that is still current.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "The conversations do not say who insures the flat, or whether that insurance is still current.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1243,9 +1248,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Draythe Verity was the cleaner booked for the flat, but that is **not current**. As of 2026/02/24, nobody is cleaning there now; the visits were stopped when the rate went up.",
+        "v8_answer": "Draythe Verity was booked to clean the flat fortnightly, but that is **not still current**. As of 2026/02/24, nobody is cleaning there now because the visits were stopped when the rate went up.",
         "v9": false,
-        "v9_answer": "The conversations do not say who cleans the flat, or whether that arrangement is still current. They only mention “cleans” as being “on my mind,” without giving a name.",
+        "v9_answer": "The conversations do not say who cleans the flat, or whether that arrangement is still current.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1262,9 +1267,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Your coffee beans came from **Feskin Solace**.\n\nThat is **not still current**: on 2026/03/01 you said you had **stopped the standing order after the last bad batch**, so no beans are arriving now.",
+        "v8_answer": "Your coffee beans were from **Feskin Solace**.\n\nThat is **not still current**: you stopped the standing order after the last bad batch, so no beans are arriving now.",
         "v9": true,
-        "v9_answer": "Your coffee beans were from **Feskin Solace**.\n\nThat is **not still current**: you stopped the standing order after the last bad batch, and no beans are arriving now.",
+        "v9_answer": "Your coffee beans were from **Feskin Solace**.\n\nThat is **not still current**: you stopped the standing order after the last bad batch, so no beans are arriving now.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1281,9 +1286,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Ryhope Pilot. It is not still current — you were discharged at the final appointment.",
+        "v8_answer": "Ryhope Pilot — but it is no longer current. You were discharged at the final appointment.",
         "v9": true,
-        "v9_answer": "You went with **Ryhope Pilot** for the shoulder physio.\n\nThat is **not still current**: the later record says the physio work is over and you were discharged at the final appointment.",
+        "v9_answer": "You were seeing **Ryhope Pilot** for the shoulder physio.\n\nThat is **not still current**: you later said the physio work was over and you were discharged at the final appointment.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1300,10 +1305,10 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Cambourne Pilot taught you guitar. That is **not still current**: you gave up the guitar lessons when the teacher moved away.",
+        "v8_answer": "Cambourne Pilot taught you guitar, but it is no longer current: you stopped the lessons when the teacher moved away.",
         "v9": false,
-        "v9_answer": "The conversations don’t give the guitar teacher’s name.\n\nThey do say the guitar lessons have stopped because the teacher moved away, so it is not still current.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "The conversations do not say who teaches you guitar, or whether that arrangement is still current.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1319,10 +1324,10 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Ryhope Anvil was the firm you chose for the window work, but it is no longer current: you later pulled out of the contract before any work started.",
+        "v8_answer": "Ryhope Anvil was the firm you had chosen for the window work, but it is not still current: you later pulled out of the contract before any work started, so the window job is dead.",
         "v9": false,
-        "v9_answer": "The conversations do not give the window firm’s name.\n\nThey do say the window job is dead: you pulled out of the contract before any work started. As far as the record shows, that is still current, so no firm is currently doing your windows.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "The conversations don’t say which firm is doing your windows, or whether that arrangement is still current.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1338,9 +1343,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You used **Trellick Verity**.\n\nThat is **not current**: later you said you have **no vet at present** and had taken her off their books.",
+        "v8_answer": "Trellick Verity — but that is **not still current**. Later you said you have **no vet at present** and took her off their books when you stopped going.",
         "v9": true,
-        "v9_answer": "You chose **Trellick Verity** as the vet, but that is **not still current** — by 2026/03/14 you said you had **no vet at present** and had taken the cat off their books.",
+        "v9_answer": "You used **Trellick Verity**.\n\nThat is **not still current**: as of 2026/03/14, you said you had **no vet at present** and had taken her off their books.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1357,9 +1362,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "Kelbrick Reverie — but that is not still current. You stopped going after the price rise.",
+        "v8_answer": "Kelbrick Reverie — but it is **not still current**. You stopped going after the price rise.",
         "v9": true,
-        "v9_answer": "Kelbrick Reverie — but that is no longer current. You stopped going after the price rise.",
+        "v9_answer": "Kelbrick Reverie — not current. You stopped going after the price rise.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1376,9 +1381,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You were in **Orrindale Meridian**.\n\nThat is **not still current**: on 2026/03/17 you said you were **clubless for running** and had let the membership lapse over the winter.",
+        "v8_answer": "You were in **Orrindale Meridian**.\n\nThat is **not still current**: by 2026/03/17 you said you were **clubless for running** and had let the membership lapse over the winter.",
         "v9": true,
-        "v9_answer": "You were in **Orrindale Meridian**.\n\nThat is **not still current**: as of 2026/03/17, you said you are **clubless for running** because you let the membership lapse over the winter.",
+        "v9_answer": "You joined **Orrindale Meridian**, but that is **not still current**: as of 2026/03/17 you said you were clubless for running and had let the membership lapse.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1395,9 +1400,9 @@
         "gold_value_required": true,
         "v1": true,
         "v8": true,
-        "v8_answer": "You were a member of **Pellow Solace**, but that is **not still current** — you quit the club after the third duplicate case, and the wine deliveries have stopped.",
+        "v8_answer": "You joined **Pellow Solace**, but that is **not still current** — you later quit the club after the third duplicate case.",
         "v9": true,
-        "v9_answer": "You joined **Pellow Solace**, but that is **not still current** — you quit the club after the third duplicate case.",
+        "v9_answer": "You were a member of **Pellow Solace**.\n\nThat is **not still current**: you said on 2026/03/22 that you quit the wine club after the third duplicate case.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1416,7 +1421,7 @@
         "v8": true,
         "v8_answer": "You picked **Wistan Verity** as the osteopath.\n\nThat is **not still current**: later you said there were **no more osteopath appointments** and that you **closed the file when the course finished**.",
         "v9": true,
-        "v9_answer": "Wistan Verity. It is not still current — you later said there were no more osteopath appointments and that you closed the file when the course finished.",
+        "v9_answer": "You saw **Wistan Verity**.\n\nThat is **not still current**: later you said there were **no more osteopath appointments** and that you had **closed the file when the course finished**.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1430,11 +1435,11 @@
         "v11": null
       },
       "tme-for-021": {
-        "v1": false,
+        "v1": true,
         "v8": true,
-        "v8_answer": "You’re driving **Halbury Verity**.  \n\nYes — it was still current in the latest car-related note (“Same car as ever, still Halbury Verity” on 2026/03/19).",
+        "v8_answer": "You’re driving **Halbury Verity**.\n\nYes — the latest car-related note says it was **“same car as ever, still Halbury Verity,”** so that is still current according to the record.",
         "v9": true,
-        "v9_answer": "Halbury Verity. It was still current in the latest car-related note, so that is the current car on record.",
+        "v9_answer": "You’re driving **Halbury Verity**.\n\nAs far as the conversations say, that is **still current**: the later note explicitly says “same car as ever, still Halbury Verity,” and there’s no subsequent change recorded.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1450,10 +1455,10 @@
       "tme-for-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your gym membership is with **Larkmead Kindred**.\n\nYes — as of the latest relevant note, it is **still current**.",
-        "v9": false,
-        "v9_answer": "I don’t know from these conversations.\n\nThey only mention “gym” in passing — “Also on my mind: gym” — but they do not give the gym’s name or state whether your membership is still current.",
-        "v9_gold_in_context": 0,
+        "v8_answer": "Your gym membership is with **Larkmead Kindred**.\n\nYes — it was still current as of the later note on **2026/04/10**, which said: “Still the same gym, for the record: Larkmead Kindred.”",
+        "v9": true,
+        "v9_answer": "Your gym membership is with **Larkmead Kindred**. As of the latest conversation, that was **still current**.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1466,11 +1471,11 @@
         "v11": null
       },
       "tme-for-023": {
-        "v1": false,
+        "v1": true,
         "v8": true,
-        "v8_answer": "You’re registered with **Cambourne Solace**.\n\nYes — according to the later note, it was **still current** as of the last mention.",
+        "v8_answer": "You are registered with **Cambourne Solace**.\n\nYes — according to the later note on **2026/04/06**, that was **still current**.",
         "v9": true,
-        "v9_answer": "You are registered with **Cambourne Solace**.\n\nYes — the record says it was **still current** on 2026/04/06, and nothing later changes that.",
+        "v9_answer": "You are registered with **Cambourne Solace**.\n\nYes — as of the later note on 2026/04/06, that was **still current**.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1484,11 +1489,11 @@
         "v11": null
       },
       "tme-for-024": {
-        "v1": true,
+        "v1": false,
         "v8": true,
-        "v8_answer": "Your broadband provider is **Kelbrick Ardent**.\n\nIt is **still current according to the record**: it was confirmed as the same provider on **2026/03/21**, and no later conversation records a provider change.",
+        "v8_answer": "Your broadband provider is **Kelbrick Ardent**.\n\nIt is **still current as far as the conversations say**: the latest provider-specific note says “Still the same broadband provider… Kelbrick Ardent,” and there is no later recorded provider change.",
         "v9": true,
-        "v9_answer": "Your broadband provider is **Kelbrick Ardent**. The conversations say it was **still current**, and no later change is mentioned.",
+        "v9_answer": "Your broadband provider is **Kelbrick Ardent**.\n\nIt was stated as **still current** in the earlier conversation, and nothing later in the record says it changed.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1504,9 +1509,9 @@
       "tme-for-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Orrindale Ardent handles your flat, and yes — as of the latest mention, that is still current.",
+        "v8_answer": "Orrindale Ardent handles your flat, and as of the latest note it was still current.",
         "v9": true,
-        "v9_answer": "Orrindale Ardent handles the flat.\n\nThat was still current as of the last mention on 2026/04/03; there’s no later update in the conversations changing it.",
+        "v9_answer": "Orrindale Ardent handles the flat.\n\nThat was still current as of the latest mention on 2026/04/03, when you said there was “no change” and it was “still Orrindale Ardent.” There is no later change recorded in the conversations.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1522,9 +1527,9 @@
       "tme-for-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Trellick Ardent holds your boxes, and yes — that was still current as of the latest mention.",
+        "v8_answer": "Trellick Ardent holds your boxes, and it is still current/unchanged as of the latest note.",
         "v9": true,
-        "v9_answer": "Your boxes are in the storage unit at **Trellick Ardent**.\n\nAs of the latest note, that was **still current / unchanged**.",
+        "v9_answer": "Your boxes are in the storage unit at **Trellick Ardent**. It was stated as **unchanged**, so yes, that is still current according to the conversations.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1540,9 +1545,9 @@
       "tme-for-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re riding an **Orrindale Vantage**.\n\nYes — that is still current: on **2026/04/18** you noted “Nothing new on the bike: Orrindale Vantage as before,” and there’s no later change recorded.",
+        "v8_answer": "Orrindale Vantage. Yes — the latest note says “Nothing new on the bike: Orrindale Vantage as before,” so it is still current in the record.",
         "v9": true,
-        "v9_answer": "You’re riding an **Orrindale Vantage**.  \n\nYes — as of the latest conversation, that was still current (“Nothing new on the bike: Orrindale Vantage as before”).",
+        "v9_answer": "You’re riding an **Orrindale Vantage**.  \n\nYes — that is still current, based on the latest bike update: “Nothing new on the bike: Orrindale Vantage as before.”",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1558,10 +1563,10 @@
       "tme-for-028": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Kelbrick Solace does your accounts, and that is still current — it was confirmed unchanged on 2026/04/28.",
-        "v9": true,
-        "v9_answer": "Kelbrick Solace does your accounts/returns. As far as these conversations show, that is still current.",
-        "v9_gold_in_context": 1,
+        "v8_answer": "Kelbrick Solace does your accounts, and yes — that is still current as of the latest note.",
+        "v9": false,
+        "v9_answer": "The conversations do not say who does your accounts, so I can’t give a name or say whether it is still current.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1576,9 +1581,9 @@
       "tme-for-029": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You are on the **Ryhope Meridian** phone tariff, and it is still current according to the latest conversation record.",
+        "v8_answer": "You are on the **Ryhope Meridian** phone tariff.\n\nYes — it was still current as of the latest relevant note on **2026/04/27**, which said: “Nothing new on the phone tariff: Ryhope Meridian as before.”",
         "v9": true,
-        "v9_answer": "You’re on the **Ryhope Meridian** phone tariff, and it was **still current** as of the latest conversation.",
+        "v9_answer": "You are on the **Ryhope Meridian** phone tariff, and it is **still current** according to the latest record.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1594,10 +1599,10 @@
       "tme-for-030": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The flat is insured with **Feskin Kindred**, and yes — it was still current as of the latest relevant note.",
-        "v9": true,
-        "v9_answer": "Feskin Kindred insures the flat, and it was still current as of the latest relevant conversation.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "The flat is insured with **Feskin Kindred**.\n\nYes — as of the last relevant note (2026/04/24), that was **still current**.",
+        "v9": false,
+        "v9_answer": "The conversations do not say who insures the flat, so I can’t give a current insurer name.\n\nThey do mention that the boiler cover is still **Padstowe Plain**, but they do not identify a flat insurance provider or confirm whether flat insurance is current.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1612,9 +1617,9 @@
       "tme-for-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Quarrell Cascade cleans the flat, fortnightly. It was still current as of 2026/04/28, and there is no later record of a change.",
+        "v8_answer": "Quarrell Cascade cleans the flat. As far as the conversations say, that is still current: on 2026/04/28 it was “same cleaner as ever, still Quarrell Cascade.”",
         "v9": false,
-        "v9_answer": "The conversations do not say who cleans the flat, so I can’t give a name or say whether it is still current.",
+        "v9_answer": "The conversations do not say who cleans the flat. They only mention “cleans” in passing, without giving a name or saying whether it is current.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1630,9 +1635,9 @@
       "tme-for-032": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your coffee beans come from **Vintry Verity**.\n\nThat appears to be **still current**: on 2026/04/26 you noted, “Still the same coffee supplier, for the record: Vintry Verity,” and there’s no later change recorded.",
+        "v8_answer": "Your coffee beans come from **Vintry Verity**.\n\nYes — as of the latest relevant note, that was **still current**.",
         "v9": true,
-        "v9_answer": "Your coffee beans come from **Vintry Verity**.  \n\nYes — according to the latest relevant note, that was **still current**.",
+        "v9_answer": "Your coffee beans come from **Vintry Verity**.\n\nThat was still current as of the last relevant note: **2026/04/26**, when you said it was “still the same coffee supplier.”",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1648,9 +1653,9 @@
       "tme-for-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You’re seeing **Draythe Ember** for physio, and yes — it was still current as of the latest relevant note.",
+        "v8_answer": "You’re seeing **Draythe Ember** for physio, and that was still current as of the latest note mentioning it on **2026/05/01**.",
         "v9": true,
-        "v9_answer": "You’re seeing **Draythe Ember** for physio, and yes — as of the latest relevant note, that was **still current**.",
+        "v9_answer": "Draythe Ember — yes, still current as of the latest record (“at least for now” on 2026/05/01).",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1666,9 +1671,9 @@
       "tme-for-034": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your guitar teacher is **Quarrell Verity**.  \n\nYes — as of the latest note, that is **still current**.",
+        "v8_answer": "Quarrell Verity teaches you guitar, and yes — that is still current as of the latest note.",
         "v9": false,
-        "v9_answer": "The conversations do not say who teaches you guitar, or whether any guitar lessons are still current.",
+        "v9_answer": "The conversations do not say who teaches you guitar, or whether that is still current.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1684,9 +1689,9 @@
       "tme-for-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ryhope Solace is doing the windows. Yes — it was still current as of the later note saying “Still the same window firm,” and no later change is mentioned.",
+        "v8_answer": "Ryhope Solace is doing the windows, and yes — as of the latest relevant note, that was still current.",
         "v9": true,
-        "v9_answer": "Ryhope Solace. It was stated to be “still the same window firm” on 2026/05/04, and there’s no later conversation saying it changed, so it is still current as far as these records show.",
+        "v9_answer": "Ryhope Solace. It was stated as “still the same window firm,” and nothing later in the conversations says it changed, so it is still current as far as the record shows.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1806,10 +1811,15 @@
         "v10_committed": 0,
         "v10_samples": 3,
         "v10": true,
-        "v11_abstained": 3,
-        "v11_committed": 0,
+        "v11_drawn_answers": [
+          "You ordered the **Bexley Plain** greenhouse.",
+          "Bexley Plain."
+        ],
+        "v11_abstained": 1,
+        "v11_committed": 2,
         "v11_samples": 3,
-        "v11": true
+        "v11_drawn_from_haystack": 2,
+        "v11": false
       },
       "tme-for-043_abs": {
         "v1": null,
@@ -1940,7 +1950,6 @@
         "v11": true
       }
     },
-    "probed_corpus_sha256": "be14b81ae4e2f3d8f1bf4b422259c9cc627a233da92edb8754dc24c91a32f82e",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "probed_corpus_sha256": "2aaa0a41fc92fb25a2d6ad0a5041b48e1bf87f45ac271f47c9666e26bacd38af"
   }
 }

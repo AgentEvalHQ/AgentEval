@@ -329,7 +329,10 @@ public sealed class TypedMemEvalCorpusTests
             .GroupBy(kv => kv.Value.PairId!, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(19, pairs.Length);
+        // 19 -> 30 with P2 (2026-09-13): due-later 4->7, expiring 3->7, not-yet 3->7,
+        // due-window 9 unchanged. The three that grew were measured failing the
+        // discrimination floor on sample size, not on a property of the shape.
+        Assert.Equal(30, pairs.Length);
         foreach (var pair in pairs)
         {
             var members = pair.ToArray();
@@ -1512,13 +1515,44 @@ public sealed class TypedMemEvalCorpusTests
         [TypedMemEvalVertical.Forgetting] = 1.0,
         [TypedMemEvalVertical.Conjunction] = 1.0,
         [TypedMemEvalVertical.Temporal] = 28.0 / 30.0,
-        // 4/15 -> 9/15 -> 15/15 over three corrections, and the residual is GONE rather than
-        // declared. The last step was not a corpus change: 16 of the 18 remaining "reproductions"
-        // were responses that explicitly DECLINED the co-reference ("the conversations do not
-        // mention a workshop by that name; at the unit behind the depot...") and an equivalence
-        // judge scored them as reaching a gold that names no place. The ablation arms now require
-        // the answer to be tied to the asked entity.
-        [TypedMemEvalVertical.Semantic] = 1.0,
+        // 4/15 -> 9/15 -> 15/15 over three corrections, then 14/15 on 2026-09-13 -- and the last
+        // step is the only one where the NUMBER got worse while the MEASUREMENT got better.
+        //
+        // The three corrections: rival same-kind facts under other designations (a reader that
+        // never resolves the alias is then left with several candidates), a chance-floor fix to
+        // V6, and `answer_must_name` -- 16 of 18 remaining "reproductions" were responses that
+        // explicitly DECLINED the co-reference ("the conversations do not mention a workshop by
+        // that name; at the unit behind the depot...") and an equivalence judge scored them as
+        // reaching a gold that names no place.
+        //
+        // 14/15: ONE ALIAS IN THE BANK NAMES ITS OWN REFERENT. tme-sem-024 asks "What work is
+        // outstanding at the runaround?" over the chain runaround -> the overflow space -> the blue
+        // estate car. Drop the first link and the reader still answers "The roof needs doing before
+        // winter", 3 of 3 -- because "the runaround" is ordinary English for a small car, and the
+        // blue estate car is the only vehicle among the six stated designations. The hop the shape
+        // exists to measure is available outside the corpus.
+        //
+        // IT WAS ALWAYS AVAILABLE. At the previous corpus the same ablation produced "If by 'the
+        // runaround' you mean the blue estate car: the roof needs doing before winter" and "The
+        // records don’t use the word 'runaround.'" -- the resolution grader marked all three
+        // `declined`, and 15/15 was earned by the model HEDGING, not by the component carrying
+        // weight. The 2026-09-13 rebuild changed the filler, the hedge went away, and the leak
+        // that had been there all along became visible. 14/15 is the truer number.
+        //
+        // BOUNDED, and bounded by measurement rather than by hope: V2 (10 samples, no gold) and V3
+        // (gold ablated) are clean on BOTH runaround questions -- the reader declines outright and
+        // lists the rival roof facts at the other designations -- so no published arm moves. The
+        // second question, tme-sem-030, is one phrasing away: dropping its link produced "The
+        // conversations don’t mention 'the runaround' by that name. They do say that at the blue
+        // estate car, parking is on the north side", graded `declined` twice and saved by the same
+        // hedge.
+        //
+        // TRIGGER: the next semantic corpus change must retire the ("the blue estate car", "the
+        // runaround") entry in DESIGNATIONS for a pair whose asked name does not identify the KIND
+        // of its referent, as the other five do. It is NOT worth a re-probe of its own -- it moves
+        // no published number and 48 of 50 questions are untouched -- and this file is where the
+        // next author finds out that it is owed.
+        [TypedMemEvalVertical.Semantic] = 14.0 / 15.0,
         // The tenth vertical, and the one whose V6 number took four measurements to become true.
         // The arc is worth keeping, because every step of it moved the number for a different
         // reason and only the last one moved the CORPUS:

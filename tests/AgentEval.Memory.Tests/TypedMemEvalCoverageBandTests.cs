@@ -42,12 +42,23 @@ public class TypedMemEvalCoverageBandTests
     /// so the corpus is answerable; BM25 simply cannot find the evidence, which is the point of a
     /// retrieval benchmark. Declared rather than tuned, because tuning it toward 0.70 would trade
     /// away the widest headroom in the family (0.93).</item>
-    /// <item><c>prospective/due-window</c> — below the floor AND reasoning-limited (V8 4/18), so it is
-    /// hard in two different ways at once. Scoped for redesign.</item>
-    /// <item><c>prospective/not-yet-true</c> — SATURATED at 1.0. BM25 returns gold for every question,
-    /// and its headroom of 0.1667 is one question out of six. This is the one entry here that is a
-    /// defect rather than a declared property.</item>
+    /// <item><c>prospective/due-window</c> — the same argument at its limit, and re-taken on
+    /// 2026-09-13: V1 <b>18/18</b> and V8 <b>16/18</b>, so the questions are answerable and a real
+    /// system reaches them; V9 is <b>1/18</b>. The old note here said "reasoning-limited (V8 4/18)",
+    /// which the current corpus refutes — it is retrieval-limited, and structurally so.</item>
+    /// <item><c>procedural/step-order</c> — moved out of band ON PURPOSE, trading a proxy for a
+    /// measurement. Its own entry below carries the argument.</item>
     /// </list>
+    /// <para>
+    /// TWO ENTRIES LEFT THIS LIST on 2026-09-13, which is the direction a ratchet is supposed to
+    /// move and the reason it is read both ways. <c>episodic/participant-attribution</c> was
+    /// declared at 1.0000 — saturated, because the question quoted the statement it asked about —
+    /// and the E1-b re-form (identify the claim by its consequence) took it to <b>0.5222</b>, in
+    /// band. <c>prospective/not-yet-true</c> was declared at 1.0000 and called "the one entry here
+    /// that is a defect rather than a declared property"; it now reads <b>0.7857</b>. Both were
+    /// removed rather than kept at a value nothing could trip, so the plain band assertion applies
+    /// to them again.
+    /// </para>
     /// </remarks>
     private static readonly Dictionary<(TypedMemEvalVertical, string), double> OutOfBand =
         new()
@@ -56,12 +67,34 @@ public class TypedMemEvalCoverageBandTests
             // BETTER value so it cannot drift back: the decoy designation's event count now
             // differs from gold's, which changed how many sessions the shape carries.
             [(TypedMemEvalVertical.Conjunction, "alias-then-count")] = 0.4344,
-            // Structural, not debt: the question carries the whole gold session's content, so
-            // nothing can outrank it. Declared here rather than tuned — its old in-band 0.667 came
-            // from an answer leak. See UncalibratableShapes in TypedMemEvalCorpusTests.
-            [(TypedMemEvalVertical.Episodic, "participant-attribution")] = 1.0000,
-            [(TypedMemEvalVertical.Prospective, "due-window")] = 0.4352,
-            [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 1.0000,
+            // BELOW THE FLOOR BY CONSTRUCTION, and the construction is a date-window query.
+            // due-window asks what falls due between two instants. Its gold is the SET of reminders
+            // whose due dates land inside that window, and a reminder's text is about its own
+            // subject -- toner, a renewal, a deposit -- never about the window. So the question
+            // shares almost no terms with the sessions that answer it, and a lexical retriever has
+            // nothing to rank on. That is not a corpus that was tuned too hard; it is what a
+            // temporal-RANGE query looks like to BM25.
+            //
+            // Measured on the shipped corpus: V1 18/18, V8 16/18, V9 1/18, headroom 0.9444, pair
+            // headroom 1.0. The questions are answerable and a system with the whole haystack
+            // reaches 16 of 18 of them -- the same argument alias-then-count is declared on, at the
+            // far end of it.
+            //
+            // 0.4352 -> 0.2222, FURTHER OUT, and the move is the equalise_echo correction of
+            // 2026-09-13 rather than anything done to this shape. That fix weaves gold's clause at
+            // the same knob as its distractors (gold had been sized at echo 0: 1.00 terms against
+            // filler's 3.17), which dilutes gold and costs BM25 reach everywhere. It cost most
+            // here because this shape has the deepest gold in the vertical and coverage is the
+            // SHARE of it retrieved.
+            //
+            // THE ALTERNATIVE WAS PRICED, NOT IGNORED. Recalibrating prospective was measured in a
+            // scratch tree: due-window comes back to 0.4213 -- still outside the band, and still
+            // 0.014 further out than the 0.4352 recorded here -- while the vertical mean moves
+            // 0.5972 to 0.6192. It also redraws the corpus (G={1:53,2:16,3:2,4:1} becomes
+            // {1:51,2:8,3:10,4:3}), so it costs a full re-probe and a corpus-change disclosure to
+            // arrive at the same declaration. A spend that cannot buy the claim it is for does not
+            // get made; the measurement is recorded here so the next reader inherits it.
+            [(TypedMemEvalVertical.Prospective, "due-window")] = 0.2222,
             // BELOW THE FLOOR BY CONSTRUCTION, and the construction is the point. step-order is the
             // only shape carrying SEVEN mandatory strong competitors -- two three-session rival
             // chains plus an applicability session -- against G=4 gold at K_ref=5, and those

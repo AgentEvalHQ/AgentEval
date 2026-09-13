@@ -74,7 +74,7 @@ public class TypedMemEvalGuessingBaselineTests
     public void TheBaselineNeverExceedsTheQuestionCount_NorFallsBelowChanceOnOne()
     {
         // A floor is a probability, so the sum cannot exceed the number of questions declaring one.
-        // ⚠ This does NOT catch a nested-floor double-count: measured, 0 of 565 questions declare
+        // ⚠ This does NOT catch a nested-floor double-count: measured, 0 of 587 questions declare
         //   two floors, so the "largest, once per question" rule is a no-op on real data and an
         //   ablation through this path cannot fail. Found by ablating and watching it stay green.
         //   TheNestedFloorRuleTakesTheLargestOnce covers that rule directly instead.
@@ -98,7 +98,7 @@ public class TypedMemEvalGuessingBaselineTests
     [Fact]
     public void TheNestedFloorRuleTakesTheLargestOnce()
     {
-        // Constructed, not drawn from a corpus, because no shipped corpus exercises it (0 of 565).
+        // Constructed, not drawn from a corpus, because no shipped corpus exercises it (0 of 587).
         // Two floors on one question, at different depths: the rule must return the LARGEST once,
         // never their sum. Summing would overstate how much score was free, which is the
         // flattering direction and therefore the one to guard.

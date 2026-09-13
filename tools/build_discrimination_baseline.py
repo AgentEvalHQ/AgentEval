@@ -3,14 +3,21 @@
 
 WHY THIS EXISTS
 ---------------
-The family publishes "N of M shapes rank two systems". Three of 36 currently do not, and the goal
-they are measured against allows either 36/36 *or each exception declared with a drift check*.
-Today only ONE of the three is declared: `forgetting/never-known` carries
-`discrimination_exempt_reason`, generated automatically because it has no gold at all. The other two
--- `episodic/participant-attribution` and `forgetting/still-valid` -- HAVE gold and measurably fail
-to discriminate, which is a different thing, and nothing declares it.
+The family publishes "N of M shapes rank two systems", and the goal it is measured against allows
+either 36/36 *or each exception declared with a drift check*.
 
 An undeclared exception is indistinguishable from a regression nobody noticed.
+
+CURRENT STATE (2026-09-13): 33 of 36 rank two systems. The three exceptions are
+`forgetting/never-known` (no gold at all, scored on abstention) and
+`prospective/expiring-validity` + `prospective/not-yet-true`, which P2 grew from 6 questions to 14
+and which then read 0.1429 -- one question below the floor -- where their n=6 figures had said
+0.3333 and 0.5000. Those were noise; these are the shapes' behaviour.
+
+⚠ BOTH DIRECTIONS OF THIS CHECK HAVE NOW FIRED IN ANGER. `episodic/participant-attribution` and
+`forgetting/still-valid` were once declared here and BOTH now discriminate (0.6667 and 0.2000), so
+their declarations were removed -- good news the check surfaced rather than let the headline
+understate. The prospective pair moved the other way in the same run.
 
 THE DRIFT CHECK, AND WHY IT RUNS BOTH WAYS
 ------------------------------------------
@@ -48,20 +55,28 @@ REASONS = {
         "V1 0.933, V9 1.000, headroom -0.067 -- the retriever BEATS a perfect gold-only selector, "
         "which is the signature of a question form that leaks its own answer. E1 re-formed the "
         "shape and the cap survived; the triage plan's verdict is 'new forms, not new knobs'. "
-        "Remains declared until the question form changes.",
-    ('forgetting', 'still-valid'):
-        "Headroom 0.0667, below the 0.15 floor. This is the CONTROL arm of a pair: its job is "
-        "catching over-forgetting -- a system reporting a still-valid fact as superseded -- which "
-        "is a property of the PAIR, not of either arm's retrieval headroom. Read `paired_arms` "
-        "instead, where pair headroom is 0.4667 against a scaled floor of 0.24 at 3.68 sd. The arm "
-        "alone is not supposed to discriminate and is not a defect. "
-        "ADDED 2026-09-12: the 0.0667 is ALSO an artefact of the wrong ceiling. This shape's answer "
-        "asserts an ABSENCE -- 'nothing has cancelled it' -- and gold cannot hold an absence, so V1 "
-        "is not a valid ceiling for it: V8 (15/15) BEATS V1 (13/15), which is impossible when gold "
-        "suffices. Measured against the ceiling that applies, V8-V9 = 0.200 CLEARS the 0.15 floor "
-        "on its own. So the arm is exempt because it is a control, NOT because it cannot rank two "
-        "systems -- it can. See MEASUREMENT_STATUS 88.16 and ABSENCE_SHAPES in "
-        "tools/typedmemeval_quality_board.py.",
+        "⚠ HISTORICAL as of 2026-09-12: the question form DID change (`E1-b`, identify the claim "
+        "by its consequence) and this shape now runs headroom 0.6667 and discriminates, so it is no "
+        "longer a declared exception. The text is kept because the reason a shape once failed is "
+        "worth more to a future reader than a deleted key, and it is applied only if the shape ever "
+        "stops discriminating again.",
+    ('prospective', 'expiring-validity'):
+        "Headroom 0.1429 at n=14, which is 0.007 -- ONE QUESTION -- below the 0.15 floor. It is "
+        "declared rather than fixed because the number is NEW INFORMATION, not a regression: at "
+        "n=6 this shape reported 0.3333, and P2 (2026-09-13) grew it to 14 questions precisely "
+        "because F2 had measured these pair-shapes failing on SAMPLE SIZE rather than on any "
+        "floor. The old value was sampling noise; this one is the shape's actual behaviour. V9 "
+        "runs 12/14 with a 95% interval of [0.60, 0.96], so 'at the floor' is the honest reading "
+        "and 'below it' overstates the precision. TRIGGER: a design that lowers ALLgold on a "
+        "depth-1 prospective shape, or another growth to n>=25 that narrows the interval.",
+    ('prospective', 'not-yet-true'):
+        "Headroom 0.1429 at n=14, same story and same arc as `expiring-validity`: it reported "
+        "0.5000 at n=6 and 0.1429 at n=14. Two shapes moving from different noisy values to the "
+        "SAME value under the same growth is itself evidence the n=6 figures carried no signal. "
+        "V9 11/14, 95% interval [0.52, 0.92]. ALSO an ABSENCE shape (MEASUREMENT_STATUS 88.16): "
+        "its answer asserts a triggering event has not occurred, so V1 is not a valid ceiling for "
+        "it and V8-V9 = 0.2143 is the statistic that applies -- which clears the floor. Declared "
+        "on the uncorrected number because `discriminates` is keyed on it. TRIGGER: as above.",
     ('forgetting', 'never-known'):
         "Exempt by construction: every question has zero gold sessions, so V1/V8/V9 are undefined "
         "and V1-V9 cannot be formed. Scored on abstention (V10/V11) instead. The probe tool emits "

@@ -140,7 +140,7 @@ public static class TypedMemEvalCorpus
     /// <remarks>
     /// <para>
     /// 🔴 <b>This exists because <c>Correct</c> is not interpretable without it.</b> 125 of the
-    /// family's 565 questions are closed-choice and say so in their own extension
+    /// family's 587 questions are closed-choice and say so in their own extension
     /// (<c>chance_floor</c>), and the concentration is extreme: <b>Procedural declares one on all 80</b>,
     /// summing to <b>27.2</b>. A reader told "Correct 35 of 80" reads 44%; luck alone supplies 27 of
     /// those 35. Conjunction 12.5 of 65, Semantic 5.0 of 50, and the other seven verticals declare
@@ -203,7 +203,7 @@ public static class TypedMemEvalCorpus
     /// <returns>The floor, or null when none is declared.</returns>
     /// <remarks>
     /// ⚠ <b>Internal so it can be tested DIRECTLY.</b> No shipped corpus declares two floors on
-    /// one question — measured: 0 of 565 — so this rule is a no-op on real data and an ablation
+    /// one question — measured: 0 of 587 — so this rule is a no-op on real data and an ablation
     /// through <see cref="GuessingBaseline"/> cannot make it fail. A guard no test can exercise is
     /// a guard nobody has checked, so the test constructs the nested case itself.
     /// </remarks>

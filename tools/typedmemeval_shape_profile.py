@@ -47,6 +47,26 @@ import json
 import os
 import sys
 
+
+# A GATE MUST NOT DIE ON ITS OWN WARNING TEXT.
+#
+# The findings here are marked with U+1F534 and U+26A0, and Windows hands a bare `python x.py`
+# a cp1252 stdout that cannot encode either. Every line that carries one sits on a branch that
+# only fires when something is WRONG -- an undeclared absence shape, an exemption that is an
+# artefact of the wrong ceiling, the bar-supplied caveat -- so the tool ran green for as long as
+# it had nothing to say and raised UnicodeEncodeError, mid-report, the first time it did. It did
+# exactly that on 2026-09-13, after `prospective/not-yet-true` became a declared exception with
+# V8 > V1 and reached the second of those branches for the first time.
+#
+# A traceback is not a finding. Reconfiguring is preferred over rewriting the six strings in
+# ASCII because the next warning someone adds will carry a marker too, and a convention nobody
+# can see is a convention that lapses. `errors="replace"` keeps the line readable on a console
+# that still cannot render the glyph.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import typedmemeval_common as tmc  # noqa: E402
@@ -63,13 +83,20 @@ EXCEPTIONS = {
     ('conjunction', 'order-then-value'):
         'V9 0.60 vs ALLgold 0.20. The order half is answerable from the value half alone, so the '
         'arm scores without holding both gold sessions -- a partial-credit route, not a retrieval win.',
-    ('prospective', 'not-yet-true'):
-        'V9 0.33 vs ALLgold 0.67. The only shape scoring BELOW its retrieval: holding the gold is '
-        'not sufficient, so this shape is reasoning-limited rather than retrieval-limited. n=6.',
     ('forgetting', 'still-valid'):
-        'V9 0.80 vs ALLgold 0.53. Answerable from partial gold, which is why its headroom (0.067) '
-        'sits below the discrimination floor for a DIFFERENT reason than participant-attribution.',
+        'V9 0.73 vs ALLgold 0.47. Answerable from PARTIAL gold: it carries a statement and a '
+        'reaffirmation that are deliberately redundant (the control arm of a pair), so finding '
+        'either mention is enough and the arm outruns its own retrieval. Its headroom is now 0.200 '
+        'and it discriminates -- the 0.067 this entry used to cite was measured before the '
+        'equalise_echo fix (2026-09-13) gave its gold clause the term count its distractors had.',
 }
+
+#: NO LONGER AN EXCEPTION, recorded because it left the set rather than never entering it:
+#: `prospective/not-yet-true` sat here at V9 0.33 vs ALLgold 0.67, described as "the only shape
+#: scoring BELOW its retrieval ... reasoning-limited rather than retrieval-limited, n=6". After P2
+#: grew it 6 -> 14 questions it FITS the identity and the declaration was stale. The n=6 residual
+#: was sampling noise, which is the same lesson the shape's discrimination figure taught: at six
+#: questions this shape reported whatever the draw happened to give.
 
 #: NOT exceptions, and deliberately recorded as such -- the two shapes sitting ON the boundary:
 #:

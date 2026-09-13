@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-semantic-v5",
   "vertical": "semantic",
-  "revision": "v5+d5eff38bc74e",
+  "revision": "v5+630ea487e7dc",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c",
+  "corpus_sha256": "630ea487e7dc8115376936505169bff0dc834e7756539267365883dc2cd01bf9",
   "generator": {
     "tool": "gen_typedmemeval_semantic.py",
     "version": "1.0.0",
@@ -20,7 +20,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6667,
+    "mean_realised": 0.6567,
     "echo": 0.6667,
     "iterations": 84,
     "search_trace": [],
@@ -33,7 +33,7 @@
       "tme-sem-006": 0.0,
       "tme-sem-007": 1.0,
       "tme-sem-008": 1.0,
-      "tme-sem-009": 0.5,
+      "tme-sem-009": 0.0,
       "tme-sem-010": 0.0,
       "tme-sem-011": 1.0,
       "tme-sem-012": 1.0,
@@ -83,9 +83,10 @@
     },
     "per_shape_realised": {
       "co-reference": 0.6889,
-      "current-value": 0.6,
+      "current-value": 0.575,
       "source-attribution": 0.7333
-    }
+    },
+    "per_shape_out_of_band": []
   },
   "ceiling": {
     "k_ref": 5,
@@ -113,7 +114,7 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": true,
     "empty_turns": {
-      "count": 237,
+      "count": 235,
       "of_turns": 5330,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
@@ -399,40 +400,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5178,
+        "session_length_chars": 0.5468,
         "turn_count": 0.5,
         "position_in_haystack": 0.5215,
         "digit_density": 0.5,
-        "uppercase_density": 0.5166,
-        "sentence_count": 0.5639,
-        "punctuation_density": 0.5417,
+        "uppercase_density": 0.534,
+        "sentence_count": 0.522,
+        "punctuation_density": 0.522,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5178,
-        "type_token_ratio": 0.5517,
-        "first_user_length_chars": 0.5415,
-        "first_user_uppercase_density": 0.5302,
-        "first_user_sentence_count": 0.5921,
-        "first_assistant_length_chars": 0.5198,
-        "first_assistant_uppercase_density": 0.5033,
-        "first_assistant_sentence_count": 0.5364,
-        "user_slot1_length_chars": 0.5439,
+        "mean_turn_chars": 0.5468,
+        "type_token_ratio": 0.5564,
+        "first_user_length_chars": 0.5852,
+        "first_user_uppercase_density": 0.5641,
+        "first_user_sentence_count": 0.5894,
+        "first_assistant_length_chars": 0.5153,
+        "first_assistant_uppercase_density": 0.5051,
+        "first_assistant_sentence_count": 0.53,
+        "user_slot1_length_chars": 0.5226,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5055,
-        "assistant_slot2_length_chars": 0.5257,
+        "assistant_slot1_length_chars": 0.5149,
+        "assistant_slot2_length_chars": 0.5033,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5222,
-        "user_uppercase_density": 0.5104,
-        "user_sentence_count": 0.5981,
-        "user_punctuation_density": 0.5761,
-        "user_type_token_ratio": 0.512,
-        "user_mean_turn_chars": 0.5222,
-        "assistant_length_chars": 0.5111,
-        "assistant_uppercase_density": 0.5022,
-        "assistant_sentence_count": 0.5089,
-        "assistant_punctuation_density": 0.5198,
-        "assistant_type_token_ratio": 0.5413,
-        "assistant_mean_turn_chars": 0.5111,
+        "user_length_chars": 0.5504,
+        "user_uppercase_density": 0.5524,
+        "user_sentence_count": 0.5801,
+        "user_punctuation_density": 0.5255,
+        "user_type_token_ratio": 0.5768,
+        "user_mean_turn_chars": 0.5504,
+        "assistant_length_chars": 0.506,
+        "assistant_uppercase_density": 0.5146,
+        "assistant_sentence_count": 0.5315,
+        "assistant_punctuation_density": 0.5315,
+        "assistant_type_token_ratio": 0.5275,
+        "assistant_mean_turn_chars": 0.506,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -443,7 +444,7 @@
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
         "gold_marker_ngram": 0.6085,
-        "boilerplate_ngram": 0.6047
+        "boilerplate_ngram": 0.5932
       },
       "worst_refused_feature": "gold_marker_ngram",
       "worst_refused_auc": 0.6085,
@@ -452,15 +453,15 @@
       "worst_gold_marker_ngram": "this down",
       "gold_marker_ngram_auc": 0.6085,
       "worst_boilerplate_ngram": "will",
-      "boilerplate_ngram_auc": 0.6047,
+      "boilerplate_ngram_auc": 0.5932,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.0,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 0,
+          "observed": 1,
           "expected": 1.68,
-          "z": -1.36
+          "z": -0.55
         },
         "turn_count": {
           "share": 0.0,
@@ -484,25 +485,25 @@
           "z": -1.36
         },
         "uppercase_density": {
-          "share": 0.04,
-          "chance": 0.0336,
-          "observed": 2,
-          "expected": 1.68,
-          "z": 0.26
-        },
-        "sentence_count": {
-          "share": 0.02,
-          "chance": 0.0336,
-          "observed": 1,
-          "expected": 1.68,
-          "z": -0.55
-        },
-        "punctuation_density": {
           "share": 0.0,
           "chance": 0.0336,
           "observed": 0,
           "expected": 1.68,
           "z": -1.36
+        },
+        "sentence_count": {
+          "share": 0.06,
+          "chance": 0.0336,
+          "observed": 3,
+          "expected": 1.68,
+          "z": 1.07
+        },
+        "punctuation_density": {
+          "share": 0.02,
+          "chance": 0.0336,
+          "observed": 1,
+          "expected": 1.68,
+          "z": -0.55
         },
         "em_dash_density": {
           "share": 0.0,
@@ -512,18 +513,18 @@
           "z": -1.36
         },
         "mean_turn_chars": {
-          "share": 0.0,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 0,
+          "observed": 1,
           "expected": 1.68,
-          "z": -1.36
+          "z": -0.55
         },
         "type_token_ratio": {
-          "share": 0.0,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 0,
+          "observed": 1,
           "expected": 1.68,
-          "z": -1.36
+          "z": -0.55
         },
         "first_user_length_chars": {
           "share": 0.04,
@@ -547,18 +548,18 @@
           "z": -1.36
         },
         "first_assistant_length_chars": {
-          "share": 0.0,
+          "share": 0.04,
           "chance": 0.0336,
-          "observed": 0,
+          "observed": 2,
           "expected": 1.68,
-          "z": -1.36
+          "z": 0.26
         },
         "first_assistant_uppercase_density": {
-          "share": 0.1,
+          "share": 0.06,
           "chance": 0.0336,
-          "observed": 5,
+          "observed": 3,
           "expected": 1.68,
-          "z": 2.69
+          "z": 1.07
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
@@ -568,11 +569,11 @@
           "z": -1.36
         },
         "user_slot1_length_chars": {
-          "share": 0.04,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 2,
+          "observed": 1,
           "expected": 1.68,
-          "z": 0.26
+          "z": -0.55
         },
         "user_slot2_length_chars": {
           "share": 0.0,
@@ -589,11 +590,11 @@
           "z": -1.36
         },
         "assistant_slot1_length_chars": {
-          "share": 0.04,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 2,
+          "observed": 1,
           "expected": 1.68,
-          "z": 0.26
+          "z": -0.55
         },
         "assistant_slot2_length_chars": {
           "share": 0.0,
@@ -610,11 +611,11 @@
           "z": -1.36
         },
         "user_length_chars": {
-          "share": 0.04,
+          "share": 0.02,
           "chance": 0.0336,
-          "observed": 2,
+          "observed": 1,
           "expected": 1.68,
-          "z": 0.26
+          "z": -0.55
         },
         "user_uppercase_density": {
           "share": 0.06,
@@ -631,39 +632,39 @@
           "z": -0.55
         },
         "user_punctuation_density": {
-          "share": 0.06,
+          "share": 0.04,
           "chance": 0.0336,
-          "observed": 3,
+          "observed": 2,
           "expected": 1.68,
-          "z": 1.07
+          "z": 0.26
         },
         "user_type_token_ratio": {
+          "share": 0.04,
+          "chance": 0.0336,
+          "observed": 2,
+          "expected": 1.68,
+          "z": 0.26
+        },
+        "user_mean_turn_chars": {
           "share": 0.02,
           "chance": 0.0336,
           "observed": 1,
           "expected": 1.68,
           "z": -0.55
         },
-        "user_mean_turn_chars": {
-          "share": 0.04,
-          "chance": 0.0336,
-          "observed": 2,
-          "expected": 1.68,
-          "z": 0.26
-        },
         "assistant_length_chars": {
-          "share": 0.04,
+          "share": 0.0,
           "chance": 0.0336,
-          "observed": 2,
+          "observed": 0,
           "expected": 1.68,
-          "z": 0.26
+          "z": -1.36
         },
         "assistant_uppercase_density": {
-          "share": 0.06,
+          "share": 0.04,
           "chance": 0.0336,
-          "observed": 3,
+          "observed": 2,
           "expected": 1.68,
-          "z": 1.07
+          "z": 0.26
         },
         "assistant_sentence_count": {
           "share": 0.02,
@@ -673,25 +674,25 @@
           "z": -0.55
         },
         "assistant_punctuation_density": {
-          "share": 0.0,
-          "chance": 0.0336,
-          "observed": 0,
-          "expected": 1.68,
-          "z": -1.36
-        },
-        "assistant_type_token_ratio": {
-          "share": 0.06,
-          "chance": 0.0336,
-          "observed": 3,
-          "expected": 1.68,
-          "z": 1.07
-        },
-        "assistant_mean_turn_chars": {
           "share": 0.04,
           "chance": 0.0336,
           "observed": 2,
           "expected": 1.68,
           "z": 0.26
+        },
+        "assistant_type_token_ratio": {
+          "share": 0.04,
+          "chance": 0.0336,
+          "observed": 2,
+          "expected": 1.68,
+          "z": 0.26
+        },
+        "assistant_mean_turn_chars": {
+          "share": 0.0,
+          "chance": 0.0336,
+          "observed": 0,
+          "expected": 1.68,
+          "z": -1.36
         },
         "position_0_is_user": {
           "share": 0.0,
@@ -761,19 +762,17 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c"
+      "probed_corpus_sha256": "630ea487e7dc8115376936505169bff0dc834e7756539267365883dc2cd01bf9"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-12T17:27:21Z",
+    "run_at": "2026-09-13T02:00:20Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
-      "passed": 49,
-      "failed": [
-        "tme-sem-027"
-      ]
+      "passed": 50,
+      "failed": []
     },
     "v1_pair_flip": {
       "pairs": 0,
@@ -786,9 +785,8 @@
       "reject_at_hits": 2,
       "temperature": "provider default",
       "applicable": 50,
-      "passed": 48,
+      "passed": 49,
       "failed": [
-        "tme-sem-040",
         "tme-sem-048"
       ],
       "closed_choice": {
@@ -809,8 +807,10 @@
     },
     "v6_leave_one_out": {
       "applicable": 15,
-      "passed": 15,
-      "failed": [],
+      "passed": 14,
+      "failed": [
+        "tme-sem-024"
+      ],
       "excluded_declared_redundant": [],
       "excluded_no_load_bearing_claim": [
         "tme-sem-001",
@@ -845,82 +845,82 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 405,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 404,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 4050,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1433,
+        "judge_calls": 270,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 1086,
+        "calls": 151,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 380,
+        "judge_calls": 88,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 1195,
+        "calls": 131,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 632,
+        "judge_calls": 93,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 405,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 405,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 405,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 395,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 45,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 45,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 45,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 45,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
       "applicable": 50,
-      "v1_passed": 49,
+      "v1_passed": 50,
       "v8_passed": 49,
-      "interference_cost": 0.0,
+      "interference_cost": 0.02,
       "regressed_under_interference": [
         "tme-sem-024"
       ],
@@ -951,18 +951,18 @@
     },
     "v9_reference_retrieval": {
       "applicable": 50,
-      "v1_gold_only": 49,
+      "v1_gold_only": 50,
       "v8_full_haystack": 49,
-      "v9_bm25_top_k": 30,
-      "headroom_over_lexical_retrieval": 0.38,
-      "headroom_unlimited_context_over_lexical": 0.38,
+      "v9_bm25_top_k": 28,
+      "headroom_over_lexical_retrieval": 0.44,
+      "headroom_unlimited_context_over_lexical": 0.42,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "by_shape": {
       "co-reference": {
         "questions": 15,
         "v1_applicable": 15,
-        "v1_passed": 14,
+        "v1_passed": 15,
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
@@ -971,8 +971,8 @@
         "v9_passed": 6,
         "ci95": {
           "v1": [
-            0.7018,
-            0.9881
+            0.7961,
+            1.0
           ],
           "v3": [
             0.7961,
@@ -994,12 +994,12 @@
         "v9_above_chance": 0.0667,
         "v8_above_chance": 0.6,
         "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
-        "headroom_perfect_selector": 0.5333,
+        "headroom_perfect_selector": 0.6,
         "discriminates": true,
         "headroom_reachable": 0.5333,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
-        "headroom_above_chance": 0.5333,
+        "headroom_above_chance": 0.6,
         "headroom_above_chance_reading": "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the lexical retriever and a guesser, because a guesser scores the floor for free. Where this is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads where guessing does not -- and the difference is floor, not retrieval room. Quote this figure, not the uncorrected one, when claiming how much better retrieval can make a system. `discriminates` is deliberately still keyed on the uncorrected headroom so the verdict does not move under a reporting change; on every shipped shape both agree."
       },
       "current-value": {
@@ -1011,7 +1011,7 @@
         "v8_applicable": 20,
         "v8_passed": 20,
         "v9_applicable": 20,
-        "v9_passed": 13,
+        "v9_passed": 11,
         "ci95": {
           "v1": [
             0.8389,
@@ -1026,15 +1026,15 @@
             1.0
           ],
           "v9": [
-            0.4329,
-            0.8188
+            0.3421,
+            0.7418
           ]
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 4,
-        "headroom_perfect_selector": 0.35,
+        "headroom_perfect_selector": 0.45,
         "discriminates": true,
-        "headroom_reachable": 0.35,
+        "headroom_reachable": 0.45,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
@@ -1079,9 +1079,9 @@
       "tme-sem-001": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your usual courier is now Oakhurst Transit.",
+        "v8_answer": "Your usual courier is now **Oakhurst Transit**.",
         "v9": false,
-        "v9_answer": "Pellham Freight.",
+        "v9_answer": "Your usual courier is Pellham Freight.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1097,9 +1097,9 @@
       "tme-sem-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Culverton Office.",
+        "v8_answer": "You get cartridges from **Culverton Office** now.",
         "v9": false,
-        "v9_answer": "The conversations don’t say who you get cartridges from now. They only mention that “cartridges, get” was on your mind.",
+        "v9_answer": "The conversations don’t say who you get cartridges from now. They only mention “cartridges, get” as something on your mind.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1115,9 +1115,9 @@
       "tme-sem-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your standing meeting is now in the **Vanbrugh room**.",
+        "v8_answer": "Your standing meeting is now in the Vanbrugh room.",
         "v9": true,
-        "v9_answer": "Your standing meeting is now in the **Vanbrugh room**.",
+        "v9_answer": "Your standing meeting is in the Vanbrugh room now.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1133,7 +1133,7 @@
       "tme-sem-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your main project code is **Millbrook**.",
+        "v8_answer": "Your main project code now is **Millbrook**.",
         "v9": true,
         "v9_answer": "Your main project code is now **Millbrook**.",
         "v9_gold_in_context": 5,
@@ -1152,8 +1152,8 @@
         "v1": true,
         "v8": true,
         "v8_answer": "Your usual courier now is **Marlow Carriage**.",
-        "v9": true,
-        "v9_answer": "Marlow Carriage.",
+        "v9": false,
+        "v9_answer": "Your usual courier is Bardsey Logistics.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1169,9 +1169,9 @@
       "tme-sem-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Denhurst Paper.",
+        "v8_answer": "You get cartridges from **Denhurst Paper** now.",
         "v9": false,
-        "v9_answer": "You get cartridges from Tarnhill Supply.",
+        "v9_answer": "Tarnhill Supply.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1187,7 +1187,7 @@
       "tme-sem-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your standing meeting is in the **Ridgeway room**.",
+        "v8_answer": "Your standing meeting is in the **Ridgeway room** now.",
         "v9": true,
         "v9_answer": "Your standing meeting is in the Ridgeway room now.",
         "v9_gold_in_context": 4,
@@ -1205,7 +1205,7 @@
       "tme-sem-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your main project code is **Larkspur**.",
+        "v8_answer": "Your main project code now is **Larkspur**.",
         "v9": true,
         "v9_answer": "Your main project code now is **Larkspur**.",
         "v9_gold_in_context": 5,
@@ -1224,9 +1224,9 @@
         "v1": true,
         "v8": true,
         "v8_answer": "Oakhurst Transit.",
-        "v9": true,
-        "v9_answer": "Oakhurst Transit.",
-        "v9_gold_in_context": 1,
+        "v9": false,
+        "v9_answer": "The conversations don’t say who your usual courier is.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1243,7 +1243,7 @@
         "v8": true,
         "v8_answer": "You get cartridges from **Ashcombe Supplies** now.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They mention “cartridges, get” as something on your mind, but they never say who you get cartridges from now.",
+        "v9_answer": "The conversations do not say who you get cartridges from now.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1259,9 +1259,9 @@
       "tme-sem-011": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your standing meeting is in the **Ridgeway room** now.",
+        "v8_answer": "Your standing meeting is now in the Ridgeway room.",
         "v9": true,
-        "v9_answer": "Your standing meeting is now in the Ridgeway room.",
+        "v9_answer": "Your standing meeting room is now the Ridgeway room.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1277,9 +1277,9 @@
       "tme-sem-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your main project code is now **Ironvale**.",
+        "v8_answer": "Your main project code now is **Ironvale**.",
         "v9": true,
-        "v9_answer": "Your main project code now is **Ironvale**.",
+        "v9_answer": "Your main project code is now **Ironvale**.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1295,7 +1295,7 @@
       "tme-sem-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your usual courier now is **Oakhurst Transit**.",
+        "v8_answer": "Your usual courier is **Oakhurst Transit**.",
         "v9": true,
         "v9_answer": "Oakhurst Transit.",
         "v9_gold_in_context": 1,
@@ -1315,7 +1315,7 @@
         "v8": true,
         "v8_answer": "Fairbourne Depot.",
         "v9": false,
-        "v9_answer": "The conversations don’t say who you get cartridges from now. They only note “cartridges, get” as something on your mind.",
+        "v9_answer": "The conversations don’t say who you get cartridges from now. They only mention that cartridges were on your mind to get.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1333,7 +1333,7 @@
         "v8": true,
         "v8_answer": "Your standing meeting room is now the **Thornbury room**.",
         "v9": true,
-        "v9_answer": "Your standing meeting room is now the **Thornbury room**.",
+        "v9_answer": "Your standing meeting is in the Thornbury room now.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1367,9 +1367,9 @@
       "tme-sem-017": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your usual courier is **Oakhurst Transit**.",
+        "v8_answer": "Your usual courier is now **Oakhurst Transit**.",
         "v9": false,
-        "v9_answer": "The conversations don’t say who your usual courier is. They only mention “courier, usual” without naming them.",
+        "v9_answer": "The conversations don’t say who your usual courier is.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1387,7 +1387,7 @@
         "v8": true,
         "v8_answer": "You get cartridges from Culverton Office now.",
         "v9": false,
-        "v9_answer": "The conversations do not say who you get cartridges from now.",
+        "v9_answer": "Ravensworth Print — Tarnhill Supply is out.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1403,7 +1403,7 @@
       "tme-sem-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Your standing meeting is now in the **Selby room**.",
+        "v8_answer": "Your standing meeting is in the Selby room now.",
         "v9": true,
         "v9_answer": "Your standing meeting is now in the Selby room.",
         "v9_gold_in_context": 4,
@@ -1440,7 +1440,7 @@
         "answer_must_name": "the new flat",
         "v1": true,
         "v8": true,
-        "v8_answer": "At the new flat — the second address, the place on Ferrow Row — the boiler was replaced **in the spring**.",
+        "v8_answer": "The boiler at the new flat was replaced in the spring.",
         "v9": false,
         "v9_answer": "The conversations do not say when the boiler was replaced at the new flat.",
         "v9_gold_in_context": 1,
@@ -1505,7 +1505,7 @@
         "v8": false,
         "v8_answer": "The conversations only say that **the runaround is the overflow space**. They do **not** mention any outstanding work at the runaround.",
         "v9": false,
-        "v9_answer": "The conversations do not say what work is outstanding at the runaround. They only state that “the runaround is the overflow space.”",
+        "v9_answer": "The conversations don’t say what work is outstanding at the runaround. They only say that “the runaround is the overflow space.”",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1515,8 +1515,10 @@
         "ablation_samples": 3,
         "v6_candidates": 3,
         "v6_required_hits": 3,
-        "v6": true,
-        "v6_redundant_components": [],
+        "v6": false,
+        "v6_redundant_components": [
+          6
+        ],
         "v10": null,
         "v11": null
       },
@@ -1526,7 +1528,7 @@
         "v8": true,
         "v8_answer": "At the weekend place — the cottage at Wray Head — parking is on the north side.",
         "v9": true,
-        "v9_answer": "The weekend place is the cottage at Wray Head, and the parking there is on the north side.",
+        "v9_answer": "Parking at the weekend place—the cottage at Wray Head—is on the north side.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1547,7 +1549,7 @@
         "v8": true,
         "v8_answer": "The annexe is the Peverel building, and the boiler there was replaced **in the spring**.",
         "v9": false,
-        "v9_answer": "The conversations do not give a single clear answer.\n\nThey mention “annexe” alongside two boiler-replacement notes:\n\n- At the unit behind the depot: replaced **right after the sale**.\n- At the place on Ferrow Row: replaced **two winters ago**.\n\nSo I can’t say plainly which one was “the annexe” from ",
+        "v9_answer": "The conversations don’t state this unambiguously.\n\nThey mention **“annexe”** alongside two boiler notes:\n\n- **Unit behind the depot** — boiler replaced **right after the sale**.\n- **Place on Ferrow Row** — boiler replaced **two winters ago**.\n\nSo if the annexe was the unit behind the depot, it was *",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1564,11 +1566,11 @@
       },
       "tme-sem-027": {
         "answer_must_name": "the new flat",
-        "v1": false,
+        "v1": true,
         "v8": true,
-        "v8_answer": "The new flat is the second address, which is the place on Ferrow Row. Its lease runs to the end of next year — i.e. the end of 2029.",
+        "v8_answer": "The lease at the new flat runs to the end of next year — i.e. the end of 2029.",
         "v9": false,
-        "v9_answer": "The conversations don’t state that plainly. They only say the new flat is “the second address”; they do not explicitly give the lease length for the new flat.",
+        "v9_answer": "The lease at the new flat runs to the end of the month.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1587,9 +1589,9 @@
         "answer_must_name": "the workshop",
         "v1": true,
         "v8": true,
-        "v8_answer": "At the workshop — the unit behind the depot — the alarm code was changed after the break-in.",
+        "v8_answer": "At the workshop—the unit behind the depot—the alarm code was changed after the break-in.",
         "v9": true,
-        "v9_answer": "The alarm code at the workshop was changed after the break-in.",
+        "v9_answer": "At the workshop—the unit behind the depot—the alarm code was changed after the break-in.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1608,9 +1610,9 @@
         "answer_must_name": "head office",
         "v1": true,
         "v8": true,
-        "v8_answer": "The outstanding work at head office is: the roof at the Calderwick office needs doing before winter.",
+        "v8_answer": "The outstanding work at head office is that the roof needs doing before winter.\n\nHead office is the Calderwick office.",
         "v9": true,
-        "v9_answer": "At head office — the Calderwick office — the roof needs doing before winter. Also, a back-office window will not shut.",
+        "v9_answer": "The outstanding work at head office is: the roof at the Calderwick office needs doing before winter.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1631,7 +1633,7 @@
         "v8": true,
         "v8_answer": "Parking at the runaround is on the north side.",
         "v9": false,
-        "v9_answer": "The conversations do not say where the parking is at the runaround. They only say that “the runaround is the overflow space.”",
+        "v9_answer": "At the runaround, the parking is the overflow space.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1650,7 +1652,7 @@
         "answer_must_name": "the weekend place",
         "v1": true,
         "v8": true,
-        "v8_answer": "The boiler at the weekend place was replaced in the spring.",
+        "v8_answer": "The boiler at the weekend place — the cottage at Wray Head — was replaced in the spring.",
         "v9": true,
         "v9_answer": "The boiler at the weekend place—the cottage at Wray Head—was replaced in the spring.",
         "v9_gold_in_context": 2,
@@ -1671,9 +1673,9 @@
         "answer_must_name": "the annexe",
         "v1": true,
         "v8": true,
-        "v8_answer": "The annexe is the Peverel building, and the lease there runs to the end of next year.",
+        "v8_answer": "The annexe is the Peverel building, and its lease runs to the end of next year — i.e. the end of 2030.",
         "v9": false,
-        "v9_answer": "The conversations indicate: **annexe — long**.",
+        "v9_answer": "The conversations indicate: **the lease at the annexe is long.**",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1692,9 +1694,9 @@
         "answer_must_name": "the new flat",
         "v1": true,
         "v8": true,
-        "v8_answer": "The alarm code at the new flat was changed after the break-in.",
+        "v8_answer": "At the new flat — the second address, which is the place on Ferrow Row — the alarm code was changed after the break-in.",
         "v9": false,
-        "v9_answer": "The conversations do not say what happened to the alarm code at the new flat. They only say that the new flat is the second address.",
+        "v9_answer": "The conversations do not say what happened to the alarm code at the new flat. They only mention that the new flat is the second address, and that alarm codes were changed at other locations.",
         "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
@@ -1715,7 +1717,7 @@
         "v8": true,
         "v8_answer": "The workshop is the unit behind the depot, and the outstanding work there is that the roof needs doing before winter.",
         "v9": false,
-        "v9_answer": "The outstanding workshop item mentioned is the floor. The workshop is the unit behind the depot.",
+        "v9_answer": "The conversations do not say what work is outstanding at the workshop. They only say that the workshop is the unit behind the depot.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1773,7 +1775,7 @@
         "v8": true,
         "v8_answer": "We were discussing the insurance renewal.",
         "v9": true,
-        "v9_answer": "We were discussing the insurance renewal.",
+        "v9_answer": "You were discussing the insurance renewal.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1788,9 +1790,9 @@
       "tme-sem-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the parking permit.",
+        "v8_answer": "We were discussing the parking permit — specifically, that the permit does not cover the visitor bay.",
         "v9": false,
-        "v9_answer": "The conversations don’t contain a statement that “the permit does not cover the visitor bay,” nor do they identify what we were discussing at that moment.",
+        "v9_answer": "I don’t have that in the record. The conversations only mention “permit, bay, discussing, visitor, cover” as things on your mind; they do not say that “the permit does not cover the visitor bay,” so I can’t tell what we were discussing when you said it.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1807,7 +1809,7 @@
         "v8": true,
         "v8_answer": "We were discussing the broadband change.",
         "v9": false,
-        "v9_answer": "I don’t know from these records. They mention “line, stays, told, live, month, old” as being on your mind, but they don’t say what discussion that referred to.",
+        "v9_answer": "It isn’t unique in the record. You had that “old line stays live for a month” thought during several discussions:\n\n- Verney Cartons taking over from Wickham Crates as archive box supplier\n- The second-floor printer being jammed again\n- Ackworth Clean being replaced by Bramfield Care for the cleaning",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1826,8 +1828,8 @@
         "v9": true,
         "v9_answer": "We were discussing the recycling collection. You told me that glass is taken on a different week.",
         "v9_gold_in_context": 1,
-        "v2_hits": 2,
-        "v2": false,
+        "v2_hits": 1,
+        "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
         "v3": true,
@@ -1856,7 +1858,7 @@
       "tme-sem-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the window quote. You told me that scaffolding is charged separately.",
+        "v8_answer": "We were discussing the window quote.",
         "v9": true,
         "v9_answer": "We were discussing the window quote.",
         "v9_gold_in_context": 1,
@@ -1873,9 +1875,9 @@
       "tme-sem-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the fence dispute.",
+        "v8_answer": "The fence dispute.",
         "v9": true,
-        "v9_answer": "You were discussing the fence dispute.",
+        "v9_answer": "The fence dispute.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1909,7 +1911,7 @@
         "v8": true,
         "v8_answer": "We were discussing the insurance renewal.",
         "v9": false,
-        "v9_answer": "The record doesn’t identify a single discussion. That “claim / made / discussing / excess / doubles / twice” note appears in several conversations, alongside:\n\n- a bicycle left in the corridor\n- the second-floor printer being jammed\n- your cleaning contract being Bramfield Care\n- the side door nobod",
+        "v9_answer": "I can’t identify a single discussion from the record. The note about “claim, made, discussing, excess, doubles, twice” appears in multiple sessions, alongside several topics:\n\n- the coffee order arriving short by two boxes\n- the new visitor sign-in tablet\n- the cleaning contract being Bramfield Care",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1924,11 +1926,11 @@
       "tme-sem-046": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the parking permit.",
+        "v8_answer": "We were discussing the parking permit. You noted that the permit does not cover the visitor bay.",
         "v9": true,
-        "v9_answer": "We were discussing the parking permit — specifically that it does not cover the visitor bay.",
+        "v9_answer": "We were discussing the parking permit.",
         "v9_gold_in_context": 1,
-        "v2_hits": 1,
+        "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
         "v3_required_hits": 1,
@@ -1941,7 +1943,7 @@
       "tme-sem-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the broadband change. You noted that the old line stays live for a month.",
+        "v8_answer": "We were discussing the broadband change.",
         "v9": true,
         "v9_answer": "We were discussing the broadband change.",
         "v9_gold_in_context": 1,
@@ -1958,11 +1960,11 @@
       "tme-sem-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the recycling collection. You noted that glass is taken on a different week.",
+        "v8_answer": "We were discussing the recycling collection.",
         "v9": false,
-        "v9_answer": "You mentioned “taken, different, told, week, glass” during several discussions, not just one:\n\n- changes to your shredding pickup provider,\n- the spare key being on the blue fob,\n- and someone rearranging the storage cupboard.\n\nThe conversations do not show you explicitly saying “glass is taken on a",
+        "v9_answer": "The record doesn’t show you explicitly saying “glass is taken on a different week.” It only shows “taken, different, told, week, glass” listed as being on your mind.\n\nThat phrase appeared while we were discussing several things, including:\n\n- a bicycle left in the corridor\n- changes to your shreddin",
         "v9_gold_in_context": 0,
-        "v2_hits": 2,
+        "v2_hits": 3,
         "v2": false,
         "v3_hits": 0,
         "v3_required_hits": 1,
@@ -1992,9 +1994,9 @@
       "tme-sem-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "We were discussing the window quote.",
+        "v8_answer": "The window quote.",
         "v9": true,
-        "v9_answer": "We were discussing the window quote. You noted that scaffolding is charged separately.",
+        "v9_answer": "You were discussing the window quote.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2007,7 +2009,6 @@
         "v11": null
       }
     },
-    "probed_corpus_sha256": "d5eff38bc74ebd1f179ace46e326b32dcf079d01d6e47648b1bfa71e31d3cd8c",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "probed_corpus_sha256": "630ea487e7dc8115376936505169bff0dc834e7756539267365883dc2cd01bf9"
   }
 }

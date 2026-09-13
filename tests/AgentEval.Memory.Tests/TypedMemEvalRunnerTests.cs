@@ -97,14 +97,14 @@ public sealed class TypedMemEvalRunnerTests
 
         var pairs = result.TypedOutcomes!.PairConsistency;
         Assert.NotNull(pairs);
-        Assert.Equal(19, pairs!.Pairs);
-        Assert.Equal(19, pairs.BothArmsCorrect);
+        Assert.Equal(30, pairs!.Pairs);
+        Assert.Equal(30, pairs.BothArmsCorrect);
 
         // A fake judge that calls everything correct is NOT a time-blind system: gold flips between
         // the arms, so a genuinely time-blind answer produces Correct-then-Missed or
         // Premature-then-Correct, never Correct-then-Correct. This assertion pins that distinction,
         // because the first version of the metric counted identical outcomes and would have scored
-        // this run 19/19 — reporting a time-blindness finding about a run that has none.
+        // this run 30/30 — reporting a time-blindness finding about a run that has none.
         Assert.Equal(0, pairs.TimeBlindPattern);
     }
 
@@ -120,23 +120,29 @@ public sealed class TypedMemEvalRunnerTests
             new TypedMemEvalGuardTests.RecordingAgent(), TypedMemEvalVertical.Prospective);
 
         var pairs = result.TypedOutcomes!.PairConsistency!;
-        Assert.Equal(19, pairs.Pairs);
+        Assert.Equal(30, pairs.Pairs);
         Assert.Equal(0, pairs.BothArmsCorrect);
-        Assert.Equal(19, pairs.MissedAfter);
+        Assert.Equal(30, pairs.MissedAfter);
 
-        // TEN OF NINETEEN, AND THE SHORTFALL IS THE TEST DOUBLE, NOT THE DETECTOR. ArmAwareJudge
-        // recognises a before-arm by three markers the generator guarantees on named-entity gold -
-        // "Not yet.", "Yes, still valid", "It is still ahead". A due-window answer is a SET of
-        // things falling due ("2: reorder the printer toner on 13 April 2026, ...") and carries
-        // none of them, so the stub reads both window arms as after-arms and answers "missed" to
-        // each. That is why MissedAfter is 19 while the correct-then-missed pattern is 10.
+        // TWENTY-ONE OF THIRTY, AND THE SHORTFALL IS THE TEST DOUBLE, NOT THE DETECTOR.
+        // ArmAwareJudge recognises a before-arm by three markers the generator guarantees on
+        // named-entity gold - "Not yet.", "Yes, still valid", "It is still ahead". A due-window
+        // answer is a SET of things falling due ("2: reorder the printer toner on 13 April 2026,
+        // ...") and carries none of them, so the stub reads both window arms as after-arms and
+        // answers "missed" to each. That is why MissedAfter is 30 while the correct-then-missed
+        // pattern is 21.
         //
-        // What this test therefore covers is the ten named-entity pairs. Whether the outcome-pair
+        // P2 (2026-09-13) was a PREDICTION, not a re-baseline. The three named-entity shapes went
+        // 4+3+3 pairs to 7+7+7, so this number had to move 10 -> 21 and MissedAfter 19 -> 30 if
+        // the mechanism above is the real one and the nine window pairs are still the whole gap.
+        // Written down before the run; the run returned 21.
+        //
+        // What this test therefore covers is the 21 named-entity pairs. Whether the outcome-pair
         // detector catches a genuinely time-blind system on the window shape is NOT established
         // here and should not be inferred from this number - a real such system returns the same
         // SET at both instants, whose label pattern depends on how the judge grades a partly-right
         // set. Establishing it needs a stub that can answer a window question.
-        Assert.Equal(10, pairs.TimeBlindPattern);
+        Assert.Equal(21, pairs.TimeBlindPattern);
     }
 
     [Fact]

@@ -17756,3 +17756,169 @@ spread is construct depth, and once depth is removed **no vertical is below par 
 (§88.32). That statement survives whichever scale you prefer.
 
 **Cost: zero calls, zero corpus bytes.**
+
+### 88.35 ✅ P2 — three shapes were failing on SAMPLE SIZE, and growing them said so (2026-09-13)
+
+Three of Prospective's four pair-shapes shipped at 3–4 pairs, i.e. 6–8 questions. §F2 measured
+them missing the 0.15 discrimination floor by about **1.1 sd** — which is not a finding, it is a
+sample size. At n=6 one question moves a rate by 17 points.
+
+P2 grew each to **7 pairs**, the capacity of the smallest source bank: 50 → **72** questions, 19 →
+**30** pairs.
+
+| shape | headroom at n=6 | headroom at n=14 |
+| --- | ---: | ---: |
+| `due-later-reminder` | 0.3333 | **0.4286** (discriminates) |
+| `expiring-validity` | 0.3333 | **0.1429** |
+| `not-yet-true` | 0.5000 | **0.1429** |
+
+> ✅ **Two shapes moved from DIFFERENT noisy values to the SAME one.** That is what a sampling
+> artefact looks like once it is gone, and it is better evidence than either number alone.
+
+Both now sit **0.007 — one question — below** the floor, with V9's 95% Wilson interval at
+[0.60, 0.96] and [0.52, 0.92]. "At the floor" is the honest reading; "below it" claims a precision
+14 questions do not carry. Declared in `PendingRedesign` with that argument rather than fixed.
+
+#### The half of this that was a PREDICTION
+
+`Prospective_FlagsATimeBlindSystemByItsPairPattern` asserts that a stub time-blind judge produces
+the correct-then-missed pattern on **10 of 19** pairs, because the stub reads a before-arm by
+three markers that only named-entity gold carries and the nine `due-window` pairs carry none.
+
+If that mechanism is the real one, growing 4+3+3 pairs to 7+7+7 must move the number to **21 of
+30** and `MissedAfter` to 30 — the nine window pairs still being the whole gap. Written down
+before the run. **The run returned 21.**
+
+A number re-taken after a change is a re-baseline; a number written down before it and then
+matched is a test of the explanation. Only the second says the comment above the assertion is
+true.
+
+**Cost: one re-probe of Prospective, already spent.**
+
+### 88.36 🔴 A MEAN gate inside the function whose whole point is that a mean hides things (2026-09-13)
+
+`calibrate_pinned` rebuilds a corpus at the echo its sidecar records — the mechanism that makes a
+corpus a function of (generator, seed, RECORDED ECHO) instead of (generator, seed, SEARCH
+ALGORITHM). Its gate checked **the vertical mean** against the [0.50, 0.90] band.
+
+It sits inside a function with an explicit `per_shape_mode` branch, which exists **because a mean
+is satisfiable by averaging one shape's collapse against another's saturation.**
+
+#### What it let through
+
+The §88.2x `equalise_echo` correction weaves gold's clause at the same knob as its distractors
+(gold had been sized at echo 0 — 1.00 terms against filler's 3.17). That dilutes gold and costs
+BM25 reach everywhere. Rebuilding at the RECORDED knob:
+
+| | before | after | verdict |
+| --- | ---: | ---: | --- |
+| prospective vertical mean | 0.6333 | 0.5972 | in band — **gate silent** |
+| prospective `due-window` | 0.5093 | **0.2222** | 0.278 OUTSIDE the band |
+
+The C# band ratchet caught it — **after** the corpus had been written and a re-probe paid for.
+Fourteen shapes across six verticals moved under the same mechanism; `due-window` is the only one
+that left the band, because it has the deepest gold in its vertical and coverage is the SHARE of
+gold retrieved.
+
+#### ✅ The same ratchet now runs at the generator, where it is free
+
+`_pinned_per_shape_gate` refuses a pinned rebuild that pushes any shape FURTHER outside the band
+than the sidecar records. A pinned rebuild is supposed to REPRODUCE, so measured against the
+sidecar it was read from every shape matches and it never fires; it fires only when the GENERATOR
+moved difficulty under a fixed knob — which is the one case pinning cannot absorb, and the case
+`calibrate_pinned`'s own docstring already said should stop the build loudly.
+
+**ABLATED, IN THE SAME COMMIT AS THE CLAIM.** A gate nobody has seen refuse is a gate nobody has
+seen. `scratchpad/gate_control.py` runs both directions against a scratch DATA_ROOT:
+
+```
+CONTROL   rebuild prospective pinned against its own sidecar  -> both files IDENTICAL, no refusal
+ABLATION  rebuild prospective pinned against the HEAD sidecar -> BUILD REFUSED:
+          "moved 1 shape(s) FURTHER outside the [0.5, 0.9] band -- due-window 0.5093 -> 0.2222.
+           The vertical mean can absorb this and did; the shape cannot."
+```
+
+The ablation is the exact rebuild that shipped the collapsed shape. It is now refused before a
+single model call.
+
+#### ⚠ And a stale comment that was instructing the next reader to reintroduce the bug
+
+`calibrate_pinned` told its reader to mirror "the argument they differ on: calibrate_per_shape
+neutralises at 0.0 because its knob is per shape". That 0.0 **was** the defect. Faithfully
+reproducing it is what the comment asked for. Re-taken.
+
+#### The disposition for `due-window`, with the alternative PRICED
+
+Recalibrating prospective was measured in a scratch tree rather than argued about:
+
+| | pinned (shipped) | recalibrated |
+| --- | ---: | ---: |
+| vertical mean | 0.5972 | 0.6192 |
+| `due-window` coverage | 0.2222 | **0.4213** — still out of band |
+| distance outside | 0.278 | 0.079, vs the 0.065 recorded |
+| gold depth | G={1:53, 2:16, 3:2, 4:1} | G={1:51, 2:8, 3:10, 4:3} — **a redraw** |
+
+> 🔴 The spend does not buy the claim. Recalibration costs a full re-probe and a corpus-change
+> disclosure **to arrive at the same declaration**: still out of band, and still further out than
+> the recorded 0.4352.
+
+So it is declared, on the evidence that it is hard rather than broken: **V1 18/18, V8 16/18, V9
+1/18**, headroom 0.9444, pair headroom 1.0. A date-window query asks what falls due between two
+instants; a reminder's text is about toner or a renewal, never about the window. The question
+shares almost no terms with the sessions that answer it. **That is what a temporal-RANGE query
+looks like to BM25**, not a corpus tuned too hard — and the old note claiming it was
+"reasoning-limited (V8 4/18)" is refuted by the current 16/18.
+
+✅ **Two entries LEFT the out-of-band list in the same pass**: `episodic/participant-attribution`
+(1.0000 → 0.5222, in band after E1-b) and `prospective/not-yet-true` (1.0000 → 0.7857, the entry
+that had been called "the one here that is a defect"). Removed rather than kept at a value nothing
+could trip. Five declared exceptions became three.
+
+**Cost: zero calls.**
+
+### 88.37 🔴 Semantic V6 got WORSE because the measurement got BETTER (2026-09-13)
+
+`semantic` V6 went **15/15 → 14/15**. The ratchet is written to refuse that. Reading the failure
+rather than re-baselining it gives a defect that was there the whole time.
+
+`tme-sem-024` asks *"What work is outstanding at the runaround?"* over the chain **runaround → the
+overflow space → the blue estate car**. V6 drops one gold component and asks whether the answer
+survives. Drop the first link and the reader answers **"The roof needs doing before winter", 3 of
+3.**
+
+> 🔴 **"The runaround" is ordinary English for a small car, and the blue estate car is the only
+> vehicle among the six stated designations.** The co-reference hop the shape exists to measure is
+> available from world knowledge.
+
+#### It was ALWAYS available — 15/15 was earned by the model hedging
+
+The previous corpus's cached ablation responses, at the same dropped component:
+
+```
+"If by 'the runaround' you mean the blue estate car: the roof needs doing before winter."
+"The records don't use the word 'runaround.' If you mean the blue estate car, ..."
+```
+
+The resolution grader marked all three **`declined`**, so the component scored load-bearing. The
+2026-09-13 rebuild changed the filler, the hedge went away, and the same leak became visible.
+**14/15 is the truer number**; 15/15 was a property of phrasing.
+
+#### Bounded by measurement, not by hope
+
+- **V2** (10 samples, no gold) and **V3** (gold ablated) are clean on BOTH runaround questions —
+  the reader declines outright and lists the rival roof facts filed under the other designations.
+  **No published arm moves.**
+- `tme-sem-030` is **one phrasing away**: its link-drop produced *"The conversations don't mention
+  'the runaround' by that name. They do say that at the blue estate car, parking is on the north
+  side"* — graded `declined` twice, saved by the same hedge.
+- 48 of 50 semantic questions are untouched.
+
+#### Declared, with the trigger written where the fix will be made
+
+The remedy is one bank entry: an asked designation must not identify the **kind** of its referent,
+which is the property the other five pairs have and this one lacks. Changing it moves corpus bytes
+and owes a re-probe that nothing else in this vertical currently needs, so it is **not** taken
+here — it is recorded at the `DESIGNATIONS` entry itself and in `V6Ratchet`, which are the two
+places the next author will be standing.
+
+**Cost: zero calls.**

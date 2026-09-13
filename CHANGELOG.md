@@ -7,6 +7,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking — SIX corpora changed bytes in one pass
+
+| vertical | `corpus_sha256` | questions |
+| --- | --- | ---: |
+| `arithmetic` | `535f4ed01b92` → **`8de66481d5b8`** | 50 |
+| `conjunction` | `a949006ce182` → **`9455d2dcb0b0`** | 65 |
+| `episodic` | `a50846277e29` → **`cefa9956c0a8`** | 50 |
+| `forgetting` | `be14b81ae4e2` → **`2aaa0a41fc92`** | 50 |
+| `prospective` | `39f205b72294` → **`dd86f46ff1c4`** | **50 → 72** |
+| `semantic` | `d5eff38bc74e` → **`630ea487e7dc`** | 50 |
+
+`bitemporal` (`cdc27b225033`), `procedural` (`d431a7fc9ac5`), `temporal` (`3c459ed5866a`) and
+`workingmemory` (`ba49f2528ace`) are **byte-identical**. All ten reproduce from their committed
+generators.
+
+#### What was wrong, and in which direction
+
+`equalise_echo` exists to stop the calibration echo becoming a **tell**: gold and its distractors
+must carry the same number of woven terms, or gold is identifiable by having fewer commas. On the
+seven verticals that calibrate **per shape** it was passed a literal `0.0` instead of the knob —
+the call sites "neutralised" it because there is no single knob to pass — so **gold’s clause was
+sized at echo 0 while its distractors were woven at the shape’s real and much larger knob.**
+
+| vertical | echo terms in gold | in filler |
+| --- | ---: | ---: |
+| `episodic` | 1.00 | 3.56 |
+| `prospective` | 1.00 | 3.17 |
+| `semantic` | 1.00 | 2.75 |
+| `arithmetic` | 1.00 | 1.93 |
+
+**Direction of error: the affected corpora were EASIER for a lexical retriever than designed.**
+Gold was the short, clean, query-shaped session in a haystack of longer woven ones. Published
+headroom was therefore **understated** — which is why 10 of the 12 shapes that moved went **up**.
+
+#### Blast radius, measured rather than asserted
+
+On **five** of the six, every `question`, every `answer` and every `answer_session_ids` entry is
+unchanged; **only haystack filler moved**. On `prospective` that is not true and must not be
+assumed:
+
+| | ids in common | same question | same gold ids |
+| --- | ---: | ---: | ---: |
+| arithmetic / conjunction / episodic / forgetting / semantic | all | **all** | **all** |
+| **`prospective`** | 50 of 72 | **20** | **26** |
+
+🔴 **`prospective` is a redraw with stable ids.** `tme-pro-001`–`050` survive as names and
+mostly do not survive as questions; `tme-pro-051`–`072` are new. A cache, leaderboard row or
+regression baseline keyed on `question_id` will **silently mis-grade** rather than fail loudly.
+Compare on `corpus_sha256`.
+
+#### A falsifiable prediction, for anyone checking this disclosure
+
+Diff the tag. On `arithmetic`, `conjunction`, `episodic`, `forgetting` and `semantic` the set of
+`(question_id, question, answer, answer_session_ids)` tuples is **identical** before and after —
+if any one of them differs, this note is wrong. On `prospective`, exactly **30** of the 50
+surviving ids differ in question text. Cached *retrieval* results are stale everywhere, including
+the five where the questions did not move.
+
+#### Prospective also GREW: 50 → 72 questions, 19 → 30 pairs
+
+Three of its four pair-shapes shipped at 3–4 pairs and were measured missing the 0.15
+discrimination floor by about **1.1 sd** — a sample size, not a finding. Each grew to **7 pairs**,
+the capacity of the smallest source bank. `due-later-reminder` went 0.3333 → **0.4286** and now
+discriminates; `expiring-validity` (0.3333) and `not-yet-true` (0.5000) both landed on **0.1429**
+— two different noisy values converging on one, which is what a sampling artefact looks like once
+it is gone. Both are declared in `PendingRedesign` at 0.007 — one question — under the floor.
+
+#### What moved
+
+| shape | before | after |
+| --- | ---: | ---: |
+| `arithmetic/delta` | 0.9000 | 0.7000 |
+| `conjunction/order-then-value` | 0.4000 | 0.4667 |
+| `episodic/assistant-stated` | 0.3000 | 0.4000 |
+| `episodic/participant-attribution` | 0.5333 | 0.6667 |
+| `forgetting/still-valid` | 0.0667 | **0.2000** — now discriminates |
+| `prospective/due-later-reminder` | 0.2500 | 0.4286 |
+| `prospective/due-window` | 0.8889 | 0.9444 |
+| `prospective/expiring-validity` | 0.3333 | 0.1429 |
+| `prospective/not-yet-true` | 0.5000 | 0.1429 |
+| `prospective/seed-carry-over` | 0.3333 | 0.4167 |
+| `semantic/co-reference` | 0.5333 | 0.6000 |
+| `semantic/current-value` | 0.3500 | 0.4500 |
+
+Shapes that rank two systems: **34 → 33 of 36**, with all three exceptions declared and drift-
+checked in both directions.
+
+#### Declared alongside this release
+
+- **`prospective/due-window` coverage 0.4352 → 0.2222**, further outside the band. Diluting gold
+  costs most where gold is deepest. Recalibration was measured rather than argued: it returns
+  0.4213, still out of band and still further out than the recorded value, at the price of a full
+  redraw and re-probe — so it is declared, on V1 **18/18**, V8 **16/18**, V9 **1/18**. A
+  date-window query shares almost no vocabulary with the sessions that answer it.
+- **`semantic` V6 15/15 → 14/15.** `tme-sem-024`’s alias chain runs through "the runaround", which
+  is ordinary English for a car, and the blue estate car is the only vehicle among the six stated
+  designations — so the co-reference hop is available from world knowledge. The previous 15/15
+  was earned by the model **hedging** ("If by ‘the runaround’ you mean the blue estate car…"),
+  which the resolution grader scored as declining. V2 and V3 are clean on both affected
+  questions; no published arm moves.
+- **Two exemptions RETIRED** rather than kept at a value nothing could trip:
+  `episodic/participant-attribution` (out-of-band 1.0000 → 0.5222, and no longer scored on the
+  reader — it ranks systems on the ordinary floor) and `prospective/not-yet-true` (1.0000 →
+  0.7857).
+
+#### Gates added
+
+- `calibrate_pinned` now applies the **per-shape** band ratchet, not only the vertical mean. A
+  mean gate inside the function whose per-shape branch exists *because* a mean hides a collapsed
+  shape is how `due-window` shipped. Ablated: rebuilding prospective against the previous sidecar
+  is now refused with the exact number.
+- `EveryShape_CanRankTwoSystems` checks the **scored-on-the-reader** declaration in both
+  directions. A shape exempted because a lexical retriever cannot fail it must still fail to
+  clear the floor; when it starts clearing it, the exemption is stale and the gate says so.
+- The derived gates no longer die on their own warning text: `UnicodeEncodeError` on a cp1252
+  console had made every red-flag branch of the quality board unreachable.
+
+
 ### Breaking — the `bitemporal` corpus changed bytes
 
 **`corpus_sha256` `abf2f3f43219` → `cdc27b225033`.** Compare on the sha, never on `question_id`:

@@ -73,6 +73,26 @@ import json
 import os
 import sys
 
+
+# A GATE MUST NOT DIE ON ITS OWN WARNING TEXT.
+#
+# The findings here are marked with U+1F534 and U+26A0, and Windows hands a bare `python x.py`
+# a cp1252 stdout that cannot encode either. Every line that carries one sits on a branch that
+# only fires when something is WRONG -- an undeclared absence shape, an exemption that is an
+# artefact of the wrong ceiling, the bar-supplied caveat -- so the tool ran green for as long as
+# it had nothing to say and raised UnicodeEncodeError, mid-report, the first time it did. It did
+# exactly that on 2026-09-13, after `prospective/not-yet-true` became a declared exception with
+# V8 > V1 and reached the second of those branches for the first time.
+#
+# A traceback is not a finding. Reconfiguring is preferred over rewriting the six strings in
+# ASCII because the next warning someone adds will carry a marker too, and a convention nobody
+# can see is a convention that lapses. `errors="replace"` keeps the line readable on a console
+# that still cannot render the glyph.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(os.path.dirname(HERE), 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
 BASELINE = os.path.join(HERE, 'typedmemeval-discrimination-baseline.json')
