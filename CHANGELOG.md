@@ -7,6 +7,272 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0-beta] - 2026-09-13
+### Breaking — SIX corpora changed bytes in one pass
+
+| vertical | `corpus_sha256` | questions |
+| --- | --- | ---: |
+| `arithmetic` | `535f4ed01b92` → **`8de66481d5b8`** | 50 |
+| `conjunction` | `a949006ce182` → **`9455d2dcb0b0`** | 65 |
+| `episodic` | `a50846277e29` → **`cefa9956c0a8`** | 50 |
+| `forgetting` | `be14b81ae4e2` → **`2aaa0a41fc92`** | 50 |
+| `prospective` | `39f205b72294` → **`dd86f46ff1c4`** | **50 → 72** |
+| `semantic` | `d5eff38bc74e` → **`630ea487e7dc`** | 50 |
+
+`bitemporal` (`cdc27b225033`), `procedural` (`d431a7fc9ac5`), `temporal` (`3c459ed5866a`) and
+`workingmemory` (`ba49f2528ace`) are **byte-identical**. All ten reproduce from their committed
+generators.
+
+#### What was wrong, and in which direction
+
+`equalise_echo` exists to stop the calibration echo becoming a **tell**: gold and its distractors
+must carry the same number of woven terms, or gold is identifiable by having fewer commas. On the
+seven verticals that calibrate **per shape** it was passed a literal `0.0` instead of the knob —
+the call sites "neutralised" it because there is no single knob to pass — so **gold’s clause was
+sized at echo 0 while its distractors were woven at the shape’s real and much larger knob.**
+
+| vertical | echo terms in gold | in filler |
+| --- | ---: | ---: |
+| `episodic` | 1.00 | 3.56 |
+| `prospective` | 1.00 | 3.17 |
+| `semantic` | 1.00 | 2.75 |
+| `arithmetic` | 1.00 | 1.93 |
+
+**Direction of error: the affected corpora were EASIER for a lexical retriever than designed.**
+Gold was the short, clean, query-shaped session in a haystack of longer woven ones. Published
+headroom was therefore **understated** — which is why 10 of the 12 shapes that moved went **up**.
+
+#### Blast radius, measured rather than asserted
+
+On **five** of the six, every `question`, every `answer` and every `answer_session_ids` entry is
+unchanged; **only haystack filler moved**. On `prospective` that is not true and must not be
+assumed:
+
+| | ids in common | same question | same gold ids |
+| --- | ---: | ---: | ---: |
+| arithmetic / conjunction / episodic / forgetting / semantic | all | **all** | **all** |
+| **`prospective`** | 50 of 72 | **20** | **26** |
+
+🔴 **`prospective` is a redraw with stable ids.** `tme-pro-001`–`050` survive as names and
+mostly do not survive as questions; `tme-pro-051`–`072` are new. A cache, leaderboard row or
+regression baseline keyed on `question_id` will **silently mis-grade** rather than fail loudly.
+Compare on `corpus_sha256`.
+
+#### A falsifiable prediction, for anyone checking this disclosure
+
+Diff the tag. On `arithmetic`, `conjunction`, `episodic`, `forgetting` and `semantic` the set of
+`(question_id, question, answer, answer_session_ids)` tuples is **identical** before and after —
+if any one of them differs, this note is wrong. On `prospective`, exactly **30** of the 50
+surviving ids differ in question text. Cached *retrieval* results are stale everywhere, including
+the five where the questions did not move.
+
+#### Prospective also GREW: 50 → 72 questions, 19 → 30 pairs
+
+Three of its four pair-shapes shipped at 3–4 pairs and were measured missing the 0.15
+discrimination floor by about **1.1 sd** — a sample size, not a finding. Each grew to **7 pairs**,
+the capacity of the smallest source bank. `due-later-reminder` went 0.3333 → **0.4286** and now
+discriminates; `expiring-validity` (0.3333) and `not-yet-true` (0.5000) both landed on **0.1429**
+— two different noisy values converging on one, which is what a sampling artefact looks like once
+it is gone. Both are declared in `PendingRedesign` at 0.007 — one question — under the floor.
+
+#### What moved
+
+| shape | before | after |
+| --- | ---: | ---: |
+| `arithmetic/delta` | 0.9000 | 0.7000 |
+| `conjunction/order-then-value` | 0.4000 | 0.4667 |
+| `episodic/assistant-stated` | 0.3000 | 0.4000 |
+| `episodic/participant-attribution` | 0.5333 | 0.6667 |
+| `forgetting/still-valid` | 0.0667 | **0.2000** — now discriminates |
+| `prospective/due-later-reminder` | 0.2500 | 0.4286 |
+| `prospective/due-window` | 0.8889 | 0.9444 |
+| `prospective/expiring-validity` | 0.3333 | 0.1429 |
+| `prospective/not-yet-true` | 0.5000 | 0.1429 |
+| `prospective/seed-carry-over` | 0.3333 | 0.4167 |
+| `semantic/co-reference` | 0.5333 | 0.6000 |
+| `semantic/current-value` | 0.3500 | 0.4500 |
+
+Shapes that rank two systems: **34 → 33 of 36**, with all three exceptions declared and drift-
+checked in both directions.
+
+#### Declared alongside this release
+
+- **`prospective/due-window` coverage 0.4352 → 0.2222**, further outside the band. Diluting gold
+  costs most where gold is deepest. Recalibration was measured rather than argued: it returns
+  0.4213, still out of band and still further out than the recorded value, at the price of a full
+  redraw and re-probe — so it is declared, on V1 **18/18**, V8 **16/18**, V9 **1/18**. A
+  date-window query shares almost no vocabulary with the sessions that answer it.
+- **`semantic` V6 15/15 → 14/15.** `tme-sem-024`’s alias chain runs through "the runaround", which
+  is ordinary English for a car, and the blue estate car is the only vehicle among the six stated
+  designations — so the co-reference hop is available from world knowledge. The previous 15/15
+  was earned by the model **hedging** ("If by ‘the runaround’ you mean the blue estate car…"),
+  which the resolution grader scored as declining. V2 and V3 are clean on both affected
+  questions; no published arm moves.
+- **Two exemptions RETIRED** rather than kept at a value nothing could trip:
+  `episodic/participant-attribution` (out-of-band 1.0000 → 0.5222, and no longer scored on the
+  reader — it ranks systems on the ordinary floor) and `prospective/not-yet-true` (1.0000 →
+  0.7857).
+
+#### Gates added
+
+- `calibrate_pinned` now applies the **per-shape** band ratchet, not only the vertical mean. A
+  mean gate inside the function whose per-shape branch exists *because* a mean hides a collapsed
+  shape is how `due-window` shipped. Ablated: rebuilding prospective against the previous sidecar
+  is now refused with the exact number.
+- `EveryShape_CanRankTwoSystems` checks the **scored-on-the-reader** declaration in both
+  directions. A shape exempted because a lexical retriever cannot fail it must still fail to
+  clear the floor; when it starts clearing it, the exemption is stale and the gate says so.
+- The derived gates no longer die on their own warning text: `UnicodeEncodeError` on a cp1252
+  console had made every red-flag branch of the quality board unreachable.
+
+
+### Breaking — the `bitemporal` corpus changed bytes
+
+**`corpus_sha256` `abf2f3f43219` → `cdc27b225033`.** Compare on the sha, never on `question_id`:
+all 60 ids survive and `corpus_id`/`revision` do not move, but every question’s haystack changed.
+
+**Why.** `belief-at-instant` published headroom **0.3056** and `discriminates: True` while, split on
+the `clock` axis the corpus already declares, its `valid` half ran headroom **0.0556** — below the
+0.15 floor. **18 of 60 questions ranked nothing and the shape said they did.** `correction-depth`
+had a second dead rung at `corrections=2` (V9 4/4, headroom exactly 0.000).
+
+Both had one cause: with one or two retroactive corrections the final amendment is trivially the
+answer. The correction chain is raised (`belief-at-instant` 1→3, `correction-depth` 2,3,4→3,4,5) so
+several lexically identical amendments compete for the top-K budget, plus a tail reserve so gold is
+never the last session (position was separating gold at 3.0 sd).
+
+| stratum | before | after |
+| --- | ---: | ---: |
+| `belief-at-instant/valid` | **0.0556** | **0.1667** |
+| `belief-at-instant/transaction` | 0.5556 | 0.5556 |
+| `correction-depth/valid` | 0.3333 | 0.2500 |
+| `correction-depth/transaction` | 0.3333 | **0.7500** |
+
+`strata_below_floor` is now **empty on both shapes**. ⚠ The repaired stratum clears the floor by
+**0.0167 — three questions**; it is fixed, not comfortable.
+
+**Also:** every shape whose corpus declares a second axis now publishes `by_stratum` and
+`strata_below_floor`, and every floor-declaring shape publishes `headroom_above_chance`.
+
+### Breaking — the `episodic` corpus changed bytes
+
+**`corpus_sha256` `bfb35552ec82` → `a50846277e29`.** The other nine corpora are byte-identical;
+this is not a family re-probe.
+
+🔴 **Compare on the sha, never on `question_id`, `corpus_id` or `revision`.** All 50 question ids
+survive unchanged, `corpus_id` (`agenteval-typedmemeval-episodic-v5`) and `revision` (`v5`) do not
+move, and **15 of the 50 carry different question text and a different gold session set** —
+`tme-epi-036`–`050`, the `participant-attribution` shape. A cache, leaderboard row or regression
+baseline keyed on `question_id` will **silently mis-grade** rather than fail loudly. The other 35
+questions (`assistant-stated`, `list-order`) are byte-identical.
+
+**Why.** `participant-attribution` published headroom **−0.067**: its BM25 arm *beat* a perfect
+gold-only selector, so the shape could not rank two retrievers at all. It was the only shape of 35
+in the family where BM25's top-5 held **all** the gold on **every** question, because the question
+quoted the claim it was asking about.
+
+Questions now identify the claim by its **consequence** — one gold session states it, a second acts
+on it without restating it, and the question shares vocabulary only with the second — so
+attribution is a two-hop join. Gold depth moves 1 → 2, and 2 → 3 on the `both` arm; the vertical’s
+G distribution is now `{1:20, 2:10, 3:5, 4:4, 5:4, 6:3, 7:4}`.
+
+| `participant-attribution` | before | after |
+| --- | ---: | ---: |
+| V1 perfect selector | 14/15 | **15/15** |
+| V9 BM25 top-5 | **15/15** | **7/15** |
+| headroom | **−0.067** | **+0.533** |
+| discriminates | **False** | **True** |
+
+Family-wide the discriminating count moves **33 → 34 of 36**, leaving two declared exceptions, both
+in Forgetting. Full record, including two defects introduced and caught during the arc, in
+`docs/findings/MEASUREMENT_STATUS.md` §88.14.
+
+
+### Added — the retriever prediction, MEASURED: 8 of 8 at-risk, 4 of 4 controls
+
+`tools/typedmemeval_v9_dense.py` re-runs the V9 arm with cosine-over-embeddings in place of BM25 —
+same documents, budget, prompt and judge, reused from the probe tool rather than reimplemented.
+
+All eight shapes predicted to stop discriminating do. **Five reach V9 exactly 1.000**: a dense
+retriever finds every gold session on every question, so their headroom is zero rather than thin.
+All four controls stay above the floor, moving 0.000–0.200 against the at-risk shapes’ 0.143–0.500
+— which is what separates “the prediction was right” from “a better retriever helps everything”.
+
+🔴 One control the predictor got **backwards**: `conjunction/order-then-value` was predicted to
+get harder and got easier. It is already a declared identity exception — *the order half is
+answerable from the value half alone* — and ALLgold cannot predict a shape that does not need all
+its gold. The identity’s declared exceptions are exactly where its predictions fail, and a
+separate shipped instrument had already named this shape.
+
+Cost 367 calls. See `MEASUREMENT_STATUS` §88.40.
+
+### Added — every headroom figure is conditional on (BM25, K=5), and the sidecars now say so
+
+The retrieval BUDGET is the second monoculture and the larger one. `K_REF = 5` is 23% of a median
+22-session haystack, and every published headroom number is that single point:
+
+| K | RANDOM | BM25 | DENSE | predicted headroom BM25 / DENSE |
+| ---: | ---: | ---: | ---: | ---: |
+| 3 | 0.051 | 0.264 | 0.379 | 0.736 / 0.621 |
+| **5** | 0.100 | **0.416** | 0.540 | **0.584** / 0.460 |
+| 10 | 0.227 | 0.647 | 0.792 | 0.353 / **0.208** |
+
+🔴 **At a dense retriever and K=10 — 45% of a median haystack, an ordinary configuration — 21
+of 35 shapes fall below the 0.15 discrimination floor.** The fourteen that survive are
+`procedural` (4 of 4), `conjunction` (3 of 4), `prospective/due-window`,
+`temporal/occurrence-order`, `semantic/co-reference` and WorkingMemory’s ladder: every one asks
+for a SET or a SEQUENCE, which no retriever scoring documents independently gets right by being
+more similar.
+
+This is a **reporting** defect rather than a corpus one — the measurement was always conditional
+and the condition was implicit. Each sidecar now carries `probes.retriever_sensitivity`: per
+shape, ALLgold under both retrievers, the predicted headroom under each, and
+`discriminates_under_dense`. **No `corpus_sha256` moved and no corpus file changed**, so no
+consumer control resets. `--stamp` refuses anything but a full-family run at K_ref, because a
+partial stamp is a claim about shapes it never measured.
+
+### Fixed — a declared reason that pointed the next author at the wrong remedy
+
+`prospective/expiring-validity` and `not-yet-true` were declared this same day with the trigger
+*"another growth to n≥25 that narrows the interval"*. Measured against a dense retriever both
+reach ALLgold **1.000** — headroom zero outside the lexical baseline — so a bigger n would only
+tighten an interval around a shape a modern retriever saturates. The trigger is now a **question
+form that does not name its own target**, the `E1-b` move, which under the same dense retriever
+is shown to work: `episodic/participant-attribution` still ranks (0.133 → 0.467) while its
+unchanged sibling `assistant-stated` collapses to 1.000.
+
+### Added — the retriever monoculture, measured for the first time
+
+`tools/typedmemeval_dense_retrieval.py`. Every headroom figure the family publishes is `V1 - V9`,
+and V9 uses a plain BM25 retriever; `realised_coverage` has always said it is a *floor proxy* a
+stronger retriever will exceed. By how much was never measured.
+
+Measured over the same documents, budget and ALLgold operand, with a random-selection control:
+BM25 ALLgold **0.416**, dense **0.540**, random **0.094**. A dense retriever closes **21%** of the
+room BM25 leaves open, so **79% of published headroom is not a lexical artifact**.
+
+🔴 **The mean hides the finding.** Eight of 35 shapes fall below the 0.15 discrimination floor
+under dense retrieval — for a consumer retrieving with embeddings the family is **27 of 35**. All
+eight are single-fact lookups. The multi-hop and ordering shapes (`conjunction`, `procedural`)
+hold, and several get HARDER: retrieving ALL of a four-session chain is not a similarity problem.
+
+This is a prediction from `1 - ALLgold`, re-validated here against published headroom at slope
++0.905 / R² 0.853 / median residual 0.000, and it over-states by +0.032. The measurement would be
+a V9 re-run against dense top-5. See `MEASUREMENT_STATUS` §88.38.
+
+### Fixed — `v0.35.0-beta` had no CHANGELOG section, and nothing was checking
+
+Its notes stayed in `[Unreleased]`, where this release would have shipped them a second time
+under its own number. The section is cut retroactively, dated from the tag.
+
+The rule was assumed to be enforced. `check_tag_has_status_entry.py` says in its own docstring
+that *"the CHANGELOG never drifted because CI READS IT"* — no workflow mentioned the CHANGELOG
+at all. `tools/check_tag_has_changelog_section.py` is the missing reader, and unlike its sibling
+it runs in CI, because `CHANGELOG.md` is tracked. It refuses to report a pass when it can see no
+tags, which is the state a shallow `actions/checkout` would put it in.
+
+## [0.35.0-beta] - 2026-09-08
+
 ### Added
 
 - **`BenchmarkRunner`** — runs one `BenchmarkDefinition` against one `BenchmarkArm` into one run

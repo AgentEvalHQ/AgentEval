@@ -20,6 +20,31 @@ permissions:
   contents: read
 
 jobs:
+  # Every tag must have a CHANGELOG section of its own. This gate exists because the rule was
+  # assumed to be enforced and was not: the sibling checker for the status doc says in its own
+  # docstring that "the CHANGELOG never drifted because CI READS IT", and nothing did. v0.35.0-beta
+  # was tagged 2026-09-08 with its notes still in [Unreleased], where the next release would have
+  # shipped them a second time under its own number.
+  #
+  # fetch-depth: 0 is LOAD-BEARING. actions/checkout is shallow and fetches no tags, so the check
+  # would see an empty tag list -- and "every tag has a section" is trivially true of no tags. It
+  # refuses to report a pass in that state (exit 2, "the repository has no tags, so this measured
+  # nothing"), so a missing fetch-depth breaks the job loudly instead of greening it. The guard is
+  # there because this is the shape that would have shipped otherwise.
+  changelog-sections:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Every tag has a CHANGELOG section
+      run: python tools/check_tag_has_changelog_section.py
+
   dependency-review:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'

@@ -117,7 +117,20 @@
          in the test csproj so it doesn't leak into any shipped surface. -->
     <PackageVersion Include="PdfPig" Version="0.1.10" />
     
-    <!-- SourceLink for debugging support -->
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <!-- SourceLink for debugging support.
+         8.0.0 to 10.0.401 on 2026-09-13. CVE-2026-62900 (GHSA-23fw-v26w-5fgq, .NET information
+         disclosure) lists Microsoft.Build.Tasks.Git 8.0.0 as vulnerable with NO patch on that
+         line, and SourceLink.GitHub 8.0.0 pulls exactly that transitively. The advisory was
+         published after main last went green, so CI failed on a commit that changed no
+         dependency at all: the vulnerable-package listing reads the LIVE advisory database,
+         which is the point of it. 10.0.401 is above every patched threshold the advisory names
+         (10.0.111 and 10.0.303). PrivateAssets="All" everywhere it is referenced, so this is
+         build-time only and ships in no package.
+
+         NOTE FOR THE NEXT EDITOR: a double hyphen is ILLEGAL inside an XML comment. Writing one
+         here silently invalidates this whole file, every project loses central package
+         management at once, and the failure surfaces as NU1015 "no version specified" across
+         dozens of unrelated packages, which reads like a dependency problem and is not one. -->
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
   </ItemGroup>
 </Project>

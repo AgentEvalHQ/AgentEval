@@ -820,8 +820,12 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
     pair_no = 1
     base = datetime(2026, 3, 2, 9, 30)
 
-    # --- Due-later reminders: 4 pairs -------------------------------------------------
-    for i in range(4):
+    # --- Due-later reminders: 7 pairs -------------------------------------------------
+    # P2. Was 4 pairs. Three of this vertical's five shapes sat at 3-4 pairs, and F2 measured
+    # them failing on SAMPLE SIZE (~1.1 sd separation), not on any floor: a 6-question shape
+    # cannot support a verdict either way. 7 is the largest the NOT_YET bank supplies without
+    # reusing a topic, so all three grow to it together and the vertical stays collision-free.
+    for i in range(7):
         task, noun = REMINDERS[i % len(REMINDERS)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -838,8 +842,9 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
         index += 2
         pair_no += 1
 
-    # --- Expiring validity: 3 pairs ---------------------------------------------------
-    for i in range(3):
+    # --- Expiring validity: 7 pairs ---------------------------------------------------
+    # P2, see above. VALIDITY has 8 entries, so 7 pairs reuses nothing.
+    for i in range(7):
         thing, noun = VALIDITY[i % len(VALIDITY)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -855,8 +860,10 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:
         index += 2
         pair_no += 1
 
-    # --- Not-yet-true assertions: 3 pairs ---------------------------------------------
-    for i in range(3):
+    # --- Not-yet-true assertions: 7 pairs ---------------------------------------------
+    # P2, see above. NOT_YET has exactly 7 entries -- this is the bank's capacity and the
+    # reason all three shapes stop at 7 rather than going further.
+    for i in range(7):
         future, past, noun = NOT_YET[i % len(NOT_YET)]
         questions += _pair(
             f"tme-pro-{index:03d}", f"tme-pro-{index + 1:03d}", f"tme-pro-p{pair_no:02d}",
@@ -943,7 +950,17 @@ def check_pairs(questions: list[tmc.Question]) -> list[str]:
         if not any(marker in lowered for marker in ("not yet", "still valid", "still ahead")):
             failures.append(f"{pid}: before-arm gold does not say the moment is still ahead")
 
-    expected = 19
+    # 19 -> 30 with P2 (2026-09-12). ADR §5.1 declared 19 pairs: due-later 4, expiring 3,
+    # not-yet 3, due-window 9. Three of those sat at 3-4 pairs and F2 measured them failing on
+    # SAMPLE SIZE (~1.1 sd), not on any floor -- a 6-question shape cannot support a verdict
+    # either way, which is why the plan files P2 as "four shapes under 15 questions".
+    #
+    # The three grow to 7 pairs each (the NOT_YET bank's capacity, so no topic is reused) and
+    # due-window stays at 9, because rebalancing WITHIN 19 would have had to cut due-window --
+    # the vertical's strongest shape at headroom 0.889 -- and simply moved the power problem.
+    # This is a DECLARED structural change, not a knob: the count is asserted here so a silent
+    # drift still fails.
+    expected = 30
     if len(pairs) != expected:
         failures.append(f"{len(pairs)} pairs, ADR §5.1 declares {expected}")
 

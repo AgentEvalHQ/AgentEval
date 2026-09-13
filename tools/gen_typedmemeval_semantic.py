@@ -109,6 +109,22 @@ DESIGNATIONS = (
     ("the place on Ferrow Row", "the new flat", "The new flat is the place on Ferrow Row."),
     ("the unit behind the depot", "the workshop", "The workshop is the unit behind the depot."),
     ("the Calderwick office", "head office", "Head office is the Calderwick office."),
+    # OWED A REPLACEMENT, and the reason is in the pair itself rather than in the corpus.
+    # Every other entry here pairs two names that carry no relation outside these conversations:
+    # nothing about "the annexe" tells you it is the Peverel building. "The runaround" is ordinary
+    # English for a small car, and the blue estate car is the ONLY vehicle among the six stated
+    # designations -- so the hop this shape exists to measure can be taken from world knowledge.
+    #
+    # V6 caught it on 2026-09-13: drop the runaround -> overflow space link on tme-sem-024 and the
+    # reader still answers "The roof needs doing before winter", 3 of 3. It was never carrying its
+    # weight; the previous corpus passed 15/15 because the model HEDGED ("If by 'the runaround'
+    # you mean the blue estate car...") and the resolution grader scored the hedge as declining.
+    # tme-sem-030 still passes on that hedge and is one phrasing away.
+    #
+    # NOT changed here, because changing it moves corpus bytes and owes a re-probe that nothing
+    # else in this vertical currently needs. The next semantic corpus change should carry it: a
+    # replacement needs an asked name that does not identify the KIND of its referent, which is
+    # the property the other five have and this one lacks. See V6Ratchet in TypedMemEvalCorpusTests.
     ("the blue estate car", "the runaround", "The runaround is the blue estate car."),
     ("the cottage at Wray Head", "the weekend place",
      "The weekend place is the cottage at Wray Head."),

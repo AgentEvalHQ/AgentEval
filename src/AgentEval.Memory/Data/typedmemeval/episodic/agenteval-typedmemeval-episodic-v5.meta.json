@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-episodic-v5",
   "vertical": "episodic",
-  "revision": "v5+bfb35552ec82",
+  "revision": "v5+cefa9956c0a8",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 50,
-  "corpus_sha256": "bfb35552ec82f45b4389a2c1620e30e1fee9ed2480188fa381ed1e046d36ac6d",
+  "corpus_sha256": "cefa9956c0a856149c1826a242e620d608334e8b11a45b3a696e4156ea472d19",
   "generator": {
     "tool": "tools/gen_typedmemeval_episodic.py",
     "version": "1.0.0",
@@ -20,16 +20,16 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.7877,
-    "echo": 0.6667,
-    "iterations": 54,
+    "mean_realised": 0.5969,
+    "echo": 0.3333,
+    "iterations": 76,
     "search_trace": [],
     "per_question": {
       "tme-epi-001": 1.0,
       "tme-epi-002": 0.0,
       "tme-epi-003": 0.0,
       "tme-epi-004": 1.0,
-      "tme-epi-005": 1.0,
+      "tme-epi-005": 0.0,
       "tme-epi-006": 0.0,
       "tme-epi-007": 1.0,
       "tme-epi-008": 0.0,
@@ -38,7 +38,7 @@
       "tme-epi-011": 1.0,
       "tme-epi-012": 1.0,
       "tme-epi-013": 1.0,
-      "tme-epi-014": 1.0,
+      "tme-epi-014": 0.0,
       "tme-epi-015": 0.0,
       "tme-epi-016": 1.0,
       "tme-epi-017": 1.0,
@@ -46,52 +46,54 @@
       "tme-epi-019": 1.0,
       "tme-epi-020": 0.0,
       "tme-epi-021": 0.6667,
-      "tme-epi-022": 0.7143,
-      "tme-epi-023": 0.4,
-      "tme-epi-024": 1.0,
+      "tme-epi-022": 0.4286,
+      "tme-epi-023": 0.6,
+      "tme-epi-024": 0.75,
       "tme-epi-025": 0.8,
       "tme-epi-026": 1.0,
       "tme-epi-027": 0.5,
-      "tme-epi-028": 0.75,
-      "tme-epi-029": 0.2857,
+      "tme-epi-028": 1.0,
+      "tme-epi-029": 0.1429,
       "tme-epi-030": 1.0,
       "tme-epi-031": 1.0,
       "tme-epi-032": 0.5714,
       "tme-epi-033": 0.6667,
-      "tme-epi-034": 0.4286,
+      "tme-epi-034": 0.2857,
       "tme-epi-035": 0.6,
-      "tme-epi-036": 1.0,
-      "tme-epi-037": 1.0,
-      "tme-epi-038": 1.0,
-      "tme-epi-039": 1.0,
+      "tme-epi-036": 0.5,
+      "tme-epi-037": 0.5,
+      "tme-epi-038": 0.3333,
+      "tme-epi-039": 0.3333,
       "tme-epi-040": 1.0,
       "tme-epi-041": 1.0,
-      "tme-epi-042": 1.0,
-      "tme-epi-043": 1.0,
-      "tme-epi-044": 1.0,
-      "tme-epi-045": 1.0,
-      "tme-epi-046": 1.0,
-      "tme-epi-047": 1.0,
-      "tme-epi-048": 1.0,
-      "tme-epi-049": 1.0,
-      "tme-epi-050": 1.0
+      "tme-epi-042": 0.3333,
+      "tme-epi-043": 0.5,
+      "tme-epi-044": 0.5,
+      "tme-epi-045": 0.5,
+      "tme-epi-046": 0.5,
+      "tme-epi-047": 0.3333,
+      "tme-epi-048": 0.5,
+      "tme-epi-049": 0.5,
+      "tme-epi-050": 0.5
     },
     "echo_by_shape": {
       "assistant-stated": 0.75,
       "list-order": 0.25,
-      "participant-attribution": 1.0
+      "participant-attribution": 0.0
     },
     "per_shape_realised": {
-      "assistant-stated": 0.7,
-      "list-order": 0.6922,
-      "participant-attribution": 1.0
-    }
+      "assistant-stated": 0.6,
+      "list-order": 0.6675,
+      "participant-attribution": 0.5222
+    },
+    "per_shape_out_of_band": []
   },
   "ceiling": {
     "k_ref": 5,
     "by_g": {
       "1": 1.0,
       "2": 1.0,
+      "3": 1.0,
       "4": 1.0,
       "5": 1.0,
       "6": 0.8333,
@@ -102,8 +104,9 @@
   },
   "structure": {
     "g_distribution": {
-      "1": 30,
-      "2": 5,
+      "1": 20,
+      "2": 10,
+      "3": 5,
       "4": 4,
       "5": 4,
       "6": 3,
@@ -115,8 +118,8 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": false,
     "empty_turns": {
-      "count": 250,
-      "of_turns": 5525,
+      "count": 231,
+      "of_turns": 5645,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
     }
@@ -295,53 +298,68 @@
       "episodic"
     ],
     "tme-epi-036": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-037": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-038": [
+      "episodic",
       "episodic",
       "episodic"
     ],
     "tme-epi-039": [
       "episodic",
+      "episodic",
       "episodic"
     ],
     "tme-epi-040": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-041": [
+      "episodic",
       "episodic",
       "episodic"
     ],
     "tme-epi-042": [
       "episodic",
+      "episodic",
       "episodic"
     ],
     "tme-epi-043": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-044": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-045": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-046": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-047": [
       "episodic",
+      "episodic",
       "episodic"
     ],
     "tme-epi-048": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-049": [
+      "episodic",
       "episodic"
     ],
     "tme-epi-050": [
+      "episodic",
       "episodic"
     ]
   },
@@ -403,40 +421,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5192,
+        "session_length_chars": 0.5736,
         "turn_count": 0.5,
-        "position_in_haystack": 0.5053,
-        "digit_density": 0.593,
-        "uppercase_density": 0.5135,
-        "sentence_count": 0.5749,
-        "punctuation_density": 0.5985,
-        "em_dash_density": 0.5113,
-        "mean_turn_chars": 0.5192,
-        "type_token_ratio": 0.5799,
-        "first_user_length_chars": 0.5794,
-        "first_user_uppercase_density": 0.5076,
-        "first_user_sentence_count": 0.5452,
-        "first_assistant_length_chars": 0.5776,
-        "first_assistant_uppercase_density": 0.5131,
-        "first_assistant_sentence_count": 0.5581,
-        "user_slot1_length_chars": 0.5612,
+        "position_in_haystack": 0.504,
+        "digit_density": 0.5588,
+        "uppercase_density": 0.5127,
+        "sentence_count": 0.5295,
+        "punctuation_density": 0.5098,
+        "em_dash_density": 0.5115,
+        "mean_turn_chars": 0.5736,
+        "type_token_ratio": 0.5275,
+        "first_user_length_chars": 0.5559,
+        "first_user_uppercase_density": 0.5457,
+        "first_user_sentence_count": 0.5095,
+        "first_assistant_length_chars": 0.5528,
+        "first_assistant_uppercase_density": 0.504,
+        "first_assistant_sentence_count": 0.5612,
+        "user_slot1_length_chars": 0.5421,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.5463,
-        "assistant_slot2_length_chars": 0.5268,
+        "assistant_slot1_length_chars": 0.5171,
+        "assistant_slot2_length_chars": 0.5047,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5033,
-        "user_uppercase_density": 0.5293,
-        "user_sentence_count": 0.5557,
-        "user_punctuation_density": 0.5815,
-        "user_type_token_ratio": 0.5434,
-        "user_mean_turn_chars": 0.5033,
-        "assistant_length_chars": 0.5178,
-        "assistant_uppercase_density": 0.5029,
-        "assistant_sentence_count": 0.5504,
-        "assistant_punctuation_density": 0.5667,
-        "assistant_type_token_ratio": 0.5567,
-        "assistant_mean_turn_chars": 0.5178,
+        "user_length_chars": 0.5814,
+        "user_uppercase_density": 0.5177,
+        "user_sentence_count": 0.5009,
+        "user_punctuation_density": 0.583,
+        "user_type_token_ratio": 0.5386,
+        "user_mean_turn_chars": 0.5814,
+        "assistant_length_chars": 0.5322,
+        "assistant_uppercase_density": 0.535,
+        "assistant_sentence_count": 0.5337,
+        "assistant_punctuation_density": 0.5861,
+        "assistant_type_token_ratio": 0.5029,
+        "assistant_mean_turn_chars": 0.5322,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -446,337 +464,337 @@
         "position_3_is_user": 0.5,
         "position_3_is_assistant": 0.5,
         "role_sequence": 0.5,
-        "gold_marker_ngram": 0.6724,
-        "boilerplate_ngram": 0.6294
+        "gold_marker_ngram": 0.6553,
+        "boilerplate_ngram": 0.6185
       },
       "worst_refused_feature": "gold_marker_ngram",
-      "worst_refused_auc": 0.6724,
+      "worst_refused_auc": 0.6553,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
       "worst_gold_marker_ngram": "on the",
-      "gold_marker_ngram_auc": 0.6724,
-      "worst_boilerplate_ngram": "order",
-      "boilerplate_ngram_auc": 0.6294,
+      "gold_marker_ngram_auc": 0.6553,
+      "worst_boilerplate_ngram": "put the",
+      "boilerplate_ngram_auc": 0.6185,
       "gold_exclusive_ngrams": [],
       "perfect_separation": {
         "session_length_chars": {
-          "share": 0.12,
-          "chance": 0.0606,
-          "observed": 6,
-          "expected": 3.03,
-          "z": 1.8
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "turn_count": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_in_haystack": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "digit_density": {
-          "share": 0.02,
-          "chance": 0.0606,
-          "observed": 1,
-          "expected": 3.03,
-          "z": -1.23
+          "share": 0.08,
+          "chance": 0.0415,
+          "observed": 4,
+          "expected": 2.07,
+          "z": 1.41
         },
         "uppercase_density": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "sentence_count": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "punctuation_density": {
-          "share": 0.04,
-          "chance": 0.0606,
-          "observed": 2,
-          "expected": 3.03,
-          "z": -0.62
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "em_dash_density": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "mean_turn_chars": {
-          "share": 0.12,
-          "chance": 0.0606,
-          "observed": 6,
-          "expected": 3.03,
-          "z": 1.8
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "type_token_ratio": {
           "share": 0.02,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 1,
-          "expected": 3.03,
-          "z": -1.23
+          "expected": 2.07,
+          "z": -0.78
         },
         "first_user_length_chars": {
-          "share": 0.0,
-          "chance": 0.0606,
-          "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "first_user_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0606,
-          "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "first_user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "first_assistant_length_chars": {
-          "share": 0.1,
-          "chance": 0.0606,
-          "observed": 5,
-          "expected": 3.03,
-          "z": 1.19
+          "share": 0.08,
+          "chance": 0.0415,
+          "observed": 4,
+          "expected": 2.07,
+          "z": 1.41
         },
         "first_assistant_uppercase_density": {
           "share": 0.04,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 2,
-          "expected": 3.03,
-          "z": -0.62
+          "expected": 2.07,
+          "z": -0.05
         },
         "first_assistant_sentence_count": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "user_slot1_length_chars": {
-          "share": 0.02,
-          "chance": 0.0606,
-          "observed": 1,
-          "expected": 3.03,
-          "z": -1.23
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "user_slot2_length_chars": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "user_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "assistant_slot1_length_chars": {
-          "share": 0.02,
-          "chance": 0.0606,
-          "observed": 1,
-          "expected": 3.03,
-          "z": -1.23
+          "share": 0.06,
+          "chance": 0.0415,
+          "observed": 3,
+          "expected": 2.07,
+          "z": 0.68
         },
         "assistant_slot2_length_chars": {
-          "share": 0.0,
-          "chance": 0.0606,
-          "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "assistant_slot3_length_chars": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "user_length_chars": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "user_uppercase_density": {
-          "share": 0.0,
-          "chance": 0.0606,
-          "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "user_sentence_count": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "user_punctuation_density": {
           "share": 0.04,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 2,
-          "expected": 3.03,
-          "z": -0.62
+          "expected": 2.07,
+          "z": -0.05
         },
         "user_type_token_ratio": {
-          "share": 0.12,
-          "chance": 0.0606,
-          "observed": 6,
-          "expected": 3.03,
-          "z": 1.8
+          "share": 0.04,
+          "chance": 0.0415,
+          "observed": 2,
+          "expected": 2.07,
+          "z": -0.05
         },
         "user_mean_turn_chars": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.02,
+          "chance": 0.0415,
+          "observed": 1,
+          "expected": 2.07,
+          "z": -0.78
         },
         "assistant_length_chars": {
           "share": 0.08,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 4,
-          "expected": 3.03,
-          "z": 0.59
+          "expected": 2.07,
+          "z": 1.41
         },
         "assistant_uppercase_density": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "assistant_sentence_count": {
-          "share": 0.06,
-          "chance": 0.0606,
-          "observed": 3,
-          "expected": 3.03,
-          "z": -0.02
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "assistant_punctuation_density": {
           "share": 0.04,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 2,
-          "expected": 3.03,
-          "z": -0.62
+          "expected": 2.07,
+          "z": -0.05
         },
         "assistant_type_token_ratio": {
-          "share": 0.04,
-          "chance": 0.0606,
-          "observed": 2,
-          "expected": 3.03,
-          "z": -0.62
+          "share": 0.0,
+          "chance": 0.0415,
+          "observed": 0,
+          "expected": 2.07,
+          "z": -1.52
         },
         "assistant_mean_turn_chars": {
           "share": 0.08,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 4,
-          "expected": 3.03,
-          "z": 0.59
+          "expected": 2.07,
+          "z": 1.41
         },
         "position_0_is_user": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_0_is_assistant": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_1_is_user": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_1_is_assistant": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_2_is_user": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_2_is_assistant": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_3_is_user": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "position_3_is_assistant": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         },
         "gold_marker_ngram": {
           "share": 0.0,
-          "chance": 0.0606,
+          "chance": 0.0415,
           "observed": 0,
-          "expected": 3.03,
-          "z": -1.84
+          "expected": 2.07,
+          "z": -1.52
         }
       },
       "bimodal_features": {},
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "bfb35552ec82f45b4389a2c1620e30e1fee9ed2480188fa381ed1e046d36ac6d"
+      "probed_corpus_sha256": "cefa9956c0a856149c1826a242e620d608334e8b11a45b3a696e4156ea472d19"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T13:18:54Z",
+    "run_at": "2026-09-13T09:11:45Z",
     "questions_probed": 50,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
       "applicable": 50,
       "passed": 49,
       "failed": [
-        "tme-epi-043"
+        "tme-epi-037"
       ]
     },
     "v1_pair_flip": {
@@ -831,13 +849,24 @@
         "tme-epi-033",
         "tme-epi-034",
         "tme-epi-035",
+        "tme-epi-036",
+        "tme-epi-037",
         "tme-epi-038",
         "tme-epi-039",
+        "tme-epi-040",
         "tme-epi-041",
         "tme-epi-042",
-        "tme-epi-047"
+        "tme-epi-043",
+        "tme-epi-044",
+        "tme-epi-045",
+        "tme-epi-046",
+        "tme-epi-047",
+        "tme-epi-048",
+        "tme-epi-049",
+        "tme-epi-050"
       ],
       "excluded_not_decidable": [],
+      "excluded_chance_undecidable": [],
       "excluded_reading": "These questions publish `gold_components_redundant: true`: the design states either component suffices, so ablating one leaves the other and V6 fails them by construction. They are OUT of both numerator and denominator, not scored as failures. Scoring them is what made this arm read 20/35 -- fifteen declared-by-design cases pooled with twenty real passes, which reads as a 57% validity rate on an arm that is clean where it is defined.",
       "applies_to": "questions that DECLARE `gold_components_load_bearing` and have more than one gold session. The scope used to be a hardcoded list of two verticals; it is now a per-question declaration, because three more generators state the same claim in their own comments and nothing tested it, while `semantic/current-value` states the opposite within a vertical the list would have swept in wholesale -- dropping a middle replacement still leaves the latest one",
       "not_applicable_reason": "V6 is not defined for episodic"
@@ -848,93 +877,119 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 16460,
+        "calls": 500,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 353,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4519,
-        "empty": 9,
-        "rate": 0.002,
-        "judge_calls": 1392,
+        "calls": 150,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 111,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 4621,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 2553,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 50,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1630,
+        "judge_calls": 50,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
       "applicable": 50,
       "v1_passed": 49,
-      "v8_passed": 50,
-      "interference_cost": -0.02,
-      "regressed_under_interference": [],
+      "v8_passed": 48,
+      "interference_cost": 0.02,
+      "regressed_under_interference": [
+        "tme-epi-036",
+        "tme-epi-041"
+      ],
       "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
+      "by_stratum": {
+        "assistant-stated": {
+          "questions": 20,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "list-order": {
+          "questions": 15,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "participant-attribution": {
+          "questions": 15,
+          "regressed": 2,
+          "interference_cost": 0.1333,
+          "question_ids": [
+            "tme-epi-036",
+            "tme-epi-041"
+          ]
+        }
+      }
     },
     "v9_reference_retrieval": {
       "applicable": 50,
       "v1_gold_only": 49,
-      "v8_full_haystack": 50,
-      "v9_bm25_top_k": 33,
-      "headroom_over_lexical_retrieval": 0.32,
-      "headroom_unlimited_context_over_lexical": 0.34,
+      "v8_full_haystack": 48,
+      "v9_bm25_top_k": 20,
+      "headroom_over_lexical_retrieval": 0.58,
+      "headroom_unlimited_context_over_lexical": 0.56,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
     "by_shape": {
@@ -947,7 +1002,7 @@
         "v8_applicable": 20,
         "v8_passed": 20,
         "v9_applicable": 20,
-        "v9_passed": 14,
+        "v9_passed": 12,
         "ci95": {
           "v1": [
             0.8389,
@@ -962,15 +1017,15 @@
             1.0
           ],
           "v9": [
-            0.481,
-            0.8545
+            0.3866,
+            0.7812
           ]
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 1,
-        "headroom_perfect_selector": 0.3,
+        "headroom_perfect_selector": 0.4,
         "discriminates": true,
-        "headroom_reachable": 0.3,
+        "headroom_reachable": 0.4,
         "limited_by": "retrieval",
         "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
       },
@@ -1017,9 +1072,9 @@
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
-        "v8_passed": 15,
+        "v8_passed": 13,
         "v9_applicable": 15,
-        "v9_passed": 15,
+        "v9_passed": 4,
         "ci95": {
           "v1": [
             0.7018,
@@ -1030,26 +1085,28 @@
             1.0
           ],
           "v8": [
-            0.7961,
-            1.0
+            0.6212,
+            0.9626
           ],
           "v9": [
-            0.7961,
-            1.0
+            0.109,
+            0.5195
           ]
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
-        "required_sessions_median": 1,
+        "required_sessions_median": 2,
         "chance_floor": 0.3333,
         "chance_floor_reason": "the question names its own 3 candidates, so a reader with no evidence still reaches gold at 1/3",
-        "v9_above_chance": 0.6667,
-        "v8_above_chance": 0.6667,
+        "v9_above_chance": -0.0666,
+        "v8_above_chance": 0.5334,
         "chance_floor_reading": "v9_above_chance is the reference retriever's rate MINUS what guessing scores on this shape. At or below zero the lexical baseline is not beating chance, so read the published headroom as measured against a floor rather than against retrieval skill. The shape can still rank two systems: a retriever that finds the selecting evidence scores above the floor, which is what the headroom is room for.",
-        "headroom_perfect_selector": -0.0667,
-        "discriminates": false,
-        "headroom_reachable": 0.0,
+        "headroom_perfect_selector": 0.6667,
+        "discriminates": true,
+        "headroom_reachable": 0.6,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "headroom_above_chance": 0.6,
+        "headroom_above_chance_reading": "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the lexical retriever and a guesser, because a guesser scores the floor for free. Where this is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads where guessing does not -- and the difference is floor, not retrieval room. Quote this figure, not the uncorrected one, when claiming how much better retrieval can make a system. `discriminates` is deliberately still keyed on the uncorrected headroom so the verdict does not move under a reporting change; on every shipped shape both agree."
       }
     },
     "per_question": {
@@ -1073,7 +1130,7 @@
       "tme-epi-002": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Calcombe handles the loft insulation quote.",
+        "v8_answer": "The loft insulation quote goes through Calcombe.",
         "v9": false,
         "v9_answer": "The conversations don’t say who handles the loft insulation quote.",
         "v9_gold_in_context": 0,
@@ -1090,9 +1147,9 @@
       "tme-epi-003": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The skip hire booking goes through Quincombe.",
+        "v8_answer": "Quincombe handles the skip hire booking.",
         "v9": false,
-        "v9_answer": "The earlier conversations don’t say who handles the skip hire booking. They only say the skip hire booking sits in bay RS-454.",
+        "v9_answer": "I didn’t say who handles the skip hire booking. I only said it sits in bay RS-454.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1107,9 +1164,9 @@
       "tme-epi-004": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The stair carpet order was filed under reference **HP-212**.",
+        "v8_answer": "HP-212.",
         "v9": true,
-        "v9_answer": "The stair carpet order reference was **HP-212**.",
+        "v9_answer": "HP-212",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1125,9 +1182,9 @@
         "v1": true,
         "v8": true,
         "v8_answer": "The Halmore yard.",
-        "v9": true,
-        "v9_answer": "Halmore yard.",
-        "v9_gold_in_context": 1,
+        "v9": false,
+        "v9_answer": "RS-273.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1141,9 +1198,9 @@
       "tme-epi-006": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Nadridge handles the boiler flue check, going by the file.",
+        "v8_answer": "Nadridge.",
         "v9": false,
-        "v9_answer": "I didn’t say who handles it. I only said the boiler flue check sits in bay PN-537.",
+        "v9_answer": "I didn’t say who handles the boiler flue check. The only recorded detail is that it sits in bay PN-537.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1158,9 +1215,9 @@
       "tme-epi-007": {
         "v1": true,
         "v8": true,
-        "v8_answer": "ZG-682.",
+        "v8_answer": "The guttering replacement sits in bay ZG-682.",
         "v9": true,
-        "v9_answer": "ZG-682",
+        "v9_answer": "The guttering replacement sits in bay ZG-682.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1175,9 +1232,9 @@
       "tme-epi-008": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Calrel handles the window survey.",
+        "v8_answer": "The window survey goes through Calrel.",
         "v9": false,
-        "v9_answer": "The conversations don’t say who handles the window survey. They only mention “handles,” “window,” and “survey” as things on your mind, without assigning them to anyone.",
+        "v9_answer": "The conversations do not say who handles the window survey.",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1192,9 +1249,9 @@
       "tme-epi-009": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The chimney sweep visit was filed under reference **KN-788**.",
+        "v8_answer": "The chimney sweep visit is filed under reference **KN-788**.",
         "v9": true,
-        "v9_answer": "KN-788.",
+        "v9_answer": "KN-788",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1243,9 +1300,9 @@
       "tme-epi-012": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The kayak trailer hire was filed under reference **VH-397**.",
+        "v8_answer": "VH-397",
         "v9": true,
-        "v9_answer": "VH-397.",
+        "v9_answer": "VH-397",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1260,7 +1317,7 @@
       "tme-epi-013": {
         "v1": true,
         "v8": true,
-        "v8_answer": "QV-319",
+        "v8_answer": "The garage door part was filed under reference **QV-319**.",
         "v9": true,
         "v9_answer": "The garage door part reference was **QV-319**.",
         "v9_gold_in_context": 1,
@@ -1277,10 +1334,10 @@
       "tme-epi-014": {
         "v1": true,
         "v8": true,
-        "v8_answer": "XC-826",
-        "v9": true,
-        "v9_answer": "XC-826",
-        "v9_gold_in_context": 1,
+        "v8_answer": "XC-826.",
+        "v9": false,
+        "v9_answer": "I don’t see a reference for the woodstore delivery in those conversations.",
+        "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1294,7 +1351,7 @@
       "tme-epi-015": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Keststow yard.",
+        "v8_answer": "The allotment shed permit is being held at the **Keststow yard**.",
         "v9": false,
         "v9_answer": "The conversations don’t say which yard the allotment shed permit is being held at.",
         "v9_gold_in_context": 0,
@@ -1311,9 +1368,9 @@
       "tme-epi-016": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The compost bin swap sits in bay **TD-797**.",
+        "v8_answer": "TD-797.",
         "v9": true,
-        "v9_answer": "The compost bin swap sits in bay TD-797.",
+        "v9_answer": "TD-797.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1345,7 +1402,7 @@
       "tme-epi-018": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The solar diverter part sits in bay RL-864.",
+        "v8_answer": "The solar diverter part sits in bay **RL-864**.",
         "v9": true,
         "v9_answer": "The solar diverter part sits in bay RL-864.",
         "v9_gold_in_context": 1,
@@ -1362,9 +1419,9 @@
       "tme-epi-019": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The drain survey was filed under reference **SQ-289**.",
+        "v8_answer": "SQ-289",
         "v9": true,
-        "v9_answer": "The drain survey reference was **SQ-289**.",
+        "v9_answer": "SQ-289.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -1379,9 +1436,9 @@
       "tme-epi-020": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The gate latch order is being held at the Wexholt yard.",
+        "v8_answer": "Wexholt yard.",
         "v9": false,
-        "v9_answer": "The earlier conversations don’t say that the gate latch order is being held at any yard. I only told you it “goes through PN-397.”",
+        "v9_answer": "I didn’t tell you a yard for the gate latch order. I only said it “goes through PN-397.”",
         "v9_gold_in_context": 0,
         "v2_hits": 0,
         "v2": true,
@@ -1396,9 +1453,9 @@
       "tme-epi-021": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Kestfoot — 2026/01/07\n2. Calcombe — 2026/01/16\n3. Braylick — 2026/01/17\n4. Kestridge — 2026/01/30\n5. Wexway — 2026/02/08\n6. Ottfoot — 2026/02/09",
+        "v8_answer": "Earliest first:\n\n1. Kestfoot — 2026/01/07  \n2. Calcombe — 2026/01/16  \n3. Braylick — 2026/01/17  \n4. Kestridge — 2026/01/30  \n5. Wexway — 2026/02/08  \n6. Ottfoot — 2026/02/09",
         "v9": false,
-        "v9_answer": "The conversations only show four of those additions:\n\n1. Kestfoot — 2026/01/07  \n2. Kestridge — 2026/01/30  \n3. Wexway — 2026/02/08  \n4. Ottfoot — 2026/02/09  \n\nI don’t see Calcombe or Braylick mentioned in the provided conversations, so I can’t determine their positions in the full six-item order f",
+        "v9_answer": "The conversations only show four of the six being added:\n\n1. Kestfoot — 2026/01/07  \n2. Calcombe — 2026/01/16  \n3. Braylick — 2026/01/17  \n4. Ottfoot — 2026/02/09  \n\nWexway and Kestridge do not appear in the provided conversations, so their positions in the full order cannot be determined from this ",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1414,10 +1471,10 @@
       "tme-epi-022": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Calhow — 2026/01/06\n2. Brayhow — 2026/01/12\n3. Quinholt — 2026/01/19\n4. Halway — 2026/01/21\n5. Rushfoot — 2026/01/24\n6. Nadridge — 2026/01/26\n7. Quinhow — 2026/01/27",
+        "v8_answer": "Earliest first:\n\n1. Calhow — 2026/01/06  \n2. Brayhow — 2026/01/12  \n3. Quinholt — 2026/01/19  \n4. Halway — 2026/01/21  \n5. Rushfoot — 2026/01/24  \n6. Nadridge — 2026/01/26  \n7. Quinhow — 2026/01/27",
         "v9": false,
-        "v9_answer": "The conversations do not contain the answer for all seven: **Quinholt** and **Halway** are not mentioned as being added.\n\nFrom the records, the known order is:\n\n1. **Calhow** — 2026/01/06  \n2. **Brayhow** — 2026/01/12  \n3. **Rushfoot** — 2026/01/24  \n4. **Nadridge** — 2026/01/26  \n5. **Quinhow** — 2",
-        "v9_gold_in_context": 5,
+        "v9_answer": "I don’t have enough information to give the full seven-item order.\n\nFrom the conversations, the coastal walks additions I can see are:\n\n1. Calhow — 2026/01/06  \n2. Halway — 2026/01/21  \n3. Quinhow — 2026/01/27  \n\nBrayhow, Quinholt, Nadridge, and Rushfoot are not mentioned as being added in the provi",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1434,8 +1491,8 @@
         "v8": true,
         "v8_answer": "Earliest first:\n\n1. Rushfoot — 2026/01/05\n2. Halmore — 2026/01/09\n3. Brayway — 2026/01/11\n4. Ottcombe — 2026/01/24\n5. Keststow — 2026/01/25",
         "v9": false,
-        "v9_answer": "The conversations don’t contain enough information to determine the full order.\n\nThey only show:\n\n1. **Brayway** — added on 2026/01/11  \n2. **Keststow** — added on 2026/01/25  \n\n**Ottcombe, Halmore, and Rushfoot** are not mentioned in the record, so their positions can’t be determined from it.",
-        "v9_gold_in_context": 2,
+        "v9_answer": "The conversations don’t contain enough information to order all five.\n\nWhat they do show is:\n\n1. Rushfoot — 2026/01/05  \n2. Halmore — 2026/01/09  \n3. Brayway — 2026/01/11  \n\nKeststow and Ottcombe do not appear in the record, so their positions can’t be determined from these conversations.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1451,9 +1508,9 @@
         "v1": true,
         "v8": true,
         "v8_answer": "Torrel → Velhow → Ferrel → Torcombe",
-        "v9": true,
-        "v9_answer": "Torrel → Velhow → Ferrel → Torcombe",
-        "v9_gold_in_context": 4,
+        "v9": false,
+        "v9_answer": "The conversations only show two supper-club additions:\n\n1. Torrel — 2026/01/09  \n2. Velhow — 2026/01/10  \n\nThey do not mention Torcombe or Ferrel being added, so the full four-item order cannot be determined from the record.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1468,9 +1525,9 @@
       "tme-epi-025": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Bramstow — 2026/01/10\n2. Penrel — 2026/01/12\n3. Rushstow — 2026/01/22\n4. Kestmore — 2026/01/24\n5. Halway — 2026/01/25",
+        "v8_answer": "Bramstow → Penrel → Rushstow → Kestmore → Halway",
         "v9": false,
-        "v9_answer": "From the conversations, the additions I can verify are:\n\n1. Bramstow — 2026/01/10  \n2. Penrel — 2026/01/12  \n3. Rushstow — 2026/01/22  \n4. Halway — 2026/01/25  \n\nKestmore is not mentioned in the provided conversations, so I can’t determine where it fits in the order.",
+        "v9_answer": "The conversations show four orchard varieties added, in this order:\n\n1. Bramstow — 2026/01/10  \n2. Penrel — 2026/01/12  \n3. Rushstow — 2026/01/22  \n4. Kestmore — 2026/01/24  \n\nThey do not mention Halway being added, so I can’t place Halway in the order from the provided record.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1486,7 +1543,7 @@
       "tme-epi-026": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Marstow — 2026/01/05\n2. Sellick — 2026/01/11\n3. Calstow — 2026/01/15\n4. Hesthow — 2026/01/19",
+        "v8_answer": "Marstow → Sellick → Calstow → Hesthow",
         "v9": true,
         "v9_answer": "Marstow, Sellick, Calstow, Hesthow.",
         "v9_gold_in_context": 4,
@@ -1504,9 +1561,9 @@
       "tme-epi-027": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Otthow → Selfoot → Marstow → Glenway → Penhow → Halcombe",
+        "v8_answer": "Earliest first:\n\n1. Otthow — 2026/01/11  \n2. Selfoot — 2026/01/14  \n3. Marstow — 2026/01/16  \n4. Glenway — 2026/01/24  \n5. Penhow — 2026/01/27  \n6. Halcombe — 2026/01/31",
         "v9": false,
-        "v9_answer": "I can’t determine the full six-item order from the conversations provided.\n\nThe records only show these named beaches being added:\n\n1. Otthow — 2026/01/11  \n2. Glenway — 2026/01/24  \n3. Halcombe — 2026/01/31  \n\nThey do not show Selfoot, Penhow, or Marstow being added.",
+        "v9_answer": "The conversations don’t contain enough information to determine the full order for all six.\n\nThey only show these additions:\n\n1. Selfoot — 2026/01/14  \n2. Marstow — 2026/01/16  \n3. Glenway — 2026/01/24  \n\nHalcombe, Penhow, and Otthow are not mentioned in the provided conversations.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1523,9 +1580,9 @@
         "v1": true,
         "v8": true,
         "v8_answer": "Selridge → Ardcombe → Nadrel → Penridge",
-        "v9": false,
-        "v9_answer": "The conversations don’t say when Ardcombe was added, so I can’t determine the full order.\n\nFrom the records given, the known order is:\n\n1. Selridge — 2026/01/11  \n2. Nadrel — 2026/01/25  \n3. Penridge — 2026/01/26\n\nArdcombe is not mentioned in the provided conversations.",
-        "v9_gold_in_context": 3,
+        "v9": true,
+        "v9_answer": "Selridge, Ardcombe, Nadrel, Penridge.",
+        "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1542,8 +1599,8 @@
         "v8": true,
         "v8_answer": "Earliest first:\n\n1. Rushholt — 2026/01/05  \n2. Bramridge — 2026/01/15  \n3. Ferway — 2026/01/16  \n4. Glenway — 2026/01/20  \n5. Ardlick — 2026/01/22  \n6. Glenlick — 2026/01/31  \n7. Braymore — 2026/02/03",
         "v9": false,
-        "v9_answer": "The conversations only establish two of those additions:\n\n1. Rushholt — added 2026/01/05  \n2. Bramridge — added 2026/01/15  \n\nThey do not contain enough information to place Ardlick, Glenlick, Glenway, Braymore, or Ferway in the order.",
-        "v9_gold_in_context": 2,
+        "v9_answer": "I can’t determine that order from the conversations.\n\nThey only explicitly mention adding **Glenway** to the swimming spots shortlist, on **2026/01/20**, plus **Windle bothy** and **Marden ferry**. They do not mention Ardlick, Glenlick, Rushholt, Braymore, Ferway, or Bramridge being added, nor give ",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1576,9 +1633,9 @@
       "tme-epi-031": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Quinstow → Quincombe → Wexmore → Calmore → Bramway",
+        "v8_answer": "Earliest first:\n\n1. Quinstow — 2026/01/05  \n2. Quincombe — 2026/01/12  \n3. Wexmore — 2026/01/15  \n4. Calmore — 2026/01/21  \n5. Bramway — 2026/01/27",
         "v9": true,
-        "v9_answer": "Quinstow → Quincombe → Wexmore → Calmore → Bramway",
+        "v9_answer": "Quinstow, Quincombe, Wexmore, Calmore, Bramway.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -1596,7 +1653,7 @@
         "v8": true,
         "v8_answer": "Earliest first:\n\n1. Nadhow — 2026/01/15  \n2. Dunhow — 2026/01/17  \n3. Vellick — 2026/01/19  \n4. Calhow — 2026/01/24  \n5. Nadrel — 2026/02/05  \n6. Selmore — 2026/02/06  \n7. Penhow — 2026/02/11",
         "v9": false,
-        "v9_answer": "The conversations do not contain the full order for all seven.\n\nThey only show these additions, earliest first:\n\n1. Nadhow — 2026/01/15  \n2. Dunhow — 2026/01/17  \n3. Calhow — 2026/01/24  \n4. Nadrel — 2026/02/05  \n\nSelmore, Vellick, and Penhow are not shown as being added in the provided conversation",
+        "v9_answer": "The conversations only show four of those market-stalls additions:\n\n1. Nadhow — 2026/01/15  \n2. Dunhow — 2026/01/17  \n3. Selmore — 2026/02/06  \n4. Penhow — 2026/02/11  \n\nNadrel, Vellick, and Calhow do not appear in the provided conversations, so the full seven-item order cannot be determined from th",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1612,9 +1669,9 @@
       "tme-epi-033": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Quinlick → Nadstow → Velcombe → Ardcombe → Halway → Glenstow",
+        "v8_answer": "Earliest first:\n\n1. Quinlick — 2026/01/07  \n2. Nadstow — 2026/01/12  \n3. Velcombe — 2026/01/15  \n4. Ardcombe — 2026/01/16  \n5. Halway — 2026/01/30  \n6. Glenstow — 2026/02/04",
         "v9": false,
-        "v9_answer": "I can’t determine the full six-shop order from the conversations provided.\n\nThe recorded additions, earliest first, are:\n\n1. Velcombe — 2026/01/15  \n2. Ardcombe — 2026/01/16  \n3. Halway — 2026/01/30  \n4. Glenstow — 2026/02/04  \n\nQuinlick and Nadstow do not appear in the provided conversations, so th",
+        "v9_answer": "I can’t determine the full six-item order from the conversations shown, because **Halway** and **Ardcombe** are not mentioned there.\n\nThe record shops additions that are recorded, earliest first, are:\n\n1. **Quinlick** — 2026/01/07  \n2. **Nadstow** — 2026/01/12  \n3. **Velcombe** — 2026/01/15  \n4. **G",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -1632,8 +1689,8 @@
         "v8": true,
         "v8_answer": "Earliest first:\n\n1. Duncombe — 2026/01/09 03:00  \n2. Ottridge — 2026/01/17 21:00  \n3. Dunridge — 2026/01/21 15:00  \n4. Selhow — 2026/01/26 15:00  \n5. Sellick — 2026/01/30 09:00  \n6. Marway — 2026/02/05 15:00  \n7. Ferhow — 2026/02/08 03:00",
         "v9": false,
-        "v9_answer": "The conversations do not contain the full answer.\n\nThey only show these podcast-series shortlist additions:\n\n1. Ottridge — 2026/01/17  \n2. Selhow — 2026/01/26  \n3. Sellick — 2026/01/30  \n\nThere is no record here of Marway, Ferhow, Duncombe, or Dunridge being added, so I can’t determine the full earl",
-        "v9_gold_in_context": 3,
+        "v9_answer": "The conversations do not contain enough information to determine the full order for all seven.\n\nThey only show these podcast-series additions:\n\n1. **Duncombe** — 2026/01/09  \n2. **Ferhow** — 2026/02/08  \n\nSo the only order supported by the record is: **Duncombe before Ferhow**. The record does not s",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -1648,9 +1705,9 @@
       "tme-epi-035": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Earliest first:\n\n1. Nadrel — 2026/01/09  \n2. Fermore — 2026/01/11  \n3. Hesthow — 2026/01/16  \n4. Penrel — 2026/01/17  \n5. Ferholt — 2026/01/24",
+        "v8_answer": "Nadrel → Fermore → Hesthow → Penrel → Ferholt",
         "v9": false,
-        "v9_answer": "The conversations only show these repair cafes shortlist additions:\n\n1. Nadrel — 2026/01/09  \n2. Penrel — 2026/01/17  \n3. Ferholt — 2026/01/24  \n\nThey do not mention Hesthow or Fermore, so I can’t determine the full five-item order from the record provided.",
+        "v9_answer": "The conversations only show three shortlist additions:\n\n1. Nadrel — 2026/01/09  \n2. Penrel — 2026/01/17  \n3. Ferholt — 2026/01/24  \n\nThey do not mention Hesthow or Fermore being added, so the full five-item order cannot be determined from the record.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -1665,10 +1722,10 @@
       },
       "tme-epi-036": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "I said it — the assistant did, in the 2026/01/26 session. You asked about the tool library, and I replied that “renewals happen at the counter, never online.”",
-        "v9": true,
-        "v9_answer": "It was me (the assistant), not you. In Session 5, you asked what to keep in mind about the tool library, and I replied that renewals happen at the counter, never online.",
+        "v8": false,
+        "v8_answer": "You. In that afternoon session, you were the one who brought up giving up on the website and going in person; I only agreed that it sounded sensible afterward.",
+        "v9": false,
+        "v9_answer": "Your point. You were the one who brought up giving up on the website and walking down there in person; I only responded to it afterward.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1679,35 +1736,37 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
       "tme-epi-037": {
-        "v1": true,
+        "v1": false,
         "v8": true,
-        "v8_answer": "It was you.\n\nIn Session 19, you said: “Worth remembering about the canal gate: it gets locked from the far side.”\n\nI don’t see me saying that about the canal gate in the earlier conversations.",
-        "v9": true,
-        "v9_answer": "You said it — in Session 5: “Worth remembering about the canal gate: it gets locked from the far side.”\n\nI did not say that about the canal gate in the recorded conversations.",
+        "v8_answer": "Yours.  \n\nYou had earlier said the canal gate “gets locked from the far side” in Session 3, and my later towpath line in Session 14 seems to be following from that. I don’t see an earlier assistant-originated point that independently set it up.",
+        "v9": false,
+        "v9_answer": "The record doesn’t say whose earlier point it was. The “double back round the towpath” line was said by me in Session 2, in response to you, but it doesn’t specify whether the point was yours, mine, or both.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
-        "v3_hits": 0,
+        "v3_hits": 2,
         "v3_required_hits": 3,
         "v3_candidates": 3,
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
       "tme-epi-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Both of us.\n\nYou said it first in Session 1: “About the corner pharmacy — it shuts for an hour over lunch.”\n\nI also said it later in Session 15: “About the corner pharmacy — it shuts for an hour over lunch.”",
-        "v9": true,
-        "v9_answer": "Both of us.\n\nYou said it in Session 1: “About the corner pharmacy — it shuts for an hour over lunch.”\n\nI said it in Session 5: “About the corner pharmacy — it shuts for an hour over lunch.”",
-        "v9_gold_in_context": 2,
+        "v8_answer": "Both of us — assuming you mean the point that the corner pharmacy shuts for an hour over lunch.\n\nYou raised that first on Jan 9, and I repeated it on Jan 14. The half-twelve cafe-opposite incident fits with that.",
+        "v9": false,
+        "v9_answer": "Yours. In the record, you were the one who brought up turning up at half twelve and killing time in the cafe opposite; I only responded afterward.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1724,10 +1783,10 @@
       "tme-epi-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Both of us.\n\n- You said it on 2026/01/07: “On the Marrow Lane depot, it only takes card after six.”\n- I said it on 2026/01/10: “On the Marrow Lane depot, it only takes card after six.”",
-        "v9": true,
-        "v9_answer": "Both of us.\n\nYou said it in Session 1: “On the Marrow Lane depot, it only takes card after six.”\n\nI also said it in Session 3: “On the Marrow Lane depot, it only takes card after six.”",
-        "v9_gold_in_context": 2,
+        "v8_answer": "Both of us — but you said it first.\n\nYou noted on 2026/01/09 that the Marrow Lane depot “only takes card after six,” and I repeated the same point on 2026/01/17. The later “rolled up late” / “tapped my bank app instead of paying cash” bit was going on that card-after-six point.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say whether it was your point, my point, or both of ours.\n\nThey only say that, on that late run, **Ithe Vellevund and Norra Wendxby had both said as much**.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1744,10 +1803,10 @@
       "tme-epi-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it. In Session 11, you said: “The thing with the west stairwell is that the light there is on its own breaker.”",
+        "v8_answer": "You. The earlier relevant point in the record was yours: on Jan 22 you said the west stairwell light was on its own breaker. When the landing went dark later, I only acknowledged that flipping the separate switch made sense.",
         "v9": true,
-        "v9_answer": "That was you. In Session 5, you said: “The thing with the west stairwell is that the light there is on its own breaker.”\n\nI did not say that about the west stairwell in the recorded conversations.",
-        "v9_gold_in_context": 1,
+        "v9_answer": "You. The record shows you brought up the landing going dark and flipping the separate switch in the cupboard.",
+        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1757,16 +1816,17 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
       "tme-epi-041": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "Both of us.\n\n- You said it on 2026/01/14: “One thing about the community fridge, it stops taking donations mid-afternoon.”\n- I said it on 2026/01/24: “One thing about the community fridge, it stops taking donations mid-afternoon.”",
+        "v8": false,
+        "v8_answer": "The record only shows **you** saying, “That sounds like the sensible way round it,” and then **me** stating, “I dropped the crate round first thing so it would not be turned away.”\n\nIt doesn’t say that either of us had made that point earlier. So I can’t tell from the conversations whether it was yo",
         "v9": true,
-        "v9_answer": "Both of us.\n\nYou said it in Session 3, and I said it in Session 5.",
-        "v9_gold_in_context": 2,
+        "v9_answer": "You had made the earlier point first: the community fridge stops taking donations mid-afternoon.\n\nI repeated it later, so by the time of the crate we had both mentioned it, but it originated with you.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1783,10 +1843,10 @@
       "tme-epi-042": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Both of us.\n\nYou said it in Session 13: “Worth remembering about the print shop: it wants files flattened before upload.”\n\nI also said it in Session 18: “Worth remembering about the print shop: it wants files flattened before upload.”",
-        "v9": true,
-        "v9_answer": "Both of us.\n\nYou said it in Session 4, and I repeated it in Session 5.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "Both of us, but it originated with you.\n\nYou first noted that the print shop “wants files flattened before upload” in Session 11, and I repeated that point in Session 15. Your later exporting it as a single image in Session 16 was following that earlier flattening point.",
+        "v9": false,
+        "v9_answer": "Your point. You brought up the single-image export and sending it over; I only followed on from that.",
+        "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1801,88 +1861,12 @@
         "v11": null
       },
       "tme-epi-043": {
-        "v1": false,
-        "v8": true,
-        "v8_answer": "It was **me** — the assistant.\n\nIn Session 8, I said: “About the bus replacement — it leaves from the far side of the bridge.”\n\nYou did use that phrase earlier too, but about the **west stairwell**, not the bus replacement.",
-        "v9": true,
-        "v9_answer": "It was me — the assistant — not you.\n\nIn Session 4, I said: “About the bus replacement — it leaves from the far side of the bridge.”",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2_candidates": 3,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 3,
-        "v3_candidates": 3,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null,
-        "v10": null,
-        "v11": null
-      },
-      "tme-epi-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me — the assistant.\n\nIn Session 19, I said: “On the hall projector, it wakes up faster on the side input.”\n\nYou did say that phrase earlier, but about the community fridge, not the hall projector.",
-        "v9": true,
-        "v9_answer": "You said it — in Session 5, the assistant said: “On the hall projector, it wakes up faster on the side input.”\n\nYou had mentioned the hall projector, but you did not say that particular line about the side input.",
+        "v8_answer": "We were going on **my earlier point**: I had said the bus replacement left from the far side of the bridge, and then later said we crossed over and waited by the parade of shops. I don’t see that you had made that same point earlier.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say whether it was your earlier point, mine, or both. The only record says that “we crossed over and waited by the parade of shops instead,” and that Quenn Marthphex and Lorrin Sablewraith had both said as much.",
         "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2_candidates": 3,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 3,
-        "v3_candidates": 3,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null,
-        "v10": null,
-        "v11": null
-      },
-      "tme-epi-045": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "You said it — not me.\n\nIn Session 20, you said: “The thing with the wheelie bin round is that it skips the first week of every month.”",
-        "v9": true,
-        "v9_answer": "You said it. In Session 4, you said: “The thing with the wheelie bin round is that it skips the first week of every month.”\n\nI did not say that about the wheelie bin round in the recorded conversations.",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2_candidates": 3,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 3,
-        "v3_candidates": 3,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null,
-        "v10": null,
-        "v11": null
-      },
-      "tme-epi-046": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "It was you.\n\nIn Session 11, you said: “One thing about the low bend on the river path, it floods for days after heavy rain.”",
-        "v9": true,
-        "v9_answer": "It was you. In Session 4, you said: “One thing about the low bend on the river path, it floods for days after heavy rain.”",
-        "v9_gold_in_context": 1,
-        "v2_hits": 0,
-        "v2_candidates": 3,
-        "v2": true,
-        "v3_hits": 0,
-        "v3_required_hits": 3,
-        "v3_candidates": 3,
-        "v3": true,
-        "ablation_samples": 3,
-        "v6": null,
-        "v10": null,
-        "v11": null
-      },
-      "tme-epi-047": {
-        "v1": true,
-        "v8": true,
-        "v8_answer": "Both of us.\n\nYou said it in Session 9: “Worth remembering about the loft hatch: it sticks unless you lift before you push.”\n\nI said it in Session 14: “Worth remembering about the loft hatch: it sticks unless you lift before you push.”",
-        "v9": true,
-        "v9_answer": "Both of us.\n\nYou said it in Session 3: “Worth remembering about the loft hatch: it sticks unless you lift before you push.”\n\nI also said it in Session 4: “Worth remembering about the loft hatch: it sticks unless you lift before you push.”",
-        "v9_gold_in_context": 2,
         "v2_hits": 0,
         "v2_candidates": 3,
         "v2": true,
@@ -1896,12 +1880,12 @@
         "v10": null,
         "v11": null
       },
-      "tme-epi-048": {
+      "tme-epi-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "That was me. In Session 12, you asked about the bulk-buy account, and I answered that it “needs two signatures before anything changes.”",
-        "v9": true,
-        "v9_answer": "That was me. You asked about the bulk-buy account, but I was the one who said it needs two signatures before anything changes.",
+        "v8_answer": "It was my earlier point: I’d said the hall projector “wakes up faster on the side input” in Session 22. Your later note about swapping the cable to the other socket and it coming on almost straight away matches that.",
+        "v9": false,
+        "v9_answer": "The conversations don’t say whose earlier point it was. They only record you saying that we swapped the cable to the other socket and it worked.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1912,15 +1896,96 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
+        "v10": null,
+        "v11": null
+      },
+      "tme-epi-045": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Your point. It follows your earlier note that the wheelie bin round skips the first week of every month.",
+        "v9": true,
+        "v9_answer": "You had made the earlier point. I then replied with the bit about leaving ours on the kerb until the following Tuesday.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 3,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
+        "v10": null,
+        "v11": null
+      },
+      "tme-epi-046": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You. The relevant earlier point was your note that the low bend on the river path “floods for days after heavy rain.” I only acknowledged it later; I didn’t originate that point.",
+        "v9": true,
+        "v9_answer": "We were going on **your** point. You were the one who said we went the long way round by the fields rather than risk our boots; I only agreed that it sounded sensible.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 3,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
+        "v10": null,
+        "v11": null
+      },
+      "tme-epi-047": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "Both of us.\n\nYou first noted that the loft hatch “sticks unless you lift before you push” in Session 6, and I repeated the same point in Session 9. The later “took the weight on my shoulders first and it gave without a fight” appears to be going on that shared earlier point.",
+        "v9": false,
+        "v9_answer": "The record only shows that I said “I took the weight on my shoulders first and it gave without a fight” in response to your preceding message. It doesn’t plainly say whether that was going on your earlier point, mine, or both.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 3,
+        "v2": true,
+        "v3_hits": 1,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
+        "v10": null,
+        "v11": null
+      },
+      "tme-epi-048": {
+        "v1": true,
+        "v8": true,
+        "v8_answer": "You were going on **my earlier point**.\n\nThe relevant earlier note was in Session 1, when I said the bulk-buy account “needs two signatures before anything changes.” Later, you said you had to chase Priya for a countersign so the order would not stall. The record does not show you making that counte",
+        "v9": false,
+        "v9_answer": "Your point. You were the one who brought up chasing Priya for the countersign; I only responded afterward.",
+        "v9_gold_in_context": 1,
+        "v2_hits": 0,
+        "v2_candidates": 3,
+        "v2": true,
+        "v3_hits": 0,
+        "v3_required_hits": 3,
+        "v3_candidates": 3,
+        "v3": true,
+        "ablation_samples": 3,
+        "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
       "tme-epi-049": {
         "v1": true,
         "v8": true,
-        "v8_answer": "You said it — in Session 1: “On the allotment tap, it gets turned off at the main over winter.”\n\nI did not say that about the allotment tap in the record.",
-        "v9": true,
-        "v9_answer": "It was you. In Session 1, you said: “On the allotment tap, it gets turned off at the main over winter.”",
+        "v8_answer": "We were going on **your** earlier point: in Session 2 you said the allotment tap “gets turned off at the main over winter.” That explains the later bit about hauling cans down from the house on every visit.",
+        "v9": false,
+        "v9_answer": "That was the assistant’s earlier point, not yours, and not both. The “hauling a couple of cans down from the house every visit” line appears only in the assistant’s Session 2 reply.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1931,15 +1996,16 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       },
       "tme-epi-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "It was me, not you.\n\nIn Session 18, you asked, “Remind me about the laundrette?” and I answered: “The thing with the laundrette is that the big machines take tokens rather than coins.”\n\nYou did say that exact “big machines take tokens rather than coins” detail earlier, but that was about the corner ",
-        "v9": true,
-        "v9_answer": "It was me: in Session 5, I said, “The thing with the laundrette is that the big machines take tokens rather than coins.” You had asked about the laundrette, but you didn’t say that specific thing about it.",
+        "v8_answer": "You were going on **my** earlier point: in Session 8 I said the laundrette’s big machines take **tokens rather than coins**, and later you mentioned queuing for a handful of **brass discs** before starting.",
+        "v9": false,
+        "v9_answer": "You. In the record, you were the one who first mentioned queuing at the desk for a handful of brass discs; I only responded afterward.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2_candidates": 3,
@@ -1950,11 +2016,44 @@
         "v3": true,
         "ablation_samples": 3,
         "v6": null,
+        "v6_not_applicable": "no_load_bearing_claim",
         "v10": null,
         "v11": null
       }
     },
-    "probed_corpus_sha256": "bfb35552ec82f45b4389a2c1620e30e1fee9ed2480188fa381ed1e046d36ac6d",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "probed_corpus_sha256": "cefa9956c0a856149c1826a242e620d608334e8b11a45b3a696e4156ea472d19",
+    "retriever_sensitivity": {
+      "reference_retriever": "bm25-okapi-k1.5-b0.75",
+      "reference_k": 5,
+      "dense_retriever": "azure-openai-embeddings, cosine, same documents and budget",
+      "operand": "ALLgold -- gold.issubset(top_k), the quantity V9 tracks",
+      "reading": "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a CONDITION of every headroom figure in this sidecar and was left implicit until 2026-09-13. This block states it. `allgold_dense` is the same measurement with an embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's published figures, over-stating by +0.032. A shape with `discriminates_under_dense: false` can still rank two systems for a BM25 consumer and cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and it says nothing about any consumer's chunking, reranking or query rewriting.",
+      "by_shape": {
+        "assistant-stated": {
+          "questions": 20,
+          "allgold_bm25": 0.6,
+          "allgold_dense": 1.0,
+          "predicted_headroom_bm25": 0.4,
+          "predicted_headroom_dense": 0.0,
+          "discriminates_under_dense": false
+        },
+        "list-order": {
+          "questions": 15,
+          "allgold_bm25": 0.2667,
+          "allgold_dense": 0.4,
+          "predicted_headroom_bm25": 0.7333,
+          "predicted_headroom_dense": 0.6,
+          "discriminates_under_dense": true
+        },
+        "participant-attribution": {
+          "questions": 15,
+          "allgold_bm25": 0.1333,
+          "allgold_dense": 0.4667,
+          "predicted_headroom_bm25": 0.8667,
+          "predicted_headroom_dense": 0.5333,
+          "discriminates_under_dense": true
+        }
+      }
+    }
   }
 }

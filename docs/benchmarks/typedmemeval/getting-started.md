@@ -368,15 +368,15 @@ Shipped calibration (BM25 @ K_ref = 5):
 
 | Vertical | n | Mean realised coverage | `G` distribution |
 |---|---|---|---|
-| Prospective | 50 | 0.633 | 1 (×31), 2 (×8), 3 (×8), 4 (×3) |
-| Episodic | 50 | 0.788 | 1 (×30), 2 (×5), 4 (×4), 5 (×4), 6 (×3), 7 (×4) |
-| Arithmetic | 50 | 0.758 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
+| Prospective | 72 | 0.597 | 1 (×53), 2 (×16), 3 (×2), 4 (×1) |
+| Episodic | 50 | 0.597 | 1 (×20), 2 (×10), 3 (×5), 4 (×4), 5 (×4), 6 (×3), 7 (×4) |
+| Arithmetic | 50 | 0.770 | 3 (×11), 4 (×17), 5 (×8), 6 (×14) |
 | WorkingMemory | 60 | 0.600 | 1 (×60) |
-| Forgetting | 50 | 0.686 | 0 (×15), 2 (×35) |
-| Bitemporal | 60 | 0.750 | 1 (×60) |
+| Forgetting | 50 | 0.614 | 0 (×15), 2 (×35) |
+| Bitemporal | 60 | 0.617 | 1 (×60) |
 | Temporal | 50 | 0.704 | 2 (×15), 3 (×11), 4 (×12), 5 (×12) |
-| Semantic | 50 | 0.667 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
-| Conjunction | 65 | 0.604 | 2 (×15), 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
+| Semantic | 50 | 0.657 | 1 (×15), 2 (×15), 3 (×10), 4 (×5), 5 (×5) |
+| Conjunction | 65 | 0.610 | 2 (×15), 3 (×5), 4 (×12), 5 (×20), 6 (×7), 8 (×6) |
 | Procedural | 80 | 0.575 | 2 (×60), 4 (×20) |
 
 Forgetting's two coverage figures are the same distinction the runtime report draws. Fifteen of its
@@ -452,15 +452,15 @@ gold is itself an abstention.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
-| Prospective | 49/50 | 18/19 | 50/50 | 27/27 | — | 48/50 | 22/50 | +0.54 |
-| Episodic | 49/50 | — | 50/50 | 50/50 | — | 50/50 | 33/50 | +0.32 |
-| Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 19/50 | +0.62 |
+| Prospective | 71/72 | 29/30 | 72/72 | 35/35 | — | 70/72 | 39/72 | +0.44 |
+| Episodic | 49/50 | — | 50/50 | 50/50 | — | 48/50 | 20/50 | +0.58 |
+| Arithmetic | 50/50 | — | 50/50 | 49/50 | 49/50 | 50/50 | 21/50 | +0.58 |
 | WorkingMemory | 60/60 | — | 60/60 | 60/60 | — | 60/60 | 37/60 | +0.38 |
-| Forgetting | 33/35 | 13/15 | 35/35 | 35/35 | 20/20 | 35/35 | 23/35 | +0.29 |
-| Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 57/60 | 41/60 | +0.32 |
+| Forgetting | 34/35 | 14/15 | 35/35 | 35/35 | 20/20 | 35/35 | 22/35 | +0.34 |
+| Bitemporal | 60/60 | 30/30 | 60/60 | 60/60 | — | 57/60 | 35/60 | +0.42 |
 | Temporal | 50/50 | — | 50/50 | 30/30 | 30/30 | 50/50 | 19/50 | +0.62 |
-| Semantic | 49/50 | — | 48/50 | 50/50 | 15/15 | 49/50 | 30/50 | +0.38 |
-| Conjunction | 65/65 | — | 65/65 | 65/65 | 50/50 | 63/65 | 16/65 | +0.75 |
+| Semantic | 50/50 | — | 49/50 | 50/50 | 14/15 | 49/50 | 28/50 | +0.44 |
+| Conjunction | 65/65 | — | 65/65 | 65/65 | 50/50 | 62/65 | 15/65 | +0.77 |
 | Procedural | 80/80 | — | 80/80 | 80/80 | 70/72 | 80/80 | 16/80 | +0.80 |
 
 > **Read this before citing any of these corpora for retrieval quality — the first version of this

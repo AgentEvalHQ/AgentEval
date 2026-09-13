@@ -16253,3 +16253,1907 @@ nothing was changed that could fix it. Nine clean runs bound the frequency, they
 reach it — a genuine correctness problem in the gate rather than a test artefact. Until then this
 is an open, low-frequency, test-only anomaly with a named subject and a live instrument, recorded
 rather than closed.
+
+---
+
+## §88 — Phase 0 re-taken against `e4322e0d`: three items closed, three defects found, **0 corpus bytes** (2026-09-12)
+
+Every figure below was measured against the tree at `e4322e0d`, free. **No corpus file changed in any
+of the nine commits** — checked, not assumed:
+
+```
+git diff --name-only dc5369b1..HEAD -- src/AgentEval.Memory/Data/typedmemeval/   ->  0
+procedural corpus_sha256, dc5369b1 vs now                                         ->  IDENTICAL
+```
+
+So no `probed_corpus_sha256` moved and **no consumer control resets**. Every measurement in the
+quality board still binds.
+
+### 88.1 `C-F` — the filed question conflated two different floors
+
+`CalibratedFloorMean` is the corpus's **calibrated BM25 mean coverage** — a competent algorithm's
+performance. `ChanceFloor` is *"k, the arm's DECLARED draw budget"* — what luck alone yields, applied
+at an admission door. Typing the first as the second would let **"beat word matching" masquerade as
+"cleared chance"**, which is a far stronger claim. Refused, with the reason in the code.
+
+**But the real floor never crossed at all, and it is material.** Measured at any nesting depth (a
+first count said 0 of 565 because the extension key was guessed as `extension`; it is `typedmemeval`):
+
+| vertical | declares a floor | E[correct from luck] | share of vertical |
+| --- | ---: | ---: | ---: |
+| **procedural** | **80 / 80** | **27.2** | **34.1%** |
+| conjunction | 30 / 65 | 12.5 | 19.2% |
+| semantic | 15 / 50 | 5.0 | 10.0% |
+| the other seven | none | — | — |
+
+Floors in use: `0.3333` ×96, `0.5` ×23, `0.2` ×5, `0.25` ×1.
+
+A consumer receives **aggregate counts only** — no per-question results — so "correct 35 of 80" on
+Procedural reads as 44% understanding when luck supplies 27 of those 35. `TypedMemEvalGuessingBaseline`
+now ships it per vertical, printed directly beneath `correct`.
+
+⚠ **An upper bound on free score, never a subtraction.** It assumes the system answers every
+closed-choice question; one that abstains scores below it without being worse.
+
+### 88.2 `B3` — one cause, not three, and the corpus was never the problem
+
+| shape | clock | n | regressed | rate |
+| --- | --- | ---: | ---: | ---: |
+| `belief-at-instant` | **transaction** | 18 | **3** | **16.7%** |
+| `belief-at-instant` | valid | 18 | 0 | 0.0% |
+| `correction-depth` | transaction | 12 | 0 | 0.0% |
+| `correction-depth` | valid | 12 | 0 | 0.0% |
+
+All three regressions sit in one cell of eighteen: the sub-shape asking what the record showed **as of
+a date before a correction**, with that correction in the haystack. Valid time conflated with
+transaction time — the one thing bitemporal exists to test. **Not a defect; the vertical working.**
+
+🔴 **The defect was the reporting.** `interference_cost 0.05` is a mean over a structured population,
+understating by **3.3×** and hiding that the other 42 questions show no interference at all.
+`by_shape` could not see it either: the split is **within** a shape, on a `clock` field the corpus
+already declares and no arm was reading.
+
+**Consequence for `B1`** (filed as "add a third shape"): bitemporal already behaves as three.
+
+### 88.3 `F2` — closed as not worth doing, and it would have changed nothing
+
+| shape | pairs | headroom | floor | sep sd | verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `bitemporal/belief-at-instant` | 18 | 0.5556 | 0.2542 | 4.74 | PASS |
+| `bitemporal/correction-depth` | 12 | 0.5833 | 0.25 | 4.09 | PASS |
+| `prospective/due-window` | 9 | 1.0 | 0.1667 | 13.77 | PASS |
+| `prospective/due-later-reminder` | 4 | 0.25 | 0.2625 | 1.09 | fail |
+| `prospective/expiring-validity` | 3 | 0.3333 | 0.25 | 1.19 | fail |
+| `prospective/not-yet-true` | 3 | 0.3333 | 0.175 | 1.19 | fail |
+
+An exact correction can only **lower** the floor. Drive it to **zero** and all three failures stand:
+each fails on **separation** at ~1.1–1.2 sd, on three or four pairs. Their problem is sample size —
+`P2` — not the floor. And correcting the amplification from the observed data would be the artifact
+supplying its own bar.
+
+🔴 **The docstring arguing for F2 quoted a retired verdict** — "belief-at-instant 0.167 against 0.275
+… about 1.7 sd", from a superseded corpus. That shape now reads **0.5556 against 0.2542 at 4.74 sd**
+and passes comfortably. The one example offered as evidence that the conservative floor costs
+something was, on the current corpora, an example of nothing.
+
+### 88.4 Two instrument defects found by sweeping, both latent
+
+**`_discrimination` keyed its silence on the RESULT, not the INPUT.** `rate()` returns `None` both
+when an arm is undefined **by design** (no gold) and when every draw went **silent**; `{}` was
+returned for both. And `discriminates` is the field behind "N of 36 shapes rank two systems" — so a
+silenced shape would **vanish from that count rather than fail it**, leaving N and M both smaller and
+the ratio flattering.
+
+⚠ Shape **5b**: `_abstention` carries the identical rule thirty lines below — *"APPLICABILITY IS KEYED
+ON THE QUESTIONS, NOT ON THE RESULTS"* — written after the same hole was found there once. It never
+travelled. Latent: all 36 shapes publish a verdict today.
+
+**`swap_echo_terms` documented a policy that never ran.** It closed with *"So the terms are swapped
+rather than added"*, present tense, after a detailed measured rationale (3.7–4.8 sd on turn length;
+punctuation density 0.761). **One reference in the repository: its own `def`.** The live treatment is
+`equalise_echo`, which solves it from the other side, and under which v5's separability baseline reads
+`"blocked": {}`. Deleted; the measurements moved onto the function they are true of.
+
+### 88.5 Episodic measured before paying — and `E2` is mis-specified
+
+`E2` is filed as "35 of 50 questions are single-gold". **Measured: 30 of 50 (60%).**
+
+| gold depth | n | V1 | V9 | headroom | ceiling at K_ref=5 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 30 | 0.967 | 0.800 | **0.167** | 1.0 |
+| 2 | 5 | 1.000 | 1.000 | 0.000 | 1.0 |
+| 4 | 4 | 1.000 | 0.750 | 0.250 | 1.0 |
+| 5 | 4 | 1.000 | 0.250 | **0.750** | 1.0 |
+| 6 | 3 | 1.000 | 0.000 | 1.000 | **0.8333** |
+| 7 | 4 | 1.000 | 0.000 | 1.000 | **0.7143** |
+
+🔴 **The obvious fix would buy an artifact, and the corpus says so itself.** `ceiling.by_g` carries
+`structural_below_one: true`: at G=6–7 a perfect retriever **cannot hold all the gold inside
+K_ref=5**, so part of that 1.000 headroom is the budget, not the question. **G=5 is the sweet spot** —
+ceiling 1.0, BM25 still only 0.250.
+
+> **`E2` re-specified:** move single-gold to **G=4–5, never beyond**; hold K_ref=5; declare the
+> existing G=6/7 questions as structurally capped rather than counting them as headroom.
+
+**And depth is not the vertical's real problem:**
+
+| shape | n | V1 | V9 | headroom | median gold | discriminates |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `assistant-stated` | 20 | 1.000 | 0.700 | 0.300 | 1 | True |
+| `list-order` | 15 | 1.000 | 0.267 | **0.733** | **5** | True |
+| `participant-attribution` | 15 | 0.933 | 1.000 | **−0.067** | 1 | **False** |
+
+**30% of Episodic sits in a shape that cannot rank anything** — V9 *beats* a perfect gold-only
+selector, the signature of a question form that leaks its own answer. That is why the vertical scores
+7.5, and no amount of gold depth fixes it.
+
+⚠ A `gold=2` anomaly was filed here as a new finding and **is not one** — all five are
+`participant-attribution`, i.e. E1's known cap re-found under a different label. Checked before
+claiming.
+
+### 88.6 The discrimination exceptions were not declared
+
+Of the three shapes that do not rank two systems, only `forgetting/never-known` was declared — the
+probe tool emits its reason automatically because it has zero gold. `episodic/participant-attribution`
+and `forgetting/still-valid` **have gold and measurably fail**, which is a different thing, and nothing
+said so. **An undeclared exception is indistinguishable from a regression nobody noticed.**
+
+All three now carry written reasons plus a drift check that runs **both ways**: declared-True must
+still discriminate (a regression), declared-False must still not (a **stale declaration**). The second
+direction matters as much: a rebuilt shape that starts ranking would otherwise keep the headline at
+33 of 36 when the truth is 34 — good news suppressed by the instrument meant to keep the family honest.
+
+### 88.7 🔴 "No tag without a §0 entry" has now failed FIVE times
+
+§0w is titled *"three tags shipped unlogged"* and exists to close this. **`v0.32.0-beta` and
+`v0.33.0-beta` then shipped unlogged too**, after the rule was written — both moving corpora (14 and
+17 files), so both reset consumer controls. Logged retroactively as §0x-b.
+
+§0w's own diagnosis was right and did not save it: *"the CHANGELOG never drifted because CI READS IT;
+this doc drifted because nothing does."* A fifth recurrence is a missing check, not a discipline
+problem. `tools/check_tag_has_status_entry.py` is now that reader — scoped by tag date (26 of 45 tags
+predate the rule), and it **fails rather than skips** when the doc is absent, because a check that
+cannot see its subject must not report a pass.
+
+### 88.8 `C-E` — narrowed to what is purchasable, and blocked on credits
+
+| judge source | state |
+| --- | --- |
+| Anthropic / Google / Mistral | no key configured |
+| OpenAI (`o1`, `o3`, `o4-mini`) | key present, **account has no credits** (`429 insufficient_quota`) |
+| Azure `gpt-5.5` | works, and **is the shipped judge** |
+
+The claim is narrowed twice and named exactly: **not** "judge-family bias is bounded", **nor** the
+fallback "deployment variance within one family" — o3/o4-mini are a different **model line**, so that
+wording would have *understated* what the run shows — but *"two judges on a different model line, same
+vendor, agree with the shipped judge at X"*, **unpurchased**.
+
+⚠ The frame is **5,344** live verdicts, not 16,013: the cache is content-keyed, so two thirds are
+orphaned by superseded corpora. And the 50-case sample is balanced on the shipped judge's own verdict,
+which **over-samples the rare class** — v2 is 0.3% yes in the frame and 57% in the sample — so any raw
+rate it produces is not a population rate and must be re-weighted per cell.
+
+### 88.9 What this session did NOT move, stated plainly
+
+Mean **8.45**, Episodic **7.5**, **33 of 36** shapes, open triage **20**. None moved, and none could
+have: every commit was free by construction. Moving them needs a corpus regeneration and a re-probe —
+which resets a consumer's controls — and, for Episodic, a **new question form** for
+`participant-attribution` that E1 already attempted once. That is design work, not a parameter change.
+
+### 88.10 🔴 A design of mine, falsified by a free test before it cost anything (2026-09-12)
+
+> 🔴 **REVERSED BY 88.13, same day. `E1-b` is NOT falsified.** Both the table and the counterfactual below are **ANY-gold** retrieval, the operand 88.12 shows is anti-predictive. Re-taken on ALL-gold, `list-order` is **4/15**, not 15/15 — the contrast that falsified the design does not exist, and the counterfactual predicts headroom **+0.400** against the 0.150 it needed. Read 88.13.
+
+`participant-attribution` is 30% of Episodic at −0.067 headroom and blocks the vertical reaching
+8.5. I diagnosed it as **the question quoting the claim it asks about**, designed `E1-b` around that
+(identify the statement by its consequence, not its content), and wrote a falsifiable prediction:
+V9 **1.000 → ≤ 0.500**.
+
+Then I tested the mechanism with BM25 alone — `tmc.bm25_rank` is a pure function, so **zero model
+calls** — and both halves of the diagnosis failed.
+
+| shape | gold in BM25 top-5 | headroom | discriminates |
+| --- | ---: | ---: | --- |
+| `participant-attribution` | **15 of 15 (100%)** | −0.067 | **False** |
+| `list-order` | **15 of 15 (100%)** | **0.733** | True |
+| `assistant-stated` | 14 of 20 (70%) | 0.300 | True |
+
+`list-order` has **identical** retrieval and discriminates fine, so "BM25 finds gold" cannot be the
+cause. And stripping the quoted statement moves retrieval only **15/15 → 12/15**, three questions,
+so `E1-b` would not have reached its own predicted 0.500.
+
+**The real mechanism:** retrieving gold and being able to ANSWER are different things, and this shape
+collapses them. `list-order` needs reasoning over what was retrieved; `participant-attribution`'s
+answer is **a structural property of the retrieved session** — which role's turn carries the sentence
+— so retrieval IS the answer. That is why re-forming the wording (E1) did not help: **the leak is the
+role structure, not the vocabulary.**
+
+✅ **What this saved.** Running the Episodic arc on `E1-b` would have cost **2,100–3,200 calls** to
+produce a result that fails its own stated prediction. The prediction is what made that checkable in
+advance; a design without one would have shipped and been argued about afterwards. This is the
+"measure the defect before paying to fix it" rule catching **my own** proposed remedy, which is the
+first time in this record it has been applied against something I authored rather than something I
+inherited.
+
+### 88.11 🔴 THREE mechanisms proposed for one defect, THREE falsified — and I still do not know (2026-09-12)
+
+> ⚠ **CORRECTED BY 88.12, same day.** The cause IS known. One of the three falsifications below was run against an operand of mine that is anti-predictive (r = −0.525 against the quantity it was meant to explain). Read 88.12 first; what survives here is hypothesis 2 and the discipline, not the verdict "unknown".
+
+`participant-attribution` (episodic, 15 questions, headroom **−0.067**) is what blocks Episodic
+reaching 8.5. I proposed three explanations and measured each, free. All three are wrong.
+
+| # | proposed mechanism | falsified by |
+| --- | --- | --- |
+| 1 | "the question QUOTES the claim, so it is a search query for its own answer" | `list-order` retrieves gold **15/15** too and discriminates at **0.733** |
+| 2 | "one retrieved session settles the answer" | `assistant-stated` is **100%** single-session sufficient and discriminates at **0.300** |
+| 3 | "retrieval==1 AND sufficiency==1 together" | **no shape** in the family has both at ceiling, so the rule never fires; and both non-discriminating shapes HAVE an escape route |
+
+The converse check is what kills #3: `forgetting/still-valid` has **both** escapes (retrieval 0.80,
+sufficiency 0.00) and still fails at 0.067; `prospective/seed-carry-over` has nearly the same profile
+as `participant-attribution` (sufficiency 0.67) and reaches **+0.333**. The shape is an outlier even
+within its own band.
+
+**So the honest state is: the cause is unknown.** Three diagnoses, three refutations, no theory.
+
+✅ **What this settles about the spend.** Regenerating Episodic now would be a corpus change made
+with no working theory of the defect it is meant to fix — the "fix that outran the diagnosis" shape
+(§87.4, gate shape 9) that this record already carries once, at a cost of a reverted public API.
+Doing it again at 2,100–3,200 calls and a consumer control reset would be worse.
+
+**What survives is an instrument, not an answer.** `two_factor.py` computes, for all 35 headroom-
+bearing shapes, BM25 retrieval rate and single-session sufficiency from the corpora alone — no model
+calls. It did not explain this defect, but it is the first family-wide structural profile of the
+shapes, and it is what any fourth hypothesis should be tested against before it is built.
+
+⚠ **Kept as a negative result on purpose.** Three refuted hypotheses recorded is worth more than a
+fourth guess shipped, and the next person to look at this shape should start knowing which three
+roads are closed.
+
+### 88.12 🟢 The mechanism, found — and 88.11's "cause unknown" was my own broken operand (2026-09-12)
+
+88.11, committed earlier today, said three mechanisms had been proposed for
+`episodic/participant-attribution` (headroom **−0.067**) and all three falsified, cause unknown.
+**That entry is corrected here.** The cause is known, and one of the three refutations was run
+against an operand of mine that is anti-predictive.
+
+#### The identity
+
+Across all 35 headroom-bearing shapes, the published V9 pass rate **equals** the rate at which
+BM25's top-K_ref holds **ALL** of a question's gold sessions — not merely one of them:
+
+| statistic | value |
+| --- | ---: |
+| median \|V9 − ALLgold\| | **0.000** |
+| mean \|V9 − ALLgold\| | 0.045 |
+| exact matches (<0.005) | **27 of 35 shapes** |
+| least squares | slope **+0.887**, intercept +0.069, R² **0.818** |
+
+So V9 is not measuring reasoning under a lexical baseline. It measures whether a fixed `K_ref`
+budget happened to hold the whole gold set. V1 sits at or near 1.0 on nearly every shape, so
+
+> **headroom = V1 − V9  ≈  1 − ALLgold_retrieval**
+
+Headroom is a statement about the **retrieval budget** first, and about shape design only second.
+
+#### The defect, explained
+
+`participant-attribution` is the **only shape in the family at ALLgold = 1.00**. BM25 with K=5
+already holds every gold session on all 15 questions, so V9 saturates at 1.00 and there is nothing
+for a better retriever to win; V1's single miss (14/15) then makes the gap negative. One shape of
+35 is saturated and it is exactly the one that does not discriminate.
+
+#### 🔴 The operand that was wrong was mine
+
+| | operand | vs the published V9 rate |
+| --- | --- | --- |
+| superseded | `bool(gold & top_k)` — **ANY** gold session retrieved | slope **−0.803**, R² 0.276 — anti-predictive |
+| corrected | `gold.issubset(top_k)` — **ALL** gold retrieved | slope **+0.887**, R² 0.818, median residual **0.000** |
+
+**Direction of the error:** it **flattered retrieval**. For a shape needing 4 sessions, holding 1
+is a failure my operand scored as a success — overstating by ≥0.30 on **18 of 35** shapes, and by a
+full **1.00** on `conditional-branch` and `step-order`.
+
+**Blast radius, bounded:** the ANY-gold column lived only in an uncommitted scratch script and in
+88.11's reasoning. It never reached a corpus, a sidecar, a published number, or the probe runner —
+`run_typedmemeval_probes.py` has always recorded `v9_gold_in_context` as a **count**, which is
+correct. **No published number moves.** What moves is 88.11's conclusion.
+
+#### Which of the three hypotheses actually survives
+
+| # | hypothesis | 88.11 verdict | corrected verdict |
+| --- | --- | --- | --- |
+| 1 | the question quotes the claim, so it is a search query for its own answer | falsified | ✅ **substantially right**, now sharpened into the identity |
+| 2 | one retrieved session settles the answer | falsified | ✅ falsification **stands** — both shapes are depth 1, so sufficiency cannot separate them |
+| 3 | retrieval==1 **and** sufficiency==1 | falsified | ⚠ **untested** — it was run against the broken operand |
+
+H1 was refuted by observing that `list-order` "also retrieves gold 15/15". Under the correct
+operand `list-order` is at ALLgold **0.27** against `participant-attribution`'s **1.00**: the
+contrast that killed the hypothesis does not exist.
+
+#### Four shapes do not fit, and are declared rather than smoothed
+
+`order-then-value` (+0.40), `still-valid` (+0.27), `not-yet-true` (−0.33). A **positive** residual
+means the shape is answerable from **partial** gold; the one negative means holding gold is not
+sufficient. ⚠ `still-valid` is the family's *other* non-discriminating shape and it fails for this
+different reason — so the two low outliers were never one phenomenon, and a single fix was never
+going to address both. `temporal/occurrence-order` sits at residual exactly +0.20, on the
+boundary: I declared it, and `--check` rejected the declaration as **stale**, which is the gate
+working against its own author.
+
+#### ✅ What this buys, and it is the point
+
+`headroom ≈ 1 − ALLgold` is computable from a corpus with **zero model calls**. A proposed shape
+revision can therefore be checked for discriminating power **before it is generated and before a
+probe run is paid for** — which converts the Episodic arc from a ~2,100–3,200-call gamble into a
+free pre-check followed by a run that already knows its answer.
+`tools/typedmemeval_shape_profile.py --check` gates the identity and its exception set in both
+directions.
+
+**`E1-b` now has a quantitative prediction rather than a hope.** The design raises gold depth
+1 → 2 and moves the question's vocabulary onto the consequence session, both of which push ALLgold
+down. Every depth-2 shape in the family sits at ALLgold **0.00–0.55**. So:
+
+| quantity | now | predicted after `E1-b` | how it is checked |
+| --- | ---: | ---: | --- |
+| ALLgold retrieval | **1.00** | **≤ 0.55** | free, before generation |
+| headroom | **−0.067** | **≥ 0.45** | the re-probe |
+
+🔴 **If the regenerated corpus does not drop ALLgold below 1.00, do not run the probe** — the
+identity says the headroom cannot move, and the calls would buy a number already known. That is a
+gate the earlier design could not state.
+
+### 88.13 🟢 `E1-b` un-falsified — the counterfactual that killed it used the broken operand too (2026-09-12)
+
+88.10 marked `E1-b` **FALSIFIED** and concluded *"the leak is the role structure, not the
+vocabulary."* Its table and its counterfactual are both **ANY-gold** measurements. 88.12 shows
+that operand runs at slope **−0.803** against the V9 rate it was standing in for. Re-taken with
+**ALL-gold**, which tracks V9 at a median residual of 0.000:
+
+| shape | ANYgold | **ALLgold** | published V9 | headroom | discriminates |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `participant-attribution` | 15/15 | **15/15** | 1.00 | −0.067 | **False** |
+| `list-order` | 15/15 | **4/15** | 0.27 | 0.733 | True |
+| `assistant-stated` | 14/20 | **14/20** | 0.70 | 0.300 | True |
+
+The falsifying contrast **does not exist**. On the operand that predicts V9, the two shapes are
+1.00 against 0.27 — and `list-order`'s 4/15 = 0.267 *is* its published V9 rate, to the question.
+
+#### The counterfactual, re-taken
+
+| | ANYgold | **ALLgold** |
+| --- | ---: | ---: |
+| question QUOTES the statement (shipped) | 15/15 | **15/15** |
+| statement REMOVED | 12/15 | **9/15** |
+| movement | −0.20 | **−0.40** |
+
+88.10 read the ANYgold row — three questions — and concluded the design could not reach its own
+target. On ALLgold the crude proxy moves **six**, and since `headroom ≈ 1 − ALLgold` that alone
+predicts headroom **+0.400** against the **0.150** `E1-b` needs.
+
+⚠ Stripping the clause is only a PROXY: it deletes text and keeps everything else. `E1-b` also
+adds a consequence session, moving gold depth **1 → 2**, and every depth-2 shape in the family sits
+at ALLgold **0.00–0.55** — so the real design should land at or below the proxy, not above it.
+
+#### ✅ REVERSED: `E1-b` is restored as the live design for `participant-attribution`
+
+**Direction of the error.** 88.10's mistake was **conservative** — it killed a design that works,
+rather than shipping one that does not. That is the cheaper direction and it spent nothing, but it
+is still wrong: acted on, it would have left Episodic blocked indefinitely behind a conclusion the
+corpus does not support, and it stood for exactly as long as it took to check the operand.
+
+**And 88.10's replacement mechanism goes with it.** *"The leak is the role structure, not the
+vocabulary"* was inferred from the same broken table and has no support: the identity says the leak
+is that gold is depth-1 **and** lexically adjacent to the question. Vocabulary is precisely the
+lever, which is what `E1-b` moves.
+
+⚠ **What 88.10 got right, and keeps.** The discipline. Testing a design before paying for it is
+what made both the false negative **and** its correction free — nothing was spent either time, and
+the total cost of getting this wrong and then right was zero calls.
+
+🔴 **The refusal stands, with a number attached.** Regenerate Episodic, then run
+`tools/typedmemeval_shape_profile.py` against the candidate corpus **before** probing. If ALLgold
+on `participant-attribution` has not fallen below **0.85**, do not spend the run.
+
+### 88.14 🟢 `E1-b` BUILT AND PROBED — Episodic's blocking shape now discriminates (2026-09-12)
+
+The first corpus change of this arc, and the first spend. `participant-attribution` went from
+**−0.067** headroom — its lexical arm *beating* a perfect selector — to **+0.533**.
+
+| `participant-attribution` | before | after |
+| --- | ---: | ---: |
+| V1 perfect selector | 14/15 | **15/15** |
+| V8 full haystack | 15/15 | 13/15 |
+| V9 BM25 top-5 | **15/15** | **7/15** |
+| headroom (V1−V9) | **−0.067** | **+0.533** |
+| headroom reachable (V8−V9) | — | +0.400 |
+| declared chance floor | 0.333 | 0.333 |
+| **discriminates** | **False** | ✅ **True** |
+
+All three Episodic shapes now rank two systems, and family-wide the count moves **33 → 34 of 36**
+with two declared exceptions left, both in Forgetting (`never-known`, exempt by construction;
+`still-valid`, the control arm of a pair). `corpus_sha256` **`bfb35552ec82` → `a50846277e29`**.
+
+#### The design, and why it was chosen from a measurement rather than a guess
+
+The question now identifies the claim by its **consequence**: gold A states it, gold B acts on it
+without restating it, and the question shares vocabulary only with **B**. Attribution becomes a
+two-hop join. Gold depth moves 1 → 2, and 2 → 3 on the `both` arm, so the vertical's G distribution
+is now `{1:20, 2:10, 3:5, 4:4, 5:4, 6:3, 7:4}`.
+
+✅ **The free gate worked exactly as §88.13 promised.** `headroom ≈ 1 − ALLgold` is computable with
+zero model calls, so the candidate corpus was measured **before** any spend: ALLgold **1.00 → 0.27**,
+predicted headroom **+0.73** against a required 0.15. Measured after the run: **+0.533**. The
+prediction was high by 0.20 and right about the decision, which is what it was for.
+
+#### 🔴 Two defects I introduced, both caught by instruments rather than by reading
+
+**1 · The question outgrew the chance-floor detector.** `closed_choice_k` only reads a trailing
+"or" clause on questions **under 160 characters**. My first frame ran 145–172, so **10 of 15**
+questions published **no chance floor at all** and the other 5 published 0.333 — a split *within a
+shape*, which is the exact shape of defect `B3` cost this family a re-probe to find. Caught by
+`TypedMemEvalDiscriminationTests`, not by me. The frame is now bounded and `check_episodic` asserts
+`closed_choice_k == 3` on every question, ablated 0/15 → 15/15.
+
+**2 · Shortening it to fit broke answerability.** Trimming to *"whose earlier point was that?"*
+dropped **V1 from 15/15 to 9/15** — "that" reads as the consequence rather than the earlier claim,
+so the shape became 40% unanswerable *with perfect gold selection*. Restoring the wording that had
+measured 15/15 and buying the length back from the reference text instead returned V1 to **15/15**.
+
+⚠ **Both cost a re-probe each.** Three runs, **960 calls**, where one would have done. The
+detector's 160-character bound is a real coupling between question wording and published floor, and
+nothing warned me about it in advance — which is why it is now an assertion in the generator.
+
+#### What was checked
+
+| check | result |
+| --- | --- |
+| three-stage protocol | `--dry-run` all 50 (0 calls) → one real item → full run |
+| candidate built outside the repo | generator run against a scratch `DATA_ROOT`; positive control reproduced the **shipped** corpus byte-for-byte first |
+| E1-b overlap rule | ablated — 0 failures as authored, 1 naming the exact leaked words when a `ref` is re-pointed at its own claim |
+| closed-choice floor | ablated — 0 failures as authored, 15 under over-long refs |
+| discrimination drift | the baseline **refused** as a STALE DECLARATION (declared False, observed True) and was rebuilt deliberately |
+| `AgentEval.Memory.Tests` | **1190/1190** on net8.0, net9.0 and net10.0 |
+| other nine corpora | byte-identical; only `episodic` moved |
+
+#### ⚠ A refinement tested and REFUTED, recorded so it is not re-proposed
+
+V9 on this shape lands at **0.467** against ALLgold 0.27, and `ALLgold + (1−ALLgold)×floor` predicts
+0.511 — close enough to look like a law. Tested family-wide it fits **worse** than the plain
+identity (median residual **0.042** against **0.000**), because most shapes that declare a floor
+score at ALLgold *exactly*: the models **fail** rather than guess. One shape's near-agreement is a
+coincidence. The plain identity stands unchanged.
+
+### 88.15 🔴 The family's most-cited number had no instrument at all (2026-09-12)
+
+TypedMemEval publishes a per-vertical **quality score** — *"mean **8.45**, range 7.5 (Episodic) to
+9.5 (Conjunction, Procedural)"* — in the plan, the README and the status-and-plan-forward doc. It
+is the headline a reader is most likely to quote, and it is the number the current goal is written
+against.
+
+**Searched on 2026-09-12: there is no rubric, no score table with a derivation, and no tool that
+computes any of it.** The scores exist only as prose assertions. Nothing in `tools/`, the sidecars,
+the ADRs or the plan defines what a 9.5 is or what separates it from an 8.0.
+
+That is claim-without-instrument (gate shape 6) sitting on the family's headline figure — in a
+family whose entire purpose is that a published number be traceable to a measurement.
+
+#### The instrument, built: `tools/typedmemeval_quality_board.py`
+
+Each shape is scored on the criteria that apply to it. Every criterion is binary, reads a field the
+probe run already writes, and states its threshold:
+
+| | criterion | threshold | what it catches |
+| --- | --- | --- | --- |
+| C1 | discriminates | `headroom >= 0.15` | a shape that cannot rank two systems |
+| C2 | answerable | `V1 >= 0.90` | a shape asking what its own gold cannot settle |
+| C3 | reachable | `headroom_reachable >= 0.15` | headroom only a *perfect* selector can win |
+| C4 | floor disclosed | closed-choice publishes `chance_floor` | an undeclared guessing floor |
+| C5 | headroom is skill | `v9_above_chance >= 0` | headroom that is partly floor, not retrieval |
+
+`score = 10 × (criteria passed / criteria applicable)`. Shapes already declared exempt in the
+discrimination baseline are excluded from C1/C3 **with their reason**, never silently passed.
+
+#### What it reads — and it inverts the published ranking
+
+| vertical | derived | min headroom | failing |
+| --- | ---: | ---: | --- |
+| forgetting | **7.50** | +0.067 | `still-valid` C2 (**V1 13/15**) |
+| conjunction | 8.75 | +0.400 | `alias-then-count`, `conditional-branch` C5 |
+| procedural | 8.89 | +0.650 | `retired-step`, `step-order` C5 |
+| temporal | 9.23 | +0.467 | `occurrence-order` C5 |
+| prospective | 9.47 | +0.250 | `not-yet-true` C2 (V1 5/6) |
+| arithmetic / bitemporal / episodic / semantic / workingmemory | 10.00 | +0.250–+0.500 | — |
+
+**Mean 9.38; one vertical below 8.5.** The published board called Episodic the family's *worst* at
+7.5 and never flagged Forgetting; derived, Episodic meets every criterion and **Forgetting is the
+only vertical below the line** — on a shape whose 2 unanswerable questions nothing was reporting.
+
+#### 🔴🔴 This does NOT mean the targets are met, and the reason is the point
+
+**The rubric is bar-supplied.** The targets (*mean ≥ 9.0, none < 8.5*) were calibrated against the
+old hand-assigned numbers, and I replaced the measuring device — then reported that the new device
+clears them. That is exactly the failure this family exists to catch: *never let the artifact under
+test supply any input to its own pass mark* ([[reference_gate_self_examination_rule]], shape 2).
+A 9.38 from a ruler I built while wanting 9.0 is not evidence of anything about the family.
+
+What the work legitimately establishes is narrower, and stands on its own:
+
+- ✅ **the published board had no instrument** — a defect independent of any score;
+- ✅ **the named criterion failures are real** whatever the scale: `forgetting/still-valid` is 2
+  questions short of answerable with a *perfect* selector, `prospective/not-yet-true` 1, and five
+  shapes carry a lexical baseline scoring below chance.
+
+⚠ **Re-anchoring the numeric targets is the maintainer's call, not mine.** The tool says so in its
+docstring and prints it on every run, so the caveat cannot be separated from the number.
+
+⚠ **And the rubric's own limitation, stated rather than papered over:** every criterion is a binary
+floor, so it measures *whether* a shape clears each declared threshold, never *by how much*. A
+shape at 0.16 headroom and one at 0.90 both pass C1. Six verticals clear every floor with a
+thinnest shape under 0.35, so `min headroom` is printed beside every score — a 10.00 means **no
+floor is breached**, never **comfortable margin**.
+
+### 88.16 🔴 V1 is not a valid ceiling for a shape whose answer asserts an ABSENCE (2026-09-12)
+
+The derived quality board (§88.15) failed two shapes on **C2 answerable** — `V1 >= 0.90`. Chasing
+the first one found a defect in how the family measures a whole class of shape.
+
+#### The impossible number
+
+| shape | V1 gold only | V8 full haystack |
+| --- | ---: | ---: |
+| `forgetting/still-valid` | **13/15** | **15/15** |
+| `prospective/not-yet-true` | **5/6** | **6/6** |
+
+**V8 beating V1 should be impossible.** Gold is a subset of the haystack, so a selector handed
+*only the right sessions* cannot be beaten by one handed *everything* — unless the answer needs
+information that is not in gold.
+
+#### The cause, and it is a class not an accident
+
+Both questions assert an **absence**. `still-valid` asks to *"say whether that is still current"*
+— the answer claims **nothing in the record cancelled it**. `not-yet-true` asks whether something
+has happened **yet**. Gold holds the statement and its reaffirmation; **it cannot hold the absence
+of a later cancellation**, because an absence is established only by the whole record.
+
+The paired arm proves it. `forgetting/invalidated` asks the same question where something *did*
+cancel — so the cancellation IS in gold — and it runs **V1 20/20**. Same vertical, same generator,
+same question frame; the only difference is whether the answer is a presence or an absence.
+
+#### ✅ What it changes: an exemption that is an artefact, not a property
+
+`forgetting/still-valid` is declared non-discriminating on `V1−V9 = 0.067`. Against the ceiling
+that actually applies:
+
+> **V8 − V9 = 0.200**, which **clears** the 0.15 floor.
+
+So the shape **can** rank two systems. It stays exempt — it is the control arm of a pair and is not
+*supposed* to carry the pair's discrimination — but the declared **reason was wrong about why**,
+and a reader comparing 0.067 against the floor would conclude the shape is broken. The baseline's
+reason now carries both halves.
+
+⚠ This also re-reads §88.12's exception list: `still-valid` sits there as an identity exception
+with residual +0.27, described as "answerable from partial gold". That was the right observation
+with the wrong cause — it is answerable from the **haystack**, which is a different thing and the
+reason its V9 outruns its ALLgold.
+
+#### The rule, and how it is applied
+
+> **A shape whose answer asserts an absence must be ceilinged on V8, never V1.**
+
+🔴 **Declared from the QUESTION, never from the measurement.** `V8 > V1` is this class's
+signature and the board prints it as a diagnostic — but keying the *rule* on it would take
+applicability from the **result** instead of the **input**, which is gate self-examination shape 7,
+the silent-`{}` defect this family has already shipped once. `ABSENCE_SHAPES` in
+`tools/typedmemeval_quality_board.py` lists the three affected shapes with the phrase in each
+question that makes it an absence claim. A shape that belongs there but stops showing `V8 > V1`
+**stays declared**: that would mean the model got lucky, not that the ceiling became valid. A shape
+showing `V8 > V1` that is NOT declared prints a red warning telling the reader to go and read the
+question rather than add it to silence the line.
+
+⚠ **`forgetting/never-known` is the same phenomenon at its limit** — it asks about a fact never
+stated, has **zero gold**, and is already scored on abstention instead. What looked like a special
+case of one shape is the extreme end of a three-shape class.
+
+**Cost: zero calls, zero corpus bytes.** Both the finding and its fix are declarations.
+
+### 88.17 🔴 Five published headroom figures counted the chance floor as retrieval room (2026-09-12)
+
+`headroom_perfect_selector` is **V1 − V9**. On a closed-choice shape V9 can land **below** the chance
+floor — measured on **5 of 11** floor-declaring shapes — because a lexical retriever holding *part*
+of the gold is actively misled where a guesser is not (§88.12). When that happens the published
+headroom counts the stretch between *worse than guessing* and *guessing* as room a better retriever
+could win. **A coin already covers it.**
+
+| shape | published | vs `max(V9, floor)` | overstated by |
+| --- | ---: | ---: | ---: |
+| `conjunction/alias-then-count` | 0.867 | **0.500** | −0.367 |
+| `conjunction/conditional-branch` | **1.000** | **0.667** | −0.333 |
+| `procedural/step-order` | **1.000** | **0.667** | −0.333 |
+| `temporal/occurrence-order` | 0.750 | **0.500** | −0.250 |
+| `procedural/retired-step` | 0.800 | 0.667 | −0.133 |
+
+⚠ **The family's two largest headroom figures were each overstated by a third**, and both are shapes
+a reader would reach for first precisely because they looked strongest.
+
+#### The fix, and what it deliberately does not touch
+
+Every shape now publishes **`headroom_above_chance`** = `V1 − max(V9, chance_floor)` with a reading
+that says which figure to quote. Both numbers ship: the uncorrected one because every prior release
+quoted it and removing it would silently break comparisons, the corrected one because it is the
+defensible figure.
+
+✅ **`discriminates` is still keyed on the UNCORRECTED headroom, on purpose.** All five corrected
+shapes still clear the 0.15 floor, so **no verdict moves** — checked, not assumed, and the
+discrimination drift check passes unchanged at 34 of 36. This is a magnitude correction, not a
+re-ranking, and keying the verdict on a reporting change would have made it one.
+
+✅ **Cost: zero calls and zero corpus bytes.** The re-probe ran fully from cache
+(`calls=0 cached=16,326` across all ten verticals) and only **sidecars** changed — every
+`corpus_sha256` is untouched, so **no consumer control resets**. `AgentEval.Memory.Tests` 1190/1190
+on all three TFMs.
+
+### 88.18 ✅ Phase 0 closed — the gate self-examination sweep, all nine shapes (2026-09-12)
+
+**Tier 0 is empty.** `C-F` (`7b725632`), `B3` (`3d4b822f`) and `F2` (`d767cb9c`) are all closed;
+the triage plan still listed `F2` as *open* and has been re-taken. Every tag in scope has a §0 entry
+(`check_tag_has_status_entry.py`: 45 tags, 26 predate the log, 19 in scope, **all named**).
+
+| # | shape | status against the tree as it stands |
+| --- | --- | --- |
+| 1 | element-missing | ✅ nothing in a pass/fail path is supplied by the artifact under test |
+| 2 | **bar-supplied** | 🔴 **FOUND, in my own work** — I built the quality-board rubric while working toward the targets it grades (§88.15). Declared in the tool's docstring and printed on every run; re-anchoring is the maintainer's call |
+| 3 | diluted-denominator | ✅ **measured**: 0 of 36 shapes have an arm whose `applicable` differs from the shape's question count |
+| 4 | **floor-below-chance** | 🔴 **FOUND** — 5 of 11 floor-declaring shapes counted the chance floor as retrieval room (§88.17). Fixed: `headroom_above_chance` now published on **all** floor-declaring shapes, 0 missing |
+| 5 | co-moving operands | ✅ `_discrimination` no longer keys silence on the RESULT (`a68d7141`) |
+| 6 | **claim-without-instrument** | 🔴 **FOUND** — the family's headline quality score had no rubric, table or tool (§88.15). Instrument built |
+| 7 | silent-`{}` / applicability from the result | ✅ **actively avoided this session**: the absence-ceiling rule keys on the QUESTION, never on its `V8 > V1` signature (§88.16) |
+| 8 | declared-not-reached | ✅ every declared arm is applied — **after I corrected my own reading**, see below |
+| 9 | fix-outran-diagnosis | ✅ the E1-b arc measured the mechanism first and gated the spend on it (§88.13–14) |
+
+#### ⚠ Shape 8 nearly became a fabricated defect, for the third time this session
+
+My first sweep reported **"v2, v6, v10, v11: NEVER REACHED on 0 of 36 shapes"** — which would have
+been a serious finding. It was wrong: those arms are not reported under `by_shape` at all. `v2` and
+`v6` live at the **vertical** level (`v2_non_inferability`, `v6_leave_one_out`) and `v10`/`v11` in
+the per-shape **`abstention`** block. The probe run had printed `V2 50/50` and `V6 30/30` on screen
+minutes earlier.
+
+🔴 **That is the third "zero finding" this session produced by reading the wrong location** — after
+the wrong extension key (`extension` vs `typedmemeval`, "0 of 565 declare a chance floor") and the
+`:judge` suffix conflation (186 "unparseable" verdicts that were `commit`/`abstain`). All three were
+caught by asking *where is this actually written* before publishing. **A zero is a claim about a
+location as much as about a population**, and it needs a positive control proving the location is
+the right one — which is the rule this record has now paid for three times.
+
+### 88.19 ✅ `C-E` RUN — in the weakest form that was purchasable, and named as such (2026-09-12)
+
+§88.8 left `C-E` narrowed in writing but **unpurchased**: OpenAI returns `429 insufficient_quota`,
+so the o-series second judges were unreachable. The plan names a fallback for exactly this —
+*"narrow the claim yourself to deployment variance within one family, rename it, publish honestly"*
+— and that fallback turned out to be **runnable**: three distinct Azure deployments are configured
+(`gpt-5.5`, the shipped judge; `gpt-5-chat`; `gpt-5-mini`).
+
+| | |
+| --- | --- |
+| claim **NOT** supported | "judge-family bias is bounded at X" |
+| claim **NOT** supported | "two judges on a different model LINE agree at X" (still unpurchased) |
+| claim this run **does** support | **"two other deployments of the shipped judge's own model family agree with it at X"** |
+
+#### The numbers, re-weighted
+
+| second judge | raw sample | **re-weighted to the live frame** |
+| --- | ---: | ---: |
+| `gpt-5-chat` | 49/50 = 0.980 | **0.99953** |
+| `gpt-5-mini` | 49/50 = 0.980 | **0.99963** |
+
+The two second judges agree **with each other** on 48 of 50, and there are **0 cases where both
+agree with each other and differ from the shipped judge**. Co-directional disagreement is the only
+pattern that would be signal about the shipped judge, and none is visible at this sample size.
+
+✅ **The re-weighting is the whole point and it moved the number.** The sample is balanced on the
+shipped judge's own yes/no, so `v2` is ~0.3% yes in the frame and ~57% yes in the sample. Every
+figure is computed **per cell** — (arm, shipped verdict) — then weighted by that cell's true share
+of the **5,344** live verdicts. The rebuilt frame is asserted against the `drawn_from` recorded when
+the sample was drawn; a drift fails loudly rather than producing a confident number.
+
+#### 🔴 What this canNOT do, stated first because it is the important half
+
+**Both second judges are the same vendor AND the same model family as the judge under test.** A bias
+shared by the whole family is **invisible to this design** — all three would express it together and
+agree perfectly. So 0.9995 is close to the *weakest possible* version of this check, and a high
+number here is largely evidence that the three deployments are consistent with each other, not that
+the shipped judge is unbiased.
+
+⚠ **A cross-vendor bound remains unpurchased and is still the thing that would settle it.** This
+result narrows the open question; it does not close it.
+
+⚠ **And one rounding defect in my own reporting, caught before it shipped:** the re-weighted figure
+printed as **`1.000`** at three decimals while real disagreements existed — they had landed in cells
+worth 0.19% and 0.07% of the frame. A bound that rounds toward *perfect* is the one direction a
+bound must never round, so the tool now prints five decimals and says **"NOT 1.0"** beside any
+figure above 0.9995 that still carries a disagreement.
+
+**Cost: 101 calls** (1 staged + 100 full), zero corpus bytes.
+
+### 88.20 🔴 A shape that publishes `discriminates: True` while half of it ranks nothing (2026-09-12)
+
+`bitemporal/belief-at-instant` publishes headroom **0.3056** and **`discriminates: True`**. Split on
+`clock` — an axis the **corpus already declares**, and the same axis `B3` found the interference
+concentrated on — it is two different instruments:
+
+| stratum | n | V1 | V9 | headroom | |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `clock = transaction` | 18 | 18/18 | 8/18 | **0.556** | discriminates |
+| `clock = valid` | 18 | 18/18 | **17/18** | **0.056** | 🔴 **below the 0.15 floor** |
+
+**18 questions — 30% of the vertical — cannot tell two systems apart, and the published number says
+they can.** This is the mean-satisfiable-by-averaging defect the family already fixed for Arithmetic
+and Episodic at the SHAPE level, one level further down: a mean over strata hides a dead half exactly
+as well as a mean over shapes.
+
+#### The fix, and what it deliberately does not touch
+
+Every shape whose corpus declares a second axis now publishes **`by_stratum`**, plus
+**`strata_below_floor`** naming any stratum that fails on its own. ⚠ The shape-level `discriminates`
+is **NOT** changed by this: moving a published verdict on a reporting change is how a reporting fix
+becomes a silent re-ranking. What changes is that the split is now visible beside the verdict.
+
+#### A second dead stratum, on a different axis
+
+`correction-depth` (headroom 0.3333, discriminates) splits on `corrections`:
+
+| `corrections` | n | V1 | V9 | headroom |
+| ---: | ---: | ---: | ---: | ---: |
+| **2** | 8 | 8/8 | **8/8** | **0.000** |
+| 3 | 8 | 8/8 | 3/8 | 0.625 |
+| 4 | 8 | 8/8 | 5/8 | 0.375 |
+
+At one correction the lexical baseline is **already perfect** — V9 8/8 — so the rung is saturated,
+the same pattern that made `participant-attribution` unrankable. Against 3/8 and 5/8 on the
+neighbouring rungs this is a structural difference, not a marginal flag.
+
+#### ✅ And one flag DECLARED AS NOISE rather than banked
+
+The sweep covered **106 strata** across every candidate axis in all ten verticals. At n=6–8 a
+stratum sits about **one question** from the floor, so isolated marginal flags are expected by
+chance. `belief-at-instant` split on `difficulty` shows rung 3 at 0.125 — below the floor — while
+rungs 1, 2, 4 and 5 all pass. **That is noise and is recorded as noise:** one question (V9 7/8 → 6/8)
+moves it above the line, `difficulty` is an ordinal dial rather than two instruments, and a single
+dipping middle rung among five is what 106 comparisons produce.
+
+⚠ Reporting it as a finding would have been the flattering direction — a third defect discovered —
+which is exactly why the multiplicity was counted before the list was written.
+
+**Nine of ten verticals show no stratum below the floor at n≥6.** This is a Bitemporal-specific
+defect, not a family-wide reporting gap.
+
+**Cost: zero calls, zero corpus bytes** — the re-probe ran fully from cache (`calls=0
+cached=16,326`) and only sidecars moved. `AgentEval.Memory.Tests` 1190/1190 on all three TFMs.
+
+### 88.21 ✅ The Bitemporal fix REFUSED by its own pre-check — and the confound that nearly hid it (2026-09-12)
+
+§88.20 measured a real defect: `belief-at-instant/valid` runs headroom **0.056**, below the floor, on
+18 questions the shape publishes as discriminating. I designed a fix, and **did not ship it.**
+
+#### What was tried
+
+Raise `corrections` 1 → 3 on `belief-at-instant` and 2,3,4 → 3,4,5 on `correction-depth`, on the
+reading that more retroactive corrections put more lexically identical sessions in competition for
+the top-K budget. The shipped rungs appeared to support it: at 2 corrections ALLgold was **1.000**
+and headroom **0.000**; at 3–4 it was 0.50–0.75 and the rungs worked.
+
+**The separability gate refused the first attempt outright** — a 3-correction chain clamps against
+the end of the haystack, and the valid arm's gold is the LAST correction, so `position_in_haystack`
+separated gold perfectly in 22% of questions (13 against 6.0 by chance, 3.0 sd). Fixed with a tail
+reserve. The generator then passed.
+
+#### 🔴 Then the pre-check refused it, and the reason generalises
+
+| stratum | shipped ALLgold | candidate | predicted headroom | |
+| --- | ---: | ---: | ---: | --- |
+| `belief-at-instant/valid` | 0.889 | 0.833 | **+0.167** | MARGINAL |
+| `correction-depth/valid` | 0.667 | **0.833** | **+0.167** | MARGINAL — **worse** |
+
+**Regenerating re-searches the ECHO knob**, which weaves question vocabulary into distractors so
+they compete. Echo drives ALLgold directly — *lower echo → weaker distractors → gold easier to
+retrieve → higher ALLgold* — and it moved **0.6406 → 0.3750**. So the candidate differs from its
+predecessor in **two** variables, not one.
+
+The operand settles it: `correction-depth/valid` at correction-rung **3** reads ALLgold **0.500**
+shipped and **0.750** candidate — *the same rung*, moved by echo alone. Read as a rung effect that
+would have been a **fabricated mechanism**. And the shipped rung pattern I built the design on is
+**n=4 per cell**: 1.000 against 0.500 is two questions.
+
+✅ **Not spent.** This is the fourth filed item to turn out smaller than filed or wrong to fix.
+
+#### ⚠ The same confound applies retrospectively to `E1-b` — and its conclusion survives
+
+Episodic's echo moved **0.6667 → 0.3333** across that arc, so its pre-check was confounded too.
+**The confound runs AGAINST the change looking good**: a lower echo *raises* ALLgold, so a candidate
+clearing the floor despite it clears it conservatively, and the design's true effect is at least
+what was measured. E1-b's ALLgold fell **1.00 → 0.27** through that headwind and the arc delivered
+**+0.533** measured headroom. The conclusion stands; what changes is that the margin, not just the
+direction, now has a stated reason to be trusted.
+
+🔴 **A marginal pass, by contrast, is not attributable.** An echo delta alone is easily 0.15 of
+ALLgold, which is the entire margin bitemporal showed.
+
+#### The gate is now a shipped instrument rather than a scratch script
+
+`tools/typedmemeval_precheck.py <vertical> <candidate-root>` prints both echo knobs, flags any
+stratum that got **worse**, and returns three distinct verdicts: **PASS** (clears with margin),
+**NOT ESTABLISHED** (within 0.10 of the floor — "not shown to work", explicitly *not* "a small
+improvement"), and **DO NOT SPEND** (below the floor). It refused this candidate at exit 3.
+
+**Cost: zero calls, zero corpus bytes.** The generator change is reverted; `bitemporal`'s
+`corpus_sha256` never moved.
+
+### 88.22 ✅ Phase 1 disposition — the five remaining verticals, audited against every instrument (2026-09-12)
+
+Phase 1 runs lowest-score-first: Episodic → Bitemporal → **WorkingMemory → Prospective → Arithmetic
+→ Temporal → Semantic**. The first two are done. The remaining five were each audited against every
+instrument built this session, because *measure the defect before paying to fix it* applies to
+deciding whether a vertical needs an arc at all.
+
+**Checked per vertical:** the five quality-board criteria (§88.15); the 106-stratum sweep for a
+sub-population below the floor (§88.20); the `V8 > V1` absence-ceiling detector (§88.16); the
+identity's exception set (§88.12); and the below-chance baseline column (§88.17).
+
+| vertical | score | min headroom | measured defects |
+| --- | ---: | ---: | --- |
+| WorkingMemory | 10.00 | +0.250 | **none** |
+| Prospective | 9.47 | +0.250 | 1 — `not-yet-true` V1 5/6 |
+| Arithmetic | 10.00 | +0.500 | **none** |
+| Temporal | 9.23 | +0.467 | 1 — `occurrence-order` baseline below chance |
+| Semantic | 10.00 | +0.267 | **none** |
+
+#### Both flagged items are already explained and declared
+
+- **`prospective/not-yet-true` V1 5/6** is an **absence shape** (§88.16): its answer asserts that a
+  triggering event has *not* occurred, and gold cannot hold an absence — so V1 is not a valid
+  ceiling for it. **V8 is 6/6.** The shape is fine; the statistic was wrong, and is now declared.
+- **`temporal/occurrence-order`** carries `v9_above_chance −0.250`, already corrected in reporting
+  by §88.17: it publishes `headroom_above_chance` **0.500** beside the uncorrected 0.750. The
+  underlying fact — a lexical retriever scoring below a guesser on this shape — is a real property,
+  now disclosed rather than folded into the headline.
+
+#### 🔴 So no arc is funded for these five, and that is the finding
+
+**None of the five carries an unaddressed defect.** Regenerating any of them would spend ~200–500
+calls plus a consumer control reset to fix nothing that has been measured — precisely the *"spend
+that cannot support the claim it is for"*. Three of the five have **zero** criterion failures, no
+stratum below the floor, and every shape discriminating.
+
+⚠ This is the same disposition the plan's Tier 1 already records for them, now reached by
+measurement rather than by deferral: `W2`/`W3` (WorkingMemory) trigger on *any rung crossing its
+band* — none has; `A2`/`A3` (Arithmetic) trigger on *Arithmetic falling below 8.5* — it does not, on
+the only instrument that exists; `P2` (Prospective) remains the highest-value Tier 1 arc on the page
+because three pair-shapes sit at 3–4 pairs and fail on **sample size**, not on any defect a
+regeneration would fix.
+
+✅ **What this means for Phase 1.** Two verticals had measurable defects and were executed: Episodic
+(shipped, `−0.067 → +0.533`) and Bitemporal (defect measured and published; fix designed, built, and
+**refused by its own pre-check**, §88.21). The other five were audited and need nothing. Phase 1 is
+complete in the only form that survives its own discipline — **an arc where a defect was measured, a
+written reason where none was.**
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.23 ✅ The published scale RECOVERED — it was never arbitrary, and the target is further off than it looked (2026-09-12)
+
+§88.15 established that the published quality score had **no rubric, table or tool**, and I left
+re-anchoring as the maintainer's call. That was one step short. The score had no *written* rubric,
+but it was **not arbitrary** — and its basis is recoverable from its own published numbers.
+
+#### Only three per-vertical scores are sourced anywhere
+
+🔴 **RETRACTION FIRST.** I stated repeatedly this session that *"four verticals sit at 8.0
+(Bitemporal, WorkingMemory, Prospective, Arithmetic)"*. **That is unsourced.** It appears in no
+document, and with mean 8.45 and three known values the other seven are **not recoverable**
+(they sum to 58.0). I was repeating a reconstruction as if it were a record. The sourced set is:
+
+| vertical | published | mean headroom |
+| --- | ---: | ---: |
+| Episodic (pre-`E1-b`) | **7.5** — lowest | 0.322 |
+| Conjunction | **9.5** — highest | 0.754 |
+| Procedural | **9.5** — highest | 0.800 |
+
+#### The basis is mean headroom, and it fits all three anchors within 0.10
+
+> **score = 6.106 + 4.362 × mean_headroom**
+
+predicting **7.51 / 9.40 / 9.59** against the published 7.5 / 9.5 / 9.5. The original was tracking
+**how much room a better system has to win** — it simply never wrote that down.
+
+#### ⚠ And it inverts my own rubric, which is the useful part
+
+The criteria score of §88.15 ranks Episodic **8th of 10** and Conjunction **2nd** — exactly reversing
+the published order. Both instruments are defensible and they answer different questions:
+
+| | asks | penalises |
+| --- | --- | --- |
+| criteria score (§88.15, **bar-supplied**) | is every declared floor cleared? | below-chance baselines, which is where Conjunction and Procedural fail |
+| recovered scale (**anchored on published numbers**) | how much room does a better system have? | thin headroom, which is where Episodic and Bitemporal fail |
+
+#### 🔴 On the recovered scale the target is further off than the published board suggested
+
+| vertical | mean headroom | recovered score |
+| --- | ---: | ---: |
+| forgetting | 0.258 | **7.23** |
+| bitemporal | 0.319 | **7.50** |
+| semantic / workingmemory | 0.383 | **7.78** |
+| prospective | 0.461 | **8.12** |
+| **episodic** | 0.522 | **8.38** |
+| temporal / arithmetic | 0.606 / 0.639 | 8.75 / 8.89 |
+| conjunction / procedural | 0.754 / 0.800 | 9.40 / 9.60 |
+
+**Recovered family mean 8.34. SIX verticals below 8.5, not four.**
+
+✅ **What `E1-b` actually bought, on the maintainer's own scale:** Episodic **7.51 → 8.38**, a real
+**+0.87** — and still **short of 8.5**. That is the honest verdict on the one arc that shipped, and
+it is only statable because the scale was recovered.
+
+#### What the target would now cost, stated rather than estimated
+
+- **mean ≥ 9.0** needs family mean headroom **0.663**, against **0.512** today.
+- **none < 8.5** needs *every* vertical at mean headroom **≥ 0.549**; six are below.
+
+That is a large, real lift — roughly every vertical brought to Conjunction's level — and it is a
+**corpus** programme, not a reporting one.
+
+⚠ **Fragility, stated.** Three anchors but only **two distinct values** (7.5 and 9.5), so this is
+effectively a two-point fit. It also under-predicts the published family mean (**8.25**
+reconstructed against **8.45** published), so mean headroom explains the ordering and the anchors
+but is not the whole story. Best available reconstruction of the published scale — not a validated
+rubric, and not a licence to re-declare the target met.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.24 ✅ The second Episodic arc, considered and REFUSED — the gap is inside the ruler's error (2026-09-12)
+
+On the recovered scale (§88.23) Episodic reads **8.38** against a **≥8.5** target. The gap is
+**0.12**, and `assistant-stated` — the vertical's thinnest shape at headroom 0.300 — is exactly what
+`E2` was filed to fix. I designed the change (two details per question, two gold sessions, gold depth
+1 → 2, predicted ALLgold 0.70 → ~0.40 and headroom → ~0.60) and **did not build it.** Two independent
+reasons, either sufficient:
+
+#### 1 · The gap is smaller than the scale's own systematic error
+
+| | |
+| --- | ---: |
+| reconstructed family mean at the anchor era | **8.25** |
+| published family mean | **8.45** |
+| systematic under-prediction | **0.20** |
+| Episodic's gap to the target | **0.12** |
+
+The recovered scale is a fit on **two distinct anchor values** that misses the published mean by
+0.20. Spending a re-probe to move a number by **0.12** on that scale is chasing a difference the
+instrument cannot resolve — and "the measured improvement was inside the measurement error" is a
+result this record should not have to publish twice.
+
+#### 2 · It would contradict the disposition published one commit earlier
+
+`episodic/assistant-stated` has **zero criterion failures**: headroom 0.300 is above the 0.15 floor,
+V1 20/20, no stratum below the floor, no absence-ceiling problem, no below-chance baseline. §88.22
+declined to fund WorkingMemory, Arithmetic and Semantic on **exactly that standard**. Funding
+Episodic's thinnest-but-passing shape while refusing three verticals in the same condition would
+make the rule "fund what is closest to a target" rather than "fund what is measurably broken" —
+which is how a benchmark starts optimising its own headline.
+
+⚠ **What I would do differently, stated plainly.** `E2` should have ridden in the `E1-b` arc
+(`0cf3eb0a`). The plan's own rule is *one arc per vertical, one re-probe, never two fixes shipped
+separately*, and I shipped E1-b while explicitly deferring E2. Had they been batched, Episodic would
+very likely have cleared 8.5 for the same single spend. **That is a process error of mine, and the
+cost of correcting it now — a second full re-probe — is precisely what the rule exists to prevent.**
+Paying it to recover 0.12 of an unresolvable scale would compound the error rather than fix it.
+
+#### Where the targets actually stand
+
+| target | state |
+| --- | --- |
+| Tier 0 empty, Tier 1 ≤3 with triggers | ✅ met |
+| 36/36 **or** each exception declared with a drift check | ✅ met via clause 2 — 34/36, both exceptions in Forgetting, written reasons, two-way check |
+| judge bias bounded **or** narrowed in writing | ✅ met via clause 2 — narrowed (§88.8) **and** measured within that scope (§88.19) |
+| CHANGELOG carries every corpus revision; §0 entry per tag | ✅ met |
+| every number re-taken against the final tree | ✅ met — and the headline's scale recovered rather than asserted |
+| lowest vertical Episodic ≥ 8.5 | ⚠ **8.38** — moved **+0.87** by `E1-b`, short by less than the scale's error |
+| mean ≥ 9.0, none < 8.5 | 🔴 **unmet: 8.34, six below.** Needs family mean headroom **0.663** against **0.512** — a corpus programme across six verticals, not one more arc |
+
+**Cost of this entry: zero calls, zero corpus bytes.**
+
+### 88.25 🔴 A killed run left an UNMEASURED corpus in the tree — and two of my own gates passed it (2026-09-12)
+
+§88.21 refused the Bitemporal fix because the echo knob moved and made the comparison uncontrolled.
+I then ran the experiment I had named but not performed: **regenerate with the echo PINNED**.
+
+| stratum | shipped ALLgold | candidate | |
+| --- | ---: | ---: | --- |
+| `belief-at-instant/transaction` | 0.667 | 0.556 | |
+| `belief-at-instant/valid` | 0.889 | **0.778** | predicts **0.222** against **0.056 measured** |
+| `correction-depth/transaction` | 0.750 | **0.333** | |
+| `correction-depth/valid` | 0.667 | 0.750 | worse, still above floor |
+
+Echo held at **0.6406 on both sides**, so the movement IS the design change. The mechanism holds in
+3 of 4 strata, and the shape measured below the floor is lifted above it. The spend was justified on
+the defect, not on a target.
+
+**The full re-probe was then KILLED by system memory pressure**, after `--dry-run` (0 calls) and one
+real item (19 calls). No results were produced.
+
+#### 🔴 What that exposed, which is worth more than the arc
+
+Generation **wipes the probe records**, so the tree briefly held a bitemporal corpus (`cdc27b22`)
+whose sidecar carried a `probes` block with **no `by_shape`, no `run_at`, no
+`probed_corpus_sha256`** — a corpus with no measurements behind it. Running every gate against that
+state:
+
+| gate | verdict | |
+| --- | --- | --- |
+| discrimination baseline | **exit 1** — *"declared but NOT FOUND in any sidecar"* | ✅ caught it |
+| quality board | **exit 2**, printing *"mean 9.32 over **9** verticals"* | 🔴 **silently dropped it** |
+| shape profiler | **exit 0**, *"identity holds"* | 🔴 **silently dropped it** |
+
+Two instruments I built this session computed a family number **over the survivors** and reported a
+pass with a tenth of the family unmeasured. That is the diluted-denominator defect (gate shape 3)
+inside the tools written to catch it, and it breaks the rule this record already states: **a check
+that cannot see its subject must not report a pass.**
+
+✅ **Both now fail loudly**, naming the vertical and saying that any figure printed is computed over
+the remainder and is not a family number. Verified against the broken state before it was reverted.
+
+#### Disposition
+
+The corpus and the generator change are **reverted** — `bitemporal`'s `corpus_sha256` never moved,
+and an unmeasured corpus must not sit in the tree. The pre-check result above stands as a
+**pre-registered prediction** for whoever runs the arc: echo pinned at 0.6406,
+`belief-at-instant/valid` ALLgold 0.889 → 0.778, predicted headroom **0.222** against **0.056**
+measured. ⚠ If the re-probe does not lift that stratum above the 0.15 floor, the design is wrong and
+must not ship as an improvement.
+
+**Cost: 19 calls, zero corpus bytes retained.**
+
+### 88.26 🔴 The Bitemporal arc is BLOCKED on the environment — three attempts, two diagnoses refuted (2026-09-12)
+
+The arc is designed, validated and pre-registered (§88.25). It has now failed to **run** three times,
+each killed by system memory pressure with no results produced:
+
+| attempt | workers | other tasks running | outcome |
+| --- | ---: | --- | --- |
+| 1 | 8 (default) | 2 waiters + recent `dotnet test` | killed |
+| 2 | 2 | 1 waiter | killed |
+| 3 | 4 | **none** | killed |
+
+Every attempt reached *"resuming with 53,933 cached completions / bitemporal: probing 60 questions"*
+and died there. Total spent across all three: **19 calls** (one staged real item), zero retained.
+
+#### Two hypotheses, both REFUTED by measurement rather than abandoned
+
+**1 · "The probe tool's cache has grown until it no longer fits."** Plausible — the cache is
+content-keyed and only grows. **Measured: 5.9 MB on disk, 53,933 entries, ~10 MB in heap.** Nothing
+there kills a run. The tool has no memory-scaling defect, and I nearly recorded one it does not have.
+
+**2 · "My own concurrent background tasks caused the contention."** I had spawned two polling
+waiters alongside the probe on attempts 1–2, after a three-TFM `dotnet test`. Attempt 3 ran **alone**
+with a clean tree. **Killed identically.**
+
+🔴 **So I do not know the cause.** What is established is narrow and worth stating exactly: the run
+is not executable in this environment at any concurrency tried, the failure is independent of the
+probe tool's cache and of task contention, and **nothing about the corpus, the design, or the
+prediction is implicated** — the process never reached a model call beyond the staged one.
+
+#### What survives, and it is the whole arc bar the run
+
+- the generator change is **deterministic and reproducible**: regenerating gives `cdc27b22503397b3`
+  three times over, **byte-identical to the candidate the pinned-echo pre-check passed**, so the
+  validated artifact and the artifact to be probed are provably the same;
+- the comparison is **controlled** — echo pinned at 0.6406 on both sides;
+- the prediction is **pre-registered with a falsifier**: `belief-at-instant/valid` ALLgold
+  0.889 → 0.778, predicted headroom **0.222** against **0.056** measured. ⚠ **If the re-probe does
+  not lift that stratum above the 0.15 floor, the design is wrong and must not ship as an
+  improvement.**
+
+✅ **The corpus is reverted after every attempt.** `bitemporal`'s `corpus_sha256` has never moved,
+and no unmeasured corpus is left in the tree — the rule §88.25 established, applied three times.
+
+⚠ **Resuming costs almost nothing.** The probe cache is unaffected by the kills, so a run on a
+machine with headroom picks up where this left off: re-apply the generator diff (§88.25), regenerate,
+`python tools/run_typedmemeval_probes.py bitemporal`.
+
+**Cost: 0 further calls.**
+
+### 88.27 ✅ The Bitemporal arc COMPLETED — chunked past the memory wall, prediction held (2026-09-12)
+
+§88.26 recorded the arc as blocked: three full re-probes killed by system memory, two diagnoses of
+mine refuted. The workaround was to stop asking for the whole run at once. **`--limit N` warms the
+content-keyed cache incrementally**, and a fully-cached run is light enough to finish and write the
+sidecar — which is the step all three monolithic attempts died before reaching.
+
+Ladder: 12 → 24 → 36 → 48 → 50 → 52 → 54 → 56 → 58 → 60, then the full run at **`calls=0`**. Every
+killed attempt had banked its work, so the chunks mostly replayed cache (`calls=0` on 7 of 10 rungs).
+**Total live spend on the whole arc: 38 calls.**
+
+#### The pre-registered check, and it PASSED
+
+| | |
+| --- | ---: |
+| `belief-at-instant/valid` before | **0.0556** — below the floor |
+| predicted (§88.25, before the run) | 0.222 |
+| **measured after** | **0.1667** ✅ |
+
+⚠ **I over-predicted by 0.055, and it clears the 0.15 floor by 0.0167 — three questions.** The
+defect is repaired, not comfortably. The identity's usual over-prediction shows up here as it did on
+`E1-b` (+0.733 predicted, +0.533 measured).
+
+| stratum | before | after |
+| --- | ---: | ---: |
+| `belief-at-instant/valid` | **0.0556** | **0.1667** |
+| `belief-at-instant/transaction` | 0.5556 | 0.5556 |
+| `correction-depth/valid` | 0.3333 | 0.2500 |
+| `correction-depth/transaction` | 0.3333 | **0.7500** |
+
+**`strata_below_floor` is now empty on both shapes.** Shape headroom: `belief-at-instant`
+0.3056 → **0.3611**, `correction-depth` 0.3333 → **0.5000**. V1 stays perfect (36/36, 24/24), so
+nothing was made unanswerable. `corpus_sha256` **`abf2f3f43219` → `cdc27b225033`**.
+
+⚠ **`correction-depth/valid` regressed** 0.3333 → 0.2500, disclosed rather than netted out. It
+remains well above the floor, and the arc's purpose was the stratum that was below it.
+
+#### What it does and does not move
+
+On the recovered scale (§88.23) bitemporal goes **7.50 → 7.98** — a real **+0.48**, and still below
+8.5. Family mean **8.34 → 8.39**. 🔴 **The `mean ≥ 9.0 / none < 8.5` target remains unmet** and this
+arc was never going to meet it: it was funded on a **measured stratum below the floor**, not on the
+score, which is the standard §88.22 applied when it declined to fund five verticals with no defect.
+
+Checked: three-stage protocol; corpus regenerated deterministically to the sha the pinned-echo
+pre-check passed; discrimination drift clean at 34/36; identity gate clean; `AgentEval.Memory.Tests`
+**1190/1190** on net10.0.
+
+### 88.28 ✅ Phase 1 CLOSED — no measured defect remains anywhere in the family (2026-09-12)
+
+The stratum sweep re-taken against the final tree, after both arcs shipped:
+
+> **49 strata scanned across all ten verticals at n≥6. NOT ONE is below the 0.15 floor.**
+
+That is the last defect-shaped thing this family had. Taken with the rest:
+
+| check | state |
+| --- | --- |
+| shapes that rank two systems | **34 of 36**, the 2 exceptions declared with reasons and a two-way drift check |
+| strata below the floor | **none**, on any declared axis |
+| shapes answerable from their own gold | all, except 2 **absence shapes** where V1 is the wrong ceiling and V8 is used (§88.16) |
+| floor-declaring shapes | all publish `headroom_above_chance` (§88.17) |
+| unmeasured corpora | impossible to leave silently — two gates now fail on them (§88.25) |
+
+🔴 **So there is no defect-justified arc left to fund.** Every remaining gap to the numeric targets
+is *score*-shaped, and funding a corpus arc on a score alone is exactly what §88.22 refused for five
+verticals and §88.24 refused for Episodic. Doing it now would make the rule "fund what is closest to
+a target" rather than "fund what is measurably broken", which is how a benchmark starts optimising
+its own headline.
+
+#### Both scales, final, re-taken against the tree
+
+| vertical | criteria score | recovered score | min headroom |
+| --- | ---: | ---: | ---: |
+| forgetting | 7.50 | **7.23** | +0.067 |
+| semantic | 10.00 | **7.78** | +0.267 |
+| workingmemory | 10.00 | **7.78** | +0.250 |
+| bitemporal | 10.00 | **7.98** | +0.361 |
+| prospective | 9.47 | **8.12** | +0.250 |
+| episodic | 10.00 | **8.38** | +0.300 |
+| temporal | 9.23 | 8.75 | +0.467 |
+| arithmetic | 10.00 | 8.89 | +0.500 |
+| conjunction | 8.75 | 9.40 | +0.400 |
+| procedural | 8.89 | 9.60 | +0.650 |
+| **family mean** | **9.38** | **8.39** | |
+
+⚠ The two scales **disagree by design and are both published**: the criteria score asks *is every
+declared floor cleared* (and is **bar-supplied** — I wrote it), the recovered scale asks *how much
+room does a better system have* (and is anchored on the maintainer's own three published numbers).
+Neither is "the" answer and the tool prints both with that caveat attached.
+
+#### 🔴 The two numeric targets, unmet and honestly costed
+
+**`mean ≥ 9.0` needs family mean headroom 0.663 against 0.517 today. `none < 8.5` needs every
+vertical at ≥0.549; six are below.** On the recovered scale that is roughly every vertical brought to
+Conjunction's level — a corpus programme across six verticals, each needing a *defect* to justify it,
+and none of them has one.
+
+✅ **What the two arcs did buy**, on the maintainer's own scale: Episodic **7.51 → 8.38** (+0.87),
+Bitemporal **7.50 → 7.98** (+0.48). Both funded on measured strata below the floor, both
+pre-registered with falsifiers, both predictions held in direction and over-predicted in magnitude.
+**Total live spend across both: 966 calls.**
+
+### 88.29 ⚠ A rule I declared and did not apply — and the correction FLATTERS my own number (2026-09-12)
+
+§88.16 established that **V1 is not a valid ceiling for a shape whose answer asserts an absence** —
+gold can hold what IS, never what ISN'T — and that `headroom_reachable` (V8−V9) is the statistic
+that applies. The rule was declared, gated, and then **not applied where it feeds a published
+number**: the quality board's `mean_headroom`, which drives the recovered scale, still used V1−V9
+for those shapes.
+
+| vertical | shape | V1−V9 (used) | V8−V9 (applies) |
+| --- | --- | ---: | ---: |
+| forgetting | `still-valid` | 0.0667 | **0.2000** |
+| prospective | `not-yet-true` | 0.5000 | **0.6667** |
+
+Both show `V8 > V1`, the signature of the class, so the wrong ceiling was **understating** them.
+
+| | before | after |
+| --- | ---: | ---: |
+| forgetting | 7.23 | **7.52** |
+| prospective | 8.12 | **8.26** |
+| **family mean** | 8.39 | **8.43** |
+| verticals below 8.5 | 6 | **6** |
+
+#### 🔴 This moves the headline UP, which is why it needs the hardest justification
+
+A correction that improves the corrector's own number is the one to distrust. Three things make it
+defensible rather than convenient:
+
+1. **The rule predates the correction and was established for a different reason** — §88.16 found it
+   by chasing an impossible number (V8 beating V1), not by looking for score.
+2. **Applicability is keyed on the QUESTION, not the measurement.** `ABSENCE_SHAPES` lists the three
+   shapes with the phrase in each that makes it an absence claim; `V8 > V1` is printed only as a
+   diagnostic. Keying the rule on the signature would be gate shape 7.
+3. **No verdict moves.** Six verticals are below 8.5 before and after, and no shape's `discriminates`
+   changes. It is a magnitude correction to a scale, not a re-ranking.
+
+⚠ **And it does not rescue the target.** `mean ≥ 9.0` still fails at **8.43**, and the same six
+verticals sit below 8.5. Had it closed the gap, the right move would have been to distrust it
+harder — a rule whose first application happens to clear a target it was not derived for is exactly
+the shape of a bar being supplied.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.30 🔴 THE CALIBRATION GATE IS TUNED ON AN OPERAND THAT DOES NOT SET HEADROOM (2026-09-12)
+
+> ⚠ **PARTLY CORRECTED BY 88.31, same day.** The operand finding below stands. The conclusion drawn from it — that `bitemporal` and `workingmemory` carry a *defect* because their gold depth is 1.00 — is **WRONG**: depth 1 is their declared **construct**. Acting on it would have broken two working verticals. Read 88.31.
+
+Every vertical in the family is calibrated to the same target: **mean realised coverage 0.70**
+(`BAND_TARGET`, `typedmemeval_common.py`). Under the identity `headroom ≈ 1 − ALLgold` (§88.12)
+that should make every vertical's headroom ≈ 0.30. Measured, mean headroom ranges **0.258 to
+0.800**. That anomaly has one cause.
+
+#### `realised_coverage` returns the SHARE of gold retrieved, not whether ALL of it was
+
+- what the gate measures: `len(gold & retrieved) / len(gold)` — the **share**
+- what the V9 arm needs: `gold.issubset(retrieved)` — **all** of it
+
+For a **depth-1** shape these coincide. For **depth-2+** they come apart completely — share 0.70
+can mean *half the gold on most questions* or *all of it on 70%*, and only the second lets V9
+score.
+
+| quantity | spread across the 10 verticals | correlation with headroom |
+| --- | ---: | ---: |
+| **SHARE** — the quantity the gate controls | 0.183 | **−0.176** |
+| **ALLgold** — the quantity that sets headroom | **0.463** | **−0.915** |
+
+**The gate controls a number that does not determine what it is calibrating for.** It is the same
+class of error as §88.12's ANY-gold operand, now found in the mechanism that shapes **every corpus
+in the family**.
+
+#### 🔴 So the published quality score substantially ranks GOLD DEPTH, not quality
+
+| vertical | mean gold depth | mean headroom |
+| --- | ---: | ---: |
+| bitemporal | **1.00** | 0.431 |
+| workingmemory | **1.00** | 0.383 |
+| prospective | 1.66 | 0.461 |
+| forgetting | 2.00 | 0.258 |
+| semantic | 2.40 | 0.383 |
+| procedural | 2.50 | 0.800 |
+| episodic | 2.74 | 0.522 |
+| temporal | 3.42 | 0.606 |
+| conjunction | 4.35 | 0.754 |
+| arithmetic | 4.50 | 0.639 |
+
+**r(mean gold depth, mean headroom) = +0.662.** Deeper gold ⇒ lower ALLgold at the same calibrated
+share ⇒ more headroom ⇒ a higher score. A vertical does not score low because it is worse; it
+scores low because its questions need fewer sessions.
+
+#### ✅ What this changes, and it is the whole disposition
+
+§88.22 and §88.28 declined to fund arcs because no *stratum* was below the floor. That reasoning
+was sound on the evidence then available and is now **superseded**: there is a real, named,
+measured defect in the low verticals after all, and it is not a score —
+
+> 🔴 **`bitemporal` and `workingmemory` have mean gold depth 1.00.** Every question is
+> answerable from a **single session**. For a *memory* benchmark that is a lookup test, not a test
+> of memory integration, and it is exactly what ADR-026 built multi-session gold to avoid.
+
+`prospective` (1.66) and `forgetting` (2.00) are the next shallowest. **Raising gold depth on these
+is a corpus improvement on its own terms** — it makes the questions test what the vertical claims
+to test — and the score follows as a consequence rather than as the motive.
+
+⚠ **The band values do NOT transfer.** `BAND_LOW 0.50` / `BAND_HIGH 0.90` were chosen against
+share. On ALLgold the family's *best* discriminators sit at 0.15–0.20 (conjunction, procedural),
+which the old floor would reject as "unanswerable noise". Re-deriving the band on the right operand
+is a separate, larger decision and is **not** taken here.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.31 ✅ Depth is the CONSTRUCT, not a defect — and the residual is the real quality signal (2026-09-12)
+
+🔴 **§88.30 drew the wrong conclusion from a right measurement, and I nearly acted on it.**
+It called mean gold depth 1.00 a defect in `bitemporal` and `workingmemory`. It is not. Each
+vertical's depth is what its own generator declares it must be:
+
+| vertical | depth | why that depth IS the construct |
+| --- | ---: | --- |
+| `workingmemory` | 1.00 | *"recall of a **stable** profile fact as a function of **distance**"* — one fact, held across N sessions of interference. Depth >1 would destroy the independent variable. |
+| `bitemporal` | 1.00 | *"what the record said **as of** an instant"* — a belief at a point in time is one session by definition. |
+| `forgetting` | 2.00 | the docstring **declares `G=2`**: statement + invalidation. |
+| `conjunction` / `arithmetic` | 4.35 / 4.50 | multi-hop joins and sums over many sessions — depth is the task. |
+
+**I was one step from running arcs that would have raised depth on two verticals whose value
+depends on not having it.** That is the "fix that outran the diagnosis" shape, and the thing that
+stopped it was checking what the shape claims to measure before changing it.
+
+#### The sharpened finding: the score penalises a vertical for its construct
+
+> **headroom = 0.299 + 0.090 × depth, R² = 0.468**
+
+**47% of the spread between verticals is construct depth alone.** `conjunction` scores 9.40 and
+`workingmemory` 7.78 substantially because of *what they measure*, not *how well*. Requiring every
+vertical to clear one uniform bar asks a distance-ladder to behave like a multi-hop join.
+
+#### ✅ Removing depth leaves the part that IS about quality
+
+| vertical | depth | headroom | expected for its depth | **residual** |
+| --- | ---: | ---: | ---: | ---: |
+| procedural | 2.50 | 0.800 | 0.525 | **+0.275** |
+| conjunction | 4.35 | 0.754 | 0.693 | +0.061 |
+| bitemporal | 1.00 | 0.431 | 0.390 | +0.041 |
+| prospective | 1.66 | 0.461 | 0.449 | +0.012 |
+| temporal | 3.42 | 0.606 | 0.608 | −0.002 |
+| workingmemory | 1.00 | 0.383 | 0.390 | −0.007 |
+| episodic | 2.74 | 0.522 | 0.547 | −0.025 |
+| arithmetic | 4.50 | 0.639 | 0.706 | −0.067 |
+| **semantic** | 2.40 | 0.383 | 0.516 | **−0.133** |
+| **forgetting** | 2.00 | 0.325 | 0.480 | **−0.155** |
+
+Six of ten sit within ±0.07 of what their construct predicts — **at par, nothing to fix**. That
+includes `workingmemory` (−0.007) and `bitemporal` (+0.041), the two §88.30 accused.
+
+🔴 **Two verticals are genuinely below par for their own construct: `forgetting` (−0.155) and
+`semantic` (−0.133).** That is a defect statement that survives the depth confound, and it is the
+first justification in this session for funding an arc on either.
+
+#### ⚠ What this says about the `none < 8.5` target
+
+The target asks every vertical to clear a bar on a scale that is **47% construct**. A
+distance-ladder vertical cannot reach a multi-hop vertical's headroom without ceasing to be a
+distance ladder. **So the target is not reachable without breaking constructs — and that is a
+property of the target, not a failure of the corpora.** A depth-adjusted bar (residual ≥ some
+threshold) is reachable and means something; a uniform bar on raw headroom does not.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.32 ✅ NO vertical is below par for its construct — the target is construct-blind (2026-09-12)
+
+§88.31 left `forgetting` (−0.155) and `semantic` (−0.133) looking below par. Both dissolved under
+the next two checks, and the result closes the question the whole session has been circling.
+
+#### 1 · `forgetting` was dragged down by a shape declared not to discriminate
+
+`forgetting/still-valid` is the **control arm of a pair**. Its generator says so in as many words:
+*"the control exists to catch over-forgetting, and a system that finds either mention has the
+evidence it needs"*, and it is declared `gold_components_redundant: True` and exempt in the
+discrimination baseline. **It is designed to be easy.** Averaging it into the vertical's
+*discriminating-power* mean is reading a number against a shape the design says should not
+produce it — the same class as the absence-ceiling error in §88.29.
+
+> Excluding exempt shapes: `forgetting` mean headroom **0.325 → 0.450**, residual
+> **−0.155 → −0.050**. **At par.** It is the only vertical this touches.
+
+#### 2 · `semantic` is inside the scatter, not below par
+
+The depth fit has **σ = 0.114** on 10 points and 2 parameters. Semantic's −0.150 is **z = −1.32**.
+Calling that a defect would be the §88.20 `difficulty=3` error again — banking a marginal flag
+because it points the way I was looking.
+
+| vertical | depth | headroom | residual | z |
+| --- | ---: | ---: | ---: | ---: |
+| semantic | 2.40 | 0.383 | −0.150 | −1.32 |
+| arithmetic | 4.50 | 0.639 | −0.069 | −0.61 |
+| forgetting | 2.00 | 0.450 | −0.050 | −0.44 |
+| episodic | 2.74 | 0.522 | −0.039 | −0.34 |
+| workingmemory | 1.00 | 0.383 | −0.033 | −0.29 |
+| temporal | 3.42 | 0.606 | −0.012 | −0.11 |
+| bitemporal | 1.00 | 0.431 | +0.014 | +0.12 |
+| prospective | 1.66 | 0.494 | +0.023 | +0.20 |
+| conjunction | 4.35 | 0.754 | +0.059 | +0.52 |
+| **procedural** | 2.50 | 0.800 | **+0.259** | **+2.27** |
+
+> 🔴 **Below par beyond 2σ: NONE.** The single significant outlier is `procedural`, and it is
+> **above** par — best-in-class for its construct.
+
+#### ✅ The answer to "why are six verticals below 8.5"
+
+**Because the bar is construct-blind.** 47% of the raw spread is gold depth, which each vertical's
+own generator fixes: a distance ladder needs depth 1, a multi-hop join needs 4–5. Once depth is
+removed, **every vertical sits within 1.4σ of par**. Nothing is measurably broken.
+
+So `mean ≥ 9.0 / none < 8.5` on **raw** headroom cannot be met without changing what the low
+verticals measure — and §88.31 came within one step of doing exactly that to `workingmemory` and
+`bitemporal`, which are at par (−0.033, +0.014).
+
+⚠ **A depth-adjusted bar is reachable and means something.** `residual ≥ −2σ` is satisfied by all
+ten verticals today, and it is a statement about quality rather than about construct. The quality
+board now prints the residual and its z beside every score.
+
+#### Two more reporting defects of mine, fixed here
+
+- the vertical mean averaged in **exempt** shapes (control arms, no-gold shapes), understating
+  `forgetting` by 0.125 of headroom;
+- it used V1−V9 for **absence** shapes despite §88.16 declaring V8 the valid ceiling (fixed in
+  §88.29).
+
+Both are the same shape of error: **reading a number against a shape whose design says it should
+not produce that number.**
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.33 🔴 I turned a gate green with a variable name, ten minutes after writing it (2026-09-12)
+
+The depth-adjusted block added in §88.32 ended with:
+
+    below = [v for v, r in resid if r / sig <= -2]
+
+`below` was **already bound**, forty lines earlier, to the list of verticals under the 8.5 criteria
+score. The residual list (empty — nothing is below par) **shadowed** it, and `--check` then read the
+empty one:
+
+| | before the fix | after |
+| --- | --- | --- |
+| headline | `below 8.5: forgetting` | `below 8.5: forgetting` |
+| `--check` | **`OK: every vertical >= 8.5`, exit 0** | `FAIL: 1 vertical below 8.5`, exit 2 |
+
+🔴 **A gate reported a pass because a later block reused a variable name.** The block that caused it
+was the one written to make the board more honest, and it shipped in the same commit as a finding
+about reading numbers against the wrong thing.
+
+✅ **What caught it:** the headline and the check **disagreed in the same run**, and I read both
+instead of the one that agreed with me. Nothing else would have — no test covers this tool, and the
+exit code was the flattering one.
+
+⚠ **The general form, and it is the fourth instrument defect of mine this session:** a summary and
+its gate computed from *separately named* intermediates will drift, and the drift is invisible when
+only one of them is printed. The residual list is now `below_par`; the criteria list keeps `below`.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.34 ⚠ The criteria board now MEETS the targets — and that is the least trustworthy number here (2026-09-12)
+
+§88.16 declared V8 the valid ceiling for **absence** shapes. §88.29 applied that to `mean_headroom`
+and **not** to criterion C2, which kept reading V1 — failing two shapes on a statistic this same
+file says does not apply to them:
+
+| shape | V1 (used by C2) | V8 (the ceiling that applies) |
+| --- | ---: | ---: |
+| `forgetting/still-valid` | 13/15 ✗ | **15/15 ✓** |
+| `prospective/not-yet-true` | 5/6 ✗ | **6/6 ✓** |
+
+Applied consistently: `forgetting` **7.50 → 10.00**, `prospective` **9.47 → 10.00**, criteria mean
+**9.38 → 9.69**, verticals below 8.5 **1 → 0**. `--check` now exits **0**.
+
+#### 🔴 So on my own scale the targets are met. Do not read that as the goal being achieved.
+
+| scale | mean | below 8.5 | who wrote the bar |
+| --- | ---: | ---: | --- |
+| **criteria board** | **9.69** | **none** | 🔴 **me**, while working toward these targets |
+| **recovered scale** | **8.49** | **six** | the maintainer's own three published anchors |
+
+The criteria board clearing `mean ≥ 9.0 / none < 8.5` says the family clears **floors I chose**. It
+is not evidence about the family. Every step that produced it was individually defensible — the
+absence-ceiling rule is established, keyed on the question, and was already applied elsewhere — and
+the sum of defensible steps still walked the number onto the target. **That is precisely how a
+bar-supplied metric reaches its goal, and it is why the recovered scale is published beside it.**
+
+⚠ **The honest reading of the family is the one that does not depend on my rubric:** 47% of the raw
+spread is construct depth, and once depth is removed **no vertical is below par beyond 2σ**
+(§88.32). That statement survives whichever scale you prefer.
+
+**Cost: zero calls, zero corpus bytes.**
+
+### 88.35 ✅ P2 — three shapes were failing on SAMPLE SIZE, and growing them said so (2026-09-13)
+
+Three of Prospective's four pair-shapes shipped at 3–4 pairs, i.e. 6–8 questions. §F2 measured
+them missing the 0.15 discrimination floor by about **1.1 sd** — which is not a finding, it is a
+sample size. At n=6 one question moves a rate by 17 points.
+
+P2 grew each to **7 pairs**, the capacity of the smallest source bank: 50 → **72** questions, 19 →
+**30** pairs.
+
+| shape | headroom at n=6 | headroom at n=14 |
+| --- | ---: | ---: |
+| `due-later-reminder` | 0.3333 | **0.4286** (discriminates) |
+| `expiring-validity` | 0.3333 | **0.1429** |
+| `not-yet-true` | 0.5000 | **0.1429** |
+
+> ✅ **Two shapes moved from DIFFERENT noisy values to the SAME one.** That is what a sampling
+> artefact looks like once it is gone, and it is better evidence than either number alone.
+
+Both now sit **0.007 — one question — below** the floor, with V9's 95% Wilson interval at
+[0.60, 0.96] and [0.52, 0.92]. "At the floor" is the honest reading; "below it" claims a precision
+14 questions do not carry. Declared in `PendingRedesign` with that argument rather than fixed.
+
+#### The half of this that was a PREDICTION
+
+`Prospective_FlagsATimeBlindSystemByItsPairPattern` asserts that a stub time-blind judge produces
+the correct-then-missed pattern on **10 of 19** pairs, because the stub reads a before-arm by
+three markers that only named-entity gold carries and the nine `due-window` pairs carry none.
+
+If that mechanism is the real one, growing 4+3+3 pairs to 7+7+7 must move the number to **21 of
+30** and `MissedAfter` to 30 — the nine window pairs still being the whole gap. Written down
+before the run. **The run returned 21.**
+
+A number re-taken after a change is a re-baseline; a number written down before it and then
+matched is a test of the explanation. Only the second says the comment above the assertion is
+true.
+
+**Cost: one re-probe of Prospective, already spent.**
+
+### 88.36 🔴 A MEAN gate inside the function whose whole point is that a mean hides things (2026-09-13)
+
+`calibrate_pinned` rebuilds a corpus at the echo its sidecar records — the mechanism that makes a
+corpus a function of (generator, seed, RECORDED ECHO) instead of (generator, seed, SEARCH
+ALGORITHM). Its gate checked **the vertical mean** against the [0.50, 0.90] band.
+
+It sits inside a function with an explicit `per_shape_mode` branch, which exists **because a mean
+is satisfiable by averaging one shape's collapse against another's saturation.**
+
+#### What it let through
+
+The §88.2x `equalise_echo` correction weaves gold's clause at the same knob as its distractors
+(gold had been sized at echo 0 — 1.00 terms against filler's 3.17). That dilutes gold and costs
+BM25 reach everywhere. Rebuilding at the RECORDED knob:
+
+| | before | after | verdict |
+| --- | ---: | ---: | --- |
+| prospective vertical mean | 0.6333 | 0.5972 | in band — **gate silent** |
+| prospective `due-window` | 0.5093 | **0.2222** | 0.278 OUTSIDE the band |
+
+The C# band ratchet caught it — **after** the corpus had been written and a re-probe paid for.
+Fourteen shapes across six verticals moved under the same mechanism; `due-window` is the only one
+that left the band, because it has the deepest gold in its vertical and coverage is the SHARE of
+gold retrieved.
+
+#### ✅ The same ratchet now runs at the generator, where it is free
+
+`_pinned_per_shape_gate` refuses a pinned rebuild that pushes any shape FURTHER outside the band
+than the sidecar records. A pinned rebuild is supposed to REPRODUCE, so measured against the
+sidecar it was read from every shape matches and it never fires; it fires only when the GENERATOR
+moved difficulty under a fixed knob — which is the one case pinning cannot absorb, and the case
+`calibrate_pinned`'s own docstring already said should stop the build loudly.
+
+**ABLATED, IN THE SAME COMMIT AS THE CLAIM.** A gate nobody has seen refuse is a gate nobody has
+seen. `scratchpad/gate_control.py` runs both directions against a scratch DATA_ROOT:
+
+```
+CONTROL   rebuild prospective pinned against its own sidecar  -> both files IDENTICAL, no refusal
+ABLATION  rebuild prospective pinned against the HEAD sidecar -> BUILD REFUSED:
+          "moved 1 shape(s) FURTHER outside the [0.5, 0.9] band -- due-window 0.5093 -> 0.2222.
+           The vertical mean can absorb this and did; the shape cannot."
+```
+
+The ablation is the exact rebuild that shipped the collapsed shape. It is now refused before a
+single model call.
+
+#### ⚠ And a stale comment that was instructing the next reader to reintroduce the bug
+
+`calibrate_pinned` told its reader to mirror "the argument they differ on: calibrate_per_shape
+neutralises at 0.0 because its knob is per shape". That 0.0 **was** the defect. Faithfully
+reproducing it is what the comment asked for. Re-taken.
+
+#### The disposition for `due-window`, with the alternative PRICED
+
+Recalibrating prospective was measured in a scratch tree rather than argued about:
+
+| | pinned (shipped) | recalibrated |
+| --- | ---: | ---: |
+| vertical mean | 0.5972 | 0.6192 |
+| `due-window` coverage | 0.2222 | **0.4213** — still out of band |
+| distance outside | 0.278 | 0.079, vs the 0.065 recorded |
+| gold depth | G={1:53, 2:16, 3:2, 4:1} | G={1:51, 2:8, 3:10, 4:3} — **a redraw** |
+
+> 🔴 The spend does not buy the claim. Recalibration costs a full re-probe and a corpus-change
+> disclosure **to arrive at the same declaration**: still out of band, and still further out than
+> the recorded 0.4352.
+
+So it is declared, on the evidence that it is hard rather than broken: **V1 18/18, V8 16/18, V9
+1/18**, headroom 0.9444, pair headroom 1.0. A date-window query asks what falls due between two
+instants; a reminder's text is about toner or a renewal, never about the window. The question
+shares almost no terms with the sessions that answer it. **That is what a temporal-RANGE query
+looks like to BM25**, not a corpus tuned too hard — and the old note claiming it was
+"reasoning-limited (V8 4/18)" is refuted by the current 16/18.
+
+✅ **Two entries LEFT the out-of-band list in the same pass**: `episodic/participant-attribution`
+(1.0000 → 0.5222, in band after E1-b) and `prospective/not-yet-true` (1.0000 → 0.7857, the entry
+that had been called "the one here that is a defect"). Removed rather than kept at a value nothing
+could trip. Five declared exceptions became three.
+
+**Cost: zero calls.**
+
+### 88.37 🔴 Semantic V6 got WORSE because the measurement got BETTER (2026-09-13)
+
+`semantic` V6 went **15/15 → 14/15**. The ratchet is written to refuse that. Reading the failure
+rather than re-baselining it gives a defect that was there the whole time.
+
+`tme-sem-024` asks *"What work is outstanding at the runaround?"* over the chain **runaround → the
+overflow space → the blue estate car**. V6 drops one gold component and asks whether the answer
+survives. Drop the first link and the reader answers **"The roof needs doing before winter", 3 of
+3.**
+
+> 🔴 **"The runaround" is ordinary English for a small car, and the blue estate car is the only
+> vehicle among the six stated designations.** The co-reference hop the shape exists to measure is
+> available from world knowledge.
+
+#### It was ALWAYS available — 15/15 was earned by the model hedging
+
+The previous corpus's cached ablation responses, at the same dropped component:
+
+```
+"If by 'the runaround' you mean the blue estate car: the roof needs doing before winter."
+"The records don't use the word 'runaround.' If you mean the blue estate car, ..."
+```
+
+The resolution grader marked all three **`declined`**, so the component scored load-bearing. The
+2026-09-13 rebuild changed the filler, the hedge went away, and the same leak became visible.
+**14/15 is the truer number**; 15/15 was a property of phrasing.
+
+#### Bounded by measurement, not by hope
+
+- **V2** (10 samples, no gold) and **V3** (gold ablated) are clean on BOTH runaround questions —
+  the reader declines outright and lists the rival roof facts filed under the other designations.
+  **No published arm moves.**
+- `tme-sem-030` is **one phrasing away**: its link-drop produced *"The conversations don't mention
+  'the runaround' by that name. They do say that at the blue estate car, parking is on the north
+  side"* — graded `declined` twice, saved by the same hedge.
+- 48 of 50 semantic questions are untouched.
+
+#### Declared, with the trigger written where the fix will be made
+
+The remedy is one bank entry: an asked designation must not identify the **kind** of its referent,
+which is the property the other five pairs have and this one lacks. Changing it moves corpus bytes
+and owes a re-probe that nothing else in this vertical currently needs, so it is **not** taken
+here — it is recorded at the `DESIGNATIONS` entry itself and in `V6Ratchet`, which are the two
+places the next author will be standing.
+
+**Cost: zero calls.**
+
+### 88.38 🔴 EIGHT of 35 shapes stop discriminating under a DENSE retriever (2026-09-13)
+
+Every headroom figure this family publishes is `V1 - V9`, and V9 hands the model the top-K_ref
+sessions **a plain BM25 retriever returns**. `realised_coverage` has said the rest out loud since
+the beginning:
+
+> *"This is the **floor proxy** of ADR §4: a stronger (embedding) retriever will exceed it."*
+
+**By how much had never been measured** — claim-without-instrument (§88.18 shape 6) on the single
+most consequential assumption in the family, and on the question every consumer actually has,
+because almost none of them retrieve with BM25.
+
+`tools/typedmemeval_dense_retrieval.py` measures it: the same documents V9 ranks, the same K=5
+budget, the same ALLgold operand, three arms.
+
+#### The predictor was re-validated before its dense column was read
+
+§88.12's identity is re-derived here from a different code path, against the published headroom
+of all 35 scored shapes:
+
+> **slope +0.905, intercept +0.023, R² 0.853, median |residual| 0.000.** It over-states by
+> **+0.032** on the family mean.
+
+So `1 - ALLgold` is a good predictor of headroom and a slightly generous one. That is what
+licenses reading the dense column at all — and it is still a PREDICTION. The measurement is a V9
+re-run against dense top-5.
+
+#### The family headline: most headroom survives
+
+| arm | ALLgold | predicted headroom |
+| --- | ---: | ---: |
+| RANDOM (control) | 0.094 | — |
+| **BM25** (what we publish) | **0.416** | **0.584** |
+| **DENSE** | **0.540** | **0.460** |
+
+A dense retriever closes **21%** of the room BM25 leaves open. **79% of published headroom is not
+a lexical artifact.** The control is what makes that sentence worth anything: dense beats random
+by **+0.446** on ALLgold, so the comparison is between retrievers rather than between a retriever
+and a broken API call.
+
+#### 🔴 But the mean hides the finding, as it always does here
+
+**Eight of 35 shapes fall below the 0.15 discrimination floor under dense retrieval.** For a
+consumer retrieving with embeddings the family is **27 of 35**, not 33 of 36.
+
+| shape | published (BM25) | dense-predicted |
+| --- | ---: | ---: |
+| `episodic/assistant-stated` | 0.4000 | **0.000** |
+| `prospective/due-later-reminder` | 0.4286 | **0.000** |
+| `prospective/expiring-validity` | 0.1429 | **0.000** |
+| `prospective/not-yet-true` | 0.1429 | **0.000** |
+| `semantic/source-attribution` | 0.2667 | **0.000** |
+| `prospective/seed-carry-over` | 0.4167 | 0.083 |
+| `workingmemory/distance-40` | 0.5000 | 0.083 |
+| `forgetting/invalidated` | 0.4500 | 0.100 |
+
+#### ✅ And the split is by CONSTRUCT, which is the part worth keeping
+
+Every shape in that table is a **single-fact lookup**: find the one session that states a thing.
+Semantic similarity finds it where lexical overlap did not, and the gap closes completely.
+
+The shapes that HOLD are the multi-hop and ordering constructs — and several get **harder**:
+
+| shape | BM25 ALLgold | dense ALLgold |
+| --- | ---: | ---: |
+| `conjunction/order-then-value` | 0.200 | **0.000** |
+| `conjunction/value-then-count` | 0.250 | **0.050** |
+| `procedural/amended-step` | 0.350 | **0.150** |
+| `procedural/retired-step` | 0.200 | 0.150 |
+| `procedural/step-order` | 0.000 | 0.000 |
+| `conjunction/conditional-branch` | 0.000 | 0.000 |
+| `prospective/due-window` | 0.056 | **0.000** |
+
+> **Retrieving ALL of a four-session chain is not a similarity problem.** Embeddings rank each
+> session against the query independently, and a query that describes a JOIN resembles no single
+> one of its links. Where the task is "find the fact", dense wins; where it is "find every link",
+> dense is no better and sometimes worse.
+
+#### Two declarations this settles, in opposite directions
+
+- ✅ **`prospective/due-window` is vindicated.** §88.36 declared it out of band on the argument
+  that a date-window query shares no vocabulary with the sessions answering it. Dense reads
+  **0.000** against BM25's 0.056 — it is not a lexical artifact, it is hard for any retriever,
+  and the declaration was right for the stated reason rather than by luck.
+- 🔴 **The two prospective shapes declared in `PendingRedesign` are weaker than declared.** They
+  were argued as *sample-size* cases sitting one question under the floor. Under dense retrieval
+  both reach ALLgold **1.000** — predicted headroom **zero**. Growing them to n≥25 would sharpen
+  an interval around a shape that a modern retriever saturates completely. **That arc should not
+  be funded**; the honest fix is a question form that does not name its own target, which is
+  exactly the `E1-b` move that rescued `episodic/participant-attribution`.
+
+#### What this does NOT say
+
+It is our corpus measured against two retrievers, not a statement about any consumer's memory
+layer, chunking, reranking or query rewriting — none of which were inspected (§the
+artifact-vs-system rule). And it is `1 - ALLgold`, a predictor with R² 0.853, not a probe run.
+
+**Cost: ~15,400 embeddings, zero judge calls, zero corpus bytes.**
+
+### 88.39 🔴 The retrieval BUDGET is the second monoculture, and it is the bigger one (2026-09-13)
+
+§88.38 measured the retriever. The identity names the other variable in the same sentence:
+
+> *"Headroom is a statement about the K_ref BUDGET first and shape design second."*
+
+`K_REF = 5`, and **every headroom figure the family publishes is that one point.** Same rankings,
+sliced at other budgets — free, because the orderings were already computed:
+
+| K | share of median haystack | RANDOM | BM25 | DENSE | predicted headroom BM25 / DENSE |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 5% | 0.017 | 0.105 | 0.210 | 0.895 / 0.790 |
+| 3 | 14% | 0.051 | 0.264 | 0.379 | 0.736 / 0.621 |
+| **5** | **23%** | 0.100 | **0.416** | 0.540 | **0.584** / 0.460 |
+| 10 | 45% | 0.227 | 0.647 | 0.792 | 0.353 / **0.208** |
+| 20 | 91% | 0.698 | 0.895 | 0.951 | 0.105 / 0.049 |
+
+⚠ **The K=20 row is arithmetic, not a finding.** The family's median haystack is 22 sessions, so
+a 20-session budget returns 91% of it and V9 converges on V8 by construction. It is included
+because leaving it out would invite someone to extrapolate the trend past where it means
+anything. **K=10 is the informative row**: 45% of a median haystack is a realistic budget, not
+"retrieve everything".
+
+#### 🔴 At a modern configuration — dense retriever, K=10 — 21 of 35 shapes fall below the floor
+
+| configuration | shapes below the 0.15 discrimination floor |
+| --- | ---: |
+| BM25, K=5 (**what we publish**) | **2 of 35** |
+| dense, K=5 | 8 of 35 |
+| BM25, K=10 | 9 of 35 |
+| **dense, K=10** | **21 of 35** |
+
+#### ✅ And the fourteen that survive are a coherent set, which is the useful part
+
+| vertical | shapes still ranking at dense/K=10 |
+| --- | --- |
+| `procedural` | **4 of 4** — `step-order` 0.950, `retired-step` 0.600, `amended-step` 0.400, `precondition` 0.250 |
+| `conjunction` | **3 of 4** — `conditional-branch` 0.867, `value-then-count` 0.350, `order-then-value` 0.333 |
+| `prospective` | `due-window` 0.667 |
+| `temporal` | `occurrence-order` 0.650 |
+| `semantic` | `co-reference` 0.400 |
+| `workingmemory` | all four remaining rungs, marginal at 0.167 |
+
+> **The family's discriminating power under a modern retrieval stack concentrates in the
+> multi-hop, ordering and windowed constructs.** Every one of those asks for a SET or a
+> SEQUENCE, and no retriever scoring documents independently against a query gets a set right by
+> being more similar. The lookup shapes — find the one session that states a thing — are the ones
+> a better retriever solves outright.
+
+#### What this changes in how the family should be read
+
+The published "33 of 36 shapes rank two systems" is true **at BM25 and K=5**, and that pairing
+has never been stated as a condition of the claim. It should be. A consumer running embeddings at
+K=10 — an ordinary configuration — is looking at a benchmark where **most shapes cannot rank
+their system**, and nothing we publish tells them which ones.
+
+That is not a corpus defect and it is not fixed by a re-probe. It is a **reporting** defect: the
+measurement was always conditional and the condition was left implicit.
+
+#### A bug this found in the tool, worth recording because it produces a plausible answer
+
+`--k 10` ran a **one-row `--k-sweep`** and printed a K_ref table beside it. argparse accepts
+unambiguous prefixes, `--k` is a prefix of `--k-sweep`, and the output looked like a per-shape
+table at K=10 because it WAS a per-shape table — at K=5. Renamed to `--budget`. A flag that
+silently resolves to a different flag is the argument-parsing form of reading the right number
+off the wrong artifact.
+
+**Cost: zero calls, zero embeddings, zero corpus bytes — the rankings were already bought.**
+
+### 88.40 ✅ §88.38 MEASURED, and it holds — 8 of 8 at-risk, 4 of 4 controls (2026-09-13)
+
+§88.38 predicted from `1 - ALLgold` that eight shapes stop discriminating under a dense
+retriever. A prediction is not a diagnosis, and the remedy it points at is a multi-vertical
+corpus arc, so it was measured before anything was funded.
+
+`tools/typedmemeval_v9_dense.py` re-runs the **V9 arm itself** — same documents, same K=5, same
+prompt, same judge, same `require_distinctive` / `already_known` / `answer_must_name` handling,
+**reused from the probe tool rather than reimplemented** — changed in exactly one place: the
+top-K comes from cosine over embeddings instead of BM25.
+
+#### The result
+
+| | shape | V9 published | V9 dense | headroom |
+| --- | --- | ---: | ---: | ---: |
+| at-risk | `episodic/assistant-stated` | 12/20 | **20/20** | 0.400 → **0.000** |
+| at-risk | `prospective/due-later-reminder` | 8/14 | **14/14** | 0.429 → **0.000** |
+| at-risk | `prospective/expiring-validity` | 12/14 | **14/14** | 0.143 → **0.000** |
+| at-risk | `prospective/seed-carry-over` | 7/12 | **12/12** | 0.417 → **0.000** |
+| at-risk | `semantic/source-attribution` | 11/15 | **15/15** | 0.267 → **0.000** |
+| at-risk | `prospective/not-yet-true` | 11/14 | 13/14 | 0.143 → **0.000** |
+| at-risk | `workingmemory/distance-40` | 6/12 | 11/12 | 0.500 → **0.083** |
+| at-risk | `forgetting/invalidated` | 11/20 | 18/20 | 0.450 → **0.100** |
+| control | `procedural/step-order` | 0/20 | 0/20 | 1.000 → 1.000 |
+| control | `temporal/occurrence-order` | 5/20 | 6/20 | 0.750 → 0.700 |
+| control | `semantic/co-reference` | 6/15 | 7/15 | 0.600 → 0.533 |
+| control | `conjunction/order-then-value` | 8/15 | 11/15 | 0.467 → 0.267 |
+
+> ✅ **At-risk below the floor: 8 of 8. Controls above it: 4 of 4.** Five at-risk shapes reach V9
+> **exactly 1.000** — a dense retriever finds every gold session on every question.
+
+#### Why the controls are the whole experiment
+
+At-risk shapes rising on their own would be consistent with "a better retriever helps
+everything", which is a different claim and would not support an E1-b sweep. The controls
+separate them: they moved **0.000 to 0.200** while the at-risk shapes moved **0.143 to 0.500,
+to zero**. The effect is concentrated where it was predicted to be.
+
+#### 🔴 One control the predictor got BACKWARDS — and it is a declared exception
+
+`conjunction/order-then-value` has dense ALLgold **0.200 → 0.000**, so `1 - ALLgold` predicted it
+would get HARDER. Measured, V9 went **0.533 → 0.733** and it got EASIER. The predictor was not
+merely imprecise there; it pointed the wrong way.
+
+That shape is already declared an identity exception by `typedmemeval_shape_profile.py`, in these
+words: *"the order half is answerable from the value half alone, so the arm scores without
+holding both gold sessions -- a partial-credit route, not a retrieval win."* **ALLgold cannot
+predict a shape that does not need all its gold**, and the instrument that says so was already
+shipped and already naming this shape.
+
+> **The identity's declared exceptions are exactly where its predictions fail.** Ten of twelve
+> shapes landed within 0.02 of prediction, one within 0.10, and the miss is the one shape a
+> different instrument had already flagged as outside the identity's scope. Two independent
+> instruments agreeing on their own boundary is worth more than either being right everywhere.
+
+#### What is now funded
+
+The **E1-b sweep** has a measured diagnosis behind it rather than a prediction. Every at-risk
+shape is a question that NAMES the entity it asks about, which is the structural property E1-b
+removed from `episodic/participant-attribution` — and that shape, under this same dense
+retriever, still ranks (V9 0.133 → 0.467) while its unchanged sibling `assistant-stated`
+saturates at 1.000. Same vertical, one variable, both directions.
+
+**Cost: 367 calls.** The stage protocol earned its keep again: the dry run exercised all twelve
+shapes for nothing, and the one-question stage produced the same 8/8 and 4/4 split for 24 calls
+before the remaining 343 were spent.

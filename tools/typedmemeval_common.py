@@ -127,7 +127,9 @@ DATE_FORMAT = "%Y/%m/%d (%a) %H:%M"
 
 VERTICALS = {
     # vertical      abbrev   question count
-    "prospective":  ("pro",  50),
+    # P2 (2026-09-12): 50 -> 72. The three pair-shapes at 3-4 pairs failed on SAMPLE SIZE, not
+    # on a floor; raised to 7 pairs each, the capacity of the smallest source bank.
+    "prospective":  ("pro",  72),
     "episodic":     ("epi",  50),
     "arithmetic":   ("ari",  50),
     "workingmemory": ("wm",  60),
@@ -352,38 +354,6 @@ def echo_terms(question_text: str, echo: float, rng: random.Random) -> list[str]
 ECHO_LEAD = "Also on my mind:"
 
 
-def swap_echo_terms(sentence: str, extra: list[str]) -> str:
-    """REPLACES the last few terms of an existing echo clause with `extra`, keeping the count.
-
-    Adding terms was the obvious move and it failed twice, each time on a different axis. Appending a
-    second clause read badly and pushed turn length, mean turn length and punctuation density to
-    3.7-4.8 sd. Merging into the one clause fixed the prose and still left every distractor carrying
-    more echo terms than its gold, which is more commas: punctuation density 0.761, over the bar.
-
-    So the terms are swapped rather than added. The clause keeps its length, its comma count and its
-    token count; only WHICH words sit in it changes. The distractor gives up a couple of the query
-    keywords it was echoing, which costs a little retrieval competitiveness -- that is a real cost,
-    and it is the one the calibration gate is there to measure, so it gets measured rather than
-    guessed at.
-    """
-    if not extra:
-        return sentence
-    marker = f"({ECHO_LEAD} "
-    start = sentence.rfind(marker)
-    if start < 0:
-        return sentence
-    close = sentence.find(")", start)
-    if close < 0:
-        return sentence
-    inner = sentence[start + len(marker):close].rstrip().rstrip(".")
-    terms = [term.strip() for term in inner.split(",") if term.strip()]
-    if not terms:
-        return sentence
-    keep = terms[:max(1, len(terms) - len(extra))] if len(terms) > len(extra) else terms[:1]
-    merged = keep + extra[:max(0, len(terms) - len(keep))]
-    return f"{sentence[:start]}{marker}{', '.join(merged)}.){sentence[close + 1:]}"
-
-
 def weave_echo(sentence: str, terms: list[str]) -> str:
     """Appends echoed vocabulary as a natural-sounding trailing clause.
 
@@ -596,11 +566,6 @@ _PAD_PUNCT_TAILS = [
     "(it hardly signified)",
     "which, in fairness, was the point",
 ]
-
-
-def _role_text(session: Session, role: str) -> str:
-    """The text one speaker contributes to a session."""
-    return " ".join(t.content for t in session.turns if t.role == role)
 
 
 def _slot_index(session: Session, role: str, ordinal: int) -> int | None:
@@ -1682,7 +1647,7 @@ class Calibration:
 
 
 
-def equalise_echo(questions: list[Question], echo: float, rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
+def equalise_echo(questions, echo, rng: random.Random) -> None:  # DevSkim: ignore DS148264 - deterministic corpus generation, not a security function
     """Gives gold sessions the same calibration clause the distractors carry, with NEUTRAL terms.
 
     Generators weave the clause into filler only, which is the natural way to write them and is a
@@ -1699,6 +1664,20 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
 
     Applied centrally, after build and before scoring, so no generator can reintroduce the tell by
     forgetting it.
+
+    ⚠ AN EARLIER APPROACH TO THIS SAME PROBLEM WAS DELETED ON 2026-09-12, and its measurements
+    are kept here because they cost real runs to obtain. `swap_echo_terms` REPLACED the last few
+    terms of a distractor's existing clause instead of giving gold one of its own. Its rationale,
+    verbatim: appending a second clause "read badly and pushed turn length, mean turn length and
+    punctuation density to 3.7-4.8 sd"; merging into one clause "fixed the prose and still left
+    every distractor carrying more echo terms than its gold, which is more commas: punctuation
+    density 0.761, over the bar".
+
+    It was introduced with the v5 work and NEVER CALLED -- 1 reference in the repository, its own
+    `def`. So the shipped corpora were never built that way, while its docstring read "the terms
+    are swapped rather than added" as though describing current policy. A future reader would have
+    taken it for the live treatment. This function is the live treatment, and v5's separability
+    baseline is EMPTY under it.
     """
     # Built from question text, minus every token that appears in ANY question's ANSWER.
     # Episodic's attribution questions embed the statement they ask about, so a value that is
@@ -1712,6 +1691,20 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
         return
 
     for question in questions:
+        # PER-SHAPE KNOB, not a neutralised 0.0.
+        #
+        # `echo` may be a float (single-knob verticals) or the shape->knob map that per-shape
+        # calibration searches. The per-shape paths used to pass 0.0 here -- "neutralising" because
+        # there is no single knob -- and the effect was that gold's clause was sized at echo 0, i.e.
+        # ONE term, while its distractors were woven at that shape's real and much larger knob.
+        # Measured on the shipped corpora: gold's clause averaged 1.00 terms against filler's 3.56
+        # (episodic), 3.17 (prospective), 2.75 (semantic), 1.93 (arithmetic) -- and the only three
+        # verticals where the counts matched are the three built through a path that passed a real
+        # knob. Fewer terms is fewer commas, which is the punctuation tell this function exists to
+        # remove, reintroduced by the argument meant to keep the search reproducible.
+        eff_echo = echo
+        if isinstance(echo, dict):
+            eff_echo = echo.get((question.extension or {}).get("shape"), 0.0)
         marked = sum(
             1 for s in question.sessions if not s.is_gold and ECHO_LEAD in s.text())
         rate = marked / max(1, question.h)
@@ -1744,6 +1737,27 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
         if not neutral:
             continue
 
+        # PAD THE POOL TO THE COUNT GOLD ACTUALLY NEEDS, not merely to non-empty.
+        #
+        # `answers_all` subtracts every token of every answer in the corpus, which is right for
+        # safety and far too broad for supply: on Prospective it left `neutral` at ONE term while a
+        # distractor's clause carried six. `take` then clamped to that 1, and gold's clause ended up
+        # with no commas where every distractor had five -- restoring, in punctuation, exactly the
+        # tell this function exists to remove. Measured on the shipped corpora, gold's clause
+        # averaged 1.00 terms against filler's 3.56 (episodic), 3.17 (prospective), 2.75 (semantic),
+        # 1.93 (arithmetic); the four verticals where the counts already matched are the four that
+        # showed no punctuation separation at all.
+        #
+        # The old fallback fired only when `neutral` was EMPTY, so "too small to match" went
+        # unnoticed. Topping up from `pool` is safe by construction: `pool` is question vocabulary
+        # with every answer token already removed, and `own` is excluded, so gold gains no query
+        # keyword and no answer.
+        need = max(1, round(len(own) * eff_echo))
+        if len(neutral) < need:
+            seen = set(neutral)
+            neutral = neutral + [t for t in pool
+                                 if t not in own and t not in seen][:need - len(neutral)]
+
         # How many gold sessions get the clause is COUNTED, not drawn per session. A per-session
         # coin flip at the distractors' rate is right on average and wrong where it matters: a
         # question with one gold session and a 0.92 rate leaves that session bare 8% of the time,
@@ -1758,7 +1772,7 @@ def equalise_echo(questions: list[Question], echo: float, rng: random.Random) ->
             wanted = max(1, wanted)
         foreign_per_gold: list[int] = []
         for session in rng.sample(unmarked, min(len(unmarked), wanted)):
-            take = max(1, min(len(neutral), round(len(own) * echo)))
+            take = max(1, min(len(neutral), round(len(own) * eff_echo)))
             # Some terms are drawn from words ALREADY in this gold session, minus the question's own
             # vocabulary. A distractor's clause repeats the question's keywords, and those keywords
             # are also in the distractor's prose, so a distractor says several words twice; gold,
@@ -1990,7 +2004,7 @@ def calibrate_per_shape(build, seed: int, shape_of, max_iterations: int = 24, ba
     """
     def attempt(echo_map: dict[str, float]) -> list[Question]:
         questions = build(echo_map, random.Random(seed))  # DevSkim: ignore DS148264 - deterministic corpus generation
-        equalise_echo(questions, 0.0, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
+        equalise_echo(questions, echo_map, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
         equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
         _balance(balance, questions, seed)
         equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
@@ -2152,8 +2166,61 @@ def _dump(payload) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
+def _pinned_per_shape_gate(rebuilt: dict, previous) -> None:
+    """Refuse a pinned rebuild that pushes a SHAPE further outside the band than it was.
+
+    THE MEAN GATE BELOW IS THE AVERAGING DEFECT, IN THE GATE. `calibrate_pinned` checked the
+    vertical mean and nothing else -- inside a function whose whole per-shape branch exists
+    because a mean is satisfiable by averaging one shape's collapse against another's
+    saturation. It then shipped exactly that. The 2026-09-13 equalise_echo correction weaves
+    gold's clause at the real knob, which dilutes gold and lowers BM25's reach, and rebuilding
+    prospective at its RECORDED knob took `due-window` from 0.5093 to 0.2222 -- from inside the
+    band to 0.278 outside it -- while the vertical mean moved 0.6333 to 0.5972 and stayed
+    comfortably in range. The mean gate said nothing. The C# band ratchet caught it, AFTER the
+    corpus had been written and a re-probe paid for.
+
+    So the same ratchet runs here, where it is free. A pinned rebuild is supposed to REPRODUCE:
+    measured against the sidecar it was read from, every shape matches and this never fires. It
+    fires only when the GENERATOR moved difficulty under a fixed knob -- the one case pinning
+    cannot absorb, and the case the docstring below already says should stop the build loudly.
+
+    A shape may move TOWARD the band freely, and a shape already declared out of band may stay
+    where it is: distance from the nearer edge is the quantity, so a collapsed shape and a
+    saturated one are held by one rule. `previous` absent -- a first build, or a sidecar with no
+    per-shape block -- means there is nothing to ratchet against, and a gate with no operand
+    must not invent one.
+    """
+    if not previous:
+        return
+
+    def outside(value: float) -> float:
+        if value < BAND_LOW:
+            return BAND_LOW - value
+        if value > BAND_HIGH:
+            return value - BAND_HIGH
+        return 0.0
+
+    worse = []
+    for shape, value in sorted(rebuilt.items()):
+        was = previous.get(shape)
+        if was is None:
+            continue                      # a NEW shape has no recorded value to ratchet against
+        if outside(value) > outside(was) + 1e-4:
+            worse.append((shape, was, value))
+    if not worse:
+        return
+    detail = "; ".join("%s %.4f -> %.4f" % row for row in worse)
+    raise SystemExit(
+        f"calibration gate: rebuilding at the RECORDED echo moved {len(worse)} shape(s) FURTHER "
+        f"outside the [{BAND_LOW}, {BAND_HIGH}] band -- {detail}. The vertical mean can absorb "
+        f"this and did; the shape cannot. The pinned knob no longer suits this generator, which "
+        f"means the generator moved difficulty. Re-run with --recalibrate to search for a new "
+        f"echo, and re-probe the corpus that produces.")
+
+
 def calibrate_pinned(build, seed: int, echo, shape_of=None,
-                     iterations: int = 0, trace=None, balance=None
+                     iterations: int = 0, trace=None, balance=None,
+                     previous_per_shape=None
                      ) -> tuple[list[Question], Calibration]:
     """Rebuilds at a RECORDED echo instead of searching for one.
 
@@ -2176,10 +2243,17 @@ def calibrate_pinned(build, seed: int, echo, shape_of=None,
     """
     per_shape_mode = shape_of is not None
     questions = build(echo, random.Random(seed))  # DevSkim: ignore DS148264 - deterministic corpus generation
-    # Mirrors the equalisation each search path uses, INCLUDING the argument they differ on:
-    # calibrate_per_shape neutralises at 0.0 because its knob is per shape, while calibrate passes
-    # the single knob through. Getting this wrong reproduces nothing and looks like a generator bug.
-    equalise_echo(questions, 0.0 if per_shape_mode else echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
+    # Mirrors the equalisation each search path uses, and they no longer differ on the argument:
+    # BOTH pass the real knob. This comment used to say calibrate_per_shape "neutralises at 0.0
+    # because its knob is per shape", and reproducing that faithfully was the bug rather than the
+    # fix -- `echo` is a shape->knob MAP on those verticals, equalise_echo now looks the shape up,
+    # and gold's clause is sized at the same knob its distractors are woven at. Under the old
+    # spelling gold averaged 1.00 echo terms against filler's 3.56 (episodic) / 3.17 (prospective)
+    # / 2.75 (semantic) -- fewer terms is fewer commas, which is the punctuation tell this
+    # function exists to remove, reintroduced by the argument meant to keep the search
+    # reproducible. Getting this wrong still reproduces nothing and still looks like a generator
+    # bug.
+    equalise_echo(questions, echo, random.Random(seed + 1))  # DevSkim: ignore DS148264 - see above
     equalise_reply(questions, random.Random(seed + 3))  # DevSkim: ignore DS148264 - see above
     _balance(balance, questions, seed)
     equalise_shape(questions, random.Random(seed + 2))  # DevSkim: ignore DS148264 - see above
@@ -2200,6 +2274,7 @@ def calibrate_pinned(build, seed: int, echo, shape_of=None,
             if q.g > 0:                       # same exclusion measurable_coverage_mean uses
                 grouped.setdefault(shape_of(q), []).append(realised_coverage(q))
         per_shape = {k: round(sum(v) / len(v), 4) for k, v in sorted(grouped.items()) if v}
+        _pinned_per_shape_gate(per_shape, previous_per_shape)
 
     return questions, Calibration(
         echo=round(sum(echo.values()) / len(echo), 4) if isinstance(echo, dict) else round(echo, 4),
@@ -2239,6 +2314,24 @@ def recorded_echo(vertical: str, corpus_id: str, per_shape: bool):
     if coverage.get("echo_by_shape") is not None:
         return None, iterations, trace
     return coverage.get("echo"), iterations, trace
+
+
+def recorded_per_shape(vertical: str, corpus_id: str):
+    """The per-shape realised coverage the sidecar records, or None if it records none.
+
+    Read separately from :func:`recorded_echo` rather than returned beside it, because the two
+    are wanted at different times: the echo has to be known before the build, the per-shape
+    reading only after it. Folding them into one call would make the gate look like part of the
+    pinning contract when it is a check ON the result of pinning.
+    """
+    sidecar = DATA_ROOT / vertical / f"{corpus_id}.meta.json"
+    if not sidecar.exists():
+        return None
+    try:
+        coverage = json.loads(sidecar.read_text(encoding="utf-8")).get("coverage") or {}
+    except json.JSONDecodeError:
+        return None
+    return coverage.get("per_shape_realised") or None
 
 
 def _carry_measurements(previous: dict, rebuilt: dict) -> None:
@@ -2296,7 +2389,8 @@ def finalise(
         else recorded_echo(vertical, corpus_id, shape_of is not None))
     if pinned is not None:
         questions, calibration = calibrate_pinned(
-            build, seed, pinned, shape_of, pinned_iterations, pinned_trace, balance)
+            build, seed, pinned, shape_of, pinned_iterations, pinned_trace, balance,
+            recorded_per_shape(vertical, corpus_id))
     elif shape_of is not None:
         questions, calibration = calibrate_per_shape(build, seed, shape_of, balance=balance)
     else:

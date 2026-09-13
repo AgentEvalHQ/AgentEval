@@ -1314,8 +1314,31 @@ def _retrieval_headroom(records: list[dict]) -> dict:
     }
 
 
-def _interference(records: list[dict]) -> dict:
-    """V1 vs V8 on the questions both are defined on, and the gap between them."""
+def _interference(records: list[dict], strata: dict[str, tuple] | None = None) -> dict:
+    """V1 vs V8 on the questions both are defined on, and the gap between them.
+
+    `strata` maps question_id -> a tuple of the DECLARED sub-population keys (shape, and any
+    second axis the corpus declares, e.g. bitemporal's `clock`). When it splits the corpus into
+    more than one cell, the per-cell rates are reported beside the mean.
+
+    WHY (B3, measured 2026-09-12). Bitemporal published `interference_cost 0.05` over 60
+    questions, which reads as a small, diffuse effect. It is neither. All three regressions sit
+    in ONE cell of eighteen:
+
+        belief-at-instant / transaction   3 of 18   16.7%
+        belief-at-instant / valid         0 of 18    0.0%
+        correction-depth  / transaction   0 of 12    0.0%
+        correction-depth  / valid         0 of 12    0.0%
+
+    That cell is the one asking what the record showed AS OF a date BEFORE a correction, with
+    the correction present in the haystack -- valid time versus transaction time, the single
+    thing bitemporal exists to test. The mean understates it by 3.3x and hides that the other
+    42 questions show no interference at all. `by_shape` could not see it either: the split is
+    WITHIN one shape.
+
+    This is the family's own "read the shapes, never the mean" rule applied one level further
+    down, to the sub-shape the corpus already declares and no arm was reading.
+    """
     both = [r for r in records if r.get("v1") is not None and r.get("v8") is not None]
     if not both:
         return {"applicable": 0, "v1_passed": 0, "v8_passed": 0, "interference_cost": None,
@@ -1347,7 +1370,36 @@ def _interference(records: list[dict]) -> dict:
         "reading": ("V1 minus V8 as a share of the questions both are defined on. 0.0 means a "
                     "perfect retriever and no retriever produce the same answers here, so no two "
                     "retrievers can be distinguished on this corpus."),
+        **({"by_stratum": _interference_by_stratum(both, strata)} if strata else {}),
     }
+
+
+def _interference_by_stratum(both: list[dict], strata: dict[str, tuple]) -> dict:
+    """Interference per declared sub-population, so a concentrated effect cannot read as a mean.
+
+    Returns nothing when the corpus declares only one cell -- a "breakdown" with a single row is
+    noise that makes a reader think they have checked something.
+    """
+    cells: dict[tuple, list[dict]] = {}
+    for record in both:
+        key = strata.get(record["question_id"])
+        if key is None:
+            continue
+        cells.setdefault(key, []).append(record)
+
+    if len(cells) < 2:
+        return {}
+
+    out = {}
+    for key, group in sorted(cells.items(), key=lambda kv: [str(x) for x in kv[0]]):
+        regressed = [r for r in group if r["v1"] and not r["v8"]]
+        out["/".join("-" if k is None else str(k) for k in key)] = {
+            "questions": len(group),
+            "regressed": len(regressed),
+            "interference_cost": round(len(regressed) / len(group), 4),
+            "question_ids": sorted(r["question_id"] for r in regressed),
+        }
+    return out
 
 
 def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
@@ -1374,6 +1426,14 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
     # entire argument for having one.
     arm_of = {e["question_id"]: ((e.get("typedmemeval") or {}).get("pair_id"),
                                  (e.get("typedmemeval") or {}).get("arm")) for e in entries}
+    # The sub-populations the corpus itself declares. `clock` is bitemporal's second axis and
+    # splits `belief-at-instant` into two behaviourally different instruments -- see B3 in
+    # `_interference`. Verticals that declare no second axis fall back to shape alone, and a
+    # single-cell breakdown is suppressed rather than printed.
+    strata = {e["question_id"]: tuple(
+        v for v in ((e.get("typedmemeval") or {}).get("shape"),
+                    (e.get("typedmemeval") or {}).get("clock")) if v is not None)
+        for e in entries}
     # WHAT A GUESSER SCORES, from either of the two places a closed choice can live.
     #
     # These were two mechanisms for one concept, which is the two-spellings-of-one-rule defect this
@@ -1615,7 +1675,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # scaled floor of 0.24 and 3.68 sd of separation, so the capability the vertical is about
         # is comfortably measurable while `still-valid` alone reads 0.0667.
         **({"paired_arms": _cross_shape_pairs} if _cross_shape_pairs else {}),
-        "v8_full_haystack": _interference(records),
+        "v8_full_haystack": _interference(records, strata),
         "v9_reference_retrieval": _retrieval_headroom(records),
         "by_shape": {
             shape: {
@@ -1650,8 +1710,7 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
                     "shape here is 6-18 questions, so one question moves a rate by 5-17 points: "
                     "compare two systems on OVERLAP, not on which point estimate is higher."),
                 "required_sessions_median": _median_g(group, gold_counts),
-                **_chance_floor(group, floors),
-                **_discrimination(group),
+                **_discrimination_and_floor(group, floors, strata),
                 **_abstention(group),
                 **_pair_discrimination(group, arm_of),
             }
@@ -1707,6 +1766,31 @@ def _discrimination(group: list[dict]) -> dict:
 
     v1, v8, v9 = rate("v1"), rate("v8"), rate("v9")
     if v1 is None or v9 is None:
+        # APPLICABILITY ON THE INPUT, NOT THE RESULT -- the same rule `_abstention` carries thirty
+        # lines below, which was never carried up to here. `rate` returns None both when an arm is
+        # undefined BY DESIGN (the shape has no gold, so V1 cannot exist) and when every draw went
+        # SILENT. Returning {} for both publishes nothing either way, and a reader cannot tell
+        # "correctly nothing to say" from "we failed to measure and said nothing" -- while
+        # `discriminates` is the field behind the family's headline "N of 36 shapes rank two
+        # systems", so a silenced shape would drop out of that count entirely rather than fail it.
+        #
+        # LATENT, NOT LIVE: all 36 shipped shapes currently publish a verdict, so this has never
+        # fired. It is fixed because the identical hole was found once already on the abstention
+        # arm, and the correction did not travel.
+        silenced = sorted({arm for record in group
+                          for arm in record.get("silent_arms", []) if arm in ("v1", "v9")})
+        if silenced:
+            return {
+                "discrimination_not_measured": True,
+                "unmeasured_arms": silenced,
+                "questions": len(group),
+                "reading": (
+                    "This shape HAS gold, so a discrimination verdict is defined for it -- but the "
+                    "arms named above returned nothing on every question, so none could be "
+                    "computed. Read as NOT MEASURED, never as 'this shape does not discriminate' "
+                    "and never as 'this shape has nothing to measure'. It is excluded from any "
+                    "'N of M shapes discriminate' count, and M must shrink with it."),
+            }
         return {}
 
     headroom = v1 - v9
@@ -1723,6 +1807,128 @@ def _discrimination(group: list[dict]) -> dict:
             "headroom_reachable is V8-V9, what a real retriever can reach, because returning more "
             "than gold cannot beat having everything. Where these diverge the shape is "
             "reasoning-limited and retrieval work will not move it.")
+    return row
+
+
+def _discrimination_by_stratum(group: list[dict], strata: dict) -> dict:
+    """Headroom per DECLARED sub-population, so a stratum that cannot rank systems cannot hide.
+
+    THE DEFECT THIS EXISTS FOR, measured. `bitemporal/belief-at-instant` publishes headroom 0.3056
+    and `discriminates: True`. Split on `clock` -- an axis the corpus already declares, and the same
+    axis `B3` found the interference concentrated on -- it is two different instruments:
+
+        clock=transaction   18q   V1 18/18   V9  8/18   headroom 0.556   discriminates
+        clock=valid         18q   V1 18/18   V9 17/18   headroom 0.056   BELOW THE 0.15 FLOOR
+
+    So 18 questions -- 30% of the vertical -- cannot tell two systems apart, and the shape-level
+    number says they can. This is the mean-satisfiable-by-averaging defect the family already fixed
+    for Arithmetic and Episodic at the SHAPE level, one level further down: a mean over strata is
+    just as capable of hiding a dead half as a mean over shapes.
+
+    ⚠ This reports; it does NOT change `discriminates`. The shape-level verdict stays keyed on the
+    shape-level headroom, because moving a published verdict on a reporting change is how a
+    reporting fix turns into a silent re-ranking. What changes is that the reader can now SEE the
+    split, and `discriminates_by_stratum` names any stratum that fails on its own.
+
+    Returns nothing when the corpus declares only one cell for this shape -- a one-row "breakdown"
+    invites a reader to think they have checked something.
+    """
+    cells: dict[tuple, list[dict]] = {}
+    for record in group:
+        key = strata.get(record["question_id"])
+        if key is not None:
+            cells.setdefault(key, []).append(record)
+    if len(cells) < 2:
+        return {}
+
+    def rate(rows, arm):
+        n = sum(1 for r in rows if r.get(arm) is not None)
+        return (sum(1 for r in rows if r.get(arm) is True) / n, n) if n else (None, 0)
+
+    out, failing = {}, []
+    for key, rows in sorted(cells.items(), key=lambda kv: [str(x) for x in kv[0]]):
+        (v1, n1), (v9, n9) = rate(rows, "v1"), rate(rows, "v9")
+        if v1 is None or v9 is None:
+            continue
+        name = "/".join("-" if k is None else str(k) for k in key)
+        h = v1 - v9
+        out[name] = {
+            "questions": len(rows),
+            "v1_passed": sum(1 for r in rows if r.get("v1") is True), "v1_applicable": n1,
+            "v9_passed": sum(1 for r in rows if r.get("v9") is True), "v9_applicable": n9,
+            "headroom_perfect_selector": round(h, 4),
+            "discriminates": h >= DISCRIMINATION_FLOOR,
+        }
+        if h < DISCRIMINATION_FLOOR:
+            failing.append(name)
+
+    if not out:
+        return {}
+    return {
+        "by_stratum": out,
+        "discriminates_by_stratum": not failing,
+        "strata_below_floor": failing,
+        "by_stratum_reading": (
+            "Headroom recomputed inside each sub-population the CORPUS declares. A shape whose "
+            "strata disagree is two instruments reported as one, and its shape-level headroom is a "
+            "mean that can hide a stratum which ranks nothing. The shape-level `discriminates` is "
+            "deliberately NOT changed by this block: read `strata_below_floor` beside it."),
+    }
+
+
+def _discrimination_and_floor(group: list[dict], floors: dict, strata: dict | None = None) -> dict:
+    """Merge the floor block and the discrimination block, then correct the headroom against chance.
+
+    THE DEFECT THIS FIXES. `headroom_perfect_selector` is V1 - V9, and on a closed-choice shape V9
+    can land BELOW the chance floor -- measured on five of eleven floor-declaring shapes, because a
+    lexical retriever holding PART of the gold is actively misled where a guesser is not. When that
+    happens the published headroom counts the stretch between "worse than guessing" and "guessing"
+    as though it were room a better retriever could win. It is not: a coin already covers it.
+
+        conjunction/alias-then-count    0.867 published, 0.500 against max(V9, floor)
+        conjunction/conditional-branch  1.000 published, 0.667
+        procedural/step-order           1.000 published, 0.667
+        procedural/retired-step         0.800 published, 0.667
+        temporal/occurrence-order       0.750 published, 0.500
+
+    So the two largest headroom figures in the whole family were each overstated by a third.
+
+    The baseline a real system must beat is `max(V9, chance_floor)`, never V9 alone. Both numbers are
+    published: the uncorrected one because it is what every prior release quoted and removing it
+    would silently break comparisons, and the corrected one because it is the defensible figure.
+
+    ⚠ NO SHAPE'S VERDICT MOVES. All five still clear the 0.15 discrimination floor after correction,
+    so `discriminates` is unchanged everywhere and this is a magnitude correction, not a re-ranking.
+    Checked rather than assumed -- see the assertion below.
+    """
+    floor_block = _chance_floor(group, floors)
+    row = {**floor_block, **_discrimination(group)}
+    if strata:
+        row.update(_discrimination_by_stratum(group, strata))
+
+    floor = floor_block.get("chance_floor")
+    headroom = row.get("headroom_perfect_selector")
+    if floor is None or headroom is None:
+        return row
+
+    def rate(arm: str) -> float | None:
+        n = sum(1 for r in group if r.get(arm) is not None)
+        return (sum(1 for r in group if r.get(arm) is True) / n) if n else None
+
+    v1, v9 = rate("v1"), rate("v9")
+    if v1 is None or v9 is None:
+        return row
+
+    corrected = max(0.0, v1 - max(v9, floor))
+    row["headroom_above_chance"] = round(corrected, 4)
+    row["headroom_above_chance_reading"] = (
+        "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the "
+        "lexical retriever and a guesser, because a guesser scores the floor for free. Where this "
+        "is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads "
+        "where guessing does not -- and the difference is floor, not retrieval room. Quote this "
+        "figure, not the uncorrected one, when claiming how much better retrieval can make a "
+        "system. `discriminates` is deliberately still keyed on the uncorrected headroom so the "
+        "verdict does not move under a reporting change; on every shipped shape both agree.")
     return row
 
 
@@ -1965,15 +2171,38 @@ def _pair_discrimination(group: list[dict], arms: dict) -> dict:
     holds when the arms are INDEPENDENT. They are not: both arms read the same haystack, and on the
     shipped corpus pair-V9 came in at 14/18 = 0.778 against the 0.735 independence predicts, so the
     arms are positively correlated and the true amplification is SMALLER than (V1 + V9). The scaled
-    floor is therefore conservative -- it can fail a shape that would survive an exact correction,
-    and the verdict on belief-at-instant turns on precisely that margin (0.167 against 0.275, where
-    the unscaled floor would have passed it).
+    floor is therefore conservative -- it can in principle fail a shape that would survive an exact
+    correction. On the CURRENT corpora it fails none: see the table below, measured 2026-09-12.
 
-    SO THE FLOOR IS NOT WHAT CARRIES THE belief-at-instant VERDICT, and it should not be quoted as
-    though it were. What carries it is the raw separation: 3 pairs out of 18, against a binomial
-    standard error near 1.75 pairs -- about 1.7 sd, which no reading of the amplification rescues.
-    A shape whose entire discrimination is three pairs on n=18 cannot rank two systems whatever
-    floor it is compared against, and the sample size is itself worth revisiting.
+    SO THE FLOOR IS NOT WHAT CARRIES ANY VERDICT, and it should not be quoted as though it were.
+    What carries one is the raw separation, which assumes nothing about correlation.
+
+    F2 -- "replace the assumption with an empirical correction" -- IS CLOSED AS NOT WORTH DOING,
+    2026-09-12, on two grounds, the second measured.
+
+    1. It would be the artifact supplying its own bar. The only data available to estimate the
+       arm correlation is the same data being graded, and a gate whose threshold is derived from
+       the observations it judges is the defect this family keeps finding.
+
+    2. IT WOULD CHANGE NO VERDICT. Every shape carrying a pair block, from the shipped sidecars:
+
+         bitemporal/belief-at-instant   18 pairs  headroom 0.5556  floor 0.2542  4.74 sd  PASS
+         bitemporal/correction-depth    12 pairs  headroom 0.5833  floor 0.25    4.09 sd  PASS
+         prospective/due-window          9 pairs  headroom 1.0     floor 0.1667 13.77 sd  PASS
+         prospective/due-later-reminder  4 pairs  headroom 0.25    floor 0.2625  1.09 sd  fail
+         prospective/expiring-validity   3 pairs  headroom 0.3333  floor 0.25    1.19 sd  fail
+         prospective/not-yet-true        3 pairs  headroom 0.3333  floor 0.175   1.19 sd  fail
+
+       An exact correction can only LOWER the floor (the true amplification is smaller). Drive
+       the floor to ZERO and all three failures stand: each is failed by separation at ~1.1-1.2
+       sd, on THREE OR FOUR PAIRS. Their problem is sample size, not the floor -- which is P2
+       (rebalance shape sizes) and costs a re-probe, not a heuristic.
+
+    ⚠ THE EXAMPLE THAT USED TO SIT HERE WAS STALE, and it argued the opposite. It read
+    "belief-at-instant 0.167 against 0.275 ... 3 pairs out of 18 ... about 1.7 sd", from a corpus
+    since superseded; that shape now reads 0.5556 against 0.2542 at 4.74 sd and passes
+    comfortably. A live comment citing a retired verdict is worse than no comment, because it is
+    quoted with the authority of code.
     """
     paired = [(r, arms.get(r["question_id"], (None, None))) for r in group]
     pairs: dict[str, dict[str, dict]] = {}

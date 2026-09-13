@@ -149,6 +149,11 @@ TXN_FRAMES = (
 
 REPLIES = ("Updated.", "Filed.", "Noted.", "Recorded.", "Got it.", "Amended.")
 
+#: Sessions kept AFTER the last correction, so the valid arm's gold is never the final session.
+#: Gold that is reliably last is identifiable by POSITION alone -- a property of the layout rather
+#: than of memory, and the separability gate measures exactly that.
+_TAIL_RESERVE = 3
+
 #: Same-domain filler that states and corrects facts about people no question asks about. Class
 #: parity with instance divergence: identical construction, entities that cannot be candidate answers.
 FILLER_SUBJECTS = (
@@ -368,7 +373,12 @@ def _pair(qid_valid: str, qid_txn: str, pair_id: str, shape: str, qtype: str,
         # The FIRST correction lands at the banded latency after the record; the rest follow it.
         # Always after the record they correct -- "recorded later" is this vertical's whole subject.
         anchor = sessions.index(record if step == 0 else correction_sessions[-1])
-        node_at = min(len(sessions), anchor + (gap if step == 0 else rng.randint(1, 3)))
+        # TAIL RESERVE. The old clamp parks a long chain against the END of the haystack, and the
+        # valid arm's gold is the LAST correction -- so POSITION becomes the answer. The
+        # separability gate refused a 3-correction corpus at `position_in_haystack` separating gold
+        # perfectly in 22% of questions (3.0 sd). H is fixed, so this moves filler, never adds it.
+        limit = max(anchor + 1, len(sessions) - _TAIL_RESERVE)
+        node_at = min(limit, anchor + (gap if step == 0 else rng.randint(1, 3)))
         sessions.insert(node_at, node)
         correction_sessions.append(node)
         stale = value
@@ -438,7 +448,13 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS
         questions += _pair(
             f"tme-bit-{index:03d}", f"tme-bit-{index + 1:03d}", f"tme-bit-p{pair_no:02d}",
             SHAPE_BELIEF, TYPE_BELIEF, SUBJECTS[i % len(SUBJECTS)],
-            corrections=1, band=(i % 5) + 1, ordinal=i, rng=rng, echo=knob(SHAPE_BELIEF))
+            # 1 -> 3. MEASURED WITHIN ONE CORPUS AT ONE ECHO: correction-depth's own rungs run
+            # ALLgold 1.000 at 2 corrections against 0.500-0.750 at 3-4. At a single correction the
+            # valid-time arm is cue-matchable -- the one amendment IS the answer -- and it measured
+            # V9 17/18, headroom 0.056, below the floor (MEASUREMENT_STATUS 88.20). The transaction
+            # arm is unaffected by construction: `belief_at` sits midway between the record and the
+            # FIRST correction, so its answer is still the original value however many follow.
+            corrections=3, band=(i % 5) + 1, ordinal=i, rng=rng, echo=knob(SHAPE_BELIEF))
         index += 2
         pair_no += 1
 
@@ -449,7 +465,9 @@ def build(echo, rng: random.Random) -> list[tmc.Question]:  # DevSkim: ignore DS
         questions += _pair(
             f"tme-bit-{index:03d}", f"tme-bit-{index + 1:03d}", f"tme-bit-p{pair_no:02d}",
             SHAPE_DEPTH, TYPE_DEPTH, SUBJECTS[(i + 3) % len(SUBJECTS)],
-            corrections=2 + (i % 3), band=(i % 5) + 1, ordinal=BELIEF_PAIRS + i,
+            # 2,3,4 -> 3,4,5. The 2-correction rung was SATURATED on both arms: ALLgold 1.000,
+            # V9 4/4, headroom exactly 0.000 on 8 questions that ranked nothing.
+            corrections=3 + (i % 3), band=(i % 5) + 1, ordinal=BELIEF_PAIRS + i,
             rng=rng, echo=knob(SHAPE_DEPTH))
         index += 2
         pair_no += 1

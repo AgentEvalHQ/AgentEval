@@ -66,10 +66,44 @@ public class TypedMemEvalDiscriminationTests
     /// Shapes that cannot yet rank and are awaiting a redesign. May improve; may not regress.
     /// </summary>
     /// <remarks>
-    /// Both are near-closed-choice forms where the question names the entity it asks about, which
-    /// hands a lexical retriever the session it needs. That is the same structural cap that limited
-    /// <c>episodic/participant-attribution</c> to 0.20 after calibration — so these likely need new
-    /// QUESTION FORMS rather than tuning, and ADR-028 §7.4 scopes them separately.
+    /// <para>
+    /// The two <c>prospective</c> entries are here on a <b>new measurement</b>, not a regression.
+    /// Both shapes shipped at 3 pairs — 6 questions — and reported 0.3333 and 0.5000, which a
+    /// re-probe attributed to SAMPLE SIZE rather than to the shapes: at n=6 a single question moves
+    /// the rate by 17 points. P2 grew each to 7 pairs, the capacity of the smallest source bank,
+    /// and both then read <b>0.1429</b> — from two different noisy values to the same one, which is
+    /// what a sampling artefact looks like once it is gone.
+    /// </para>
+    /// <para>
+    /// They are declared rather than fixed because 0.1429 is <b>0.007 below</b> the floor — one
+    /// question at n=14 — and V9's 95% Wilson interval runs [0.60, 0.96]. "At the floor" is the
+    /// honest reading; "below it" claims a precision 14 questions do not carry.
+    /// </para>
+    /// <para>
+    /// 🔴 <b>The last sentence of this note used to read "growing them again is the next move,
+    /// not a new question form", and that was WRONG — corrected the same day it was written.</b>
+    /// MEASUREMENT_STATUS §88.38 measured both shapes against a dense retriever and both reach
+    /// ALLgold <b>1.000</b>: a modern retriever finds all of their gold on every question, so
+    /// their headroom is not thin, it is <b>zero</b> outside the lexical baseline we happen to
+    /// publish against. Growing them to n≥25 would buy a tighter interval around a shape an
+    /// embedding retriever saturates completely — paying to measure more precisely something
+    /// that should not exist in this form.
+    /// </para>
+    /// <para>
+    /// <b>A new question form IS the move.</b> Both shapes name the entity they ask about, which
+    /// is the structural property that capped <c>episodic/participant-attribution</c> until E1-b
+    /// re-formed it to identify a claim by its CONSEQUENCE. That worked example is in the same
+    /// family and can be read against a control: under a dense retriever the re-formed shape
+    /// holds (ALLgold 0.133 → 0.467, still ranking) while its unchanged sibling
+    /// <c>episodic/assistant-stated</c> collapses to 1.000. The remedy is demonstrated, not
+    /// hypothesised.
+    /// </para>
+    /// <para>
+    /// The two entries this list once held — <c>temporal/occurrence-order</c> and
+    /// <c>bitemporal/belief-at-instant</c> — were near-closed-choice forms where the question named
+    /// the entity it asked about, handing a lexical retriever the session it needed. Both were
+    /// FIXED rather than re-baselined around; see the notes in the body.
+    /// </para>
     /// </remarks>
     private static readonly Dictionary<(TypedMemEvalVertical, string), double> PendingRedesign =
         new()
@@ -91,6 +125,25 @@ public class TypedMemEvalDiscriminationTests
             //
             // Both were fixed rather than re-baselined around, which is the point of keeping a
             // ratchet: a list that only ever grows is a list nobody reads.
+
+            // NO LONGER EMPTY as of P2 (2026-09-13). Both entries are the SAME value arrived at
+            // from different directions -- 0.3333 and 0.5000 at n=6, 0.1429 apiece at n=14 -- and
+            // both sit 0.007, one question, under the floor. See the remarks above for why that
+            // reads as "at the floor" rather than "below it".
+            //
+            // DO NOT "FIX" THESE BY GROWING THEM. Measured against a dense retriever the same
+            // day (MEASUREMENT_STATUS 88.38), both reach ALLgold 1.000 -- headroom zero outside
+            // the lexical baseline. They need a question form that does not name its own target,
+            // which is the E1-b move and a separate, larger arc.
+            [(TypedMemEvalVertical.Prospective, "expiring-validity")] = 0.1429,
+
+            // Also an ABSENCE shape: its gold answer asserts that a triggering event has NOT
+            // occurred, and gold sessions cannot hold an absence, so V1 is not a valid ceiling
+            // for it (MEASUREMENT_STATUS 88.16). On the ceiling that does apply, V8 - V9 =
+            // 0.2143, it CLEARS the floor. Declared on the uncorrected number because
+            // `discriminates` is keyed on it and a gate must not read a different operand from
+            // the field it is ratcheting.
+            [(TypedMemEvalVertical.Prospective, "not-yet-true")] = 0.1429,
         };
 
     /// <summary>
@@ -169,8 +222,14 @@ public class TypedMemEvalDiscriminationTests
     /// all of that difficulty came from the calibration echo scattering the quoted statement across
     /// both roles' filler — which is also what let a gold-ablated reader answer "both of us", 3
     /// draws of 3. Removing the leak removed the difficulty with it: V9 went 12/15 to 15/15.
-    /// Distractor engineering cannot restore it, because the question names a topic AND quotes a
-    /// statement, so gold is the only session carrying the whole query.
+    /// </para>
+    /// <para>
+    /// <b>⚠ And the next sentence used to read "distractor engineering cannot restore it, because
+    /// the question names a topic AND quotes a statement".</b> That was true of the question form,
+    /// not of the shape. E1-b changed the form — the question identifies the claim by its
+    /// CONSEQUENCE and shares no vocabulary with it — and V9 fell 15/15 to 4/15 against V1 14/15.
+    /// The list is empty as a result. A cap that a new question form removes was never structural;
+    /// it was a property of the sentence we happened to be asking.
     /// </para>
     /// <para>
     /// <b>The bar is on the reader.</b> With the full labelled transcript, attribution must land
@@ -182,9 +241,23 @@ public class TypedMemEvalDiscriminationTests
     private static readonly Dictionary<(TypedMemEvalVertical, string), string> ScoredOnTheReader =
         new()
         {
-            [(TypedMemEvalVertical.Episodic, "participant-attribution")] =
-                "the answer is a role and the transcript labels every turn with its role, so the "
-                + "reference retriever cannot fail it; the bar is V8 against the chance floor",
+            // EMPTY as of 2026-09-13, and the entry it held left for the right reason.
+            //
+            // episodic/participant-attribution was listed because the reference retriever could
+            // not fail it: the question quoted the statement it asked about, so gold was the only
+            // session carrying the whole query and V9 ran 15/15. E1-b replaced the question form --
+            // identify the claim by its CONSEQUENCE, with zero vocabulary shared between claim and
+            // question -- and V9 is now 4/15 against V1 14/15. Headroom 0.6667, retrieval-limited,
+            // and it ranks two systems on the ordinary floor like any other shape.
+            //
+            // The exemption's PREMISE was refuted, so the exemption goes. Keeping it would have
+            // meant a future regression back to V9 15/15 being scored only on the reader bar and
+            // passing in silence -- which is the stale-declaration direction the two-way check
+            // below now refuses outright.
+            //
+            // What stays true: render() still emits every turn as "{role}: {content}", so
+            // attribution itself is free to any reader of the transcript. That is why the shape
+            // needed a new question form rather than new distractors.
         };
 
     /// <summary>Minimum <c>V8 − chance</c> for a shape scored on the reader.</summary>
@@ -247,6 +320,20 @@ public class TypedMemEvalDiscriminationTests
                     $"{vertical} shape '{shape}' attributes at only {v8Above.GetDouble():F4} above "
                     + "chance WITH the full labelled transcript in context. That is a corpus "
                     + "defect — ambiguous gold — not a retrieval result.");
+
+                // AND THE OTHER DIRECTION. A shape is diverted here because the reference
+                // retriever CANNOT fail it. If it starts clearing the headroom floor, that premise
+                // is gone and the diversion is hiding good news: the family keeps publishing the
+                // shape as unable to rank while it ranks. The same two-way rule the discrimination
+                // baseline applies, in the gate that was missing it -- and it is the direction that
+                // actually fired, on this list's only entry.
+                Assert.True(
+                    headroom < DiscriminationFloor,
+                    $"{vertical} shape '{shape}' is declared as scored on the reader BECAUSE a "
+                    + $"lexical retriever cannot fail it — and it now runs headroom {headroom:F4}, "
+                    + $"clearing the {DiscriminationFloor} floor on its own. The declaration is "
+                    + "STALE: remove it so the ordinary floor applies, rather than leaving a shape "
+                    + "exempt from the bar it can meet.");
                 continue;
             }
 

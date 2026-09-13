@@ -1,7 +1,7 @@
 {
   "corpus_id": "agenteval-typedmemeval-conjunction-v5",
   "vertical": "conjunction",
-  "revision": "v5+a949006ce182",
+  "revision": "v5+9455d2dcb0b0",
   "design_revision": "v5",
   "supersedes": {
     "revision": "v4",
@@ -9,7 +9,7 @@
     "reason": "v4 shipped separable, and so did v1, v2 and v3. None of them should be cited. The consuming project's per-question probe found constructions that only gold ever receives: \"while it lasts\" in 12 Prospective gold sessions and 0 distractors, \"for the record\" and \"still the same\" in 15 Forgetting gold sessions each and 0, \"since the\" in 20 WorkingMemory gold sessions and 0, \"the winter\" in 15 and 0. v4's central fix made filler state first-person facts in gold's construction and reached only the statement verb -- the acknowledgement, the temporal clause, the retention marker and the reminder frame all stayed gold-only. The gate could not see any of it for a reason worth recording: three features, including the gold-marker n-gram, were scored for AUC outside the per-session loop and so were never given the distribution test that 36 of the other 39 features got. v5 tests phrase EXCLUSIVITY directly -- a phrase recurring in at least a fifth of the questions that reaches zero distractor sessions is refused, which no AUC variant expresses -- builds n-grams within punctuation segments so the screen cannot invent phrases across sentence boundaries, and exempts instance vocabulary without exempting the frames that paraphrase it. Filler now states the same KIND of durable fact as gold, in the same construction, about entities no question asks about. Every session is rewritten, so no v4 number is comparable with a v5 number."
   },
   "question_count": 65,
-  "corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858",
+  "corpus_sha256": "9455d2dcb0b0cdffed450e991487459d45d3040fd832f0c99df3dc6d674af4e3",
   "generator": {
     "tool": "gen_typedmemeval_conjunction.py",
     "version": "1.0.0",
@@ -20,7 +20,7 @@
     "retriever": "bm25-okapi-k1.5-b0.75",
     "band_low": 0.5,
     "band_high": 0.9,
-    "mean_realised": 0.6035,
+    "mean_realised": 0.6096,
     "echo": 0.0938,
     "iterations": 174,
     "search_trace": [],
@@ -64,9 +64,9 @@
       "tme-cnj-037": 1.0,
       "tme-cnj-038": 1.0,
       "tme-cnj-039": 0.8,
-      "tme-cnj-040": 0.4,
+      "tme-cnj-040": 0.6,
       "tme-cnj-041": 0.8,
-      "tme-cnj-042": 0.4,
+      "tme-cnj-042": 0.6,
       "tme-cnj-043": 0.6,
       "tme-cnj-044": 0.8,
       "tme-cnj-045": 1.0,
@@ -100,9 +100,12 @@
     "per_shape_realised": {
       "alias-then-count": 0.4344,
       "conditional-branch": 0.5,
-      "order-then-value": 0.7333,
+      "order-then-value": 0.76,
       "value-then-count": 0.7104
-    }
+    },
+    "per_shape_out_of_band": [
+      "alias-then-count"
+    ]
   },
   "ceiling": {
     "k_ref": 5,
@@ -132,7 +135,7 @@
     "h_is_independent_variable": false,
     "no_absolute_dates": true,
     "empty_turns": {
-      "count": 324,
+      "count": 330,
       "of_turns": 7555,
       "cause": "turns inserted by role-sequence alignment into a slot with no content anywhere at the time padding targets were computed",
       "separates_gold": false
@@ -611,40 +614,40 @@
       "exempt_features": [],
       "reported_only_features": [],
       "features": {
-        "session_length_chars": 0.5405,
+        "session_length_chars": 0.5449,
         "turn_count": 0.5,
         "position_in_haystack": 0.5001,
         "digit_density": 0.5,
-        "uppercase_density": 0.5102,
-        "sentence_count": 0.5295,
-        "punctuation_density": 0.5002,
+        "uppercase_density": 0.5156,
+        "sentence_count": 0.5393,
+        "punctuation_density": 0.5061,
         "em_dash_density": 0.5,
-        "mean_turn_chars": 0.5405,
-        "type_token_ratio": 0.5602,
-        "first_user_length_chars": 0.5659,
-        "first_user_uppercase_density": 0.5422,
-        "first_user_sentence_count": 0.6425,
-        "first_assistant_length_chars": 0.5056,
-        "first_assistant_uppercase_density": 0.5281,
-        "first_assistant_sentence_count": 0.524,
-        "user_slot1_length_chars": 0.5066,
+        "mean_turn_chars": 0.5449,
+        "type_token_ratio": 0.551,
+        "first_user_length_chars": 0.571,
+        "first_user_uppercase_density": 0.5376,
+        "first_user_sentence_count": 0.6339,
+        "first_assistant_length_chars": 0.5005,
+        "first_assistant_uppercase_density": 0.5272,
+        "first_assistant_sentence_count": 0.5412,
+        "user_slot1_length_chars": 0.5059,
         "user_slot2_length_chars": 0.5,
         "user_slot3_length_chars": 0.5,
-        "assistant_slot1_length_chars": 0.521,
-        "assistant_slot2_length_chars": 0.5278,
+        "assistant_slot1_length_chars": 0.5098,
+        "assistant_slot2_length_chars": 0.524,
         "assistant_slot3_length_chars": 0.5,
-        "user_length_chars": 0.5416,
-        "user_uppercase_density": 0.5279,
-        "user_sentence_count": 0.6152,
-        "user_punctuation_density": 0.5092,
-        "user_type_token_ratio": 0.5937,
-        "user_mean_turn_chars": 0.5416,
-        "assistant_length_chars": 0.5244,
-        "assistant_uppercase_density": 0.5149,
-        "assistant_sentence_count": 0.5311,
-        "assistant_punctuation_density": 0.515,
-        "assistant_type_token_ratio": 0.5113,
-        "assistant_mean_turn_chars": 0.5244,
+        "user_length_chars": 0.5462,
+        "user_uppercase_density": 0.5244,
+        "user_sentence_count": 0.5995,
+        "user_punctuation_density": 0.5089,
+        "user_type_token_ratio": 0.5876,
+        "user_mean_turn_chars": 0.5462,
+        "assistant_length_chars": 0.5134,
+        "assistant_uppercase_density": 0.5009,
+        "assistant_sentence_count": 0.5148,
+        "assistant_punctuation_density": 0.5252,
+        "assistant_type_token_ratio": 0.5238,
+        "assistant_mean_turn_chars": 0.5134,
         "position_0_is_user": 0.5,
         "position_0_is_assistant": 0.5,
         "position_1_is_user": 0.5,
@@ -658,10 +661,10 @@
         "boilerplate_ngram": 0.6318
       },
       "worst_refused_feature": "first_user_sentence_count",
-      "worst_refused_auc": 0.6425,
+      "worst_refused_auc": 0.6339,
       "worst_role_sequence": null,
       "role_sequence_auc": 0.5,
-      "worst_gold_marker_ngram": "quick",
+      "worst_gold_marker_ngram": "update",
       "gold_marker_ngram_auc": 0.5946,
       "worst_boilerplate_ngram": "is the",
       "boilerplate_ngram_auc": 0.6318,
@@ -973,11 +976,11 @@
       "passed": true,
       "status": "run",
       "measured_by": "generator",
-      "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858"
+      "probed_corpus_sha256": "9455d2dcb0b0cdffed450e991487459d45d3040fd832f0c99df3dc6d674af4e3"
     },
     "reference_deployment": "gpt-5.5",
     "reference_model_note": "Azure deployment name, not a model identity — a deployment may be repointed at a different model without this value changing.",
-    "run_at": "2026-09-02T13:42:47Z",
+    "run_at": "2026-09-13T10:06:27Z",
     "questions_probed": 65,
     "match_detection": "over-sensitive lexical screen on distinctive tokens, escalated to a reference-model yes/no equivalence judgment; only the judgment decides a match",
     "v1_oracle_answerability": {
@@ -1047,95 +1050,126 @@
     "empty_rate_by_arm": {
       "v1": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 65,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 65,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v2": {
         "population": "probe_answers",
-        "calls": 16460,
+        "calls": 650,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 5506,
+        "judge_calls": 150,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v3": {
         "population": "probe_answers",
-        "calls": 4519,
-        "empty": 9,
-        "rate": 0.002,
-        "judge_calls": 1392,
+        "calls": 195,
+        "empty": 0,
+        "rate": 0.0,
+        "judge_calls": 47,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v6": {
         "population": "probe_answers",
-        "calls": 4621,
+        "calls": 552,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 2553,
+        "judge_calls": 467,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v8": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 65,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1646,
+        "judge_calls": 65,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v9": {
         "population": "probe_answers",
-        "calls": 1646,
+        "calls": 65,
         "empty": 0,
         "rate": 0.0,
-        "judge_calls": 1630,
+        "judge_calls": 65,
         "judge_empty": 0,
         "judge_rate": 0.0
       },
       "v10": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       },
       "v11": {
         "population": "probe_answers",
-        "calls": 93,
+        "calls": 0,
         "empty": 0,
-        "rate": 0.0,
-        "judge_calls": 93,
+        "rate": null,
+        "judge_calls": 0,
         "judge_empty": 0,
-        "judge_rate": 0.0
+        "judge_rate": null
       }
     },
     "v8_full_haystack": {
       "applicable": 65,
       "v1_passed": 65,
-      "v8_passed": 63,
-      "interference_cost": 0.0308,
+      "v8_passed": 62,
+      "interference_cost": 0.0462,
       "regressed_under_interference": [
+        "tme-cnj-042",
         "tme-cnj-046",
         "tme-cnj-049"
       ],
       "failures_with_no_captured_answer": [],
-      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus."
+      "reading": "V1 minus V8 as a share of the questions both are defined on. 0.0 means a perfect retriever and no retriever produce the same answers here, so no two retrievers can be distinguished on this corpus.",
+      "by_stratum": {
+        "alias-then-count": {
+          "questions": 15,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "conditional-branch": {
+          "questions": 15,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        },
+        "order-then-value": {
+          "questions": 15,
+          "regressed": 3,
+          "interference_cost": 0.2,
+          "question_ids": [
+            "tme-cnj-042",
+            "tme-cnj-046",
+            "tme-cnj-049"
+          ]
+        },
+        "value-then-count": {
+          "questions": 20,
+          "regressed": 0,
+          "interference_cost": 0.0,
+          "question_ids": []
+        }
+      }
     },
     "v9_reference_retrieval": {
       "applicable": 65,
       "v1_gold_only": 65,
-      "v8_full_haystack": 63,
-      "v9_bm25_top_k": 16,
-      "headroom_over_lexical_retrieval": 0.7538,
+      "v8_full_haystack": 62,
+      "v9_bm25_top_k": 15,
+      "headroom_over_lexical_retrieval": 0.7692,
       "headroom_unlimited_context_over_lexical": 0.7231,
       "reading": "V1 is a perfect selector, V8 is unlimited context, V9 is a plain BM25 top-K selector. V1 - V9 is what better retrieval can buy. V1 - V8 is NOT a headroom number -- it only asks whether distractors confuse a reader who already has everything."
     },
@@ -1179,7 +1213,9 @@
         "discriminates": true,
         "headroom_reachable": 0.8667,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "headroom_above_chance": 0.5,
+        "headroom_above_chance_reading": "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the lexical retriever and a guesser, because a guesser scores the floor for free. Where this is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads where guessing does not -- and the difference is floor, not retrieval room. Quote this figure, not the uncorrected one, when claiming how much better retrieval can make a system. `discriminates` is deliberately still keyed on the uncorrected headroom so the verdict does not move under a reporting change; on every shipped shape both agree."
       },
       "conditional-branch": {
         "questions": 15,
@@ -1220,7 +1256,9 @@
         "discriminates": true,
         "headroom_reachable": 1.0,
         "limited_by": "retrieval",
-        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it."
+        "reading": "headroom_perfect_selector is V1-V9, what a selector returning ONLY gold would buy. headroom_reachable is V8-V9, what a real retriever can reach, because returning more than gold cannot beat having everything. Where these diverge the shape is reasoning-limited and retrieval work will not move it.",
+        "headroom_above_chance": 0.6667,
+        "headroom_above_chance_reading": "V1 minus max(V9, chance_floor). The baseline a real system must beat is the better of the lexical retriever and a guesser, because a guesser scores the floor for free. Where this is below headroom_perfect_selector, V9 is scoring BELOW chance -- partial gold misleads where guessing does not -- and the difference is floor, not retrieval room. Quote this figure, not the uncorrected one, when claiming how much better retrieval can make a system. `discriminates` is deliberately still keyed on the uncorrected headroom so the verdict does not move under a reporting change; on every shipped shape both agree."
       },
       "order-then-value": {
         "questions": 15,
@@ -1229,9 +1267,9 @@
         "v3_applicable": 15,
         "v3_passed": 15,
         "v8_applicable": 15,
-        "v8_passed": 13,
+        "v8_passed": 12,
         "v9_applicable": 15,
-        "v9_passed": 9,
+        "v9_passed": 8,
         "ci95": {
           "v1": [
             0.7961,
@@ -1242,17 +1280,17 @@
             1.0
           ],
           "v8": [
-            0.6212,
-            0.9626
+            0.5481,
+            0.9295
           ],
           "v9": [
-            0.3575,
-            0.8018
+            0.3012,
+            0.7519
           ]
         },
         "ci95_reading": "95% Wilson intervals on the pass rates above, from the recorded counts. Every shape here is 6-18 questions, so one question moves a rate by 5-17 points: compare two systems on OVERLAP, not on which point estimate is higher.",
         "required_sessions_median": 5,
-        "headroom_perfect_selector": 0.4,
+        "headroom_perfect_selector": 0.4667,
         "discriminates": true,
         "headroom_reachable": 0.2667,
         "limited_by": "retrieval",
@@ -2119,9 +2157,9 @@
       "tme-cnj-036": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Corvin Dispatch.\n\nThe record says the Draimune inspection happened after the Quorlory rewiring and before the Ondrey audit. Corvin Dispatch took over from Pellham Freight in the week of the Quorlory rewiring, and Marlow Carriage replaced Corvin in the week of the Ondrey audit.",
-        "v9": true,
-        "v9_answer": "Corvin Dispatch. The conversations say the courier was switched from Corvin Dispatch to Marlow Carriage in the week of the Ondrey audit, and the Draimune inspection happened before the Ondrey audit.",
+        "v8_answer": "Corvin Dispatch.  \n\nThe conversations say the Draimune inspection happened after the Quorlory rewiring and before the Ondrey audit; the courier changed from Pellham Freight to Corvin Dispatch in the week of the Quorlory rewiring, and then from Corvin Dispatch to Marlow Carriage in the week of the On",
+        "v9": false,
+        "v9_answer": "The conversations do not say plainly enough.\n\nThey say the Draimune inspection was before the Ondrey audit, and that the courier was switched from Corvin Dispatch to Marlow Carriage during the week of the Ondrey audit. But they do not pin down whether that switch had already happened when the Draimu",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2139,9 +2177,9 @@
       "tme-cnj-037": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ashcombe Press.",
+        "v8_answer": "Ashcombe Press. The Ondrey audit was after the Zethisk handover and before the Quorlory rewiring; Ashcombe Press took over from Culverton Print in the week of the Zethisk handover, and Elmsworth Type only took over in the week of the Quorlory rewiring.",
         "v9": true,
-        "v9_answer": "Ashcombe Press. The conversations say it had taken over from Culverton Print in the week of the Zethisk handover, and the Ondrey audit happened after that but before the Quorlory rewiring.",
+        "v9_answer": "Ashcombe Press.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -2159,9 +2197,9 @@
       "tme-cnj-038": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ilminster Trades.",
+        "v8_answer": "You were using **Ilminster Trades** as the main contractor when the **Quorlory rewiring** happened.\n\nThe records say you moved from **Halstead Works** to **Ilminster Trades** in the week of the **Ondrey audit**, and later moved from **Ilminster Trades** to **Lowther Site** in the week of the **Vresk",
         "v9": true,
-        "v9_answer": "Ilminster Trades.",
+        "v9_answer": "Ilminster Trades. The record says you moved from Halstead Works to Ilminster Trades the week of the Ondrey audit, and the Quorlory rewiring happened after the Ondrey audit and before the Vreskade survey.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -2179,9 +2217,9 @@
       "tme-cnj-039": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Marlow Carriage.\n\nThe record says the Vreskade survey happened after the Traymoor fit-out and before the Quorlory rewiring. The usual courier moved from Corvin Dispatch to Marlow Carriage in the week of the Traymoor fit-out, and then from Marlow Carriage to Pellham Freight in the week of the Quorlor",
+        "v8_answer": "Marlow Carriage. The records say the Vreskade survey was after the Traymoor fit-out and before the Quorlory rewiring; the usual courier moved from Corvin Dispatch to Marlow Carriage in the week of Traymoor, then from Marlow Carriage to Pellham Freight in the week of Quorlory.",
         "v9": true,
-        "v9_answer": "Marlow Carriage. The courier was moved from Corvin Dispatch to Marlow Carriage during the week of the Traymoor fit-out, and the Vreskade survey happened after that.",
+        "v9_answer": "Marlow Carriage. The Vreskade survey happened after the Traymoor fit-out, and the usual courier had been moved from Corvin Dispatch to Marlow Carriage during the week of that fit-out.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2199,10 +2237,10 @@
       "tme-cnj-040": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Fairbourne Plate.",
-        "v9": false,
-        "v9_answer": "The second-floor printer.",
-        "v9_gold_in_context": 2,
+        "v8_answer": "Fairbourne Plate. The records say you switched from Denhurst Bindery to Fairbourne Plate in the week of the Zethisk handover, and the Draimune inspection happened after the Zethisk handover but before the Ondrey audit.",
+        "v9": true,
+        "v9_answer": "Fairbourne Plate.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -2219,9 +2257,9 @@
       "tme-cnj-041": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Jarrow Contracting. \n\nThe conversations say you switched from Garrowby Build to Jarrow Contracting in the week of the Traymoor fit-out, and later from Jarrow Contracting to Ilminster Trades in the week of the Zethisk handover. They also say the Ondrey audit was after Traymoor and before Zethisk.",
+        "v8_answer": "Jarrow Contracting.\n\nThe record says you moved from Garrowby Build to Jarrow Contracting during the week of the Traymoor fit-out, and later moved from Jarrow Contracting to Ilminster Trades during the week of the Zethisk handover. It also says the Ondrey audit happened after Traymoor and before Zeth",
         "v9": false,
-        "v9_answer": "Garrowby Build — the later records say you moved off Garrowby Build to Jarrow Contracting only afterward.",
+        "v9_answer": "The conversations do not state which main contractor you were using when the Ondrey audit happened.\n\nThey say:\n- Main contractor was Garrowby Build as of the Oct 10 note.\n- Later it moved to Jarrow Contracting, then Ilminster Trades.\n- The Ondrey audit is mentioned, but not tied clearly to any of th",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2238,11 +2276,11 @@
       },
       "tme-cnj-042": {
         "v1": true,
-        "v8": true,
-        "v8_answer": "Bardsey Logistics. The Quorlory rewiring was after the Vreskade survey, when Bardsey had taken over, and before the Draimune inspection, when Marlow Carriage took over.",
+        "v8": false,
+        "v8_answer": "The record is inconsistent, so I can’t say definitively.\n\n- One note says the Quorlory rewiring was **after the Vreskade survey** and **before the Draimune inspection**; that would make the courier **Bardsey Logistics**.\n- But other notes place the Quorlory rewiring **before the Zethisk handover**, ",
         "v9": false,
-        "v9_answer": "The conversations do not say which usual courier you were using when the Quorlory rewiring happened. They only note that the Quorlory rewiring happened after the Vreskade survey and before the Draimune inspection.",
-        "v9_gold_in_context": 2,
+        "v9_answer": "The conversations only state that your usual courier is **Oakhurst Transit**. They do not specifically say what courier you were using at the exact time the Quorlory rewiring happened.",
+        "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
         "v3_hits": 0,
@@ -2259,9 +2297,9 @@
       "tme-cnj-043": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Culverton Print.\n\nThe conversations say you switched from Denhurst Bindery to Culverton Print in the week of the Ondrey audit, and Ashcombe Press only took over in the week of the Traymoor fit-out. Since the Vreskade survey happened after the Ondrey audit and before the Traymoor fit-out, the regular",
-        "v9": true,
-        "v9_answer": "Culverton Print. You had switched your regular printer from Denhurst Bindery to Culverton Print in the week of the Ondrey audit, and the Vreskade survey happened after the Ondrey audit.",
+        "v8_answer": "You were using **Culverton Print** as your regular printer when the **Vreskade survey** happened.",
+        "v9": false,
+        "v9_answer": "Denhurst Bindery.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -2279,9 +2317,9 @@
       "tme-cnj-044": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Jarrow Contracting.",
+        "v8_answer": "You were using **Jarrow Contracting** when the **Draimune inspection** happened.",
         "v9": true,
-        "v9_answer": "Jarrow Contracting.\n\nYou moved from Kelsall Group to Jarrow Contracting during the week of the Traymoor fit-out, and the Draimune inspection happened after Traymoor but before the Ondrey audit, when you later switched to Lowther Site.",
+        "v9_answer": "You were using **Jarrow Contracting** when the Draimune inspection happened.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2299,9 +2337,9 @@
       "tme-cnj-045": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Oakhurst Transit. The records say the Ondrey audit was after the Draimune inspection and before the Zethisk handover; the usual courier changed from Nettleford Runners to Oakhurst Transit in the week of the Draimune inspection, and from Oakhurst Transit to Corvin Dispatch in the week of the Zethisk ",
+        "v8_answer": "You were using **Oakhurst Transit** as your usual courier when the **Ondrey audit** happened.",
         "v9": true,
-        "v9_answer": "Oakhurst Transit. The Ondrey audit was after the Draimune inspection and before the Zethisk handover, and during that interval your usual courier had changed from Nettleford Runners to Oakhurst Transit.",
+        "v9_answer": "Oakhurst Transit.",
         "v9_gold_in_context": 5,
         "v2_hits": 0,
         "v2": true,
@@ -2319,9 +2357,9 @@
       "tme-cnj-046": {
         "v1": true,
         "v8": false,
-        "v8_answer": "Denhurst Bindery.\n\nThe relevant chain is: the regular printer changed from Denhurst Bindery to Fairbourne Plate in the week of the Vreskade survey, and the later timeline puts the Traymoor fit-out before the Vreskade survey.",
-        "v9": true,
-        "v9_answer": "Fairbourne Plate. The switch to Brentwood Litho happened in the week of the Ondrey audit, and the Traymoor fit-out was before the Ondrey audit.",
+        "v8_answer": "I can’t determine it reliably from the record, because the conversations conflict.\n\n- One entry says the Traymoor fit-out was **after the Vreskade survey and before the Ondrey audit**; that would imply **Fairbourne Plate**.\n- Another says the Vreskade survey was **after the Traymoor fit-out**; that ",
+        "v9": false,
+        "v9_answer": "Denhurst Bindery.",
         "v9_gold_in_context": 3,
         "v2_hits": 0,
         "v2": true,
@@ -2339,7 +2377,7 @@
       "tme-cnj-047": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Garrowby Build. The notes say Garrowby Build took over from Jarrow Contracting during the week of the Quorlory rewiring, and the Ondrey audit happened after the Quorlory rewiring but before the Zethisk handover, when Halstead Works took over.",
+        "v8_answer": "Garrowby Build.\n\nThe conversations say Garrowby Build took over from Jarrow Contracting during the Quorlory rewiring, and Halstead Works took over from Garrowby Build during the Zethisk handover. Since the Ondrey audit happened after the Quorlory rewiring and before the Zethisk handover, the main co",
         "v9": true,
         "v9_answer": "Garrowby Build.",
         "v9_gold_in_context": 3,
@@ -2359,7 +2397,7 @@
       "tme-cnj-048": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Pellham Freight.",
+        "v8_answer": "Pellham Freight — using the note that the Quorlory rewiring happened after the Ondrey audit and before the Draimune inspection.\n\nThere is an earlier contradictory note about the Draimune/Quorlory order, but on the later timing record, the courier in that interval was Pellham Freight.",
         "v9": false,
         "v9_answer": "Oakhurst Transit.",
         "v9_gold_in_context": 3,
@@ -2379,9 +2417,9 @@
       "tme-cnj-049": {
         "v1": true,
         "v8": false,
-        "v8_answer": "The record is inconsistent, so I can’t say plainly which one.\n\n- If the Draimune inspection was **after Traymoor and before Quorlory** (Session 3), the regular printer would have been **Elmsworth Type**.\n- If Quorlory was **before Draimune** (Session 18), then the regular printer would have been **C",
+        "v8_answer": "The conversations are inconsistent on that point.\n\n- One note says the Draimune inspection was **after the Traymoor fit-out and before the Quorlory rewiring**. Since Elmsworth Type took over during Traymoor and Culverton Print took over during Quorlory, that would mean **Elmsworth Type**.\n- A later ",
         "v9": false,
-        "v9_answer": "I can’t determine it plainly from the conversations, because the timing is contradictory.\n\n- One note says the Draimune inspection was **after the Traymoor fit-out and before the Quorlory rewiring** — that would make the printer **Elmsworth Type**.\n- A later note says the Quorlory rewiring was **aft",
+        "v9_answer": "The conversations don’t settle it: they conflict.\n\n- If the Draimune inspection was after the Traymoor fit-out and before the Quorlory rewiring, you were using **Elmsworth Type**.\n- If the Quorlory rewiring was before the Draimune inspection, you were using **Culverton Print**.\n\nSo I can’t determine",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2399,9 +2437,9 @@
       "tme-cnj-050": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Lowther Site. It had taken over from Halstead Works in the week of the Vreskade survey, and Ilminster Trades did not replace Lowther Site until the week of the Draimune inspection. The Traymoor fit-out was between those two events.",
-        "v9": false,
-        "v9_answer": "The conversations don’t say plainly.\n\nThey say the Traymoor fit-out happened before the Draimune inspection, and that the main contractor changed from Lowther Site to Ilminster Trades during the week of the Draimune inspection. That suggests Lowther Site may have still been in place before then, but",
+        "v8_answer": "Lowther Site. The records say Lowther Site took over from Halstead Works in the week of the Vreskade survey, and Ilminster Trades replaced Lowther Site in the week of the Draimune inspection. The Traymoor fit-out happened after the Vreskade survey and before the Draimune inspection.",
+        "v9": true,
+        "v9_answer": "Lowther Site.",
         "v9_gold_in_context": 4,
         "v2_hits": 0,
         "v2": true,
@@ -2419,9 +2457,9 @@
       "tme-cnj-051": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Nettleford Runners.\n\nThe standing rule says to use Nettleford Runners when the Kelvaryn access is open, and the record says the Kelvaryn access was open as of 2031/11/29 with no later change noted.",
+        "v8_answer": "Nettleford Runners. The record says the Kelvaryn access is open, and the standing rule makes Nettleford Runners the usual courier when it is open.",
         "v9": false,
-        "v9_answer": "The conversations do not say whether Kelvaryn access is currently open, closed for resurfacing, or otherwise unavailable, so they do not determine which usual courier is in force.\n\nThe standing rule recorded was:\n\n- Kelvaryn access open → Nettleford Runners  \n- Closed for resurfacing → Oakhurst Tran",
+        "v9_answer": "I can’t tell which courier is in force from these conversations, because they don’t say whether the Kelvaryn access is currently open, closed for resurfacing, or something else.\n\nThe standing rule recorded was:\n\n- **Nettleford Runners** if Kelvaryn access is open  \n- **Oakhurst Transit** if it is cl",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2439,9 +2477,9 @@
       "tme-cnj-052": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ashcombe Press.\n\nThe standing rule says: if the Peskadd permit is still pending, the regular printer is Ashcombe Press. The conversations only record it as still pending, with no later update.",
+        "v8_answer": "Ashcombe Press — the record says the Peskadd permit was still pending, and the standing rule says “still pending means Ashcombe Press.”",
         "v9": false,
-        "v9_answer": "The conversations don’t say whether the Peskadd permit is granted, still pending, or something else, so they don’t contain enough information to determine which regular printer is in force.",
+        "v9_answer": "I can’t determine that from the conversations. The standing rule is given, but the current status of the Peskadd permit is not.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2459,9 +2497,9 @@
       "tme-cnj-053": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Garrowby Build. The rule was: Halstead Works if the Zannifer slot is confirmed, Ilminster Trades if provisional, otherwise Garrowby Build; later the Zannifer slot was released back.",
+        "v8_answer": "Garrowby Build.\n\nThe standing rule was: Halstead Works if the Zannifer slot is confirmed, Ilminster Trades if provisional, and Garrowby Build otherwise. Later, the Zannifer slot was “released back,” so it falls under “any other case.”",
         "v9": false,
-        "v9_answer": "The conversations give the standing rule:\n\n- Zannifer slot confirmed → Halstead Works\n- Zannifer slot provisional → Ilminster Trades\n- Any other case → Garrowby Build\n\nBut they do not say what the current Zannifer slot status is, so the contractor in force cannot be determined from the conversations",
+        "v9_answer": "I don’t have enough information to tell. The conversations give the rule for choosing the main contractor, but they do not say whether the Zannifer slot is currently confirmed, provisional, or neither.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2479,9 +2517,9 @@
       "tme-cnj-054": {
         "v1": true,
         "v8": true,
-        "v8_answer": "The last recorded status says the Muldreth gauge was in the green. By the standing rule, that means the usual courier is Pellham Freight.\n\nNo later conversation changes that.",
+        "v8_answer": "Pellham Freight. The standing rule says Pellham Freight applies when the Muldreth gauge is green, and the last recorded update says the gauge is green.",
         "v9": false,
-        "v9_answer": "The conversations give the rule: Pellham Freight if the Muldreth gauge is green, Oakhurst Transit if amber, and Marlow Carriage otherwise.\n\nThey do not say what the Muldreth gauge currently shows, so the usual courier in force cannot be determined from the record.",
+        "v9_answer": "The conversations don’t say what state the Muldreth gauge is currently in, so they don’t contain enough information to determine which usual courier is in force.\n\nThe standing rule is:\n\n- Green → Pellham Freight\n- Amber → Oakhurst Transit\n- Any other case → Marlow Carriage",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2499,9 +2537,9 @@
       "tme-cnj-055": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Ashcombe Press. The Ferrasque window was last recorded as narrowed, and the standing rule says a narrowed Ferrasque window means Ashcombe Press is the regular printer.",
+        "v8_answer": "Ashcombe Press. The standing rule says the regular printer is Ashcombe Press when the Ferrasque window is narrowed, and it was logged as narrowed on 2032/05/07.",
         "v9": false,
-        "v9_answer": "The conversations give the standing rule, but they do not say whether the Ferrasque window is currently open, narrowed, or otherwise. So the regular printer in force cannot be determined from the record.",
+        "v9_answer": "The conversations give the standing rule, but they do not say whether the Ferrasque window is open, narrowed, or otherwise. So the regular printer in force cannot be determined from the record.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2519,9 +2557,9 @@
       "tme-cnj-056": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Jarrow Contracting. The standing rule says anything other than “signed off” or “queried” uses Jarrow Contracting, and the latest update says the Tovrekk clearance was withdrawn.",
+        "v8_answer": "Jarrow Contracting. The standing rule says anything other than signed off or queried applies, and the Tovrekk clearance was later confirmed as withdrawn.",
         "v9": false,
-        "v9_answer": "The conversations give the rule:\n\n- Tovrekk clearance **signed off** → **Halstead Works**\n- **queried** → **Lowther Site**\n- anything else → **Jarrow Contracting**\n\nBut they do **not** say what the current Tovrekk clearance status is. So the main contractor in force cannot be determined from these c",
+        "v9_answer": "The conversations give the rule, but not the current Tovrekk clearance status. So I can’t determine which main contractor is in force.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2539,9 +2577,9 @@
       "tme-cnj-057": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Nettleford Runners. The standing rule says that when the Kelvaryn access is open, the usual courier is Nettleford Runners, and the later record says the Kelvaryn access came back open.",
+        "v8_answer": "Nettleford Runners.\n\nThe standing rule says the usual courier is **Nettleford Runners** when the **Kelvaryn access is open**, and the later record says the Kelvaryn access “came back open” on 2032/07/25, with no later change noted.",
         "v9": false,
-        "v9_answer": "I don’t know from these conversations. They give the rule, but not whether the Kelvaryn access is open, closed for resurfacing, or something else.",
+        "v9_answer": "I can’t determine that from the conversations. They record the rule, but not whether the Kelvaryn access is currently open, closed for resurfacing, or something else.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2559,9 +2597,9 @@
       "tme-cnj-058": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Denhurst Bindery. The standing rule says a still-pending Peskadd permit means Denhurst Bindery, and the later note says the Peskadd permit is still pending.",
+        "v8_answer": "Denhurst Bindery.",
         "v9": false,
-        "v9_answer": "The conversations give the standing rule, but they do not say whether the Peskadd permit is granted, pending, or otherwise. So the regular printer in force cannot be determined from the record.",
+        "v9_answer": "The conversations do not say what the current status of the Peskadd permit is. They only give the rule:\n\n- granted → Fairbourne Plate  \n- pending → Denhurst Bindery  \n- otherwise → Elmsworth Type\n\nSo the regular printer currently in force cannot be determined from the record.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2579,9 +2617,9 @@
       "tme-cnj-059": {
         "v1": true,
         "v8": true,
-        "v8_answer": "Lowther Site.\n\nThe standing rule says: confirmed Zannifer slot → Garrowby Build; provisional → Jarrow Contracting; otherwise → Lowther Site. Later, the Zannifer slot was confirmed as “released back,” so the “otherwise” case applies.",
+        "v8_answer": "Lowther Site. The Zannifer slot was later confirmed as “released back,” so under the standing rule it falls to the “otherwise” contractor.",
         "v9": false,
-        "v9_answer": "The conversations do not say whether the Zannifer slot is confirmed, provisional, or otherwise, so they do not contain enough information to identify which main contractor is in force.",
+        "v9_answer": "The conversations give the standing rule, but they do not say whether the Zannifer slot is confirmed, provisional, or neither. So the main contractor in force cannot be determined from the record.",
         "v9_gold_in_context": 1,
         "v2_hits": 0,
         "v2": true,
@@ -2717,7 +2755,47 @@
         "v11": null
       }
     },
-    "probed_corpus_sha256": "a949006ce1823116a8a021e4b4abc068d3334ce5b3235b47428e1fd7aa84e858",
-    "empty_rate_scope": "family-wide, derived from the shared reference-model call cache and split by population: `calls`/`empty`/`rate` are PROBE ANSWERS, and judge grades are carried alongside rather than pooled into them. Per-corpus attribution arrives with the next full run."
+    "probed_corpus_sha256": "9455d2dcb0b0cdffed450e991487459d45d3040fd832f0c99df3dc6d674af4e3",
+    "retriever_sensitivity": {
+      "reference_retriever": "bm25-okapi-k1.5-b0.75",
+      "reference_k": 5,
+      "dense_retriever": "azure-openai-embeddings, cosine, same documents and budget",
+      "operand": "ALLgold -- gold.issubset(top_k), the quantity V9 tracks",
+      "reading": "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a CONDITION of every headroom figure in this sidecar and was left implicit until 2026-09-13. This block states it. `allgold_dense` is the same measurement with an embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's published figures, over-stating by +0.032. A shape with `discriminates_under_dense: false` can still rank two systems for a BM25 consumer and cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and it says nothing about any consumer's chunking, reranking or query rewriting.",
+      "by_shape": {
+        "alias-then-count": {
+          "questions": 15,
+          "allgold_bm25": 0.1333,
+          "allgold_dense": 0.2667,
+          "predicted_headroom_bm25": 0.8667,
+          "predicted_headroom_dense": 0.7333,
+          "discriminates_under_dense": true
+        },
+        "conditional-branch": {
+          "questions": 15,
+          "allgold_bm25": 0.0,
+          "allgold_dense": 0.0,
+          "predicted_headroom_bm25": 1.0,
+          "predicted_headroom_dense": 1.0,
+          "discriminates_under_dense": true
+        },
+        "order-then-value": {
+          "questions": 15,
+          "allgold_bm25": 0.2,
+          "allgold_dense": 0.0,
+          "predicted_headroom_bm25": 0.8,
+          "predicted_headroom_dense": 1.0,
+          "discriminates_under_dense": true
+        },
+        "value-then-count": {
+          "questions": 20,
+          "allgold_bm25": 0.25,
+          "allgold_dense": 0.05,
+          "predicted_headroom_bm25": 0.75,
+          "predicted_headroom_dense": 0.95,
+          "discriminates_under_dense": true
+        }
+      }
+    }
   }
 }
