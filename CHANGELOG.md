@@ -187,6 +187,19 @@ in Forgetting. Full record, including two defects introduced and caught during t
 `docs/findings/MEASUREMENT_STATUS.md` §88.14.
 
 
+### Fixed — `v0.35.0-beta` had no CHANGELOG section, and nothing was checking
+
+Its notes stayed in `[Unreleased]`, where this release would have shipped them a second time
+under its own number. The section is cut retroactively, dated from the tag.
+
+The rule was assumed to be enforced. `check_tag_has_status_entry.py` says in its own docstring
+that *"the CHANGELOG never drifted because CI READS IT"* — no workflow mentioned the CHANGELOG
+at all. `tools/check_tag_has_changelog_section.py` is the missing reader, and unlike its sibling
+it runs in CI, because `CHANGELOG.md` is tracked. It refuses to report a pass when it can see no
+tags, which is the state a shallow `actions/checkout` would put it in.
+
+## [0.35.0-beta] - 2026-09-08
+
 ### Added
 
 - **`BenchmarkRunner`** — runs one `BenchmarkDefinition` against one `BenchmarkArm` into one run
