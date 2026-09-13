@@ -18236,3 +18236,54 @@ of the arc and was not visible from §88.40's table. The sweep is **held unshipp
 so three verticals move in one release and the consuming agent gets one notice, not three.
 
 **Cost: embeddings only; zero judge calls, zero shipped corpus bytes.**
+
+### 88.42 🔴 The free gate measures RETRIEVAL, and my remedy passed it by making questions unanswerable (2026-09-13)
+
+S1 re-formed `semantic/source-attribution` to ask by consequence (§88.41). Every free instrument
+said ship it:
+
+| instrument | reading | verdict |
+| --- | --- | --- |
+| `typedmemeval_precheck.py` | source-attribution ALLgold 0.733 → 0.200 | **PASS**, “the spend is justified” |
+| dense ALLgold | 1.000 → 0.800, headroom 0.000 → ~0.2 | the shape ranks again |
+| the echo confound | knob fell 0.667 → 0.292, which should RAISE ALLgold | conservative, trustworthy |
+
+The re-probe cost ~1,190 calls and refused it:
+
+| | shipped | re-formed |
+| --- | ---: | ---: |
+| V1 — **gold only, the ceiling** | 15/15 | **10/15** |
+| V8 — full haystack | 15/15 | **7/15** |
+| V6 — components load-bearing | 15/15 | **16/30**, 14 of the 15 new ones fail |
+
+#### 🔴 The lesson, and it generalises past this shape
+
+> **ALLgold is a measure of retrieval difficulty. It cannot see whether the question is still
+> answerable.** A change that makes gold harder to FIND and a change that makes the answer
+> impossible to DERIVE move it in the same direction, and the free gate reports both as progress.
+
+Five of the eight consequence pairs are too weak a semantic link: with only the two gold sessions
+in context the reader cannot get from the consequence back to the topic. **Part of the headroom
+gain I measured was unanswerability**, which is the flattering direction and therefore the one to
+distrust — §88.18 shape 3, arriving through a new door.
+
+#### And a second defect, which V6 named exactly
+
+Decoys read *“About {decoy} — nothing decided yet”*, so the gold source is identifiable as the
+only **contentful** `About X` session. Drop the consequence and the answer still falls out; the
+component was not load-bearing. The competitors were competitive on topic and not on substance —
+the same error as §88.41's S2 attempt, in a different shape, made by me twice in one day.
+
+#### Disposition
+
+**Reverted.** `semantic` stays at `630ea487e7dc`. The generator work is kept on a branch with
+this diagnosis attached, because the DESIGN is sound and the execution is not: the two defects
+are named and both are fixable — stronger consequence links, and decoys that discuss their own
+topic substantively rather than announcing that nothing happened.
+
+⚠ **The precheck's docstring now overstates what it can license.** It says a comfortable pass
+means “the spend is justified”. It justifies the spend and nothing after it: only the probe sees
+V1, and V1 is the question of whether the corpus still works.
+
+**Cost: ~1,190 calls, and they bought a refutation rather than a corpus.** That is the correct
+outcome for a probe run and the reason the arm exists.
