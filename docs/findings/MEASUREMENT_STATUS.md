@@ -18332,3 +18332,67 @@ returns 2. A missing fit is also a FAIL rather than a silent pass — “nothing
 true of a fit that never ran.
 
 **Cost: zero calls. Reversible in one commit if the maintainer prefers the uniform bar.**
+
+### 88.44 ✅ §88.30 PRICED AND CLOSED — the wrong operand is real, and re-calibrating is a CONTRACT change (2026-09-14)
+
+§88.30 named the defect and declined to fix it, leaving the disposition open. Priced now, for
+zero calls, against all ten shipped corpora using **V9's own documents** rather than the
+generator's.
+
+#### The defect is sharper than §88.30 recorded
+
+| quantity | spread across 10 verticals | correlation with headroom |
+| --- | ---: | ---: |
+| **SHARE** — what the calibration gate controls | 0.195 | **+0.004** |
+| **ALLgold** — what sets headroom | **0.463** | −1.000 (it *is* headroom) |
+
+§88.30 measured r(share, headroom) = −0.176 on a partial read. Across all ten it is **+0.004**:
+not weakly related, **unrelated**. The calibration machinery does its job perfectly, on a quantity
+that has no bearing on the property the family accepts shapes against. `r(depth, ALLgold)` is
+**−0.739**, which is the confound arriving through the front door.
+
+#### 🔴 But the obvious fix is unavailable, and the corpora say why
+
+**For gold depth 1 the two operands are the SAME FUNCTION.** With one gold session,
+`share = |gold ∩ top| / 1` is 1 exactly when `gold ⊆ top`. So calibrating on ALLgold differs from
+calibrating on share **only where depth ≥ 2**, and **two** verticals are at depth exactly 1.00:
+
+| vertical | depth | share | ALLgold | operands |
+| --- | ---: | ---: | ---: | --- |
+| `bitemporal` | **1.00** | 0.617 | 0.617 | **identical** |
+| `workingmemory` | **1.00** | 0.600 | 0.617 | **identical function** (see the rendering note) |
+| `prospective` | 1.32 | 0.597 | 0.542 | ⚠ **NOT identical** — mostly depth 1, and the gap is real |
+
+> An ALLgold target of 0.30 — the value that would give the headroom 0.70 the band was aiming at
+> — **is a SHARE target of 0.30 on the two depth-1.00 verticals**, which is 0.20 below the declared
+> [0.50, 0.90] band floor. **The two contracts cannot both hold.**
+
+⚠ **`prospective` is NOT part of that claim, and an earlier draft of this section wrongly included
+it.** At mean depth 1.32 its own row shows share 0.597 against ALLgold 0.542: close, because most of
+its questions are depth 1, but not equal. Where the two differ the share consequence of an ALLgold
+target depends on the depth MIXTURE, and that mapping is not measured here. Two verticals are enough
+to make the contracts incompatible; three would have been an overclaim, and the table on this very
+page refuted it. Caught in review of PR #242.
+
+(The tiny `workingmemory` gap, 0.600 vs 0.617, is the two tools rendering documents differently:
+the sidecar's share comes from the generator's `s.text()`, this measurement from the
+`### Session` block V9 actually ranks. The FUNCTION is identical; the inputs differ slightly.)
+
+#### ✅ Disposition, and why the interim remedy is the right one
+
+Re-calibrating on ALLgold is **not an engineering task**. It requires choosing which contract the
+family publishes — a share band it currently declares in ADR-026, or an ALLgold band that does not
+exist yet and whose floor would reject three verticals outright. It then costs a full-family
+re-probe (~23,000 calls) and ten `corpus_sha256` moves.
+
+**The depth-adjusted anchoring shipped in §88.43 is the correct interim remedy**, and this
+measurement is why: the operand defect expresses itself as a DEPTH confound (r = −0.739), and the
+anchoring removes depth at the reporting layer without requiring the family to change contract or
+move a single corpus byte. It treats the symptom — knowingly, which is the difference between a
+workaround and a fix nobody labelled.
+
+⚠ **What is NOT claimed:** that the calibration gate is fine. It is measurably steering a quantity
+uncorrelated with its purpose, and a future family redesign should target ALLgold from the start.
+That is a v6 decision, not a v5 patch.
+
+**Cost: zero calls, zero corpus bytes. §88.30 is closed.**
