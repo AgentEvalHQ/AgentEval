@@ -31,7 +31,7 @@ jobs:
   # refuses to report a pass in that state (exit 2, "the repository has no tags, so this measured
   # nothing"), so a missing fetch-depth breaks the job loudly instead of greening it. The guard is
   # there because this is the shape that would have shipped otherwise.
-  changelog-sections:
+  repository-hygiene:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,6 +44,10 @@ jobs:
         python-version: '3.12'
     - name: Every tag has a CHANGELOG section
       run: python tools/check_tag_has_changelog_section.py
+    # Runs in the SAME job because it needs the same full-depth checkout: the history half of
+    # the check reads `git log --all`, which a shallow clone cannot answer.
+    - name: No private path is tracked in this public repository
+      run: python tools/check_no_private_paths.py
 
   dependency-review:
     runs-on: ubuntu-latest
