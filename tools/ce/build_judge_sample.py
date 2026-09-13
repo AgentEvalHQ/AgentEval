@@ -82,13 +82,17 @@ for arm in sorted(by_arm, key=lambda a: -len(by_arm[a])):
     print('  %-8s n=%-5d yes=%-5d no=%-5d' % (arm, len(rs), y, len(rs) - y))
 print()
 
-rng = random.Random(SEED)
+# DevSkim: ignore DS148264 - a STRATIFIED SAMPLING seed, not a security function. The sample is
+# the unit of a judge-agreement study, so it has to be the same 50 items every time it is drawn
+# or two runs of the study are not comparable. A cryptographic RNG would destroy exactly the
+# property this line exists for.
+rng = random.Random(SEED)  # DevSkim: ignore DS148264
 sample = []
 for arm in sorted(by_arm):
     yes = [r for r in by_arm[arm] if r['judge1'] == 'yes']
     no = [r for r in by_arm[arm] if r['judge1'] == 'no']
     half = PER_ARM_TARGET // 2
-    take_y = rng.sample(yes, min(half, len(yes)))
+    take_y = rng.sample(yes, min(half, len(yes)))  # DevSkim: ignore DS148264
     take_n = rng.sample(no, min(PER_ARM_TARGET - len(take_y), len(no)))
     # if one side was short, top the other side up so the arm still reaches its target
     if len(take_y) + len(take_n) < PER_ARM_TARGET:
@@ -96,7 +100,7 @@ for arm in sorted(by_arm):
         take_n += rng.sample(pool, min(PER_ARM_TARGET - len(take_y) - len(take_n), len(pool)))
     sample.extend(take_y + take_n)
 
-rng.shuffle(sample)
+rng.shuffle(sample)  # DevSkim: ignore DS148264
 sample = sample[:50]
 
 print('SAMPLE DRAWN  n = %d   seed = %d' % (len(sample), SEED))
