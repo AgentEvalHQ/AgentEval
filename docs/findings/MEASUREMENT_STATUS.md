@@ -18090,3 +18090,70 @@ silently resolves to a different flag is the argument-parsing form of reading th
 off the wrong artifact.
 
 **Cost: zero calls, zero embeddings, zero corpus bytes — the rankings were already bought.**
+
+### 88.40 ✅ §88.38 MEASURED, and it holds — 8 of 8 at-risk, 4 of 4 controls (2026-09-13)
+
+§88.38 predicted from `1 - ALLgold` that eight shapes stop discriminating under a dense
+retriever. A prediction is not a diagnosis, and the remedy it points at is a multi-vertical
+corpus arc, so it was measured before anything was funded.
+
+`tools/typedmemeval_v9_dense.py` re-runs the **V9 arm itself** — same documents, same K=5, same
+prompt, same judge, same `require_distinctive` / `already_known` / `answer_must_name` handling,
+**reused from the probe tool rather than reimplemented** — changed in exactly one place: the
+top-K comes from cosine over embeddings instead of BM25.
+
+#### The result
+
+| | shape | V9 published | V9 dense | headroom |
+| --- | --- | ---: | ---: | ---: |
+| at-risk | `episodic/assistant-stated` | 12/20 | **20/20** | 0.400 → **0.000** |
+| at-risk | `prospective/due-later-reminder` | 8/14 | **14/14** | 0.429 → **0.000** |
+| at-risk | `prospective/expiring-validity` | 12/14 | **14/14** | 0.143 → **0.000** |
+| at-risk | `prospective/seed-carry-over` | 7/12 | **12/12** | 0.417 → **0.000** |
+| at-risk | `semantic/source-attribution` | 11/15 | **15/15** | 0.267 → **0.000** |
+| at-risk | `prospective/not-yet-true` | 11/14 | 13/14 | 0.143 → **0.000** |
+| at-risk | `workingmemory/distance-40` | 6/12 | 11/12 | 0.500 → **0.083** |
+| at-risk | `forgetting/invalidated` | 11/20 | 18/20 | 0.450 → **0.100** |
+| control | `procedural/step-order` | 0/20 | 0/20 | 1.000 → 1.000 |
+| control | `temporal/occurrence-order` | 5/20 | 6/20 | 0.750 → 0.700 |
+| control | `semantic/co-reference` | 6/15 | 7/15 | 0.600 → 0.533 |
+| control | `conjunction/order-then-value` | 8/15 | 11/15 | 0.467 → 0.267 |
+
+> ✅ **At-risk below the floor: 8 of 8. Controls above it: 4 of 4.** Five at-risk shapes reach V9
+> **exactly 1.000** — a dense retriever finds every gold session on every question.
+
+#### Why the controls are the whole experiment
+
+At-risk shapes rising on their own would be consistent with "a better retriever helps
+everything", which is a different claim and would not support an E1-b sweep. The controls
+separate them: they moved **0.000 to 0.200** while the at-risk shapes moved **0.143 to 0.500,
+to zero**. The effect is concentrated where it was predicted to be.
+
+#### 🔴 One control the predictor got BACKWARDS — and it is a declared exception
+
+`conjunction/order-then-value` has dense ALLgold **0.200 → 0.000**, so `1 - ALLgold` predicted it
+would get HARDER. Measured, V9 went **0.533 → 0.733** and it got EASIER. The predictor was not
+merely imprecise there; it pointed the wrong way.
+
+That shape is already declared an identity exception by `typedmemeval_shape_profile.py`, in these
+words: *"the order half is answerable from the value half alone, so the arm scores without
+holding both gold sessions -- a partial-credit route, not a retrieval win."* **ALLgold cannot
+predict a shape that does not need all its gold**, and the instrument that says so was already
+shipped and already naming this shape.
+
+> **The identity's declared exceptions are exactly where its predictions fail.** Ten of twelve
+> shapes landed within 0.02 of prediction, one within 0.10, and the miss is the one shape a
+> different instrument had already flagged as outside the identity's scope. Two independent
+> instruments agreeing on their own boundary is worth more than either being right everywhere.
+
+#### What is now funded
+
+The **E1-b sweep** has a measured diagnosis behind it rather than a prediction. Every at-risk
+shape is a question that NAMES the entity it asks about, which is the structural property E1-b
+removed from `episodic/participant-attribution` — and that shape, under this same dense
+retriever, still ranks (V9 0.133 → 0.467) while its unchanged sibling `assistant-stated`
+saturates at 1.000. Same vertical, one variable, both directions.
+
+**Cost: 367 calls.** The stage protocol earned its keep again: the dry run exercised all twelve
+shapes for nothing, and the one-question stage produced the same 8/8 and 4/4 split for 24 calls
+before the remaining 343 were spent.

@@ -187,6 +187,24 @@ in Forgetting. Full record, including two defects introduced and caught during t
 `docs/findings/MEASUREMENT_STATUS.md` §88.14.
 
 
+### Added — the retriever prediction, MEASURED: 8 of 8 at-risk, 4 of 4 controls
+
+`tools/typedmemeval_v9_dense.py` re-runs the V9 arm with cosine-over-embeddings in place of BM25 —
+same documents, budget, prompt and judge, reused from the probe tool rather than reimplemented.
+
+All eight shapes predicted to stop discriminating do. **Five reach V9 exactly 1.000**: a dense
+retriever finds every gold session on every question, so their headroom is zero rather than thin.
+All four controls stay above the floor, moving 0.000–0.200 against the at-risk shapes’ 0.143–0.500
+— which is what separates “the prediction was right” from “a better retriever helps everything”.
+
+🔴 One control the predictor got **backwards**: `conjunction/order-then-value` was predicted to
+get harder and got easier. It is already a declared identity exception — *the order half is
+answerable from the value half alone* — and ALLgold cannot predict a shape that does not need all
+its gold. The identity’s declared exceptions are exactly where its predictions fail, and a
+separate shipped instrument had already named this shape.
+
+Cost 367 calls. See `MEASUREMENT_STATUS` §88.40.
+
 ### Added — every headroom figure is conditional on (BM25, K=5), and the sidecars now say so
 
 The retrieval BUDGET is the second monoculture and the larger one. `K_REF = 5` is 23% of a median

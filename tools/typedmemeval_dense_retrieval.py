@@ -511,4 +511,7 @@ def main():
     return 0
 
 
-sys.exit(main())
+# Guarded so the cosine ranking and the embedding cache can be REUSED rather than reimplemented.
+# A second copy of the ranking is a second thing to get wrong, and the two would drift silently.
+if __name__ == "__main__":
+    sys.exit(main())
