@@ -172,7 +172,10 @@ def _stub_vector(text: str) -> list[float]:
     """
     vec = [0.0] * 64
     for i in range(len(text) - 2):
-        h = hashlib.sha1(text[i:i + 3].encode('utf-8')).digest()
+        # sha256, not sha1. The digest is used as an arbitrary bucket index, so the choice is
+        # free -- and a scanner alert that has to be argued away in a comment costs more than
+        # picking the algorithm nobody has to argue about.
+        h = hashlib.sha256(text[i:i + 3].encode('utf-8')).digest()
         vec[h[0] % 64] += 1.0
     norm = sum(v * v for v in vec) ** 0.5 or 1.0
     return _pack([v / norm for v in vec])
@@ -400,7 +403,10 @@ def main():
             ranked = {'bm25': tmc.bm25_rank(q['question'], docs),
                       'dense': cosine_rank(q['question'], docs)}
             shuffled = list(range(len(docs)))
-            rng.shuffle(shuffled)
+            # DevSkim: ignore DS148264 - the RANDOM CONTROL ARM. A seeded RNG is the point:
+            # this arm is the floor the dense arm is measured against, and a floor that
+            # changes between runs cannot be compared to anything.
+            rng.shuffle(shuffled)  # DevSkim: ignore DS148264
             ranked['random'] = shuffled
             cell = by_shape[(vertical, q['shape'])]
             cell['n'] += 1
