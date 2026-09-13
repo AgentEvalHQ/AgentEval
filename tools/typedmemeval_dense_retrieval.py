@@ -137,6 +137,22 @@ def _shard(name: str) -> str:
     return os.path.join(CACHE_DIR, '%s.json' % name)
 
 
+#: Key under which a shard records WHICH deployment produced its vectors.
+#:
+#: A shard was keyed by text hash alone, so re-running against a different
+#: AZURE_OPENAI_EMBEDDING_DEPLOYMENT -- or copying a shard between machines -- silently skipped
+#: re-embedding and ranked with vectors from the other model. The run would look complete and
+#: cost nothing, and the dense arm would be a comparison between two retrievers that were never
+#: the same one. Found in review of PR #238.
+#:
+#: The deployment NAME is recorded, never the endpoint or the key.
+_PROVENANCE_KEY = '__embedding_deployment__'
+
+
+def _deployment_name() -> str:
+    return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "") or "(unset)"
+
+
 def _load_cache(names) -> None:
     """Load only the shards this run will touch. Loading the family to measure one vertical is
     the same mistake in a smaller coat.
@@ -149,14 +165,23 @@ def _load_cache(names) -> None:
         if not os.path.exists(path):
             continue
         try:
-            _cache.update(json.loads(open(path, encoding='utf-8').read()))
+            shard = json.loads(open(path, encoding='utf-8').read())
         except json.JSONDecodeError:
-            pass                      # a torn shard is re-embedded, never half-trusted
+            continue                  # a torn shard is re-embedded, never half-trusted
+        stamped = shard.pop(_PROVENANCE_KEY, None)
+        if stamped is not None and stamped != _deployment_name():
+            # REFUSE RATHER THAN MIX. Two models' vectors in one ranking is not a weaker
+            # measurement, it is not a measurement.
+            print('    ignoring shard %s: built by deployment %r, this run uses %r'
+                  % (name, stamped, _deployment_name()), flush=True)
+            continue
+        _cache.update(shard)
 
 
 def _save_shard(name: str, keys) -> None:
     os.makedirs(CACHE_DIR, exist_ok=True)
     payload = {k: _cache[k] for k in keys if k in _cache}
+    payload[_PROVENANCE_KEY] = _deployment_name()
     tmp = _shard(name) + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as fh:
         json.dump(payload, fh)
