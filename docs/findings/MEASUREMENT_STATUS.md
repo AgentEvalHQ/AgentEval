@@ -18157,3 +18157,82 @@ saturates at 1.000. Same vertical, one variable, both directions.
 **Cost: 367 calls.** The stage protocol earned its keep again: the dry run exercised all twelve
 shapes for nothing, and the one-question stage produced the same 8/8 and 4/4 split for 24 calls
 before the remaining 343 were spent.
+
+### 88.41 The E1-b sweep: 5 of 8, not 8 — and the cheap remedy is REFUTED on the shape that needs one (2026-09-13)
+
+§88.40 measured eight shapes out of the discrimination floor under a dense retriever and the
+obvious next move was to re-form all eight. Reading them first — free — says that would have
+applied one remedy to three different causes.
+
+#### Scoping, before any corpus was touched
+
+| shape | names its own target? | gold depth | disposition |
+| --- | --- | ---: | --- |
+| `episodic/assistant-stated` | yes — *“the bike-rack delivery”* | 1 | E1-b |
+| `prospective/due-later-reminder` | yes — *“the allotment lease”* | 1 | E1-b |
+| `prospective/expiring-validity` | yes — *“the climbing-wall pass”* | 1 | E1-b |
+| `prospective/not-yet-true` | yes — *“Halloway Instruments”* | 1 | E1-b |
+| `semantic/source-attribution` | yes — **quotes the belief** | 1 | E1-b |
+| `forgetting/invalidated` | no — 1 shared content word | 2 | different cause |
+| `prospective/seed-carry-over` | no — **0 shared content words** | 2 | different cause |
+| `workingmemory/distance-40` | no — generic words only | 1 | 🔴 **do not touch** |
+
+The last is the important one. It is **one rung of a five-rung distance ladder** whose siblings
+sit at 0.083–0.333 predicted headroom; at n=12 one question is 0.083, so rung 40 is a single
+question from rung 25. The whole ladder is retriever-sensitive and singling out a rung would
+break the construct — the construct §88.31 already caught me one step from breaking.
+
+#### ✅ S1 · `semantic/source-attribution` — the remedy works
+
+The question quoted the belief and gold was the session containing it. Re-formed to ask by
+CONSEQUENCE, with a second gold session carrying it (depth 1 → 2) and a check asserting zero
+content-word overlap between question and belief. Rival consequences added **after** measuring a
+thin margin, not before.
+
+| | BM25 headroom | dense headroom |
+| --- | ---: | ---: |
+| shipped | 0.267 | **0.000** |
+| re-formed | 0.800 | 0.200 |
+| + rival consequences | **0.933** | **~0.2** |
+
+⚠ Three rebuilds read 0.200 / 0.267 / 0.200 dense. That spread is the echo search re-running on
+every build, not signal — `current-value` moved the same way while untouched. **The claim is
+0.000 → ~0.2**: from ranking nothing to ranking. The retired `the runaround` alias also lifted
+`co-reference` 0.533 → 0.600 dense.
+
+#### 🔴 S2 · `episodic/assistant-stated` — the CHEAP remedy is refuted, twice
+
+`bitemporal/belief-at-instant` was fixed by same-subject competitors (0.11 → 0.3056), so the same
+move was tried here rather than authoring 22 consequence pairs.
+
+| attempt | competitors | BM25 headroom | dense headroom |
+| --- | --- | ---: | ---: |
+| shipped | none | 0.400 | **0.000** |
+| 1 · six same-topic sessions, no value read out | topic only | 0.300 | **0.000** |
+| 2 · six same-topic sessions stating a DIFFERENT detail | topic + act | 0.250 | **0.000** |
+
+**Dense ALLgold never moved off 1.000, and BM25 headroom got worse both times.** The second
+measurement gives the reason:
+
+> The question is *“Which bay did you tell me the {topic} sits in?”* and gold’s user turn is
+> *“Can you find out which bay the {topic} sits in?”* — the question is a near-verbatim copy of
+> the gold exchange. It specifies gold by **(topic, detail-kind)** and the corpus holds exactly
+> one session matching that pair. Competitors that vary the topic do not share the detail;
+> competitors that vary the detail do not share the topic.
+
+🔴 **No distractor design can fix a question that uniquely specifies its own gold.** Distractors
+raise the cost of CHOOSING among candidates; they cannot create candidates where the query admits
+one. The shape needs the expensive remedy — a question that does not name what it is looking for
+— and that is ~22 authored consequence pairs, one per topic, each carrying the zero-overlap
+property.
+
+Both attempts were **reverted**: strictly worse on BM25, no better on dense. Recorded rather than
+deleted, because a refutation nobody wrote down is a thing the next author tries again.
+
+#### What this costs the sweep
+
+S1 is one vertical and done. S2 and S3 need authored consequence banks, which is the real price
+of the arc and was not visible from §88.40's table. The sweep is **held unshipped on one branch**
+so three verticals move in one release and the consuming agent gets one notice, not three.
+
+**Cost: embeddings only; zero judge calls, zero shipped corpus bytes.**
