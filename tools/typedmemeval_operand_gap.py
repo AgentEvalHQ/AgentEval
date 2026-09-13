@@ -20,9 +20,15 @@ declares.
 Run it after any change that moves gold depth or the echo knob.
 """
 import json, os, sys
-sys.path.insert(0, 'C:/git/joslat/AgentEval/tools')
+
+# Derived, never hard-coded. An absolute path to one machine's checkout makes the measurement
+# unrunnable everywhere else -- including in the repository it ships in. Same defect as
+# tools/ce/build_judge_sample.py carried until 2026-09-13; reintroduced here by lifting the
+# script out of a scratch directory, which is exactly how it travels.
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 import typedmemeval_common as tmc
-R='C:/git/joslat/AgentEval/src/AgentEval.Memory/Data/typedmemeval'
+R = os.path.join(os.path.dirname(HERE), 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
 
 def render(sess, date):
     turns = "\n".join("%s: %s" % (t['role'], t['content']) for t in sess)

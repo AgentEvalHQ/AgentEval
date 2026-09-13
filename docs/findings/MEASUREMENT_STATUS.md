@@ -18355,17 +18355,24 @@ that has no bearing on the property the family accepts shapes against. `r(depth,
 
 **For gold depth 1 the two operands are the SAME FUNCTION.** With one gold session,
 `share = |gold ∩ top| / 1` is 1 exactly when `gold ⊆ top`. So calibrating on ALLgold differs from
-calibrating on share **only where depth ≥ 2**, and three verticals sit at depth ~1:
+calibrating on share **only where depth ≥ 2**, and **two** verticals are at depth exactly 1.00:
 
-| vertical | depth | share | ALLgold |
-| --- | ---: | ---: | ---: |
-| `bitemporal` | 1.00 | 0.617 | 0.617 |
-| `workingmemory` | 1.00 | 0.600 | 0.617 |
-| `prospective` | 1.32 | 0.597 | 0.542 |
+| vertical | depth | share | ALLgold | operands |
+| --- | ---: | ---: | ---: | --- |
+| `bitemporal` | **1.00** | 0.617 | 0.617 | **identical** |
+| `workingmemory` | **1.00** | 0.600 | 0.617 | **identical function** (see the rendering note) |
+| `prospective` | 1.32 | 0.597 | 0.542 | ⚠ **NOT identical** — mostly depth 1, and the gap is real |
 
 > An ALLgold target of 0.30 — the value that would give the headroom 0.70 the band was aiming at
-> — **is a SHARE target of 0.30 for those three**, which is 0.20 below the declared [0.50, 0.90]
-> band floor. **The two contracts cannot both hold.**
+> — **is a SHARE target of 0.30 on the two depth-1.00 verticals**, which is 0.20 below the declared
+> [0.50, 0.90] band floor. **The two contracts cannot both hold.**
+
+⚠ **`prospective` is NOT part of that claim, and an earlier draft of this section wrongly included
+it.** At mean depth 1.32 its own row shows share 0.597 against ALLgold 0.542: close, because most of
+its questions are depth 1, but not equal. Where the two differ the share consequence of an ALLgold
+target depends on the depth MIXTURE, and that mapping is not measured here. Two verticals are enough
+to make the contracts incompatible; three would have been an overclaim, and the table on this very
+page refuted it. Caught in review of PR #242.
 
 (The tiny `workingmemory` gap, 0.600 vs 0.617, is the two tools rendering documents differently:
 the sidecar's share comes from the generator's `s.text()`, this measurement from the
