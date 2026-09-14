@@ -133,6 +133,47 @@ def verdict(text):
     return 'unparseable'
 
 
+#: The model line the SHIPPED judge belongs to. The claim is a statement about the distance
+#: between this and the second judges, so it has to be named rather than assumed.
+SHIPPED_JUDGE_LINE = 'gpt-5'
+
+#: Prefixes that identify a vendor/family. Anything not matching OpenAI's lines is a different
+#: VENDOR, which is the only thing that settles judge-family bias.
+_OPENAI_PREFIXES = ('gpt-', 'o1', 'o3', 'o4', 'text-', 'chatgpt')
+
+
+def _line_of(model: str) -> str:
+    """The model LINE, e.g. gpt-5 / gpt-4 / o3. Used to tell 'different size' from 'different line'."""
+    m = model.lower()
+    for p in ('gpt-5', 'gpt-4', 'o4', 'o3', 'o1'):
+        if m.startswith(p):
+            return p
+    return m.split('-')[0]
+
+
+def _claim_for(shipped_line: str, models) -> str:
+    """What this RUN may claim, derived from the models actually used.
+
+    It used to be derived from `--provider`: openai meant "different model line" and azure meant
+    "deployment variance within one family". That is the wrong operand. The provider says where the
+    call is routed; the MODELS say how far the second judges sit from the shipped one, and that is
+    the whole content of the claim. Running gpt-4.1/gpt-4o through the azure provider is a different
+    LINE and was being reported as the weaker within-family fallback.
+    """
+    if not models:
+        return 'nothing -- no second judge was named'
+    foreign = [m for m in models if not m.lower().startswith(_OPENAI_PREFIXES)]
+    if foreign:
+        return ('judge-FAMILY bias across VENDORS -- the claim C-E was filed for '
+                '(second judges: %s)' % ', '.join(foreign))
+    lines = {_line_of(m) for m in models}
+    if lines - {shipped_line}:
+        return ('two judges on a different MODEL LINE (%s vs the shipped %s), same vendor'
+                % ('/'.join(sorted(lines)), shipped_line))
+    return ('deployment variance within ONE model line (%s) -- the weakest form, and it does not '
+            'bound family bias' % shipped_line)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dry-run', action='store_true',
@@ -149,9 +190,9 @@ def main():
 
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
     models = [m for m in args.models.split(',') if m]
-    claim = ('two judges on a different MODEL LINE, same vendor' if args.provider == 'openai'
-             else 'deployment variance within ONE model family (the weaker fallback)')
-    print('provider=%s  ->  claim supported: %s' % (args.provider, claim))
+    claim = _claim_for(SHIPPED_JUDGE_LINE, models)
+    print('provider=%s  judges=%s' % (args.provider, ','.join(models)))
+    print('  -> claim supported: %s' % claim)
     print('cases=%d  second judges=%s  %s'
           % (len(cases), ','.join(models),
              'DRY RUN (nothing written)' if args.dry_run else ('ONE REAL CALL' if args.one else 'FULL RUN')))
