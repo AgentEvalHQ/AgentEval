@@ -172,7 +172,12 @@ jobs:
         if ($orphanCorpora.Count -or $orphanSidecars.Count) {
           foreach ($o in $orphanCorpora)  { Write-Host "::error::Corpus '$o.json' has no sidecar '$o.meta.json'." }
           foreach ($o in $orphanSidecars) { Write-Host "::error::Sidecar '$o.meta.json' has no corpus '$o.json'." }
-          Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. Refusing to verify a set that does not."
+          # THE COUNTS ARE PART OF THE DIAGNOSTIC, not decoration. This check exists to separate a
+          # mismatched 2/2 set from a paired one, so a refusal that omits the totals hides the very
+          # thing that makes it necessary -- a reader sees "unpaired" without seeing that the count
+          # guard above was satisfied. The message is also where an earlier claim went wrong: the
+          # counts were printed by the harness that TESTED this logic and never by the logic itself.
+          Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. Counts were $corpusCount corpora / $sidecarCount sidecars, so a totals check alone would not have caught this. Refusing to verify a set that does not pair."
           exit 1
         }
         Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($corpusCount corpora, $sidecarCount sidecars)"

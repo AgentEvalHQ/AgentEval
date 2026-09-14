@@ -18880,5 +18880,20 @@ not test: claim-without-instrument in three lines. Stems are compared now and or
 Run against the reviewer’s own counterexample: `REFUSED (counts were 2/2): corpus ‘b’ has no
 sidecar; sidecar ‘c’ has no corpus` — the report states the counts that would have cleared it.
 
+And a fourth round, which is the one to keep. That sentence was **false when I first wrote it**:
+the workflow emitted the orphan names and a generic error and never the counts. `counts were 2/2`
+came from the PowerShell function I wrote to TEST the logic. **I verified a re-implementation and
+reported its behaviour as the artifact’s.** The other two claim-without-instrument instances in
+this sequence were comments overstating code; this one was a VERIFICATION running different code
+from the thing shipped, which is strictly worse because it looks like evidence.
+
+Re-done properly: the step’s `run:` block is now extracted from the YAML and **executed verbatim**
+against a synthetic tree, with only `$repoCorpora` redirected. Unpaired 2/2 → `exit=1` with both
+orphans named and the counts present; the real repository → `exit=0`,
+`Reference files in the working tree: 20 (10 corpora, 10 sidecars)`.
+
+**The rule: when a check lives in a workflow, run the workflow’s own lines.** A harness that
+re-implements the logic tests the harness.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
