@@ -183,9 +183,9 @@ jobs:
           # false. A diagnostic that overstates on one of its own branches is the same defect as a
           # comment that overstates its code -- three of those in this sequence already.
           $note = if ($corpusCount -eq $sidecarCount) {
-            "Counts were $corpusCount corpora / $sidecarCount sidecars, so a totals check alone would not have caught this."
+            "Counts were $corpusCount corpora / $sidecarCount sidecars -- the totals AGREE, so only this name-by-name comparison could have caught it."
           } else {
-            "Counts were $corpusCount corpora / $sidecarCount sidecars, which do not match either."
+            "Counts were $corpusCount corpora / $sidecarCount sidecars -- the totals themselves DISAGREE, so at least one file is absent from one side entirely."
           }
           Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. $note Refusing to verify a set that does not pair."
           exit 1
