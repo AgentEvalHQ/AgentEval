@@ -346,6 +346,22 @@ def _save_shard(name: str, keys) -> None:
     # second would drop the first's. That is this very defect one level up.
     with tmc.exclusive_file_lock(existing):
         payload = {}
+        # THE MIGRATION PATH IS THE LOSS PATH AGAIN. On the first save after the per-model split,
+        # `existing` does not exist yet -- but `_load_cache` may have just accepted the PRE-SPLIT
+        # flat shard. Writing only this run's keys would leave the flat file shadowed: later loads
+        # prefer the model-scoped shard, find a partial one, and the rest is lost exactly as the
+        # `--limit` defect lost 8,941 vectors. The flat file is folded in on that first write, and
+        # only when its own stamp matches -- a mismatched one was already refused at load and must
+        # not be resurrected here. Found in review of PR #245.
+        flat = _flat_shard(name)
+        if not os.path.exists(existing) and os.path.exists(flat):
+            try:
+                legacy = json.loads(open(flat, encoding='utf-8').read())
+            except json.JSONDecodeError:
+                legacy = {}
+            if (legacy.get(_PROVENANCE_KEY) == _deployment_name()
+                    and legacy.get(_MODEL_KEY) == (_resolve_deployment_model() or None)):
+                payload.update({k: v for k, v in legacy.items() if not k.startswith('__')})
         if os.path.exists(existing):
             try:
                 prior = json.loads(open(existing, encoding='utf-8').read())

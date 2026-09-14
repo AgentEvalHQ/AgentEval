@@ -204,19 +204,20 @@ def load_cache() -> None:
     paid for every call again, and then flushed its handful of entries over the real file.
     """
     with _cache_lock:
-        if _cache or not CACHE_PATH.exists():
+        if _cache:
             return
-        try:
-            _cache.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
-        except json.JSONDecodeError:
-            return
-        # Experimental completions are loaded for RESUME -- they cost real money -- but they live in
-        # a separate file, so anything rebuilding a population from CACHE_PATH never sees them.
-        if EXPERIMENT_CACHE_PATH.exists():
+        # EACH FILE IS LOADED INDEPENDENTLY. This used to `return` when CACHE_PATH was missing or
+        # unparseable, before the experiment cache was ever read -- so a checkout holding only the
+        # experimental completions would re-pay for every one of them. The two files have separate
+        # lifetimes by design; making one a precondition of the other reintroduced the coupling the
+        # split exists to remove. Found in review of PR #245.
+        for path in (CACHE_PATH, EXPERIMENT_CACHE_PATH):
+            if not path.exists():
+                continue
             try:
-                _cache.update(json.loads(EXPERIMENT_CACHE_PATH.read_text(encoding="utf-8")))
+                _cache.update(json.loads(path.read_text(encoding="utf-8")))
             except json.JSONDecodeError:
-                pass
+                continue              # a torn file is skipped, never allowed to skip the other
 
 
 #: Per-arm call and empty tallies, so the empty rate is a published, gateable statistic rather

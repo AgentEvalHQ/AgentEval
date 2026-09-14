@@ -102,13 +102,25 @@ def main():
         entries = load(vertical)
         wanted = dict(by_vertical[vertical])
         dense._cache.clear()
-        dense._load_cache([vertical])
+        # THE DRY-RUN FLAG REACHES THE LOADER. Without it this caller loaded the real shards, found
+        # every text banked, embedded nothing, and ranked with real dense vectors while reporting a
+        # stub-only exercise -- the same defect fixed in the measurement tool earlier in this pull
+        # request and not carried across. Applied-once, caught in review of PR #245.
+        dense._load_cache([vertical], args.dry_run)
         embedded: list[str] = []
         # THE SAME LIVE CHECK THE MEASUREMENT TOOL RUNS. This file loads the vector cache directly,
         # so without this it would inherit the structural provenance refusal and none of the
         # empirical one -- and a shard stamped with a model it was not built by is exactly what the
         # stamp alone cannot catch. Re-embeds one banked text; skipped when nothing was banked.
-        _probe_texts = [entry['question'] for entry in entries][:64]
+        # CANDIDATES INCLUDE THE DOCUMENTS, not just the questions. `_verify_cache_matches_live`
+        # probes the first candidate it finds already banked and returns silently when none is --
+        # so offering only the first 64 questions meant a cache holding document vectors and none
+        # of those questions skipped the check without saying so. That is applicability taken from
+        # the wrong operand: this reader ranks documents, so documents belong in the pool.
+        _probe_texts = [entry['question'] for entry in entries]
+        for entry in entries[:4]:
+            _probe_texts.extend(dense.render_one(sess, d) for sess, d
+                                in zip(entry['haystack_sessions'], entry['haystack_dates']))
         if not args.dry_run and _probe_texts:
             dense._verify_cache_matches_live(_probe_texts)
 

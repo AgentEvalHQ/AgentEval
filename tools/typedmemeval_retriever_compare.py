@@ -87,9 +87,17 @@ def load_model_cache(model: str, vertical: str) -> dict:
             continue
         shard = json.loads(open(path, encoding='utf-8').read())
         stamped = shard.get(dr._MODEL_KEY)
-        if stamped and stamped != model:
-            raise SystemExit('%s claims model %r; refusing to read it as %r.'
-                             % (path, stamped, model))
+        # AN EXACT MATCH, NOT "no contradiction". `if stamped and stamped != model` accepts a shard
+        # with NO stamp, because the first operand is false -- the identical fail-open that
+        # `_load_cache` carried on `if stamped is not None` and that was fixed there earlier in this
+        # same pull request. Being under a model-named directory is not evidence of provenance: the
+        # directory records where a run chose to write, the stamp records what produced the bytes.
+        # Applied-once, caught in review of PR #245.
+        if stamped != model:
+            raise SystemExit(
+                '%s carries model %r, not %r. A comparison must not include vectors whose '
+                'producer is unproven -- re-embed that shard or drop the model from --models.'
+                % (path, stamped, model))
         cache.update({k: v for k, v in shard.items() if not k.startswith('__')})
     return cache
 
