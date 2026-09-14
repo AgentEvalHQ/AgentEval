@@ -90,8 +90,13 @@ def ask(model, question, gold, response, dry, provider='openai'):
         req = urllib.request.Request(
             f'{endpoint}/openai/deployments/{model}/chat/completions'
             f'?api-version={AZURE_API_VERSION}',
+            # THE TOKEN-LIMIT PARAMETER IS VENDOR-SPECIFIC, and this tool assumed OpenAI's spelling
+            # for its whole life because every judge it had ever run was OpenAI. Mistral rejects
+            # `max_completion_tokens` outright (422 extra_forbidden) and wants `max_tokens`. The
+            # moment C-E became cross-vendor -- which is the entire point of C-E -- the request
+            # schema stopped being one schema.
             data=json.dumps({'messages': [{'role': 'user', 'content': content}],
-                             'max_completion_tokens': 2000}).encode('utf-8'),
+                             _token_limit_key(model): 2000}).encode('utf-8'),
             headers={'Content-Type': 'application/json', 'api-key': key})
         return _send(req)
 
@@ -110,17 +115,35 @@ def ask(model, question, gold, response, dry, provider='openai'):
     return _send(req)
 
 
+#: Deployments whose underlying model is NOT OpenAI. Filled in by _resolve_azure at start-up so
+#: the request schema can follow the vendor rather than the endpoint.
+_NON_OPENAI_DEPLOYMENTS = set()
+
+
+def _token_limit_key(model: str) -> str:
+    """`max_tokens` for non-OpenAI models, `max_completion_tokens` for OpenAI ones."""
+    return 'max_tokens' if model in _NON_OPENAI_DEPLOYMENTS else 'max_completion_tokens'
+
 def _send(req):
-    for attempt in range(3):
+    # RETRY ON THE SERVICE'S TIMESCALE. 3 attempts backing off 4/8 seconds lost a run against a
+    # freshly deployed model: a GlobalStandard deployment's limit is TOKENS PER MINUTE, so every
+    # retry inside the first few seconds argues with a window that has not moved. Same correction
+    # already made in typedmemeval_dense_retrieval.py -- applied-once, found again here.
+    for attempt in range(8):
         try:
-            with urllib.request.urlopen(req, timeout=180) as r:
+            with urllib.request.urlopen(req, timeout=180) as r:  # DevSkim: ignore DS137138
                 payload = json.load(r)
             return (payload['choices'][0]['message']['content'] or '').strip()
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503) and attempt < 2:
-                time.sleep(4 * (attempt + 1))
-                continue
-            raise
+            if e.code not in (429, 500, 502, 503, 504) or attempt == 7:
+                raise
+            hinted = e.headers.get('Retry-After') if e.headers else None
+            if hinted and str(hinted).strip().isdigit():
+                delay = min(90, max(5, int(str(hinted).strip())))
+            else:
+                delay = min(60, 5 * 2 ** attempt)
+            print('    %d, waiting %ds' % (e.code, delay), flush=True)
+            time.sleep(delay)
     return ''
 
 
@@ -253,6 +276,10 @@ def main():
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
     models = [m for m in args.models.split(',') if m]
     resolved = _resolve_azure(models) if args.provider == 'azure' else None
+    if resolved:
+        _NON_OPENAI_DEPLOYMENTS.update(
+            dep for dep, real in resolved.items()
+            if real and not real.lower().startswith(_OPENAI_PREFIXES))
     claim = _claim_for(SHIPPED_JUDGE_LINE, models, resolved)
     print('provider=%s  judges=%s' % (args.provider, ','.join(models)))
     if resolved:

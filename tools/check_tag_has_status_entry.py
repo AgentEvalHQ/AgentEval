@@ -28,6 +28,16 @@ import re
 import subprocess
 import sys
 
+# Its own output was garbled: "§0 log" rendered as mojibake on a cp1252 console, in a gate
+# whose entire subject is a section named with that character. Fixed in the quality board and
+# the shape profile on 2026-09-13 and in tools/ce/ on 2026-09-14; this was the last file
+# carrying it. Applied-once, three times.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOC = os.path.join(ROOT, 'strategy', 'AgentEval-Status-and-Plan-Forward.md')
 
