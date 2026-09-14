@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 import random
+import sys
 
 # Derived, not hard-coded. This was an absolute path to one machine's checkout, so the first
 # cache read below failed everywhere else -- including in the repository it ships in. The line
@@ -29,7 +30,12 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'judge-sample-50.
 
 SEED = 20260912          # fixed and declared: the sample must be redrawable
 PER_ARM_TARGET = 8       # 7 arms x 8 = 56, trimmed to 50 by frame size
-ABSTENTION_ARMS = {'v10', 'v11'}
+# ONE definition of the frame, imported rather than restated. These two files had separate copies
+# of the rule and the analyser's drift check exists precisely because they can disagree -- which
+# they then did: a deny-list of abstention arms admitted the experimental `v9dense` arm into both,
+# and the builder drew 8 cases from it. A shared constant cannot drift from itself.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from analyse_judge_agreement import SHIPPED_ARMS  # noqa: E402
 
 
 def key_for(entry):
@@ -55,7 +61,7 @@ for k, verdict in cache.items():
     if not k.endswith(':judge'):
         continue
     arm = k.split(':')[1]
-    if arm in ABSTENTION_ARMS:
+    if arm not in SHIPPED_ARMS:
         continue
     h = k.split(':')[0]
     if h not in index:

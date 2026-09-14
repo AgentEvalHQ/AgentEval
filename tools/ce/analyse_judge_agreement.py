@@ -28,6 +28,17 @@ import json
 import os
 import sys
 
+# A GATE MUST NOT DIE ON ITS OWN WARNING TEXT. Windows hands a bare `python x.py` a cp1252 stdout
+# that cannot encode the markers these findings are written with, and every line carrying one sits
+# on a branch that fires only when something is WRONG -- so the tool runs green for as long as it
+# has nothing to say and dies mid-report the first time it does. Fixed in the quality board and the
+# shape profile on 2026-09-13 and NOT carried here, which is the applied-once shape this project
+# keeps finding: a right treatment with too small a reach.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CACHE = os.path.join(ROOT, 'tools', '.typedmemeval_probe_cache.json')
@@ -36,6 +47,14 @@ SAMPLE = os.path.join(HERE, 'judge-sample-50.json')
 RESULTS = os.path.join(HERE, 'judge-agreement-results.json')
 
 ABSTENTION_ARMS = {'v10', 'v11'}       # their ':judge' keys hold commit/abstain, NOT yes/no
+
+#: The arms a shipped corpus is actually accepted on. An ALLOW-list, not a deny-list, and the
+#: difference is not stylistic: the frame used to be "any `:judge` key whose arm is not an
+#: abstention arm", which admits every arm anyone ever adds to the shared probe cache. On
+#: 2026-09-14 an experimental `v9dense` arm (the retriever-sensitivity work) put 185 verdicts into
+#: the frame silently, changing the population the C-E re-weighting is computed against. A deny-list
+#: cannot refuse what it has never heard of.
+SHIPPED_ARMS = {'v1', 'v2', 'v3', 'v6', 'v8', 'v9'}
 
 
 def key_for(entry):
@@ -47,6 +66,7 @@ def key_for(entry):
 
 
 def live_frame():
+    excluded = {}
     index = {}
     for path in glob.glob(os.path.join(CORPORA, '*', '*-v5.json')):
         data = json.load(open(path, encoding='utf-8'))
@@ -59,12 +79,16 @@ def live_frame():
         if not k.endswith(':judge'):
             continue
         arm = k.split(':')[1]
-        if arm in ABSTENTION_ARMS or k.split(':')[0] not in index:
+        if k.split(':')[0] not in index or k[:-len(':judge')] not in cache:
             continue
-        if k[:-len(':judge')] not in cache:
+        if arm not in SHIPPED_ARMS:
+            # Counted and named rather than dropped in silence: an arm appearing here is either a
+            # new shipped arm this file has not been told about, or an experiment leaking into the
+            # frame. Both need a human to look; neither should change the population quietly.
+            excluded[arm] = excluded.get(arm, 0) + 1
             continue
         frame.append((arm, 'yes' if str(v).strip().lower().startswith('yes') else 'no'))
-    return frame
+    return frame, excluded
 
 
 def main():
@@ -75,13 +99,18 @@ def main():
     sample = json.load(open(SAMPLE, encoding='utf-8'))
     models = res['models']
 
-    frame = live_frame()
+    frame, excluded = live_frame()
     declared = sample.get('drawn_from')
     print('C-E  provider=%s' % res.get('provider', 'openai'))
     print('claim this run can support: %s' % res.get('claim_supported', '(unrecorded)'))
     print()
     print('POSITIVE CONTROL on the rebuilt frame')
     print('  rebuilt %d live verdicts; the sample was drawn from %s' % (len(frame), declared))
+    if excluded:
+        print('  arms EXCLUDED from the frame (not in SHIPPED_ARMS): %s'
+              % ', '.join('%s=%d' % kv for kv in sorted(excluded.items())))
+        print('    Either tell this file about a new shipped arm, or keep the experiment out of')
+        print('    the shared probe cache. Silence here is how a population changes unnoticed.')
     if declared is not None and len(frame) != declared:
         print('  🔴 FRAME DRIFT: the rules in this file no longer match build_judge_sample.py, or')
         print('     the corpora moved since the sample was drawn. The re-weighting below would be')

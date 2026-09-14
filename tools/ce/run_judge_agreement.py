@@ -133,6 +133,109 @@ def verdict(text):
     return 'unparseable'
 
 
+#: The model line the SHIPPED judge belongs to. The claim is a statement about the distance
+#: between this and the second judges, so it has to be named rather than assumed.
+SHIPPED_JUDGE_LINE = 'gpt-5'
+
+#: Prefixes that identify a vendor/family. Anything not matching OpenAI's lines is a different
+#: VENDOR, which is the only thing that settles judge-family bias.
+_OPENAI_PREFIXES = ('gpt-', 'o1', 'o3', 'o4', 'text-', 'chatgpt')
+
+
+#: Model ids whose LINE is not recoverable from the prefix. `gpt-chat-latest` is the gpt-5 chat
+#: model; reading it as its own line made the §88.19 run look like a cross-LINE comparison when it
+#: was within-line -- overstating, which is the direction that matters.
+_LINE_ALIASES = {
+    'gpt-chat-latest': 'gpt-5',
+    'gpt-5-chat-latest': 'gpt-5',
+}
+
+
+def _line_of(model: str):
+    """The model LINE (gpt-5 / gpt-4 / o3), or None when it cannot be determined.
+
+    RETURNS None RATHER THAN GUESSING. The old version fell back to the first hyphen-separated
+    token, so any unrecognised id became its own "line" and the claim asserted a difference it had
+    not established. An unknown line has to block the claim, not decorate it.
+    """
+    m = model.lower()
+    if m in _LINE_ALIASES:
+        return _LINE_ALIASES[m]
+    for p in ('gpt-5', 'gpt-4', 'o4', 'o3', 'o1'):
+        if m.startswith(p):
+            return p
+    return None
+
+
+def _resolve_azure(models):
+    """deployment alias -> the model actually behind it, or None where it cannot be resolved.
+
+    ON AZURE THE NAME PASSED IS A DEPLOYMENT ID THE USER CHOSE, not a model. An OpenAI deployment
+    called `judge-primary` and a Llama deployment called `gpt-4o` are both legal, so classifying the
+    claim on the string is classifying on a label that carries no guarantee -- and the claim would
+    be wrong in BOTH directions. The deployments listing carries the real mapping; where it cannot
+    be reached, the claim must say the provenance is unverified rather than assume it.
+    """
+    endpoint = (os.environ.get('AZURE_OPENAI_ENDPOINT') or '').rstrip('/')
+    key = os.environ.get('AZURE_OPENAI_API_KEY') or ''
+    out = {m: None for m in models}
+    if not (endpoint and key):
+        return out
+    try:
+        req = urllib.request.Request(
+            endpoint + '/openai/deployments?api-version=2023-03-15-preview',
+            headers={'api-key': key})
+        with urllib.request.urlopen(req, timeout=60) as r:  # DevSkim: ignore DS137138
+            data = json.loads(r.read().decode('utf-8'))
+    except Exception:
+        return out
+    mapping = {d.get('id'): d.get('model') for d in data.get('data', [])}
+    for m in models:
+        out[m] = mapping.get(m)
+    return out
+
+
+def _claim_for(shipped_line: str, models, resolved=None) -> str:
+    """What this RUN may claim, derived from the models actually used.
+
+    It used to be derived from `--provider`: openai meant "different model line" and azure meant
+    "deployment variance within one family". That is the wrong operand. The provider says where the
+    call is routed; the MODELS say how far the second judges sit from the shipped one, and that is
+    the whole content of the claim. Running gpt-4.1/gpt-4o through the azure provider is a different
+    LINE and was being reported as the weaker within-family fallback.
+    """
+    if not models:
+        return 'nothing -- no second judge was named'
+
+    # Classify on the RESOLVED model where one is available. `resolved` is None for providers whose
+    # model string is the model (direct OpenAI); on Azure it is the deployment->model mapping.
+    if resolved is not None:
+        unresolved = [m for m in models if not resolved.get(m)]
+        if unresolved:
+            return ('UNVERIFIED provenance -- %s could not be resolved to an underlying model, and '
+                    'on this provider the name is a deployment alias the user chose. No family or '
+                    'line claim can be made from it.' % ', '.join(unresolved))
+        effective = [resolved[m] for m in models]
+    else:
+        effective = list(models)
+
+    foreign = [m for m in effective if not m.lower().startswith(_OPENAI_PREFIXES)]
+    if foreign:
+        return ('judge-FAMILY bias across VENDORS -- the claim C-E was filed for '
+                '(second judges: %s)' % ', '.join(foreign))
+    lines = {_line_of(m) for m in effective}
+    if None in lines:
+        unknown = sorted(m for m in effective if _line_of(m) is None)
+        return ('UNVERIFIED line -- %s is same-vendor but its model line could not be determined, '
+                'so a cross-line claim is not established. Add it to _LINE_ALIASES once known.'
+                % ', '.join(unknown))
+    if lines - {shipped_line}:
+        return ('two judges on a different MODEL LINE (%s vs the shipped %s), same vendor'
+                % ('/'.join(sorted(lines)), shipped_line))
+    return ('deployment variance within ONE model line (%s) -- the weakest form, and it does not '
+            'bound family bias' % shipped_line)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dry-run', action='store_true',
@@ -149,9 +252,13 @@ def main():
 
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
     models = [m for m in args.models.split(',') if m]
-    claim = ('two judges on a different MODEL LINE, same vendor' if args.provider == 'openai'
-             else 'deployment variance within ONE model family (the weaker fallback)')
-    print('provider=%s  ->  claim supported: %s' % (args.provider, claim))
+    resolved = _resolve_azure(models) if args.provider == 'azure' else None
+    claim = _claim_for(SHIPPED_JUDGE_LINE, models, resolved)
+    print('provider=%s  judges=%s' % (args.provider, ','.join(models)))
+    if resolved:
+        print('  deployment -> model: %s'
+              % ', '.join('%s=%s' % (k, v or 'UNRESOLVED') for k, v in sorted(resolved.items())))
+    print('  -> claim supported: %s' % claim)
     print('cases=%d  second judges=%s  %s'
           % (len(cases), ','.join(models),
              'DRY RUN (nothing written)' if args.dry_run else ('ONE REAL CALL' if args.one else 'FULL RUN')))

@@ -18396,3 +18396,63 @@ uncorrelated with its purpose, and a future family redesign should target ALLgol
 That is a v6 decision, not a v5 patch.
 
 **Cost: zero calls, zero corpus bytes. §88.30 is closed.**
+
+### 88.45 ✅ C-E UPGRADED — a different MODEL LINE agrees at 0.979, and the disagreements are not directional (2026-09-14)
+
+§88.19 ran C-E in “the weakest form that was purchasable”: `gpt-5-chat` + `gpt-5-mini`, which is
+deployment variance **within one model line**. The blocker was recorded as “no second family
+configured”. That premise was false — the Azure resource carries a **426-model catalog** including
+Claude, Llama, Mistral, DeepSeek, Cohere and Jamba.
+
+⚠ **But catalogue is not deployment.** All three reachable resources have only OpenAI GPT
+deployments; every non-OpenAI model returns `DeploymentNotFound`. What WAS available without
+deploying anything is the **gpt-4 line** — a different model line from the shipped `gpt-5.5`.
+
+#### The result, on a frame that reproduces
+
+| second judge | raw | **re-weighted** | frame coverage |
+| --- | ---: | ---: | ---: |
+| `gpt-4.1` | 43/48 | **0.979** | 100% |
+| `gpt-4o` | 44/48 | **0.933** | 100% |
+
+> **The two second judges agree with each other on 43 of 48, and both differ from the shipped
+> judge on only 2 — one in each direction** (shipped=no→both yes; shipped=yes→both no).
+
+Co-directional disagreement is the signal about the shipped judge, and there is **no direction to
+it**: one case each way is what equivalence judging at the margin looks like, not a systematic
+flip. That is the reading §88.19 could not reach, because two deployments of one line cannot
+separate “the judge is biased” from “the second judge is wrong”.
+
+⚠ **What is still NOT claimed.** Same vendor. The gpt-4 line is also OLDER than gpt-5.5, so a
+disagreement is confounded with capability — an older judge being worse looks identical to a newer
+judge being biased. **A cross-VENDOR bound remains unpurchased**, and is now one portal action
+away: deploying any single non-OpenAI model from the catalog makes it runnable for ~100 calls.
+
+#### 🔴 Two defects found by running it, both of the same shape
+
+**1 · The claim was derived from the PROVIDER flag, not the models.** `--provider azure` printed
+“deployment variance within ONE model family” no matter which models were passed, so this run would
+have recorded a claim two steps weaker than what it measured. The provider says where a call is
+routed; the MODELS say how far the second judges sit from the shipped one, and that is the entire
+content of the claim. Now derived from the models — and it correctly reclassifies §88.19's own
+result as “deployment variance within ONE model line … does not bound family bias”.
+
+**2 · The live frame was a DENY-list, so my own experiment polluted it.** It admitted any `:judge`
+key whose arm was not an abstention arm — and the `v9dense` arm from the retriever work (§88.40) put
+**185 verdicts** into the population silently. A deny-list cannot refuse what it has never heard
+of. Now an ALLOW-list of the six shipped arms, and excluded arms are **named with counts** rather
+than dropped in silence.
+
+`build_judge_sample.py` had a **second copy** of the same rule and drew 8 cases from `v9dense`. The
+analyser's drift check exists because those two files can disagree; they then did. The constant is
+now imported rather than restated — a shared definition cannot drift from itself.
+
+#### And the drift check earned its keep twice
+
+It refused to print the re-weighting when the rebuilt frame (5,439) did not match the sample's
+recorded draw (5,344). Both causes were real: my `v9dense` pollution, **and** `v0.36.0-beta` moving
+six corpora, which legitimately changed which questions are live. The sample was stale regardless.
+Re-drawn from the current frame, the control now reads **5,254 = 5,254** and the weights are
+population shares.
+
+**Cost: 96 calls.**
