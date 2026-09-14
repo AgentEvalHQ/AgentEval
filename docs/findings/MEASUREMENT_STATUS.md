@@ -18841,5 +18841,27 @@ measurement rather than the reassurance.
 8.02); recovered family mean **8.54** against a target of 9.0; `V8 > V1` on two shapes, so `V1` is
 not a valid ceiling there.
 
+#### 🔴 And the packed check skipped the very bytes this release is about
+
+Found by review of PR #246, before the tag. `release.yml` verifies that the packed assemblies carry
+the repository's corpora — a step written specifically to replace *"the link is held by the build
+being correct"* with *"something checks it"*. It skipped every `*.meta.json`.
+
+So for the **sidecars** the link was still held by nothing. And the in-repo test
+`EmbeddedSidecar_IsTheSidecarCommittedToTheRepository` does not close it: that reads the
+**source-built** assembly, not the packed artifact. A release could have pushed a package carrying
+stale sidecars and passed — in the release whose entire purpose is delivering corrected sidecar
+bytes.
+
+**Applied-once again**: the right treatment (compare packed bytes against the repository) with too
+small a reach. Extending it shook out a second defect — the name derivation was a `-replace` that
+returns the string UNCHANGED when it does not match, and a sidecar name never matched, so it
+produced a bogus key instead of an error. That is half of why sidecars were skipped rather than
+fixed. It now matches and refuses a name it cannot read.
+
+Verified against the real assembly rather than by inspection: 20 of 20 resources derive,
+**assertions 10 → 20**, all byte-identical. Ablation — declare one sidecar stale and the check
+reports `agenteval-typedmemeval-arithmetic-v5.meta.json packed 3627b04e546f != repo 0f9f75d857ea`.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.

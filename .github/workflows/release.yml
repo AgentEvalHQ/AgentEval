@@ -127,16 +127,31 @@ jobs:
           return ((($sha.ComputeHash($bytes)) | ForEach-Object { $_.ToString('x2') }) -join '')
         }
 
+        # SIDECARS ARE VERIFIED TOO, and they were not until 0.37.0-beta. This step was written to
+        # replace "the link is held by the build being correct" with "something checks it" -- and it
+        # skipped every *.meta.json, so for the sidecars the link was still held by nothing. That is
+        # the applied-once shape: a right treatment with too small a reach. It mattered immediately:
+        # 0.37.0-beta exists SPECIFICALLY to deliver corrected sidecar bytes (the dense retriever id),
+        # and this check would have passed a package that shipped stale ones. The in-repo test
+        # `EmbeddedSidecar_IsTheSidecarCommittedToTheRepository` covers the source-built assembly, not
+        # the packed artifact, so it does not close this. Found in review of PR #246.
         $expectedCorpora = @{}
+        $sidecarCount = 0
         foreach ($f in Get-ChildItem $repoCorpora -Recurse -Filter '*.json') {
-          if ($f.Name -like '*.meta.json') { continue }
+          if ($f.Name -like '*.meta.json') { $sidecarCount++ }
           $expectedCorpora[$f.Name] = Get-NormalisedHash ([System.IO.File]::ReadAllText($f.FullName))
         }
         if ($expectedCorpora.Count -eq 0) {
           Write-Host "::error::No corpora found under $repoCorpora. Refusing to pass a check with nothing in it."
           exit 1
         }
-        Write-Host "Reference corpora in the working tree: $($expectedCorpora.Count)"
+        if ($sidecarCount -eq 0) {
+          # A count that can silently reach zero is how the sidecars went unverified in the first
+          # place. Every corpus has a sidecar; none found means the glob stopped matching them.
+          Write-Host "::error::No *.meta.json sidecars found under $repoCorpora. They are consumer-facing and must be verified, so a run that found none has not verified them."
+          exit 1
+        }
+        Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($sidecarCount sidecars)"
 
         $failures = @()
         $mvids = @()
@@ -179,8 +194,17 @@ jobs:
             $mvidByTfm[$tfm] += $asm.ManifestModule.ModuleVersionId
             $seen = @{}
             foreach ($res in $asm.GetManifestResourceNames()) {
-              if ($res -notmatch 'typedmemeval' -or $res -like '*.meta.json') { continue }
-              $name = ($res -replace '^.*?([^.]+-v[0-9]+)\.json$', '$1') + '.json'
+              if ($res -notmatch 'typedmemeval') { continue }
+              # MATCHED, NOT REWRITTEN. The old derivation was a `-replace` that returned the string
+              # UNCHANGED when it did not match -- which is what a sidecar name does, since
+              # `-v5.meta.json` has `meta` where the pattern wants the version. A non-match then
+              # produced a bogus key instead of an error, which is half of why sidecars were skipped
+              # rather than fixed. This refuses a name it cannot read.
+              if ($res -notmatch '([^.]+-v[0-9]+(?:\.meta)?\.json)$') {
+                $failures += "$label : embedded '$res' is under typedmemeval but its file name cannot be derived"
+                continue
+              }
+              $name = $Matches[1]
               $stream = $asm.GetManifestResourceStream($res)
               $ms = New-Object IO.MemoryStream
               $stream.CopyTo($ms)
@@ -231,13 +255,13 @@ jobs:
         }
 
         Write-Host "Frameworks verified: $($mvidByTfm.Keys.Count) ($($mvids.Count) assembly reads across packages, $distinct distinct builds)"
-        Write-Host "Corpus assertions:   $assertions"
+        Write-Host "File assertions:     $assertions (corpora and sidecars)"
         if ($failures) {
-          Write-Host "::error::Packed corpora do not match the repository. Nothing was pushed."
+          Write-Host "::error::Packed corpora or sidecars do not match the repository. Nothing was pushed."
           $failures | Select-Object -Unique | ForEach-Object { Write-Host "  $_" }
           exit 1
         }
-        Write-Host "All packed corpora are byte-identical to the repository."
+        Write-Host "All packed corpora AND sidecars are byte-identical to the repository."
 
     - name: Push to NuGet
       run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
