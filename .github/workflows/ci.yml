@@ -48,6 +48,11 @@ jobs:
     # the check reads `git log --all`, which a shallow clone cannot answer.
     - name: No private path is tracked in this public repository
       run: python tools/check_no_private_paths.py
+    # Needs no credentials and no network: the check pins the resolved model and every
+    # vector is synthetic. It spawns two child interpreters to prove that concurrent writers
+    # do not lose each other's work, which is why it takes a few seconds rather than none.
+    - name: The dense retriever contract holds
+      run: python tools/check_dense_retriever_contract.py
 
   dependency-review:
     runs-on: ubuntu-latest
