@@ -18880,5 +18880,51 @@ not test: claim-without-instrument in three lines. Stems are compared now and or
 Run against the reviewer’s own counterexample: `REFUSED (counts were 2/2): corpus ‘b’ has no
 sidecar; sidecar ‘c’ has no corpus` — the report states the counts that would have cleared it.
 
+And a fourth round, which is the one to keep. That sentence was **false when I first wrote it**:
+the workflow emitted the orphan names and a generic error and never the counts. `counts were 2/2`
+came from the PowerShell function I wrote to TEST the logic. **I verified a re-implementation and
+reported its behaviour as the artifact’s.** The other two claim-without-instrument instances in
+this sequence were comments overstating code; this one was a VERIFICATION running different code
+from the thing shipped, which is strictly worse because it looks like evidence.
+
+Re-done properly: the step’s `run:` block is now extracted from the YAML and **executed verbatim**
+against a synthetic tree, with only `$repoCorpora` redirected. Unpaired 2/2 → `exit=1` with both
+orphans named and the counts present; the real repository → `exit=0`,
+`Reference files in the working tree: 20 (10 corpora, 10 sidecars)`.
+
+**The rule: when a check lives in a workflow, run the workflow’s own lines.** A harness that
+re-implements the logic tests the harness.
+
+A fifth round found the new diagnostic overstating on one of its own branches: it said
+“a totals check alone would not have caught this” **unconditionally**, and on the unequal-count path
+a totals check *would* have caught it. Same defect as a comment overstating its code, now wearing
+an error message. Made conditional, and both branches run through the shipped script:
+equal 2/2 keeps the clause, unequal 2/1 reads “which do not match either”, the real tree exits 0.
+
+A sixth trimmed the dangling reference out of the unequal branch (“which do not match either” —
+*either* what?). Both messages now state their own conclusion: equal totals → “only this
+name-by-name comparison could have caught it”, unequal → “the totals themselves DISAGREE, so at
+least one file is absent from one side entirely”.
+
+**Six review findings on one 40-line step, every one real, every one mine.** Three were
+claim-without-instrument: a comment, a verification, and an error message each asserting something
+its code did not support. The verification is the one that matters — the other two overstate, but
+a harness that re-implements the logic produces something that *reads like proof* and is not.
+
+#### An observation that cuts against §88.48, recorded rather than buried
+
+These release PRs hit **two isolated windows flakes in two consecutive runs** —
+`AgenticGoldenCoverageTests.TheJailbreakGoldenAuthoredForD8…` on `9.0.x`, then
+`SecurityGraphIngestionPumpTests.HungStore_DrainIsBoundedAndOutcomeIsExplicit` on `10.0.x`, each
+with the other five build jobs green. At the historical rate of 3.7% of runs, two in a row is
+about 0.1% if independent.
+
+They are not independent today: GitHub reclaimed and restarted this repository’s build jobs
+repeatedly for hours. §88.48 refuted contention on **historical** data, where flakes ran at
+*lower* load than passes — and today’s conditions sit outside that sample. This does not overturn
+the refutation; it says the sample never contained a degraded-runner day. It also widens the
+population: the jailbreak-golden test is **not** one of the nine previously named, so the flaky set
+is larger than `SecurityGraphIngestionPumpTests`.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.

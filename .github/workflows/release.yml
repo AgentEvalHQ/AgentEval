@@ -172,7 +172,22 @@ jobs:
         if ($orphanCorpora.Count -or $orphanSidecars.Count) {
           foreach ($o in $orphanCorpora)  { Write-Host "::error::Corpus '$o.json' has no sidecar '$o.meta.json'." }
           foreach ($o in $orphanSidecars) { Write-Host "::error::Sidecar '$o.meta.json' has no corpus '$o.json'." }
-          Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. Refusing to verify a set that does not."
+          # THE COUNTS ARE PART OF THE DIAGNOSTIC, not decoration. This check exists to separate a
+          # mismatched 2/2 set from a paired one, so a refusal that omits the totals hides the very
+          # thing that makes it necessary -- a reader sees "unpaired" without seeing that the count
+          # guard above was satisfied. The message is also where an earlier claim went wrong: the
+          # counts were printed by the harness that TESTED this logic and never by the logic itself.
+          # THE CLAUSE IS CONDITIONAL, because it is only true on one of the two paths here. When
+          # the totals are EQUAL, saying "a totals check would not have caught this" is the whole
+          # point; when they differ, a totals check WOULD have caught it and the sentence is simply
+          # false. A diagnostic that overstates on one of its own branches is the same defect as a
+          # comment that overstates its code -- three of those in this sequence already.
+          $note = if ($corpusCount -eq $sidecarCount) {
+            "Counts were $corpusCount corpora / $sidecarCount sidecars -- the totals AGREE, so only this name-by-name comparison could have caught it."
+          } else {
+            "Counts were $corpusCount corpora / $sidecarCount sidecars -- the totals themselves DISAGREE, so at least one file is absent from one side entirely."
+          }
+          Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. $note Refusing to verify a set that does not pair."
           exit 1
         }
         Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($corpusCount corpora, $sidecarCount sidecars)"
