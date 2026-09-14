@@ -18699,3 +18699,89 @@ is fine". What changed is that the target is now a named test class holding 82% 
 with a falsifiable hypothesis attached — instead of "the Windows flake".
 
 **Cost: 0 calls; ~600 API reads and 40 local test runs.**
+
+### 88.49 🔴 THE THIRD MONOCULTURE — "dense retrieval" was one 2022 model, and the shapes reorder without it (2026-09-14)
+
+§88.47 gave the dense arm a name. Naming it made the obvious next question askable: **how much of
+"dense retrieval closes 21% of the headroom BM25 leaves open" is about dense retrieval, and how much
+is about `text-embedding-ada-002`?**
+
+The tool already makes this argument one level down — `--k-sweep` exists because K_ref=5 is a single
+point and headroom is a statement about the retrieval BUDGET first. The retrieval MODEL is the same
+kind of hidden condition, and it was never even recorded until today.
+
+#### It cost nothing to ask
+
+`text-embedding-3-small` was **already deployed on the same resource and unused.** The dense arm has
+been on ada-002 the whole time because that is what `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` pointed at.
+Full family, 572 questions, 35 shapes, same documents, same K_ref=5:
+
+| retriever | family ALLgold | predicted headroom | closes |
+|---|---|---|---|
+| BM25 `bm25-okapi-k1.5-b0.75` | 0.416 | 0.584 | — |
+| `azure-emb-text-embedding-ada-002-d1536-cosine-f16` | 0.540 | 0.460 | **21.3%** |
+| `azure-emb-text-embedding-3-small-d1536-cosine-f16` | 0.575 | 0.425 | **27.2%** |
+
+At family level the spread is 0.035 ALLgold. That alone would be a footnote.
+
+#### Per shape it is not a footnote
+
+**25 of 35 shapes move.** The largest swings:
+
+```
+-0.334  workingmemory  distance-40      0.917 -> 0.583
++0.267  temporal       recency          0.533 -> 0.800
++0.266  forgetting     still-valid      0.667 -> 0.933
++0.215  arithmetic     sum              0.571 -> 0.786
+-0.200  episodic       list-order       0.400 -> 0.200
+```
+
+**On 6 shapes the SIGN flips** — whether dense beats BM25 at all depends on which embedding model
+you picked, and it flips in *both* directions:
+
+| shape | BM25 | ada-002 | 3-small |
+|---|---|---|---|
+| `arithmetic/delta` | 0.300 | 0.300 (no better) | **0.500 (better)** |
+| `episodic/list-order` | 0.267 | 0.400 (better) | **0.200 (worse)** |
+| `prospective/due-window` | 0.056 | 0.000 (worse) | **0.111 (better)** |
+| `temporal/recency` | 0.533 | 0.533 (no better) | **0.800 (better)** |
+| `workingmemory/distance-60` | 0.667 | 0.750 (better) | **0.583 (worse)** |
+| `workingmemory/distance-8` | 0.750 | 0.667 (worse) | **0.833 (better)** |
+
+#### 🔴 And it moves a PUBLISHED boolean
+
+`discriminates_under_dense` is a per-shape flag in every sidecar. A consumer reads it to decide
+whether a shape can still rank two systems for them. **Four shapes flip it:**
+
+```
+forgetting/still-valid          true -> false
+temporal/interval-position      true -> false
+workingmemory/distance-25       true -> false
+workingmemory/distance-40      false -> true
+```
+
+Until §88.47 the sidecar did not name the model at all, so that boolean was a claim resting on a
+condition the reader was never told about. It now names the retriever, and the `reading` block
+carries this sensitivity so nobody has to find this entry to learn it.
+
+#### The comparison is a command, not a number I typed
+
+`tools/typedmemeval_retriever_compare.py`, zero calls — both models' vectors are banked under their
+own model directories and it only re-ranks. Two safeguards, both exercised:
+
+* **a partial comparison is refused**, naming which model is short by how many vectors. Two
+  retrievers scored over different question sets is not a weaker comparison; it is not one.
+* **`--models X,X` is a positive control on the plumbing.** One model against itself must come out
+  at exactly `0.000000` spread. It does. Two independently loaded caches that disagreed would make
+  every cross-model number noise of unknown origin, and there would be no way to tell from the
+  output.
+
+#### What this does NOT say
+
+Nothing here says 3-small is the better retriever to publish against. It is better on the family
+aggregate and worse on nine shapes. The finding is about the **conditionality**, not the winner: a
+dense figure without a retriever id is a number whose value moves by up to 0.334 on a choice the
+reader cannot see.
+
+**Cost: ~15,000 embeddings on the second model (≈$0.06) + 1 provenance call. The comparison itself
+is free and repeatable.**

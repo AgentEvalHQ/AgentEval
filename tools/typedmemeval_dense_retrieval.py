@@ -292,7 +292,21 @@ def _load_cache(names, dry_run: bool = False) -> None:
         stamped = shard.pop(_PROVENANCE_KEY, None)
         stamped_model = shard.pop(_MODEL_KEY, None)
         shard.pop(_DIMS_KEY, None)
-        if stamped is not None and stamped != _deployment_name():
+        if stamped is None or stamped_model is None:
+            # UNSTAMPED IS REFUSED, not accepted. The guard used to read `if stamped is not None`,
+            # which accepts a shard carrying no provenance at all under ANY deployment -- and the
+            # one such file, `_migrated.json`, was read for every vertical. It was back-stamped on
+            # 2026-09-14 after re-embedding one of its own texts, so every shard on disk now
+            # carries provenance and requiring it costs nothing.
+            #
+            # It also closes the hole for callers that never reach `_verify_cache_matches_live`:
+            # `typedmemeval_v9_dense.py` loads this cache directly, and a structural refusal
+            # protects it whether or not it runs the live probe.
+            print('    ignoring shard %s: no model provenance. Re-embed it, or delete it -- a '
+                  'shard that cannot say which model produced it cannot be ranked against one.'
+                  % name, flush=True)
+            continue
+        if stamped != _deployment_name():
             # REFUSE RATHER THAN MIX. Two models' vectors in one ranking is not a weaker
             # measurement, it is not a measurement.
             print('    ignoring shard %s: built by deployment %r, this run uses %r'
@@ -326,25 +340,35 @@ def _save_shard(name: str, keys) -> None:
     the next one will not be a cheap one. A partial run now costs the shard nothing.
     """
     os.makedirs(_cache_root(), exist_ok=True)
-    payload = {}
     existing = _shard(name)
-    if os.path.exists(existing):
-        try:
-            prior = json.loads(open(existing, encoding='utf-8').read())
-        except json.JSONDecodeError:
-            prior = {}              # a torn shard is replaced, never half-merged
-        # `__`-prefixed provenance is re-derived below, never carried forward: a stale model stamp
-        # surviving a merge would be a provenance claim about vectors it no longer describes.
-        payload.update({k: v for k, v in prior.items() if not k.startswith('__')})
-    payload.update({k: _cache[k] for k in keys if k in _cache})
-    sample = next(iter(payload.values()), None)
-    payload[_PROVENANCE_KEY] = _deployment_name()
-    payload[_MODEL_KEY] = _resolve_deployment_model() or None
-    payload[_DIMS_KEY] = len(_unpack(sample)) if sample else None
-    tmp = _shard(name) + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as fh:
-        json.dump(payload, fh)
-    os.replace(tmp, _shard(name))
+    # READ, MERGE AND REPLACE UNDER ONE LOCK. `os.replace` makes each write atomic and does nothing
+    # about two writers: both would read the same prior shard, add their own vectors, and the
+    # second would drop the first's. That is this very defect one level up.
+    with tmc.exclusive_file_lock(existing):
+        payload = {}
+        if os.path.exists(existing):
+            try:
+                prior = json.loads(open(existing, encoding='utf-8').read())
+            except json.JSONDecodeError:
+                prior = {}          # a torn shard is replaced, never half-merged
+            # `__`-prefixed provenance is re-derived below, never carried forward: a stale model
+            # stamp surviving a merge would be a claim about vectors it no longer describes.
+            payload.update({k: v for k, v in prior.items() if not k.startswith('__')})
+        payload.update({k: _cache[k] for k in keys if k in _cache})
+        sample = next(iter(payload.values()), None)
+        payload[_PROVENANCE_KEY] = _deployment_name()
+        payload[_MODEL_KEY] = _resolve_deployment_model() or None
+        payload[_DIMS_KEY] = len(_unpack(sample)) if sample else None
+        # PER-PROCESS TEMP NAME. A single `.tmp` is a second way two writers destroy each other,
+        # independent of the merge: both write the same scratch file and the first replace consumes
+        # it, so the second gets FileNotFoundError and loses its whole run. The lock above makes
+        # this unreachable for THIS writer, and the name is still made unique -- a shared scratch
+        # path between processes is wrong whether or not something else currently prevents the
+        # overlap. Surfaced by the lock ablation in review of PR #245.
+        tmp = '%s.%d.tmp' % (existing, os.getpid())
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, existing)
 
 
 def _stub_vector(text: str) -> list[float]:
@@ -547,7 +571,17 @@ def _stamp(by_shape, args, k: int) -> None:
         "published figures, over-stating by +0.032. A shape with "
         "`discriminates_under_dense: false` can still rank two systems for a BM25 consumer and "
         "cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and "
-        "it says nothing about any consumer's chunking, reranking or query rewriting.")
+        "it says nothing about any consumer's chunking, reranking or query rewriting. "
+        "HOW MUCH OF THIS BELONGS TO THE MODEL RATHER THAN TO 'DENSE': re-run on 2026-09-14 "
+        "against a second embedding model, text-embedding-3-small, over the same documents "
+        "and the same budget. Family ALLgold 0.575 against this block's 0.540, so 'dense "
+        "closes 21% of the headroom BM25 leaves open' becomes 27%. Per shape it is larger and "
+        "not uniform: 25 of 35 shapes move, 6 flip the SIGN of whether dense beats BM25 (in "
+        "both directions), and 4 flip `discriminates_under_dense` itself -- "
+        "forgetting/still-valid, temporal/interval-position and workingmemory/distance-25 go "
+        "true->false, workingmemory/distance-40 goes false->true. So read every figure here "
+        "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
+        "tools/typedmemeval_retriever_compare.py.")
 
     for vertical, shapes in sorted(per_vertical.items()):
         path = os.path.join(CORPORA, vertical,

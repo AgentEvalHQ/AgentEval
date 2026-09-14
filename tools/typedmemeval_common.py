@@ -39,12 +39,15 @@ Usage sketch:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
+import os
 import random  # DevSkim: ignore DS148264 - corpus generation must be replayable under a seed; a CSPRNG cannot be seeded to reproduce a draw, and this selects filler text, not secrets.
 import re
 import sys
+import time
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
@@ -119,6 +122,55 @@ BAND_RESOLUTION = 1e-4
 
 #: The deterministic reference retriever. Named in metadata so the number is re-derivable.
 RETRIEVER_ID = "bm25-okapi-k1.5-b0.75"
+
+#: How long a writer waits for another process to finish its read-merge-replace before giving up.
+#: Generous, because the alternative to waiting is losing paid work; finite, because a wedged lock
+#: should surface as an error a person can read rather than a hang.
+CACHE_LOCK_TIMEOUT = 120.0
+
+
+@contextlib.contextmanager
+def exclusive_file_lock(path, timeout: float = CACHE_LOCK_TIMEOUT):
+    """Serialise a read-modify-write on `path` ACROSS PROCESSES, not just across threads.
+
+    WHY A LOCK AND NOT JUST `os.replace`. Atomic replace guarantees no reader ever sees half a
+    file. It guarantees nothing about two writers: both read the same prior contents, each merges
+    its own additions, each replaces, and the second silently drops the first's. For these caches
+    the dropped content is paid API calls -- the same loss the merge-on-save fix was written to end,
+    one level up. Found in review of PR #245.
+
+    A lock DIRECTORY rather than a file: `os.mkdir` is atomic and fails cleanly when the name
+    exists on every platform this runs on, with no O_EXCL or file-handle lifetime to reason about.
+
+    A STALE LOCK IS REPORTED, NEVER STOLEN. A crashed writer leaves the directory behind, and
+    stealing it on an age heuristic reintroduces exactly the race being closed here -- while
+    looking like it fixed something. The error names the path and its age so a person can decide.
+    """
+    lock = str(path) + '.lock'
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            os.mkdir(lock)
+            break
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                try:
+                    age = time.time() - os.path.getmtime(lock)
+                except OSError:
+                    age = float('nan')
+                raise TimeoutError(
+                    'waited %.0fs for %s, which another process still holds (age %.0fs). If no '
+                    'other run is active that lock is stale -- delete the directory and re-run. It '
+                    'is not removed automatically: stealing a lock on a guess is the race this '
+                    'exists to close.' % (timeout, lock, age))
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        try:
+            os.rmdir(lock)
+        except OSError:
+            pass
 BM25_K1 = 1.5
 BM25_B = 0.75
 

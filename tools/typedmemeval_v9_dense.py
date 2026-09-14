@@ -104,6 +104,13 @@ def main():
         dense._cache.clear()
         dense._load_cache([vertical])
         embedded: list[str] = []
+        # THE SAME LIVE CHECK THE MEASUREMENT TOOL RUNS. This file loads the vector cache directly,
+        # so without this it would inherit the structural provenance refusal and none of the
+        # empirical one -- and a shard stamped with a model it was not built by is exactly what the
+        # stamp alone cannot catch. Re-embeds one banked text; skipped when nothing was banked.
+        _probe_texts = [entry['question'] for entry in entries][:64]
+        if not args.dry_run and _probe_texts:
+            dense._verify_cache_matches_live(_probe_texts)
 
         for entry in entries:
             shape = (entry.get('typedmemeval') or {}).get('shape')

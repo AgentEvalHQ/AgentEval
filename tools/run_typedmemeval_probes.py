@@ -157,33 +157,43 @@ def _flush_cache() -> None:
     #     cost ~30,000 cached completions in one run.
     #   - Two probe processes running at once each flushed their own view, and the last writer won.
     #
-    # Reading the on-disk copy back before writing makes both harmless: entries only ever accumulate,
-    # and a process that knows less than the file cannot subtract from it.
-    merged: dict[str, str] = {}
-    if CACHE_PATH.exists():
-        try:
-            merged.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
-        except json.JSONDecodeError:
-            pass                      # a torn file is worth less than what we hold; fall through
-    merged.update({k: v for k, v in _cache.items() if not is_experimental(k)})
-    temporary = CACHE_PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8")
-    temporary.replace(CACHE_PATH)
+    # Reading the on-disk copy back before writing BOUNDS the loss; it does not remove it, and an
+    # earlier version of this comment said "makes both harmless", which was too strong. Two
+    # processes that read the same file, each merge their own additions and each write, still lose
+    # whichever wrote first -- atomic replace is atomic per WRITE, not per read-merge-replace. The
+    # interprocess lock below closes that; `_cache_lock` never could, being process-local. Found in
+    # review of PR #245.
+    with tmc.exclusive_file_lock(CACHE_PATH):
+        merged: dict[str, str] = {}
+        if CACHE_PATH.exists():
+            try:
+                merged.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
+            except json.JSONDecodeError:
+                pass                  # a torn file is worth less than what we hold; fall through
+        merged.update({k: v for k, v in _cache.items() if not is_experimental(k)})
+        # Per-process scratch name: a shared `.tmp` is a second collision route between writers,
+        # independent of the merge. See typedmemeval_dense_retrieval._save_shard.
+        temporary = CACHE_PATH.with_suffix(".%d.tmp" % os.getpid())
+        temporary.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(CACHE_PATH)
 
     # Experimental arms are persisted too -- they are expensive and worth resuming -- but to their
     # OWN file, so a population built from the shared cache cannot pick them up by accident.
     experimental = {k: v for k, v in _cache.items() if is_experimental(k)}
     if experimental:
-        merged_x: dict[str, str] = {}
-        if EXPERIMENT_CACHE_PATH.exists():
-            try:
-                merged_x.update(json.loads(EXPERIMENT_CACHE_PATH.read_text(encoding="utf-8")))
-            except json.JSONDecodeError:
-                pass
-        merged_x.update(experimental)
-        temp_x = EXPERIMENT_CACHE_PATH.with_suffix(".tmp")
-        temp_x.write_text(json.dumps(merged_x, ensure_ascii=False), encoding="utf-8")
-        temp_x.replace(EXPERIMENT_CACHE_PATH)
+        # ITS OWN LOCK, not the shared one. Two different files, so sharing a lock would serialise
+        # writers that never contend and buy nothing.
+        with tmc.exclusive_file_lock(EXPERIMENT_CACHE_PATH):
+            merged_x: dict[str, str] = {}
+            if EXPERIMENT_CACHE_PATH.exists():
+                try:
+                    merged_x.update(json.loads(EXPERIMENT_CACHE_PATH.read_text(encoding="utf-8")))
+                except json.JSONDecodeError:
+                    pass
+            merged_x.update(experimental)
+            temp_x = EXPERIMENT_CACHE_PATH.with_suffix(".%d.tmp" % os.getpid())
+            temp_x.write_text(json.dumps(merged_x, ensure_ascii=False), encoding="utf-8")
+            temp_x.replace(EXPERIMENT_CACHE_PATH)
 
 
 def load_cache() -> None:
