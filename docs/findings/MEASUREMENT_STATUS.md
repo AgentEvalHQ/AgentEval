@@ -18642,28 +18642,60 @@ The apparent load signal in a first pass (7.0 vs 6.0 in flight) came entirely fr
 breaks** (median 7.0, mean 8.4), which is unsurprising for a different reason: a busy period means
 many pushes, which means more broken code. Pooling real breaks with flakes was the confound.
 
-#### What it actually is
+#### What it actually is — and a correction to my own first pass
 
-All 58 windows failures are in the `Test` step — never restore, never build. Named from the logs of
-the 8 most recent isolated failures, **one class owns half of them and it fails on both platforms**:
+> **CORRECTION.** The first version of this section said `ConcurrentProducers` *"fails on both
+> platforms"*, from the logs of the 8 most recent isolated failures. **That attribution was wrong.**
+> A run's log archive contains *every* job's log, and I searched the whole archive and credited each
+> test name to whichever job I was iterating. Re-done against the per-job `N_<job name>.txt` entry,
+> across all 20 isolated failures. The rate table above is unaffected — it was built from job
+> conclusions, not logs.
 
-```
-3  SecurityGraphIngestionPumpTests.ConcurrentProducers_AccountForEveryAttempt   (2 windows, 1 linux)
-1  SecurityGraphIngestionPumpTests.HungStore_DrainIsBoundedAndOutcomeIsExplicit
-1  HiddenInstructionPrefilterGateTests.LexicalPrefilterDoesNotClaimSourceCodeContextAwareness
-1  ExcessiveAgencyEvaluatorTests.EvaluateAsync_RefusalEchoingComplianceVerb_IsResisted
-1  HallucinatedCitationJudgeTests.InspectAsync_CitationToRealSource_UnsupportedClaim_Blocks
-```
+All 58 windows failures are in the `Test` step — never restore, never build. Per job, the failing
+tests are **disjoint by platform**:
+
+| test | windows | linux |
+|---|---|---|
+| `SecurityGraphIngestionPumpTests.ConcurrentProducers_AccountForEveryAttempt` | **5** | 0 |
+| `SecurityGraphIngestionPumpTests.HungStore_DrainIsBoundedAndOutcomeIsExplicit` | **3** | 0 |
+| `SecurityGraphIngestionPumpTests.TryEnqueue_FullQueueCreatesDurableCoverageGap` | **1** | 0 |
+| `HallucinatedCitationJudgeTests.InspectAsync_CitationToRealSource_UnsupportedClaim_Blocks` | 0 | **3** |
+| four others, one occurrence each | 2 | 2 |
+| no `[FAIL]` line at all — the job failed outside the tests | 0 | 3 |
+
+**`SecurityGraphIngestionPumpTests` owns 9 of the 11 windows isolated failures — 82% — and has
+never failed on linux.** So the corrected reading is neither of the two I have held:
+
+* **the rates are the same** (3.7% vs 3.0%) — "all `build-windows`" was still a selection artifact
+  at the level of *how often CI goes red*;
+* **the causes are disjoint** — windows flakes are almost entirely one concurrency test class,
+  linux flakes are spread across four unrelated tests plus three non-test failures.
+
+Both halves matter. Chasing "the Windows flake" as one phenomenon was wrong; so was concluding from
+the matching rates that there is nothing platform-specific underneath.
 
 `9.0.x` carries 10 of the 20 isolated failures against a 1-in-3 share — an over-representation, but
 at n=20 that is p≈0.09 and not something to act on yet.
+
+#### A hypothesis, with what would refute it
+
+`CompleteAndDrainAsync` waits on a **bounded** `_consumer.WaitAsync(_drainTimeout)`, and
+`ConcurrentProducers_AccountForEveryAttempt` fires 128 thread-pool tasks at a pump whose consumer is
+doing real file I/O through `JsonFileSecurityGraphStore`. A drain bound crossed under thread-pool
+starvation would fail `Assert.True(await pump.CompleteAndDrainAsync())` before any of the count
+assertions were reached.
+
+**This is a hypothesis and nothing has been changed on it.** It predicts the failing assertion is
+the `Assert.True` on the drain, not an `Assert.Equal` count mismatch — that is checkable in the next
+CI failure's log, and it is the thing to look at first rather than a patch to write now. The last
+root cause declared here without a reproduction was refuted and reverted.
 
 **No fix is proposed here.** 40 consecutive local runs of the dominant class did not reproduce it
 (`pass=40 fail=0`), and the last time a root cause was declared on this without a reproduction it
 was refuted and reverted. **40 clean runs is a weak bound, not an all-clear**: it puts the
 per-execution failure probability below roughly 7% at 95% confidence, which does not exclude
 anything near the observed CI rate. Read it as "the cheap reproduction failed", not as "the test
-is fine". What changed is that the target is now a named, platform-independent, concurrency-shaped
-test class instead of "the Windows flake".
+is fine". What changed is that the target is now a named test class holding 82% of the windows flakes,
+with a falsifiable hypothesis attached — instead of "the Windows flake".
 
 **Cost: 0 calls; ~600 API reads and 40 local test runs.**
