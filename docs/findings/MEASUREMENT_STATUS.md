@@ -18872,5 +18872,13 @@ separately, plus a one-to-one pairing check. Exercised on synthetic trees rather
 about: sidecars-only REFUSED (map count 1 -- nonzero, which is exactly what the old guard cleared),
 corpora-only REFUSED, 2-corpora-1-sidecar REFUSED, the real tree PASS at 10 and 10.
 
+A third round on the same step, and the sharpest: **I called a COUNT comparison a pairing check.**
+It is not one. `a.json, b.json, a.meta.json, c.meta.json` is 2 and 2 -- it clears a count guard
+while `b` has no sidecar and `c` has no corpus, and the resource loop compares the filename SET, so
+an unpaired file reaches a release. The comment beside the code asserted a property the code did
+not test: claim-without-instrument in three lines. Stems are compared now and orphans are named.
+Run against the reviewer’s own counterexample: `REFUSED (counts were 2/2): corpus ‘b’ has no
+sidecar; sidecar ‘c’ has no corpus` — the report states the counts that would have cleared it.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
