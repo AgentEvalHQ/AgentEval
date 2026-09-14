@@ -143,12 +143,15 @@ jobs:
         # the one that already existed measuring a different population than it names. Found in
         # review of PR #246.
         $expectedCorpora = @{}
-        $sidecarCount = 0
-        $corpusCount = 0
+        $corpusStems = @{}
+        $sidecarStems = @{}
         foreach ($f in Get-ChildItem $repoCorpora -Recurse -Filter '*.json') {
-          if ($f.Name -like '*.meta.json') { $sidecarCount++ } else { $corpusCount++ }
+          if ($f.Name -like '*.meta.json') { $sidecarStems[($f.Name -replace '\.meta\.json$', '')] = $true }
+          else { $corpusStems[($f.Name -replace '\.json$', '')] = $true }
           $expectedCorpora[$f.Name] = Get-NormalisedHash ([System.IO.File]::ReadAllText($f.FullName))
         }
+        $corpusCount = $corpusStems.Count
+        $sidecarCount = $sidecarStems.Count
         if ($corpusCount -eq 0) {
           Write-Host "::error::No corpora found under $repoCorpora. Refusing to pass a check with nothing in it."
           exit 1
@@ -159,10 +162,17 @@ jobs:
           Write-Host "::error::No *.meta.json sidecars found under $repoCorpora. They are consumer-facing and must be verified, so a run that found none has not verified them."
           exit 1
         }
-        if ($corpusCount -ne $sidecarCount) {
-          # Every corpus ships exactly one sidecar. An asymmetry means the glob matched one family
-          # and not the other, which is the failure both guards above are blind to individually.
-          Write-Host "::error::Found $corpusCount corpora but $sidecarCount sidecars under $repoCorpora. They must pair one to one."
+        # PAIRED BY NAME, NOT BY COUNT. An earlier version compared the two totals and its own
+        # comment called that a pairing check -- it is not one. `a.json, b.json, a.meta.json,
+        # c.meta.json` is 2 and 2: it clears a count guard while `b` has no sidecar and `c` has no
+        # corpus, and the resource loop below compares the filename SET, so an unpaired file reaches
+        # a release. Stems are compared and orphans are named. Found in review of PR #247.
+        $orphanCorpora = @($corpusStems.Keys | Where-Object { -not $sidecarStems.ContainsKey($_) } | Sort-Object)
+        $orphanSidecars = @($sidecarStems.Keys | Where-Object { -not $corpusStems.ContainsKey($_) } | Sort-Object)
+        if ($orphanCorpora.Count -or $orphanSidecars.Count) {
+          foreach ($o in $orphanCorpora)  { Write-Host "::error::Corpus '$o.json' has no sidecar '$o.meta.json'." }
+          foreach ($o in $orphanSidecars) { Write-Host "::error::Sidecar '$o.meta.json' has no corpus '$o.json'." }
+          Write-Host "::error::Corpora and sidecars must pair one to one under $repoCorpora. Refusing to verify a set that does not."
           exit 1
         }
         Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($corpusCount corpora, $sidecarCount sidecars)"
