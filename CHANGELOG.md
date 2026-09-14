@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0-beta] - 2026-09-14
+### The dense retriever is named, and no corpus byte moved
+
+**No corpus content changed.** All ten `corpus_sha256` values, every question id and every question
+count are **identical to `0.36.0-beta`**. 587 questions, 36 shapes, 10 verticals. Nothing a consumer
+pins resets.
+
+What changed inside the package is `probes.retriever_sensitivity` in all ten `.meta.json` sidecars:
+
+| field | `0.36.0-beta` | `0.37.0-beta` |
+| --- | --- | --- |
+| `dense_retriever` | `"azure-openai-embeddings, cosine, same documents and budget"` | `"azure-emb-text-embedding-ada-002-d1536-cosine-f16"` |
+| `dense_retriever_note` | *(absent)* | how the id was resolved and verified |
+| `reading` | — | gains the retriever-model sensitivity paragraph |
+
+`by_shape` is byte-identical. The whole family was re-embedded from scratch and re-ranked to confirm
+that: every per-shape figure reproduced exactly.
+
+### Why this is a release and not a note
+
+The sidecars are an `EmbeddedResource` — they ship **inside the package**. The old string named a
+vendor and a similarity function and pinned no model, so a consumer on `0.36.0-beta` reads a
+descriptor that cannot identify the retriever their numbers came from. It was
+`text-embedding-ada-002` the whole time.
+
+### 🔴 One published boolean is conditional, and now says so
+
+`discriminates_under_dense` tells a consumer whether a shape can still separate two systems under an
+embedding retriever. Re-running the identical measurement against `text-embedding-3-small` (same
+documents, same `K_ref=5`):
+
+| retriever | family ALLgold | closes of BM25's headroom |
+| --- | ---: | ---: |
+| `text-embedding-ada-002` *(what ships)* | 0.540 | 21.3% |
+| `text-embedding-3-small` | 0.575 | 27.2% |
+
+25 of 35 shapes move; 6 flip the sign of "dense beats BM25", in both directions; **4 flip
+`discriminates_under_dense`** — `forgetting/still-valid`, `temporal/interval-position` and
+`workingmemory/distance-25` go true→false, `workingmemory/distance-40` goes false→true.
+
+**The shipped values are unchanged** (they are the ada-002 values). What is new is that the flag is
+stated as conditional on a named retriever. Reproduce with
+`tools/typedmemeval_retriever_compare.py --models A,B` — zero API calls; `--models X,X` is its
+self-check and must print a spread of exactly `0.000000`.
+
+### C-E closed: judge-family bias measured across vendors, and it is not there
+
+587 questions rested on one judge and that had never been tested against a different vendor. Two
+non-OpenAI models were deployed and run against the same stratified sample:
+
+| second judge | raw | re-weighted to the live population |
+| --- | ---: | ---: |
+| `Llama-3.3-70B-Instruct` (Meta) | 45/48 | **0.99910** |
+| `Mistral-Large-3` (Mistral AI) | 42/48 | **0.99852** |
+
+Both differ from the shipped judge on the same 2 cases, co-directionally, in cells holding 0.06% and
+0.21% of the frame. **No judge-family bias is detectable at the population level.**
+
+### Changed
+
+- `TypedMemEvalReport` — the citation-rule remarks moved onto the type they describe. Generated API
+  docs previously attached them to `TypedMemEvalGuessingBaseline` and omitted the report contract.
+  **XML documentation only; no public member added, removed or changed.**
+- CI gains `check_dense_retriever_contract.py` in `repository-hygiene` — no credentials, no network.
+
+### Fixed (tooling; no shipped behaviour)
+
+- A `--limit` dense run overwrote full embedding shards with its own subset. Measured before the
+  fix: **8,941 of 15,040 vectors were banked nowhere.** All restored.
+- `--dry-run` loaded real shards and reported a real measurement under the stub's disclaimer.
+- The shard provenance guard failed open on the one unstamped file, which was read for every
+  vertical.
+- Read-merge-replace on the caches was not serialised across processes, and two writers shared one
+  `.tmp` name.
+- `text=True` subprocess captures in four gates decoded with the platform codec (cp1252 on Windows).
+- Experimental probe arms are isolated at the source, not only at the reader.
+
+### Known, unchanged by this release
+
+6 shapes still fail the `v9_above_chance` criterion; 4 verticals sit below the recovered 8.5
+(forgetting 7.67, workingmemory 7.78, bitemporal 7.98, semantic 8.02); recovered family mean is
+**8.54** against a target of 9.0. `V8 > V1` on two shapes, so `V1` is not a valid ceiling there.
+
 ## [0.36.0-beta] - 2026-09-13
 ### Breaking — SIX corpora changed bytes in one pass
 

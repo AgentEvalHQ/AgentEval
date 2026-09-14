@@ -18785,3 +18785,83 @@ reader cannot see.
 
 **Cost: ~15,000 embeddings on the second model (≈$0.06) + 1 provenance call. The comparison itself
 is free and repeatable.**
+
+### 88.50 ✅ `v0.37.0-beta` RELEASED — the retriever correction reaches consumers (2026-09-14)
+
+§88.47 named the dense retriever and §88.49 measured what that naming was hiding. Both landed on
+`main` and **neither reached anybody**: the sidecars are an `EmbeddedResource`, so they ship inside
+the package, and every consumer on `v0.36.0-beta` was still reading
+`"azure-openai-embeddings, cosine, same documents and budget"` — a string that names a vendor and a
+similarity function and pins no model.
+
+I initially recorded "no tag is warranted: tooling and metadata only". **That was wrong, and the
+reason it was wrong is worth keeping:** "metadata" was doing the work of "not consumer-facing", and
+these particular bytes are shipped, read, and were *known by us to be superseded*. A correction that
+stays on `main` is a correction nobody has received.
+
+#### What this release is, derived from the DIFF and not from intent
+
+| | |
+|---|---|
+| corpus content | **unchanged** — all ten `corpus_sha256`, every question id, every count identical to `0.36.0-beta` |
+| sidecars | `dense_retriever` gains a real id; `dense_retriever_note` added; `reading` gains the sensitivity paragraph |
+| `by_shape` | byte-identical, confirmed by re-embedding the family from scratch and re-ranking |
+| C# | one XML doc-comment relocation in `TypedMemEvalReport`. **No public member added, removed or changed** |
+| CI | `check_dense_retriever_contract.py` joins `repository-hygiene` |
+
+587 questions · 36 shapes · 10 verticals, unchanged. **Nothing a consumer pins resets**, which is
+why this is a normal release and not a corpus change requiring the coordination protocol.
+
+#### 🔴 Found while releasing: the tag gate's section boundary is 99% of the document
+
+`check_tag_has_status_entry.py` enforces "no tag without a §0 entry". Its comment records a
+deliberate loosening — from matching §0 *headings* to matching §0 *sections* — because §0w covers
+three tags in one entry and a heading-per-tag rule failed four releases that ARE logged.
+
+The loosening went further than it reads. Sections are split on `^## 0[a-z-]*\.`, and **§0c is the
+LAST §0 heading**, so its "section" runs to end-of-file: **1,219,151 of 1,231,338 characters, 99% of
+the document**, including the whole §87 and §88 numbered log. For any tag mentioned after §0c — which
+is every tag since — the rule is exactly the `t not in text` check it was tightened away from.
+
+**Measured, not inferred:** `v0.36.0-beta` appears in the document only twice, at §87 and §88.46,
+both far below §0c, and the gate passes it.
+
+**Deliberately NOT fixed in this release.** Narrowing the boundary to the next `##` of any kind
+would fail most existing tags — because releases in this project are logged in the **numbered log**,
+not in §0 sections. So the defect is not the boundary; it is that the RULE names a location the
+project does not use. Fixing it means deciding what the rule should say, which is a change with its
+own ablation and not something to do inside a release. Filed here so the next person finds the
+measurement rather than the reassurance.
+
+#### Still open, unchanged by this release
+
+6 shapes fail `v9_above_chance` (conjunction `alias-then-count` / `conditional-branch`, procedural
+`retired-step` / `step-order`, episodic `participant-attribution`, temporal `occurrence-order`);
+4 verticals below the recovered 8.5 (forgetting 7.67, workingmemory 7.78, bitemporal 7.98, semantic
+8.02); recovered family mean **8.54** against a target of 9.0; `V8 > V1` on two shapes, so `V1` is
+not a valid ceiling there.
+
+#### 🔴 And the packed check skipped the very bytes this release is about
+
+Found by review of PR #246, before the tag. `release.yml` verifies that the packed assemblies carry
+the repository's corpora — a step written specifically to replace *"the link is held by the build
+being correct"* with *"something checks it"*. It skipped every `*.meta.json`.
+
+So for the **sidecars** the link was still held by nothing. And the in-repo test
+`EmbeddedSidecar_IsTheSidecarCommittedToTheRepository` does not close it: that reads the
+**source-built** assembly, not the packed artifact. A release could have pushed a package carrying
+stale sidecars and passed — in the release whose entire purpose is delivering corrected sidecar
+bytes.
+
+**Applied-once again**: the right treatment (compare packed bytes against the repository) with too
+small a reach. Extending it shook out a second defect — the name derivation was a `-replace` that
+returns the string UNCHANGED when it does not match, and a sidecar name never matched, so it
+produced a bogus key instead of an error. That is half of why sidecars were skipped rather than
+fixed. It now matches and refuses a name it cannot read.
+
+Verified against the real assembly rather than by inspection: 20 of 20 resources derive,
+**assertions 10 → 20**, all byte-identical. Ablation — declare one sidecar stale and the check
+reports `agenteval-typedmemeval-arithmetic-v5.meta.json packed 3627b04e546f != repo 0f9f75d857ea`.
+
+**Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
+the bytes shipping here.
