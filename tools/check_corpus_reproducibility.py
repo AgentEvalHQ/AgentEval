@@ -66,7 +66,7 @@ def main() -> int:
     if not args.allow_dirty:
         status = subprocess.run(  # DevSkim: ignore DS107369 - fixed argv
             ["git", "status", "--porcelain", "--", str(DATA)],
-            capture_output=True, text=True, cwd=str(DATA.parents[3]))
+            capture_output=True, text=True, encoding="utf-8", cwd=str(DATA.parents[3]))
         dirty = [line for line in status.stdout.splitlines() if line.strip()]
         if dirty:
             print('refusing to run: the corpus directory has uncommitted changes, and this '
@@ -93,7 +93,7 @@ def main() -> int:
                     continue
                 run = subprocess.run(  # DevSkim: ignore DS107369 - fixed argv, repo-local script
                     [sys.executable, str(generator)], cwd=str(TOOLS),
-                    capture_output=True, text=True)
+                    capture_output=True, text=True, encoding="utf-8")
                 if run.returncode != 0:
                     failures.append(
                         f"{vertical}: generator exited {run.returncode}\n"

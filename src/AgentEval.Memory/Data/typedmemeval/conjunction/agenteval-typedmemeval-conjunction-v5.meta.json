@@ -2759,9 +2759,10 @@
     "retriever_sensitivity": {
       "reference_retriever": "bm25-okapi-k1.5-b0.75",
       "reference_k": 5,
-      "dense_retriever": "azure-openai-embeddings, cosine, same documents and budget",
+      "dense_retriever": "azure-emb-text-embedding-ada-002-d1536-cosine-f16",
+      "dense_retriever_note": "Resolved from the deployment alias to the underlying model, and the banked vectors were re-checked against the live deployment before this stamp was written. Fields: model, dimensions, similarity, stored precision -- each one changes the ranking. Supersedes the prose string \"azure-openai-embeddings, cosine, same documents and budget\", which pinned no model at all.",
       "operand": "ALLgold -- gold.issubset(top_k), the quantity V9 tracks",
-      "reading": "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a CONDITION of every headroom figure in this sidecar and was left implicit until 2026-09-13. This block states it. `allgold_dense` is the same measurement with an embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's published figures, over-stating by +0.032. A shape with `discriminates_under_dense: false` can still rank two systems for a BM25 consumer and cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and it says nothing about any consumer's chunking, reranking or query rewriting.",
+      "reading": "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a CONDITION of every headroom figure in this sidecar and was left implicit until 2026-09-13. This block states it. `allgold_dense` is the same measurement with the retriever azure-emb-text-embedding-ada-002-d1536-cosine-f16 over the same documents and the same budget; `1 - ALLgold` predicts headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's published figures, over-stating by +0.032. A shape with `discriminates_under_dense: false` can still rank two systems for a BM25 consumer and cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and it says nothing about any consumer's chunking, reranking or query rewriting.",
       "by_shape": {
         "alias-then-count": {
           "questions": 15,

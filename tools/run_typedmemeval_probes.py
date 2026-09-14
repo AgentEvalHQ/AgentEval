@@ -75,6 +75,45 @@ V2_REJECT_AT = 2
 ABLATION_SAMPLES = 3
 CACHE_PATH = Path(__file__).resolve().parent / ".typedmemeval_probe_cache.json"
 
+#: The arms a shipped corpus is accepted on. An ALLOW-list: anything else is an experiment.
+#:
+#: On 2026-09-14 a `v9dense` arm -- the retriever-sensitivity work -- wrote 185 verdicts into the
+#: shared cache and they silently joined the C-E judge-agreement population, because every consumer
+#: of this file defines "live" as "not an abstention arm". A deny-list cannot refuse what it has
+#: never heard of. That was fixed at the reader; this fixes it at the source, so the NEXT experiment
+#: cannot repeat it without someone deciding to.
+SHIPPED_ARMS = frozenset({"v1", "v2", "v3", "v6", "v8", "v9", "v10", "v11"})
+
+#: Diagnostic arms that already live in the shared cache. They are not shipped-corpus arms and
+#: downstream populations exclude them, but they are HISTORY: relocating them would be churn with
+#: no safety gained, and this mechanism exists to stop the NEXT experiment, not to relitigate past
+#: ones.
+LEGACY_ARMS = frozenset({"v9strip"})
+
+#: A probe cache key is `<16-hex question key>:<arm>[:...]`. Other tools in this directory share the
+#: file with entirely different key shapes -- entity-name probes, per-question diagnostics -- and a
+#: first cut of this rule read "segment 1 is not a known arm" without checking the shape, which
+#: classified 1,132 of THEIR keys as experimental and moved them. The shape test is what makes the
+#: arm test safe to apply.
+_PROBE_KEY = re.compile(r"^[0-9a-f]{16}$")
+
+#: Where an unrecognised arm's completions go instead. Same format, same merge discipline, simply
+#: not the file a population is drawn from.
+EXPERIMENT_CACHE_PATH = (Path(__file__).resolve().parent
+                         / ".typedmemeval_experiment_cache.json")
+
+
+def is_experimental(cache_key: str) -> bool:
+    """Whether this key is a PROBE key for an arm nothing is accepted on.
+
+    Both halves are load-bearing. Without the shape test this sweeps up every other tool sharing the
+    cache file; without the arm test it isolates nothing.
+    """
+    parts = cache_key.split(":")
+    if len(parts) < 2 or not _PROBE_KEY.match(parts[0]):
+        return False                  # not a probe key -- another tool owns it, leave it alone
+    return parts[1] not in SHIPPED_ARMS and parts[1] not in LEGACY_ARMS
+
 _cache: dict[str, str] = {}
 _cache_lock = Lock()
 _stats = Counter()
@@ -126,10 +165,25 @@ def _flush_cache() -> None:
             merged.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
         except json.JSONDecodeError:
             pass                      # a torn file is worth less than what we hold; fall through
-    merged.update(_cache)
+    merged.update({k: v for k, v in _cache.items() if not is_experimental(k)})
     temporary = CACHE_PATH.with_suffix(".tmp")
     temporary.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8")
     temporary.replace(CACHE_PATH)
+
+    # Experimental arms are persisted too -- they are expensive and worth resuming -- but to their
+    # OWN file, so a population built from the shared cache cannot pick them up by accident.
+    experimental = {k: v for k, v in _cache.items() if is_experimental(k)}
+    if experimental:
+        merged_x: dict[str, str] = {}
+        if EXPERIMENT_CACHE_PATH.exists():
+            try:
+                merged_x.update(json.loads(EXPERIMENT_CACHE_PATH.read_text(encoding="utf-8")))
+            except json.JSONDecodeError:
+                pass
+        merged_x.update(experimental)
+        temp_x = EXPERIMENT_CACHE_PATH.with_suffix(".tmp")
+        temp_x.write_text(json.dumps(merged_x, ensure_ascii=False), encoding="utf-8")
+        temp_x.replace(EXPERIMENT_CACHE_PATH)
 
 
 def load_cache() -> None:
@@ -146,6 +200,13 @@ def load_cache() -> None:
             _cache.update(json.loads(CACHE_PATH.read_text(encoding="utf-8")))
         except json.JSONDecodeError:
             return
+        # Experimental completions are loaded for RESUME -- they cost real money -- but they live in
+        # a separate file, so anything rebuilding a population from CACHE_PATH never sees them.
+        if EXPERIMENT_CACHE_PATH.exists():
+            try:
+                _cache.update(json.loads(EXPERIMENT_CACHE_PATH.read_text(encoding="utf-8")))
+            except json.JSONDecodeError:
+                pass
 
 
 #: Per-arm call and empty tallies, so the empty rate is a published, gateable statistic rather

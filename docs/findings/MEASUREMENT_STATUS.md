@@ -18523,3 +18523,147 @@ instance in two days**. Now honours `Retry-After` and backs off to a minute.
 makes C-E repeatable per release, which is what the plan asks of it. Re-running is one command.
 
 **Cost: 96 calls + two deployments.**
+
+### 88.47 ✅ The dense arm has a NAME now — and finding one uncovered four ways the cache lied (2026-09-14)
+
+`C-B` was recorded as "measured but not **versioned**": the corpus contract pinned
+`bm25-okapi-k1.5-b0.75` for the reference retriever and, for the dense arm, the prose string
+*"azure-openai-embeddings, cosine, same documents and budget"*. That sentence names a vendor and a
+similarity function and pins **nothing**. Every embedding model Azure has ever served satisfies it,
+and they do not rank the same documents.
+
+#### What the dense arm actually was
+
+`text-embedding-ada-002` — resolved from the deployment alias against the deployments listing, not
+read off the environment variable. The sidecars now carry:
+
+```
+reference_retriever : bm25-okapi-k1.5-b0.75
+dense_retriever     : azure-emb-text-embedding-ada-002-d1536-cosine-f16
+```
+
+Four fields, each because it changes the ranking: the model, the width of the space, the
+similarity, and the float16 storage that sits between the model and the ranking and can reorder
+near-ties. `dense_retriever_id()` returns `''` when the model cannot be resolved and `--stamp`
+refuses on `''` — a sidecar naming no retriever is a gap a reader can act on, one naming the wrong
+retriever is not.
+
+**The resolution is a no-op on this resource**, and that is worth saying plainly rather than
+dressing up: the deployment alias here happens to *be* the string `text-embedding-ada-002`. The
+mechanism matters, the discovery does not. On any resource where someone named a deployment
+`embeddings` or `judge-primary`, classifying on the alias would have produced a wrong identity in
+either direction.
+
+#### THE IDENTITY IS MEASURED, NOT ASSERTED
+
+Resolution asks what the alias points at **today**. The shards hold vectors embedded on some
+earlier day, and the deployment-name check cannot separate those — the name is exactly what stays
+the same when an alias is repointed. So before any stamp, one already-banked text is re-embedded
+against the live deployment and the cosine must clear 0.995.
+
+| | cosine |
+|---|---|
+| banked vs live, same model | **0.999999** |
+| banked vs a substituted vector | **−0.046** |
+
+The bar sits in an empty gap two orders of magnitude wide. Without this the stamp would have been
+environment-derived — the artifact supplying its own provenance.
+
+#### 🔴 Four defects found on the way, three of them in the cache
+
+**1 · A `--limit` run ate the cache.** `_save_shard` built its payload from the current run's keys
+alone, so a `--limit 4` run wrote a four-question shard over a full one. Measured before the fix:
+**8,941 of the family's 15,040 vectors were banked nowhere** — `episodic.json` held 27 of 1,179,
+`workingmemory.json` 62 of 3,672. The two verticals never re-run with `--limit`, arithmetic and
+bitemporal, were the two still intact. **The survivors were the untouched ones**, which is how the
+writer rather than the reader was identified. It is about $0.25 of ada-002 to re-buy, and that is
+the reason to fix it rather than a reason not to: a tool that discards a cache discards whatever
+cache it is pointed at. Now merges; ablation in `check_dense_retriever_contract.py`.
+
+**2 · `--dry-run` reported a REAL measurement under the stub's disclaimer.** It loaded the real
+shards, found every text banked, embedded nothing, and printed `DENSE 1.000` beneath the line *"the
+stub carries 3-gram lexical signal and no semantics, so this number says the PATH works and nothing
+about real dense retrieval"*. That number **was** real dense retrieval. The counter agreed with the
+disclaimer (`0 real, 0 stub`) because nothing was embedded either way. Understating a result is
+still a claim that does not match its artifact. A dry run now reads no real shard: same case, same
+limit, `0 real, 96 stub`, `DENSE 0.500`.
+
+**3 · The provenance guard failed open on the one file that predated it.** `_load_cache` refuses a
+mismatched stamp — but only `if stamped is not None`. `_migrated.json` carried no stamp and is read
+for **every** vertical, so pointing the deployment at another model would have reused all **5,422**
+of its ada-002 vectors as if they belonged to the new one. Back-stamped, and the stamp was measured
+the same way (cosine **1.000000**) rather than written because ada-002 is what is configured today
+— that would have been the same fail-open one layer up.
+
+**4 · My own fix for (1) opened a second route to the same place.** A shard REFUSED at load for a
+provenance mismatch still had its old entries merged back in at save, under the new model's stamp.
+One file, two retrievers, one name. The refusal at load and the merge at save were each right and
+together wrong. Settled by scoping the write path per model:
+`.typedmemeval_embeddings/<model>/<vertical>.json`.
+
+#### The numbers did not move
+
+Re-embedding **8,941** vectors from scratch and re-ranking the whole family reproduced every
+per-shape figure **byte-identically** — the sidecar diff is 5 lines per file, all of them identity
+fields. Family ALLgold at K_ref=5: random 0.100, BM25 0.416, dense 0.540 over 572 questions and 35
+shapes. Positive control `dense − random = +0.441`.
+
+**Cost: ~9,000 embeddings (≈$0.25) + 3 provenance calls.**
+
+### 88.48 ❌ REFUTED — the "Windows CI flake" is neither Windows-specific nor contention (2026-09-14)
+
+The plan carried this as *"Four distinct tests, all timing-sensitive, all `build-windows`, all pass
+on re-run… investigate as runner contention."* Both halves of that are wrong, and an earlier
+root-cause attempt here was already refuted once and reverted, which is why this was measured
+before anything was touched.
+
+**299 CI runs, 2026-07-18 → 2026-09-14**, every job of every run. A failure is separated from a
+flake by whether its two sibling TFMs passed on the same commit: a real break fails all three, a
+flake fails one.
+
+| | runs | clean | 1-of-3 (flake) | 3-of-3 (real) | flake rate |
+|---|---|---|---|---|---|
+| `build-windows` | 298 | 270 | **11** | 17 | **3.7%** |
+| `build` (linux) | 297 | 266 | **9** | 22 | **3.0%** |
+
+**Linux flakes at essentially the same rate.** "All `build-windows`" was a selection artifact: those
+were the failures that happened to interrupt me, not the only ones happening. On 2026-09-13 alone
+there were isolated failures on *both* platforms across three branches.
+
+#### Contention predicted three things. None of them held.
+
+| prediction | pass | FLAKE | verdict |
+|---|---|---|---|
+| starved jobs run LONGER | 5.5 min median | 5.7 min | no |
+| failures cluster at HIGH load | 6.0 jobs in flight | **5.5** | no — flakes run at *lower* load |
+| failures cluster in BUSY hours | — | 5 of 20 in the 6 busiest hours | no — 25%, exactly chance |
+
+The apparent load signal in a first pass (7.0 vs 6.0 in flight) came entirely from the **real
+breaks** (median 7.0, mean 8.4), which is unsurprising for a different reason: a busy period means
+many pushes, which means more broken code. Pooling real breaks with flakes was the confound.
+
+#### What it actually is
+
+All 58 windows failures are in the `Test` step — never restore, never build. Named from the logs of
+the 8 most recent isolated failures, **one class owns half of them and it fails on both platforms**:
+
+```
+3  SecurityGraphIngestionPumpTests.ConcurrentProducers_AccountForEveryAttempt   (2 windows, 1 linux)
+1  SecurityGraphIngestionPumpTests.HungStore_DrainIsBoundedAndOutcomeIsExplicit
+1  HiddenInstructionPrefilterGateTests.LexicalPrefilterDoesNotClaimSourceCodeContextAwareness
+1  ExcessiveAgencyEvaluatorTests.EvaluateAsync_RefusalEchoingComplianceVerb_IsResisted
+1  HallucinatedCitationJudgeTests.InspectAsync_CitationToRealSource_UnsupportedClaim_Blocks
+```
+
+`9.0.x` carries 10 of the 20 isolated failures against a 1-in-3 share — an over-representation, but
+at n=20 that is p≈0.09 and not something to act on yet.
+
+**No fix is proposed here.** 40 consecutive local runs of the dominant class did not reproduce it
+(`pass=40 fail=0`), and the last time a root cause was declared on this without a reproduction it
+was refuted and reverted. **40 clean runs is a weak bound, not an all-clear**: it puts the
+per-execution failure probability below roughly 7% at 95% confidence, which does not exclude
+anything near the observed CI rate. Read it as "the cheap reproduction failed", not as "the test
+is fine". What changed is that the target is now a named, platform-independent, concurrency-shaped
+test class instead of "the Windows flake".
+
+**Cost: 0 calls; ~600 API reads and 40 local test runs.**

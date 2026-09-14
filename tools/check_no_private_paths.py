@@ -50,7 +50,7 @@ DECLARED_HISTORY_COMMITS = 4
 
 def git(*args):
     return subprocess.run(['git', *args],  # DevSkim: ignore DS107369 - fixed argv
-                          cwd=ROOT, capture_output=True, text=True).stdout
+                          cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout
 
 
 def main():
