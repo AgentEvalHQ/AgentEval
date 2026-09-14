@@ -18895,5 +18895,15 @@ orphans named and the counts present; the real repository → `exit=0`,
 **The rule: when a check lives in a workflow, run the workflow’s own lines.** A harness that
 re-implements the logic tests the harness.
 
+A fifth round found the new diagnostic overstating on one of its own branches: it said
+“a totals check alone would not have caught this” **unconditionally**, and on the unequal-count path
+a totals check *would* have caught it. Same defect as a comment overstating its code, now wearing
+an error message. Made conditional, and both branches run through the shipped script:
+equal 2/2 keeps the clause, unequal 2/1 reads “which do not match either”, the real tree exits 0.
+
+**Five review findings on one 40-line step, every one real, every one mine.** Three were
+claim-without-instrument: a comment, a verification, and an error message each asserting something
+its code did not support.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
