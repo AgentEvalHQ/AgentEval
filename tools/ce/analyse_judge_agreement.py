@@ -59,6 +59,18 @@ RESULTS = os.path.join(HERE, 'judge-agreement-results.json')
 #: cannot refuse what it has never heard of.
 SHIPPED_ARMS = {'v1', 'v2', 'v3', 'v6', 'v8', 'v9'}
 
+#: Arms whose absence from the frame is the DESIGN, not a drift.
+#:
+#: v10/v11 are the abstention arms (`v10_full_haystack`, `v11_reference_retrieval`). They are
+#: scored on whether the model declined, not on whether a judge called two answers equivalent, so
+#: there is no judge verdict of theirs that could belong in a judge-agreement population.
+#:
+#: They are listed rather than silently dropped because the banner below used to fire on them every
+#: run, telling the reader to "tell this file about a new shipped arm, or keep the experiment out of
+#: the shared probe cache" -- two wrong actions for a permanent and correct exclusion. A warning
+#: that is always on is a warning nobody reads, which is precisely the state that let v9dense in.
+EXPECTED_ABSENT = {'v10', 'v11'}
+
 
 def key_for(entry):
     material = json.dumps(
@@ -109,11 +121,18 @@ def main():
     print()
     print('POSITIVE CONTROL on the rebuilt frame')
     print('  rebuilt %d live verdicts; the sample was drawn from %s' % (len(frame), declared))
-    if excluded:
-        print('  arms EXCLUDED from the frame (not in SHIPPED_ARMS): %s'
-              % ', '.join('%s=%d' % kv for kv in sorted(excluded.items())))
-        print('    Either tell this file about a new shipped arm, or keep the experiment out of')
-        print('    the shared probe cache. Silence here is how a population changes unnoticed.')
+    expected = {a: n for a, n in excluded.items() if a in EXPECTED_ABSENT}
+    unexpected = {a: n for a, n in excluded.items() if a not in EXPECTED_ABSENT}
+    if expected:
+        print('  abstention arms, excluded by design: %s'
+              % ', '.join('%s=%d' % kv for kv in sorted(expected.items())))
+    if unexpected:
+        print('  \U0001f534 UNRECOGNISED arms in the shared probe cache: %s'
+              % ', '.join('%s=%d' % kv for kv in sorted(unexpected.items())))
+        print('    They are kept OUT of the frame, which is the safe direction, but something is')
+        print('    writing judge verdicts here that nothing in this file knows about. Either tell')
+        print('    this file about a new shipped arm, or keep the experiment out of the shared')
+        print('    cache. Silence here is how a population changes unnoticed.')
     if declared is not None and len(frame) != declared:
         print('  🔴 FRAME DRIFT: the rules in this file no longer match build_judge_sample.py, or')
         print('     the corpora moved since the sample was drawn. The re-weighting below would be')

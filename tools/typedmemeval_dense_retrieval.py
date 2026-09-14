@@ -133,7 +133,27 @@ def _unpack(blob: str):
     return struct.unpack("<%de" % (len(data) // 2), data)
 
 
+def _cache_root() -> str:
+    """The directory this run's vectors belong in: one per MODEL.
+
+    A flat cache can hold one retriever. The moment a second embedding model runs -- which is the
+    point of having a retriever id at all -- a flat cache either refuses the run or mixes the two,
+    and mixing is the failure nobody can see afterwards.
+
+    Falls back to the flat directory when the model cannot be resolved, so an unreachable
+    deployments listing degrades to the previous behaviour rather than writing into a directory
+    named ''.
+    """
+    model = _resolve_deployment_model()
+    return os.path.join(CACHE_DIR, model) if model else CACHE_DIR
+
+
 def _shard(name: str) -> str:
+    return os.path.join(_cache_root(), '%s.json' % name)
+
+
+def _flat_shard(name: str) -> str:
+    """Where shards lived before the split. READ ONLY, and only when the stamp matches."""
     return os.path.join(CACHE_DIR, '%s.json' % name)
 
 
@@ -149,43 +169,222 @@ def _shard(name: str) -> str:
 _PROVENANCE_KEY = '__embedding_deployment__'
 
 
+#: Keys under which a shard records WHAT its vectors are, as opposed to where they came from.
+#:
+#: `_PROVENANCE_KEY` above holds the deployment NAME, which is a LOCAL identity: an alias the
+#: resource owner picked. It is the right thing to refuse a mismatch on and the wrong thing to
+#: publish -- `embeddings` on one resource and `embeddings` on another are different retrievers
+#: wearing one name, and repointing an alias changes the model without changing the name. These
+#: two record the model and the vector width, which is what a reader needs to reproduce a ranking.
+_MODEL_KEY = '__embedding_model__'
+_DIMS_KEY = '__embedding_dims__'
+
+#: Resolved once per process. None = not yet looked up, '' = looked up and could not be resolved.
+_resolved_model = None
+
+#: Whether the on-disk vectors have been checked against the live deployment this run.
+_provenance_checked = False
+
+#: Whether ANY vector came off disk. A run that bought every vector it used needs no provenance
+#: check -- the live deployment produced them, by construction. Without this the stamp refused a
+#: wholly fresh run, which is the one case where the provenance is least in doubt.
+_loaded_from_disk = False
+
+
 def _deployment_name() -> str:
     return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "") or "(unset)"
 
 
-def _load_cache(names) -> None:
+def _resolve_deployment_model() -> str:
+    """The MODEL behind AZURE_OPENAI_EMBEDDING_DEPLOYMENT, or '' if it cannot be resolved.
+
+    Returns '' rather than falling back to the deployment name. A retriever identity built from
+    an alias identifies nothing, and one that GUESSES is worse than one that is absent: a reader
+    can act on a missing field and cannot act on a wrong one.
+    """
+    global _resolved_model
+    if _resolved_model is not None:
+        return _resolved_model
+    _resolved_model = ''
+    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+    key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+    if not (endpoint and key):
+        return _resolved_model
+    # 2023-03-15-preview is not a stale copy-paste: it is the ONLY api-version this data plane
+    # answers a deployments listing on. 2023-05-15, 2024-06-01 and 2024-10-21 all return 404.
+    try:
+        request = urllib.request.Request(
+            endpoint + "/openai/deployments?api-version=2023-03-15-preview",
+            headers={"api-key": key})
+        with urllib.request.urlopen(request, timeout=60) as response:  # DevSkim: ignore DS137138
+            listing = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return _resolved_model
+    for item in listing.get("data", []):
+        if item.get("id") == _deployment_name():
+            _resolved_model = item.get("model") or ''
+            break
+    return _resolved_model
+
+
+def dense_retriever_id(model: str, dims: int) -> str:
+    """A versioned identity for the dense arm, in the shape `tmc.RETRIEVER_ID` uses for BM25.
+
+    WHY THIS EXISTS. `RETRIEVER_ID` is `bm25-okapi-k1.5-b0.75`: the algorithm plus the two knobs
+    that change its answers, so a published coverage figure names the thing that produced it. The
+    dense arm shipped instead with the prose string "azure-openai-embeddings, cosine, same
+    documents and budget" -- a vendor and a similarity function, pinning NOTHING. Every embedding
+    model Azure has ever served satisfies that sentence, and they do not rank the same documents.
+    It was measured but not VERSIONED, which is the open half of the C-B row.
+
+    Each field is here because it changes the ranking, not because it was available:
+      * model  -- the whole retriever. This family's is `text-embedding-ada-002`, which a reader
+                  seeing only the word "azure-openai-embeddings" would have had no way to know.
+      * dims   -- the width of the space the cosine is taken in.
+      * cosine -- the similarity, taken over L2-normalised vectors (`cosine_rank` normalises at
+                  rank time rather than trusting the service's unit-norm invariant).
+      * f16    -- vectors are stored as float16. A lossy step between the model and the ranking
+                  can reorder near-ties, so it belongs in the identity of the ranking.
+
+    Returns '' when the model is unknown, which is the caller's signal to refuse to publish.
+    """
+    if not model:
+        return ''
+    return 'azure-emb-%s-d%d-cosine-f16' % (model, dims)
+
+
+def _load_cache(names, dry_run: bool = False) -> None:
     """Load only the shards this run will touch. Loading the family to measure one vertical is
     the same mistake in a smaller coat.
 
     `_migrated` is always read: it holds the vectors bought under the first cache format, which
     was replaced mid-run. They are paid for and identical -- keyed by sha256 of the same text --
     so re-buying them would be spending money to reproduce bytes already on disk."""
+    if dry_run:
+        # A DRY RUN MUST NOT READ THE REAL SHARDS. It loaded them, found every text already
+        # banked, embedded nothing, and printed `DENSE 1.000` under the line "the stub carries
+        # 3-gram lexical signal and no semantics, so this number says the PATH works and nothing
+        # about real dense retrieval". That number WAS real dense retrieval. The disclaimer and
+        # the measurement described different runs, and the counter agreed with the disclaimer
+        # (`0 real, 0 stub`) because nothing was embedded either way.
+        #
+        # Understating a result is still a claim that does not match its artifact. The dry run's
+        # whole job is to exercise the path on vectors it produced itself, so it gets none.
+        return
+    global _loaded_from_disk
     for name in list(names) + ['_migrated']:
         path = _shard(name)
         if not os.path.exists(path):
-            continue
+            # PRE-SPLIT SHARDS ARE READ, NEVER WRITTEN BACK. They are accepted only when their
+            # stamp matches; the one unstamped file, `_migrated.json`, was back-stamped on
+            # 2026-09-14 after re-embedding one of its own texts and measuring the agreement.
+            flat = _flat_shard(name)
+            if not os.path.exists(flat):
+                continue
+            path = flat
         try:
             shard = json.loads(open(path, encoding='utf-8').read())
         except json.JSONDecodeError:
             continue                  # a torn shard is re-embedded, never half-trusted
+        # POPPED BEFORE THE UPDATE, ALL THREE. A provenance key left in the shard becomes a
+        # cache entry keyed by a string that is not a text hash, and `_save_shard` would write it
+        # back as if it were a vector.
         stamped = shard.pop(_PROVENANCE_KEY, None)
-        if stamped is not None and stamped != _deployment_name():
+        stamped_model = shard.pop(_MODEL_KEY, None)
+        shard.pop(_DIMS_KEY, None)
+        if stamped is None or stamped_model is None:
+            # UNSTAMPED IS REFUSED, not accepted. The guard used to read `if stamped is not None`,
+            # which accepts a shard carrying no provenance at all under ANY deployment -- and the
+            # one such file, `_migrated.json`, was read for every vertical. It was back-stamped on
+            # 2026-09-14 after re-embedding one of its own texts, so every shard on disk now
+            # carries provenance and requiring it costs nothing.
+            #
+            # It also closes the hole for callers that never reach `_verify_cache_matches_live`:
+            # `typedmemeval_v9_dense.py` loads this cache directly, and a structural refusal
+            # protects it whether or not it runs the live probe.
+            print('    ignoring shard %s: no model provenance. Re-embed it, or delete it -- a '
+                  'shard that cannot say which model produced it cannot be ranked against one.'
+                  % name, flush=True)
+            continue
+        if stamped != _deployment_name():
             # REFUSE RATHER THAN MIX. Two models' vectors in one ranking is not a weaker
             # measurement, it is not a measurement.
             print('    ignoring shard %s: built by deployment %r, this run uses %r'
                   % (name, stamped, _deployment_name()), flush=True)
             continue
+        live_model = _resolve_deployment_model()
+        if stamped_model and live_model and stamped_model != live_model:
+            # The alias matched and the MODEL did not, which is the case the deployment-name
+            # check above cannot see: someone repointed the alias. Same refusal, different
+            # operand -- and this is the operand that actually gets published.
+            print('    ignoring shard %s: built by model %r, this deployment now serves %r'
+                  % (name, stamped_model, live_model), flush=True)
+            continue
         _cache.update(shard)
+        _loaded_from_disk = _loaded_from_disk or bool(shard)
 
 
 def _save_shard(name: str, keys) -> None:
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    payload = {k: _cache[k] for k in keys if k in _cache}
-    payload[_PROVENANCE_KEY] = _deployment_name()
-    tmp = _shard(name) + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as fh:
-        json.dump(payload, fh)
-    os.replace(tmp, _shard(name))
+    """Write this run's vectors into the vertical's shard, KEEPING what the shard already held.
+
+    IT USED TO REPLACE. `payload` was built from this run's keys alone, so a `--limit 4` run wrote
+    a four-question shard over a full one and the rest of the vectors were gone. Measured on
+    2026-09-14 before this fix: 8,941 of the family's 15,040 vectors were banked nowhere --
+    `episodic.json` held 27 of 1,179, `workingmemory.json` 62 of 3,672 -- while `arithmetic` and
+    `bitemporal`, the two verticals never re-run with `--limit`, were intact at 1,259 and 1,274.
+    The shards that survived are the ones nobody touched, which is the signature of the writer
+    rather than the reader.
+
+    It is only about $0.25 of ada-002 to re-buy, and that is the reason to fix it rather than a
+    reason not to: the tool that discards a cache discards whatever cache it is pointed at, and
+    the next one will not be a cheap one. A partial run now costs the shard nothing.
+    """
+    os.makedirs(_cache_root(), exist_ok=True)
+    existing = _shard(name)
+    # READ, MERGE AND REPLACE UNDER ONE LOCK. `os.replace` makes each write atomic and does nothing
+    # about two writers: both would read the same prior shard, add their own vectors, and the
+    # second would drop the first's. That is this very defect one level up.
+    with tmc.exclusive_file_lock(existing):
+        payload = {}
+        # THE MIGRATION PATH IS THE LOSS PATH AGAIN. On the first save after the per-model split,
+        # `existing` does not exist yet -- but `_load_cache` may have just accepted the PRE-SPLIT
+        # flat shard. Writing only this run's keys would leave the flat file shadowed: later loads
+        # prefer the model-scoped shard, find a partial one, and the rest is lost exactly as the
+        # `--limit` defect lost 8,941 vectors. The flat file is folded in on that first write, and
+        # only when its own stamp matches -- a mismatched one was already refused at load and must
+        # not be resurrected here. Found in review of PR #245.
+        flat = _flat_shard(name)
+        if not os.path.exists(existing) and os.path.exists(flat):
+            try:
+                legacy = json.loads(open(flat, encoding='utf-8').read())
+            except json.JSONDecodeError:
+                legacy = {}
+            if (legacy.get(_PROVENANCE_KEY) == _deployment_name()
+                    and legacy.get(_MODEL_KEY) == (_resolve_deployment_model() or None)):
+                payload.update({k: v for k, v in legacy.items() if not k.startswith('__')})
+        if os.path.exists(existing):
+            try:
+                prior = json.loads(open(existing, encoding='utf-8').read())
+            except json.JSONDecodeError:
+                prior = {}          # a torn shard is replaced, never half-merged
+            # `__`-prefixed provenance is re-derived below, never carried forward: a stale model
+            # stamp surviving a merge would be a claim about vectors it no longer describes.
+            payload.update({k: v for k, v in prior.items() if not k.startswith('__')})
+        payload.update({k: _cache[k] for k in keys if k in _cache})
+        sample = next(iter(payload.values()), None)
+        payload[_PROVENANCE_KEY] = _deployment_name()
+        payload[_MODEL_KEY] = _resolve_deployment_model() or None
+        payload[_DIMS_KEY] = len(_unpack(sample)) if sample else None
+        # PER-PROCESS TEMP NAME. A single `.tmp` is a second way two writers destroy each other,
+        # independent of the merge: both write the same scratch file and the first replace consumes
+        # it, so the second gets FileNotFoundError and loses its whole run. The lock above makes
+        # this unreachable for THIS writer, and the name is still made unique -- a shared scratch
+        # path between processes is wrong whether or not something else currently prevents the
+        # overlap. Surfaced by the lock ablation in review of PR #245.
+        tmp = '%s.%d.tmp' % (existing, os.getpid())
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, existing)
 
 
 def _stub_vector(text: str) -> list[float]:
@@ -265,6 +464,54 @@ def embed_all(texts: list[str], dry_run: bool) -> None:
         time.sleep(REQUEST_SPACING)
 
 
+def _verify_cache_matches_live(texts) -> None:
+    """Check that the vectors ALREADY ON DISK came from the deployment this run is about to name.
+
+    THE STAMP IS OTHERWISE ENVIRONMENT-DERIVED. `_resolve_deployment_model()` asks what the alias
+    points at TODAY; the shards hold vectors embedded on some earlier day. The deployment-name
+    check cannot separate those, because the name is exactly what stays the same when an alias is
+    repointed -- so a re-stamp with no re-embedding would publish today's model name over
+    yesterday's vectors, and every number in the sidecar would belong to a retriever that is not
+    the one named. That is the artifact supplying its own provenance.
+
+    So: re-embed one text that is already banked and compare. One call, on the shortest cached
+    text in the run. Runs once per process; skipped when nothing was cached, because then this run
+    IS the source and there is nothing for it to disagree with.
+    """
+    global _provenance_checked
+    if _provenance_checked:
+        return
+    cached = [t for t in texts if _key(t) in _cache]
+    if not cached:
+        return
+    probe = min(cached, key=len)
+    stored = _unpack(_cache.pop(_key(probe)))
+    embed_all([probe], False)                 # reuses the real path, retries and all
+    fresh = _unpack(_cache[_key(probe)])
+    _provenance_checked = True
+
+    if len(stored) != len(fresh):
+        raise SystemExit(
+            'the banked vectors are %d-dimensional and this deployment returns %d. They are '
+            'different retrievers; a ranking mixing them is not a weaker measurement, it is not '
+            'a measurement. Delete %s and re-embed.' % (len(stored), len(fresh), CACHE_DIR))
+    num = sum(a * b for a, b in zip(stored, fresh))
+    den = ((sum(a * a for a in stored) ** 0.5) * (sum(b * b for b in fresh) ** 0.5)) or 1.0
+    agreement = num / den
+    # NOT 1.0, AND NOT BECAUSE THE BAR IS BEING LOWERED TO PASS. The stored side has been through
+    # a float16 round-trip (~1e-3 per component) and the service is not bit-deterministic across
+    # calls, so the same model against itself lands just under 1. Two DIFFERENT models embed into
+    # unrelated spaces and land near 0 -- there is no band between these where the test becomes a
+    # judgement call.
+    print('    provenance: banked vs live cosine %.6f on one re-embedded text' % agreement,
+          flush=True)
+    if agreement < 0.995:
+        raise SystemExit(
+            'banked vectors disagree with the live deployment (cosine %.4f). The shards were not '
+            'built by the model this run would name. Delete %s and re-embed rather than publish '
+            'a retriever id that describes neither.' % (agreement, CACHE_DIR))
+
+
 def _key(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()[:32]
 
@@ -303,6 +550,21 @@ def _stamp(by_shape, args, k: int) -> None:
     if args.limit or args.vertical or k != tmc.K_REF or args.dry_run:
         raise SystemExit('--stamp needs a full-family run at K_ref with real embeddings; this run was partial, and a partial stamp is a claim about shapes it never measured')
 
+    sample = next(iter(_cache.values()), None)
+    dense_dims = len(_unpack(sample)) if sample else 0
+    dense_id = dense_retriever_id(_resolve_deployment_model(), dense_dims)
+    if not dense_id:
+        raise SystemExit(
+            'refusing to stamp: the embedding deployment did not resolve to a model, so the dense '
+            'arm has no identity to record. The numbers would sit in a sidecar beside the name of '
+            'a retriever nobody can reproduce, which is the defect this field exists to fix.')
+    if _loaded_from_disk and not _provenance_checked:
+        raise SystemExit(
+            'refusing to stamp: vectors were read from disk but none was re-embedded against the '
+            'live deployment, so they were never shown to come from %s. Delete one shard and '
+            're-run, or accept that the identity would be asserted rather than measured.'
+            % dense_id)
+
     per_vertical = collections.defaultdict(dict)
     for (vertical, shape), c in by_shape.items():
         n = c['n']
@@ -319,13 +581,23 @@ def _stamp(by_shape, args, k: int) -> None:
     reading = (
         "Published headroom is V1-V9, and V9 uses a BM25 retriever at K_ref=5. That pairing is a "
         "CONDITION of every headroom figure in this sidecar and was left implicit until "
-        "2026-09-13. This block states it. `allgold_dense` is the same measurement with an "
-        "embedding retriever over the same documents and the same budget; `1 - ALLgold` predicts "
+        "2026-09-13. This block states it. `allgold_dense` is the same measurement with the "
+        "retriever " + dense_id + " over the same documents and the same budget; `1 - ALLgold` predicts "
         "headroom at slope +0.905 / R^2 0.853 / median residual 0.000 against this family's "
         "published figures, over-stating by +0.032. A shape with "
         "`discriminates_under_dense: false` can still rank two systems for a BM25 consumer and "
         "cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and "
-        "it says nothing about any consumer's chunking, reranking or query rewriting.")
+        "it says nothing about any consumer's chunking, reranking or query rewriting. "
+        "HOW MUCH OF THIS BELONGS TO THE MODEL RATHER THAN TO 'DENSE': re-run on 2026-09-14 "
+        "against a second embedding model, text-embedding-3-small, over the same documents "
+        "and the same budget. Family ALLgold 0.575 against this block's 0.540, so 'dense "
+        "closes 21% of the headroom BM25 leaves open' becomes 27%. Per shape it is larger and "
+        "not uniform: 25 of 35 shapes move, 6 flip the SIGN of whether dense beats BM25 (in "
+        "both directions), and 4 flip `discriminates_under_dense` itself -- "
+        "forgetting/still-valid, temporal/interval-position and workingmemory/distance-25 go "
+        "true->false, workingmemory/distance-40 goes false->true. So read every figure here "
+        "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
+        "tools/typedmemeval_retriever_compare.py.")
 
     for vertical, shapes in sorted(per_vertical.items()):
         path = os.path.join(CORPORA, vertical,
@@ -336,7 +608,13 @@ def _stamp(by_shape, args, k: int) -> None:
         meta.setdefault('probes', {})['retriever_sensitivity'] = {
             'reference_retriever': tmc.RETRIEVER_ID,
             'reference_k': tmc.K_REF,
-            'dense_retriever': 'azure-openai-embeddings, cosine, same documents and budget',
+            'dense_retriever': dense_id,
+            'dense_retriever_note': (
+                'Resolved from the deployment alias to the underlying model, and the banked '
+                'vectors were re-checked against the live deployment before this stamp was '
+                'written. Fields: model, dimensions, similarity, stored precision -- each one '
+                'changes the ranking. Supersedes the prose string "azure-openai-embeddings, '
+                'cosine, same documents and budget", which pinned no model at all.'),
             'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
             'reading': reading,
             'by_shape': dict(sorted(shapes.items())),
@@ -412,10 +690,12 @@ def main():
         texts = list(dict.fromkeys(texts))
 
         _cache.clear()
-        _load_cache([vertical])
+        _load_cache([vertical], args.dry_run)
         print('%-14s %3d questions, %5d texts%s'
               % (vertical, len(questions), len(texts), ' (STUB)' if args.dry_run else ''),
               flush=True)
+        if not args.dry_run:
+            _verify_cache_matches_live(texts)
         embed_all(texts, args.dry_run)
         if not args.dry_run:
             _save_shard(vertical, [_key(t) for t in texts])

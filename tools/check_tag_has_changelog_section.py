@@ -47,7 +47,7 @@ LOG_BEGINS = '2026-07-17'
 
 def tags():
     out = subprocess.run(['git', 'tag'],  # DevSkim: ignore DS107369 - fixed argv
-                         cwd=ROOT, capture_output=True, text=True, check=True)
+                         cwd=ROOT, capture_output=True, text=True, encoding="utf-8", check=True)
     return sorted(t.strip() for t in out.stdout.splitlines() if t.strip())
 
 
@@ -88,7 +88,7 @@ def main():
     in_scope, pre_rule = [], []
     for tag in all_tags:
         when = subprocess.run(['git', 'log', '-1', '--format=%cs', tag],  # DevSkim: ignore DS107369
-                              cwd=ROOT, capture_output=True, text=True).stdout.strip()
+                              cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout.strip()
         (in_scope if when >= LOG_BEGINS else pre_rule).append(tag)
 
     missing = [t for t in in_scope if t.lstrip('v') not in versions]

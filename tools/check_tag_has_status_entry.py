@@ -46,7 +46,7 @@ LOG_BEGINS = '2026-07-17'
 
 
 def tags():
-    out = subprocess.run(['git', 'tag'], cwd=ROOT, capture_output=True, text=True, check=True)
+    out = subprocess.run(['git', 'tag'], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", check=True)
     return sorted(t.strip() for t in out.stdout.splitlines() if t.strip())
 
 
@@ -88,7 +88,7 @@ def main():
     in_scope, pre_rule = [], []
     for tag in all_tags:
         when = subprocess.run(['git', 'log', '-1', '--format=%cs', tag],
-                              cwd=ROOT, capture_output=True, text=True).stdout.strip()
+                              cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout.strip()
         (in_scope if when >= LOG_BEGINS else pre_rule).append(tag)
 
     # MATCH INSIDE A §0 HEADING, NOT ANYWHERE IN THE DOCUMENT. `t not in text` passed on a tag
