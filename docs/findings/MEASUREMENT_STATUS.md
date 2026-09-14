@@ -18456,3 +18456,70 @@ Re-drawn from the current frame, the control now reads **5,254 = 5,254** and the
 population shares.
 
 **Cost: 96 calls.**
+
+### 88.46 ✅ C-E CLOSED — judge-family bias measured ACROSS VENDORS, and it is not there (2026-09-14)
+
+C-E was filed as a bound on judge-FAMILY bias and had never been run as one. §88.19 reached
+“deployment variance within one model line”; §88.45 reached “a different model line, same vendor”.
+Both said the same thing about the gap: **every published figure rests on one judge, and nothing
+had tested it against a different vendor.**
+
+#### The blocker was never credentials
+
+The Azure resource carries a 426-model catalog and **nothing non-OpenAI was deployed** — that was
+the whole obstacle, across three sessions of writing it down as “no second family configured”. Two
+deployments later it was gone:
+
+| deployment | model | vendor |
+| --- | --- | --- |
+| `ce-llama-33-70b` | `Llama-3.3-70B-Instruct` | **Meta** |
+| `ce-mistral-large-3` | `Mistral-Large-3` | **Mistral AI** |
+
+⚠ Anthropic models are in the same catalog and were the first choice, but deploying one requires
+`ModelProviderData` — industry, organisation name, country code. That is a legal attestation about
+the deploying organisation and is **not an agent's to invent**, so Meta and Mistral were used
+instead. Two vendors is what the claim needs; three would not have added a kind.
+
+#### The result
+
+| second judge | vendor | raw | **re-weighted** | frame coverage |
+| --- | --- | ---: | ---: | ---: |
+| `Llama-3.3-70B-Instruct` | Meta | 45/48 | **0.99910** | 100% |
+| `Mistral-Large-3` | Mistral AI | 42/48 | **0.99852** | 100% |
+
+> **Two judges from two different vendors agree with the shipped judge at 0.999 of the live
+> population.** The raw rates (0.938 / 0.875) are lower because the sample deliberately
+> over-samples the rare class; the disagreements sit almost entirely in cells worth **0.06%,
+> 0.08% and 0.21%** of the frame.
+
+**Verdict: no judge-family bias is detectable at the population level.** That is the claim C-E was
+filed for, and it is now supported rather than narrowed.
+
+#### ⚠ What the co-directional pair does and does not say
+
+The two second judges agree with each other on 43 of 48 and **both** differ from the shipped judge
+on 2 — this time in the SAME direction (`shipped=no → both yes`). Co-directional disagreement is
+signal about the shipped judge rather than about judge noise, so it is the one thing here worth
+not waving away. But both cases fall in cells of **0.06%–0.21%** population share at n=3–4. It is a
+hint about the rare tail, not a population claim, and it is recorded so a future run can see
+whether it recurs.
+
+#### 🔴 Two defects the cross-vendor run exposed, both invisible while every judge was OpenAI
+
+**1 · The request schema was assumed to be one schema.** The runner hard-coded
+`max_completion_tokens`, which Mistral rejects outright (`422 extra_forbidden`; it wants
+`max_tokens`). The token-limit parameter is VENDOR-SPECIFIC, and the moment C-E became
+cross-vendor — which is the entire point of C-E — that assumption broke. It now follows the
+resolved model rather than the endpoint.
+
+**2 · The retry budget was again sized for nothing in particular.** 3 attempts backing off 4/8
+seconds lost a run to a fresh deployment's TPM ceiling. Same correction already made in
+`typedmemeval_dense_retrieval.py` on 2026-09-13 and not carried here — **applied-once, third
+instance in two days**. Now honours `Retry-After` and backs off to a minute.
+
+#### The deployments are KEPT
+
+`GlobalStandard` is pay-per-token with no standing charge, so leaving them costs nothing idle and
+makes C-E repeatable per release, which is what the plan asks of it. Re-running is one command.
+
+**Cost: 96 calls + two deployments.**

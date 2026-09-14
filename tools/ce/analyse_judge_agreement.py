@@ -46,7 +46,10 @@ CORPORA = os.path.join(ROOT, 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
 SAMPLE = os.path.join(HERE, 'judge-sample-50.json')
 RESULTS = os.path.join(HERE, 'judge-agreement-results.json')
 
-ABSTENTION_ARMS = {'v10', 'v11'}       # their ':judge' keys hold commit/abstain, NOT yes/no
+# ABSTENTION_ARMS was removed on 2026-09-14. It listed v10/v11 as the arms to EXCLUDE, and became
+# dead the moment the frame switched to SHIPPED_ARMS below -- but a constant that still reads like
+# a live rule is worse than no constant, because the next reader assumes something enforces it.
+# v10/v11 are still excluded; they are simply not in the allow-list, which is the whole point.
 
 #: The arms a shipped corpus is actually accepted on. An ALLOW-list, not a deny-list, and the
 #: difference is not stylistic: the frame used to be "any `:judge` key whose arm is not an

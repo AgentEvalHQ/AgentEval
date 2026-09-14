@@ -1,17 +1,33 @@
 # -*- coding: utf-8 -*-
-"""C-E (narrowed): cross-model-line judge agreement, within one vendor.
+"""C-E: judge agreement against second judges, and what the second judges let you claim.
 
-WHAT THIS IS, AND WHAT IT IS NOT
---------------------------------
-C-E was filed as a bound on judge-FAMILY bias. It cannot be that here: no Anthropic, Google or
-Mistral key is configured. What IS reachable is the o-series (o3, o4-mini) alongside the shipped
-judge's gpt-5.5 -- a different MODEL LINE, same vendor. So the claim is narrowed and renamed rather
-than overstated:
+WHAT THIS IS
+------------
+C-E was filed as a bound on judge-FAMILY bias. It is now that. Two non-OpenAI models were
+deployed on 2026-09-14 -- Llama-3.3-70B-Instruct (Meta) and Mistral-Large-3 (Mistral AI) -- and
+agreed with the shipped gpt-5 judge at 0.99910 and 0.99852 once re-weighted to the live
+population of 5,254 verdicts -- raw 45/48 and 42/48 on a sample that deliberately over-samples
+the rare class, which is why the raw figure is not the one to quote.
 
-    NOT  "judge-family bias is bounded at X"
-    BUT  "two judges on a different model line, same vendor, agree with the shipped judge at X"
+Seven of the 48 rows carry a disagreement from at least one second judge. On 2 of them BOTH
+second judges differ, and in the SAME direction (shipped `no` -> both `yes`); those sit in the
+`v1/no` and `v8/no` cells, 0.06% and 0.21% of the frame. The other 5 are single-judge, and 4 of
+those are Mistral alone in `v2/yes`, a cell holding 0.08%. No cell above 1% of the frame shows a
+single disagreement from either judge.
 
-A cross-vendor bound remains unpurchased and is still the thing that would settle it.
+The claim is NOT hard-coded. `_claim_for` derives it from the models this run actually used, and
+it walks the whole ladder:
+
+    judge-FAMILY bias across VENDORS          <- what the run above supports
+    different MODEL LINE, same vendor         <- what o3/o4-mini support
+    deployment variance within ONE line       <- the weakest, and it bounds nothing
+    UNVERIFIED provenance / UNVERIFIED line   <- refuses to claim at all
+
+That last rung matters more than it looks. On Azure the `--models` string is a DEPLOYMENT ALIAS
+the resource owner chose, not a model: an OpenAI deployment named `judge-primary` and a Llama
+deployment named `gpt-4o` are both legal. The alias is resolved against the deployments listing
+before anything is claimed, and a real run REFUSES to start when an alias will not resolve --
+see `main`.
 
 WHY TWO SECOND JUDGES, NOT ONE
 ------------------------------
@@ -22,11 +38,11 @@ the reading is that equivalence judging is noisy at the margin and no bias claim
 
 SAMPLING, AND THE WEIGHT THAT MUST TRAVEL WITH ANY NUMBER
 ---------------------------------------------------------
-The 50 cases are stratified by arm and balanced on the shipped judge's own yes/no, because a family
+The 48 cases are stratified by arm and balanced on the shipped judge's own yes/no, because a family
 bias shows as a systematic flip in one direction and a cell with no `yes` cases cannot see a
 yes->no flip. That balancing DELIBERATELY over-samples the rare class: v2 is 0.3% yes in the live
 frame and 57% yes in the sample. So the raw sample disagreement rate is NOT a population rate. Per
-cell first, then re-weighted by each cell's true share of the 5,344 live verdicts.
+cell first, then re-weighted by each cell's true share of the 5,254 live verdicts.
 
 THREE-STAGE PROTOCOL: --dry-run (free, every case), then --one (a single real call), then the full
 run. Nothing is written on a dry run.
@@ -90,8 +106,13 @@ def ask(model, question, gold, response, dry, provider='openai'):
         req = urllib.request.Request(
             f'{endpoint}/openai/deployments/{model}/chat/completions'
             f'?api-version={AZURE_API_VERSION}',
+            # THE TOKEN-LIMIT PARAMETER IS VENDOR-SPECIFIC, and this tool assumed OpenAI's spelling
+            # for its whole life because every judge it had ever run was OpenAI. Mistral rejects
+            # `max_completion_tokens` outright (422 extra_forbidden) and wants `max_tokens`. The
+            # moment C-E became cross-vendor -- which is the entire point of C-E -- the request
+            # schema stopped being one schema.
             data=json.dumps({'messages': [{'role': 'user', 'content': content}],
-                             'max_completion_tokens': 2000}).encode('utf-8'),
+                             _token_limit_key(model): 2000}).encode('utf-8'),
             headers={'Content-Type': 'application/json', 'api-key': key})
         return _send(req)
 
@@ -110,17 +131,36 @@ def ask(model, question, gold, response, dry, provider='openai'):
     return _send(req)
 
 
+#: Deployments whose underlying model is NOT OpenAI. Filled in by _resolve_azure at start-up so
+#: the request schema can follow the vendor rather than the endpoint.
+_NON_OPENAI_DEPLOYMENTS = set()
+
+
+def _token_limit_key(model: str) -> str:
+    """`max_tokens` for non-OpenAI models, `max_completion_tokens` for OpenAI ones."""
+    return 'max_tokens' if model in _NON_OPENAI_DEPLOYMENTS else 'max_completion_tokens'
+
+
 def _send(req):
-    for attempt in range(3):
+    # RETRY ON THE SERVICE'S TIMESCALE. 3 attempts backing off 4/8 seconds lost a run against a
+    # freshly deployed model: a GlobalStandard deployment's limit is TOKENS PER MINUTE, so every
+    # retry inside the first few seconds argues with a window that has not moved. Same correction
+    # already made in typedmemeval_dense_retrieval.py -- applied-once, found again here.
+    for attempt in range(8):
         try:
-            with urllib.request.urlopen(req, timeout=180) as r:
+            with urllib.request.urlopen(req, timeout=180) as r:  # DevSkim: ignore DS137138
                 payload = json.load(r)
             return (payload['choices'][0]['message']['content'] or '').strip()
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503) and attempt < 2:
-                time.sleep(4 * (attempt + 1))
-                continue
-            raise
+            if e.code not in (429, 500, 502, 503, 504) or attempt == 7:
+                raise
+            hinted = e.headers.get('Retry-After') if e.headers else None
+            if hinted and str(hinted).strip().isdigit():
+                delay = min(90, max(5, int(str(hinted).strip())))
+            else:
+                delay = min(60, 5 * 2 ** attempt)
+            print('    %d, waiting %ds' % (e.code, delay), flush=True)
+            time.sleep(delay)
     return ''
 
 
@@ -253,6 +293,31 @@ def main():
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
     models = [m for m in args.models.split(',') if m]
     resolved = _resolve_azure(models) if args.provider == 'azure' else None
+    if resolved:
+        _NON_OPENAI_DEPLOYMENTS.update(
+            dep for dep, real in resolved.items()
+            if real and not real.lower().startswith(_OPENAI_PREFIXES))
+    # FAIL BEFORE SPENDING, NOT AFTER. An unresolved alias used to print `UNVERIFIED` and then
+    # proceed into 96 paid calls, and it took BOTH things the resolution feeds with it:
+    #   * the request schema -- `_token_limit_key` falls back to `max_completion_tokens`, which is
+    #     the 422 `extra_forbidden` on a Mistral deployment that this resolution exists to avoid;
+    #   * the claim -- an unresolved run can only ever report UNVERIFIED provenance, so every
+    #     verdict it buys is unpublishable the moment it is written.
+    # A run whose output cannot support any claim is not a cheaper run, it is a purchase with no
+    # deliverable. --dry-run is deliberately exempt: it spends nothing and its whole job is to
+    # exercise this path when the listing is unreachable.
+    if resolved is not None and not args.dry_run:
+        unresolved = sorted(dep for dep, real in resolved.items() if not real)
+        if unresolved:
+            raise SystemExit(
+                'refusing to start: %s did not resolve to an underlying model.\n'
+                'On this provider the name is a deployment alias, so an unresolved run would (a) '
+                'guess the vendor-specific token-limit parameter and (b) be able to claim nothing '
+                'but UNVERIFIED provenance -- paying for %d calls whose result cannot be '
+                'published.\nCheck the deployment exists and that AZURE_OPENAI_ENDPOINT / '
+                'AZURE_OPENAI_API_KEY reach it, or use --dry-run.'
+                % (', '.join(unresolved), len(cases) * len(models)))
+
     claim = _claim_for(SHIPPED_JUDGE_LINE, models, resolved)
     print('provider=%s  judges=%s' % (args.provider, ','.join(models)))
     if resolved:
