@@ -135,13 +135,21 @@ jobs:
         # and this check would have passed a package that shipped stale ones. The in-repo test
         # `EmbeddedSidecar_IsTheSidecarCommittedToTheRepository` covers the source-built assembly, not
         # the packed artifact, so it does not close this. Found in review of PR #246.
+        # COUNTED SEPARATELY, AND GUARDED SEPARATELY. The single `Count -eq 0` guard was written
+        # when this map held corpora ONLY, and adding sidecars to the same map silently changed what
+        # it proves: a tree holding nothing but *.meta.json has a nonzero count and clears it, so
+        # every actual corpus could be absent and the check would pass. Widening a set narrows the
+        # guard on it unless the guard is widened too -- and I added the sidecar guard while leaving
+        # the one that already existed measuring a different population than it names. Found in
+        # review of PR #246.
         $expectedCorpora = @{}
         $sidecarCount = 0
+        $corpusCount = 0
         foreach ($f in Get-ChildItem $repoCorpora -Recurse -Filter '*.json') {
-          if ($f.Name -like '*.meta.json') { $sidecarCount++ }
+          if ($f.Name -like '*.meta.json') { $sidecarCount++ } else { $corpusCount++ }
           $expectedCorpora[$f.Name] = Get-NormalisedHash ([System.IO.File]::ReadAllText($f.FullName))
         }
-        if ($expectedCorpora.Count -eq 0) {
+        if ($corpusCount -eq 0) {
           Write-Host "::error::No corpora found under $repoCorpora. Refusing to pass a check with nothing in it."
           exit 1
         }
@@ -151,7 +159,13 @@ jobs:
           Write-Host "::error::No *.meta.json sidecars found under $repoCorpora. They are consumer-facing and must be verified, so a run that found none has not verified them."
           exit 1
         }
-        Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($sidecarCount sidecars)"
+        if ($corpusCount -ne $sidecarCount) {
+          # Every corpus ships exactly one sidecar. An asymmetry means the glob matched one family
+          # and not the other, which is the failure both guards above are blind to individually.
+          Write-Host "::error::Found $corpusCount corpora but $sidecarCount sidecars under $repoCorpora. They must pair one to one."
+          exit 1
+        }
+        Write-Host "Reference files in the working tree: $($expectedCorpora.Count) ($corpusCount corpora, $sidecarCount sidecars)"
 
         $failures = @()
         $mvids = @()

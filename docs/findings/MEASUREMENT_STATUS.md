@@ -18863,5 +18863,14 @@ Verified against the real assembly rather than by inspection: 20 of 20 resources
 **assertions 10 → 20**, all byte-identical. Ablation — declare one sidecar stale and the check
 reports `agenteval-typedmemeval-arithmetic-v5.meta.json packed 3627b04e546f != repo 0f9f75d857ea`.
 
+And the same review caught what widening the set did to the guard ON it. `$expectedCorpora.Count
+-eq 0` was written when that map held corpora only; adding sidecars changed what it proves, because
+a tree holding nothing but `*.meta.json` has a nonzero count and clears it. Every actual corpus
+could be absent and the check would pass. I had added a symmetric guard for the sidecars and left
+the one that already existed measuring a population it no longer names. Now counted and guarded
+separately, plus a one-to-one pairing check. Exercised on synthetic trees rather than reasoned
+about: sidecars-only REFUSED (map count 1 -- nonzero, which is exactly what the old guard cleared),
+corpora-only REFUSED, 2-corpora-1-sidecar REFUSED, the real tree PASS at 10 and 10.
+
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
