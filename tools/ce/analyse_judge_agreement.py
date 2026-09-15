@@ -80,8 +80,21 @@ def key_for(entry):
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
+def frame_fingerprint(rows) -> str:
+    """A hash over the frame's (key, verdict) pairs -- what the re-weighting actually depends on.
+
+    Not the size. Two populations of 5,254 verdicts are the same size and can be entirely different
+    verdicts, and the per-cell shares would move with them while a count check said nothing. Verdicts
+    are included as well as keys because a re-judged cache changes the weights without changing the
+    membership.
+    """
+    payload = '\n'.join('%s\t%s' % (k, v) for k, v in sorted(rows))
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()  # DevSkim: ignore DS126858
+
+
 def live_frame():
     excluded = {}
+    identified = []
     index = {}
     for path in glob.glob(os.path.join(CORPORA, '*', '*-v5.json')):
         data = json.load(open(path, encoding='utf-8'))
@@ -102,8 +115,11 @@ def live_frame():
             # frame. Both need a human to look; neither should change the population quietly.
             excluded[arm] = excluded.get(arm, 0) + 1
             continue
-        frame.append((arm, 'yes' if str(v).strip().lower().startswith('yes') else 'no'))
-    return frame, excluded
+        verdict = 'yes' if str(v).strip().lower().startswith('yes') else 'no'
+        frame.append((arm, verdict))
+        # The KEY is kept alongside, so the population can be identified and not merely counted.
+        identified.append((k, verdict))
+    return frame, excluded, identified
 
 
 def main():
@@ -114,7 +130,7 @@ def main():
     sample = json.load(open(SAMPLE, encoding='utf-8'))
     models = res['models']
 
-    frame, excluded = live_frame()
+    frame, excluded, identified = live_frame()
     declared = sample.get('drawn_from')
     print('C-E  provider=%s' % res.get('provider', 'openai'))
     print('claim this run can support: %s' % res.get('claim_supported', '(unrecorded)'))
@@ -138,7 +154,43 @@ def main():
         print('     the corpora moved since the sample was drawn. The re-weighting below would be')
         print('     wrong, so it is not printed. Re-draw the sample, or reconcile the two files.')
         return 2
-    print('  OK: the frame reproduces, so the per-cell weights below are the population shares.')
+
+    # A COUNT IS NOT A REPRODUCTION. The check above passes for any two populations of the same
+    # SIZE, and the per-cell weights depend on composition. Two stronger operands, in order of what
+    # they can prove:
+    #
+    #   MEMBERSHIP -- every sampled case must still be in the frame. Works on a sample drawn before
+    #   any of this existed, because the sample records its own cache keys.
+    #
+    #   FINGERPRINT -- a hash over the frame's (key, verdict) pairs, recorded by the sampler. Pins
+    #   the whole population, not just the sampled part of it.
+    live_keys = {k for k, _ in identified}
+    missing = sorted(c['cache_key'] for c in sample['cases'] if c['cache_key'] not in live_keys)
+    if missing:
+        print('  🔴 %d of %d SAMPLED CASES ARE NOT IN THE REBUILT FRAME, e.g. %s.'
+              % (len(missing), len(sample['cases']), ', '.join(missing[:3])))
+        print('     The sample was drawn from a population this run cannot reproduce, so the')
+        print('     per-cell weights are not this frame\'s shares. Re-draw the sample.')
+        return 2
+
+    actual = frame_fingerprint(identified)
+    stamped = sample.get('drawn_from_fingerprint')
+    if stamped and stamped != actual:
+        print('  🔴 FRAME FINGERPRINT MISMATCH: sample %s, rebuilt %s.'
+              % (stamped[:12], actual[:12]))
+        print('     Same SIZE, different population or different verdicts. The re-weighting below')
+        print('     would be computed against shares this frame does not have.')
+        return 2
+
+    print('  OK: all %d sampled cases are present in the rebuilt frame.' % len(sample['cases']))
+    if stamped:
+        print('  OK: frame fingerprint %s matches, so the population is the one sampled.'
+              % actual[:12])
+    else:
+        print('  ⚠ This sample predates the frame fingerprint (%s), so the whole-population'
+              % actual[:12])
+        print('    identity is UNVERIFIED -- membership above covers the sampled cases only. The')
+        print('    next sample drawn records it; a count alone never was a reproduction.')
 
     weight = collections.Counter(frame)
     total = sum(weight.values())

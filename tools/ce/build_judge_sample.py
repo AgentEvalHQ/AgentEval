@@ -35,7 +35,7 @@ PER_ARM_TARGET = 8       # 7 arms x 8 = 56, trimmed to 50 by frame size
 # they then did: a deny-list of abstention arms admitted the experimental `v9dense` arm into both,
 # and the builder drew 8 cases from it. A shared constant cannot drift from itself.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from analyse_judge_agreement import SHIPPED_ARMS  # noqa: E402
+from analyse_judge_agreement import SHIPPED_ARMS, frame_fingerprint  # noqa: E402
 
 
 def key_for(entry):
@@ -134,6 +134,13 @@ for arm in sorted({a for a, _ in comp}):
     print('  %-8s yes=%d no=%d' % (arm, comp[(arm, 'yes')], comp[(arm, 'no')]))
 print('  verticals covered: %d' % len({r['vertical'] for r in sample}))
 
-json.dump({'seed': SEED, 'drawn_from': len(live), 'cases': sample},
+json.dump({'seed': SEED, 'drawn_from': len(live),
+           # THE POPULATION'S IDENTITY, not just its size. `drawn_from` is a COUNT, and a count
+           # passes for any two populations of the same length while the per-cell weights depend on
+           # composition. Built from the same rows this sample was drawn from, using the analyser's
+           # own function so the two cannot drift. See SS88.52.
+           'drawn_from_fingerprint': frame_fingerprint(
+               [(r['cache_key'], r['judge1']) for r in live]),
+           'cases': sample},
           open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
 print('\n  written: %s' % OUT)
