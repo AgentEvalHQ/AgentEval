@@ -19044,6 +19044,29 @@ versioned. The field that does not move is `design_revision`, and it lives in th
 So the accurate sentence is: **`revision` moves with the sha (`v5+<sha12>`), `design_revision` stays
 at `v5`, and the corpus file itself is unversioned.** Recorded here so the next disclosure uses it.
 
+#### 🔴 Five more in review, and the co-published column was not durable
+
+The serious one: **the dense tool’s own `--stamp` deleted the second column.** It assigns
+`retriever_sensitivity` fresh, so a plain re-run dropped `second_dense_retriever`, every
+`second_dense` value and every `retriever_agreement` — shipped fields, removed by the tool that
+owns the block, silently. I had run exactly that sequence an hour earlier and only the ORDER saved
+it. Now carried forward, and **only where this run’s reference figures match the ones the verdict
+was derived against**: a classification re-attached to numbers it no longer describes is worse
+than an absent one, so a moved reference drops the pair loudly. Proved by running the dense
+`--stamp` alone against a family that already had the column: carried on 35 of 35, 0 dropped, and
+the ten sidecars came out **byte-identical**.
+
+The other four, all refusals replacing silent skips: a **missing sidecar** was skipped, publishing
+a partial family past the whole-family check; **re-stamping with a different second model**
+silently overwrote published release evidence (a typo in `--models` would have done it); the
+**zero-spread wiring-fault guard ran after the publication branch returned**, so a control the
+printout enforces the publication skipped; and a **shard with no recorded width** was merged while
+`dims_of` took the number from a sibling, publishing an identity over vectors whose width was
+never established.
+
+Each verified by firing it: the overwrite guard names both retriever ids, the width guard names the
+shard, and the family still classifies 18/10/7/1 across all 36 shapes.
+
 #### Recorded from their side, not ours
 
 — **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather

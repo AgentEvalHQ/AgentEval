@@ -107,12 +107,18 @@ def load_model_cache(model: str, vertical: str) -> dict:
             continue
         shard = json.loads(open(path, encoding='utf-8').read())
         width = shard.get(dr._DIMS_KEY)
-        if width:
-            seen = _dims_by_model.setdefault(model, width)
-            if seen != width:
-                raise SystemExit('%s: shards of %r disagree on vector width (%d vs %d). One of '
-                                 'them was not produced by that model.'
-                                 % (path, model, seen, width))
+        if not isinstance(width, int) or width <= 0:
+            # EVERY shard, not whichever happens to carry the field. Accepting a shard with no
+            # width and taking the number from a sibling publishes an identity covering vectors
+            # whose width was never established -- the id would be describing the other shard.
+            raise SystemExit('%s records no usable __embedding_dims__ (%r). Its vectors have an '
+                             'unestablished width, so no identity can honestly cover them. '
+                             'Re-embed it.' % (path, width))
+        seen = _dims_by_model.setdefault(model, width)
+        if seen != width:
+            raise SystemExit('%s: shards of %r disagree on vector width (%d vs %d). One of '
+                             'them was not produced by that model.'
+                             % (path, model, seen, width))
         stamped = shard.get(dr._MODEL_KEY)
         # AN EXACT MATCH, NOT "no contradiction". `if stamped and stamped != model` accepts a shard
         # with NO stamp, because the first operand is false -- the identical fail-open that
@@ -225,13 +231,26 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
         path = os.path.join(dr.CORPORA, vertical,
                             'agenteval-typedmemeval-%s-v5.meta.json' % vertical)
         if not os.path.exists(path):
-            continue
+            # SKIPPING IT WOULD PUBLISH A PARTIAL FAMILY while the completeness checks upstream all
+            # passed -- the vertical had vectors and shapes, it simply has nowhere to write. That is
+            # the whole-family refusal being bypassed by a missing file.
+            raise SystemExit('%s has no sidecar at %s, so its column cannot be written. Refusing '
+                             'to publish a column over part of the family.' % (vertical, path))
         meta = json.loads(open(path, encoding='utf-8-sig').read())
         block = (meta.get('probes') or {}).get('retriever_sensitivity')
         if not block:
             raise SystemExit('%s has no retriever_sensitivity block. Run the dense tool\'s --stamp '
                              'first: this column sits beside that one, it does not replace it.'
                              % vertical)
+        published_second = block.get('second_dense_retriever')
+        if published_second and published_second != second_id:
+            # RELEASE EVIDENCE IS NOT OVERWRITTEN ON A TYPO. A changed alias or a mistyped --models
+            # would silently rewrite every second_dense value and every retriever_agreement in a
+            # shipped sidecar, and the diff would look like an ordinary re-stamp.
+            raise SystemExit(
+                '%s already publishes second_dense_retriever %r and this run would write %r. '
+                'Replacing a published column is a deliberate act: remove the existing block by '
+                'hand if that is what you mean.' % (vertical, published_second, second_id))
         if block.get('dense_retriever') != first_id:
             raise SystemExit('%s publishes dense_retriever %r but this run\'s first model is %r. '
                              'The reference column must be the one already published.'
@@ -451,6 +470,17 @@ def main() -> int:
     print('  That spread is the part of any "dense retrieval closes X" sentence that belongs to the')
     print('  MODEL rather than to dense retrieval. Quote the retriever id with the number, or the')
     print('  number is a claim about a model the reader was never told about.')
+    # THE ZERO-SPREAD GUARD RUNS BEFORE THE PUBLICATION, not after it. The stamp branch used to
+    # return above this check, so two DISTINCT models landing on an identical family ALLgold -- which
+    # the ordinary path calls a wiring fault and exits 1 on -- would have been published instead.
+    # A control the reporting path enforces and the publishing path skips is not a control.
+    if args.stamp and spread == 0:
+        raise SystemExit(
+            'refusing to stamp: two DIFFERENT models produced an identical family ALLgold. The '
+            'ordinary comparison treats that as a wiring fault until proven otherwise, and a '
+            'publication cannot be held to a weaker bar than a printout. Run --models <alias>,'
+            '<the same alias> -- that self-check is the only place a zero belongs.')
+
     if args.stamp:
         # THE SKIP LIST IS A REFUSAL, not a note. `--stamp` advertises that it refuses a partial
         # family; it enforced that for `--vertical` and `--budget` and then published whatever

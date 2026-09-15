@@ -538,6 +538,32 @@ def render_one(session, date) -> str:
     return f"### Session 1 ({date})\n{turns}"
 
 
+def _carry_second_column(fresh: dict, prior: dict):
+    """Re-attach a co-published second column to freshly computed rows, where it still applies.
+
+    The second column and its `retriever_agreement` are derived from BOTH retrievers, so they stay
+    true only while this run's reference figures match the ones they were derived against. A shape
+    whose reference moved gets the second column dropped, loudly -- a verdict re-attached to numbers
+    it no longer describes is worse than an absent one.
+    """
+    out, carried, dropped = {}, 0, 0
+    for shape, row in fresh.items():
+        old = prior.get(shape) or {}
+        keep = {k: old[k] for k in ('second_dense', 'retriever_agreement') if k in old}
+        if keep:
+            same = all(round(old.get(f, object()), 4) == round(row[f], 4)
+                       for f in ('allgold_bm25', 'allgold_dense'))
+            if same:
+                row = dict(row, **keep)
+                carried += 1
+            else:
+                print('    dropping the second column on %s: its reference figures moved, so the '
+                      'paired verdict no longer describes them' % shape, flush=True)
+                dropped += 1
+        out[shape] = row
+    return out, carried, dropped
+
+
 def _stamp(by_shape, args, k: int) -> None:
     """Write `retriever_sensitivity` into every measured vertical's sidecar.
 
@@ -632,6 +658,18 @@ def _stamp(by_shape, args, k: int) -> None:
         if not os.path.exists(path):
             continue
         meta = json.loads(open(path, encoding='utf-8-sig').read())
+
+        # A CO-PUBLISHED SECOND COLUMN MUST SURVIVE THIS TOOL. `retriever_sensitivity` is assigned
+        # fresh below, so a plain re-stamp silently dropped `second_dense_retriever`, every
+        # `second_dense` value and every `retriever_agreement` written by the compare tool -- shipped
+        # fields, deleted by the tool that owns the block, with nothing saying so.
+        #
+        # Carried forward ONLY where the reference figures this run computes are identical to the
+        # ones the classification was derived from. If a reference number moved, the paired verdict
+        # is stale and is dropped rather than re-attached to a column it no longer describes.
+        prior = ((meta.get('probes') or {}).get('retriever_sensitivity') or {})
+        prior_shapes = prior.get('by_shape') or {}
+        measured_rows, carried, dropped = _carry_second_column(shapes, prior_shapes)
         meta.setdefault('probes', {})['retriever_sensitivity'] = {
             'reference_retriever': tmc.RETRIEVER_ID,
             'reference_k': tmc.K_REF,
@@ -645,7 +683,7 @@ def _stamp(by_shape, args, k: int) -> None:
             'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
             'reading': reading,
             'by_shape': dict(sorted(
-                list(shapes.items())
+                list(measured_rows.items())
                 + [(shape, {
                     'questions': n,
                     'retrieval_measured': False,
@@ -662,10 +700,15 @@ def _stamp(by_shape, args, k: int) -> None:
                 }) for shape, n in not_applicable.get(vertical, {}).items()]
             )),
         }
+        for key in ('second_dense_retriever', 'second_dense_note'):
+            if key in prior:
+                meta['probes']['retriever_sensitivity'][key] = prior[key]
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(meta, fh, indent=2, ensure_ascii=False)
             fh.write('\n')
-        print('  stamped %s (%d shapes)' % (vertical, len(shapes)))
+        print('  stamped %s (%d shapes%s)'
+              % (vertical, len(shapes),
+                 ', second column carried on %d' % carried if carried else ''))
 
 
 def main():
