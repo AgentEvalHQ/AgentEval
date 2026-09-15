@@ -3,6 +3,9 @@
 
 using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
+using AgentEval.Evals;
+using AgentEval.Output;
+using AgentEval.Core.Evals.Rendering;
 using AgentEval.Memory.External.TypedMemEval;
 using Xunit;
 
@@ -266,6 +269,160 @@ public sealed class TypedMemEvalJudgeAndRunSetTests
         Assert.NotNull(warning);
         Assert.Contains("double-counts", warning!, StringComparison.Ordinal);
         Assert.Contains("SeededFrom", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Adapter_CarriesTheNumbersAScoreMustBeReadAgainst()
+    {
+        // A report that shows only a score is worse than one that shows nothing: a full-haystack
+        // 1.000 reads as a memory result unless the floor, the arms and the retriever travel with
+        // it. Temporal is used because all three of its shapes publish a V9 arm.
+        var result = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Temporal, 8);
+
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(result, judgeModel: "test-judge");
+
+        var shape = eval.Details.SubResults!
+            .Single(n => n.Metric.Key == "typedmemeval.temporal.recency");
+
+        // The numbers -- rendered by HtmlEvalResultRenderer as the node's "Metrics" table.
+        Assert.Contains("floor.chance", shape.Details.Dimensions!.Keys);
+        Assert.Contains("headroom.perfectSelector", shape.Details.Dimensions.Keys);
+        Assert.Contains("arm.v8FullHaystack", shape.Details.Dimensions.Keys);
+        Assert.Contains("arm.v9ReferenceRetrieval", shape.Details.Dimensions.Keys);
+
+        // The V9 arm must not be silently equal to the full-haystack arm: that difference is the
+        // whole reason the corpus exists, and an equal pair would mean the sidecar was misread.
+        Assert.True(
+            shape.Details.Dimensions["arm.v8FullHaystack"]
+            > shape.Details.Dimensions["arm.v9ReferenceRetrieval"],
+            "recency publishes a V8 above its V9; equal values mean the wrong fields were read.");
+
+        // The words -- rendered as the node's bullet list.
+        Assert.Contains(shape.Details.Recommendations!, r => r.StartsWith("Ranking:", StringComparison.Ordinal));
+
+        // THE ROOT MUST NAME WHICH RETRIEVER CONDITIONS WHICH NUMBER, not just list them.
+        // `headroom.perfectSelector` is V1 minus V9 and V9 is the BM25 reference arm — measured
+        // 1.0000 - 0.5333 = 0.4667 on this shape. The dense pair decides the ranking class and
+        // enters neither figure. An earlier version said all three conditioned "every retrieval
+        // figure", which is the loose conditionality claim this family exists to stamp out.
+        var referenceNote = Assert.Single(
+            eval.Details.Recommendations!.Where(r => r.StartsWith("Reference retriever:", StringComparison.Ordinal)));
+        Assert.Contains("bm25", referenceNote, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("headroom.perfectSelector", referenceNote, StringComparison.Ordinal);
+        Assert.Contains("nothing else", referenceNote, StringComparison.Ordinal);
+
+        var denseNote = Assert.Single(
+            eval.Details.Recommendations!.Where(r => r.StartsWith("Dense retrievers compared:", StringComparison.Ordinal)));
+        Assert.Contains("text-embedding-ada-002", denseNote, StringComparison.Ordinal);
+        Assert.Contains("ranking class ONLY", denseNote, StringComparison.Ordinal);
+
+        // The two must not be confused. Asserting the word "headroom" is ABSENT would be the
+        // wrong check — the note mentions it precisely in order to DISCLAIM it. Assert the
+        // disclaimer instead: it is the claim that matters, not the vocabulary.
+        Assert.Contains("do not enter", denseNote, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Adapter_ProjectsEveryQuestionAsALeafUnderItsShape()
+    {
+        // The tree used to stop at shape level: root -> 3 shapes -> nothing, for a 50-question
+        // run. A hierarchy whose leaves ARE the aggregate cannot be drilled into, and the
+        // per-question results sat unused in the result object.
+        const int asked = 8;
+        var result = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Temporal, asked);
+
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(result, judgeModel: "test-judge");
+
+        var shapes = eval.Details.SubResults!;
+        Assert.NotEmpty(shapes);
+
+        // Every question asked appears exactly once, somewhere under its own shape.
+        var leaves = shapes.SelectMany(sh => sh.Details.SubResults ?? []).ToList();
+        Assert.Equal(asked, leaves.Count);
+
+        // Ids are unique and match the ids the run actually recorded — not invented, not
+        // duplicated across shapes.
+        var leafIds = leaves.Select(l => l.Metric.Name).ToList();
+        Assert.Equal(leafIds.Count, leafIds.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(
+            result.QuestionResults.Select(q => q.QuestionId).OrderBy(x => x, StringComparer.Ordinal),
+            leafIds.OrderBy(x => x, StringComparer.Ordinal));
+
+        // Each leaf sits under the shape its own typed outcome names — a leaf filed under the
+        // wrong parent would still produce the right COUNT above, so the parentage is asserted.
+        foreach (var shapeNode in shapes)
+        {
+            var shapeName = shapeNode.Metric.Key.Split('.').Last();
+            foreach (var leaf in shapeNode.Details.SubResults ?? [])
+            {
+                var recorded = result.QuestionResults.Single(q => q.QuestionId == leaf.Metric.Name);
+                Assert.Equal(recorded.TypedOutcome!.Shape, shapeName);
+                Assert.Contains(leaf.Details.Recommendations!, r => r.StartsWith("Outcome:", StringComparison.Ordinal));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RenderedHtmlReport_ShowsTheContext_NotJustTheScore()
+    {
+        // WIRING, BOTH DIRECTIONS. The adapter carrying a dimension is worth nothing if the
+        // renderer drops it. A real report written before this enrichment contained a "Metrics"
+        // table and ZERO occurrences of the floor, the arms, the retriever id or the ranking
+        // class -- it headlined "PASS 100.0%" for a run where the model was handed the whole
+        // haystack. This asserts the rendered bytes, not the object graph.
+        var result = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Temporal, 8);
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(result, judgeModel: "test-judge");
+
+        var bytes = await new HtmlEvalResultRenderer().RenderAsync(
+            eval,
+            new EvalResultRenderOptions(
+                Subject: new SubjectIdentity(SubjectKind.Agent, "test", "test-model", "MAF"),
+                Title: "TypedMemEval",
+                RunId: "test-run"));
+
+        var html = System.Text.Encoding.UTF8.GetString(bytes);
+
+        Assert.Contains("floor.chance", html, StringComparison.Ordinal);
+        Assert.Contains("headroom.perfectSelector", html, StringComparison.Ordinal);
+        Assert.Contains("arm.v9ReferenceRetrieval", html, StringComparison.Ordinal);
+        Assert.Contains("Ranking:", html, StringComparison.Ordinal);
+        Assert.Contains("text-embedding-ada-002", html, StringComparison.Ordinal);
+
+        // And the aggregate must not stand alone: the reader has to be told not to cite it.
+        Assert.Contains("Read the per-shape nodes", html, StringComparison.Ordinal);
+
+        // THE LEAVES MUST SURVIVE RENDERING. Projecting per-question nodes is worth nothing if
+        // the renderer stops recursing at depth 2 — the report would still show three rows and
+        // the drill-down would exist only in the object graph.
+        foreach (var id in result.QuestionResults.Select(q => q.QuestionId))
+            Assert.Contains(id, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Adapter_AddsNothingWhenTheSidecarDoesNotCarryTheShape()
+    {
+        // NEGATIVE CONTROL. The enrichment must be additive and fail-soft: a projection is not
+        // allowed to be the thing that fails a completed, paid-for run. `forgetting/never-known`
+        // publishes an empty gold set and therefore no headroom fields at all, so it is the real
+        // in-corpus case for "the sidecar has the shape but not the numbers".
+        var result = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Forgetting, 12);
+
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(result, judgeModel: "test-judge");
+
+        var neverKnown = eval.Details.SubResults!
+            .SingleOrDefault(n => n.Metric.Key == "typedmemeval.forgetting.never-known");
+        if (neverKnown is null)
+            return;   // the sampled subset did not reach that shape; nothing to assert
+
+        // No headroom is published for it, so none may be invented.
+        if (neverKnown.Details.Dimensions is { } dims)
+        {
+            Assert.DoesNotContain("headroom.perfectSelector", dims.Keys);
+            Assert.DoesNotContain("arm.v9ReferenceRetrieval", dims.Keys);
+        }
+
+        // The typed vector still projects: enrichment adds, it never removes.
+        Assert.NotNull(neverKnown.Score);
     }
 
     [Fact]

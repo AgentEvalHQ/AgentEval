@@ -64,14 +64,14 @@ Pick group **H — Benchmarks (v0.10.1)** from the menu, then choose a sample.
 Or by legacy index (1-based across the flat sample list):
 
 ```bash
-dotnet run --project samples/AgentEval.Samples -- 43   # Performance     (H2)
-dotnet run --project samples/AgentEval.Samples -- 44   # Agentic         (H3)
-dotnet run --project samples/AgentEval.Samples -- 45   # GDPR            (H4)
+dotnet run --project samples/AgentEval.Samples -- 45   # Performance     (H2)
+dotnet run --project samples/AgentEval.Samples -- 46   # Agentic         (H3)
+dotnet run --project samples/AgentEval.Samples -- 47   # GDPR            (H4)
 # …
-dotnet run --project samples/AgentEval.Samples -- 49   # NIST AI RMF     (H8)
-dotnet run --project samples/AgentEval.Samples -- 50   # LongMemEval     (H9)
-dotnet run --project samples/AgentEval.Samples -- 51   # Memory          (H10)
-dotnet run --project samples/AgentEval.Samples -- 54   # Report Browser  (H13)
+dotnet run --project samples/AgentEval.Samples -- 51   # NIST AI RMF     (H8)
+dotnet run --project samples/AgentEval.Samples -- 52   # LongMemEval     (H9)
+dotnet run --project samples/AgentEval.Samples -- 53   # Memory          (H10)
+dotnet run --project samples/AgentEval.Samples -- 56   # Report Browser  (H13)
 ```
 
 ---
@@ -110,10 +110,10 @@ Resolution order (top wins):
 ```bash
 # Standard tier, no prompts (CI-friendly):
 AGENTEVAL_SAMPLES_NONINTERACTIVE=1 AGENTEVAL_SAMPLES_PRESET=standard \
-  dotnet run --project samples/AgentEval.Samples -- 45
+  dotnet run --project samples/AgentEval.Samples -- 47   # GDPR      (H4)
 
 # Audit-grade via command-line flag:
-dotnet run --project samples/AgentEval.Samples -- 46 --preset audit-grade
+dotnet run --project samples/AgentEval.Samples -- 48 --preset audit-grade   # EU AI Act (H5)
 ```
 
 ---
