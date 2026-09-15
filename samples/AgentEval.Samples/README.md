@@ -28,11 +28,11 @@ You can also run a specific sample directly from the command line by its **legac
 
 ```bash
 dotnet run -- 1    # Hello World             (A1)
-dotnet run -- 23   # Red Team Basic          (E2)
-dotnet run -- 43   # Performance benchmark   (H2)
-dotnet run -- 54   # Report Browser          (H13)
-dotnet run -- 59   # Gatekeeper Hello World  (J1)
-dotnet run -- 88   # Agent Skills Hello World (K1)
+dotnet run -- 24   # Red Team Basic          (E2)
+dotnet run -- 45   # Performance benchmark   (H2)
+dotnet run -- 56   # Report Browser          (H13)
+dotnet run -- 61   # Gatekeeper Hello World  (J1)
+dotnet run -- 90   # Agent Skills Hello World (K1)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -121,6 +121,7 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset | Yes | 15 min |
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
+| 11 | **TypedMemEval Baseline** | A score beside its chance floor, its own condition's ceiling (V8), and what a *retrieving* system faces — no aggregate score | Yes | 10 min |
 
 ### H — Benchmarks  ★ JSON + HTML (+ PDF) for every registered family
 

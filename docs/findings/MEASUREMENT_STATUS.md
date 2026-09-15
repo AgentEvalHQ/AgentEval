@@ -19266,3 +19266,95 @@ is what the aggregation reads.** Each step looked sufficient until someone asked
 the seven were pointed out rather than found.
 
 **Cost: 0 calls.**
+
+### 88.53 ✅ A sample that printed a RETRIEVAL number beside a NO-RETRIEVAL score — and the documented run commands that were already wrong (2026-09-15)
+
+TypedMemEval had **zero** samples in `AgentEval.Samples` while LongMemEval had three, so
+`11_TypedMemEvalBaselineDemo.cs` was built: one vertical, per shape, no aggregate score. It runs
+through `TypedMemEvalRunner` — the same path `agenteval bench typedmemeval` uses — and everything
+below the run is presentation joined to the shipped sidecar.
+
+#### The defect: the right number against the wrong condition
+
+The first build printed one table per shape: `model`, `chance floor`, `above chance`, **`headroom`**,
+`retriever_agreement`. It ran, and every shape came back **1.000**.
+
+`headroom` is `V1 − V9`, and **V9 is a retrieval arm**. The runner injects every haystack session,
+so the reader retrieves nothing and selects nothing — that is the corpus's own `v8_full_haystack`
+condition. A reader handed the whole haystack is not leaving `0.467` on the table; it is **at the
+ceiling for its own condition**. The sample was inviting precisely the misreading it exists to
+prevent, in its own output.
+
+Fixed by splitting the output in two: **the reader against V8** (same condition, so it is the
+ceiling that applies), then separately **what a retrieving system faces** (V9, headroom, ranking),
+carrying an explicit line that those columns do not describe the run above.
+
+| shape | n | model | V8 published | floor | V9 ref | headroom |
+|---|---:|---:|---:|---:|---:|---:|
+| interval-position | 15 | 1.000 | 1.000 | – | 0.400 | 0.600 |
+| occurrence-order | 20 | 1.000 | 1.000 | 0.500 | 0.250 | 0.750 |
+| recency | 15 | 1.000 | 1.000 | 0.333 | 0.533 | 0.467 |
+
+**n/n is a wiring fault until proven otherwise.** It is not one here: all three reproduce
+`v8_passed` exactly. But that is a **wiring reproduction through a second entry point and nothing
+more** — the probe used the **same deployment** (`gpt-5.5`), so it is not an independent
+confirmation, and the sample prints that caveat rather than letting the match look like one.
+
+The honest headline is the **gap between the blocks**: hand a system everything and these shapes
+look solved; make it retrieve and V9 lands at 0.250–0.533. That gap is what the corpus is for.
+
+#### The larger defect: the shape was DERIVED from a convenient string, not READ from the field
+
+The first build grouped questions by splitting `question_type` on its first dash —
+`"temporal-recency"` → `"recency"` — and that matched the sidecar keys, so the table populated and
+looked right.
+
+**It matched for `temporal` and for almost nothing else.** Measured across all ten verticals:
+
+| vertical | `question_type` | sidecar keys | what the split produced |
+|---|---|---|---|
+| `workingmemory` | `workingmemory-recall` (**all 60**) | `distance-8` … `distance-60` (5) | `recall` — matches nothing |
+| `bitemporal` | `bitemporal-belief` | `belief-at-instant` | `belief` — matches nothing |
+| `prospective` | `prospective-memory`, `prospective-not-yet` | `due-later-reminder`, `expiring-validity`, … | 3 of 5 wrong |
+| `episodic` | `episodic-attribution` | `participant-attribution` | wrong |
+
+For `workingmemory` the shape **is not in `question_type` at all** — every question carries the
+same type while the sidecar keys on five distance rungs. The failure is silent and flattering in
+the worst way: no exception, no empty table, just a full table of shapes with **every sidecar
+column rendered `-`**, which reads as "this corpus has no floors or headroom" rather than "this
+join is broken". Only `temporal` — the one vertical the sample shipped with — worked.
+
+The corpus declares the shape per question: `typedmemeval.shape` is `"distance-8"` on a question
+whose `question_type` is `workingmemory-recall`. **The shape is a field. Read the field.** The
+join is now `question_id` → `typedmemeval.shape` from the packaged corpus, and questions whose
+shape cannot be resolved are counted and reported rather than dropped into a quietly smaller
+denominator. Verified across all ten verticals: **36 of 36 shapes join, 0 unresolved.**
+
+This is the same defect as the headroom column one paragraph up, and the same as the C-E frame
+control in §88.52: **comparing what is convenient instead of what identifies.** A string that
+happens to contain the answer for the case in front of you is not the field that holds it.
+
+#### A second defect, found by asking what the registration broke
+
+`Program.RunLegacyNumber` resolves `dotnet run -- <n>` against `Groups.SelectMany(g => g.Samples)`,
+and the file's own comment warns that inserting anywhere but the tail renumbers everything after.
+Checking the blast radius found the numbers **were already wrong before this change**, in two
+independent places:
+
+| where | claim | what it actually ran |
+|---|---|---|
+| `README.md` ×4, `Benchmarks/README.md` ×7 | every `(H*)`/`(J*)`/`(K*)` reference | **off by one** — `-- 43  # Performance (H2)` ran `Registry Discovery` |
+| `README.md` ×1 | `-- 23  # Red Team Basic (E2)` | off by one since **`82ceadb1` (2026-09-08)** — traced through history: E2 sat at flat 23 from 2026-08-07 and moved to 24 in that commit, which was **one of our own PRs**. Nobody noticed for a week |
+| `docs/walkthrough.md` | 9 commands | **7 wrong**; and "Mock mode (no API keys required) — Samples 1-4" was false: **all four** call `AIConfig.IsConfigured`. The genuinely offline pair is group M (98, 99) |
+
+Nothing had failed. Every command ran — and ran the wrong sample.
+
+**The check that holds it.** The doc lines already carried the stable coordinate: `(H2)` is group H,
+sample 2, and a group letter plus a position does **not** move when an earlier group grows — only
+the flat number does. So each line contains both the claim and the thing that identifies it, and
+`tools/check_sample_numbering.py` compares the two without anyone maintaining a second list.
+**26/26 references pass; `--ablate-shift` turns all 26 red.** Unlabelled lines are counted and
+reported, never skipped silently — there are now none. Wired into CI `repository-hygiene`, and the
+step was verified by extracting its `run:` block from the YAML and executing it verbatim.
+
+**Cost: one 50-question run on the Temporal vertical (~100 calls).**
