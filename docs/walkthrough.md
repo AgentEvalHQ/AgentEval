@@ -548,19 +548,22 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 git clone https://github.com/AgentEvalHQ/AgentEval
 cd AgentEval/samples/AgentEval.Samples
 
-# Offline - no credentials, no spend. The menu marks this group "offline".
-# Much of the Gatekeeper group (J) also runs without credentials: CI executes it as
+# No API keys needed - samples 1-4 fall back to a mock agent when AIConfig is
+# unconfigured, so they run and print real assertions with no Azure and no spend.
+dotnet run -- 1    # Hello World                 (A1)
+dotnet run -- 2    # Agent + One Tool            (A2)
+dotnet run -- 3    # Agent + Multiple Tools      (A3)
+dotnet run -- 4    # Performance Metrics         (A4)
+
+# Also offline: the menu marks group M so, and CI runs the Gatekeeper suite as
 #   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
 dotnet run -- 98   # Eval + Chance Floor         (M1)
 dotnet run -- 99   # Deterministic Benchmark     (M2)
 
-# The samples below DO need Azure OpenAI - Getting Started included.
+# A REAL model (and real spend) needs Azure OpenAI:
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
 
-dotnet run -- 1    # Hello World                 (A1)
-dotnet run -- 2    # Agent + One Tool            (A2)
-dotnet run -- 4    # Performance Metrics         (A4)
 dotnet run -- 8    # Comprehensive RAG           (B1)
 dotnet run -- 12   # Calibrated Evaluator        (B5)
 dotnet run -- 14   # Real MAF Workflow           (C2)

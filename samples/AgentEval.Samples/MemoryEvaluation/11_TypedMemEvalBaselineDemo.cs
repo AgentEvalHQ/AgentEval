@@ -117,10 +117,16 @@ public static class TypedMemEvalBaselineDemo
 
         // Grouped by the shape THE CORPUS DECLARES, joined on question_id -- never by splitting
         // `question_type`, which carries the shape for `temporal` and for almost nothing else.
-        var judged = result.QuestionResults.Where(q => q.Correct is not null).ToList();
-        var unresolved = judged.Count(q => !shapeOf.ContainsKey(q.QuestionId));
+        //
+        // EVERY SELECTED QUESTION REACHES THE TABLE. Filtering on `Correct is not null` first
+        // would drop agent errors and inconclusive verdicts BEFORE grouping, so a partial run
+        // would print a clean rate over the survivors and use that shrunken count as the V8
+        // denominator. A question that failed to produce a verdict is not absent from the run;
+        // it is a hole in it, and the table has to show the hole.
+        var attempted = result.QuestionResults.ToList();
+        var unresolved = attempted.Count(q => !shapeOf.ContainsKey(q.QuestionId));
 
-        var scored = judged
+        var scored = attempted
             .Where(q => shapeOf.ContainsKey(q.QuestionId))
             .GroupBy(q => shapeOf[q.QuestionId])
             .OrderBy(g => g.Key, StringComparer.Ordinal)
@@ -131,7 +137,7 @@ public static class TypedMemEvalBaselineDemo
             // NO SILENT DROPS. A question whose shape the corpus does not declare is not a
             // question worth zero -- it is one this table cannot place, and saying so beats
             // quietly shrinking the denominator.
-            Console.WriteLine($"  \u26a0 {unresolved} judged question(s) carry no declared shape and are NOT in the");
+            Console.WriteLine($"  \u26a0 {unresolved} question(s) carry no declared shape and are NOT in the");
             Console.WriteLine("  table below. The corpus and the run have diverged; treat both blocks as partial.");
             Console.WriteLine();
         }
@@ -143,16 +149,24 @@ public static class TypedMemEvalBaselineDemo
         // ceiling that applies here. A retrieval figure would not be.
         Console.WriteLine("THE READER — full haystack, no retrieval (the corpus's V8 condition)");
         Console.WriteLine(new string('-', 88));
-        Console.WriteLine($"  {"shape",-24} {"n",3} {"model",7} {"V8 pub",7} {"floor",7} {"above ch.",9}");
+        Console.WriteLine($"  {"shape",-24} {"n",3} {"judged",6} {"model",7} {"V8 pub",7} {"floor",7} {"above ch.",9}");
         Console.WriteLine(new string('-', 88));
 
         var diverged = 0;
         var incomparable = 0;
         var compared = 0;
+        var totalAttempted = 0;
+        var totalJudged = 0;
         foreach (var group in scored)
         {
-            var n = group.Count();
-            var score = group.Count(q => q.Correct == true) / (double)n;
+            var n = group.Count();                                   // attempted
+            var judged = group.Count(q => q.Correct is not null);     // reached a verdict
+            if (judged > 0) totalJudged += judged;
+            totalAttempted += n;
+
+            // The rate names its own denominator: correct over JUDGED, never over attempted.
+            // An unjudged question is not a wrong answer, and it is not a free pass either.
+            double? score = judged > 0 ? group.Count(q => q.Correct == true) / (double)judged : null;
 
             var v8 = Rate(byShape, group.Key, "v8_passed", "v8_applicable");
             var floor = ReadDouble(byShape, group.Key, "chance_floor");
@@ -161,7 +175,7 @@ public static class TypedMemEvalBaselineDemo
             // overstates by exactly that much on any shape whose question names its alternatives.
             // A floor that is ABSENT is not a floor of zero — it prints as "-" and stays out of
             // the arithmetic rather than flattering the row by 0.000.
-            var above = floor is { } f ? $"{score - f,9:F3}" : "        -";
+            var above = score is { } sc && floor is { } f ? $"{sc - f,9:F3}" : "        -";
 
             // V8 was measured on the same corpus through the CLI's probe path. A divergence here
             // is a signal about the wiring, not about the model: same condition, same questions.
@@ -170,18 +184,28 @@ public static class TypedMemEvalBaselineDemo
             // comparable, and calling them equal because the quotients agree is the same mistake
             // as comparing a count to a population. When V8's applicable set is not this run's
             // set, the figure is still shown — the CLAIM of agreement is what gets withheld.
+            // COMPARABLE NEEDS BOTH HALVES: the published arm must cover the same number of
+            // questions, AND this run must have judged all of them. A rate over 12 of 15 is not
+            // the same measurement as a rate over 15, however close the quotients look.
             var v8n = ReadDouble(byShape, group.Key, "v8_applicable");
-            var comparable = v8 is not null && v8n is { } vn && Math.Abs(vn - n) < 0.5;
+            var sameCount = v8 is not null && v8n is { } vn && Math.Abs(vn - n) < 0.5;
+            var complete = judged == n;
+            var comparable = sameCount && complete && score is not null;
 
             if (comparable) compared++;
 
             string mark;
-            if (comparable && Math.Abs(score - v8!.Value) > 0.0005)
+            if (comparable && Math.Abs(score!.Value - v8!.Value) > 0.0005)
             {
                 mark = "  <- differs from V8";
                 diverged++;
             }
-            else if (v8 is not null && !comparable)
+            else if (v8 is not null && !complete)
+            {
+                mark = $"  <- {n - judged} unjudged, not comparable";
+                incomparable++;
+            }
+            else if (v8 is not null && !sameCount)
             {
                 mark = $"  <- not comparable: V8 covered {v8n:F0}, this run {n}";
                 incomparable++;
@@ -192,12 +216,20 @@ public static class TypedMemEvalBaselineDemo
             }
 
             Console.WriteLine(
-                $"  {group.Key,-24} {n,3} {score,7:F3} "
+                $"  {group.Key,-24} {n,3} {judged,6} "
+                + $"{(score is { } sv ? $"{sv,7:F3}" : "      -")} "
                 + $"{(v8 is { } vv ? $"{vv,7:F3}" : "      -")} "
                 + $"{(floor is { } fl ? $"{fl,7:F3}" : "      -")} {above}{mark}");
         }
 
         Console.WriteLine(new string('-', 88));
+        if (totalJudged < totalAttempted)
+        {
+            Console.WriteLine($"  \u26a0 PARTIAL RUN: {totalAttempted - totalJudged} of {totalAttempted} question(s) never reached a verdict");
+            Console.WriteLine("  (agent error, or a judge outcome that was neither yes nor no). Their shapes are");
+            Console.WriteLine("  still listed, with `judged` below `n`. Rates are over JUDGED questions only, and");
+            Console.WriteLine("  no shape with a hole in it is compared against V8.");
+        }
         // APPLICABILITY COMES FROM THE INPUT, NOT THE RESULT. "Every shape reproduces V8" is a
         // claim about the shapes that HAVE a V8 arm to reproduce. A shape whose arm was never
         // applicable (forgetting/never-known publishes v8_applicable: 0) is not a silent pass,
@@ -259,6 +291,9 @@ public static class TypedMemEvalBaselineDemo
 
         Console.WriteLine("HOW TO READ THIS");
         Console.WriteLine();
+        Console.WriteLine("  n         questions this run ATTEMPTED on that shape.");
+        Console.WriteLine("  judged    how many reached a yes/no verdict. Below n means a partial run;");
+        Console.WriteLine("            those shapes are not compared against V8.");
         Console.WriteLine("  model     the reader's pass rate on that shape, with the whole haystack in");
         Console.WriteLine("            context. No retrieval happens, so this is the V8 condition.");
         Console.WriteLine("  V8 pub    the corpus's published full-haystack arm — the SAME condition, so");
