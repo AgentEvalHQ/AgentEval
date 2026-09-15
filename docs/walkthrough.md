@@ -555,7 +555,7 @@ dotnet run -- 2    # Agent + One Tool            (A2)
 dotnet run -- 3    # Agent + Multiple Tools      (A3)
 dotnet run -- 4    # Performance Metrics         (A4)
 
-# Also offline: the menu marks group M so, and CI runs the Gatekeeper suite as
+# Also offline: the menu marks group M as offline, and CI runs the Gatekeeper suite as
 #   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
 dotnet run -- 98   # Eval + Chance Floor         (M1)
 dotnet run -- 99   # Deterministic Benchmark     (M2)

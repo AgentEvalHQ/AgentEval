@@ -135,6 +135,7 @@ def main() -> int:
     unlabelled: list[str] = []
     other_project = 0
     files_with_refs = 0
+    files_checked = 0
 
     for rel in docs:
         path = os.path.join(REPO, rel)
@@ -145,6 +146,7 @@ def main() -> int:
             continue
 
         saw = False
+        saw_labelled = False
         for lineno, line in enumerate(lines, 1):
             m = line_pattern.search(line)
             if not m:
@@ -161,6 +163,7 @@ def main() -> int:
                 continue
 
             checked += 1
+            saw_labelled = True
             g, pos = label.group('group'), int(label.group('pos'))
             items = groups.get(g)
             if not items or pos < 1 or pos > len(items):
@@ -175,10 +178,17 @@ def main() -> int:
                          where(groups, num) or '(out of range)'))
                 failures += 1
         files_with_refs += 1 if saw else 0
+        files_checked += 1 if saw_labelled else 0
 
     print()
-    print('Checked %d labelled reference(s) across %d file(s); %d failed.'
-          % (checked, files_with_refs, failures))
+    # TWO DIFFERENT COUNTS. Files carrying any reference to this dispatcher is not the same as
+    # files where something was actually CHECKED, and reporting the larger one as the coverage
+    # overstates it -- 29 labelled references live in 4 files, not the 7 that mention the runner.
+    print('Checked %d labelled reference(s) in %d file(s); %d failed.'
+          % (checked, files_checked, failures))
+    if files_with_refs > files_checked:
+        print('%d further file(s) reference this dispatcher without a (Gn) label.'
+              % (files_with_refs - files_checked))
     if other_project:
         print('%d reference(s) name a different project and were skipped.' % other_project)
     if unlabelled:

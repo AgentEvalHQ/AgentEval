@@ -10,6 +10,7 @@ using AgentEval.Memory.External.TypedMemEval;
 using AgentEval.Output;
 using AgentEval.Samples.Benchmarks;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace AgentEval.Samples;
 
@@ -59,9 +60,13 @@ namespace AgentEval.Samples;
 public static class TypedMemEvalBaselineDemo
 {
     /// <summary>
-    /// One vertical by default. Temporal is the useful demonstrator: three shapes that land in two
-    /// different retriever-agreement classes, so the output shows the distinction rather than
-    /// describing it. Raising this to the full family is ~587 questions and roughly 1,200 calls.
+    /// One vertical. Temporal is the useful demonstrator: three shapes that land in two different
+    /// retriever-agreement classes, so the output shows the distinction rather than describing it.
+    ///
+    /// DEPTH is a preset, not a constant — `--preset smoke|standard|audit-grade`, matching every
+    /// other benchmark sample. Smoke takes 12 questions, Standard 30, audit-grade the whole
+    /// vertical (50 here). The presets change HOW MANY questions are asked, never which answers
+    /// count, so a smaller preset buys a wider interval rather than an easier test.
     /// </summary>
     private const TypedMemEvalVertical Vertical = TypedMemEvalVertical.Temporal;
 
@@ -88,18 +93,51 @@ public static class TypedMemEvalBaselineDemo
                         + "If the history does not contain the answer, say so plainly.",
             includeHistory: true);
 
-        var runner = new TypedMemEvalRunner(chatClient);
+        // DEPTH, resolved the way every other benchmark sample resolves it:
+        // CLI `--preset <name>` > AGENTEVAL_SAMPLES_PRESET > interactive prompt > Smoke.
+        var preset = BenchmarkSampleHelpers.ResolvePreset();
+        BenchmarkSampleHelpers.PrintPreset(preset);
+
+        // A smaller preset samples FEWER QUESTIONS, not easier ones, so a shape can end up with a
+        // handful of questions or none at all. The per-shape table prints `n` for exactly this
+        // reason: read the width of the evidence, not just the rate.
+        var maxQuestions = preset switch
+        {
+            SamplePreset.Smoke => (int?)12,
+            SamplePreset.Standard => 30,
+            _ => null      // audit-grade: the whole vertical
+        };
+
+        // PROGRESS. The runner already logs `[i/N] shape outcome` after every question; without a
+        // logger it defaults to NullLogger and a 50-question run sits silent for minutes. This
+        // wires the console up rather than adding a second reporting mechanism beside it.
+        using var loggerFactory = LoggerFactory.Create(b => b
+            .SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information)   // AgentEval.Core has its own LogLevel
+            .AddSimpleConsole(o =>
+            {
+                o.SingleLine = true;
+                o.TimestampFormat = "HH:mm:ss ";
+            }));
+
+        var runner = new TypedMemEvalRunner(chatClient, loggerFactory.CreateLogger<TypedMemEvalRunner>());
         var options = new TypedMemEvalOptions
         {
             RandomSeed = 42,      // reproducible selection
             IncludeTimestamps = true,
+            MaxQuestions = maxQuestions,
         };
 
         Console.WriteLine($"   Vertical:  {Vertical}");
+        Console.WriteLine($"   Questions: {(maxQuestions is { } cap ? $"up to {cap}" : "the whole vertical")}");
         Console.WriteLine($"   Reader:    {deployment}");
         Console.WriteLine($"   Judge:     {deployment} (same model)");
         Console.WriteLine();
-        Console.WriteLine("   Running... one call per question plus one judge call.");
+        // Judge retries are real calls. MaxJudgeRetries defaults to 1, so a judge that returns
+        // an unparsable verdict costs another. Quoting the floor as if it were the total
+        // understates what this run bills.
+        Console.WriteLine("   Running... at least one call per question plus one judge call;");
+        Console.WriteLine("   a judge retry adds more. The exact total is reported at the end.");
+        Console.WriteLine("   Each question prints [i/N] shape outcome as it completes.");
         Console.WriteLine();
 
         var result = await runner.RunAsync(agent, Vertical, options).ConfigureAwait(false);
@@ -109,6 +147,27 @@ public static class TypedMemEvalBaselineDemo
         PrintReading(sidecar);
 
         await WriteReportsAsync(result, agent, deployment).ConfigureAwait(false);
+        PrintKeyTakeaways(result);
+    }
+
+    /// <summary>Closes the sample the way its siblings in this group do.</summary>
+    private static void PrintKeyTakeaways(ExternalBenchmarkResult result)
+    {
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine("KEY TAKEAWAYS:");
+        Console.WriteLine("   * A score is not a result until you know its FLOOR and its CEILING.");
+        Console.WriteLine("   * This reader had the whole haystack, so it was never asked to");
+        Console.WriteLine("     remember anything — that is the V8 condition, not a memory test.");
+        Console.WriteLine("   * V9 is where a system that must RETRIEVE lands. The gap is the point.");
+        Console.WriteLine("   * A shape whose ranking class is non-ranking cannot separate two");
+        Console.WriteLine("     systems at all; a good score there is not evidence.");
+        Console.WriteLine($"   * Model calls billed by this run: {result.TotalLlmCalls}"
+                          + (result.TotalJudgeRetryLlmCalls > 0
+                             ? $" (including {result.TotalJudgeRetryLlmCalls} judge retry call(s))"
+                             : string.Empty));
+        Console.WriteLine("   * Change `Vertical` to run one of the other nine.");
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine();
     }
 
     /// <summary>
@@ -187,7 +246,13 @@ public static class TypedMemEvalBaselineDemo
     /// numbers beside the score are the ones the consumer's copy carries.
     /// </summary>
     private static JsonElement LoadSidecar(TypedMemEvalVertical vertical)
-        => JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical)).RootElement;
+    {
+        // Cloned while the document is alive. Returning `.RootElement` from an undisposed
+        // JsonDocument roots its pooled buffer until finalization; a JsonElement from a DISPOSED
+        // one throws on access. Clone is the only correct way to outlive the document.
+        using var document = JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(vertical));
+        return document.RootElement.Clone();
+    }
 
     private static void PrintPerShape(
         ExternalBenchmarkResult result,
@@ -240,7 +305,8 @@ public static class TypedMemEvalBaselineDemo
 
         var diverged = 0;
         var incomparable = 0;
-        var compared = 0;
+        var compared = 0;        // same condition AND same denominator AND fully judged
+        var publishesV8 = 0;     // has a V8 arm at all -- a DIFFERENT fact
         var totalAttempted = 0;
         var totalJudged = 0;
         foreach (var group in scored)
@@ -278,6 +344,7 @@ public static class TypedMemEvalBaselineDemo
             var complete = judged == n;
             var comparable = sameCount && complete && score is not null;
 
+            if (v8 is not null) publishesV8++;
             if (comparable) compared++;
 
             string mark;
@@ -293,7 +360,7 @@ public static class TypedMemEvalBaselineDemo
             }
             else if (v8 is not null && !sameCount)
             {
-                mark = $"  <- not comparable: V8 covered {v8n:F0}, this run {n}";
+                mark = $"  <- V8 covers {v8n:F0}, this run {n} — not comparable";
                 incomparable++;
             }
             else
@@ -320,29 +387,51 @@ public static class TypedMemEvalBaselineDemo
         // claim about the shapes that HAVE a V8 arm to reproduce. A shape whose arm was never
         // applicable (forgetting/never-known publishes v8_applicable: 0) is not a silent pass,
         // so the count is stated rather than the word "every".
-        if (diverged == 0 && incomparable == 0 && compared > 0)
+        // MUTUALLY EXCLUSIVE BRANCHES. The earlier version could print "no shape publishes a V8
+        // arm" immediately below a V8 column reading 1.000, because it asked `compared == 0` --
+        // which is true whenever the DENOMINATORS differ, not only when the arm is absent.
+        // "Has a V8 arm" and "was comparable with this run" are two facts, and one counter was
+        // answering for both.
+        if (publishesV8 == 0)
         {
-            Console.WriteLine($"  All {compared} of {scored.Count} shape(s) with a published V8 arm reproduce it exactly.");
+            Console.WriteLine($"  None of the {scored.Count} shape(s) here publishes a V8 arm, so the model column");
+            Console.WriteLine("  stands on its own.");
+        }
+        else if (compared == 0)
+        {
+            Console.WriteLine($"  {publishesV8} shape(s) publish a V8 arm, but NONE was comparable with this run —");
+            Console.WriteLine("  the published arm covers the whole vertical and this run sampled a subset, so the");
+            Console.WriteLine("  two rates are over different question sets. The V8 column is shown for reference;");
+            Console.WriteLine("  the agreement claim is withheld. Use --preset audit-grade to compare like with like.");
+        }
+        else if (diverged == 0 && incomparable == 0)
+        {
+            Console.WriteLine($"  All {compared} shape(s) with a published V8 arm reproduce it exactly"
+                              + (scored.Count > publishesV8 ? $" ({scored.Count - publishesV8} of {scored.Count} publish none)." : "."));
             Console.WriteLine("  Same corpus, same condition, reached through a different entry point — a check on");
             Console.WriteLine("  this sample's wiring, NOT an independent confirmation of the score: the published");
             Console.WriteLine("  probe used this same deployment.");
         }
-        if (compared == 0)
+        else
         {
-            Console.WriteLine($"  No shape here publishes a V8 arm, so none of the {scored.Count} rows above was checked");
-            Console.WriteLine("  against one. The model column stands on its own.");
-        }
-        if (diverged > 0)
-        {
-            Console.WriteLine($"  ⚠ {diverged} shape(s) differ from the published V8 arm. Same questions and the same");
-            Console.WriteLine("  condition should give the same rate, so read this as a wiring or deployment");
-            Console.WriteLine("  difference before reading it as a result.");
-        }
-        if (incomparable > 0)
-        {
-            Console.WriteLine($"  ⚠ {incomparable} shape(s) could NOT be compared: the published V8 arm covers a");
-            Console.WriteLine("  different number of questions than this run scored, so the two rates are over");
-            Console.WriteLine("  different sets. The V8 column is still shown; the agreement claim is withheld.");
+            if (diverged > 0)
+            {
+                Console.WriteLine($"  ⚠ {diverged} shape(s) differ from the published V8 arm. Same questions and the");
+                Console.WriteLine("  same condition should give the same rate, so read this as a wiring or deployment");
+                Console.WriteLine("  difference before reading it as a result.");
+            }
+
+            if (incomparable > 0)
+            {
+                Console.WriteLine($"  ⚠ {incomparable} of {publishesV8} shape(s) with a V8 arm could NOT be compared:");
+                Console.WriteLine("  the arm covers a different number of questions than this run scored, so the two");
+                Console.WriteLine("  rates are over different sets. The agreement claim is withheld for those.");
+            }
+
+            if (compared > 0)
+            {
+                Console.WriteLine($"  {compared} shape(s) WERE comparable and reproduce their published V8 arm.");
+            }
         }
         Console.WriteLine();
 

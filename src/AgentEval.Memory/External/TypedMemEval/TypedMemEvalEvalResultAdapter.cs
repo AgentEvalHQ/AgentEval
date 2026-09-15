@@ -74,6 +74,15 @@ public static class TypedMemEvalEvalResultAdapter
         // all of it, so it travels with the projection.
         var context = SidecarContext.Load(typed.Vertical);
 
+        // EVERY QUESTION BECOMES A LEAF. Without this the tree is root -> shapes -> nothing:
+        // a 50-question run renders three rows and no way to see which question did what, while
+        // the per-question results sit unused in the result object. `TypedOutcome.Shape` carries
+        // the grouping, so the questions attach to their shape without re-reading the corpus.
+        var questionsByShape = result.QuestionResults
+            .Where(q => q.TypedOutcome is not null)
+            .GroupBy(q => q.TypedOutcome!.Shape, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
         var shapeNodes = typed.ByShape
             .OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv => Node(
@@ -84,7 +93,8 @@ public static class TypedMemEvalEvalResultAdapter
                 judgeModel: judgeModel,
                 extra: context.DimensionsFor(kv.Key),
                 recommendations: context.NotesFor(kv.Key),
-                subResults: null,
+                subResults: QuestionNodes(
+                    typed.Vertical, kv.Key, questionsByShape, judgeModel, passThreshold, now),
                 passThreshold: passThreshold,
                 now: now))
             .ToList();
@@ -291,23 +301,41 @@ public static class TypedMemEvalEvalResultAdapter
             if (!_loaded || _sensitivity.ValueKind != JsonValueKind.Object)
                 return notes;
 
-            foreach (var (field, label) in new[]
-                     {
-                         ("reference_retriever", "reference"),
-                         ("dense_retriever", "dense"),
-                         ("second_dense_retriever", "dense (2)")
-                     })
+            // EACH RETRIEVER CONDITIONS A DIFFERENT THING, and saying "all figures depend on all
+            // three" is the kind of loose conditionality statement this family exists to stamp
+            // out. `headroom.perfectSelector` is V1 minus V9 and `arm.v9ReferenceRetrieval` IS
+            // V9 — both measured on the BM25 reference arm alone. The two dense retrievers do
+            // not enter either number; they decide only the ranking class above.
+            if (Field("reference_retriever") is { } reference)
             {
-                if (_sensitivity.TryGetProperty(field, out var value)
-                    && value.ValueKind == JsonValueKind.String)
-                {
-                    notes.Add($"Retriever ({label}): {value.GetString()}. Every retrieval figure "
-                              + "above is conditional on it.");
-                }
+                var budget = _sensitivity.TryGetProperty("reference_k", out var k)
+                             && k.ValueKind == JsonValueKind.Number
+                    ? $", top-K={k.GetInt32()}"
+                    : string.Empty;
+                notes.Add($"Reference retriever: {reference}{budget}. "
+                          + "`arm.v9ReferenceRetrieval` and `headroom.perfectSelector` are "
+                          + "conditional on THIS and on nothing else.");
+            }
+
+            var dense = new[] { Field("dense_retriever"), Field("second_dense_retriever") }
+                .Where(d => d is not null)
+                .ToList();
+            if (dense.Count > 0)
+            {
+                notes.Add($"Dense retrievers compared: {string.Join(" and ", dense)}. These decide "
+                          + "the ranking class ONLY — they do not enter the V9 or headroom "
+                          + "figures above.");
             }
 
             return notes;
         }
+
+        private string? Field(string name)
+            => _sensitivity.ValueKind == JsonValueKind.Object
+               && _sensitivity.TryGetProperty(name, out var v)
+               && v.ValueKind == JsonValueKind.String
+                ? v.GetString()
+                : null;
 
         private static bool TryRow(JsonElement byShape, string shape, out JsonElement row)
         {
@@ -339,6 +367,101 @@ public static class TypedMemEvalEvalResultAdapter
                && v.ValueKind == JsonValueKind.String
                 ? v.GetString()
                 : null;
+    }
+
+    /// <summary>
+    /// One leaf per question, under its own shape. Ordered by question id so two runs of the same
+    /// corpus diff line-for-line.
+    /// </summary>
+    private static IReadOnlyList<EvalResult>? QuestionNodes(
+        string vertical,
+        string shape,
+        IReadOnlyDictionary<string, List<QuestionResult>> byShape,
+        string? judgeModel,
+        double passThreshold,
+        DateTimeOffset now)
+    {
+        if (!byShape.TryGetValue(shape, out var questions) || questions.Count == 0)
+            return null;
+
+        return questions
+            .OrderBy(q => q.QuestionId, StringComparer.Ordinal)
+            .Select(q => QuestionNode(vertical, shape, q, judgeModel, passThreshold, now))
+            .ToList();
+    }
+
+    private static EvalResult QuestionNode(
+        string vertical,
+        string shape,
+        QuestionResult question,
+        string? judgeModel,
+        double passThreshold,
+        DateTimeOffset now)
+    {
+        var outcome = question.TypedOutcome!.Outcome;
+
+        // THE OUTCOME IS THE RESULT, NOT THE BOOLEAN. A question that abstained, was never run,
+        // or came back inconclusive is not a question answered wrongly, and collapsing all three
+        // into `false` is the exact loss this family's typed vector exists to prevent. `Value`
+        // is not nullable, so the distinction is carried by Label and Severity instead.
+        var (value, label, passed, severity) = outcome switch
+        {
+            TypedMemEvalOutcome.Correct => (1.0, "pass", true, "none"),
+            TypedMemEvalOutcome.Wrong => (0.0, "fail", false, "medium"),
+            TypedMemEvalOutcome.Abstained => (0.0, "abstained", false, "low"),
+            TypedMemEvalOutcome.Missed => (0.0, "missed", false, "medium"),
+            TypedMemEvalOutcome.Premature => (0.0, "premature", false, "medium"),
+            TypedMemEvalOutcome.Inconclusive => (0.0, "inconclusive", false, "low"),
+            _ => (0.0, "unrun", false, "low")
+        };
+
+        var notes = new List<string> { $"Outcome: {outcome}." };
+        if (!string.IsNullOrWhiteSpace(question.JudgeExplanation))
+        {
+            // Truncated: a report is an index into the run, not a second copy of it.
+            var reason = question.JudgeExplanation!.Trim();
+            notes.Add("Judge: " + (reason.Length > 400 ? reason[..400] + "…" : reason));
+        }
+
+        var dimensions = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["llmCalls.agent"] = question.AgentLlmCallCount,
+            ["llmCalls.judge"] = question.JudgeLlmCallCount
+        };
+        if (question.JudgeRetryLlmCallCount > 0)
+            dimensions["llmCalls.judgeRetry"] = question.JudgeRetryLlmCallCount;
+        if (question.Duration is { } duration)
+            dimensions["durationSeconds"] = Math.Round(duration.TotalSeconds, 3);
+
+        return new EvalResult(
+            Metric: new EvalMetadata(
+                Key: $"typedmemeval.{vertical}.{shape}.{question.QuestionId}",
+                Name: question.QuestionId,
+                Category: "memory",
+                Version: "1.0.0"),
+            Score: new EvalScore(
+                Value: value,
+                Ordinal: null,
+                Label: label,
+                Passed: passed,
+                Threshold: passThreshold,
+                Severity: severity,
+                Confidence: null),
+            Details: new EvalDetails(
+                Dimensions: dimensions,
+                Evidence: null,
+                Recommendations: notes,
+                SubResults: null,
+                AggregationStrategy: "typed-outcome-vector"),
+            Provenance: new EvalProvenance(
+                Type: "question",
+                JudgeModel: judgeModel,
+                PromptId: question.QuestionId,
+                PromptHash: null,
+                TokensUsed: question.JudgeTokensUsed,
+                EstimatedCost: 0,
+                CacheHit: false),
+            EvaluatedAt: now);
     }
 
     private static EvalResult Node(
