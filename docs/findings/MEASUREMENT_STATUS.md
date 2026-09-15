@@ -19067,6 +19067,31 @@ never established.
 Each verified by firing it: the overwrite guard names both retriever ids, the width guard names the
 shard, and the family still classifies 18/10/7/1 across all 36 shapes.
 
+#### 🔴 Round three, and it has ONE theme: I compared VALUES and called it IDENTITY
+
+The cross-check this entry was proud of — *“all 70 comparisons agreed”* — proves the **numbers**
+match. It does not prove they are about the same corpus. Two different inputs can produce equal
+rounded per-shape rates and receive a second column attached to stale reference data.
+
+Four instances of the one mistake:
+
+* **The sidecar was never checked against the corpus on disk.** Now it is: `corpus_sha256` is
+  recomputed by the sidecar’s own convention (CRLF→LF, UTF-8, SHA256) and must match before
+  anything is written. Implementing it also cross-checked the convention — the Python version
+  reproduces all ten published hashes, so it agrees with the C# one.
+* **`questions` was not in the equality check.** Equal rates over different populations are not
+  the same measurement; a shape that gained or lost questions can land on the same figure.
+* **The vector width was trusted from metadata `_save_shard` derives off ONE sample** — and
+  `cosine_rank` zips vectors, so a short payload is silently TRUNCATED during ranking and still
+  published under the stated width. Every vector’s decoded length is now checked against it.
+* **The overwrite guard only caught a *different* retriever id.** Vectors can be replaced beneath
+  an unchanged model name — a re-embed, a model update — and a re-stamp would rewrite shipped
+  values with nothing in the diff to distinguish it from a no-op. An existing column must now be
+  REPRODUCED, per shape, or the run refuses.
+
+Each fired on demand: the corpus guard names both hashes, the width guard names the vector and its
+decoded length. The re-stamp after all four reproduced the family **byte-identically**.
+
 #### Recorded from their side, not ours
 
 — **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather

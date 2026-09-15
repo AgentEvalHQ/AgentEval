@@ -32,6 +32,7 @@ import glob
 import json
 import os
 import sys
+import base64
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -119,6 +120,19 @@ def load_model_cache(model: str, vertical: str) -> dict:
             raise SystemExit('%s: shards of %r disagree on vector width (%d vs %d). One of '
                              'them was not produced by that model.'
                              % (path, model, seen, width))
+        # THE STATED WIDTH IS CHECKED AGAINST THE BYTES. `_save_shard` derives __embedding_dims__
+        # from ONE sample, and `cosine_rank` zips the two vectors -- so a short or corrupted payload
+        # is silently TRUNCATED during ranking and still published under the stated width. float16,
+        # so two bytes per dimension; no unpacking needed to measure it.
+        for key, blob in shard.items():
+            if key.startswith('__'):
+                continue
+            actual = len(base64.b64decode(blob)) // 2
+            if actual != width:
+                raise SystemExit(
+                    '%s: vector %s decodes to %d dimensions but the shard states %d. Ranking zips '
+                    'vectors, so this one would be silently truncated and still published as d%d.'
+                    % (path, key[:12], actual, width, width))
         stamped = shard.get(dr._MODEL_KEY)
         # AN EXACT MATCH, NOT "no contradiction". `if stamped and stamped != model` accepts a shard
         # with NO stamp, because the first operand is false -- the identical fail-open that
@@ -243,6 +257,10 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
                              'first: this column sits beside that one, it does not replace it.'
                              % vertical)
         published_second = block.get('second_dense_retriever')
+        # Rewriting under the SAME id is the quieter half of this hazard: the cache writer can
+        # replace vectors beneath an unchanged model name (a re-embed, a model update), and then a
+        # re-stamp rewrites published values with nothing in the diff to distinguish it from a
+        # no-op. Handled per shape below, where the new values can actually be compared.
         if published_second and published_second != second_id:
             # RELEASE EVIDENCE IS NOT OVERWRITTEN ON A TYPO. A changed alias or a mistyped --models
             # would silently rewrite every second_dense value and every retriever_agreement in a
@@ -255,6 +273,18 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
             raise SystemExit('%s publishes dense_retriever %r but this run\'s first model is %r. '
                              'The reference column must be the one already published.'
                              % (vertical, block.get('dense_retriever'), first_id))
+
+        # IS THIS SIDECAR ABOUT THE CORPUS WE JUST MEASURED? Matching rounded aggregates does not
+        # answer that -- two different inputs can produce equal per-shape rates and receive a column
+        # attached to stale reference data. The corpus identity does answer it.
+        corpus_path = os.path.join(dr.CORPORA, vertical,
+                                   'agenteval-typedmemeval-%s-v5.json' % vertical)
+        on_disk = tmc.corpus_sha256(corpus_path)
+        if meta.get('corpus_sha256') != on_disk:
+            raise SystemExit(
+                '%s: the sidecar describes corpus %s but the corpus on disk is %s. A column written '
+                'beside reference data from a different input is not a comparison.'
+                % (vertical, str(meta.get('corpus_sha256'))[:12], on_disk[:12]))
 
         existing = block['by_shape']
         # Shapes DECLARED not-applicable carry no measurement to compare, and must not read as a
@@ -277,6 +307,11 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
                     '%s/%s: recomputed reference ALLgold %.4f but the sidecar publishes %.4f. One '
                     'of the two is wrong; refusing to publish a second column beside a first that '
                     'does not reproduce.' % (vertical, shape, a, published))
+            if existing[shape].get('questions') != n:
+                raise SystemExit(
+                    '%s/%s: the sidecar counts %r questions and this run counted %d. Equal rates '
+                    'over different populations are not the same measurement.'
+                    % (vertical, shape, existing[shape].get('questions'), n))
             if round(bm25, 4) != round(existing[shape]['allgold_bm25'], 4):
                 raise SystemExit(
                     '%s/%s: recomputed BM25 ALLgold %.4f but the sidecar publishes %.4f.'
@@ -284,6 +319,17 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
 
             klass = classify(existing[shape]['discriminates_under_dense'],
                              (1 - b) >= 0.15, a > bm25, b > bm25)
+            prior_col = existing[shape].get('second_dense')
+            if published_second and prior_col is not None:
+                if (round(prior_col.get('allgold', -1), 4) != round(b, 4)
+                        or existing[shape].get('retriever_agreement') != klass):
+                    raise SystemExit(
+                        '%s/%s already publishes a second column that this run does not reproduce '
+                        '(allgold %.4f -> %.4f, class %r -> %r). The vectors under %r changed. '
+                        'Rewriting shipped evidence is a deliberate act: remove the existing column '
+                        'by hand if that is what you mean.'
+                        % (vertical, shape, prior_col.get('allgold', float('nan')), b,
+                           existing[shape].get('retriever_agreement'), klass, second_id))
             tally[klass] += 1
             existing[shape]['second_dense'] = {
                 'allgold': round(b, 4),

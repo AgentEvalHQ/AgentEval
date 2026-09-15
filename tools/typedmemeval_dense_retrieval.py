@@ -551,8 +551,12 @@ def _carry_second_column(fresh: dict, prior: dict):
         old = prior.get(shape) or {}
         keep = {k: old[k] for k in ('second_dense', 'retriever_agreement') if k in old}
         if keep:
-            same = all(round(old.get(f, object()), 4) == round(row[f], 4)
-                       for f in ('allgold_bm25', 'allgold_dense'))
+            # THE DENOMINATOR IS PART OF THE IDENTITY. Rounded rates can survive a population
+            # change -- a shape that gained or lost questions can land on the same figure -- and the
+            # paired verdict was computed for the OLD population. Checked in review of PR #250.
+            same = (old.get('questions') == row.get('questions')
+                    and all(round(old.get(f, object()), 4) == round(row[f], 4)
+                            for f in ('allgold_bm25', 'allgold_dense')))
             if same:
                 row = dict(row, **keep)
                 carried += 1
