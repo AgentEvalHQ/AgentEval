@@ -18928,3 +18928,224 @@ is larger than `SecurityGraphIngestionPumpTests`.
 
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
+
+### 88.51 ✅ The second retriever is PUBLISHED, and the consumer’s own arithmetic confirms the classifier (2026-09-15)
+
+§88.49 measured the retriever monoculture and §88.50 shipped the disclosure. The consuming
+project’s coordinator replied that our qualification reasoning was right, and made one suggestion:
+**co-publish the second model as a column rather than describe it in an appendix.**
+
+They also said they would derive that column themselves from `typedmemeval_retriever_compare.py`.
+That is the decisive argument, and it is not the one they made: **two derivations of one number can
+drift, and a drift between a consumer’s copy and ours is invisible to both.** One published source
+removes it. Cost, by our own account, is zero API calls — both models’ vectors are banked and this
+only re-ranks them.
+
+#### What is published
+
+`second_dense_retriever` = `azure-emb-text-embedding-3-small-d1536-cosine-f16`, plus per shape a
+`second_dense` block (`allgold`, `predicted_headroom`, `discriminates`) and a derived
+`retriever_agreement`:
+
+| class | shapes | meaning |
+|---|---:|---|
+| `robust-ranking` | **18** | discriminates under BOTH published retrievers |
+| `retriever-sensitive` | **10** | the two disagree on discrimination OR on whether dense beats BM25 |
+| `non-ranking` | **7** | neither discriminates |
+
+**ADDITIVE.** `allgold_dense`, `predicted_headroom_dense` and `discriminates_under_dense` keep their
+exact meaning and value — they remain the reference column, and a consumer reading them before this
+release reads the same bytes after it. Verified field by field: **210 pre-existing values compared,
+0 altered**, and nothing outside the block moved.
+
+#### The classifier agrees with the coordinator’s arithmetic, for the right reason
+
+They predicted the sensitive class would be “the four named flips + the six sign-flips” = 10. The
+classifier, computed independently from the two columns, returns **10**.
+
+That agreement is only evidence if the two sets are disjoint — a shape with both a flag flip and a
+sign flip would be counted once by the classifier and twice in “4 + 6”, and the totals could match by
+cancellation. **Checked: 4 flag-flips, 6 sign-flips, 0 overlap.** The flip lists are exactly the ones
+§88.49 named, so the published column reproduces the finding rather than restating it.
+
+#### Two guards on the publication itself
+
+* **The reference column is recomputed and compared to what is already published.** The sidecar
+  already carries `allgold_dense` and `allgold_bm25` from the dense tool’s own run; the stamp
+  recomputes both from banked vectors and refuses on any disagreement rather than overwriting. Two
+  independent computations of one quantity, never previously put side by side — the §88.5c habit
+  applied deliberately instead of discovered late. **All 70 comparisons agreed.**
+* **`--stamp` runs the plumbing self-check for each model before publishing** and refuses on
+  anything but an exact `0.000000` self-spread. The coordinator asked for that by name and was right
+  to: a compare tool is a probe, and a probe that cannot come out the other way publishes noise.
+
+#### What this does NOT say
+
+Neither retriever is any consumer’s. The pair is published so the conditionality is **visible rather
+than described** — not because `3-small` is the better reference. It is better on the family
+aggregate and worse on nine shapes.
+
+#### 🔴 Three findings in review, and one was a correctness bug in the identity itself
+
+**The dimension was hard-coded.** `dense_retriever_id` takes a width *because the width changes the
+ranking*, and the stamp passed a literal `1536`. Stamping any other model would have published
+`d1536` beside vectors of a different width — an id that does not identify, which is the exact
+defect the id was introduced to end, reproduced inside the tool that publishes it. Now read from
+each shard’s `__embedding_dims__`, with a refusal when it is missing and when shards of one model
+disagree.
+
+**`--stamp` advertised a refusal it did not enforce.** Verticals skipped for missing vectors were
+printed and then ignored, so a model with an incomplete cache would publish part of the family and
+return success — while the docstring said it refuses partial runs. The `--vertical` and `--budget`
+forms were refused; the one that arises from the data was not. Claim-without-instrument again.
+
+**The publication was not all-or-nothing.** Each vertical was written as it passed, so a refusal on
+the ninth left eight sidecars already carrying a second column. The refusals exist because
+something might be wrong, so the path that fires them is precisely the one that must not leave a
+half-published family. Staged in memory now; files are touched only after every vertical passes.
+
+
+#### SEND-41 §2: the one shape that carried no verdict now carries a declared one
+
+Their full-family C-D run came back and found a gap in our sidecar, not in their store:
+**`forgetting/never-known` had no `retriever_agreement` at all.** Their ranking-only column dropped
+it rather than assume it rankable — the right call, made on an inference they should not have had to
+make.
+
+It is the one shape of 36 the dense measurement cannot cover, and the reason is worth publishing
+rather than leaving to be deduced. All 15 of its questions have an **EMPTY gold set**: the correct
+answer is an abstention. So the operand is not unmeasured, it is **undefined** —
+`gold.issubset(top_k)` is vacuously true for an empty gold set, which means ALLgold would read
+**1.000 under every retriever at every budget**. The most flattering number available in the block,
+and the least true.
+
+Now declared: `retrieval_measured: false`, `retriever_agreement: "not-applicable"`, and a
+`not_measured_because` that says the above. **No allgold or headroom fields are written for it** —
+deliberately, so it is a row that cannot be averaged by accident.
+
+This is gate shape 7 — *"an instrument that declines to measure must say WHICH of two reasons
+applies: not applicable, or not measured"* — landing on the instrument whose own docstring states the
+rule. The sidecars now carry a verdict for **all 36 shapes**: 18 robust-ranking, 10
+retriever-sensitive, 7 non-ranking, 1 not-applicable. Verified additive: 360 values compared against
+the previous state, **0 altered**, exactly one shape added.
+
+#### SEND-41 §5: their wording correction is right, with a refinement
+
+They flagged that our phrase *"the revision did not move"* undersold `C-A`, because the sidecar
+revision **did** move: `v5+535f4ed01b92` → `v5+8de66481d5b8`. Checked against the tags and they are
+correct — `revision` is literally `v5+<corpus_sha256[:12]>`, so it moves with the sha by construction.
+
+Their suggested phrasing was *"sidecar revision moves with the sha; the inner corpus-file field does
+not."* The second half needs one correction: **the corpus file carries no revision field at all.**
+Its `typedmemeval` block holds `shape`, `vertical`, `difficulty`, `derivation` and so on — nothing
+versioned. The field that does not move is `design_revision`, and it lives in the **sidecar** beside
+`revision`, holding `v5`.
+
+So the accurate sentence is: **`revision` moves with the sha (`v5+<sha12>`), `design_revision` stays
+at `v5`, and the corpus file itself is unversioned.** Recorded here so the next disclosure uses it.
+
+#### 🔴 Five more in review, and the co-published column was not durable
+
+The serious one: **the dense tool’s own `--stamp` deleted the second column.** It assigns
+`retriever_sensitivity` fresh, so a plain re-run dropped `second_dense_retriever`, every
+`second_dense` value and every `retriever_agreement` — shipped fields, removed by the tool that
+owns the block, silently. I had run exactly that sequence an hour earlier and only the ORDER saved
+it. Now carried forward, and **only where this run’s reference figures match the ones the verdict
+was derived against**: a classification re-attached to numbers it no longer describes is worse
+than an absent one, so a moved reference drops the pair loudly. Proved by running the dense
+`--stamp` alone against a family that already had the column: carried on 35 of 35, 0 dropped, and
+the ten sidecars came out **byte-identical**.
+
+The other four, all refusals replacing silent skips: a **missing sidecar** was skipped, publishing
+a partial family past the whole-family check; **re-stamping with a different second model**
+silently overwrote published release evidence (a typo in `--models` would have done it); the
+**zero-spread wiring-fault guard ran after the publication branch returned**, so a control the
+printout enforces the publication skipped; and a **shard with no recorded width** was merged while
+`dims_of` took the number from a sibling, publishing an identity over vectors whose width was
+never established.
+
+Each verified by firing it: the overwrite guard names both retriever ids, the width guard names the
+shard, and the family still classifies 18/10/7/1 across all 36 shapes.
+
+#### 🔴 Round three, and it has ONE theme: I compared VALUES and called it IDENTITY
+
+The cross-check this entry was proud of — *“all 70 comparisons agreed”* — proves the **numbers**
+match. It does not prove they are about the same corpus. Two different inputs can produce equal
+rounded per-shape rates and receive a second column attached to stale reference data.
+
+Four instances of the one mistake:
+
+* **The sidecar was never checked against the corpus on disk.** Now it is: `corpus_sha256` is
+  recomputed by the sidecar’s own convention (CRLF→LF, UTF-8, SHA256) and must match before
+  anything is written. Implementing it also cross-checked the convention — the Python version
+  reproduces all ten published hashes, so it agrees with the C# one.
+* **`questions` was not in the equality check.** Equal rates over different populations are not
+  the same measurement; a shape that gained or lost questions can land on the same figure.
+* **The vector width was trusted from metadata `_save_shard` derives off ONE sample** — and
+  `cosine_rank` zips vectors, so a short payload is silently TRUNCATED during ranking and still
+  published under the stated width. Every vector’s decoded length is now checked against it.
+* **The overwrite guard only caught a *different* retriever id.** Vectors can be replaced beneath
+  an unchanged model name — a re-embed, a model update — and a re-stamp would rewrite shipped
+  values with nothing in the diff to distinguish it from a no-op. An existing column must now be
+  REPRODUCED, per shape, or the run refuses.
+
+Each fired on demand: the corpus guard names both hashes, the width guard names the vector and its
+decoded length. The re-stamp after all four reproduced the family **byte-identically**.
+
+#### Round four: two checks that ALMOST pinned their subject
+
+**The paired verdict carried without its pair’s first half.** Rates and the denominator pin the
+MEASUREMENT; they do not pin WHICH RETRIEVER produced it. A later stamp under a different dense
+model whose figures happened to coincide would have re-attached the old class and written the new
+`dense_retriever` beside it — **a published class describing a retriever pair that never existed.**
+The reference identity is in the predicate now, and the block-level metadata travels with the rows
+rather than surviving them.
+
+**The width check floored.** `len(b64decode(blob)) // 2` accepts `2×width + 1` bytes, and
+`b64decode` without `validate=True` silently DISCARDS non-base64 characters — so corruption could
+shrink a payload to a legal-looking length. Exact byte count and validated base64 now. Verified
+both ways: a 9-byte payload and an invalid-base64 payload are each refused by name; the correct
+8-byte one passes.
+
+**Fourteen findings across four rounds on this PR, every one real.** The tally worth keeping is
+not the count but the shape: after the first round they were all versions of *a check that
+compares what is convenient instead of what identifies* — rounded rates for a corpus, metadata for
+bytes, a model name for a model’s vectors, one half of a pair for the pair.
+
+#### Round five: the fix for shape 7 reopened shape 7
+
+The check written to TOLERATE the declared not-applicable row made a **missing** one invisible.
+`measurable` filtered declared rows out, so a sidecar with no `never-known` entry at all has a
+measurable set equal to the measured shapes and sails through — while one of the family’s 36 shapes
+carries no verdict. That is precisely the hole the declared row was added to close, reopened by the
+code accommodating it. The sidecar’s shape set is now compared against the **corpus’s**, and the
+refusal names both.
+
+Two more whole-family holes: a vertical whose questions **all** lack gold yields nothing from
+`questions_for` and never reached `skipped`, so the family refusal could not see it; and the carry
+predicate still did not check the **corpus identity**, so an edit preserving the rounded aggregates
+would carry the old pair onto new reference data. Fourth place that same substitution was found in
+one pull request.
+
+**Seventeen findings across five rounds, every one real.** The count is not the point; the shape
+is. After round one they were all one substitution — *comparing what is convenient instead of what
+identifies* — and rounds four and five show it survives being fixed in one place: the corpus
+identity had to be added to the publication check, then the carry predicate, then the
+whole-family check, each time after a reviewer pointed at the place it was still missing.
+
+#### Recorded from their side, not ours
+
+— **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather
+than a sample: 1 exact, 14 undercounts, **zero overcounts**. One-directional loss is the signature of
+identity present as text and absent as structure. The shape is now the before/after instrument for
+their entity-linking work. An acceptance argument this corpus made about itself, confirmed by a
+consumer against a real store.
+
+— **A characterisation of our Prospective corpus was retracted a second time.** “0.980 — too easy,
+similarity suffices” was measured against a mis-keyed `due-window`; correctly keyed it read 17%, and
+on the current lineage 1/18 = **5.6%**. The corpus was never too easy — the key was wrong in the
+flattering direction, and the shape it hid is the most discriminating cell in the vertical (dense
+headroom 1.000). Worth keeping because it is the third time a number about this family moved in the
+flattering direction for an instrument reason.
+
+**Cost: 0 calls.** No corpus byte moved; no consumer control resets.

@@ -123,6 +123,18 @@ BAND_RESOLUTION = 1e-4
 #: The deterministic reference retriever. Named in metadata so the number is re-derivable.
 RETRIEVER_ID = "bm25-okapi-k1.5-b0.75"
 
+
+def corpus_sha256(path) -> str:
+    """The corpus hash, by the sidecar's own convention: CRLF -> LF, UTF-8, SHA256.
+
+    Exists so a tool about to write into a sidecar can ask the question that matters before it does:
+    *is this sidecar describing the corpus I just measured?* Matching per-shape rates does not answer
+    that -- two different corpora can produce equal rounded aggregates, and then a column is attached
+    to reference data from a different input. Raised in review of PR #250.
+    """
+    text = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()  # DevSkim: ignore DS126858 - content id
+
 #: How long a writer waits for another process to finish its read-merge-replace before giving up.
 #: Generous, because the alternative to waiting is losing paid work; finite, because a wedged lock
 #: should surface as an error a person can read rather than a hang.

@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0-beta] - 2026-09-15
+### A second dense retriever is now PUBLISHED, not described
+
+`0.37.0-beta` named the dense retriever and disclosed, in prose, that the per-shape flag moves under
+a different embedding model. The consuming project replied that they would derive that second column
+themselves from our compare tool. **Two derivations of one number can drift, and a drift between a
+consumer's copy and ours is invisible to both**, so it is published instead.
+
+**No corpus content changed.** All ten `corpus_sha256`, every question id and every question count
+are identical to `0.36.0-beta` and `0.37.0-beta`. 587 questions, 36 shapes, 10 verticals.
+
+### Additive — nothing existing moved
+
+Verified field by field against the previous release: **210 pre-existing values compared, 0
+altered.** `allgold_dense`, `predicted_headroom_dense` and `discriminates_under_dense` keep their
+exact meaning and value. They remain the reference column.
+
+New in `probes.retriever_sensitivity`:
+
+| field | |
+| --- | --- |
+| `second_dense_retriever` | `azure-emb-text-embedding-3-small-d1536-cosine-f16` |
+| `second_dense_note` | what the pair is for, and that neither retriever is the reader's |
+| `by_shape.<shape>.second_dense` | `allgold`, `predicted_headroom`, `discriminates` |
+| `by_shape.<shape>.retriever_agreement` | `robust-ranking` \| `retriever-sensitive` \| `non-ranking` |
+
+### Every shape now carries a verdict, including the one that cannot be measured
+
+`forgetting/never-known` had no `retriever_agreement`. All 15 of its questions have an **empty gold
+set** — the correct answer is an abstention — so `gold.issubset(top_k)` is vacuously true and ALLgold
+would read **1.000 under every retriever**: the most flattering number available and the least true.
+It is now declared rather than omitted:
+
+```json
+"never-known": {
+  "questions": 15,
+  "retrieval_measured": false,
+  "retriever_agreement": "not-applicable",
+  "not_measured_because": "..."
+}
+```
+
+No `allgold` or headroom fields are written for it, deliberately — a row that cannot be averaged by
+accident. Sidecars now cover **all 36 shapes**: 18 robust-ranking, 10 retriever-sensitive, 7
+non-ranking, 1 not-applicable.
+
+### The three-class read, across 35 shapes
+
+| class | shapes | meaning |
+| --- | ---: | --- |
+| `robust-ranking` | **18** | discriminates under **both** published retrievers |
+| `retriever-sensitive` | **10** | the two disagree on discrimination **or** on whether dense beats BM25 |
+| `non-ranking` | **7** | neither discriminates |
+
+The 10 sensitive shapes are **4 flag-flips** (`forgetting/still-valid`,
+`temporal/interval-position`, `workingmemory/distance-25`, `workingmemory/distance-40`) and **6
+sign-flips** (`arithmetic/delta`, `episodic/list-order`, `prospective/due-window`,
+`temporal/recency`, `workingmemory/distance-60`, `workingmemory/distance-8`), and the two sets are
+**disjoint** — checked, not assumed.
+
+### Two guards on the publication itself
+
+* **The reference column is recomputed and compared to what is already published.** Same quantity,
+  two independent computations, never previously put side by side. A mismatch on any of the 70
+  comparisons stops the publication rather than overwriting the older number. All 70 agreed.
+* **`--stamp` runs the plumbing self-check for each model first** and refuses on anything but an
+  exact `0.000000` self-spread. A compare tool is a probe, and a probe that cannot come out the
+  other way publishes noise.
+
+Costs zero API calls: both models' vectors were already banked, and this only re-ranks them.
+
 ## [0.37.0-beta] - 2026-09-14
 ### The dense retriever is named, and no corpus byte moved
 

@@ -2770,7 +2770,13 @@
           "allgold_dense": 0.2667,
           "predicted_headroom_bm25": 0.8667,
           "predicted_headroom_dense": 0.7333,
-          "discriminates_under_dense": true
+          "discriminates_under_dense": true,
+          "second_dense": {
+            "allgold": 0.3333,
+            "predicted_headroom": 0.6667,
+            "discriminates": true
+          },
+          "retriever_agreement": "robust-ranking"
         },
         "conditional-branch": {
           "questions": 15,
@@ -2778,7 +2784,13 @@
           "allgold_dense": 0.0,
           "predicted_headroom_bm25": 1.0,
           "predicted_headroom_dense": 1.0,
-          "discriminates_under_dense": true
+          "discriminates_under_dense": true,
+          "second_dense": {
+            "allgold": 0.0,
+            "predicted_headroom": 1.0,
+            "discriminates": true
+          },
+          "retriever_agreement": "robust-ranking"
         },
         "order-then-value": {
           "questions": 15,
@@ -2786,7 +2798,13 @@
           "allgold_dense": 0.0,
           "predicted_headroom_bm25": 0.8,
           "predicted_headroom_dense": 1.0,
-          "discriminates_under_dense": true
+          "discriminates_under_dense": true,
+          "second_dense": {
+            "allgold": 0.0,
+            "predicted_headroom": 1.0,
+            "discriminates": true
+          },
+          "retriever_agreement": "robust-ranking"
         },
         "value-then-count": {
           "questions": 20,
@@ -2794,9 +2812,17 @@
           "allgold_dense": 0.05,
           "predicted_headroom_bm25": 0.75,
           "predicted_headroom_dense": 0.95,
-          "discriminates_under_dense": true
+          "discriminates_under_dense": true,
+          "second_dense": {
+            "allgold": 0.05,
+            "predicted_headroom": 0.95,
+            "discriminates": true
+          },
+          "retriever_agreement": "robust-ranking"
         }
-      }
+      },
+      "second_dense_retriever": "azure-emb-text-embedding-3-small-d1536-cosine-f16",
+      "second_dense_note": "A SECOND published dense column, not an appendix. `dense_retriever` above stays the reference every headroom figure here was computed against; this one is the same measurement over the same documents at the same budget under a different embedding model. Co-published because the flag flips: a consumer deriving this column themselves would hold a second copy of one number that can drift from ours invisibly. `retriever_agreement` reads the pair per shape -- robust-ranking (discriminates under both), retriever-sensitive (the two disagree on discrimination OR on whether dense beats BM25), non-ranking (neither). NEITHER retriever is yours; the pair is published so the conditionality is visible rather than described. Reproduce: tools/typedmemeval_retriever_compare.py --models A,B (zero API calls)."
     }
   }
 }

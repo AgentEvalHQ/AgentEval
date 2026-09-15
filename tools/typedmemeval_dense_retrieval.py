@@ -538,6 +538,47 @@ def render_one(session, date) -> str:
     return f"### Session 1 ({date})\n{turns}"
 
 
+def _carry_second_column(fresh: dict, prior: dict, prior_dense_id, dense_id):
+    """Re-attach a co-published second column to freshly computed rows, where it still applies.
+
+    The second column and its `retriever_agreement` are derived from BOTH retrievers, so they stay
+    true only while this run's reference figures match the ones they were derived against. A shape
+    whose reference moved gets the second column dropped, loudly -- a verdict re-attached to numbers
+    it no longer describes is worse than an absent one.
+    """
+    # THE VERDICT IS ABOUT A PAIR, so the pair's first half has to match too. Rates and the
+    # denominator pin the MEASUREMENT; they do not pin WHICH RETRIEVER produced it. A later stamp
+    # under a different dense model whose figures happen to coincide would have re-attached the old
+    # class and then written the new `dense_retriever` beside it -- a published class describing a
+    # retriever pair that never existed. Found in review of PR #250.
+    if prior_dense_id != dense_id:
+        if any('second_dense' in (prior.get(s) or {}) for s in fresh):
+            print('    dropping the second column across this vertical: it was paired with %r and '
+                  'this run publishes %r' % (prior_dense_id, dense_id), flush=True)
+        return dict(fresh), 0, len(fresh)
+
+    out, carried, dropped = {}, 0, 0
+    for shape, row in fresh.items():
+        old = prior.get(shape) or {}
+        keep = {k: old[k] for k in ('second_dense', 'retriever_agreement') if k in old}
+        if keep:
+            # THE DENOMINATOR IS PART OF THE IDENTITY. Rounded rates can survive a population
+            # change -- a shape that gained or lost questions can land on the same figure -- and the
+            # paired verdict was computed for the OLD population. Checked in review of PR #250.
+            same = (old.get('questions') == row.get('questions')
+                    and all(round(old.get(f, object()), 4) == round(row[f], 4)
+                            for f in ('allgold_bm25', 'allgold_dense')))
+            if same:
+                row = dict(row, **keep)
+                carried += 1
+            else:
+                print('    dropping the second column on %s: its reference figures moved, so the '
+                      'paired verdict no longer describes them' % shape, flush=True)
+                dropped += 1
+        out[shape] = row
+    return out, carried, dropped
+
+
 def _stamp(by_shape, args, k: int) -> None:
     """Write `retriever_sensitivity` into every measured vertical's sidecar.
 
@@ -599,12 +640,66 @@ def _stamp(by_shape, args, k: int) -> None:
         "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
         "tools/typedmemeval_retriever_compare.py.")
 
+    # SHAPES THIS MEASUREMENT CANNOT COVER ARE DECLARED, NOT OMITTED. A question with no gold is
+    # skipped everywhere in this tool, correctly -- but a shape where EVERY question has no gold then
+    # vanishes from `by_shape` entirely, and an absent row reads as "nothing to say" when the truth
+    # is "the operand is undefined here".
+    #
+    # WHY IT IS UNDEFINED, which is the part worth publishing: `gold.issubset(top_k)` is vacuously
+    # TRUE for an empty gold set. So ALLgold would come out at 1.000 under every retriever at every
+    # budget -- the most flattering value available, and the least true. Excluding these shapes is
+    # right; letting the exclusion be inferred was not. Raised by the consuming project in SEND-41
+    # after their ranking-only column had to drop the shape on a guess.
+    not_applicable = collections.defaultdict(dict)
+    for path in sorted(glob.glob(os.path.join(CORPORA, '*', '*-v5.json'))):
+        if path.endswith('.meta.json'):
+            continue
+        vertical = os.path.basename(os.path.dirname(path))
+        counts = collections.Counter()
+        golds = collections.Counter()
+        for entry in json.load(open(path, encoding='utf-8')):
+            shape = (entry.get('typedmemeval') or {}).get('shape') or '(none)'
+            counts[shape] += 1
+            gold_ids = set(entry['answer_session_ids'])
+            if any(sid in gold_ids for sid in entry['haystack_session_ids']):
+                golds[shape] += 1
+        for shape, n in counts.items():
+            if golds[shape] == 0 and shape not in per_vertical.get(vertical, {}):
+                not_applicable[vertical][shape] = n
+
     for vertical, shapes in sorted(per_vertical.items()):
         path = os.path.join(CORPORA, vertical,
                             'agenteval-typedmemeval-%s-v5.meta.json' % vertical)
         if not os.path.exists(path):
             continue
         meta = json.loads(open(path, encoding='utf-8-sig').read())
+
+        # A CO-PUBLISHED SECOND COLUMN MUST SURVIVE THIS TOOL. `retriever_sensitivity` is assigned
+        # fresh below, so a plain re-stamp silently dropped `second_dense_retriever`, every
+        # `second_dense` value and every `retriever_agreement` written by the compare tool -- shipped
+        # fields, deleted by the tool that owns the block, with nothing saying so.
+        #
+        # Carried forward ONLY where the reference figures this run computes are identical to the
+        # ones the classification was derived from. If a reference number moved, the paired verdict
+        # is stale and is dropped rather than re-attached to a column it no longer describes.
+        prior = ((meta.get('probes') or {}).get('retriever_sensitivity') or {})
+        prior_shapes = prior.get('by_shape') or {}
+
+        # AND THE CORPUS THE PAIR WAS COMPUTED OVER. Rates, denominator and the reference retriever
+        # pin a great deal and still not the INPUT: a corpus edit that preserves the rounded
+        # aggregates would carry the old second-model values onto new reference data, beside a
+        # sidecar hash that no longer describes either. Fourth place this same mistake has been
+        # found in one pull request, which is why it is spelled out rather than fixed quietly.
+        corpus_file = os.path.join(CORPORA, vertical,
+                                   'agenteval-typedmemeval-%s-v5.json' % vertical)
+        corpus_now = tmc.corpus_sha256(corpus_file)
+        if meta.get('corpus_sha256') != corpus_now:
+            print('    the sidecar describes corpus %s and the corpus on disk is %s; any '
+                  'co-published column is dropped rather than carried onto different input'
+                  % (str(meta.get('corpus_sha256'))[:12], corpus_now[:12]), flush=True)
+            prior_shapes = {}
+        measured_rows, carried, dropped = _carry_second_column(
+            shapes, prior_shapes, prior.get('dense_retriever'), dense_id)
         meta.setdefault('probes', {})['retriever_sensitivity'] = {
             'reference_retriever': tmc.RETRIEVER_ID,
             'reference_k': tmc.K_REF,
@@ -617,12 +712,37 @@ def _stamp(by_shape, args, k: int) -> None:
                 'cosine, same documents and budget", which pinned no model at all.'),
             'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
             'reading': reading,
-            'by_shape': dict(sorted(shapes.items())),
+            'by_shape': dict(sorted(
+                list(measured_rows.items())
+                + [(shape, {
+                    'questions': n,
+                    'retrieval_measured': False,
+                    'retriever_agreement': 'not-applicable',
+                    'not_measured_because': (
+                        'Every question in this shape has an EMPTY gold set -- the correct answer '
+                        'is an abstention, so there is nothing to retrieve. The operand is not '
+                        'unmeasured here, it is undefined: `gold.issubset(top_k)` is vacuously '
+                        'true for an empty gold set, so ALLgold would read 1.000 under every '
+                        'retriever at every budget. That would be the most flattering number in '
+                        'this block and the least true one. No allgold or headroom fields are '
+                        'published for this shape, deliberately -- a row that cannot be averaged '
+                        'by accident.'),
+                }) for shape, n in not_applicable.get(vertical, {}).items()]
+            )),
         }
+        # The block-level second-column metadata travels with the per-shape rows, never alone: a
+        # `second_dense_retriever` left behind after the rows were dropped would name a column that
+        # is no longer there.
+        if carried:
+            for key in ('second_dense_retriever', 'second_dense_note'):
+                if key in prior:
+                    meta['probes']['retriever_sensitivity'][key] = prior[key]
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(meta, fh, indent=2, ensure_ascii=False)
             fh.write('\n')
-        print('  stamped %s (%d shapes)' % (vertical, len(shapes)))
+        print('  stamped %s (%d shapes%s)'
+              % (vertical, len(shapes),
+                 ', second column carried on %d' % carried if carried else ''))
 
 
 def main():
