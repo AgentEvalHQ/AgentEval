@@ -18985,4 +18985,23 @@ Neither retriever is any consumer’s. The pair is published so the conditionali
 than described** — not because `3-small` is the better reference. It is better on the family
 aggregate and worse on nine shapes.
 
+#### 🔴 Three findings in review, and one was a correctness bug in the identity itself
+
+**The dimension was hard-coded.** `dense_retriever_id` takes a width *because the width changes the
+ranking*, and the stamp passed a literal `1536`. Stamping any other model would have published
+`d1536` beside vectors of a different width — an id that does not identify, which is the exact
+defect the id was introduced to end, reproduced inside the tool that publishes it. Now read from
+each shard’s `__embedding_dims__`, with a refusal when it is missing and when shards of one model
+disagree.
+
+**`--stamp` advertised a refusal it did not enforce.** Verticals skipped for missing vectors were
+printed and then ignored, so a model with an incomplete cache would publish part of the family and
+return success — while the docstring said it refuses partial runs. The `--vertical` and `--budget`
+forms were refused; the one that arises from the data was not. Claim-without-instrument again.
+
+**The publication was not all-or-nothing.** Each vertical was written as it passed, so a refusal on
+the ninth left eight sidecars already carrying a second column. The refusals exist because
+something might be wrong, so the path that fires them is precisely the one that must not leave a
+half-published family. Staged in memory now; files are touched only after every vertical passes.
+
 **Cost: 0 calls.** No corpus byte moved; no consumer control resets.

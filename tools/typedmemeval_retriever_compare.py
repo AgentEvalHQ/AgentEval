@@ -72,6 +72,26 @@ def resolve_aliases(aliases):
     return out
 
 
+#: Vector width per model, read from the shards as they load. NOT assumed.
+_dims_by_model: dict = {}
+
+
+def dims_of(model: str) -> int:
+    """The width this model's banked vectors actually have.
+
+    THE IDENTITY MUST DESCRIBE THE VECTORS. `dense_retriever_id` takes a dimension because the
+    width changes the ranking, and an earlier version of this tool passed a hard-coded 1536 -- so
+    stamping any other model would have published `d1536` beside vectors of a different width. An
+    id that does not identify is the exact defect the id was introduced to end. Found in review of
+    PR #250.
+    """
+    dims = _dims_by_model.get(model)
+    if not dims:
+        raise SystemExit('no shard of %r recorded __embedding_dims__, so the width of its vectors '
+                         'is unknown and its identity cannot be written. Re-embed it.' % model)
+    return dims
+
+
 def load_model_cache(model: str, vertical: str) -> dict:
     """Every vector this model has for this vertical, from ITS OWN directory.
 
@@ -86,6 +106,13 @@ def load_model_cache(model: str, vertical: str) -> dict:
         if not os.path.exists(path):
             continue
         shard = json.loads(open(path, encoding='utf-8').read())
+        width = shard.get(dr._DIMS_KEY)
+        if width:
+            seen = _dims_by_model.setdefault(model, width)
+            if seen != width:
+                raise SystemExit('%s: shards of %r disagree on vector width (%d vs %d). One of '
+                                 'them was not produced by that model.'
+                                 % (path, model, seen, width))
         stamped = shard.get(dr._MODEL_KEY)
         # AN EXACT MATCH, NOT "no contradiction". `if stamped and stamped != model` accepts a shard
         # with NO stamp, because the first operand is false -- the identical fail-open that
@@ -178,8 +205,8 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
     compared, and a mismatch stops the publication rather than overwriting the older one. If they
     disagree, one of the two is wrong and neither should ship.
     """
-    first_id = dr.dense_retriever_id(models[0], 1536)
-    second_id = dr.dense_retriever_id(models[1], 1536)
+    first_id = dr.dense_retriever_id(models[0], dims_of(models[0]))
+    second_id = dr.dense_retriever_id(models[1], dims_of(models[1]))
     if not (first_id and second_id):
         raise SystemExit('a retriever without an id cannot be published as a column')
 
@@ -187,7 +214,12 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
     for (vertical, shape), c in by_shape.items():
         per_vertical[vertical][shape] = c
 
-    stamped = classes = 0
+    # VALIDATE EVERYTHING, THEN WRITE. Writing each vertical as it passed meant a failure on the
+    # ninth left eight sidecars already carrying a second column and the family half-published --
+    # and the refusals here exist precisely because something might be wrong, so the path that
+    # fires them is the one that must not leave a mess. Staged in memory; files are touched only
+    # after every vertical has passed. Found in review of PR #250.
+    staged = []
     tally = collections.Counter()
     for vertical, shapes in sorted(per_vertical.items()):
         path = os.path.join(dr.CORPORA, vertical,
@@ -236,7 +268,6 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
                 'discriminates': (1 - b) >= 0.15,
             }
             existing[shape]['retriever_agreement'] = klass
-            classes += 1
 
         block['second_dense_retriever'] = second_id
         block['second_dense_note'] = (
@@ -250,11 +281,15 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
             'beats BM25), non-ranking (neither). NEITHER retriever is yours; the pair is published '
             'so the conditionality is visible rather than described. '
             'Reproduce: tools/typedmemeval_retriever_compare.py --models A,B (zero API calls).')
+        staged.append((path, vertical, meta, len(shapes)))
+
+    for path, vertical, meta, n_shapes in staged:
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(meta, fh, indent=2, ensure_ascii=False)
             fh.write('\n')
-        stamped += 1
-        print('  stamped %-14s %d shapes' % (vertical, len(shapes)))
+        print('  stamped %-14s %d shapes' % (vertical, n_shapes))
+    stamped = len(staged)
+    classes = sum(n for _, _, _, n in staged)
 
     print()
     print('  second column: %s' % second_id)
@@ -413,6 +448,17 @@ def main() -> int:
     print('  MODEL rather than to dense retrieval. Quote the retriever id with the number, or the')
     print('  number is a claim about a model the reader was never told about.')
     if args.stamp:
+        # THE SKIP LIST IS A REFUSAL, not a note. `--stamp` advertises that it refuses a partial
+        # family; it enforced that for `--vertical` and `--budget` and then published whatever
+        # survived the per-vertical completeness check. A model with an incomplete cache would have
+        # stamped some verticals and returned success -- the docstring refusing what the code
+        # permitted. Found in review of PR #250.
+        if skipped:
+            raise SystemExit(
+                'refusing to stamp: %d vertical(s) were skipped for missing vectors (%s). A column '
+                'published over part of the family is a claim about shapes it never compared, and '
+                'this is exactly the partial run --stamp says it refuses. Embed the missing model '
+                'first.' % (len(skipped), ', '.join(v for v, _ in skipped)))
         print()
         return stamp_second_column(by_shape, models, args.budget)
     if spread == 0:
