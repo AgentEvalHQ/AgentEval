@@ -19004,4 +19004,59 @@ the ninth left eight sidecars already carrying a second column. The refusals exi
 something might be wrong, so the path that fires them is precisely the one that must not leave a
 half-published family. Staged in memory now; files are touched only after every vertical passes.
 
+
+#### SEND-41 §2: the one shape that carried no verdict now carries a declared one
+
+Their full-family C-D run came back and found a gap in our sidecar, not in their store:
+**`forgetting/never-known` had no `retriever_agreement` at all.** Their ranking-only column dropped
+it rather than assume it rankable — the right call, made on an inference they should not have had to
+make.
+
+It is the one shape of 36 the dense measurement cannot cover, and the reason is worth publishing
+rather than leaving to be deduced. All 15 of its questions have an **EMPTY gold set**: the correct
+answer is an abstention. So the operand is not unmeasured, it is **undefined** —
+`gold.issubset(top_k)` is vacuously true for an empty gold set, which means ALLgold would read
+**1.000 under every retriever at every budget**. The most flattering number available in the block,
+and the least true.
+
+Now declared: `retrieval_measured: false`, `retriever_agreement: "not-applicable"`, and a
+`not_measured_because` that says the above. **No allgold or headroom fields are written for it** —
+deliberately, so it is a row that cannot be averaged by accident.
+
+This is gate shape 7 — *"an instrument that declines to measure must say WHICH of two reasons
+applies: not applicable, or not measured"* — landing on the instrument whose own docstring states the
+rule. The sidecars now carry a verdict for **all 36 shapes**: 18 robust-ranking, 10
+retriever-sensitive, 7 non-ranking, 1 not-applicable. Verified additive: 360 values compared against
+the previous state, **0 altered**, exactly one shape added.
+
+#### SEND-41 §5: their wording correction is right, with a refinement
+
+They flagged that our phrase *"the revision did not move"* undersold `C-A`, because the sidecar
+revision **did** move: `v5+535f4ed01b92` → `v5+8de66481d5b8`. Checked against the tags and they are
+correct — `revision` is literally `v5+<corpus_sha256[:12]>`, so it moves with the sha by construction.
+
+Their suggested phrasing was *"sidecar revision moves with the sha; the inner corpus-file field does
+not."* The second half needs one correction: **the corpus file carries no revision field at all.**
+Its `typedmemeval` block holds `shape`, `vertical`, `difficulty`, `derivation` and so on — nothing
+versioned. The field that does not move is `design_revision`, and it lives in the **sidecar** beside
+`revision`, holding `v5`.
+
+So the accurate sentence is: **`revision` moves with the sha (`v5+<sha12>`), `design_revision` stays
+at `v5`, and the corpus file itself is unversioned.** Recorded here so the next disclosure uses it.
+
+#### Recorded from their side, not ours
+
+— **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather
+than a sample: 1 exact, 14 undercounts, **zero overcounts**. One-directional loss is the signature of
+identity present as text and absent as structure. The shape is now the before/after instrument for
+their entity-linking work. An acceptance argument this corpus made about itself, confirmed by a
+consumer against a real store.
+
+— **A characterisation of our Prospective corpus was retracted a second time.** “0.980 — too easy,
+similarity suffices” was measured against a mis-keyed `due-window`; correctly keyed it read 17%, and
+on the current lineage 1/18 = **5.6%**. The corpus was never too easy — the key was wrong in the
+flattering direction, and the shape it hid is the most discriminating cell in the vertical (dense
+headroom 1.000). Worth keeping because it is the third time a number about this family moved in the
+flattering direction for an instrument reason.
+
 **Cost: 0 calls.** No corpus byte moved; no consumer control resets.

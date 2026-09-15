@@ -33,6 +33,26 @@ New in `probes.retriever_sensitivity`:
 | `by_shape.<shape>.second_dense` | `allgold`, `predicted_headroom`, `discriminates` |
 | `by_shape.<shape>.retriever_agreement` | `robust-ranking` \| `retriever-sensitive` \| `non-ranking` |
 
+### Every shape now carries a verdict, including the one that cannot be measured
+
+`forgetting/never-known` had no `retriever_agreement`. All 15 of its questions have an **empty gold
+set** — the correct answer is an abstention — so `gold.issubset(top_k)` is vacuously true and ALLgold
+would read **1.000 under every retriever**: the most flattering number available and the least true.
+It is now declared rather than omitted:
+
+```json
+"never-known": {
+  "questions": 15,
+  "retrieval_measured": false,
+  "retriever_agreement": "not-applicable",
+  "not_measured_because": "..."
+}
+```
+
+No `allgold` or headroom fields are written for it, deliberately — a row that cannot be averaged by
+accident. Sidecars now cover **all 36 shapes**: 18 robust-ranking, 10 retriever-sensitive, 7
+non-ranking, 1 not-applicable.
+
 ### The three-class read, across 35 shapes
 
 | class | shapes | meaning |

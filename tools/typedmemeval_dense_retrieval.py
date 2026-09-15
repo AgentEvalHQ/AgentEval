@@ -599,6 +599,33 @@ def _stamp(by_shape, args, k: int) -> None:
         "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
         "tools/typedmemeval_retriever_compare.py.")
 
+    # SHAPES THIS MEASUREMENT CANNOT COVER ARE DECLARED, NOT OMITTED. A question with no gold is
+    # skipped everywhere in this tool, correctly -- but a shape where EVERY question has no gold then
+    # vanishes from `by_shape` entirely, and an absent row reads as "nothing to say" when the truth
+    # is "the operand is undefined here".
+    #
+    # WHY IT IS UNDEFINED, which is the part worth publishing: `gold.issubset(top_k)` is vacuously
+    # TRUE for an empty gold set. So ALLgold would come out at 1.000 under every retriever at every
+    # budget -- the most flattering value available, and the least true. Excluding these shapes is
+    # right; letting the exclusion be inferred was not. Raised by the consuming project in SEND-41
+    # after their ranking-only column had to drop the shape on a guess.
+    not_applicable = collections.defaultdict(dict)
+    for path in sorted(glob.glob(os.path.join(CORPORA, '*', '*-v5.json'))):
+        if path.endswith('.meta.json'):
+            continue
+        vertical = os.path.basename(os.path.dirname(path))
+        counts = collections.Counter()
+        golds = collections.Counter()
+        for entry in json.load(open(path, encoding='utf-8')):
+            shape = (entry.get('typedmemeval') or {}).get('shape') or '(none)'
+            counts[shape] += 1
+            gold_ids = set(entry['answer_session_ids'])
+            if any(sid in gold_ids for sid in entry['haystack_session_ids']):
+                golds[shape] += 1
+        for shape, n in counts.items():
+            if golds[shape] == 0 and shape not in per_vertical.get(vertical, {}):
+                not_applicable[vertical][shape] = n
+
     for vertical, shapes in sorted(per_vertical.items()):
         path = os.path.join(CORPORA, vertical,
                             'agenteval-typedmemeval-%s-v5.meta.json' % vertical)
@@ -617,7 +644,23 @@ def _stamp(by_shape, args, k: int) -> None:
                 'cosine, same documents and budget", which pinned no model at all.'),
             'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
             'reading': reading,
-            'by_shape': dict(sorted(shapes.items())),
+            'by_shape': dict(sorted(
+                list(shapes.items())
+                + [(shape, {
+                    'questions': n,
+                    'retrieval_measured': False,
+                    'retriever_agreement': 'not-applicable',
+                    'not_measured_because': (
+                        'Every question in this shape has an EMPTY gold set -- the correct answer '
+                        'is an abstention, so there is nothing to retrieve. The operand is not '
+                        'unmeasured here, it is undefined: `gold.issubset(top_k)` is vacuously '
+                        'true for an empty gold set, so ALLgold would read 1.000 under every '
+                        'retriever at every budget. That would be the most flattering number in '
+                        'this block and the least true one. No allgold or headroom fields are '
+                        'published for this shape, deliberately -- a row that cannot be averaged '
+                        'by accident.'),
+                }) for shape, n in not_applicable.get(vertical, {}).items()]
+            )),
         }
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(meta, fh, indent=2, ensure_ascii=False)

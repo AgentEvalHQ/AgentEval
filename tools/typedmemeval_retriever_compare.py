@@ -238,10 +238,14 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
                              % (vertical, block.get('dense_retriever'), first_id))
 
         existing = block['by_shape']
-        if set(existing) != set(shapes):
-            raise SystemExit('%s: the sidecar has shapes %s and this comparison has %s. A column '
-                             'written over a different shape set is not the same measurement.'
-                             % (vertical, sorted(existing), sorted(shapes)))
+        # Shapes DECLARED not-applicable carry no measurement to compare, and must not read as a
+        # shape-set disagreement -- they are the dense tool saying on the record that the operand is
+        # undefined for them (empty gold, so ALLgold would be vacuously 1.000). See SEND-41 SS2.
+        measurable = {k for k, v in existing.items() if v.get('retrieval_measured') is not False}
+        if measurable != set(shapes):
+            raise SystemExit('%s: the sidecar has measurable shapes %s and this comparison has %s. '
+                             'A column written over a different shape set is not the same '
+                             'measurement.' % (vertical, sorted(measurable), sorted(shapes)))
 
         for shape, c in shapes.items():
             n = c['n']

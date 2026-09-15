@@ -1973,6 +1973,12 @@
           },
           "retriever_agreement": "non-ranking"
         },
+        "never-known": {
+          "questions": 15,
+          "retrieval_measured": false,
+          "retriever_agreement": "not-applicable",
+          "not_measured_because": "Every question in this shape has an EMPTY gold set -- the correct answer is an abstention, so there is nothing to retrieve. The operand is not unmeasured here, it is undefined: `gold.issubset(top_k)` is vacuously true for an empty gold set, so ALLgold would read 1.000 under every retriever at every budget. That would be the most flattering number in this block and the least true one. No allgold or headroom fields are published for this shape, deliberately -- a row that cannot be averaged by accident."
+        },
         "still-valid": {
           "questions": 15,
           "allgold_bm25": 0.4667,
