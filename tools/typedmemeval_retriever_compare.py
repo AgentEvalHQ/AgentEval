@@ -117,6 +117,153 @@ def questions_for(path: str):
         }
 
 
+def _family_spread(model_a: str, model_b: str, budget: int) -> float:
+    """Family ALLgold difference between two models, over the shapes both can score.
+
+    Used only as the self-check's operand: called with the SAME model twice it must return exactly
+    0.0, because both sides then read the same banked vectors through the same ranking.
+    """
+    totals = {0: 0, 1: 0}
+    n = 0
+    paths = [p for p in sorted(glob.glob(os.path.join(dr.CORPORA, '*', '*-v5.json')))
+             if not p.endswith('.meta.json')]
+    for path in paths:
+        vertical = os.path.basename(os.path.dirname(path))
+        questions = list(questions_for(path))
+        if not questions:
+            continue
+        needed = set()
+        for q in questions:
+            needed.add(dr._key(q['question']))
+            needed.update(dr._key(d) for d in q['docs'])
+        caches = [load_model_cache(m, vertical) for m in (model_a, model_b)]
+        if any(needed - set(c) for c in caches):
+            continue
+        for q in questions:
+            n += 1
+            for i in (0, 1):
+                dr._cache = caches[i]
+                top = set(dr.cosine_rank(q['question'], q['docs'])[:budget])
+                totals[i] += 1 if q['gold'].issubset(top) else 0
+    if not n:
+        return float('nan')
+    return totals[0] / n - totals[1] / n
+
+
+def classify(disc_a: bool, disc_b: bool, beats_a: bool, beats_b: bool) -> str:
+    """The three-class read of a shape across two dense retrievers.
+
+    Named because SEND-37 demoted the single boolean to exactly this, on the evidence that the flag
+    flips on 4 of 35 shapes and the dense-beats-BM25 SIGN flips on 6 -- and neither retriever is any
+    consumer\'s. Sensitivity is checked FIRST: a shape that disagrees between two embedders is a
+    caution whatever else is true of it, and burying that under "non-ranking" would hide the one
+    thing the second column was published to show.
+    """
+    if disc_a != disc_b or beats_a != beats_b:
+        return 'retriever-sensitive'
+    return 'robust-ranking' if (disc_a and disc_b) else 'non-ranking'
+
+
+def stamp_second_column(by_shape, models, budget: int) -> int:
+    """Write the second retriever into every sidecar, beside the first rather than over it.
+
+    ADDITIVE. `allgold_dense`, `predicted_headroom_dense` and `discriminates_under_dense` keep their
+    exact meaning and value -- they are the reference column and a consumer reading them today reads
+    the same bytes afterwards. The second retriever arrives as its own nested block plus a derived
+    class, so nothing existing changes shape.
+
+    REFUSES ON DISAGREEMENT WITH WHAT IS ALREADY PUBLISHED. The reference column here is recomputed
+    from banked vectors, and the sidecar already carries the same quantity from the dense tool's own
+    run. Two independent computations of one number, never previously compared -- so they are
+    compared, and a mismatch stops the publication rather than overwriting the older one. If they
+    disagree, one of the two is wrong and neither should ship.
+    """
+    first_id = dr.dense_retriever_id(models[0], 1536)
+    second_id = dr.dense_retriever_id(models[1], 1536)
+    if not (first_id and second_id):
+        raise SystemExit('a retriever without an id cannot be published as a column')
+
+    per_vertical = collections.defaultdict(dict)
+    for (vertical, shape), c in by_shape.items():
+        per_vertical[vertical][shape] = c
+
+    stamped = classes = 0
+    tally = collections.Counter()
+    for vertical, shapes in sorted(per_vertical.items()):
+        path = os.path.join(dr.CORPORA, vertical,
+                            'agenteval-typedmemeval-%s-v5.meta.json' % vertical)
+        if not os.path.exists(path):
+            continue
+        meta = json.loads(open(path, encoding='utf-8-sig').read())
+        block = (meta.get('probes') or {}).get('retriever_sensitivity')
+        if not block:
+            raise SystemExit('%s has no retriever_sensitivity block. Run the dense tool\'s --stamp '
+                             'first: this column sits beside that one, it does not replace it.'
+                             % vertical)
+        if block.get('dense_retriever') != first_id:
+            raise SystemExit('%s publishes dense_retriever %r but this run\'s first model is %r. '
+                             'The reference column must be the one already published.'
+                             % (vertical, block.get('dense_retriever'), first_id))
+
+        existing = block['by_shape']
+        if set(existing) != set(shapes):
+            raise SystemExit('%s: the sidecar has shapes %s and this comparison has %s. A column '
+                             'written over a different shape set is not the same measurement.'
+                             % (vertical, sorted(existing), sorted(shapes)))
+
+        for shape, c in shapes.items():
+            n = c['n']
+            bm25 = c['bm25'] / n
+            a, b = c['slot0'] / n, c['slot1'] / n
+            # THE CROSS-CHECK. Same quantity, two independent computations, never compared before.
+            published = existing[shape]['allgold_dense']
+            if round(a, 4) != round(published, 4):
+                raise SystemExit(
+                    '%s/%s: recomputed reference ALLgold %.4f but the sidecar publishes %.4f. One '
+                    'of the two is wrong; refusing to publish a second column beside a first that '
+                    'does not reproduce.' % (vertical, shape, a, published))
+            if round(bm25, 4) != round(existing[shape]['allgold_bm25'], 4):
+                raise SystemExit(
+                    '%s/%s: recomputed BM25 ALLgold %.4f but the sidecar publishes %.4f.'
+                    % (vertical, shape, bm25, existing[shape]['allgold_bm25']))
+
+            klass = classify(existing[shape]['discriminates_under_dense'],
+                             (1 - b) >= 0.15, a > bm25, b > bm25)
+            tally[klass] += 1
+            existing[shape]['second_dense'] = {
+                'allgold': round(b, 4),
+                'predicted_headroom': round(1 - b, 4),
+                'discriminates': (1 - b) >= 0.15,
+            }
+            existing[shape]['retriever_agreement'] = klass
+            classes += 1
+
+        block['second_dense_retriever'] = second_id
+        block['second_dense_note'] = (
+            'A SECOND published dense column, not an appendix. `dense_retriever` above stays the '
+            'reference every headroom figure here was computed against; this one is the same '
+            'measurement over the same documents at the same budget under a different embedding '
+            'model. Co-published because the flag flips: a consumer deriving this column themselves '
+            'would hold a second copy of one number that can drift from ours invisibly. '
+            '`retriever_agreement` reads the pair per shape -- robust-ranking (discriminates under '
+            'both), retriever-sensitive (the two disagree on discrimination OR on whether dense '
+            'beats BM25), non-ranking (neither). NEITHER retriever is yours; the pair is published '
+            'so the conditionality is visible rather than described. '
+            'Reproduce: tools/typedmemeval_retriever_compare.py --models A,B (zero API calls).')
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump(meta, fh, indent=2, ensure_ascii=False)
+            fh.write('\n')
+        stamped += 1
+        print('  stamped %-14s %d shapes' % (vertical, len(shapes)))
+
+    print()
+    print('  second column: %s' % second_id)
+    print('  verticals %d, shapes %d' % (stamped, classes))
+    for k in ('robust-ranking', 'retriever-sensitive', 'non-ranking'):
+        print('    %-20s %d' % (k, tally[k]))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -124,6 +271,10 @@ def main() -> int:
                     help='two or more DEPLOYMENT aliases, comma separated')
     ap.add_argument('--budget', type=int, default=tmc.K_REF)
     ap.add_argument('--vertical')
+    ap.add_argument('--stamp', action='store_true',
+                    help='co-publish the SECOND model as a column in every sidecar. Refuses a '
+                         'partial run, refuses more than two models, and runs the plumbing '
+                         'self-check for each one first.')
     args = ap.parse_args()
 
     aliases = [a for a in args.models.split(',') if a]
@@ -131,6 +282,28 @@ def main() -> int:
         raise SystemExit('a comparison needs at least two deployments')
     resolved = resolve_aliases(aliases)
     models = list(dict.fromkeys(resolved[a] for a in aliases))
+
+    if args.stamp:
+        # A STAMP IS A PUBLICATION, so the preconditions are the publication's, not the tool's.
+        if args.vertical or args.budget != tmc.K_REF:
+            raise SystemExit('--stamp needs the whole family at K_ref=%d. A partial comparison '
+                             'published as a column is a claim about shapes it never compared.'
+                             % tmc.K_REF)
+        if len(models) != 2:
+            raise SystemExit('--stamp publishes exactly ONE second column, so it needs exactly '
+                             'two distinct models; got %d.' % len(models))
+        # THE SELF-CHECK RUNS BEFORE THE PUBLICATION, not as a thing the operator is trusted to
+        # have done. The coordinator asked for it by name in SEND-37 and they were right to: a
+        # compare tool is a probe, and a probe that cannot come out the other way publishes noise.
+        for m in models:
+            spread = _family_spread(m, m, args.budget)
+            print('  self-check %-28s spread %.6f' % (m, spread))
+            if spread != 0.0:
+                raise SystemExit(
+                    'self-check FAILED for %s: one model against itself must agree with itself '
+                    'exactly, and it came out at %.6f. Nothing is stamped -- every cross-model '
+                    'number this run could produce is noise of unknown origin.' % (m, spread))
+        print()
 
     # POSITIVE CONTROL FOR THE PLUMBING. Naming one model twice must produce a spread of EXACTLY
     # zero. If it does not, the two caches are not being read the way this tool thinks they are and
@@ -239,6 +412,9 @@ def main() -> int:
     print('  That spread is the part of any "dense retrieval closes X" sentence that belongs to the')
     print('  MODEL rather than to dense retrieval. Quote the retriever id with the number, or the')
     print('  number is a claim about a model the reader was never told about.')
+    if args.stamp:
+        print()
+        return stamp_second_column(by_shape, models, args.budget)
     if spread == 0:
         print('  \u26a0 A spread of EXACTLY zero across two DIFFERENT models is a wiring fault until')
         print('    proven otherwise. Run --models <one alias>,<the same alias> : that self-check is')

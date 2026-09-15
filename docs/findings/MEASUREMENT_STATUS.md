@@ -18928,3 +18928,61 @@ is larger than `SecurityGraphIngestionPumpTests`.
 
 **Cost: 0 calls.** No re-probe is owed — the corpus bytes that were probed for `v0.36.0-beta` are
 the bytes shipping here.
+
+### 88.51 ✅ The second retriever is PUBLISHED, and the consumer’s own arithmetic confirms the classifier (2026-09-15)
+
+§88.49 measured the retriever monoculture and §88.50 shipped the disclosure. The consuming
+project’s coordinator replied that our qualification reasoning was right, and made one suggestion:
+**co-publish the second model as a column rather than describe it in an appendix.**
+
+They also said they would derive that column themselves from `typedmemeval_retriever_compare.py`.
+That is the decisive argument, and it is not the one they made: **two derivations of one number can
+drift, and a drift between a consumer’s copy and ours is invisible to both.** One published source
+removes it. Cost, by our own account, is zero API calls — both models’ vectors are banked and this
+only re-ranks them.
+
+#### What is published
+
+`second_dense_retriever` = `azure-emb-text-embedding-3-small-d1536-cosine-f16`, plus per shape a
+`second_dense` block (`allgold`, `predicted_headroom`, `discriminates`) and a derived
+`retriever_agreement`:
+
+| class | shapes | meaning |
+|---|---:|---|
+| `robust-ranking` | **18** | discriminates under BOTH published retrievers |
+| `retriever-sensitive` | **10** | the two disagree on discrimination OR on whether dense beats BM25 |
+| `non-ranking` | **7** | neither discriminates |
+
+**ADDITIVE.** `allgold_dense`, `predicted_headroom_dense` and `discriminates_under_dense` keep their
+exact meaning and value — they remain the reference column, and a consumer reading them before this
+release reads the same bytes after it. Verified field by field: **210 pre-existing values compared,
+0 altered**, and nothing outside the block moved.
+
+#### The classifier agrees with the coordinator’s arithmetic, for the right reason
+
+They predicted the sensitive class would be “the four named flips + the six sign-flips” = 10. The
+classifier, computed independently from the two columns, returns **10**.
+
+That agreement is only evidence if the two sets are disjoint — a shape with both a flag flip and a
+sign flip would be counted once by the classifier and twice in “4 + 6”, and the totals could match by
+cancellation. **Checked: 4 flag-flips, 6 sign-flips, 0 overlap.** The flip lists are exactly the ones
+§88.49 named, so the published column reproduces the finding rather than restating it.
+
+#### Two guards on the publication itself
+
+* **The reference column is recomputed and compared to what is already published.** The sidecar
+  already carries `allgold_dense` and `allgold_bm25` from the dense tool’s own run; the stamp
+  recomputes both from banked vectors and refuses on any disagreement rather than overwriting. Two
+  independent computations of one quantity, never previously put side by side — the §88.5c habit
+  applied deliberately instead of discovered late. **All 70 comparisons agreed.**
+* **`--stamp` runs the plumbing self-check for each model before publishing** and refuses on
+  anything but an exact `0.000000` self-spread. The coordinator asked for that by name and was right
+  to: a compare tool is a probe, and a probe that cannot come out the other way publishes noise.
+
+#### What this does NOT say
+
+Neither retriever is any consumer’s. The pair is published so the conditionality is **visible rather
+than described** — not because `3-small` is the better reference. It is better on the family
+aggregate and worse on nine shapes.
+
+**Cost: 0 calls.** No corpus byte moved; no consumer control resets.
