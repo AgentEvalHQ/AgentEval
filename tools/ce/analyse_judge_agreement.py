@@ -180,12 +180,19 @@ def main():
     # and another OMITTED compares equal to the sample while the loop below counts the duplicate
     # twice and publishes figures over the wrong denominator. The binding has to reject a malformed
     # artifact, not only a foreign one. Review of PR #251.
-    res_rows = collections.Counter((c['cache_key'], c['judge1']) for c in res['cases'])
-    sample_rows = collections.Counter((c['cache_key'], c['judge1']) for c in sample['cases'])
+    # EVERY FIELD THE AGGREGATION READS, derived from the aggregation rather than guessed. It places
+    # a row with `cell = (row['arm'], row['judge1'])` and identifies it by `cache_key`, so those
+    # three are exactly what has to be bound -- binding two of them let a row keep its key and
+    # verdict, change `arm`, and land in a different population cell against a different weight.
+    # Enumerated here so the next field added to the cell is added to this tuple in the same edit.
+    bind = lambda c: (c['cache_key'], c['arm'], c['judge1'])
+    res_rows = collections.Counter(bind(c) for c in res['cases'])
+    sample_rows = collections.Counter(bind(c) for c in sample['cases'])
     if res_rows != sample_rows:
         extra = res_rows - sample_rows
         short = sample_rows - res_rows
-        fmt = lambda m: ', '.join('%s x%d' % (k, n) for (k, _), n in sorted(m.items())[:3]) or 'none'
+        fmt = lambda m: ', '.join('%s [%s/%s] x%d' % (k, arm, v, n)
+                                  for (k, arm, v), n in sorted(m.items())[:3]) or 'none'
         print('  🔴 THE RESULTS FILE IS NOT THIS SAMPLE: %d row(s) too many, %d missing.'
               % (sum(extra.values()), sum(short.values())))
         print('     too many: %s' % fmt(extra))

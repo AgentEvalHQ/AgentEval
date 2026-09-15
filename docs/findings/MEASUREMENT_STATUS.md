@@ -19247,9 +19247,22 @@ MULTISETS equal? False   <- what it compares now
 exit=2   THE RESULTS FILE IS NOT THIS SAMPLE: 1 row(s) too many, 0 missing.
 ```
 
-The sequence is the point, and it took six steps to finish: **a count → membership → membership
+And a seventh: **the binding omitted `arm`**, which the aggregation uses to place the row in a
+cell. A row keeping its key and verdict while changing `arm` passed the multiset check and landed
+in a different population cell against a different weight. Bound on `(cache_key, arm, judge1)` now
+— **derived from what the aggregation reads** rather than guessed field by field, with the tuple
+named in one place so the next field added to the cell is added to the binding in the same edit.
+
+```
+row 0 moved arm v8 -> v9, key and judge1 unchanged
+too many: b0e2ef8cf847862b:v8:judge [v9/no] x1
+missing : b0e2ef8cf847862b:v8:judge [v8/no] x1     exit=2
+```
+
+The sequence is the point, and it took seven steps to finish: **a count → membership → membership
 plus verdicts → withholding the figures rather than warning about them → binding the results to
-the sample → binding them by MULTISET rather than set.** Each step looked sufficient until someone asked what it could not see, and four of
-the six were pointed out rather than found.
+the sample → binding them by MULTISET rather than set → binding `arm` as well, because that
+is what the aggregation reads.** Each step looked sufficient until someone asked what it could not see, and four of
+the seven were pointed out rather than found.
 
 **Cost: 0 calls.**
