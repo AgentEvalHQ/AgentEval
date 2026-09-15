@@ -19345,9 +19345,44 @@ independent places:
 |---|---|---|
 | `README.md` ×4, `Benchmarks/README.md` ×7 | every `(H*)`/`(J*)`/`(K*)` reference | **off by one** — `-- 43  # Performance (H2)` ran `Registry Discovery` |
 | `README.md` ×1 | `-- 23  # Red Team Basic (E2)` | off by one since **`82ceadb1` (2026-09-08)** — traced through history: E2 sat at flat 23 from 2026-08-07 and moved to 24 in that commit, which was **one of our own PRs**. Nobody noticed for a week |
-| `docs/walkthrough.md` | 9 commands | **7 wrong**; and "Mock mode (no API keys required) — Samples 1-4" was false: **all four** call `AIConfig.IsConfigured`. Group M is the pair the menu marks offline; a further **29 of 99** samples reference no credential at all, and CI runs the Gatekeeper suite offline |
+| `docs/walkthrough.md` | 9 commands | **7 numbers wrong.** Its "Mock mode (no API keys required) — Samples 1-4" claim was **CORRECT** and I broke it twice before review restored it — see below |
 
 Nothing had failed. Every command ran — and ran the wrong sample.
+
+#### 🔴 Three times wrong on one sentence — the correction that had to be corrected twice
+
+The walkthrough said *"Mock mode (no API keys required) — Samples 1-4"*. I grepped for
+`AIConfig.IsConfigured`, found it in all four files, and declared the claim false. Then I wrote
+*"group M — these two are the only ones"*. Then I measured again and wrote *"29 of 99 reference no
+credential"*. **Review pointed out the original sentence was right all along**: all four samples
+return a mock agent on that branch —
+
+```
+// 01_HelloWorld.cs:109
+if (!AIConfig.IsConfigured) { return CreateMockAgent(); }
+```
+
+— and 02/03/04 do the same with their own mocks. **I had checked whether a SYMBOL APPEARED, not
+what its branch DOES.** The only genuine error in that block was the labels on samples 3 and 4.
+
+Right → wrong → differently wrong → right, across three commits. Same root cause as the shape
+join three files away and as every other entry in this section: reading something convenient
+instead of the thing that identifies. A grep tells you a symbol is present; only the branch tells
+you what happens.
+
+#### 🔴 And the checker shipped able to pass by finding nothing
+
+It returned success whenever `failures == 0` — including `checked == 0`. A regex change or a docs
+reformat would print `Checked 0 …; 0 failed` and leave CI green: **the exact silent-coverage
+failure the checker exists to catch, inside the checker**. Zero checked references is now a
+failure, with `--ablate-blind` as its control.
+
+Its **file list was also hand-maintained** — three hard-coded paths, the same defect it polices —
+and it missed `docs/redteam.md`, which carried two stale labelled references. The set is now
+discovered from `git ls-files` and scoped to references that resolve to `AgentEval.Samples`; 172
+naming another project are skipped and counted. Coverage **26 across 3 files → 29 across 7**.
+
+Both found in review, neither by me.
 
 **The check that holds it.** The doc lines already carried the stable coordinate: `(H2)` is group H,
 sample 2, and a group letter plus a position does **not** move when an earlier group grows — only
