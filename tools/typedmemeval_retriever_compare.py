@@ -300,6 +300,18 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
         # Shapes DECLARED not-applicable carry no measurement to compare, and must not read as a
         # shape-set disagreement -- they are the dense tool saying on the record that the operand is
         # undefined for them (empty gold, so ALLgold would be vacuously 1.000). See SEND-41 SS2.
+        # EVERY SHAPE THE CORPUS HAS, not every shape that happens to be measurable. Filtering the
+        # declared rows out made a MISSING declared row invisible: a sidecar with no `never-known`
+        # entry has a measurable set equal to the measured shapes and sails through, while one of
+        # the family's 36 shapes carries no verdict at all. That is the hole the declared row was
+        # added to close, reopened by the check written to tolerate it.
+        in_corpus = {(e.get('typedmemeval') or {}).get('shape') or '(none)'
+                     for e in json.loads(open(corpus_path, encoding='utf-8').read())}
+        if set(existing) != in_corpus:
+            raise SystemExit(
+                '%s: the corpus has shapes %s and the sidecar carries %s. Every shape needs a '
+                'verdict -- measured, or declared not-applicable by the dense tool. Re-run its '
+                '--stamp first.' % (vertical, sorted(in_corpus), sorted(existing)))
         measurable = {k for k, v in existing.items() if v.get('retrieval_measured') is not False}
         if measurable != set(shapes):
             raise SystemExit('%s: the sidecar has measurable shapes %s and this comparison has %s. '
@@ -440,10 +452,16 @@ def main() -> int:
 
     by_shape = collections.defaultdict(lambda: collections.Counter())
     skipped = []
+    no_gold_verticals = []
     for path in paths:
         vertical = os.path.basename(os.path.dirname(path))
         questions = list(questions_for(path))
         if not questions:
+            # NOT A QUIET `continue`. `questions_for` yields nothing when EVERY question in the
+            # vertical has empty gold, and that vertical then never reached `skipped` -- so the
+            # whole-family refusal could not see it, and --stamp would publish the rest and call
+            # it the family. Recorded so the caller can refuse. Found in review of PR #250.
+            no_gold_verticals.append(vertical)
             continue
         needed = set()
         for q in questions:
@@ -549,6 +567,12 @@ def main() -> int:
                 'published over part of the family is a claim about shapes it never compared, and '
                 'this is exactly the partial run --stamp says it refuses. Embed the missing model '
                 'first.' % (len(skipped), ', '.join(v for v, _ in skipped)))
+        if no_gold_verticals:
+            raise SystemExit(
+                'refusing to stamp: %s contributed no gold-bearing question, so the comparison '
+                'never covered it at all. The dense tool declares such shapes as not-applicable; a '
+                'second column must not be published over a family with a vertical missing from it '
+                'entirely.' % ', '.join(no_gold_verticals))
         print()
         return stamp_second_column(by_shape, models, args.budget)
     if spread == 0:

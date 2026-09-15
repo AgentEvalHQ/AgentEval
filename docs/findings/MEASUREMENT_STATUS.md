@@ -19112,6 +19112,27 @@ not the count but the shape: after the first round they were all versions of *a 
 compares what is convenient instead of what identifies* — rounded rates for a corpus, metadata for
 bytes, a model name for a model’s vectors, one half of a pair for the pair.
 
+#### Round five: the fix for shape 7 reopened shape 7
+
+The check written to TOLERATE the declared not-applicable row made a **missing** one invisible.
+`measurable` filtered declared rows out, so a sidecar with no `never-known` entry at all has a
+measurable set equal to the measured shapes and sails through — while one of the family’s 36 shapes
+carries no verdict. That is precisely the hole the declared row was added to close, reopened by the
+code accommodating it. The sidecar’s shape set is now compared against the **corpus’s**, and the
+refusal names both.
+
+Two more whole-family holes: a vertical whose questions **all** lack gold yields nothing from
+`questions_for` and never reached `skipped`, so the family refusal could not see it; and the carry
+predicate still did not check the **corpus identity**, so an edit preserving the rounded aggregates
+would carry the old pair onto new reference data. Fourth place that same substitution was found in
+one pull request.
+
+**Seventeen findings across five rounds, every one real.** The count is not the point; the shape
+is. After round one they were all one substitution — *comparing what is convenient instead of what
+identifies* — and rounds four and five show it survives being fixed in one place: the corpus
+identity had to be added to the publication check, then the carry predicate, then the
+whole-family check, each time after a reviewer pointed at the place it was still missing.
+
 #### Recorded from their side, not ours
 
 — **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather

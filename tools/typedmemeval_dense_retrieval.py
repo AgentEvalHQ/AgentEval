@@ -684,6 +684,20 @@ def _stamp(by_shape, args, k: int) -> None:
         # is stale and is dropped rather than re-attached to a column it no longer describes.
         prior = ((meta.get('probes') or {}).get('retriever_sensitivity') or {})
         prior_shapes = prior.get('by_shape') or {}
+
+        # AND THE CORPUS THE PAIR WAS COMPUTED OVER. Rates, denominator and the reference retriever
+        # pin a great deal and still not the INPUT: a corpus edit that preserves the rounded
+        # aggregates would carry the old second-model values onto new reference data, beside a
+        # sidecar hash that no longer describes either. Fourth place this same mistake has been
+        # found in one pull request, which is why it is spelled out rather than fixed quietly.
+        corpus_file = os.path.join(CORPORA, vertical,
+                                   'agenteval-typedmemeval-%s-v5.json' % vertical)
+        corpus_now = tmc.corpus_sha256(corpus_file)
+        if meta.get('corpus_sha256') != corpus_now:
+            print('    the sidecar describes corpus %s and the corpus on disk is %s; any '
+                  'co-published column is dropped rather than carried onto different input'
+                  % (str(meta.get('corpus_sha256'))[:12], corpus_now[:12]), flush=True)
+            prior_shapes = {}
         measured_rows, carried, dropped = _carry_second_column(
             shapes, prior_shapes, prior.get('dense_retriever'), dense_id)
         meta.setdefault('probes', {})['retriever_sensitivity'] = {
