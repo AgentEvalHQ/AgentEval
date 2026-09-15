@@ -538,7 +538,7 @@ def render_one(session, date) -> str:
     return f"### Session 1 ({date})\n{turns}"
 
 
-def _carry_second_column(fresh: dict, prior: dict):
+def _carry_second_column(fresh: dict, prior: dict, prior_dense_id, dense_id):
     """Re-attach a co-published second column to freshly computed rows, where it still applies.
 
     The second column and its `retriever_agreement` are derived from BOTH retrievers, so they stay
@@ -546,6 +546,17 @@ def _carry_second_column(fresh: dict, prior: dict):
     whose reference moved gets the second column dropped, loudly -- a verdict re-attached to numbers
     it no longer describes is worse than an absent one.
     """
+    # THE VERDICT IS ABOUT A PAIR, so the pair's first half has to match too. Rates and the
+    # denominator pin the MEASUREMENT; they do not pin WHICH RETRIEVER produced it. A later stamp
+    # under a different dense model whose figures happen to coincide would have re-attached the old
+    # class and then written the new `dense_retriever` beside it -- a published class describing a
+    # retriever pair that never existed. Found in review of PR #250.
+    if prior_dense_id != dense_id:
+        if any('second_dense' in (prior.get(s) or {}) for s in fresh):
+            print('    dropping the second column across this vertical: it was paired with %r and '
+                  'this run publishes %r' % (prior_dense_id, dense_id), flush=True)
+        return dict(fresh), 0, len(fresh)
+
     out, carried, dropped = {}, 0, 0
     for shape, row in fresh.items():
         old = prior.get(shape) or {}
@@ -673,7 +684,8 @@ def _stamp(by_shape, args, k: int) -> None:
         # is stale and is dropped rather than re-attached to a column it no longer describes.
         prior = ((meta.get('probes') or {}).get('retriever_sensitivity') or {})
         prior_shapes = prior.get('by_shape') or {}
-        measured_rows, carried, dropped = _carry_second_column(shapes, prior_shapes)
+        measured_rows, carried, dropped = _carry_second_column(
+            shapes, prior_shapes, prior.get('dense_retriever'), dense_id)
         meta.setdefault('probes', {})['retriever_sensitivity'] = {
             'reference_retriever': tmc.RETRIEVER_ID,
             'reference_k': tmc.K_REF,
@@ -704,9 +716,13 @@ def _stamp(by_shape, args, k: int) -> None:
                 }) for shape, n in not_applicable.get(vertical, {}).items()]
             )),
         }
-        for key in ('second_dense_retriever', 'second_dense_note'):
-            if key in prior:
-                meta['probes']['retriever_sensitivity'][key] = prior[key]
+        # The block-level second-column metadata travels with the per-shape rows, never alone: a
+        # `second_dense_retriever` left behind after the rows were dropped would name a column that
+        # is no longer there.
+        if carried:
+            for key in ('second_dense_retriever', 'second_dense_note'):
+                if key in prior:
+                    meta['probes']['retriever_sensitivity'][key] = prior[key]
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(meta, fh, indent=2, ensure_ascii=False)
             fh.write('\n')

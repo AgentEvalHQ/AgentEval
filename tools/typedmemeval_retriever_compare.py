@@ -127,12 +127,22 @@ def load_model_cache(model: str, vertical: str) -> dict:
         for key, blob in shard.items():
             if key.startswith('__'):
                 continue
-            actual = len(base64.b64decode(blob)) // 2
-            if actual != width:
+            # EXACT BYTES, AND VALIDATED BASE64. `// 2` floors, so a payload of 2*width+1 bytes
+            # passed and only failed later inside `_unpack`; and `b64decode` without validate=True
+            # silently DISCARDS non-base64 characters, so corruption could shrink a payload to a
+            # legal-looking length. Both make a malformed vector reach ranking. Found in review of
+            # PR #250.
+            try:
+                raw_bytes = base64.b64decode(blob, validate=True)
+            except Exception as error:
+                raise SystemExit('%s: vector %s is not valid base64 (%s). A payload that cannot be '
+                                 'decoded cannot be ranked with.' % (path, key[:12], error))
+            if len(raw_bytes) != 2 * width:
                 raise SystemExit(
-                    '%s: vector %s decodes to %d dimensions but the shard states %d. Ranking zips '
-                    'vectors, so this one would be silently truncated and still published as d%d.'
-                    % (path, key[:12], actual, width, width))
+                    '%s: vector %s decodes to %d bytes but the shard states %d dimensions, i.e. %d '
+                    'bytes. Ranking zips vectors, so a mismatch is silently truncated and still '
+                    'published as d%d.'
+                    % (path, key[:12], len(raw_bytes), width, 2 * width, width))
         stamped = shard.get(dr._MODEL_KEY)
         # AN EXACT MATCH, NOT "no contradiction". `if stamped and stamped != model` accepts a shard
         # with NO stamp, because the first operand is false -- the identical fail-open that

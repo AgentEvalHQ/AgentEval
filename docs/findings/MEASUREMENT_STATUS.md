@@ -19092,6 +19092,26 @@ Four instances of the one mistake:
 Each fired on demand: the corpus guard names both hashes, the width guard names the vector and its
 decoded length. The re-stamp after all four reproduced the family **byte-identically**.
 
+#### Round four: two checks that ALMOST pinned their subject
+
+**The paired verdict carried without its pair’s first half.** Rates and the denominator pin the
+MEASUREMENT; they do not pin WHICH RETRIEVER produced it. A later stamp under a different dense
+model whose figures happened to coincide would have re-attached the old class and written the new
+`dense_retriever` beside it — **a published class describing a retriever pair that never existed.**
+The reference identity is in the predicate now, and the block-level metadata travels with the rows
+rather than surviving them.
+
+**The width check floored.** `len(b64decode(blob)) // 2` accepts `2×width + 1` bytes, and
+`b64decode` without `validate=True` silently DISCARDS non-base64 characters — so corruption could
+shrink a payload to a legal-looking length. Exact byte count and validated base64 now. Verified
+both ways: a 9-byte payload and an invalid-base64 payload are each refused by name; the correct
+8-byte one passes.
+
+**Fourteen findings across four rounds on this PR, every one real.** The tally worth keeping is
+not the count but the shape: after the first round they were all versions of *a check that
+compares what is convenient instead of what identifies* — rounded rates for a corpus, metadata for
+bytes, a model name for a model’s vectors, one half of a pair for the pair.
+
 #### Recorded from their side, not ours
 
 — **`alias-then-count` isolated a missing join exactly as designed**, on a full 15/15 census rather
