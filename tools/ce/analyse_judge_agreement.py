@@ -176,17 +176,22 @@ def main():
     # the first two. Nothing bound the third: the results file is a separate artifact from a
     # separate run, so a sample redrawn while these results are stale passes membership and the
     # fingerprint while the figures come from rows belonging to another draw. Review of PR #251.
-    res_rows = {(c['cache_key'], c['judge1']) for c in res['cases']}
-    sample_rows = {(c['cache_key'], c['judge1']) for c in sample['cases']}
+    # MULTISETS, NOT SETS. A set discards multiplicity, so a results file with one row DUPLICATED
+    # and another OMITTED compares equal to the sample while the loop below counts the duplicate
+    # twice and publishes figures over the wrong denominator. The binding has to reject a malformed
+    # artifact, not only a foreign one. Review of PR #251.
+    res_rows = collections.Counter((c['cache_key'], c['judge1']) for c in res['cases'])
+    sample_rows = collections.Counter((c['cache_key'], c['judge1']) for c in sample['cases'])
     if res_rows != sample_rows:
-        only_res = sorted(k for k, _ in res_rows - sample_rows)[:3]
-        only_sam = sorted(k for k, _ in sample_rows - res_rows)[:3]
-        print('  🔴 THE RESULTS FILE IS NOT THIS SAMPLE: %d rows differ (%d only in results '
-              '%s, %d only in the sample %s).'
-              % (len(res_rows ^ sample_rows), len(res_rows - sample_rows), only_res,
-                 len(sample_rows - res_rows), only_sam))
-        print('     The agreement figures would be computed from rows belonging to another draw.')
-        print('     Re-run the judge agreement against this sample.')
+        extra = res_rows - sample_rows
+        short = sample_rows - res_rows
+        fmt = lambda m: ', '.join('%s x%d' % (k, n) for (k, _), n in sorted(m.items())[:3]) or 'none'
+        print('  🔴 THE RESULTS FILE IS NOT THIS SAMPLE: %d row(s) too many, %d missing.'
+              % (sum(extra.values()), sum(short.values())))
+        print('     too many: %s' % fmt(extra))
+        print('     missing : %s' % fmt(short))
+        print('     The agreement figures would be computed over rows this sample does not have,')
+        print('     or count one of its rows twice. Re-run the judge agreement against this sample.')
         return 2
 
     live_verdict = dict(identified)

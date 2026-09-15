@@ -19233,12 +19233,23 @@ a sampled verdict flipped   exit=2   1 SAMPLED VERDICT(S) CHANGED SINCE THE DRAW
 The chain is **frame → sample → results**, and everything above binds the first two. The results
 file is a separate artifact from a separate run, so a sample redrawn while those results are stale
 passes membership, verdicts and the fingerprint — while the agreement figures are computed from
-rows belonging to another draw. Now bound on `(cache_key, judge1)`, refusing with the count of
+rows belonging to another draw. Now bound on `(cache_key, judge1)` multiplicities, refusing with the count of
 differing rows and examples from each side.
 
-The sequence is the point, and it took five steps to finish: **a count → membership → membership
+And a sixth: **the binding used SETS**, which discard multiplicity. A results file with one row
+duplicated and another omitted compares equal to the sample while the loop counts the duplicate
+twice and publishes over the wrong denominator. Multisets now, reporting the difference in both
+directions. Constructed the exact case to prove it rather than assert it:
+
+```
+SETS equal?      True    <- what the old check compared
+MULTISETS equal? False   <- what it compares now
+exit=2   THE RESULTS FILE IS NOT THIS SAMPLE: 1 row(s) too many, 0 missing.
+```
+
+The sequence is the point, and it took six steps to finish: **a count → membership → membership
 plus verdicts → withholding the figures rather than warning about them → binding the results to
-the sample.** Each step looked sufficient until someone asked what it could not see, and four of
-the five were pointed out rather than found.
+the sample → binding them by MULTISET rather than set.** Each step looked sufficient until someone asked what it could not see, and four of
+the six were pointed out rather than found.
 
 **Cost: 0 calls.**
