@@ -172,6 +172,23 @@ def main():
     #
     #   FINGERPRINT -- a hash over the frame's (key, verdict) pairs, recorded by the sampler. Pins
     #   the whole population, not just the sampled part of it.
+    # THE LAST UNPINNED LINK. The chain is frame -> sample -> RESULTS, and the checks below bind
+    # the first two. Nothing bound the third: the results file is a separate artifact from a
+    # separate run, so a sample redrawn while these results are stale passes membership and the
+    # fingerprint while the figures come from rows belonging to another draw. Review of PR #251.
+    res_rows = {(c['cache_key'], c['judge1']) for c in res['cases']}
+    sample_rows = {(c['cache_key'], c['judge1']) for c in sample['cases']}
+    if res_rows != sample_rows:
+        only_res = sorted(k for k, _ in res_rows - sample_rows)[:3]
+        only_sam = sorted(k for k, _ in sample_rows - res_rows)[:3]
+        print('  🔴 THE RESULTS FILE IS NOT THIS SAMPLE: %d rows differ (%d only in results '
+              '%s, %d only in the sample %s).'
+              % (len(res_rows ^ sample_rows), len(res_rows - sample_rows), only_res,
+                 len(sample_rows - res_rows), only_sam))
+        print('     The agreement figures would be computed from rows belonging to another draw.')
+        print('     Re-run the judge agreement against this sample.')
+        return 2
+
     live_verdict = dict(identified)
     live_keys = set(live_verdict)
     missing = sorted(c['cache_key'] for c in sample['cases'] if c['cache_key'] not in live_keys)

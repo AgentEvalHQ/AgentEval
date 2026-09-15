@@ -19228,8 +19228,17 @@ default                     exit=3   RE-WEIGHTED FIGURES WITHHELD
 a sampled verdict flipped   exit=2   1 SAMPLED VERDICT(S) CHANGED SINCE THE DRAW
 ```
 
-The sequence is the point: a count → membership → membership plus verdicts → and still the
-population is only pinned by a fingerprint the current sample does not carry. Each step looked
-sufficient until someone asked what it could not see.
+#### And the last unpinned link: nothing bound the RESULTS to the sample
+
+The chain is **frame → sample → results**, and everything above binds the first two. The results
+file is a separate artifact from a separate run, so a sample redrawn while those results are stale
+passes membership, verdicts and the fingerprint — while the agreement figures are computed from
+rows belonging to another draw. Now bound on `(cache_key, judge1)`, refusing with the count of
+differing rows and examples from each side.
+
+The sequence is the point, and it took five steps to finish: **a count → membership → membership
+plus verdicts → withholding the figures rather than warning about them → binding the results to
+the sample.** Each step looked sufficient until someone asked what it could not see, and four of
+the five were pointed out rather than found.
 
 **Cost: 0 calls.**
