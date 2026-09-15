@@ -19345,7 +19345,7 @@ independent places:
 |---|---|---|
 | `README.md` ×4, `Benchmarks/README.md` ×7 | every `(H*)`/`(J*)`/`(K*)` reference | **off by one** — `-- 43  # Performance (H2)` ran `Registry Discovery` |
 | `README.md` ×1 | `-- 23  # Red Team Basic (E2)` | off by one since **`82ceadb1` (2026-09-08)** — traced through history: E2 sat at flat 23 from 2026-08-07 and moved to 24 in that commit, which was **one of our own PRs**. Nobody noticed for a week |
-| `docs/walkthrough.md` | 9 commands | **7 wrong**; and "Mock mode (no API keys required) — Samples 1-4" was false: **all four** call `AIConfig.IsConfigured`. The genuinely offline pair is group M (98, 99) |
+| `docs/walkthrough.md` | 9 commands | **7 wrong**; and "Mock mode (no API keys required) — Samples 1-4" was false: **all four** call `AIConfig.IsConfigured`. Group M is the pair the menu marks offline; a further **29 of 99** samples reference no credential at all, and CI runs the Gatekeeper suite offline |
 
 Nothing had failed. Every command ran — and ran the wrong sample.
 

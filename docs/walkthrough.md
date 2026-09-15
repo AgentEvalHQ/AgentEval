@@ -548,11 +548,13 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 git clone https://github.com/AgentEvalHQ/AgentEval
 cd AgentEval/samples/AgentEval.Samples
 
-# Offline - no credentials, no spend. These two are the only ones.
+# Offline - no credentials, no spend. The menu marks this group "offline".
+# Much of the Gatekeeper group (J) also runs without credentials: CI executes it as
+#   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
 dotnet run -- 98   # Eval + Chance Floor         (M1)
 dotnet run -- 99   # Deterministic Benchmark     (M2)
 
-# Everything else needs Azure OpenAI - including Getting Started.
+# The samples below DO need Azure OpenAI - Getting Started included.
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
 
