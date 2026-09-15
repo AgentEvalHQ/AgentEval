@@ -19149,3 +19149,120 @@ headroom 1.000). Worth keeping because it is the third time a number about this 
 flattering direction for an instrument reason.
 
 **Cost: 0 calls.** No corpus byte moved; no consumer control resets.
+
+### 88.52 ✅ The C-E frame control compared a COUNT and called it a reproduction (2026-09-15)
+
+Found by asking where else the PR #250 substitution lived, rather than by a reviewer — which is the
+only reason it is worth a section of its own.
+
+`analyse_judge_agreement.py` guarded the population with:
+
+```python
+if declared is not None and len(frame) != declared:
+```
+
+and then printed *“the frame reproduces, so the per-cell weights below are the population shares.”*
+**A count is not a reproduction.** Any two populations of 5,254 verdicts pass that check, and the
+per-cell weights — the thing the whole C-E re-weighting rests on — depend on composition, not size.
+Seventeen findings on #250 were versions of this exact substitution; this one was in a gate written
+earlier the same day.
+
+#### Two operands, in order of what they can prove
+
+**MEMBERSHIP, and it works on the sample that already exists.** Every sampled case must be present in
+the rebuilt frame. The sample records its own `cache_key` per case, so this needed no redraw:
+**all 48 present.** That is a real identity check on the part of the population the numbers are
+computed from.
+
+**FINGERPRINT, for the whole population.** A sha256 over the frame’s `(key, verdict)` pairs, written
+by the sampler using the analyser’s own function so the two cannot drift. Verdicts are included as
+well as keys, because a re-judged cache moves the weights without moving the membership.
+
+#### What the tool now says, and what it refuses to say
+
+The current sample predates the fingerprint, so the run reports the population identity as
+**UNVERIFIED** rather than claiming a reproduction it cannot demonstrate:
+
+```
+OK: all 48 sampled cases are present in the rebuilt frame.
+⚠ This sample predates the frame fingerprint (06b430d72703), so the whole-population
+  identity is UNVERIFIED -- membership above covers the sampled cases only.
+```
+
+**The fingerprint was deliberately NOT back-written into the existing sample.** Computing today’s
+frame hash and stamping it would assert that today’s population is the one drawn from — which is
+the assumption under test. It is recorded on the next draw; until then the honest state is
+“membership verified, whole population not”.
+
+This does not disturb §88.46: the count matched, the per-cell shares reproduced, and all 48 sampled
+cases are in the frame. What changes is that the control now states the limit of its own evidence.
+
+#### Verified by firing it, including the negative
+
+```
+sampled case not in frame   exit=2   1 of 48 SAMPLED CASES ARE NOT IN THE REBUILT FRAME
+fingerprint mismatch        exit=2   sample 000000000000, rebuilt 06b430d72703
+untouched (control)         exit=0   no refusal
+```
+
+The third line is the one that makes the first two mean anything.
+
+#### Review of the fix: membership cannot see a VERDICT FLIP, and a warning is not a refusal
+
+Two more, both right, and together they finish the thought.
+
+**A sampled case is grouped under the `judge1` it carried AT DRAW TIME and weighted by the cell it
+is in NOW.** A verdict that changed since the draw leaves the case straddling that seam with its
+key still present — so the membership check, which was the strengthening, cannot see it. Now
+checked directly: sampled verdicts must match the current frame, and a flip refuses by name.
+
+**And printing the figures under a caution reads exactly like a verified re-weighting.** Without a
+fingerprint the one thing still unverifiable is whether UNSAMPLED verdicts moved — and those set
+the per-cell shares the re-weighting multiplies by. So the block is now WITHHELD by default
+(exit 3), and `--accept-unverified-population` prints it with the claim narrowed and a red banner
+immediately beneath the numbers, where it travels with them.
+
+```
+default                     exit=3   RE-WEIGHTED FIGURES WITHHELD
+--accept-unverified...      exit=0   figures + POPULATION IDENTITY UNVERIFIED banner
+a sampled verdict flipped   exit=2   1 SAMPLED VERDICT(S) CHANGED SINCE THE DRAW
+```
+
+#### And the last unpinned link: nothing bound the RESULTS to the sample
+
+The chain is **frame → sample → results**, and everything above binds the first two. The results
+file is a separate artifact from a separate run, so a sample redrawn while those results are stale
+passes membership, verdicts and the fingerprint — while the agreement figures are computed from
+rows belonging to another draw. Now bound on `(cache_key, judge1)` multiplicities, refusing with the count of
+differing rows and examples from each side.
+
+And a sixth: **the binding used SETS**, which discard multiplicity. A results file with one row
+duplicated and another omitted compares equal to the sample while the loop counts the duplicate
+twice and publishes over the wrong denominator. Multisets now, reporting the difference in both
+directions. Constructed the exact case to prove it rather than assert it:
+
+```
+SETS equal?      True    <- what the old check compared
+MULTISETS equal? False   <- what it compares now
+exit=2   THE RESULTS FILE IS NOT THIS SAMPLE: 1 row(s) too many, 0 missing.
+```
+
+And a seventh: **the binding omitted `arm`**, which the aggregation uses to place the row in a
+cell. A row keeping its key and verdict while changing `arm` passed the multiset check and landed
+in a different population cell against a different weight. Bound on `(cache_key, arm, judge1)` now
+— **derived from what the aggregation reads** rather than guessed field by field, with the tuple
+named in one place so the next field added to the cell is added to the binding in the same edit.
+
+```
+row 0 moved arm v8 -> v9, key and judge1 unchanged
+too many: b0e2ef8cf847862b:v8:judge [v9/no] x1
+missing : b0e2ef8cf847862b:v8:judge [v8/no] x1     exit=2
+```
+
+The sequence is the point, and it took seven steps to finish: **a count → membership → membership
+plus verdicts → withholding the figures rather than warning about them → binding the results to
+the sample → binding them by MULTISET rather than set → binding `arm` as well, because that
+is what the aggregation reads.** Each step looked sufficient until someone asked what it could not see, and four of
+the seven were pointed out rather than found.
+
+**Cost: 0 calls.**

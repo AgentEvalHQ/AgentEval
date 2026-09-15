@@ -21,6 +21,7 @@ instead of producing a confident number.
 
 Usage:  python tools/ce/analyse_judge_agreement.py
 """
+import argparse
 import collections
 import glob
 import hashlib
@@ -80,8 +81,21 @@ def key_for(entry):
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
+def frame_fingerprint(rows) -> str:
+    """A hash over the frame's (key, verdict) pairs -- what the re-weighting actually depends on.
+
+    Not the size. Two populations of 5,254 verdicts are the same size and can be entirely different
+    verdicts, and the per-cell shares would move with them while a count check said nothing. Verdicts
+    are included as well as keys because a re-judged cache changes the weights without changing the
+    membership.
+    """
+    payload = '\n'.join('%s\t%s' % (k, v) for k, v in sorted(rows))
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()  # DevSkim: ignore DS126858
+
+
 def live_frame():
     excluded = {}
+    identified = []
     index = {}
     for path in glob.glob(os.path.join(CORPORA, '*', '*-v5.json')):
         data = json.load(open(path, encoding='utf-8'))
@@ -102,11 +116,21 @@ def live_frame():
             # frame. Both need a human to look; neither should change the population quietly.
             excluded[arm] = excluded.get(arm, 0) + 1
             continue
-        frame.append((arm, 'yes' if str(v).strip().lower().startswith('yes') else 'no'))
-    return frame, excluded
+        verdict = 'yes' if str(v).strip().lower().startswith('yes') else 'no'
+        frame.append((arm, verdict))
+        # The KEY is kept alongside, so the population can be identified and not merely counted.
+        identified.append((k, verdict))
+    return frame, excluded, identified
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--accept-unverified-population', action='store_true',
+                    help='print the re-weighted figures for a sample carrying no frame '
+                         'fingerprint. The claim narrows to "re-weighted against a population '
+                         'whose identity was not verified" -- say that wherever the number goes.')
+    args = ap.parse_args()
     if not os.path.exists(RESULTS):
         print('no results file; run tools/ce/run_judge_agreement.py first')
         return 1
@@ -114,7 +138,7 @@ def main():
     sample = json.load(open(SAMPLE, encoding='utf-8'))
     models = res['models']
 
-    frame, excluded = live_frame()
+    frame, excluded, identified = live_frame()
     declared = sample.get('drawn_from')
     print('C-E  provider=%s' % res.get('provider', 'openai'))
     print('claim this run can support: %s' % res.get('claim_supported', '(unrecorded)'))
@@ -138,7 +162,98 @@ def main():
         print('     the corpora moved since the sample was drawn. The re-weighting below would be')
         print('     wrong, so it is not printed. Re-draw the sample, or reconcile the two files.')
         return 2
-    print('  OK: the frame reproduces, so the per-cell weights below are the population shares.')
+
+    # A COUNT IS NOT A REPRODUCTION. The check above passes for any two populations of the same
+    # SIZE, and the per-cell weights depend on composition. Two stronger operands, in order of what
+    # they can prove:
+    #
+    #   MEMBERSHIP -- every sampled case must still be in the frame. Works on a sample drawn before
+    #   any of this existed, because the sample records its own cache keys.
+    #
+    #   FINGERPRINT -- a hash over the frame's (key, verdict) pairs, recorded by the sampler. Pins
+    #   the whole population, not just the sampled part of it.
+    # THE LAST UNPINNED LINK. The chain is frame -> sample -> RESULTS, and the checks below bind
+    # the first two. Nothing bound the third: the results file is a separate artifact from a
+    # separate run, so a sample redrawn while these results are stale passes membership and the
+    # fingerprint while the figures come from rows belonging to another draw. Review of PR #251.
+    # MULTISETS, NOT SETS. A set discards multiplicity, so a results file with one row DUPLICATED
+    # and another OMITTED compares equal to the sample while the loop below counts the duplicate
+    # twice and publishes figures over the wrong denominator. The binding has to reject a malformed
+    # artifact, not only a foreign one. Review of PR #251.
+    # EVERY FIELD THE AGGREGATION READS, derived from the aggregation rather than guessed. It places
+    # a row with `cell = (row['arm'], row['judge1'])` and identifies it by `cache_key`, so those
+    # three are exactly what has to be bound -- binding two of them let a row keep its key and
+    # verdict, change `arm`, and land in a different population cell against a different weight.
+    # Enumerated here so the next field added to the cell is added to this tuple in the same edit.
+    bind = lambda c: (c['cache_key'], c['arm'], c['judge1'])
+    res_rows = collections.Counter(bind(c) for c in res['cases'])
+    sample_rows = collections.Counter(bind(c) for c in sample['cases'])
+    if res_rows != sample_rows:
+        extra = res_rows - sample_rows
+        short = sample_rows - res_rows
+        fmt = lambda m: ', '.join('%s [%s/%s] x%d' % (k, arm, v, n)
+                                  for (k, arm, v), n in sorted(m.items())[:3]) or 'none'
+        print('  🔴 THE RESULTS FILE IS NOT THIS SAMPLE: %d row(s) too many, %d missing.'
+              % (sum(extra.values()), sum(short.values())))
+        print('     too many: %s' % fmt(extra))
+        print('     missing : %s' % fmt(short))
+        print('     The agreement figures would be computed over rows this sample does not have,')
+        print('     or count one of its rows twice. Re-run the judge agreement against this sample.')
+        return 2
+
+    live_verdict = dict(identified)
+    live_keys = set(live_verdict)
+    missing = sorted(c['cache_key'] for c in sample['cases'] if c['cache_key'] not in live_keys)
+    if missing:
+        print('  🔴 %d of %d SAMPLED CASES ARE NOT IN THE REBUILT FRAME, e.g. %s.'
+              % (len(missing), len(sample['cases']), ', '.join(missing[:3])))
+        print('     The sample was drawn from a population this run cannot reproduce, so the')
+        print('     per-cell weights are not this frame\'s shares. Re-draw the sample.')
+        return 2
+
+    # MEMBERSHIP CANNOT SEE A VERDICT FLIP. Each case is grouped under the `judge1` it carried AT
+    # DRAW TIME and weighted by the cell it is in NOW, so a verdict that changed since the draw
+    # leaves the case straddling a seam with its key still present. Review of PR #251.
+    flipped = sorted(c['cache_key'] for c in sample['cases']
+                     if live_verdict.get(c['cache_key']) != c['judge1'])
+    if flipped:
+        print('  🔴 %d SAMPLED VERDICT(S) CHANGED SINCE THE DRAW, e.g. %s.'
+              % (len(flipped), ', '.join(flipped[:3])))
+        print('     Those cases are grouped under the verdict they had when sampled and weighted')
+        print('     by the cell they are in now, so the re-weighting would cross a seam.')
+        print('     Re-draw the sample.')
+        return 2
+
+    actual = frame_fingerprint(identified)
+    stamped = sample.get('drawn_from_fingerprint')
+    if stamped and stamped != actual:
+        print('  🔴 FRAME FINGERPRINT MISMATCH: sample %s, rebuilt %s.'
+              % (stamped[:12], actual[:12]))
+        print('     Same SIZE, different population or different verdicts. The re-weighting below')
+        print('     would be computed against shares this frame does not have.')
+        return 2
+
+    print('  OK: all %d sampled cases are present in the rebuilt frame.' % len(sample['cases']))
+    if stamped:
+        print('  OK: frame fingerprint %s matches, so the population is the one sampled.'
+              % actual[:12])
+    else:
+        # A WARNING DOES NOT STOP A PUBLICATION. Membership and the sampled verdicts are verified
+        # above; what remains unverifiable without a fingerprint is whether UNSAMPLED verdicts
+        # moved -- and those set the per-cell shares the re-weighting multiplies by. Printing the
+        # figures under a caution reads exactly like a verified re-weighting, which is the thing
+        # to avoid. The block is withheld unless the caller asks for it by name. Review of #251.
+        print('  ⚠ This sample predates the frame fingerprint (%s), so the whole-population'
+              % actual[:12])
+        print('    identity is UNVERIFIED. Membership and sampled verdicts are checked above and')
+        print('    both hold; what cannot be checked is whether UNSAMPLED verdicts moved, and')
+        print('    those set the per-cell shares the re-weighting multiplies by.')
+        if not args.accept_unverified_population:
+            print()
+            print('  RE-WEIGHTED FIGURES WITHHELD. Re-draw the sample to record a fingerprint, or')
+            print('  pass --accept-unverified-population to print them with the claim narrowed to')
+            print('  "re-weighted against a population whose identity was not verified".')
+            return 3
 
     weight = collections.Counter(frame)
     total = sum(weight.values())
@@ -201,6 +316,10 @@ def main():
                   % ('', unparseable[m]))
 
     print()
+    if not sample.get('drawn_from_fingerprint'):
+        print('  🔴 POPULATION IDENTITY UNVERIFIED: these figures are re-weighted against a')
+        print('     frame whose unsampled verdicts were never pinned. Carry that sentence with the')
+        print('     number, or re-draw the sample.')
     print('  ⚠ Quote the RE-WEIGHTED figure. The raw one is inflated or deflated by the deliberate')
     print('    over-sampling of the rare class and is not a population rate.')
     print('  ⚠ Cells present in the frame but NOT in the sample contribute nothing; the coverage')
