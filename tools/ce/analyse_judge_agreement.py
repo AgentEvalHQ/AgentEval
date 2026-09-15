@@ -21,6 +21,7 @@ instead of producing a confident number.
 
 Usage:  python tools/ce/analyse_judge_agreement.py
 """
+import argparse
 import collections
 import glob
 import hashlib
@@ -123,6 +124,13 @@ def live_frame():
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--accept-unverified-population', action='store_true',
+                    help='print the re-weighted figures for a sample carrying no frame '
+                         'fingerprint. The claim narrows to "re-weighted against a population '
+                         'whose identity was not verified" -- say that wherever the number goes.')
+    args = ap.parse_args()
     if not os.path.exists(RESULTS):
         print('no results file; run tools/ce/run_judge_agreement.py first')
         return 1
@@ -164,13 +172,27 @@ def main():
     #
     #   FINGERPRINT -- a hash over the frame's (key, verdict) pairs, recorded by the sampler. Pins
     #   the whole population, not just the sampled part of it.
-    live_keys = {k for k, _ in identified}
+    live_verdict = dict(identified)
+    live_keys = set(live_verdict)
     missing = sorted(c['cache_key'] for c in sample['cases'] if c['cache_key'] not in live_keys)
     if missing:
         print('  🔴 %d of %d SAMPLED CASES ARE NOT IN THE REBUILT FRAME, e.g. %s.'
               % (len(missing), len(sample['cases']), ', '.join(missing[:3])))
         print('     The sample was drawn from a population this run cannot reproduce, so the')
         print('     per-cell weights are not this frame\'s shares. Re-draw the sample.')
+        return 2
+
+    # MEMBERSHIP CANNOT SEE A VERDICT FLIP. Each case is grouped under the `judge1` it carried AT
+    # DRAW TIME and weighted by the cell it is in NOW, so a verdict that changed since the draw
+    # leaves the case straddling a seam with its key still present. Review of PR #251.
+    flipped = sorted(c['cache_key'] for c in sample['cases']
+                     if live_verdict.get(c['cache_key']) != c['judge1'])
+    if flipped:
+        print('  🔴 %d SAMPLED VERDICT(S) CHANGED SINCE THE DRAW, e.g. %s.'
+              % (len(flipped), ', '.join(flipped[:3])))
+        print('     Those cases are grouped under the verdict they had when sampled and weighted')
+        print('     by the cell they are in now, so the re-weighting would cross a seam.')
+        print('     Re-draw the sample.')
         return 2
 
     actual = frame_fingerprint(identified)
@@ -187,10 +209,22 @@ def main():
         print('  OK: frame fingerprint %s matches, so the population is the one sampled.'
               % actual[:12])
     else:
+        # A WARNING DOES NOT STOP A PUBLICATION. Membership and the sampled verdicts are verified
+        # above; what remains unverifiable without a fingerprint is whether UNSAMPLED verdicts
+        # moved -- and those set the per-cell shares the re-weighting multiplies by. Printing the
+        # figures under a caution reads exactly like a verified re-weighting, which is the thing
+        # to avoid. The block is withheld unless the caller asks for it by name. Review of #251.
         print('  ⚠ This sample predates the frame fingerprint (%s), so the whole-population'
               % actual[:12])
-        print('    identity is UNVERIFIED -- membership above covers the sampled cases only. The')
-        print('    next sample drawn records it; a count alone never was a reproduction.')
+        print('    identity is UNVERIFIED. Membership and sampled verdicts are checked above and')
+        print('    both hold; what cannot be checked is whether UNSAMPLED verdicts moved, and')
+        print('    those set the per-cell shares the re-weighting multiplies by.')
+        if not args.accept_unverified_population:
+            print()
+            print('  RE-WEIGHTED FIGURES WITHHELD. Re-draw the sample to record a fingerprint, or')
+            print('  pass --accept-unverified-population to print them with the claim narrowed to')
+            print('  "re-weighted against a population whose identity was not verified".')
+            return 3
 
     weight = collections.Counter(frame)
     total = sum(weight.values())
@@ -253,6 +287,10 @@ def main():
                   % ('', unparseable[m]))
 
     print()
+    if not sample.get('drawn_from_fingerprint'):
+        print('  🔴 POPULATION IDENTITY UNVERIFIED: these figures are re-weighted against a')
+        print('     frame whose unsampled verdicts were never pinned. Carry that sentence with the')
+        print('     number, or re-draw the sample.')
     print('  ⚠ Quote the RE-WEIGHTED figure. The raw one is inflated or deflated by the deliberate')
     print('    over-sampling of the rare class and is not a population rate.')
     print('  ⚠ Cells present in the frame but NOT in the sample contribute nothing; the coverage')

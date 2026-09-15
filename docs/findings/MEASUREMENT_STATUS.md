@@ -19207,4 +19207,29 @@ untouched (control)         exit=0   no refusal
 
 The third line is the one that makes the first two mean anything.
 
+#### Review of the fix: membership cannot see a VERDICT FLIP, and a warning is not a refusal
+
+Two more, both right, and together they finish the thought.
+
+**A sampled case is grouped under the `judge1` it carried AT DRAW TIME and weighted by the cell it
+is in NOW.** A verdict that changed since the draw leaves the case straddling that seam with its
+key still present — so the membership check, which was the strengthening, cannot see it. Now
+checked directly: sampled verdicts must match the current frame, and a flip refuses by name.
+
+**And printing the figures under a caution reads exactly like a verified re-weighting.** Without a
+fingerprint the one thing still unverifiable is whether UNSAMPLED verdicts moved — and those set
+the per-cell shares the re-weighting multiplies by. So the block is now WITHHELD by default
+(exit 3), and `--accept-unverified-population` prints it with the claim narrowed and a red banner
+immediately beneath the numbers, where it travels with them.
+
+```
+default                     exit=3   RE-WEIGHTED FIGURES WITHHELD
+--accept-unverified...      exit=0   figures + POPULATION IDENTITY UNVERIFIED banner
+a sampled verdict flipped   exit=2   1 SAMPLED VERDICT(S) CHANGED SINCE THE DRAW
+```
+
+The sequence is the point: a count → membership → membership plus verdicts → and still the
+population is only pinned by a fingerprint the current sample does not carry. Each step looked
+sufficient until someone asked what it could not see.
+
 **Cost: 0 calls.**
