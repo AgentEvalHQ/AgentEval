@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Text.Json;
 using AgentEval.Evals;
 using AgentEval.Memory.External.Models;
 
@@ -65,6 +66,14 @@ public static class TypedMemEvalEvalResultAdapter
 
         var now = DateTimeOffset.UtcNow;
         var passThreshold = passThresholdPercent / 100.0;
+
+        // THE SCORE IS NOT THE RESULT, AND A REPORT THAT PRINTS ONLY THE SCORE IS WORSE THAN ONE
+        // THAT PRINTS NOTHING. A rendered report used to show "recency 15/15, 1.000" with no
+        // chance floor, no oracle ceiling, no retrieval arm and no named retriever -- so a reader
+        // took a saturated full-haystack figure for a memory result. The shipped sidecar carries
+        // all of it, so it travels with the projection.
+        var context = SidecarContext.Load(typed.Vertical);
+
         var shapeNodes = typed.ByShape
             .OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv => Node(
@@ -73,8 +82,8 @@ public static class TypedMemEvalEvalResultAdapter
                 counts: kv.Value,
                 type: "composite",
                 judgeModel: judgeModel,
-                extra: null,
-                recommendations: null,
+                extra: context.DimensionsFor(kv.Key),
+                recommendations: context.NotesFor(kv.Key),
                 subResults: null,
                 passThreshold: passThreshold,
                 now: now))
@@ -126,7 +135,7 @@ public static class TypedMemEvalEvalResultAdapter
             type: "composite",
             judgeModel: judgeModel,
             extra: dimensions,
-            recommendations: [CitationRule],
+            recommendations: [CitationRule, .. context.RootNotes()],
             subResults: shapeNodes,
             passThreshold: passThreshold,
             now: now);
@@ -143,6 +152,194 @@ public static class TypedMemEvalEvalResultAdapter
         ["outcome.inconclusive"] = counts.Inconclusive,
         ["outcome.unrun"] = counts.Unrun
     };
+
+    /// <summary>
+    /// The per-shape numbers a score has to be read against, taken from the sidecar that ships
+    /// beside the corpus. Fail-soft by construction: an unreadable sidecar, an unparsable
+    /// vertical, or a shape the sidecar does not carry yields no dimensions and no notes rather
+    /// than an exception. This projection must never be the thing that fails a completed run.
+    /// </summary>
+    private sealed class SidecarContext
+    {
+        private readonly JsonElement _byShape;
+        private readonly JsonElement _sensitivityByShape;
+        private readonly JsonElement _sensitivity;
+        private readonly bool _loaded;
+
+        private SidecarContext(JsonElement byShape, JsonElement sensitivity,
+                               JsonElement sensitivityByShape, bool loaded)
+        {
+            _byShape = byShape;
+            _sensitivity = sensitivity;
+            _sensitivityByShape = sensitivityByShape;
+            _loaded = loaded;
+        }
+
+        public static SidecarContext Load(string vertical)
+        {
+            try
+            {
+                if (!Enum.TryParse<TypedMemEvalVertical>(vertical, ignoreCase: true, out var v))
+                    return Empty;
+
+                // Parsed into a detached clone: the JsonDocument is disposed here, and a
+                // JsonElement backed by a disposed document throws on access.
+                using var document = JsonDocument.Parse(TypedMemEvalCorpus.ReadMetadataJson(v));
+                var probes = document.RootElement.TryGetProperty("probes", out var p)
+                    ? p.Clone()
+                    : default;
+                if (probes.ValueKind != JsonValueKind.Object)
+                    return Empty;
+
+                var byShape = probes.TryGetProperty("by_shape", out var bs) ? bs.Clone() : default;
+                var sensitivity = probes.TryGetProperty("retriever_sensitivity", out var rs)
+                    ? rs.Clone()
+                    : default;
+                var sensByShape = sensitivity.ValueKind == JsonValueKind.Object
+                                  && sensitivity.TryGetProperty("by_shape", out var sbs)
+                    ? sbs.Clone()
+                    : default;
+
+                return new SidecarContext(byShape, sensitivity, sensByShape, loaded: true);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or InvalidOperationException)
+            {
+                return Empty;
+            }
+        }
+
+        private static SidecarContext Empty { get; } =
+            new(default, default, default, loaded: false);
+
+        /// <summary>The numbers. Rendered by the HTML renderer as its "Metrics" table.</summary>
+        public Dictionary<string, double>? DimensionsFor(string shape)
+        {
+            if (!_loaded || !TryRow(_byShape, shape, out var row))
+                return null;
+
+            var dims = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            // A chance floor that is ABSENT is not a floor of zero, so it is simply not written.
+            if (Num(row, "chance_floor") is { } floor)
+                dims["floor.chance"] = floor;
+            if (Num(row, "headroom_perfect_selector") is { } headroom)
+                dims["headroom.perfectSelector"] = headroom;
+
+            if (Rate(row, "v1_passed", "v1_applicable") is { } v1)
+                dims["arm.v1GoldOnlyCeiling"] = v1;
+            if (Rate(row, "v8_passed", "v8_applicable") is { } v8)
+                dims["arm.v8FullHaystack"] = v8;
+            if (Rate(row, "v9_passed", "v9_applicable") is { } v9)
+                dims["arm.v9ReferenceRetrieval"] = v9;
+
+            return dims.Count > 0 ? dims : null;
+        }
+
+        /// <summary>The words. Rendered as the node's bullet list.</summary>
+        public IReadOnlyList<string>? NotesFor(string shape)
+        {
+            if (!_loaded)
+                return null;
+
+            var notes = new List<string>();
+
+            if (Str(_sensitivityByShape, shape, "retriever_agreement") is { } agreement)
+            {
+                notes.Add(agreement switch
+                {
+                    "robust-ranking" =>
+                        "Ranking: ROBUST — this shape separates two systems under BOTH published retrievers.",
+                    "retriever-sensitive" =>
+                        "Ranking: RETRIEVER-SENSITIVE — the two published retrievers DISAGREE on whether "
+                        + "this shape separates two systems. Read any comparison here cautiously.",
+                    "non-ranking" =>
+                        "Ranking: NON-RANKING — neither published retriever separates two systems on this "
+                        + "shape. A good score here is not evidence that a memory system is good.",
+                    "not-applicable" =>
+                        "Ranking: NOT APPLICABLE — the gold set is empty, so the retrieval operand is "
+                        + "undefined rather than perfect. No retrieval figure is published for it.",
+                    _ => $"Ranking: {agreement}."
+                });
+            }
+
+            if (TryRow(_byShape, shape, out var row))
+            {
+                var v8 = Rate(row, "v8_passed", "v8_applicable");
+                var v9 = Rate(row, "v9_passed", "v9_applicable");
+                if (v8 is { } full && v9 is { } retrieved && full - retrieved > 0.0005)
+                {
+                    notes.Add(
+                        $"Condition matters here: {full:F3} with the whole haystack in context, "
+                        + $"{retrieved:F3} under the reference retriever. A score measured by stuffing "
+                        + "the context is the former and must not be read as the latter.");
+                }
+            }
+
+            return notes.Count > 0 ? notes : null;
+        }
+
+        /// <summary>Root-level notes: what every figure above is conditional on.</summary>
+        public IReadOnlyList<string> RootNotes()
+        {
+            var notes = new List<string>
+            {
+                "Read the per-shape nodes, not this node's score. A mean over shapes hides the "
+                + "structure the corpus exists to expose; the score here exists for tooling "
+                + "compatibility and is not the citable result."
+            };
+
+            if (!_loaded || _sensitivity.ValueKind != JsonValueKind.Object)
+                return notes;
+
+            foreach (var (field, label) in new[]
+                     {
+                         ("reference_retriever", "reference"),
+                         ("dense_retriever", "dense"),
+                         ("second_dense_retriever", "dense (2)")
+                     })
+            {
+                if (_sensitivity.TryGetProperty(field, out var value)
+                    && value.ValueKind == JsonValueKind.String)
+                {
+                    notes.Add($"Retriever ({label}): {value.GetString()}. Every retrieval figure "
+                              + "above is conditional on it.");
+                }
+            }
+
+            return notes;
+        }
+
+        private static bool TryRow(JsonElement byShape, string shape, out JsonElement row)
+        {
+            if (byShape.ValueKind == JsonValueKind.Object
+                && byShape.TryGetProperty(shape, out row)
+                && row.ValueKind == JsonValueKind.Object)
+            {
+                return true;
+            }
+
+            row = default;
+            return false;
+        }
+
+        private static double? Num(JsonElement row, string field)
+            => row.TryGetProperty(field, out var v) && v.ValueKind == JsonValueKind.Number
+                ? v.GetDouble()
+                : null;
+
+        // 0/0 is not 0.000: an arm that was never applicable has no rate at all.
+        private static double? Rate(JsonElement row, string passed, string applicable)
+            => Num(row, passed) is { } p && Num(row, applicable) is { } a && a > 0
+                ? p / a
+                : null;
+
+        private static string? Str(JsonElement byShape, string shape, string field)
+            => TryRow(byShape, shape, out var row)
+               && row.TryGetProperty(field, out var v)
+               && v.ValueKind == JsonValueKind.String
+                ? v.GetString()
+                : null;
+    }
 
     private static EvalResult Node(
         string key,

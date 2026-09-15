@@ -7,6 +7,8 @@ using AgentEval.Core;
 using AgentEval.Memory.External;
 using AgentEval.Memory.External.Models;
 using AgentEval.Memory.External.TypedMemEval;
+using AgentEval.Output;
+using AgentEval.Samples.Benchmarks;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
@@ -37,6 +39,17 @@ namespace AgentEval.Samples;
 /// No new grading machinery: the run goes through <see cref="TypedMemEvalRunner"/>, the same path
 /// `agenteval bench typedmemeval` uses. Everything below the run is presentation, joined to the
 /// sidecar that ships inside the package.
+///
+/// REPORTS: the result is projected to an <see cref="EvalResult"/> by
+/// <see cref="TypedMemEvalEvalResultAdapter"/> -- which lives in CORE and is the same projection
+/// the CLI uses -- and written through the same artifact path the LongMemEval benchmark sample
+/// takes. That yields the canonical `.agenteval/` run record plus sidecar JSON, HTML and PDF.
+/// Nothing here renders or scores anything itself; a sample that grew its own reporting stack
+/// would be the defect, not the feature.
+///
+/// REAL ONLY. There is no mock path. With no credentials this sample PRINTS A WARNING AND STOPS,
+/// because a memory benchmark answered by a canned agent measures nothing and a green tick from
+/// one would be a lie.
 ///
 /// Prerequisites:
 /// - AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY
@@ -94,6 +107,79 @@ public static class TypedMemEvalBaselineDemo
         var sidecar = LoadSidecar(Vertical);
         PrintPerShape(result, sidecar, LoadShapeMap(Vertical));
         PrintReading(sidecar);
+
+        await WriteReportsAsync(result, agent, deployment).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Persists the run: canonical <c>.agenteval/</c> record plus sidecar JSON / HTML / PDF.
+    ///
+    /// The projection is <see cref="TypedMemEvalEvalResultAdapter.ToEvalResult"/> from CORE -- the
+    /// same one `agenteval bench typedmemeval` uses -- and the writing is the shared benchmark
+    /// helper the LongMemEval sample uses. No rendering, scoring or persistence logic is defined
+    /// in this file.
+    ///
+    /// The adapter REQUIRES <see cref="ExternalBenchmarkResult.TypedOutcomes"/> and throws without
+    /// it. <see cref="TypedMemEvalRunner"/> populates it via its report builder on the same call
+    /// made above, so it is present -- but a future runner change could silently stop populating
+    /// it, and a sample that died with an ArgumentException after paying for ~100 model calls
+    /// would be a poor trade. Hence the explicit check: the measurement is already printed, and a
+    /// failure to FILE it must not read as a failure to MAKE it.
+    /// </summary>
+    private static async Task WriteReportsAsync(
+        ExternalBenchmarkResult result,
+        IEvaluableAgent agent,
+        string deployment)
+    {
+        if (result.TypedOutcomes is null)
+        {
+            Console.WriteLine("  \u26a0 The run carries no TypedOutcomes, so no report was written. The per-shape");
+            Console.WriteLine("  table above still stands — it is read from the run and the shipped sidecar.");
+            Console.WriteLine();
+            return;
+        }
+
+        Console.WriteLine("WRITING REPORTS");
+        Console.WriteLine();
+
+        try
+        {
+            var evalTree = TypedMemEvalEvalResultAdapter.ToEvalResult(
+                result,
+                judgeModel: deployment);
+
+            var subject = new SubjectIdentity(
+                Kind: SubjectKind.Agent,
+                Name: agent.Name,
+                ModelId: deployment,
+                Framework: "MAF");
+
+            var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
+                evalTree,
+                subject,
+                benchmarkName: "typedmemeval",
+                regulationOrBenchmark: $"TypedMemEval — {Vertical} ({TypedMemEvalVerticalDescriptor.CorpusRevision})",
+                includePdf: true,
+                regulationCodeForEvidence: null,   // not a compliance benchmark
+                presetLabel: Vertical.ToString(),
+                judgeModel: deployment).ConfigureAwait(false);
+
+            BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
+
+            Console.WriteLine();
+            Console.WriteLine("  The report carries the TYPED OUTCOME VECTOR, which is the citable form. The single");
+            Console.WriteLine("  score on the root node exists for tooling compatibility and is not the result —");
+            Console.WriteLine("  read the per-shape nodes, for the reason the table above prints no aggregate.");
+            Console.WriteLine();
+
+            BenchmarkSampleHelpers.OfferToOpenReports(paths);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The measurement succeeded and is already on screen. Losing the file is not losing it.
+            Console.WriteLine($"  \u26a0 The run completed but its report could not be written: {ex.Message}");
+            Console.WriteLine();
+        }
     }
 
     /// <summary>
