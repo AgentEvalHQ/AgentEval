@@ -60,15 +60,23 @@ namespace AgentEval.Samples;
 public static class TypedMemEvalBaselineDemo
 {
     /// <summary>
-    /// One vertical. Temporal is the useful demonstrator: three shapes that land in two different
-    /// retriever-agreement classes, so the output shows the distinction rather than describing it.
+    /// EVERY vertical, because the family's whole claim is that memory is not one skill. Running
+    /// only Temporal would exercise 3 of 36 shapes and demonstrate the opposite of the point.
     ///
-    /// DEPTH is a preset, not a constant — `--preset smoke|standard|audit-grade`, matching every
-    /// other benchmark sample. Smoke takes 12 questions, Standard 30, audit-grade the whole
-    /// vertical (50 here). The presets change HOW MANY questions are asked, never which answers
-    /// count, so a smaller preset buys a wider interval rather than an easier test.
+    /// DEPTH is a preset — `--preset smoke|standard|audit-grade`, matching every other benchmark
+    /// sample. It sets questions PER VERTICAL, never which answers count, so a smaller preset
+    /// buys a wider interval and not an easier test. Measured at 7.6s per question:
+    ///
+    ///   smoke        4 per vertical   ~40 questions   ~5 min
+    ///   standard    12 per vertical  ~120 questions  ~15 min
+    ///   audit-grade  the whole family    587          ~74 min
+    ///
+    /// ⚠ BREADTH IS NOT CONFIDENCE. 36 shapes share whatever budget the preset sets, so a smoke
+    /// sweep leaves roughly one question per shape. Every row prints its own `n` for exactly this
+    /// reason — read the width of the evidence before reading the rate.
     /// </summary>
-    private const TypedMemEvalVertical Vertical = TypedMemEvalVertical.Temporal;
+    private static readonly TypedMemEvalVertical[] Verticals =
+        Enum.GetValues<TypedMemEvalVertical>();
 
     public static async Task RunAsync()
     {
@@ -98,14 +106,12 @@ public static class TypedMemEvalBaselineDemo
         var preset = BenchmarkSampleHelpers.ResolvePreset();
         BenchmarkSampleHelpers.PrintPreset(preset);
 
-        // A smaller preset samples FEWER QUESTIONS, not easier ones, so a shape can end up with a
-        // handful of questions or none at all. The per-shape table prints `n` for exactly this
-        // reason: read the width of the evidence, not just the rate.
+        // Questions PER VERTICAL. A smaller preset samples fewer questions, not easier ones.
         var maxQuestions = preset switch
         {
-            SamplePreset.Smoke => (int?)12,
-            SamplePreset.Standard => 30,
-            _ => null      // audit-grade: the whole vertical
+            SamplePreset.Smoke => (int?)4,
+            SamplePreset.Standard => 12,
+            _ => null      // audit-grade: every question in every vertical
         };
 
         // PROGRESS. The runner already logs `[i/N] shape outcome` after every question; without a
@@ -127,8 +133,8 @@ public static class TypedMemEvalBaselineDemo
             MaxQuestions = maxQuestions,
         };
 
-        Console.WriteLine($"   Vertical:  {Vertical}");
-        Console.WriteLine($"   Questions: {(maxQuestions is { } cap ? $"up to {cap}" : "the whole vertical")}");
+        Console.WriteLine($"   Verticals: {Verticals.Length} (the whole family)");
+        Console.WriteLine($"   Questions: {(maxQuestions is { } cap ? $"up to {cap} per vertical" : "every question — 587")}");
         Console.WriteLine($"   Reader:    {deployment}");
         Console.WriteLine($"   Judge:     {deployment} (same model)");
         Console.WriteLine();
@@ -140,18 +146,29 @@ public static class TypedMemEvalBaselineDemo
         Console.WriteLine("   Each question prints [i/N] shape outcome as it completes.");
         Console.WriteLine();
 
-        var result = await runner.RunAsync(agent, Vertical, options).ConfigureAwait(false);
+        // One run per vertical: the runner measures a single vertical per call, by design —
+        // the corpora are independent and each carries its own sidecar and sha.
+        var results = new List<ExternalBenchmarkResult>();
+        foreach (var vertical in Verticals)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"── {vertical} " + new string('─', Math.Max(0, 62 - vertical.ToString().Length)));
+            results.Add(await runner.RunAsync(agent, vertical, options).ConfigureAwait(false));
+        }
 
-        var sidecar = LoadSidecar(Vertical);
-        PrintPerShape(result, sidecar, LoadShapeMap(Vertical));
-        PrintReading(sidecar);
+        Console.WriteLine();
+        foreach (var (vertical, result) in Verticals.Zip(results))
+        {
+            PrintPerShape(vertical, result, LoadSidecar(vertical), LoadShapeMap(vertical));
+        }
 
-        await WriteReportsAsync(result, agent, deployment).ConfigureAwait(false);
-        PrintKeyTakeaways(result);
+        PrintReading(LoadSidecar(Verticals[0]));
+        await WriteReportsAsync(results, agent, deployment).ConfigureAwait(false);
+        PrintKeyTakeaways(results);
     }
 
     /// <summary>Closes the sample the way its siblings in this group do.</summary>
-    private static void PrintKeyTakeaways(ExternalBenchmarkResult result)
+    private static void PrintKeyTakeaways(IReadOnlyList<ExternalBenchmarkResult> results)
     {
         Console.WriteLine(new string('=', 70));
         Console.WriteLine("KEY TAKEAWAYS:");
@@ -161,11 +178,13 @@ public static class TypedMemEvalBaselineDemo
         Console.WriteLine("   * V9 is where a system that must RETRIEVE lands. The gap is the point.");
         Console.WriteLine("   * A shape whose ranking class is non-ranking cannot separate two");
         Console.WriteLine("     systems at all; a good score there is not evidence.");
-        Console.WriteLine($"   * Model calls billed by this run: {result.TotalLlmCalls}"
-                          + (result.TotalJudgeRetryLlmCalls > 0
-                             ? $" (including {result.TotalJudgeRetryLlmCalls} judge retry call(s))"
+        Console.WriteLine($"   * Memory is not ONE skill: {results.Count} verticals measure different");
+        Console.WriteLine("     constructs, which is why no single number is printed for the family.");
+        Console.WriteLine($"   * Model calls billed by this run: {results.Sum(r => r.TotalLlmCalls)}"
+                          + (results.Sum(r => r.TotalJudgeRetryLlmCalls) is var retries && retries > 0
+                             ? $" (including {retries} judge retry call(s))"
                              : string.Empty));
-        Console.WriteLine("   * Change `Vertical` to run one of the other nine.");
+        Console.WriteLine("   * --preset audit-grade runs all 587 questions (~74 min).");
         Console.WriteLine(new string('=', 70));
         Console.WriteLine();
     }
@@ -186,11 +205,11 @@ public static class TypedMemEvalBaselineDemo
     /// failure to FILE it must not read as a failure to MAKE it.
     /// </summary>
     private static async Task WriteReportsAsync(
-        ExternalBenchmarkResult result,
+        IReadOnlyList<ExternalBenchmarkResult> results,
         IEvaluableAgent agent,
         string deployment)
     {
-        if (result.TypedOutcomes is null)
+        if (results.Any(r => r.TypedOutcomes is null))
         {
             Console.WriteLine("  \u26a0 The run carries no TypedOutcomes, so no report was written. The per-shape");
             Console.WriteLine("  table above still stands — it is read from the run and the shipped sidecar.");
@@ -204,7 +223,7 @@ public static class TypedMemEvalBaselineDemo
         try
         {
             var evalTree = TypedMemEvalEvalResultAdapter.ToEvalResult(
-                result,
+                results,
                 judgeModel: deployment);
 
             var subject = new SubjectIdentity(
@@ -217,10 +236,10 @@ public static class TypedMemEvalBaselineDemo
                 evalTree,
                 subject,
                 benchmarkName: "typedmemeval",
-                regulationOrBenchmark: $"TypedMemEval — {Vertical} ({TypedMemEvalVerticalDescriptor.CorpusRevision})",
+                regulationOrBenchmark: $"TypedMemEval — {results.Count} verticals ({TypedMemEvalVerticalDescriptor.CorpusRevision})",
                 includePdf: true,
                 regulationCodeForEvidence: null,   // not a compliance benchmark
-                presetLabel: Vertical.ToString(),
+                presetLabel: $"{results.Count}-vertical sweep",
                 judgeModel: deployment).ConfigureAwait(false);
 
             BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
@@ -255,6 +274,7 @@ public static class TypedMemEvalBaselineDemo
     }
 
     private static void PrintPerShape(
+        TypedMemEvalVertical vertical,
         ExternalBenchmarkResult result,
         JsonElement sidecar,
         IReadOnlyDictionary<string, string> shapeOf)
@@ -298,7 +318,7 @@ public static class TypedMemEvalBaselineDemo
         // The runner injects every haystack session, so nothing is retrieved and nothing is
         // selected. That is the corpus's own `v8_full_haystack` arm, and V8 is therefore the
         // ceiling that applies here. A retrieval figure would not be.
-        Console.WriteLine("THE READER — full haystack, no retrieval (the corpus's V8 condition)");
+        Console.WriteLine($"{vertical.ToString().ToUpperInvariant()} — full haystack, no retrieval (the V8 condition)");
         Console.WriteLine(new string('-', 88));
         Console.WriteLine($"  {"shape",-24} {"n",3} {"judged",6} {"model",7} {"V8 pub",7} {"floor",7} {"above ch.",9}");
         Console.WriteLine(new string('-', 88));
@@ -436,7 +456,7 @@ public static class TypedMemEvalBaselineDemo
         Console.WriteLine();
 
         // ─── BLOCK 2: what a RETRIEVING system faces — which this reader is not ──────────
-        Console.WriteLine("A RETRIEVING SYSTEM — what these shapes do to one (this reader is NOT one)");
+        Console.WriteLine($"{vertical} under a RETRIEVING system (this reader is NOT one)");
         Console.WriteLine(new string('-', 88));
         Console.WriteLine($"  {"shape",-24} {"V9 ref",7} {"headroom",9}  ranking");
         Console.WriteLine(new string('-', 88));

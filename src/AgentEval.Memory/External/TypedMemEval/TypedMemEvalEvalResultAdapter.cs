@@ -51,6 +51,118 @@ public static class TypedMemEvalEvalResultAdapter
     /// can see it was chosen by the caller, and the typed vector in the dimensions is the result.
     /// </remarks>
     /// <exception cref="ArgumentException">When the result is not a TypedMemEval result.</exception>
+    /// <summary>
+    /// Projects a FAMILY sweep -- one result per vertical -- as a single tree:
+    /// family → vertical → shape → question.
+    /// </summary>
+    /// <remarks>
+    /// The root score is a micro-average over every question asked, and it is not a result.
+    /// Ten verticals measure ten different constructs; `arithmetic` and `forgetting` are not two
+    /// samples of one quantity, so a mean over them answers no question anyone actually has.
+    /// <see cref="EvalScore.Value"/> is not nullable, so a number has to be there — every note on
+    /// the node exists to stop it being read as the finding. Read the vertical nodes.
+    /// </remarks>
+    /// <param name="results">One result per vertical. Each must carry TypedOutcomes.</param>
+    /// <param name="judgeModel">Judge deployment, recorded on every node.</param>
+    /// <param name="passThresholdPercent">Pass threshold applied per node.</param>
+    public static EvalResult ToEvalResult(
+        IReadOnlyList<ExternalBenchmarkResult> results,
+        string? judgeModel = null,
+        double passThresholdPercent = 50.0)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        if (results.Count == 0)
+            throw new ArgumentException("A family projection needs at least one result.", nameof(results));
+
+        // A single vertical projects as itself. Wrapping one result in a "family" root would
+        // invent a level that says nothing and would put a second, identical score above it.
+        if (results.Count == 1)
+            return ToEvalResult(results[0], judgeModel, passThresholdPercent);
+
+        var now = DateTimeOffset.UtcNow;
+        var passThreshold = passThresholdPercent / 100.0;
+
+        var verticalNodes = results
+            .OrderBy(r => r.TypedOutcomes?.Vertical ?? string.Empty, StringComparer.Ordinal)
+            .Select(r => ToEvalResult(r, judgeModel, passThresholdPercent))
+            .ToList();
+
+        // Summed over questions, NOT averaged over verticals: a mean of ten rates would weight a
+        // 50-question vertical the same as an 80-question one. Both readings are poor; the
+        // micro-average is at least the one whose denominator is stated.
+        var totals = results
+            .Select(r => r.TypedOutcomes!.Outcomes)
+            .Aggregate(
+                (n: 0, correct: 0, wrong: 0, abstained: 0, missed: 0, premature: 0, inconclusive: 0, unrun: 0),
+                (acc, c) => (acc.n + c.N, acc.correct + c.Correct, acc.wrong + c.Wrong,
+                             acc.abstained + c.Abstained, acc.missed + c.Missed,
+                             acc.premature + c.Premature, acc.inconclusive + c.Inconclusive,
+                             acc.unrun + c.Unrun));
+
+        var measured = totals.n - totals.inconclusive - totals.unrun;
+        var share = measured > 0 ? (double)totals.correct / measured : 0;
+
+        var verticals = results
+            .Select(r => r.TypedOutcomes!.Vertical)
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToList();
+
+        var dimensions = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["n"] = totals.n,
+            ["outcome.correct"] = totals.correct,
+            ["outcome.wrong"] = totals.wrong,
+            ["outcome.abstained"] = totals.abstained,
+            ["outcome.missed"] = totals.missed,
+            ["outcome.premature"] = totals.premature,
+            ["outcome.inconclusive"] = totals.inconclusive,
+            ["outcome.unrun"] = totals.unrun,
+            ["verticals"] = verticals.Count,
+            ["shapes"] = verticalNodes.Sum(v => v.Details.SubResults?.Count ?? 0)
+        };
+
+        return new EvalResult(
+            Metric: new EvalMetadata(
+                Key: "typedmemeval",
+                Name: $"TypedMemEval — {verticals.Count} verticals",
+                Category: "memory",
+                Version: "1.0.0"),
+            Score: new EvalScore(
+                Value: share,
+                Ordinal: null,
+                Label: measured == 0 ? "inconclusive" : "aggregate",
+                Passed: measured > 0 && share >= passThreshold,
+                Threshold: passThreshold,
+                Severity: "none",
+                Confidence: null),
+            Details: new EvalDetails(
+                Dimensions: dimensions,
+                Evidence: null,
+                Recommendations:
+                [
+                    "THIS NUMBER IS NOT A RESULT. It is a micro-average over "
+                    + $"{measured} measured questions spanning {verticals.Count} verticals, and those "
+                    + "verticals measure different constructs — arithmetic and forgetting are not "
+                    + "two samples of one quantity. It exists because the score field is not "
+                    + "nullable. Read the vertical nodes.",
+                    $"Verticals swept: {string.Join(", ", verticals)}.",
+                    "Per-shape n is the number that decides whether any row below is evidence. A "
+                    + "sweep spread thin across 36 shapes buys breadth, not confidence.",
+                    CitationRule
+                ],
+                SubResults: verticalNodes,
+                AggregationStrategy: "typed-outcome-vector"),
+            Provenance: new EvalProvenance(
+                Type: "composite",
+                JudgeModel: judgeModel,
+                PromptId: null,
+                PromptHash: null,
+                TokensUsed: null,
+                EstimatedCost: 0,
+                CacheHit: false),
+            EvaluatedAt: now);
+    }
+
     public static EvalResult ToEvalResult(
         ExternalBenchmarkResult result,
         string? judgeModel = null,

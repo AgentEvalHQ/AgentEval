@@ -323,6 +323,50 @@ public sealed class TypedMemEvalJudgeAndRunSetTests
     }
 
     [Fact]
+    public async Task Adapter_ProjectsAFamilySweepAsOneTree()
+    {
+        var temporal = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Temporal, 4);
+        var episodic = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Episodic, 4);
+
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(
+            new[] { temporal, episodic }, judgeModel: "test-judge");
+
+        Assert.Equal("typedmemeval", eval.Metric.Key);
+        Assert.Equal(2, eval.Details.SubResults!.Count);
+        Assert.Contains(eval.Details.SubResults, n => n.Metric.Key == "typedmemeval.temporal");
+        Assert.Contains(eval.Details.SubResults, n => n.Metric.Key == "typedmemeval.episodic");
+
+        // The denominator is summed over QUESTIONS, not averaged over verticals — a mean of two
+        // rates would weight a 4-question vertical the same as a 40-question one.
+        Assert.Equal(8.0, eval.Details.Dimensions!["n"]);
+        Assert.Equal(2.0, eval.Details.Dimensions["verticals"]);
+
+        // The root has to argue against its own number: ten verticals measure ten constructs, so
+        // a mean over them answers no question. The score field is not nullable, so the only
+        // available defence is saying so where the reader sees it.
+        Assert.StartsWith("THIS NUMBER IS NOT A RESULT", eval.Details.Recommendations![0], StringComparison.Ordinal);
+        Assert.Contains(eval.Details.Recommendations, r => r == TypedMemEvalEvalResultAdapter.CitationRule);
+
+        // Depth is preserved all the way down: family -> vertical -> shape -> question.
+        var vertical = eval.Details.SubResults.Single(n => n.Metric.Key == "typedmemeval.temporal");
+        var shape = Assert.IsType<EvalResult>(vertical.Details.SubResults!.First());
+        Assert.NotEmpty(shape.Details.SubResults!);
+    }
+
+    [Fact]
+    public async Task Adapter_DoesNotInventAFamilyLevelForASingleVertical()
+    {
+        // NEGATIVE CONTROL. Wrapping one result in a "family" root would add a level that says
+        // nothing and stack a second, identical score above the vertical's own.
+        var one = await TypedMemEvalGuardTests.RunAsync(TypedMemEvalVertical.Temporal, 4);
+
+        var eval = TypedMemEvalEvalResultAdapter.ToEvalResult(new[] { one }, judgeModel: "test-judge");
+
+        Assert.Equal("typedmemeval.temporal", eval.Metric.Key);
+        Assert.DoesNotContain(eval.Details.SubResults!, n => n.Metric.Key == "typedmemeval.temporal");
+    }
+
+    [Fact]
     public async Task Adapter_ProjectsEveryQuestionAsALeafUnderItsShape()
     {
         // The tree used to stop at shape level: root -> 3 shapes -> nothing, for a 50-question
