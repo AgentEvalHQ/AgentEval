@@ -53,6 +53,13 @@ jobs:
     # do not lose each other's work, which is why it takes a few seconds rather than none.
     - name: The dense retriever contract holds
       run: python tools/check_dense_retriever_contract.py
+    # `dotnet run -- <n>` resolves against a FLATTENING of the sample groups, so a sample
+    # inserted anywhere but the tail renumbers every sample after it and the documented
+    # commands silently run the wrong one. They had already drifted in two independent
+    # places before this check existed. The (Gn) coordinate in each doc line is the stable
+    # anchor; this compares it against the dispatcher. No build, no credentials.
+    - name: Documented sample numbers run the sample they name
+      run: python tools/check_sample_numbering.py
 
   dependency-review:
     runs-on: ubuntu-latest

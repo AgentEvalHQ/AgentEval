@@ -548,21 +548,31 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 git clone https://github.com/AgentEvalHQ/AgentEval
 cd AgentEval/samples/AgentEval.Samples
 
-# Mock mode (no API keys required) - Samples 1-4
-dotnet run -- 1    # Hello World
-dotnet run -- 2    # Tool assertions  
-dotnet run -- 3    # Performance assertions
-dotnet run -- 4    # RAG metrics
+# No API keys needed - samples 1-4 fall back to a mock agent when AIConfig is
+# unconfigured, so they run and print real assertions with no Azure and no spend.
+dotnet run -- 1    # Hello World                 (A1)
+dotnet run -- 2    # Agent + One Tool            (A2)
+dotnet run -- 3    # Agent + Multiple Tools      (A3)
+dotnet run -- 4    # Performance Metrics         (A4)
 
-# Azure OpenAI required - Samples 5-24  
+# Also offline: the menu marks group M as offline, and CI runs the Gatekeeper suite as
+#   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
+dotnet run -- 98   # Eval + Chance Floor         (M1)
+dotnet run -- 99   # Deterministic Benchmark     (M2)
+
+# A REAL model (and real spend) needs Azure OpenAI:
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
 
-dotnet run -- 9    # Sequential Workflows
-dotnet run -- 10   # Tool-Enabled Workflows  
-dotnet run -- 20   # Quick Red Team Scan
-dotnet run -- 21   # Advanced Red Team Pipeline
-dotnet run -- 24   # Calibrated Evaluator (multi-model consensus)
+dotnet run -- 8    # Comprehensive RAG           (B1)
+dotnet run -- 12   # Calibrated Evaluator        (B5)
+dotnet run -- 14   # Real MAF Workflow           (C2)
+dotnet run -- 15   # Workflow + Tools            (C3)
+dotnet run -- 24   # Red Team Basic              (E2)
+dotnet run -- 25   # Red Team Advanced           (E3)
+
+# The number is a position in the flattened menu, so it MOVES when a sample is added.
+# The (Gn) coordinate does not. tools/check_sample_numbering.py checks one against the other.
 ```
 
 ---

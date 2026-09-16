@@ -100,6 +100,7 @@ public static class Program
             new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmarkDemo.RunAsync),
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
             new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
+            new("TypedMemEval Baseline",    "What a plain model scores — beside its chance floor and headroom",   TypedMemEvalBaselineDemo.RunAsync),
         ]),
 
         new('H', "Benchmarks (v0.10.1)", "★ JSON + HTML (+ PDF) outputs for every registered family",

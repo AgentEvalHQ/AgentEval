@@ -1238,8 +1238,8 @@ See the sample projects for complete working examples:
 - **03_RedTeamAdvanced.cs**: Advanced Red Team Evaluation with Pipeline API
 
 ```bash
-dotnet run --project samples/AgentEval.Samples -- 23   # Red Team Basic    (E2)
-dotnet run --project samples/AgentEval.Samples -- 24   # Red Team Advanced (E3)
+dotnet run --project samples/AgentEval.Samples -- 24   # Red Team Basic    (E2)
+dotnet run --project samples/AgentEval.Samples -- 25   # Red Team Advanced (E3)
 ```
 
 ## Progress Reporting
