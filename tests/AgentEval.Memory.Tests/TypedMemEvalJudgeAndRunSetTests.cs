@@ -306,13 +306,15 @@ public sealed class TypedMemEvalJudgeAndRunSetTests
         // enters neither figure. An earlier version said all three conditioned "every retrieval
         // figure", which is the loose conditionality claim this family exists to stamp out.
         var referenceNote = Assert.Single(
-            eval.Details.Recommendations!.Where(r => r.StartsWith("Reference retriever:", StringComparison.Ordinal)));
+            eval.Details.Recommendations!,
+            r => r.StartsWith("Reference retriever:", StringComparison.Ordinal));
         Assert.Contains("bm25", referenceNote, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("headroom.perfectSelector", referenceNote, StringComparison.Ordinal);
         Assert.Contains("nothing else", referenceNote, StringComparison.Ordinal);
 
         var denseNote = Assert.Single(
-            eval.Details.Recommendations!.Where(r => r.StartsWith("Dense retrievers compared:", StringComparison.Ordinal)));
+            eval.Details.Recommendations!,
+            r => r.StartsWith("Dense retrievers compared:", StringComparison.Ordinal));
         Assert.Contains("text-embedding-ada-002", denseNote, StringComparison.Ordinal);
         Assert.Contains("ranking class ONLY", denseNote, StringComparison.Ordinal);
 

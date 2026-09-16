@@ -39,18 +39,6 @@ public static class TypedMemEvalEvalResultAdapter
         "LongMemEval numbers. The typed outcome vector is the citable form; the score value on " +
         "this node exists for tooling compatibility.";
 
-    /// <summary>Converts a family result into an <see cref="EvalResult"/> tree.</summary>
-    /// <param name="result">A result carrying <see cref="ExternalBenchmarkResult.TypedOutcomes"/>.</param>
-    /// <param name="judgeModel">The declared judge model identity, when known.</param>
-    /// <param name="passThresholdPercent">
-    /// Correct-share threshold used only to populate the report shape's required pass flag.
-    /// </param>
-    /// <remarks>
-    /// TypedMemEval does not define a pass mark. The threshold exists because
-    /// <see cref="EvalScore.Passed"/> is not nullable, it is stated rather than hidden so a reader
-    /// can see it was chosen by the caller, and the typed vector in the dimensions is the result.
-    /// </remarks>
-    /// <exception cref="ArgumentException">When the result is not a TypedMemEval result.</exception>
     /// <summary>
     /// Projects a FAMILY sweep -- one result per vertical -- as a single tree:
     /// family → vertical → shape → question.
@@ -73,6 +61,13 @@ public static class TypedMemEvalEvalResultAdapter
         ArgumentNullException.ThrowIfNull(results);
         if (results.Count == 0)
             throw new ArgumentException("A family projection needs at least one result.", nameof(results));
+
+        // The SAME guard the single-result overload applies. Two public overloads of one method
+        // accepting different ranges is a trap: a caller who validated against one is not
+        // validated against the other, and an unchecked NaN here divides by 100 and lands in
+        // EvalScore looking like a measurement.
+        if (!double.IsFinite(passThresholdPercent) || passThresholdPercent is < 0 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(passThresholdPercent));
 
         // A single vertical projects as itself. Wrapping one result in a "family" root would
         // invent a level that says nothing and would put a second, identical score above it.
@@ -163,6 +158,18 @@ public static class TypedMemEvalEvalResultAdapter
             EvaluatedAt: now);
     }
 
+    /// <summary>Converts a single vertical's result into an <see cref="EvalResult"/> tree.</summary>
+    /// <param name="result">A result carrying <see cref="ExternalBenchmarkResult.TypedOutcomes"/>.</param>
+    /// <param name="judgeModel">The declared judge model identity, when known.</param>
+    /// <param name="passThresholdPercent">
+    /// Correct-share threshold used only to populate the report shape's required pass flag.
+    /// </param>
+    /// <remarks>
+    /// TypedMemEval does not define a pass mark. The threshold exists because
+    /// <see cref="EvalScore.Passed"/> is not nullable, it is stated rather than hidden so a reader
+    /// can see it was chosen by the caller, and the typed vector in the dimensions is the result.
+    /// </remarks>
+    /// <exception cref="ArgumentException">When the result is not a TypedMemEval result.</exception>
     public static EvalResult ToEvalResult(
         ExternalBenchmarkResult result,
         string? judgeModel = null,
