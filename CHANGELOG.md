@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0-beta] - 2026-09-17
+### The report stops printing only the score
+
+`TypedMemEvalEvalResultAdapter` is the only packaged file that changed. **No corpus byte moved** —
+all ten `corpus_sha256`, every question id and every count are identical to `0.36.0-beta`.
+
+#### Added
+- `TypedMemEvalEvalResultAdapter.ToEvalResult(IReadOnlyList<ExternalBenchmarkResult>, …)` — projects
+  a family sweep (one result per vertical) as a single tree: family → vertical → shape → question.
+  A single-element list projects as itself rather than gaining an invented family level.
+- Per-question leaves under every shape node, carrying the **typed outcome**
+  (`correct` / `wrong` / `abstained` / `missed` / `premature` / `inconclusive` / `unrun`) rather
+  than a boolean, plus the judge's stated reason and per-question call counts.
+- Shape nodes now carry the numbers a score has to be read against, taken from the shipped sidecar:
+  `floor.chance`, `headroom.perfectSelector`, `arm.v1GoldOnlyCeiling`, `arm.v8FullHaystack`,
+  `arm.v9ReferenceRetrieval`, plus the ranking class and the named retrievers as notes.
+- Sample **G11 — TypedMemEval Baseline** (`dotnet run -- 43`): sweeps all ten verticals, selectable
+  depth via `--preset smoke|standard|audit-grade`, live per-question progress, and JSON/HTML/PDF
+  reports. Prints no citable aggregate, by design.
+- `tools/check_sample_numbering.py` (CI): the documented `dotnet run -- <n>` numbers must resolve
+  to the sample their `(Gn)` label names.
+
+#### Fixed
+- A rendered report headlined a single score and carried none of the context needed to read it —
+  no chance floor, no oracle ceiling, no retrieval arm, no named retriever. `agenteval bench
+  typedmemeval` wrote those reports too.
+- 13 documented `dotnet run -- <n>` commands ran a different sample than the doc claimed. Twelve
+  were wrong before this release; one had been wrong for a week.
+- `docs/walkthrough.md` sent readers to 7 of 9 wrong samples.
+
+#### Note for consumers
+Shape nodes are no longer leaves. Code that walked an `EvalResult` tree and assumed shape-level
+nodes had no `SubResults` will now find per-question children, and `Details.Dimensions` on those
+nodes gained keys. Nothing was removed or renamed.
+
 ## [0.38.0-beta] - 2026-09-15
 ### A second dense retriever is now PUBLISHED, not described
 
