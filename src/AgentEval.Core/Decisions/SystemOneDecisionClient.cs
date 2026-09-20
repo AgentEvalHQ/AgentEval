@@ -383,7 +383,11 @@ internal static class SystemOneProtocol
                 }
             }
 
-            return new DecisionResponse(model, answers, usage);
+            string? responseId = root.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String
+                ? idEl.GetString()
+                : null;
+
+            return new DecisionResponse(model, answers, usage, responseId);
         }
     }
 
@@ -410,18 +414,46 @@ internal static class SystemOneProtocol
                 case BinaryQuestion:
                     return new BinaryAnswer(ReadDouble(el, "noul", id, host));
 
-                case ChoiceQuestion:
-                    return new ChoiceAnswer(
-                        ReadString(el, "choice", id, host),
-                        ReadDistribution(el, "probabilities", id, host),
-                        ReadDouble(el, "confidence", id, host));
+                case ChoiceQuestion choiceQuestion:
+                {
+                    var choice = ReadString(el, "choice", id, host);
+                    var probabilities = ReadDistribution(el, "probabilities", id, host);
 
-                case ScoreQuestion:
+                    // The contract promises a probability for every option asked and a selection from that set.
+                    // A provider that invents an option, or drops one, has not answered the question that was asked.
+                    if (!choiceQuestion.Criteria.ContainsKey(choice))
+                        throw Invalid($"{host}: answer '{id}' selected '{choice}', which is not one of the requested options.");
+                    foreach (var option in choiceQuestion.Criteria.Keys)
+                    {
+                        if (!probabilities.ContainsKey(option))
+                            throw Invalid($"{host}: answer '{id}' has no probability for option '{option}'.");
+                    }
+
+                    return new ChoiceAnswer(choice, probabilities, ReadDouble(el, "confidence", id, host));
+                }
+
+                case ScoreQuestion scoreQuestion:
+                {
+                    var probabilities = ReadDistribution(el, "probabilities", id, host);
+
+                    // Levels are 0-indexed on the wire; every requested level must be present and nothing else.
+                    foreach (var key in probabilities.Keys)
+                    {
+                        if (!int.TryParse(key, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var index) || index < 0 || index >= scoreQuestion.Criteria.Count)
+                            throw Invalid($"{host}: answer '{id}' has a probability for unknown level '{key}'.");
+                    }
+                    for (var i = 0; i < scoreQuestion.Criteria.Count; i++)
+                    {
+                        if (!probabilities.ContainsKey(i.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                            throw Invalid($"{host}: answer '{id}' has no probability for level {i}.");
+                    }
+
                     return new ScoreAnswer(
                         ReadDouble(el, "score", id, host),
-                        ReadDistribution(el, "probabilities", id, host),
+                        probabilities,
                         ReadLegend(el),
                         ReadDouble(el, "confidence", id, host));
+                }
 
                 default:
                     throw new NotSupportedException();

@@ -101,8 +101,12 @@ model id:
 | Auth | `Authorization: Bearer <key>` | same |
 | Extra reply fields | — | `id`, `provider`, `usage.cost` |
 
-The parser is strict: every question asked must come back with an answer of the matching type, or
-the call throws `DecisionClientException(InvalidResponse)`. Failure kinds map from HTTP status
+The parser is strict: every question asked must come back with an answer of the matching type, a
+choice answer must select one of the options asked and carry a probability for every one of them, and a
+score answer must carry a probability for every level asked and none other (added 2026-09-20 after the
+same rule was written into the Agent Framework transport), or the call throws
+`DecisionClientException(InvalidResponse)`. The provider's call id, when it reports one, is kept as
+`DecisionResponse.ResponseId` for provenance. Failure kinds map from HTTP status
 (401/403 → Authentication, 400/422 → InvalidRequest, 429 → RateLimited, 529 → Overloaded, 5xx →
 ProviderUnavailable). The API key is redacted from any body the client quotes.
 `RenderRequest(request, model)` returns the exact bytes a call would send, through the same

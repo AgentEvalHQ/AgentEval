@@ -88,10 +88,12 @@ public sealed record DecisionRequest(
 /// <param name="Answers">One answer per question id in the request. A missing answer is a protocol
 /// error the transport throws on; it never reaches here as an absent key.</param>
 /// <param name="Usage">Token usage and, when the provider bills the call itself, the cost it reported.</param>
+/// <param name="ResponseId">The provider's identifier for this call when it reports one (OpenRouter's relay does; TypeSafe does not), for provenance and support tickets.</param>
 public sealed record DecisionResponse(
     string Model,
     IReadOnlyDictionary<string, DecisionAnswer> Answers,
-    DecisionUsage? Usage)
+    DecisionUsage? Usage,
+    string? ResponseId = null)
 {
     /// <summary>The model the provider reports as having answered; never blank.</summary>
     public string Model { get; } = string.IsNullOrWhiteSpace(Model)

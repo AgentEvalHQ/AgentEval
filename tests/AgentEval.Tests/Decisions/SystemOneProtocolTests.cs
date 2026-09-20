@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -162,7 +162,7 @@ public class SystemOneProtocolTests
             { "model": "jev-1.13.0",
               "answers": {
                 "risk":    { "type": "choice", "choice": "high", "probabilities": { "low": 0.2, "high": 0.8 }, "confidence": 0.8 },
-                "quality": { "type": "score",  "score": 1.7, "legend": { "1": "poor", "2": "good" }, "probabilities": { "1": 0.3, "2": 0.7 }, "confidence": 0.7 }
+                "quality": { "type": "score",  "score": 0.7, "legend": { "0": "poor", "1": "good" }, "probabilities": { "0": 0.3, "1": 0.7 }, "confidence": 0.7 }
               },
               "usage": { "input_tokens": 1, "output_tokens": 1 } }
             """;
@@ -175,9 +175,9 @@ public class SystemOneProtocolTests
         Assert.Equal(0.8, risk.Confidence, precision: 6);
 
         var quality = Assert.IsType<ScoreAnswer>(response.Answers["quality"]);
-        Assert.Equal(1.7, quality.Score, precision: 6);
-        Assert.Equal("good", quality.Legend!["2"]);
-        Assert.Equal(0.7, quality.Probabilities["2"], precision: 6);
+        Assert.Equal(0.7, quality.Score, precision: 6);
+        Assert.Equal("good", quality.Legend!["1"]);
+        Assert.Equal(0.7, quality.Probabilities["1"], precision: 6);
         Assert.Equal(0.7, quality.Confidence, precision: 6);
     }
 
@@ -239,6 +239,80 @@ public class SystemOneProtocolTests
         Assert.Equal(transient, ex.IsTransient);
         Assert.Equal(status, ex.StatusCode);
         Assert.Contains($"HTTP {status}", ex.Message, StringComparison.Ordinal);
+    }
+
+    // ── Strict pairing of answers to the options and levels that were asked ──
+
+    private static IReadOnlyDictionary<string, DecisionQuestion> ChoiceAsk() =>
+        new Dictionary<string, DecisionQuestion> { ["dept"] = new ChoiceQuestion("Which?", new Dictionary<string, string> { ["billing"] = "Payments", ["tech"] = "Bugs" }) };
+
+    private static IReadOnlyDictionary<string, DecisionQuestion> ScoreAsk() =>
+        new Dictionary<string, DecisionQuestion> { ["mood"] = new ScoreQuestion("How upset?", new[] { "calm", "angry" }) };
+
+    [Fact]
+    public void ParseResponse_ChoiceSelectingUnknownOption_ThrowsInvalidResponse()
+    {
+        const string body = """{ "model": "m", "answers": { "dept": { "type": "choice", "choice": "legal", "probabilities": { "billing": 0.5, "tech": 0.5 }, "confidence": 0.5 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, ChoiceAsk(), "h"));
+
+        Assert.Equal(DecisionFailureKind.InvalidResponse, ex.Kind);
+        Assert.Contains("not one of the requested options", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseResponse_ChoiceMissingAnOptionProbability_ThrowsInvalidResponse()
+    {
+        const string body = """{ "model": "m", "answers": { "dept": { "type": "choice", "choice": "billing", "probabilities": { "billing": 1.0 }, "confidence": 1.0 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, ChoiceAsk(), "h"));
+
+        Assert.Contains("no probability for option 'tech'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseResponse_ScoreWithUnknownLevel_ThrowsInvalidResponse()
+    {
+        const string body = """{ "model": "m", "answers": { "mood": { "type": "score", "score": 0.5, "probabilities": { "0": 0.5, "1": 0.5, "7": 0.0 }, "confidence": 0.5 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, ScoreAsk(), "h"));
+
+        Assert.Contains("unknown level '7'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseResponse_ScoreMissingALevel_ThrowsInvalidResponse()
+    {
+        const string body = """{ "model": "m", "answers": { "mood": { "type": "score", "score": 0.0, "probabilities": { "0": 1.0 }, "confidence": 1.0 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, ScoreAsk(), "h"));
+
+        Assert.Contains("no probability for level 1", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseResponse_WellFormedChoiceAndScore_StillParse()
+    {
+        const string body = """{ "model": "m", "answers": { "dept": { "type": "choice", "choice": "tech", "probabilities": { "billing": 0.2, "tech": 0.8 }, "confidence": 0.8 }, "mood": { "type": "score", "score": 0.9, "probabilities": { "0": 0.1, "1": 0.9 }, "confidence": 0.9 } } }""";
+        var ask = new Dictionary<string, DecisionQuestion>(ChoiceAsk());
+        foreach (var (k, v) in ScoreAsk()) ask[k] = v;
+
+        var response = SystemOneProtocol.ParseResponse(body, ask, "h");
+
+        Assert.Equal("tech", Assert.IsType<ChoiceAnswer>(response.Answers["dept"]).Choice);
+        Assert.Equal(0.9, Assert.IsType<ScoreAnswer>(response.Answers["mood"]).Score, precision: 6);
+        Assert.Null(response.ResponseId);
+    }
+
+    [Fact]
+    public void ParseResponse_ProviderId_IsCapturedAsResponseId()
+    {
+        const string body = """{ "id": "gen-abc123", "model": "typesafe/jev-1.13", "answers": { "refund": { "type": "noul", "noul": 0.5 } }, "usage": { "input_tokens": 3, "output_tokens": 0 } }""";
+        var ask = new Dictionary<string, DecisionQuestion> { ["refund"] = new BinaryQuestion("?") };
+
+        var response = SystemOneProtocol.ParseResponse(body, ask, "h");
+
+        Assert.Equal("gen-abc123", response.ResponseId);
     }
 
     // ── Provider limits live in the transport, not the contract ──────────────
