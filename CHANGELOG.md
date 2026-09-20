@@ -59,8 +59,9 @@ schema. Nothing was removed or renamed. **No corpus byte moved.**
   resource's Azure OpenAI-compatible endpoint) | `azure` (`AZURE_OPENAI_*`) | `openai-compatible`
   (`OPENAI_COMPATIBLE_*`), or `--provider <name>` for one run. Keys for several providers may be set
   at once; the selector decides. An explicit provider with missing variables, or an unknown name,
-  selects nothing and says why — no silent fallback to a host you did not choose. 66 sample files
-  changed mechanically; no sample knows which provider it runs on. Embeddings (B1) and the
+  selects nothing and says why — no silent fallback to a host you did not choose. 72 existing
+  sample files now go through it and 7 more lost only an Azure-only banner; no sample knows
+  which provider it runs on. Embeddings (B1) and the
   hosted-agent Foundry path (H11/H12, `AZURE_FOUNDRY_ENDPOINT` + Entra) remain Azure-only and say so.
 - `AgentEval.Providers.InferenceProviderEnvironment` (Core, no SDK dependency) — the resolver behind
   that variable (`Resolve()` → `InferenceProviderSettings` with provider, endpoint, key, models,
