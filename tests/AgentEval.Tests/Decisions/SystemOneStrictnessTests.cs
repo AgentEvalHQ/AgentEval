@@ -50,6 +50,21 @@ public class SystemOneStrictnessTests
         Assert.Contains("'medium'", ex.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("ftp://127.0.0.1/v1/systemone")]        // loopback, but not http(s)
+    [InlineData("http://openrouter.ai/api/v1/systemone")] // http, but not loopback
+    [InlineData("file:///C:/systemone")]
+    public void Ctor_RejectsEveryEndpointThatIsNotHttpsOrLoopbackHttp(string endpoint)
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new SystemOneDecisionClient(new SystemOneClientOptions
+        {
+            Endpoint = new Uri(endpoint),
+            ApiKey = "k",
+            Model = "m",
+        }));
+        Assert.Contains(endpoint, ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class FixedHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

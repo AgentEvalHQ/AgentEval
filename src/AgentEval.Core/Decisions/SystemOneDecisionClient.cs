@@ -50,10 +50,10 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
     public SystemOneDecisionClient(SystemOneClientOptions options, HttpClient? httpClient = null)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.Endpoint is null || !options.Endpoint.IsAbsoluteUri)
-            throw new ArgumentException("Endpoint must be an absolute URL.", nameof(options));
-        if (options.Endpoint.Scheme != Uri.UriSchemeHttps && !options.Endpoint.IsLoopback)
-            throw new ArgumentException("Endpoint must use https (a loopback http address is allowed for local testing).", nameof(options));
+        // The same rule as every provider endpoint in AgentEval.Providers: absolute https, or http to a
+        // loopback host for local testing. Nothing else may carry the bearer — not ftp://127.0.0.1 either.
+        if (!AgentEval.Providers.InferenceProviderEnvironment.TryValidateEndpoint(options.Endpoint?.OriginalString, out _, out var why))
+            throw new ArgumentException($"Endpoint '{options.Endpoint?.OriginalString}' {why}", nameof(options));
         if (string.IsNullOrWhiteSpace(options.ApiKey))
             throw new ArgumentException("ApiKey is missing.", nameof(options));
         if (string.IsNullOrWhiteSpace(options.Model))
