@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// openai              OPENAI_API_KEY                      (OPENAI_BASE_URL, OPENAI_MODEL default to api.openai.com, gpt-4o-mini)
 /// foundry             FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL   (a Foundry resource's Azure OpenAI-compatible endpoint)
 /// azure               AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT
-/// openai-compatible   OPENAI_COMPATIBLE_ENDPOINT + OPENAI_COMPATIBLE_API_KEY + OPENAI_COMPATIBLE_MODEL   (Ollama, Groq, vLLM, ...)
+/// openai-compatible   OPENAI_COMPATIBLE_ENDPOINT + OPENAI_COMPATIBLE_MODEL   (OPENAI_COMPATIBLE_API_KEY optional; Ollama, LM Studio, vLLM, Groq, ...)
 /// </code>
 ///
 /// When the selector is unset, the first provider with credentials wins (Azure, Bitdeer, OpenAI,
@@ -173,7 +173,7 @@ public static class AIConfig
         Console.WriteLine("║   openai             OPENAI_API_KEY                                           ║");
         Console.WriteLine("║   foundry            FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL       ║");
         Console.WriteLine("║   azure              AZURE_OPENAI_ENDPOINT + _API_KEY + _DEPLOYMENT           ║");
-        Console.WriteLine("║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _API_KEY + _MODEL           ║");
+        Console.WriteLine("║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _MODEL  (_API_KEY optional) ║");
         Console.WriteLine("║                                                                              ║");
         Console.WriteLine("║  or pass --provider <name> for one run.                                       ║");
         Console.WriteLine("║  Samples that need a model run in MOCK MODE or stop without one.              ║");

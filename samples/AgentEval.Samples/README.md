@@ -297,7 +297,7 @@ Keys for several providers can be configured at once; the selector decides which
 | `openai` | `OPENAI_API_KEY` | `OPENAI_BASE_URL` = `https://api.openai.com/v1`, `OPENAI_MODEL` = `gpt-4o-mini`; `_MODEL_2`, `_MODEL_3` |
 | `foundry` | `FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY` + `FOUNDRY_MODEL` | a Foundry resource's Azure OpenAI-compatible endpoint (`https://<resource>.openai.azure.com/`); `_MODEL_2`, `_MODEL_3`. Not yet exercised live. |
 | `azure` | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` | `_DEPLOYMENT_2` = `gpt-4o-mini`, `_DEPLOYMENT_3` = `gpt-4.1` |
-| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT` + `OPENAI_COMPATIBLE_API_KEY` + `OPENAI_COMPATIBLE_MODEL` | Ollama, Groq, vLLM, Together, LM Studio, … |
+| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT` + `OPENAI_COMPATIBLE_MODEL`; `OPENAI_COMPATIBLE_API_KEY` optional | Ollama, LM Studio, vLLM (keyless; loopback `http://` allowed), Groq, Together, … |
 
 When the selector is unset, the first provider with credentials wins (Azure, Bitdeer, OpenAI, Foundry,
 generic). When it names a provider whose variables are missing, or an unknown name, **nothing** is

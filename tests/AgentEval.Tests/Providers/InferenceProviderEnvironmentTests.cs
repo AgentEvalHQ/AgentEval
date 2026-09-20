@@ -208,6 +208,20 @@ public class InferenceProviderEnvironmentTests
     }
 
     [Fact]
+    public void KeylessLocalHost_IsConfigured_WithTheNoKeySentinel()
+    {
+        // Ollama / LM Studio / vLLM: endpoint + model, no key. The SDK still needs a credential string.
+        var s = InferenceProviderEnvironment.Resolve(Env([("OPENAI_COMPATIBLE_ENDPOINT", "http://localhost:11434/v1"), ("OPENAI_COMPATIBLE_MODEL", "llama3.1")]));
+
+        Assert.Equal(InferenceProvider.OpenAICompatible, s.Provider);
+        Assert.Equal(InferenceProviderEnvironment.NoKeyNeeded, s.ApiKey);
+        Assert.Equal(InferenceProviderSelection.AutoDetected, s.Selection);
+
+        var explicitly = InferenceProviderEnvironment.Resolve(Env([("OPENAI_COMPATIBLE_ENDPOINT", "http://localhost:11434/v1"), ("OPENAI_COMPATIBLE_MODEL", "llama3.1"), ("AI_INFERENCE_PROVIDER", "openai-compatible")]));
+        Assert.Equal(InferenceProvider.OpenAICompatible, explicitly.Provider);
+    }
+
+    [Fact]
     public void MalformedEndpoint_IsRefused_WithAReason_InsteadOfThrowing()
     {
         var s = InferenceProviderEnvironment.Resolve(Env([("OPENAI_API_KEY", "ok"), ("OPENAI_BASE_URL", "not a url"), ("AI_INFERENCE_PROVIDER", "openai")]));

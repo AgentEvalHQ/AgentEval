@@ -26,7 +26,7 @@ public enum InferenceProvider
     /// </summary>
     Foundry,
 
-    /// <summary>Any OpenAI-compatible endpoint — <c>OPENAI_COMPATIBLE_ENDPOINT</c> + <c>OPENAI_COMPATIBLE_API_KEY</c> + <c>OPENAI_COMPATIBLE_MODEL</c>.</summary>
+    /// <summary>Any OpenAI-compatible endpoint — <c>OPENAI_COMPATIBLE_ENDPOINT</c> + <c>OPENAI_COMPATIBLE_MODEL</c>; <c>OPENAI_COMPATIBLE_API_KEY</c> optional (Ollama, LM Studio and vLLM take none).</summary>
     OpenAICompatible,
 }
 
@@ -175,7 +175,7 @@ public static class InferenceProviderEnvironment
         InferenceProvider.Bitdeer => "BITDEER_API_KEY (BITDEER_ENDPOINT and BITDEER_MODEL have defaults)",
         InferenceProvider.OpenAI => "OPENAI_API_KEY (OPENAI_BASE_URL and OPENAI_MODEL have defaults)",
         InferenceProvider.Foundry => "FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL",
-        InferenceProvider.OpenAICompatible => "OPENAI_COMPATIBLE_ENDPOINT + OPENAI_COMPATIBLE_API_KEY + OPENAI_COMPATIBLE_MODEL",
+        InferenceProvider.OpenAICompatible => "OPENAI_COMPATIBLE_ENDPOINT + OPENAI_COMPATIBLE_MODEL (OPENAI_COMPATIBLE_API_KEY optional; keyless local hosts get \"no-key-needed\")",
         _ => "",
     };
 
@@ -232,10 +232,15 @@ public static class InferenceProviderEnvironment
             InferenceProvider.Bitdeer => Set("BITDEER_API_KEY"),
             InferenceProvider.OpenAI => Set("OPENAI_API_KEY"),
             InferenceProvider.Foundry => Set("FOUNDRY_ENDPOINT") && Set("FOUNDRY_API_KEY") && Set("FOUNDRY_MODEL"),
-            InferenceProvider.OpenAICompatible => Set("OPENAI_COMPATIBLE_ENDPOINT") && Set("OPENAI_COMPATIBLE_API_KEY") && Set("OPENAI_COMPATIBLE_MODEL"),
+            // Ollama, LM Studio and vLLM take no key. The OpenAI SDK still needs a non-empty credential
+            // string, so an absent key becomes the same sentinel the CLI's EndpointFactory sends.
+            InferenceProvider.OpenAICompatible => Set("OPENAI_COMPATIBLE_ENDPOINT") && Set("OPENAI_COMPATIBLE_MODEL"),
             _ => false,
         };
     }
+
+    /// <summary>The credential sent to a keyless OpenAI-compatible host; the same sentinel the CLI uses.</summary>
+    public const string NoKeyNeeded = "no-key-needed";
 
     private static InferenceProviderSettings Describe(InferenceProvider provider, Func<string, string?> env, InferenceProviderSelection selection)
     {
@@ -284,7 +289,7 @@ public static class InferenceProviderEnvironment
             case InferenceProvider.OpenAICompatible:
             {
                 var model = env("OPENAI_COMPATIBLE_MODEL")!;
-                return new(provider, tag, name, endpoint, env("OPENAI_COMPATIBLE_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("OPENAI_COMPATIBLE_API_KEY") ?? NoKeyNeeded, model,
                     env("OPENAI_COMPATIBLE_MODEL_2") ?? model, env("OPENAI_COMPATIBLE_MODEL_3") ?? model, selection, null);
             }
             default:
