@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Decision models join code checks and LLM judges as a third evaluator kind (ADR-033, Proposed), and
 the samples gain a provider selector so they run on Bitdeer, OpenAI, Foundry, Azure or any
-OpenAI-compatible endpoint. Eleven packaged files changed, nine of them new; the two edits to
-existing packaged files are one price line in `JudgeCostMap` and one enum value in the result
-schema. Nothing was removed or renamed. **No corpus byte moved.**
+OpenAI-compatible endpoint. Twelve packaged files changed, nine of them new; the edits to
+existing packaged files are one price line in `JudgeCostMap`, one enum value in the result
+schema, and the `ShadowJudgePump` fix below. Nothing was removed or renamed. **No corpus byte moved.**
 
 
 #### Added
@@ -79,6 +79,13 @@ schema. Nothing was removed or renamed. **No corpus byte moved.**
   contains a `DecisionEval` node; every document without one validates unchanged. `DecisionEval`
   is uncalibrated on every AgentEval dataset (above): read its `P(yes)` as evidence beside a
   judge, not as a gate in front of one.
+
+#### Fixed
+- `ShadowJudgePump` (Gatekeeper's shadow judge): a consumer that started after `DisposeAsync` had drained,
+  given up and disposed its cancellation source threw `ObjectDisposedException` at its first line, unobserved,
+  and every item accepted before dispose was lost with nothing reported. The token is now captured in the
+  constructor, before the consumer is started. Reproduced on net8 and net10; the Windows net8 leg of one CI
+  run had hit it and looked like a flake. The regression test forces the ordering instead of hoping for it.
 
 ## [0.39.0-beta] - 2026-09-17
 ### The report stops printing only the score

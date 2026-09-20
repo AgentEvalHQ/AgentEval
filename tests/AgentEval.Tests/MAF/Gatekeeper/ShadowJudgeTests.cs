@@ -216,7 +216,58 @@ public class ShadowJudgeTests
         }
     }
 
+    [Fact]
+    public async Task ShadowJudge_ConsumerThatStartsAfterDispose_StillJudgesQueuedItems()
+    {
+        // The consumer is a Task.Run queued by the constructor. On a starved pool it can START after DisposeAsync
+        // has drained, given up and disposed _cts. It used to read _cts.Token as its first line and die there with
+        // an ObjectDisposedException nothing observed: every item accepted before dispose lost, nothing reported
+        // (the Windows net8 leg of CI run 35543200904 hit exactly this and looked like a flake).
+        //
+        // No thread-pool games: the internal consumer-starter seam hands the consumer body to the test instead of
+        // Task.Run, so "not started yet" is structural. A 1-tick drain rounds to 0 ms, so Task.WaitAsync times
+        // out synchronously and DisposeAsync completes here, on this thread, before the body has ever run.
+        Func<Task>? consumerBody = null;
+        var judged = 0;
+        var errors = new List<Exception>();
+        var pump = new ShadowJudgePump(
+            new CountingJudge(() => Interlocked.Increment(ref judged)),
+            onVerdict: null,
+            onError: ex => { lock (errors) { errors.Add(ex); } },
+            queueCapacity: 128,
+            drainTimeout: TimeSpan.FromTicks(1),
+            consumerStarter: body => { consumerBody = body; return new TaskCompletionSource().Task; });   // never started
+        pump.Enqueue(new ShadowJudgeContext("r1", InputText: null, AgentName: null, Session: null));
+        pump.Enqueue(new ShadowJudgeContext("r2", InputText: null, AgentName: null, Session: null));
+        Assert.Equal(2, pump.AcceptedCount);
+
+        await pump.DisposeAsync();      // drains 0 ms, cancels, gives up, disposes _cts — the consumer has not run
+        Assert.NotNull(consumerBody);
+        Assert.Equal(0, judged);
+
+        // NOW the consumer starts, after _cts is gone. The old code threw ObjectDisposedException out of this await.
+        await consumerBody!();
+
+        Assert.Equal(2, judged);
+        lock (errors)
+        {
+            Assert.DoesNotContain(errors, e => e is ObjectDisposedException);
+        }
+    }
+
     // ── test doubles ──
+
+    private sealed class CountingJudge : IShadowJudge
+    {
+        private readonly Action _onJudged;
+        public CountingJudge(Action onJudged) => _onJudged = onJudged;
+
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            _onJudged();
+            return Task.FromResult(ShadowVerdict.Clean());
+        }
+    }
 
     private sealed class KeywordShadowJudge : IShadowJudge
     {
