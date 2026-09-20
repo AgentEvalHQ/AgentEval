@@ -33,9 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Samples **N1 — GLM-5.3 Flash @ Bitdeer** and **N2 — Jev decisions** (`dotnet run -- 100` /
   `-- 101`): a Bitdeer-hosted model as both subject and judge through the same `IChatClient` path
   the CLI's `--endpoint` uses, and `DecisionEval` beside an `AtomicLlmEval` inside one composite.
-  Both print every payload under `--dry-run` before spending anything, and stop with a warning
-  when the key is absent — there is no mock path. `AGENTEVAL_SAMPLES_SHOW_RAW=1` makes N2 print
-  every request and reply body.
+  Both take `--dry-run` and send nothing under it: N2 renders the exact request bytes through the
+  decision client's own serializer; N1 lists the prompts it would send and stops before the chat
+  SDK builds a payload. Both stop with a warning when the key is absent — there is no mock path.
+  `AGENTEVAL_SAMPLES_SHOW_RAW=1` makes N2 print every request and reply body with the key scrubbed.
 - `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` — the first real calls. TypeSafe answered
   `jev-1.13.0` to `jev-latest` and accepted `jev-1.13.0` pinned; score levels are 0-indexed on the
   wire; an identical request repeated at 0.97 / 0.97 / 0.98. Bitdeer's smoke call succeeded and the

@@ -65,9 +65,12 @@ internal static class ProviderConfig
     public static IChatClient CreateBitdeerChatClient()
     {
         var key = BitdeerApiKey ?? throw new InvalidOperationException("BITDEER_API_KEY is not set.");
+        // BITDEER_ENDPOINT is user-controlled and will carry the key: https only (loopback http for a local proxy).
+        if (!AgentEval.Providers.InferenceProviderEnvironment.TryValidateEndpoint(BitdeerEndpoint, out var endpoint, out var why))
+            throw new InvalidOperationException($"BITDEER_ENDPOINT='{BitdeerEndpoint}' {why}");
         var client = new OpenAIClient(
             new ApiKeyCredential(key),
-            new OpenAIClientOptions { Endpoint = new Uri(BitdeerEndpoint) });
+            new OpenAIClientOptions { Endpoint = endpoint });
         return client.GetChatClient(BitdeerModel).AsIChatClient();
     }
 
@@ -93,16 +96,26 @@ internal static class ProviderConfig
     public static string? JevModelOverride => Env("JEV_MODEL");
     public static bool IsJevConfigured => TypeSafeApiKey is not null || OpenRouterApiKey is not null;
 
-    /// <summary>Picks the transport from the keys present (JEV_TRANSPORT breaks a tie), or null when neither key is set.</summary>
+    /// <summary>
+    /// Picks the transport from the keys present (JEV_TRANSPORT breaks a tie), or null when neither key
+    /// is set. An unrecognised JEV_TRANSPORT value selects NOTHING and says why — a typo must not route a
+    /// paid call to a provider the user did not choose.
+    /// </summary>
     public static SystemOneClientOptions? CreateJevOptions()
     {
         var forced = Env("JEV_TRANSPORT")?.ToLowerInvariant();
-        var useTypeSafe = forced switch
+        bool useTypeSafe;
+        switch (forced)
         {
-            "typesafe" => true,
-            "openrouter" => false,
-            _ => TypeSafeApiKey is not null,
-        };
+            case null: useTypeSafe = TypeSafeApiKey is not null; break;
+            case "typesafe": useTypeSafe = true; break;
+            case "openrouter": useTypeSafe = false; break;
+            default:
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"   ⚠️  JEV_TRANSPORT='{forced}' is not one of typesafe | openrouter — no transport selected.");
+                Console.ResetColor();
+                return null;
+        }
 
         if (useTypeSafe && TypeSafeApiKey is { } ts)
             return JevModelOverride is { } m1 ? SystemOneClientOptions.ForTypeSafe(ts, m1) : SystemOneClientOptions.ForTypeSafe(ts);
@@ -135,28 +148,34 @@ internal static class ProviderConfig
     public static bool ShowRawWire =>
         Env("AGENTEVAL_SAMPLES_SHOW_RAW") is { } v && (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>The HttpClient the Jev sample hands to <see cref="SystemOneDecisionClient"/>; wire-logging when asked.</summary>
-    public static HttpClient CreateJevHttpClient()
+    /// <summary>
+    /// The HttpClient the Jev sample hands to <see cref="SystemOneDecisionClient"/>; wire-logging when
+    /// asked. The logger is told the key so it can scrub it from anything it prints — a provider or
+    /// proxy that echoes the request headers must not put the bearer on the console.
+    /// </summary>
+    public static HttpClient CreateJevHttpClient(SystemOneClientOptions options)
     {
-        HttpMessageHandler handler = ShowRawWire ? new RawWireLoggingHandler(new HttpClientHandler()) : new HttpClientHandler();
+        HttpMessageHandler handler = ShowRawWire ? new RawWireLoggingHandler(new HttpClientHandler(), options.ApiKey) : new HttpClientHandler();
         return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
     }
 
-    private sealed class RawWireLoggingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    private sealed class RawWireLoggingHandler(HttpMessageHandler inner, string secret) : DelegatingHandler(inner)
     {
+        private string Scrub(string text) => text.Replace(secret, "[redacted]", StringComparison.Ordinal);
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine($"   ┌─ RAW → {request.Method} {request.RequestUri}   (Authorization header present, not shown)");
-            Console.WriteLine($"   │ {body}");
+            Console.WriteLine($"   │ {Scrub(body)}");
 
             var response = await base.SendAsync(request, cancellationToken);
 
             // ReadAsStringAsync buffers the content, so the client's own read afterwards still works.
             var reply = await response.Content.ReadAsStringAsync(cancellationToken);
             Console.WriteLine($"   ├─ RAW ← HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
-            Console.WriteLine($"   │ {reply}");
+            Console.WriteLine($"   │ {Scrub(reply)}");
             Console.WriteLine("   └─");
             Console.ResetColor();
             return response;

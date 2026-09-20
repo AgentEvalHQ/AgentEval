@@ -228,6 +228,11 @@ internal static class SystemOneProtocol
                         if (!probabilities.ContainsKey(option))
                             throw Invalid($"{host}: answer '{id}' has no probability for option '{option}'.");
                     }
+                    foreach (var key in probabilities.Keys)
+                    {
+                        if (!choiceQuestion.Criteria.ContainsKey(key))
+                            throw Invalid($"{host}: answer '{id}' has a probability for '{key}', which was not one of the requested options.");
+                    }
 
                     return new ChoiceAnswer(choice, probabilities, ReadDouble(el, "confidence", id, host));
                 }
@@ -280,7 +285,11 @@ internal static class SystemOneProtocol
     {
         if (!el.TryGetProperty(name, out var v) || v.ValueKind != JsonValueKind.Number)
             throw Invalid($"{host}: '{id}' has no numeric '{name}'.");
-        return v.TryGetInt64(out var l) ? l : (long)v.GetDouble();
+        // A token count is an integer. A fractional or out-of-range value is a protocol violation,
+        // not something to round: a truncated count under-reports cost.
+        if (!v.TryGetInt64(out var l))
+            throw Invalid($"{host}: '{id}.{name}' is not an integer token count ({v.GetRawText()}).");
+        return l;
     }
 
     private static string ReadString(JsonElement el, string name, string id, string host)

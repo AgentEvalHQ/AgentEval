@@ -90,7 +90,7 @@ public static class JevDecisionsDemo
         Console.WriteLine();
         if (dryRun) ProviderConfig.PrintDryRunBanner();
 
-        using var http = ProviderConfig.CreateJevHttpClient();     // AGENTEVAL_SAMPLES_SHOW_RAW=1 prints every request and reply body
+        using var http = ProviderConfig.CreateJevHttpClient(options);   // AGENTEVAL_SAMPLES_SHOW_RAW=1 prints every request and reply body, key scrubbed
         using var client = new SystemOneDecisionClient(options, http);
 
         var grounded = new DecisionEval(

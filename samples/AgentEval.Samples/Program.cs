@@ -258,7 +258,11 @@ public static class Program
             }
         }
 
-        if (!AIConfig.IsConfigured)
+        // The global "no chat provider" banner belongs to the interactive menu, where the user has not
+        // yet chosen a sample. A direct run (`dotnet run -- <n>`) lets the sample speak for itself:
+        // the Jev sample needs no chat provider at all, and every sample that does need one prints
+        // its own, accurate, warning.
+        if (args.Length == 0 && !AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
         // CI/non-interactive: run every offline-capable Gatekeeper sample and exit non-zero on any failure.

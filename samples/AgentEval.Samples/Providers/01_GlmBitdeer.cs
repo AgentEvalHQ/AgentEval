@@ -78,7 +78,16 @@ public static class GlmBitdeerProviderDemo
             ? $"   💲 Priced   : ${p.InputPer1K * 1000:F3}/M in, ${p.OutputPer1K * 1000:F3}/M out (from BITDEER_PRICE_*_PER_1M)"
             : "   💲 Priced   : NO — set BITDEER_PRICE_INPUT_PER_1M / BITDEER_PRICE_OUTPUT_PER_1M to price this run");
         Console.WriteLine();
-        if (dryRun) ProviderConfig.PrintDryRunBanner();
+        if (dryRun)
+        {
+            // Honest scope of THIS sample's dry run: it prints the prompts it would send and stops before
+            // the OpenAI client builds a Chat Completions payload. N2 renders its exact request bytes
+            // because the decision client exposes its serializer; the chat SDK does not.
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("   ── DRY RUN: prompts are listed below; NOTHING is sent and no Chat Completions payload is built. ──");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
 
         // ── Step 1: the client — the same construction the CLI's --endpoint path uses ────────
         Console.WriteLine("📝 Step 1: Build the IChatClient (OpenAI client, Bitdeer base URL)\n");
@@ -111,9 +120,14 @@ public static class GlmBitdeerProviderDemo
             name: agentName,
             systemPrompt: "You answer questions using ONLY the ledger extract in the user message. Be brief.");
 
+        // When the run is not priced, the in-memory results carry EstimatedCost = 0, which EvalProvenance
+        // cannot distinguish from "free". This sample persists nothing, prints "not priced" instead of
+        // a dollar figure, and says so here; a run that must be persisted should set the price variables.
         Func<string?, JudgeCostMap.ModelRate> rate = price is { } pr
             ? _ => new JudgeCostMap.ModelRate(pr.InputPer1K, pr.OutputPer1K)
-            : _ => new JudgeCostMap.ModelRate(0, 0);   // reported as "not priced", never as $0
+            : _ => new JudgeCostMap.ModelRate(0, 0);
+        if (price is null)
+            Console.WriteLine("   ⚠ Unpriced run: EstimatedCost in the in-memory results is 0 because no rate is known, not because the calls were free. Nothing is persisted.\n");
 
         var judgeLeaf = new AtomicLlmEval(
             evaluator: new ChatClientEvaluator(chat),

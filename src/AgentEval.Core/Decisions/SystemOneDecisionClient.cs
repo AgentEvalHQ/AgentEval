@@ -137,7 +137,20 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
             if (!response.IsSuccessStatusCode)
                 throw SystemOneProtocol.ClassifyFailure((int)response.StatusCode, body.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal), host);
 
-            return SystemOneProtocol.ParseResponse(body, request.Questions, host);
+            try
+            {
+                return SystemOneProtocol.ParseResponse(body, request.Questions, host);
+            }
+            catch (DecisionClientException ex) when (ex.Message.Contains(_options.ApiKey, StringComparison.Ordinal))
+            {
+                // A malformed 2xx body is excerpted into the exception. If a provider echoed the
+                // bearer into that body, the excerpt is the one place it could surface; scrub it.
+                throw new DecisionClientException(
+                    ex.Kind,
+                    ex.Message.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal),
+                    ex.StatusCode,
+                    ex.InnerException);
+            }
         }
     }
 

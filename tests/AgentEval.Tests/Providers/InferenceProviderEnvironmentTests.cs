@@ -186,4 +186,48 @@ public class InferenceProviderEnvironmentTests
         Assert.Null(InferenceProviderEnvironment.Parse("anthropic"));
         Assert.Null(InferenceProviderEnvironment.Parse(null));
     }
+
+    // ── Endpoints carry the key: https, or loopback http, or nothing ─────────
+
+    [Fact]
+    public void PlainHttpToARemoteHost_IsRefused_WithAReason_NotSentInCleartext()
+    {
+        var s = InferenceProviderEnvironment.Resolve(Env([.. BitdeerVars, ("BITDEER_ENDPOINT", "http://proxy.example/v1"), ("AI_INFERENCE_PROVIDER", "bitdeer")]));
+
+        Assert.Equal(InferenceProvider.None, s.Provider);
+        Assert.Contains("BITDEER_ENDPOINT", s.Diagnostic, StringComparison.Ordinal);
+        Assert.Contains("cleartext", s.Diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LoopbackHttp_IsAllowed_ForLocalServers()
+    {
+        var s = InferenceProviderEnvironment.Resolve(Env([.. CompatVars, ("AI_INFERENCE_PROVIDER", "openai-compatible")]));
+        Assert.Equal(InferenceProvider.OpenAICompatible, s.Provider);
+        Assert.Equal(new Uri("http://localhost:11434/v1"), s.Endpoint);
+    }
+
+    [Fact]
+    public void MalformedEndpoint_IsRefused_WithAReason_InsteadOfThrowing()
+    {
+        var s = InferenceProviderEnvironment.Resolve(Env([("OPENAI_API_KEY", "ok"), ("OPENAI_BASE_URL", "not a url"), ("AI_INFERENCE_PROVIDER", "openai")]));
+
+        Assert.Equal(InferenceProvider.None, s.Provider);
+        Assert.Contains("OPENAI_BASE_URL", s.Diagnostic, StringComparison.Ordinal);
+        Assert.Contains("absolute http(s) URL", s.Diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settings_ToString_NeverContainsTheKey()
+    {
+        const string key = "bk-DO-NOT-LEAK-7a2f";
+        var s = InferenceProviderEnvironment.Resolve(Env([("BITDEER_API_KEY", key)]));
+
+        var text = s.ToString();
+
+        Assert.DoesNotContain(key, text, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", text, StringComparison.Ordinal);
+        Assert.Contains("bitdeer", text, StringComparison.Ordinal);
+        Assert.Equal(key, s.ApiKey);   // the value itself is still available to the code that needs it
+    }
 }

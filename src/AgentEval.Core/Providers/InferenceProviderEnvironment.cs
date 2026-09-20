@@ -83,6 +83,15 @@ public sealed record InferenceProviderSettings(
     public static InferenceProviderSettings NotConfigured(string? diagnostic) => new(
         InferenceProvider.None, "none", "no provider configured", null, null, null, null, null,
         InferenceProviderSelection.None, diagnostic);
+
+    /// <summary>
+    /// Never prints the key. A positional record's generated <c>ToString()</c> would, and this object
+    /// is the kind that ends up in a log line ("resolved settings: {settings}").
+    /// </summary>
+    public override string ToString() =>
+        $"{nameof(InferenceProviderSettings)} {{ Provider = {Provider}, ProviderTag = {ProviderTag}, Endpoint = {Endpoint}, " +
+        $"ApiKey = {(ApiKey is null ? "null" : "[redacted]")}, Model = {Model}, SecondaryModel = {SecondaryModel}, " +
+        $"TertiaryModel = {TertiaryModel}, Selection = {Selection}, Diagnostic = {Diagnostic} }}";
 }
 
 /// <summary>
@@ -231,12 +240,25 @@ public static class InferenceProviderEnvironment
     private static InferenceProviderSettings Describe(InferenceProvider provider, Func<string, string?> env, InferenceProviderSelection selection)
     {
         string tag = TagOf(provider), name = DisplayNameOf(provider);
+        var (endpointVariable, endpointValue) = provider switch
+        {
+            InferenceProvider.AzureOpenAI => ("AZURE_OPENAI_ENDPOINT", env("AZURE_OPENAI_ENDPOINT")),
+            InferenceProvider.Bitdeer => ("BITDEER_ENDPOINT", env("BITDEER_ENDPOINT") ?? BitdeerDefaultEndpoint),
+            InferenceProvider.OpenAI => ("OPENAI_BASE_URL", env("OPENAI_BASE_URL") ?? OpenAIDefaultEndpoint),
+            InferenceProvider.Foundry => ("FOUNDRY_ENDPOINT", env("FOUNDRY_ENDPOINT")),
+            InferenceProvider.OpenAICompatible => ("OPENAI_COMPATIBLE_ENDPOINT", env("OPENAI_COMPATIBLE_ENDPOINT")),
+            _ => ("", null),
+        };
+
+        if (!TryValidateEndpoint(endpointValue, out var endpoint, out var why))
+            return InferenceProviderSettings.NotConfigured($"{endpointVariable}='{endpointValue}' {why}");
+
         switch (provider)
         {
             case InferenceProvider.AzureOpenAI:
             {
                 var model = env("AZURE_OPENAI_DEPLOYMENT") ?? AzureDefaultDeployment;
-                return new(provider, tag, name, new Uri(env("AZURE_OPENAI_ENDPOINT")!), env("AZURE_OPENAI_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("AZURE_OPENAI_API_KEY"), model,
                     env("AZURE_OPENAI_DEPLOYMENT_2") ?? AzureDefaultSecondaryDeployment,
                     env("AZURE_OPENAI_DEPLOYMENT_3") ?? AzureDefaultTertiaryDeployment,
                     selection, null);
@@ -244,29 +266,57 @@ public static class InferenceProviderEnvironment
             case InferenceProvider.Bitdeer:
             {
                 var model = env("BITDEER_MODEL") ?? BitdeerDefaultModel;
-                return new(provider, tag, name, new Uri(env("BITDEER_ENDPOINT") ?? BitdeerDefaultEndpoint), env("BITDEER_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("BITDEER_API_KEY"), model,
                     env("BITDEER_MODEL_2") ?? model, env("BITDEER_MODEL_3") ?? model, selection, null);
             }
             case InferenceProvider.OpenAI:
             {
                 var model = env("OPENAI_MODEL") ?? OpenAIDefaultModel;
-                return new(provider, tag, name, new Uri(env("OPENAI_BASE_URL") ?? OpenAIDefaultEndpoint), env("OPENAI_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("OPENAI_API_KEY"), model,
                     env("OPENAI_MODEL_2") ?? model, env("OPENAI_MODEL_3") ?? model, selection, null);
             }
             case InferenceProvider.Foundry:
             {
                 var model = env("FOUNDRY_MODEL")!;
-                return new(provider, tag, name, new Uri(env("FOUNDRY_ENDPOINT")!), env("FOUNDRY_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("FOUNDRY_API_KEY"), model,
                     env("FOUNDRY_MODEL_2") ?? model, env("FOUNDRY_MODEL_3") ?? model, selection, null);
             }
             case InferenceProvider.OpenAICompatible:
             {
                 var model = env("OPENAI_COMPATIBLE_MODEL")!;
-                return new(provider, tag, name, new Uri(env("OPENAI_COMPATIBLE_ENDPOINT")!), env("OPENAI_COMPATIBLE_API_KEY"), model,
+                return new(provider, tag, name, endpoint, env("OPENAI_COMPATIBLE_API_KEY"), model,
                     env("OPENAI_COMPATIBLE_MODEL_2") ?? model, env("OPENAI_COMPATIBLE_MODEL_3") ?? model, selection, null);
             }
             default:
                 return InferenceProviderSettings.NotConfigured(null);
         }
+    }
+
+    /// <summary>
+    /// An endpoint that will carry an API key must be an absolute <c>https</c> URL, or a loopback
+    /// <c>http</c> one for local servers (Ollama, LM Studio, vLLM). Anything else is refused with a
+    /// reason rather than sending a credential in cleartext or throwing from inside resolution.
+    /// </summary>
+    public static bool TryValidateEndpoint(string? value, out Uri? endpoint, out string? reason)
+    {
+        endpoint = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            reason = "is not set.";
+            return false;
+        }
+        if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            reason = "is not an absolute http(s) URL.";
+            return false;
+        }
+        if (uri.Scheme == Uri.UriSchemeHttp && !uri.IsLoopback)
+        {
+            reason = "uses plain http to a non-loopback host; an API key would travel in cleartext. Use https, or a loopback address for a local server.";
+            return false;
+        }
+        endpoint = uri;
+        reason = null;
+        return true;
     }
 }
