@@ -6,7 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### A third evaluator kind: decision models (ADR-033)
+
+## [0.40.0-beta] - 2026-09-21
+### A third evaluator kind, and the samples stop assuming Azure
+
+Decision models join code checks and LLM judges as a third evaluator kind (ADR-033, Proposed), and
+the samples gain a provider selector so they run on Bitdeer, OpenAI, Foundry, Azure or any
+OpenAI-compatible endpoint. Eleven packaged files changed, nine of them new; the two edits to
+existing packaged files are one price line in `JudgeCostMap` and one enum value in the result
+schema. Nothing was removed or renamed. **No corpus byte moved.**
+
 
 #### Added
 - `AgentEval.Decisions.IDecisionClient` (Abstractions) — the decision-model transport:
@@ -63,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No Jev→LLM cascade primitive and no calibration data. `DecisionEval` is uncalibrated on every
   AgentEval dataset; it is independent evidence beside a judge, not a gate in front of one.
 - No `AddBitdeer()` / provider-specific code for GLM: an OpenAI-compatible endpoint needs none.
+
+#### Note for consumers
+- Additive. A validator pinned to the previous `provenance.type` enum will reject a document that
+  contains a `DecisionEval` node; every document without one validates unchanged. `DecisionEval`
+  is uncalibrated on every AgentEval dataset (above): read its `P(yes)` as evidence beside a
+  judge, not as a gate in front of one.
 
 ## [0.39.0-beta] - 2026-09-17
 ### The report stops printing only the score
