@@ -12,7 +12,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H5: EU AI Act — runs a real Azure OpenAI–backed agent against
+/// Benchmarks H5: EU AI Act — runs a real model-backed agent against
 /// every scenario in the chosen preset, grading each live response with a real
 /// LLM judge, then renders the verdict tree to JSON + HTML + PDF.
 ///
@@ -30,7 +30,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Requires Azure OpenAI credentials. Skips gracefully when missing.
+/// Requires a model provider (see AIConfig). Skips gracefully when missing.
 /// </para>
 /// <para>
 /// <b>Per-scenario probing</b>: this sample uses
@@ -46,7 +46,7 @@ public static class EuAiActBenchmarkSample
     {
         BenchmarkSampleHelpers.PrintHeader(
             "Benchmarks H5: EU AI Act",
-            "Real agent, real judge, per-scenario probing. Skips without Azure credentials.");
+            "Real agent, real judge, per-scenario probing. Skips without a model provider.");
 
         if (!AIConfig.IsConfigured)
         {

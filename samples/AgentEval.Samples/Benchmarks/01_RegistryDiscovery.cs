@@ -22,7 +22,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <c>agenteval bench --list</c> and Mission Control build their family
 /// pickers on top of.
 ///
-/// No Azure OpenAI credentials required — this sample is pure code.
+/// No model provider required — this sample is pure code.
 /// </summary>
 /// <remarks>
 /// <para>

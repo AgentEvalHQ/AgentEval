@@ -16,17 +16,18 @@ Five aggregation strategies ship under `AgentEval.Evals.Aggregations`:
 
 ---
 
-## Three kinds of evals
+## Four kinds of evals
 
-All three implement `IEval` and produce the same `EvalResult` shape. Callers never need to branch on type.
+All four implement `IEval` and produce the same `EvalResult` shape. Callers never need to branch on type.
 
-| Kind | Class | How it scores |
-|------|-------|---------------|
-| Atomic (LLM judge) | `AtomicLlmEval` | Delegates to an `AgentEval.Core.IEvaluator`; normalises the 0–100 score to 0–1. |
-| Atomic (deterministic) | `AtomicCodeEval` (abstract) | Subclass implements `Evaluate(input)` synchronously; no LLM call. |
-| Composite | `CompositeEval` | Runs all sub-evals in parallel via `Task.WhenAll`; aggregates via `IAggregationStrategy`. |
+| Kind | Class | How it scores | `provenance.type` |
+|------|-------|---------------|-------------------|
+| Atomic (LLM judge) | `AtomicLlmEval` | Delegates to an `AgentEval.Core.IEvaluator`; normalises the 0–100 score to 0–1. | `atomic-llm` |
+| Atomic (deterministic) | `AtomicCodeEval` (abstract) | Subclass implements `Evaluate(input)` synchronously; no LLM call. | `atomic-code` |
+| Atomic (decision model) | `DecisionEval` | Asks an `AgentEval.Decisions.IDecisionClient` (TypeSafe Jev via `SystemOneDecisionClient`) ONE yes/no question; `Score.Value` is the returned `P(yes)`, also kept under `Details.Dimensions["decision.probability_yes"]`. Uncalibrated; use beside a judge, not in front of one. See [ADR-033](adr/033-decision-evals-third-evaluator-kind.md). | `atomic-decision` |
+| Composite | `CompositeEval` | Runs all sub-evals in parallel via `Task.WhenAll`; aggregates via `IAggregationStrategy`. | `composite` |
 
-All three live in the `AgentEval.Evals` namespace.
+All four live in the `AgentEval.Evals` namespace.
 
 ---
 

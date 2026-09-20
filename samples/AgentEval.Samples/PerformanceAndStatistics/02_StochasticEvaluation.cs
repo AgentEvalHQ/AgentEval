@@ -35,7 +35,7 @@ public static class StochasticEvaluation
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   ⚠️  This sample requires Azure OpenAI credentials.\n");
+            Console.WriteLine("   ⚠️  This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
             return;
         }
         
@@ -120,10 +120,7 @@ public static class StochasticEvaluation
     
     private static IEvaluableAgent CreateAgentWithCalculator()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         
         var agent = chatClient.AsAIAgent(
             name: "Calculator Agent",

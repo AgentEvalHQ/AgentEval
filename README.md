@@ -394,7 +394,7 @@ Governance doesn't stop at evaluation time: **`SkillScriptExecutionGate`** and *
 
 **Honest by construction:** a skill source MAF gives no public enumeration API for (in-memory/class/MCP skills) reports zero resources rather than a guessed inventory, a missing Security Index axis is never counted as perfect, and the injection judge ships **shadow-only** — advisory only — because live calibration found it doesn't yet clear the promotion bar on this surface. See [docs/agent-skills.md](docs/agent-skills.md) for the full, honestly-labeled rundown.
 
-**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **K** (real agent — needs Azure OpenAI), or the standalone deep-dive [`samples/AgentEval.AgentSkillsEval`](samples/AgentEval.AgentSkillsEval) • [docs/agent-skills.md](docs/agent-skills.md)
+**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **K** (real agent — needs a model provider: Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint), or the standalone deep-dive [`samples/AgentEval.AgentSkillsEval`](samples/AgentEval.AgentSkillsEval) • [docs/agent-skills.md](docs/agent-skills.md)
 
 ---
 

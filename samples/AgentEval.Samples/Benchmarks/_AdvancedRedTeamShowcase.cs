@@ -52,8 +52,7 @@ internal static class AdvancedRedTeamShowcase
         Console.WriteLine($"  ADVANCED RED-TEAM CAPABILITIES  (tier: {tier})");
         Console.WriteLine("══════════════════════════════════════════════════════════════════════");
 
-        var chat = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // ── 1. Multi-turn + (Pro) instrumented tool harness → evidence-fidelity tiers ──
         // At Pro we wrap the model as an INSTRUMENTED agent so tool-aware attacks actually execute the canary tools

@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### A third evaluator kind: decision models (ADR-033)
+
+#### Added
+- `AgentEval.Decisions.IDecisionClient` (Abstractions) — the decision-model transport:
+  `state + typed questions → typed probabilistic answers`. Three question shapes (`BinaryQuestion`
+  yes/no, `ChoiceQuestion` one-of-N, `ScoreQuestion` ordered scale) with matching answers
+  (`BinaryAnswer.TrueProbability`, `ChoiceAnswer`, `ScoreAnswer`). Deliberately not an `IChatClient`.
+- `SystemOneDecisionClient` (Core) — the System One HTTP protocol that TypeSafe's Jev speaks,
+  reachable directly (`SystemOneClientOptions.ForTypeSafe`) or through OpenRouter
+  (`ForOpenRouter`, model `typesafe/jev-1.13`). Strict parser: a missing answer, a wrong answer
+  type or a probability outside [0, 1] is a `DecisionClientException`, never a score. No hidden
+  retries; `IsTransient` tells the caller when a deliberate one is honest. The API key is redacted
+  from any provider body the client quotes. `RenderRequest` returns the exact bytes a call would
+  send, for dry runs.
+- `DecisionEval` (Core) — an `AtomicEval` that asks one yes/no question. `Score.Value` is `P(yes)`
+  as returned; `Passed` is `P(yes) >= passThreshold`; the raw probability is also carried under
+  `Details.Dimensions["decision.probability_yes"]` so a threshold sweep can re-read it.
+  `Score.Confidence` stays `null` because a noul answer carries none. `Provenance.Type` is
+  `"atomic-decision"`, and `Provenance.JudgeModel` is the model id the PROVIDER echoes back (the
+  resolved build), not the alias requested.
+- Result schema v1: `provenance.type` enum gains `"atomic-decision"` (additive; every existing
+  document still validates).
+- `JudgeCostMap`: `jev` list price (OpenRouter, 2026-09-20: $0.042/M input, output free), used only
+  when the provider reports no cost itself.
+- Samples **N1 — GLM-5.3 Flash @ Bitdeer** and **N2 — Jev decisions** (`dotnet run -- 100` /
+  `-- 101`): a Bitdeer-hosted model as both subject and judge through the same `IChatClient` path
+  the CLI's `--endpoint` uses, and `DecisionEval` beside an `AtomicLlmEval` inside one composite.
+  Both take `--dry-run` and send nothing under it: N2 renders the exact request bytes through the
+  decision client's own serializer; N1 lists the prompts it would send and stops before the chat
+  SDK builds a payload. Both stop with a warning when the key is absent — there is no mock path.
+  `AGENTEVAL_SAMPLES_SHOW_RAW=1` makes N2 print every request and reply body with the key scrubbed.
+- `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` — the first real calls. TypeSafe answered
+  `jev-1.13.0` to `jev-latest` and accepted `jev-1.13.0` pinned; score levels are 0-indexed on the
+  wire; an identical request repeated at 0.97 / 0.97 / 0.98. Bitdeer's smoke call succeeded and the
+  account then returned HTTP 402, so its judged run is still owed.
+
+#### Changed
+- `samples/AgentEval.Samples` no longer assumes Azure OpenAI. Every sample obtains its model from
+  `AIConfig.CreateChatClient(model?)`; the host is chosen by **`AI_INFERENCE_PROVIDER`** =
+  `bitdeer` (`BITDEER_API_KEY`; model defaults to `zai-org/GLM-5.3-Flash`) | `openai`
+  (`OPENAI_API_KEY`; `gpt-4o-mini`) | `foundry` (`FOUNDRY_ENDPOINT/_API_KEY/_MODEL`, a Foundry
+  resource's Azure OpenAI-compatible endpoint) | `azure` (`AZURE_OPENAI_*`) | `openai-compatible`
+  (`OPENAI_COMPATIBLE_*`), or `--provider <name>` for one run. Keys for several providers may be set
+  at once; the selector decides. An explicit provider with missing variables, or an unknown name,
+  selects nothing and says why — no silent fallback to a host you did not choose. 66 sample files
+  changed mechanically; no sample knows which provider it runs on. Embeddings (B1) and the
+  hosted-agent Foundry path (H11/H12, `AZURE_FOUNDRY_ENDPOINT` + Entra) remain Azure-only and say so.
+- `AgentEval.Providers.InferenceProviderEnvironment` (Core, no SDK dependency) — the resolver behind
+  that variable (`Resolve()` → `InferenceProviderSettings` with provider, endpoint, key, models,
+  how it was selected, and a diagnostic when nothing is), so the CLI and any host can read the same
+  variable the same way. The CLI does not read it yet; its `bench` commands still expect
+  `AZURE_OPENAI_*` — follow-up.
+
+#### Not done, on purpose
+- No Jev→LLM cascade primitive and no calibration data. `DecisionEval` is uncalibrated on every
+  AgentEval dataset; it is independent evidence beside a judge, not a gate in front of one.
+- No `AddBitdeer()` / provider-specific code for GLM: an OpenAI-compatible endpoint needs none.
 
 ## [0.39.0-beta] - 2026-09-17
 ### The report stops printing only the score

@@ -128,8 +128,7 @@ public static class LightPathMAFIntegration
 
         if (AIConfig.IsConfigured)
         {
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            var judgeClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+                        var judgeClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
             Console.WriteLine("   CODE:");
             Console.ForegroundColor = ConsoleColor.Green;
@@ -194,14 +193,14 @@ public static class LightPathMAFIntegration
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  Azure OpenAI not configured. Available LLM-judged bundles:\n");
+            Console.WriteLine("   ⚠️  No model provider configured. Available LLM-judged bundles:\n");
             Console.ResetColor();
             Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → faithfulness, relevance, coherence, fluency");
             Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → + context precision/recall, answer correctness");
             Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → toxicity, bias, misinformation");
             Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 10 metrics combined\n");
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine("   Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT to run live");
+            Console.WriteLine("   Set a provider (AZURE_OPENAI_* / BITDEER_API_KEY / OPENAI_COMPATIBLE_*) to run live");
             Console.ResetColor();
         }
 
@@ -232,10 +231,7 @@ public static class LightPathMAFIntegration
         if (!AIConfig.IsConfigured)
             return CreateMockTravelAgent();
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+                var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
         return chatClient.AsAIAgent(

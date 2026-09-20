@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// - Convenience LoadAsync / LoadStreamingAsync facade methods
 /// - Metadata collection for unknown fields
 ///
-/// ⚡ No Azure credentials required — runs fully offline.
+/// ⚡ No model provider required — runs fully offline.
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: &lt;1 second
 /// </summary>

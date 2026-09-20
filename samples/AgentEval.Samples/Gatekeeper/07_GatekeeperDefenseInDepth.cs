@@ -27,7 +27,7 @@ namespace AgentEval.Samples;
 /// so a scene shows ✅ only when a gate actually stopped the action, ❌ if the harmful call ran, and says so plainly
 /// when the model simply didn't take the bait this run.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 3 minutes
 /// </summary>
 public static class GatekeeperDefenseInDepth
@@ -43,9 +43,7 @@ public static class GatekeeperDefenseInDepth
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

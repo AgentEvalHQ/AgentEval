@@ -121,6 +121,8 @@ Two details worth surfacing:
 
 `AtomicCodeEval` is the deterministic counterpart. Subclasses implement scoring synchronously, no LLM call. Used for tool-call accuracy checks, latency budgets, format-validation rules — anything where the verdict is purely mechanical.
 
+`DecisionEval` (`src/AgentEval.Core/Evals/DecisionEval.cs`) is the third atomic kind ([ADR-033](adr/033-decision-evals-third-evaluator-kind.md)): it asks a structured decision model — TypeSafe's Jev, through `AgentEval.Decisions.IDecisionClient` — one yes/no question and scores the probability it returns. `Score.Value` is `P(yes)` as returned, the raw value is also kept in `Details.Dimensions["decision.probability_yes"]`, `Score.Confidence` stays `null` (a yes/no answer carries none), and `Provenance.Type` is `"atomic-decision"` with `JudgeModel` set to the model id the provider echoed back. It is independent evidence beside a judge; it is not calibrated on any AgentEval dataset and must not gate whether a judge runs.
+
 ### 2.4 Composite eval
 
 `CompositeEval` (`src/AgentEval.Core/Evals/CompositeEval.cs`) is the recursive building block. It holds a list of `EvalComponent` (each component wraps an `IEval` with a weight and a `Required` flag), runs them in parallel via `Task.WhenAll`, and aggregates the results via an `IAggregationStrategy`.

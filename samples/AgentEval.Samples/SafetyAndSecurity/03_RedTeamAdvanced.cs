@@ -27,7 +27,7 @@ namespace AgentEval.Samples;
 /// - OWASP compliance reporting + assertions  
 /// - Baseline comparison for CI/CD regression tracking
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 10 minutes
 /// 💰 Cost: ~$0.05-0.15
 /// </summary>
@@ -289,8 +289,7 @@ public static class RedTeamAdvanced
 
     private static AIAgent CreateAgent()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         return chatClient.AsAIAgent(
             name: "SecurityTestAgent",
@@ -317,7 +316,7 @@ public static class RedTeamAdvanced
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE E3 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE E3 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs an advanced red team security scan with:                  │
    │    • Custom attack pipeline (PromptInjection + Jailbreak)                   │
@@ -326,9 +325,9 @@ public static class RedTeamAdvanced
    │    • Baseline comparison for CI/CD regression tracking                      │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

@@ -19,7 +19,7 @@ namespace AgentEval.Samples.Benchmarks;
 ///
 /// Memory is a Shape B / runner-style benchmark (ADR-017 Convention 3). This sample
 /// wires the preset-driven (Smoke / Standard / AuditGrade) running-sample shape used
-/// by H2–H9 over the Memory runner: real Azure OpenAI agent + LLM judge + canonical
+/// by H2–H9 over the Memory runner: real model-backed agent + LLM judge + canonical
 /// <c>.agenteval/</c> store + sidecar JSON / HTML / PDF. The native
 /// <c>MemoryBenchmarkResult</c> is also written to <c>report-native.json</c> for
 /// power users who need the unaltered per-category shape (grade, stars, weak
@@ -33,7 +33,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// </list>
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials. Skips gracefully when missing. Mirrors the
+/// Requires a model provider (see AIConfig). Skips gracefully when missing. Mirrors the
 /// shape of <see cref="LongMemEvalBenchmarkSample"/> (H9) — same Shape-B-to-Shape-A
 /// bridging via <see cref="SynthesizeEvalResult"/> so the unified canonical store +
 /// sidecar JSON / HTML / PDF artefacts come out identical to every other Group-H
@@ -81,8 +81,7 @@ public static class MemoryBenchmarkSample
         // ── Build the agent (history-injectable — Memory benchmark depends on it
         // for reach-back / cross-session / reducer scenarios that inject prepared
         // histories into the agent before probing).
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var agent = chatClient.AsEvaluableAgent(
             name: "MemoryBenchmarkSampleAgent",

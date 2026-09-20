@@ -18,13 +18,13 @@ namespace AgentEval.Samples;
 /// Sample G4: DI-Based Memory Evaluation - Using dependency injection for memory services
 ///
 /// This demonstrates:
-/// - Registering a real Azure OpenAI client as IChatClient in DI
+/// - Registering a real provider-backed IChatClient in DI
 /// - Registering memory services with AddAgentEvalMemory()
 /// - Resolving evaluators and scenarios from the DI container
 /// - Running evaluations using injected services
 /// - The full DI pattern recommended for production use
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
@@ -37,21 +37,18 @@ public static class MemoryDI
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   DI registration needs a real IChatClient for the LLM judge.\n");
             return;
         }
 
-        // Step 1: Configure the DI container with real Azure OpenAI
+        // Step 1: Configure the DI container with real model-backed
         Console.WriteLine("📝 Step 1: Configuring dependency injection container...\n");
 
         var services = new ServiceCollection();
 
-        // Register the real Azure OpenAI chat client as IChatClient
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        // Register the real chat client (AIConfig.CreateChatClient) as IChatClient
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         services.AddSingleton<IChatClient>(chatClient);
 
@@ -65,7 +62,7 @@ public static class MemoryDI
         var provider = services.BuildServiceProvider();
 
         Console.WriteLine("   ✅ Services registered:");
-        Console.WriteLine($"      • IChatClient → Azure OpenAI ({AIConfig.ModelDeployment})");
+        Console.WriteLine($"      • IChatClient → {AIConfig.ProviderName} ({AIConfig.ModelDeployment})");
         Console.WriteLine("      • AddAgentEvalMemory() — all core + evaluators + scenarios + metrics");
         Console.WriteLine();
 
@@ -169,7 +166,7 @@ public static class MemoryDI
     {
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
-        Console.WriteLine("   • Register a real IChatClient (Azure OpenAI) for the LLM judge");
+        Console.WriteLine("   • Register a real IChatClient (any provider) for the LLM judge");
         Console.WriteLine("   • AddAgentEvalMemory() registers all memory services at once");
         Console.WriteLine("   • CanRememberAsync() one-liners use DI services automatically");
         Console.WriteLine("   • Evaluators are Scoped; scenarios are Singleton; metrics are Transient");

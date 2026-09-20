@@ -21,7 +21,7 @@ namespace AgentEval.Samples.Benchmarks;
 ///
 /// LongMemEval is a Shape B / runner-style benchmark (ADR-017 Convention 3).
 /// This sample wires the preset-driven (Smoke / Standard / AuditGrade) running-
-/// sample shape used by H2–H8 over the LongMemEval runner: real Azure OpenAI
+/// sample shape used by H2–H8 over the LongMemEval runner: real model-backed
 /// agent (history-injectable) + LLM judge + canonical <c>.agenteval/</c> store
 /// + sidecar JSON / HTML / PDF. Set
 /// <c>AGENTEVAL_LONGMEMEVAL_WRITE_NATIVE_REPORT=true</c> to additionally write
@@ -44,7 +44,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// </list>
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials. Skips gracefully when missing.
+/// Requires a model provider (see AIConfig). Skips gracefully when missing.
 /// Smoke + Standard work without any env var when the canonical dataset file
 /// is present at <c>&lt;workspace-root&gt;/src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json</c>.
 /// AuditGrade additionally requires the <c>LONGMEMEVAL_DATASET_PATH</c>
@@ -114,8 +114,7 @@ public static class LongMemEvalBenchmarkSample
         }
 
         // ── Build the agent (history-injectable; same shape Group-G uses).
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var agent = chatClient.AsEvaluableAgent(
             name: "LongMemEvalSampleAgent",

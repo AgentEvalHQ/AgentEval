@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 /// - Evaluating a genuine MAF workflow with the AgentEval harness
 /// - Graph extraction from actual MAF edge reflection
 /// 
-/// Azure OpenAI credentials are required — this sample executes real LLM calls
+/// A model provider is required — this sample executes real LLM calls
 /// through the MAF workflow engine.
 /// 
 /// ⏱️ Time to understand: 15 minutes
@@ -48,7 +48,7 @@ public static class WorkflowEvaluationReal
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
         Console.WriteLine($"   Executors     : {string.Join(" → ", executorIds)}");
-        Console.WriteLine($"   Mode          : 🚀 REAL (Azure OpenAI — {AIConfig.ModelDeployment})\n");
+        Console.WriteLine($"   Mode          : 🚀 REAL ({AIConfig.ProviderName} — {AIConfig.ModelDeployment})\n");
 
         Console.WriteLine("📝 Step 2: Creating MAFWorkflowAdapter.FromMAFWorkflow()...\n");
 
@@ -120,7 +120,7 @@ public static class WorkflowEvaluationReal
             Console.WriteLine($"   ❌ Workflow test failed: {ex.Message}");
             Console.ResetColor();
             Console.WriteLine();
-            Console.WriteLine("   💡 Tip: Ensure your Azure OpenAI deployment supports the model and has enough quota.");
+            Console.WriteLine("   💡 Tip: Ensure your model deployment supports the request and has enough quota.");
             return;
         }
 
@@ -251,8 +251,7 @@ public static class WorkflowEvaluationReal
     /// </summary>
     private static (Workflow workflow, string[] executorIds) CreateWorkflow()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // ── Create 4 agents with distinct system prompts ──
 
@@ -366,14 +365,14 @@ public static class WorkflowEvaluationReal
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE C2 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE C2 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a real 4-agent MAF workflow pipeline.                     │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

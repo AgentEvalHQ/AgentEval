@@ -24,7 +24,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// AgentEval Composite Eval and the Foundry eval, and renders both in one source-tagged HTML report.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials (the judge + fallback agent) and optionally an Azure AI Foundry
+/// Requires a model provider (the judge + fallback agent; see AIConfig) and optionally an Azure AI Foundry
 /// project endpoint for the Foundry branch. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
 /// <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c> (copy from the Foundry portal).
 /// Without it the sample runs AgentEval-local-only. The Foundry branch uses Azure AD
@@ -45,8 +45,7 @@ public static class FoundryHybridBenchmarkSample
         }
 
         // ── The AgentEval judge + a composite (local, deterministic, multi-dimension) ──────────────
-        var azure = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        IChatClient judgeChat = azure.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        IChatClient judgeChat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         var chatConfig = new ChatConfiguration(judgeChat);
 
         var composite = AgenticBenchmark
@@ -66,7 +65,7 @@ public static class FoundryHybridBenchmarkSample
             ? new AIProjectClient(foundryEndpoint!, new azureidentity::Azure.Identity.DefaultAzureCredential())
             : null;
 
-        // System-under-test agent: Foundry-hosted when available, else Azure OpenAI fallback.
+        // System-under-test agent: Foundry-hosted when available, else the configured chat provider as fallback.
         AIAgent agent = projectClient is not null
             ? projectClient.AsAIAgent(model: foundryModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
             : judgeChat.AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");

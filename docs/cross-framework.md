@@ -25,7 +25,12 @@ The `AsEvaluableAgent()` extension method wraps any `IChatClient` into an `IStre
 | **Groq** | `new OpenAIChatClient(new(key), new("https://api.groq.com/openai/v1"))` | Fast inference |
 | **Together.ai** | `new OpenAIChatClient(new(key), new("https://api.together.xyz/v1"))` | Open models |
 | **vLLM** | `new OpenAIChatClient(new("vllm"), new("http://localhost:8000/v1"))` | Self-hosted |
+| **Bitdeer (GLM-5.3 Flash)** | `new OpenAIClient(new ApiKeyCredential(key), new() { Endpoint = new("https://api-inference.bitdeer.ai/v1") }).GetChatClient("zai-org/GLM-5.3-Flash").AsIChatClient()` | Hosted open models; sample N1 |
 | **Any OpenAI-compat** | `EndpointFactory.CreateOpenAICompatible(url, model, key)` | Universal fallback |
+
+Name the agent `model@provider` (`zai-org/GLM-5.3-Flash@bitdeer`): serving infrastructure changes latency, throughput, quantisation and tool-call reliability, and a result that drops the host describes a model nobody ran.
+
+> **Decision models are not chat providers.** TypeSafe's Jev returns typed probabilities, not text, and is reached through `AgentEval.Decisions.IDecisionClient` / `SystemOneDecisionClient` and scored by `DecisionEval` — see [ADR-033](adr/033-decision-evals-third-evaluator-kind.md) and sample N2.
 
 ## Framework Integration Examples
 

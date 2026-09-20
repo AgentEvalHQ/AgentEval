@@ -4,6 +4,7 @@
 using System.Text;
 using AgentEval.Samples.Benchmarks;
 using AgentEval.Samples.EvalJoin;
+using AgentEval.Samples.Providers;
 
 namespace AgentEval.Samples;
 
@@ -32,7 +33,7 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need Azure)",
+        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need a model provider)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
@@ -185,7 +186,7 @@ public static class Program
             new("29 Result Behavioral Anomaly", "fixed cap vs per-tool learned result-anomaly baseline", GatekeeperToolResultBehavioralAnomaly.RunAsync),
         ], Progressive: true),
 
-        new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
+        new('K', "Agent Skills", "🔑 real agents (any configured provider) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
         [
             new("Hello World",               "★ start here — a trivial in-memory skill + ONE assertion (HaveLoadedSkill)", AgentSkillsHelloWorld.RunAsync),
             new("Disclosure Efficiency",      "Free structural metric scoring the load->read->run funnel (order, redundancy)", AgentSkillsDisclosureEfficiency.RunAsync),
@@ -209,6 +210,13 @@ public static class Program
         [
             new("Eval + Chance Floor",       "A REAL MAF agent run → EvalInput → AddEval(eval, floor) → EvalResult carrying its floor", EvalWithChanceFloor.RunAsync),
             new("Deterministic Benchmark",  "The same eval as a BenchmarkDefinition: 3 cases × 2 arms × 2 reps, scored against its floor AND against a control arm", DeterministicBenchmark.RunAsync),
+        ]),
+
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101.
+        new('N', "Providers: Bitdeer GLM + TypeSafe Jev", "🔑 BITDEER_API_KEY · TYPESAFE_API_KEY or OPENROUTER_API_KEY · --dry-run prints every payload, spends nothing",
+        [
+            new("GLM-5.3 Flash @ Bitdeer",   "Subject + judge through the ordinary IChatClient path — no provider code, provider kept in the identity", GlmBitdeerProviderDemo.RunAsync),
+            new("Jev Decisions",             "IDecisionClient + DecisionEval: P(yes) as the score, three question shapes in one request, a third evaluator kind in a composite", JevDecisionsDemo.RunAsync),
         ]),
     ];
 
@@ -235,7 +243,26 @@ public static class Program
             }
         }
 
-        if (!AIConfig.IsConfigured)
+        // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
+        if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
+            Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_DRY_RUN", "1");
+
+        // Forward `--provider bitdeer|openai|foundry|azure|openai-compatible` into AI_INFERENCE_PROVIDER
+        // so AIConfig.CreateChatClient() — the one factory every sample uses — picks that provider.
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--provider", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.SetEnvironmentVariable(AgentEval.Providers.InferenceProviderEnvironment.SelectorVariable, args[i + 1]);
+                break;
+            }
+        }
+
+        // The global "no chat provider" banner belongs to the interactive menu, where the user has not
+        // yet chosen a sample. A direct run (`dotnet run -- <n>`) lets the sample speak for itself:
+        // the Jev sample needs no chat provider at all, and every sample that does need one prints
+        // its own, accurate, warning.
+        if (args.Length == 0 && !AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
         // CI/non-interactive: run every offline-capable Gatekeeper sample and exit non-zero on any failure.

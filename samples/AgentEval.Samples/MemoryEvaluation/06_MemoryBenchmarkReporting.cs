@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// - Generating an interactive HTML report with overlaid pentagons
 /// - Using the export bridge (.ToEvaluationReport()) for CI/CD integration
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// Optional: AZURE_OPENAI_DEPLOYMENT_2 (default: gpt-4o-mini), AZURE_OPENAI_DEPLOYMENT_3 (default: gpt-4.1)
 /// </summary>
 public static class MemoryBenchmarkReporting
@@ -42,7 +42,7 @@ public static class MemoryBenchmarkReporting
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory benchmarks use an LLM judge.\n");
             return;
         }
@@ -53,7 +53,6 @@ public static class MemoryBenchmarkReporting
 
         Console.WriteLine("Step 1: Creating benchmark runner for 3 models...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var store = new JsonFileBaselineStore();
 
         // The 3 models to compare — weakest to strongest
@@ -81,7 +80,7 @@ public static class MemoryBenchmarkReporting
             var model = models[i];
             Console.WriteLine($"Step {i + 2}: Running Standard benchmark — {model.Name}...\n");
 
-            var chatClient = azureClient.GetChatClient(model.Deployment).AsIChatClient();
+            var chatClient = AIConfig.CreateChatClient(model.Deployment);
             var runner = MemoryBenchmarkRunner.Create(chatClient);
 
             var agent = chatClient.AsEvaluableAgent(

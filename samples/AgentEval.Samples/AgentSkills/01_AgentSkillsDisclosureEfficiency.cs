@@ -17,7 +17,7 @@ namespace AgentEval.Samples;
 /// disclosure ORDER and penalizes redundant loads / "load storms" — against a real agent answering a
 /// real policy question using the shared expense-report skill fixture.
 ///
-/// 🔑 Requires Azure OpenAI credentials.
+/// 🔑 Requires a model provider (see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class AgentSkillsDisclosureEfficiency
@@ -35,9 +35,7 @@ public static class AgentSkillsDisclosureEfficiency
         var skillPath = AgentSkillsSampleHelpers.ResolveExpenseReportSkillPath();
         if (skillPath is null) return;
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var agent = AgentSkillsSampleHelpers.BuildExpenseReportAgent(chatClient, skillPath);
 

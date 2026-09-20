@@ -10,7 +10,7 @@ namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
 /// Benchmarks H2: Performance — measure latency, throughput, and cost of a
-/// real Azure OpenAI–backed agent using <see cref="PerformanceBenchmark"/>.
+/// real model-backed agent using <see cref="PerformanceBenchmark"/>.
 /// Skips gracefully when credentials are missing.
 ///
 /// Demonstrates:
@@ -22,7 +22,7 @@ namespace AgentEval.Samples.Benchmarks;
 ///      changes — see <see cref="BenchmarkSampleHelpers.ResolvePreset"/>.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials. Skips gracefully when missing.
+/// Requires a model provider (see AIConfig). Skips gracefully when missing.
 /// Default preset is <see cref="SamplePreset.Smoke"/> (3 latency iters + 2s
 /// throughput) — set <c>AGENTEVAL_SAMPLES_PRESET=standard</c> for ~10× the
 /// workload, or <c>audit-grade</c> for the full audit-grade configuration.
@@ -33,7 +33,7 @@ public static class PerformanceBenchmarkSample
     {
         BenchmarkSampleHelpers.PrintHeader(
             "Benchmarks H2: Performance (latency / throughput / cost)",
-            "Real Azure OpenAI agent. Skips gracefully without credentials.");
+            "Real model-backed agent. Skips gracefully without credentials.");
 
         if (!AIConfig.IsConfigured)
         {

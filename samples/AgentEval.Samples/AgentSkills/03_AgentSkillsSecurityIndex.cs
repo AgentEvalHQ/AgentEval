@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// <c>samples/AgentEval.AgentSkillsEval</c> (Run 5-7) for the full 3-axis composition including the
 /// red-team pass and hash-pin drift detection.
 ///
-/// 🔑 Requires Azure OpenAI credentials.
+/// 🔑 Requires a model provider (see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class AgentSkillsSecurityIndex
@@ -40,9 +40,7 @@ public static class AgentSkillsSecurityIndex
         var skillPath = AgentSkillsSampleHelpers.ResolveExpenseReportSkillPath();
         if (skillPath is null) return;
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // Efficiency axis: a real agent run against the shared skill.
         var agent = AgentSkillsSampleHelpers.BuildExpenseReportAgent(chatClient, skillPath);

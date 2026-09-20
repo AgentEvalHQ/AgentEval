@@ -12,12 +12,12 @@ namespace AgentEval.Samples;
 /// Agent Skills — Hello World (the 60-second version).
 ///
 /// The simplest possible MAF Agent Skills check: a trivial in-memory skill — no SKILL.md, no directory,
-/// nothing to set up (<c>AgentInlineSkill</c> is defined entirely in code) — a real Azure OpenAI agent
+/// nothing to set up (<c>AgentInlineSkill</c> is defined entirely in code) — a real model-backed agent
 /// that loads it, and ONE fluent assertion (<c>HaveLoadedSkill</c>) on the real tool-call trace. This is
 /// the on-ramp; the rest of group K builds up the disclosure-efficiency metric, the compliance scanner,
 /// and the composite Skill Security Index on the shared expense-report fixture.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 1 minute
 /// </summary>
 public static class AgentSkillsHelloWorld
@@ -34,9 +34,7 @@ public static class AgentSkillsHelloWorld
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // A trivial skill, defined entirely in code — no fixture, no directory, nothing to build. It has
         // no resources or scripts, so its instructions tell the model, explicitly, not to reach for

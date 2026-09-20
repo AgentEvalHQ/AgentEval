@@ -46,7 +46,7 @@ public static class WorkflowWithTools
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
         Console.WriteLine($"   Executors     : {string.Join(" → ", executorIds)}");
-        Console.WriteLine($"   Mode          : 🚀 REAL (Azure OpenAI — {AIConfig.ModelDeployment})");
+        Console.WriteLine($"   Mode          : 🚀 REAL ({AIConfig.ProviderName} — {AIConfig.ModelDeployment})");
         Console.WriteLine($"   Tools         : GetInfoAbout, SearchFlights, BookFlight, BookHotel\n");
 
         Console.WriteLine("📝 Step 2: Creating MAFWorkflowAdapter.FromMAFWorkflow()...\n");
@@ -103,7 +103,7 @@ public static class WorkflowWithTools
             Console.WriteLine($"   ❌ Workflow test failed: {ex.Message}");
             Console.ResetColor();
             Console.WriteLine();
-            Console.WriteLine("   💡 Tip: Ensure your Azure OpenAI deployment supports tool calling.");
+            Console.WriteLine("   💡 Tip: Ensure your model supports tool calling.");
             return;
         }
 
@@ -315,8 +315,7 @@ public static class WorkflowWithTools
     /// </summary>
     private static (Workflow workflow, string[] executorIds) CreateTripPlannerWorkflow()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // ── TripPlanner Agent (GetInfoAbout tool) ──
         var tripPlanner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
@@ -572,14 +571,14 @@ public static class WorkflowWithTools
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE C3 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE C3 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a real TripPlanner MAF workflow with tool-calling agents. │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

@@ -27,7 +27,7 @@ namespace AgentEval.Samples;
 ///   Manual (Sample G5): Agent manually manages _longTermMemory + _conversationHistory
 ///   Native (this sample): AIContextProvider in MAF pipeline handles memory lifecycle
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// 
 /// ⏱️ Time to understand: 10 minutes
 /// ⏱️ Time to run: ~30–60 seconds (real LLM calls with memory injection)
@@ -41,7 +41,7 @@ public static class MemoryAIContextProvider
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Cross-session evaluation uses an LLM judge — it cannot run in mock mode.\n");
             return;
         }
@@ -49,10 +49,7 @@ public static class MemoryAIContextProvider
         // Step 1: Create evaluator with real LLM judge
         Console.WriteLine("📝 Step 1: Creating cross-session evaluator with LLM judge...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
         var evaluator = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);

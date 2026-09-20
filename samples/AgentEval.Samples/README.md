@@ -12,7 +12,7 @@
 Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
 needs a separately consented remote A2A endpoint), also run without credentials.
-Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
+Most other samples need a model provider — Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint, selected with `--provider` (see [Choosing a provider](#choosing-a-provider)); check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
 
@@ -33,6 +33,8 @@ dotnet run -- 45   # Performance benchmark   (H2)
 dotnet run -- 56   # Report Browser          (H13)
 dotnet run -- 61   # Gatekeeper Hello World  (J1)
 dotnet run -- 90   # Agent Skills Hello World (K1)
+dotnet run -- 100  # GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 101  # Jev Decisions           (N2)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -247,11 +249,75 @@ consent-flag rationale, and the honest fidelity-ceiling disclosure (text-only; n
 | 1 | **Live Walkthrough** | `CopilotStudioAssertions` fluent API, multi-turn conversation continuity, Gatekeeper (`UseEvalGate`) composing over a live MCS agent exactly like any other `IChatClient` | No (MCS creds instead) | 5 min |
 | 2 | **Budget + Red Team** | A tight `--max-credits`-equivalent cap tripping `CopilotStudioBudgetExceededException` for real, `HaveStayedWithinCreditBudget`, `CanResistAsync` red-teaming a live MCS agent (same one-liner as an Azure OpenAI agent), `HaveStartedNewConversation`/`HaveStartedDifferentConversation` | No (MCS creds instead) | 6 min |
 
+### N — Providers: Bitdeer GLM + TypeSafe Jev  🔑 `BITDEER_API_KEY` · `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY`
+
+Two providers that are not Azure OpenAI, exercised the way AgentEval already works — and one that is
+not a chat model at all. See [ADR-033](../../docs/adr/033-decision-evals-third-evaluator-kind.md).
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **GLM-5.3 Flash @ Bitdeer** | An OpenAI-compatible host through the ordinary `IChatClient` path (the same construction as `agenteval eval --endpoint`): the model as **subject** (`AsEvaluableAgent`) and as **judge** (`ChatClientEvaluator` in an `AtomicLlmEval`) inside one `CompositeEval`, provider kept in the identity (`…@bitdeer`), judge==subject stated in the result | No (`BITDEER_API_KEY`) | 3 min |
+| 2 | **Jev Decisions** | `IDecisionClient` + `DecisionEval`: `P(yes)` **is** the score, the raw probability survives in `Dimensions`, provenance names the model the provider echoed; three question shapes (noul / choice / score) in ONE request; `[atomic-decision]` as a third evaluator kind beside `[atomic-code]` and `[atomic-llm]` in a composite | No (`TYPESAFE_API_KEY` or `OPENROUTER_API_KEY`; `BITDEER_API_KEY` adds the GLM judge) | 4 min |
+
+Both samples run in stages — **dry run → one real item → the rest** — and both stop with a warning when
+the key is absent; there is no mock path.
+
+```bash
+dotnet run -- 100 --dry-run   # prints every prompt, sends nothing — GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 100             # …then spend — GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 101 --dry-run   # prints every request body, sends nothing — Jev Decisions (N2)
+dotnet run -- 101             # …then spend — Jev Decisions (N2)
+```
+
+```powershell
+$env:BITDEER_API_KEY    = "..."                       # https://api-inference.bitdeer.ai/v1, zai-org/GLM-5.3-Flash
+$env:TYPESAFE_API_KEY   = "..."                       # direct: https://api.typesafe.ai/v1/systemone, model jev-latest
+$env:OPENROUTER_API_KEY = "..."                       # relay:  https://openrouter.ai/api/v1/systemone, model typesafe/jev-1.13
+# optional
+$env:JEV_TRANSPORT = "typesafe"                       # or "openrouter" — when both keys are set
+$env:JEV_MODEL     = "jev-1.13.0"                     # pin a versioned id for anything reproducible (TypeSafe: jev-1.13.0; OpenRouter: typesafe/jev-1.13)
+$env:AGENTEVAL_SAMPLES_SHOW_RAW = "1"                 # N2: print every request and reply body (the key is never printed)
+$env:BITDEER_PRICE_INPUT_PER_1M  = "0.00"             # Bitdeer's list price was not verifiable from their public
+$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; unset → the run prints "not priced"
+```
+
 ---
 
 ## Prerequisites
 
-### With Azure OpenAI (full experience)
+### Choosing a provider
+
+Every sample obtains its model through one factory, `AIConfig.CreateChatClient()`, so the whole
+catalogue runs on whichever host **`AI_INFERENCE_PROVIDER`** selects, without touching a sample.
+Keys for several providers can be configured at once; the selector decides which one is used.
+
+| `AI_INFERENCE_PROVIDER` | Variables | Defaults |
+|---|---|---|
+| `bitdeer` | `BITDEER_API_KEY` | endpoint `https://api-inference.bitdeer.ai/v1`, model `zai-org/GLM-5.3-Flash`; `BITDEER_MODEL`, `_MODEL_2`, `_MODEL_3` override |
+| `openai` | `OPENAI_API_KEY` | `OPENAI_BASE_URL` = `https://api.openai.com/v1`, `OPENAI_MODEL` = `gpt-4o-mini`; `_MODEL_2`, `_MODEL_3` |
+| `foundry` | `FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY` + `FOUNDRY_MODEL` | a Foundry resource's Azure OpenAI-compatible endpoint (`https://<resource>.openai.azure.com/`); `_MODEL_2`, `_MODEL_3`. Not yet exercised live. |
+| `azure` | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` | `_DEPLOYMENT_2` = `gpt-4o-mini`, `_DEPLOYMENT_3` = `gpt-4.1` |
+| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT` + `OPENAI_COMPATIBLE_MODEL`; `OPENAI_COMPATIBLE_API_KEY` optional | Ollama, LM Studio, vLLM (keyless; loopback `http://` allowed), Groq, Together, … |
+
+When the selector is unset, the first provider with credentials wins (Azure, Bitdeer, OpenAI, Foundry,
+generic). When it names a provider whose variables are missing, or an unknown name, **nothing** is
+selected and the banner says why — it never silently spends on a host you did not choose.
+`--provider <name>` sets the selector for one run. The resolution lives in Core
+(`AgentEval.Providers.InferenceProviderEnvironment`), so the CLI can read the same variable next.
+
+```powershell
+[Environment]::SetEnvironmentVariable("AI_INFERENCE_PROVIDER", "bitdeer", "User")   # once, machine-wide
+$env:BITDEER_API_KEY = "..."
+dotnet run -- 1                                   # runs on Bitdeer
+dotnet run -- 1 --provider openai                 # this run on OpenAI instead (needs OPENAI_API_KEY)
+```
+
+The **Azure?** column in the tables above means "needs a model provider"; any of the three will do.
+Two surfaces stay Azure-only and say so when the Azure trio is absent: embeddings (B1) and Azure AI
+Foundry (H11, H12). A reasoning model such as GLM-5.3 Flash bills its reasoning as output tokens,
+so token counts and latency are higher than a non-reasoning model's for the same prompt.
+
+### With Azure OpenAI
 
 ```powershell
 # PowerShell

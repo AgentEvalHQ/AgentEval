@@ -399,21 +399,20 @@ public static class ComprehensiveRAG
 
     private static IChatClient CreateChatClient()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        return AIConfig.CreateChatClient(AIConfig.ModelDeployment);
     }
 
     private static IChatClient CreateEvaluatorClient()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        return AIConfig.CreateChatClient(AIConfig.ModelDeployment);
     }
 
     private static IAgentEvalEmbeddings CreateEmbeddingClient()
     {
+        // Embeddings are Azure-only in these samples (IsEmbeddingConfigured requires the Azure trio),
+        // whichever provider serves the chat model.
         Console.WriteLine($"   ℹ️  Using Azure OpenAI embeddings: {AIConfig.EmbeddingDeployment}\n");
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var embeddingClient = azureClient.GetEmbeddingClient(AIConfig.EmbeddingDeployment);
+        var embeddingClient = AIConfig.CreateAzureOpenAIClient().GetEmbeddingClient(AIConfig.EmbeddingDeployment);
         return new MEAIEmbeddingAdapter(embeddingClient.AsIEmbeddingGenerator());
     }
 

@@ -587,7 +587,7 @@ The distinction: **Testing metric code** vs **Demonstrating evaluation capabilit
 
 ## Composite Evaluations
 
-When a single pass/fail verdict must draw on several independent checks, use the composite-evals primitive. A `CompositeEval` runs all component evals in parallel, aggregates their scores via a pluggable `IAggregationStrategy` (Phase 1 ships `WeightedSumAggregation`), and returns one `EvalResult` with a recursive tree of sub-results. Both `AtomicLlmEval` (LLM-judge) and `AtomicCodeEval` (deterministic) implement the same `IEval` interface, so atomics and composites can be mixed freely at any nesting depth. See [Composite Evaluations](composite-evals.md) for the full guide, including the verdict matrix, persistence, and DI registration.
+When a single pass/fail verdict must draw on several independent checks, use the composite-evals primitive. A `CompositeEval` runs all component evals in parallel, aggregates their scores via a pluggable `IAggregationStrategy` (Phase 1 ships `WeightedSumAggregation`), and returns one `EvalResult` with a recursive tree of sub-results. `AtomicLlmEval` (LLM judge), `AtomicCodeEval` (deterministic) and `DecisionEval` (a decision model's `P(yes)`, [ADR-033](adr/033-decision-evals-third-evaluator-kind.md)) implement the same `IEval` interface, so atomics and composites can be mixed freely at any nesting depth. See [Composite Evaluations](composite-evals.md) for the full guide, including the verdict matrix, persistence, and DI registration.
 
 ---
 

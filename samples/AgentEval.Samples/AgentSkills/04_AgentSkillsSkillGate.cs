@@ -21,7 +21,7 @@ namespace AgentEval.Samples;
 /// <see cref="SkillDriftException"/>, then (3) re-approve the change (the CLI equivalent of
 /// <c>agenteval skills baseline approve</c>) and watch construction succeed again.
 ///
-/// 🔑 Requires Azure OpenAI credentials (only for the compliance scan's required-but-unused agent reference
+/// 🔑 Requires a model provider (see AIConfig) (only for the compliance scan's required-but-unused agent reference
 /// — see MafSkillScanner's own remarks; no model call happens during the scan or the gate check itself).
 /// ⏱️ Time to understand: 3 minutes
 /// </summary>
@@ -40,9 +40,7 @@ public static class AgentSkillsSkillGate
         var skillPath = AgentSkillsSampleHelpers.ResolveExpenseReportSkillPath();
         if (skillPath is null) return;
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var scanAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "ScannerAgent" });
         var scan = await MafSkillScanner.ScanFileSkillsWithInfoAsync(skillPath, scanAgent);

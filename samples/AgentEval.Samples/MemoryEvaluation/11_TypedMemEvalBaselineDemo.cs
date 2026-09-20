@@ -53,7 +53,7 @@ namespace AgentEval.Samples;
 /// one would be a lie.
 ///
 /// Prerequisites:
-/// - AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY
+/// - a model provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// - a chat deployment (AIConfig.ModelDeployment)
 /// The corpora ship embedded in AgentEval.Memory, so there is nothing to download.
 /// </summary>
@@ -89,8 +89,7 @@ public static class TypedMemEvalBaselineDemo
         }
 
         var deployment = AIConfig.ModelDeployment;
-        var azure = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azure.GetChatClient(deployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(deployment);
 
         // Reader and judge are the same model here, as in the LongMemEval baseline sample. The
         // family's own judge-family bias question is closed separately: two non-OpenAI judges agree

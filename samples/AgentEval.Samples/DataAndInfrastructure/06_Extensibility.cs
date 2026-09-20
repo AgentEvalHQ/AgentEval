@@ -26,8 +26,8 @@ namespace AgentEval.Samples;
 /// - Registry inspection: listing all registered components
 /// - BONUS: Live LLM evaluation with a custom letter-counting metric (when Azure configured)
 ///
-/// ⚡ Steps 1-6: No Azure credentials required — runs fully offline.
-/// 🤖 Step 7: Uses real Azure OpenAI (or mock fallback if not configured).
+/// ⚡ Steps 1-6: No model provider required — runs fully offline.
+/// 🤖 Step 7: Uses the configured provider (or mock fallback if not configured).
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: &lt;2 seconds
 /// </summary>
@@ -291,15 +291,12 @@ public static class Extensibility
         {
             // ── Real LLM path ──
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("   ✅ Azure OpenAI configured — calling real LLM!");
+            Console.WriteLine($"   ✅ {AIConfig.ProviderName} configured — calling real LLM!");
             Console.ResetColor();
 
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            var chatClient = azureClient
-                .GetChatClient(AIConfig.ModelDeployment)
-                .AsIChatClient();
+            var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
-            agentLabel = $"Azure OpenAI ({AIConfig.ModelDeployment})";
+            agentLabel = $"{AIConfig.ProviderName} ({AIConfig.ModelDeployment})";
 
             // Ask the LLM
             var response = await chatClient.GetResponseAsync(question);
@@ -309,7 +306,7 @@ public static class Extensibility
         {
             // ── Mock path ──
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  No Azure credentials — using mock response for demo.");
+            Console.WriteLine("   ⚠️  No model provider — using mock response for demo.");
             Console.ResetColor();
 
             // Simulate the classic LLM mistake: many models say "2" for Strawberry

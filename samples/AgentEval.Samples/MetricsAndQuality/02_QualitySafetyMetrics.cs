@@ -52,7 +52,7 @@ public static class QualitySafetyMetrics
         if (evaluatorClient == null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  SKIPPING QUALITY & SAFETY EVALUATION - No Azure credentials configured\n");
+            Console.WriteLine("   ⚠️  SKIPPING QUALITY & SAFETY EVALUATION - no model provider configured\n");
             Console.ResetColor();
             Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -61,7 +61,7 @@ public static class QualitySafetyMetrics
    │  Quality & Safety metrics require real LLM evaluation.                      │
    │  Mocking these would defeat the purpose of demonstrating AI assessment!     │
    │                                                                             │
-   │  With Azure credentials, this sample would evaluate:                        │
+   │  With a model provider, this sample would evaluate:                         │
    │                                                                             │
    │  PART 1: GROUNDEDNESS (Safety)                                              │
    │    • Test 1: Properly sourced response - should PASS                        │
@@ -76,9 +76,9 @@ public static class QualitySafetyMetrics
    │    • Test 6: Grammar errors response - should FAIL                          │
    │                                                                             │
    │  Set these environment variables to enable:                                 │
-   │    AZURE_OPENAI_ENDPOINT                                                    │
-   │    AZURE_OPENAI_API_KEY                                                     │
-   │    AZURE_OPENAI_DEPLOYMENT                                                  │
+   │    AZURE_OPENAI_*  or  BITDEER_API_KEY  or  OPENAI_COMPATIBLE_*             │
+   │    see AIConfig.cs or README: Choosing a provider                           │
+   │    --provider azure|bitdeer|openai-compatible                               │
    └─────────────────────────────────────────────────────────────────────────────┘
 
 💡 KEY TAKEAWAYS:
@@ -292,8 +292,7 @@ public static class QualitySafetyMetrics
     {
         if (AIConfig.IsConfigured)
         {
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+            return AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         }
         
         // NOTE: We intentionally return null when credentials are not configured.

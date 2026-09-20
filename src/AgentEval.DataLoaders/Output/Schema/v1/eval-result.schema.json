@@ -61,7 +61,7 @@
       "required": ["type", "estimatedCost", "cacheHit"],
       "additionalProperties": false,
       "properties": {
-        "type":          { "enum": ["atomic-llm", "atomic-code", "composite", "skipped", "multi-judge-adjudicated"] },
+        "type":          { "enum": ["atomic-llm", "atomic-code", "atomic-decision", "composite", "skipped", "multi-judge-adjudicated"] },
         "judgeModel":    { "type": ["string", "null"] },
         "promptId":      { "type": ["string", "null"] },
         "promptHash":    { "type": ["string", "null"] },

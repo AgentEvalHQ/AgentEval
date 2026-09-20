@@ -53,9 +53,7 @@ public static class GatekeeperExplainabilityAndTrust
     {
         Section("1. GateProvenance — why did a real judge gate decide what it decided?");
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // The same CompositeJudgeGate<TRubric> every other Gatekeeper judge sample uses — nothing new to
         // construct, GateProvenance is populated automatically once a verdict fires.

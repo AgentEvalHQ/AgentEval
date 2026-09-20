@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 /// The key insight: a basic LLM agent with conversation history loses everything on session
 /// reset. An agent with separate long-term storage retains facts across sessions.
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
@@ -36,7 +36,7 @@ public static class MemoryCrossSession
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Cross-session evaluation uses an LLM judge — it cannot run in mock mode.\n");
             return;
         }
@@ -44,10 +44,7 @@ public static class MemoryCrossSession
         // Step 1: Create evaluator with real LLM judge
         Console.WriteLine("📝 Step 1: Creating cross-session evaluator with real LLM judge...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
         var evaluator = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);

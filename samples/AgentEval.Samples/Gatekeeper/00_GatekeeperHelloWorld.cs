@@ -21,7 +21,7 @@ namespace AgentEval.Samples;
 /// <c>ProbeEvaluatorGate</c>, so the poisoned <c>write_page</c> call is blocked before it executes. Three lines
 /// change: <c>.AsBuilder()</c>, <c>.UseAgentEvalToolGate(...)</c>, <c>.Build()</c>.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 1 minute
 /// </summary>
 public static class GatekeeperHelloWorld
@@ -40,9 +40,7 @@ public static class GatekeeperHelloWorld
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 /// - Interpreting benchmark results for agent improvement
 /// - Using the benchmark runner with all evaluators
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
@@ -36,18 +36,15 @@ public static class MemoryBenchmarkDemo
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory benchmarks use an LLM judge — they cannot run in mock mode.\n");
             return;
         }
 
-        // Step 1: Create the Azure OpenAI chat client and all evaluation components
-        Console.WriteLine("📝 Step 1: Creating Azure OpenAI client and evaluation components...\n");
+        // Step 1: Create the chat client (AIConfig.CreateChatClient) and all evaluation components
+        Console.WriteLine($"📝 Step 1: Creating the {AIConfig.ProviderName} client and evaluation components...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
         var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);

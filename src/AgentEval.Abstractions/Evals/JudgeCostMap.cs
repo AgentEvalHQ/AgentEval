@@ -55,6 +55,11 @@ public static class JudgeCostMap
         ["gpt-5"]                    = new(0.00500, 0.02000),
         ["gpt-5-chat"]               = new(0.00500, 0.02000),
         ["gpt-5-mini"]               = new(0.00030, 0.00120),
+        // TypeSafe Jev (decision model, ADR-033). OpenRouter's published list price for
+        // typesafe/jev-1.13 on 2026-09-20: $0.042 per 1M input tokens, output free. Used only when
+        // the provider does not report a cost itself — OpenRouter does (usage.cost), and that wins.
+        // Substring-matched, so "typesafe/jev-1.13-20260917" and "jev-latest" both resolve here.
+        ["jev"]                      = new(0.000042, 0.0),
         ["o1-preview"]               = new(0.01500, 0.06000),
         ["o1-mini"]                  = new(0.00300, 0.01200),
         ["o3-mini"]                  = new(0.00100, 0.00400),

@@ -36,7 +36,7 @@ public static class StreamingVsAsyncPerformance
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
         Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-        Console.WriteLine("🚀 Running with REAL Azure OpenAI...\n");
+        Console.WriteLine($"🚀 Running with REAL {AIConfig.ProviderName}...\n");
 
         // Create agent
         var agent = CreateAgent();
@@ -89,8 +89,7 @@ public static class StreamingVsAsyncPerformance
 
     private static AIAgent CreateAgent()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         return chatClient.AsAIAgent(
             name: "PerformanceTestAgent",
@@ -116,14 +115,14 @@ public static class StreamingVsAsyncPerformance
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE D5 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE D5 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample compares streaming vs non-streaming performance metrics.       │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

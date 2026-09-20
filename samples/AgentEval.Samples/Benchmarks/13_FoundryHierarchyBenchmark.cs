@@ -24,7 +24,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// The rendered report is a single benchmark hierarchy where <i>some of the leaves are Foundry evals</i>.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials and optionally an Azure AI Foundry project endpoint for the
+/// Requires a model provider (see AIConfig) and optionally an Azure AI Foundry project endpoint for the
 /// Foundry leaves. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
 /// <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c> (copy from the Foundry portal).
 /// Without it only the AgentEval sub-composite runs (weight=1.0). The Foundry leaves use Azure AD
@@ -46,8 +46,7 @@ public static class FoundryHierarchyBenchmarkSample
             return;
         }
 
-        var azure = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        IChatClient judgeChat = azure.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        IChatClient judgeChat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         var judge = new ChatClientEvaluator(judgeChat);
 
         // Foundry leaves come from AZURE_FOUNDRY_ENDPOINT (see AIConfig.FoundryEndpoint).

@@ -112,10 +112,7 @@ public static class HelloWorld
             return CreateMockAgent();
         }
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
         return chatClient.AsAIAgent(
@@ -129,7 +126,7 @@ public static class HelloWorld
 
     private static AIAgent CreateMockAgent()
     {
-        // For demo without Azure credentials - uses a fake response
+        // For demo without a model provider - uses a fake response
         var mockClient = new MockChatClient("Hello Alice! 👋 Nice to meet you!");
         return mockClient.AsAIAgent(
             name: "GreetingAgent (Mock)",
@@ -158,7 +155,7 @@ public static class HelloWorld
     }
 
     /// <summary>
-    /// Simple mock chat client for tutorial demos without Azure credentials.
+    /// Simple mock chat client for tutorial demos without a model provider.
     /// Private to Sample01 to avoid naming collisions.
     /// </summary>
     private class MockChatClient : IChatClient

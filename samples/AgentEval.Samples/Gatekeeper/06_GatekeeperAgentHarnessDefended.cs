@@ -27,7 +27,7 @@ namespace AgentEval.Samples;
 /// Gates: <c>RunBudgetGate</c> (cap the loop) · <c>SequenceGate</c> (read→POST = exfiltration) ·
 /// <c>DomainAllowListGate</c> (off-host egress). Compose a calibrated Tribunal judge on top — see sample 04.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperAgentHarnessDefended
@@ -43,9 +43,7 @@ public static class GatekeeperAgentHarnessDefended
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a REAL MAF HarnessAgent (AsHarnessAgent) behind a defense-in-depth gate stack.");
 
         await RunScenario(chatClient, "LEGIT — a normal lookup",

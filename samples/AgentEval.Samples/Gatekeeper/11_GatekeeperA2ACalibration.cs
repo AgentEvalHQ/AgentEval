@@ -8,7 +8,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Calibrates both inter-agent boundary judges against the configured Azure OpenAI deployment without contacting
+/// Calibrates both inter-agent boundary judges against the configured model without contacting
 /// an A2A endpoint. The calibration corpora are sent only after the caller explicitly opts in with
 /// <c>AGENTEVAL_A2A_I_UNDERSTAND_CALIBRATION_PAYLOADS=true</c>.
 /// </summary>
@@ -35,7 +35,7 @@ public static class GatekeeperA2ACalibration
         {
             Console.WriteLine(
                 $"   Set {CalibrationConsentVariable}=true to authorize sending the reviewed " +
-                "calibration corpora to the configured Azure OpenAI deployment.");
+                "calibration corpora to the configured model.");
             return;
         }
 
@@ -57,9 +57,7 @@ public static class GatekeeperA2ACalibration
     }
 
     internal static IChatClient CreateJudge() =>
-        new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
     internal static async Task<(CalibrationReport Inbound, CalibrationReport Outbound)> CalibrateAsync(
         IChatClient judge,

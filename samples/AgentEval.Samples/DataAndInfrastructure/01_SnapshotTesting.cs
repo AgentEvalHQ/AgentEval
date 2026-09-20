@@ -25,7 +25,7 @@ namespace AgentEval.Samples;
 /// - Snapshotting tool-call data for agentic regression detection
 /// - SnapshotStore management (save, load, list, count, delete)
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class SnapshotTesting
@@ -269,8 +269,7 @@ public static class SnapshotTesting
 
     private static AIAgent CreateAgent()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         return chatClient.AsAIAgent(
             name: "SnapshotAgent",
@@ -315,14 +314,14 @@ public static class SnapshotTesting
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE F1 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F1 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample captures real agent responses and compares them as snapshots.  │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

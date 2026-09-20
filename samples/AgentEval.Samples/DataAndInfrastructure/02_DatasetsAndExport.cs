@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 /// - Interactive HTML reports with charts and filtering
 /// - CI/CD integration patterns for all formats
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 8 minutes
 /// ⏱️ Time to run: ~1–2 minutes (depends on dataset size)
 /// </summary>
@@ -82,8 +82,7 @@ public static class DatasetsAndExport
     {
         Console.WriteLine("\n📝 Step 2: Running batch evaluation against real agent...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var testResults = new List<TestResultSummary>();
         var startTime = DateTimeOffset.UtcNow;
@@ -455,14 +454,14 @@ public static class DatasetsAndExport
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE F2 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F2 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample loads a real dataset and runs batch evaluations.               │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

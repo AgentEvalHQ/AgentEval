@@ -24,7 +24,7 @@ namespace AgentEval.Samples;
 ///   4. <b>The Tribunal</b>           — a real single-axis LLM judge (indirect-injection) is CALIBRATED against a
 ///      gold set (real accuracy / κ, no blanket claim) and only then allowed to block a live injection.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 3 minutes
 /// </summary>
 public static class GatekeeperBeachhead
@@ -40,9 +40,7 @@ public static class GatekeeperBeachhead
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();
