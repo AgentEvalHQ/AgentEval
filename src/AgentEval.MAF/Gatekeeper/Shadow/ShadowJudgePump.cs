@@ -58,8 +58,26 @@ public sealed class ShadowJudgePump : IAsyncDisposable
         Action<Exception>? onError = null,
         int queueCapacity = 128,
         TimeSpan? drainTimeout = null)
+        : this(judge, onVerdict, onError, queueCapacity, drainTimeout, static body => Task.Run(body))
+    {
+    }
+
+    /// <summary>
+    /// Test seam. <paramref name="consumerStarter"/> receives the consumer body and returns the task that
+    /// represents it; production always passes <see cref="Task.Run(Func{Task})"/>. It exists because no public
+    /// behaviour can make a <see cref="Task.Run(Func{Task})"/> consumer start AFTER <see cref="DisposeAsync"/>
+    /// deterministically, and that ordering once lost every queued item unreported.
+    /// </summary>
+    internal ShadowJudgePump(
+        IShadowJudge judge,
+        Action<ShadowVerdict, ShadowJudgeContext>? onVerdict,
+        Action<Exception>? onError,
+        int queueCapacity,
+        TimeSpan? drainTimeout,
+        Func<Func<Task>, Task> consumerStarter)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        ArgumentNullException.ThrowIfNull(consumerStarter);
         if (queueCapacity < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(queueCapacity), queueCapacity, "queueCapacity must be at least 1.");
@@ -79,7 +97,7 @@ public sealed class ShadowJudgePump : IAsyncDisposable
         // accepted before dispose lost, nothing reported. The token struct stays usable after its source is
         // disposed; the source's Token property does not.
         _token = _cts.Token;
-        _consumer = Task.Run(ConsumeAsync);
+        _consumer = consumerStarter(ConsumeAsync);
     }
 
     /// <summary>Enqueue a completed run for shadow judgement. Non-blocking; drops + reports if the queue is full.</summary>

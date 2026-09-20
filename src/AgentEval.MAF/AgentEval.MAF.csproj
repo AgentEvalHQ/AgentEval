@@ -6,7 +6,12 @@
     <RootNamespace>AgentEval</RootNamespace>
   </PropertyGroup>
 
-  <!-- Internal implementation details are exercised through public behavior; no InternalsVisibleTo is needed. -->
+  <!-- Internals are exercised through public behavior, with one exception: ShadowJudgePump's consumer-starter
+       seam. No public behavior can make a Task.Run consumer start AFTER DisposeAsync deterministically, and
+       that ordering once lost every queued item unreported (see ShadowJudgeTests). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Gatekeeper/Schema/*.json" />
