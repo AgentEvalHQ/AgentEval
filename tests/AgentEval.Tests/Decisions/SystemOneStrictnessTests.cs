@@ -33,6 +33,18 @@ public class SystemOneStrictnessTests
     }
 
     [Fact]
+    public void AnswerForAQuestionThatWasNotAsked_IsInvalidResponse()
+    {
+        // A reply carrying an extra id is a reply to some other request; strict pairing cuts both ways.
+        const string body = """{ "model": "m", "answers": { "q": { "type": "noul", "noul": 0.5 }, "other": { "type": "noul", "noul": 0.1 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, OneNoul, "h"));
+
+        Assert.Equal(DecisionFailureKind.InvalidResponse, ex.Kind);
+        Assert.Contains("'other'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ChoiceAnswer_WithAProbabilityForAnUnrequestedOption_IsInvalidResponse()
     {
         var asked = new Dictionary<string, DecisionQuestion>

@@ -157,6 +157,14 @@ internal static class SystemOneProtocol
             if (!root.TryGetProperty("answers", out var answersEl) || answersEl.ValueKind != JsonValueKind.Object)
                 throw Invalid($"{host} answered without an 'answers' object.");
 
+            // One answer per question asked, and nothing else: an answer for an id that was not asked
+            // is a reply to some other request, and accepting it would let a mismatched batch pass.
+            foreach (var extra in answersEl.EnumerateObject())
+            {
+                if (!asked.ContainsKey(extra.Name))
+                    throw Invalid($"{host} returned an answer for '{extra.Name}', which was not one of the questions asked.");
+            }
+
             var answers = new Dictionary<string, DecisionAnswer>(asked.Count, StringComparer.Ordinal);
             foreach (var (id, question) in asked)
             {
