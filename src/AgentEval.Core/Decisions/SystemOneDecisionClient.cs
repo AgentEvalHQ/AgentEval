@@ -132,7 +132,33 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
 
         using (response)
         {
-            var body = await ReadBoundedBodyAsync(response, host, cancellationToken).ConfigureAwait(false);
+            // Headers-first means the body arrives here, so a reset or timeout mid-body needs the
+            // same classification as one before the headers — never a raw transport exception.
+            string body;
+            try
+            {
+                body = await ReadBoundedBodyAsync(response, host, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                throw new DecisionClientException(
+                    DecisionFailureKind.ProviderUnavailable,
+                    $"The decision call to {host} timed out while the body was being read.",
+                    (int)response.StatusCode,
+                    ex);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException)
+            {
+                throw new DecisionClientException(
+                    DecisionFailureKind.ProviderUnavailable,
+                    $"The decision call to {host} failed while the body was being read: {Scrub(ex.Message)}",
+                    (int)response.StatusCode,
+                    ex);
+            }
 
             // A provider that echoes the request (some 4xx bodies quote the headers) would otherwise
             // put the bearer into our own exception message. Only error bodies are excerpted, so only

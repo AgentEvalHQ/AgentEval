@@ -92,6 +92,34 @@ public class SystemOneStrictnessTests
         Assert.Contains("refuses anything over", ex.Message, StringComparison.Ordinal);
     }
 
+    private sealed class BodyThatFailsMidRead(string message) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) =>
+            throw new IOException(message);
+        protected override bool TryComputeLength(out long length) { length = -1; return false; }
+    }
+
+    private sealed class HeadersThenBrokenBodyHandler(string message) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new BodyThatFailsMidRead(message) });
+    }
+
+    [Fact]
+    public async Task ConnectionFailure_WhileReadingTheBody_IsATypedTransientFailure_WithTheKeyScrubbed()
+    {
+        const string key = "sk-live-DO-NOT-LEAK-55aa";
+        var client = new SystemOneDecisionClient(
+            SystemOneClientOptions.ForTypeSafe(key),
+            new HttpClient(new HeadersThenBrokenBodyHandler($"reset by peer while sending Bearer {key}")));
+
+        var ex = await Assert.ThrowsAsync<DecisionClientException>(() => client.DecideAsync(new DecisionRequest("state", OneNoul)));
+
+        Assert.Equal(DecisionFailureKind.ProviderUnavailable, ex.Kind);
+        Assert.True(ex.IsTransient);
+        Assert.DoesNotContain(key, ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ThrowingHandler(string message) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

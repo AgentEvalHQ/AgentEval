@@ -185,8 +185,18 @@ internal static class ProviderConfig
 
             var response = await base.SendAsync(request, cancellationToken);
 
-            // ReadAsStringAsync buffers the content, so the client's own read afterwards still works.
-            var reply = await response.Content.ReadAsStringAsync(cancellationToken);
+            // Buffer with the SAME cap the client enforces, so a debugging aid cannot be the way an
+            // oversized body gets into memory; the buffered content stays readable for the client.
+            string reply;
+            try
+            {
+                await response.Content.LoadIntoBufferAsync(SystemOneDecisionClient.MaxResponseBytes, cancellationToken);
+                reply = await response.Content.ReadAsStringAsync(cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                reply = $"[body larger than {SystemOneDecisionClient.MaxResponseBytes:N0} bytes — not shown; the client will refuse it]";
+            }
             Console.WriteLine($"   ├─ RAW ← HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
             Console.WriteLine($"   │ {Scrub(reply)}");
             Console.WriteLine("   └─");
