@@ -31,6 +31,7 @@ public sealed class ShadowJudgePump : IAsyncDisposable
     private readonly Action<Exception>? _onError;
     private readonly Channel<ShadowJudgeContext> _channel;
     private readonly CancellationTokenSource _cts = new();
+    private readonly CancellationToken _token;   // captured in the constructor; the consumer never touches _cts
     private readonly Task _consumer;
     private readonly TimeSpan _drainTimeout;
     private volatile bool _completed;   // writer completed (drained/disposed) — distinguishes "full" from "closed"
@@ -72,6 +73,12 @@ public sealed class ShadowJudgePump : IAsyncDisposable
         {
             SingleReader = true,   // one consumer; TryWrite returns false (does not block) when full
         });
+        // Captured HERE, before the consumer is started — never inside the consumer. DisposeAsync disposes _cts
+        // after a bounded drain, and a consumer whose Task.Run had not been scheduled by then (a starved pool)
+        // would otherwise throw ObjectDisposedException at its first line, outside the loop's catch: every item
+        // accepted before dispose lost, nothing reported. The token struct stays usable after its source is
+        // disposed; the source's Token property does not.
+        _token = _cts.Token;
         _consumer = Task.Run(ConsumeAsync);
     }
 
@@ -100,15 +107,14 @@ public sealed class ShadowJudgePump : IAsyncDisposable
 
     private async Task ConsumeAsync()
     {
-        // Capture the token ONCE. The CancellationToken struct stays usable even after the source is disposed,
-        // so if a drain abandons a hung judge and DisposeAsync disposes _cts, later items still judge cleanly
-        // (re-reading _cts.Token per item would throw ObjectDisposedException on the disposed source).
-        var token = _cts.Token;
+        // _token was captured in the constructor; this method must not read _cts at all. A drain that abandons a
+        // hung judge disposes _cts, and a consumer that starts late or resumes late still judges (or reports)
+        // every accepted item — see ShadowJudge_ConsumerThatStartsAfterDispose_StillJudgesQueuedItems.
         await foreach (var context in _channel.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             try
             {
-                var verdict = await _judge.JudgeAsync(context, token).ConfigureAwait(false);
+                var verdict = await _judge.JudgeAsync(context, _token).ConfigureAwait(false);
                 if (verdict.Compromised)
                 {
                     ArmQuarantine(context, verdict.Reason);

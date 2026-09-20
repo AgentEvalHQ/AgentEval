@@ -216,7 +216,64 @@ public class ShadowJudgeTests
         }
     }
 
+    [Fact]
+    public async Task ShadowJudge_ConsumerThatStartsAfterDispose_StillJudgesQueuedItems()
+    {
+        // The consumer is a Task.Run queued by the constructor. On a starved pool it can START after DisposeAsync
+        // has drained, given up and disposed _cts. It used to read _cts.Token as its first line and die there with
+        // an ObjectDisposedException nothing observed: every item accepted before dispose lost, nothing reported
+        // (the Windows net8 leg of CI run 35543200904 hit exactly this and looked like a flake).
+        //
+        // The ordering is FORCED, not hoped for: blockers queued before the pump take every pool thread that frees
+        // up and FIFO puts the consumer behind them; a 1-tick drain rounds to 0 ms, so Task.WaitAsync times out
+        // synchronously and DisposeAsync completes on this thread with no pool thread involved. Only then is the
+        // pool released. The precondition is asserted below rather than assumed.
+        using var hold = new ManualResetEventSlim(false);
+        var blockers = new List<Task>();
+        for (var i = 0; i < ThreadPool.ThreadCount + Environment.ProcessorCount * 2; i++)
+        {
+            blockers.Add(Task.Run(() => hold.Wait()));
+        }
+
+        var judged = 0;
+        var errors = new List<Exception>();
+        var bothJudged = new TaskCompletionSource();
+        var pump = new ShadowJudgePump(
+            new CountingJudge(() => { if (Interlocked.Increment(ref judged) == 2) bothJudged.TrySetResult(); }),
+            onError: ex => { lock (errors) { errors.Add(ex); } },
+            drainTimeout: TimeSpan.FromTicks(1));
+        pump.Enqueue(new ShadowJudgeContext("r1", InputText: null, AgentName: null, Session: null));
+        pump.Enqueue(new ShadowJudgeContext("r2", InputText: null, AgentName: null, Session: null));
+        Assert.Equal(2, pump.AcceptedCount);
+
+        await pump.DisposeAsync();                    // drains 0 ms, cancels, gives up, disposes _cts — synchronously
+        var judgedAtDispose = Volatile.Read(ref judged);
+        hold.Set();                                   // NOW the consumer may start, after _cts is gone
+        await Task.WhenAll(blockers);
+
+        Assert.Equal(0, judgedAtDispose);             // precondition: the consumer had not run before dispose
+
+        var done = await Task.WhenAny(bothJudged.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(ReferenceEquals(bothJudged.Task, done),
+            $"the late-starting consumer judged {Volatile.Read(ref judged)} of 2 accepted items within 10 s; errors reported: {errors.Count}");
+        lock (errors)
+        {
+            Assert.DoesNotContain(errors, e => e is ObjectDisposedException);
+        }
+    }
     // ── test doubles ──
+
+    private sealed class CountingJudge : IShadowJudge
+    {
+        private readonly Action _onJudged;
+        public CountingJudge(Action onJudged) => _onJudged = onJudged;
+
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            _onJudged();
+            return Task.FromResult(ShadowVerdict.Clean());
+        }
+    }
 
     private sealed class KeywordShadowJudge : IShadowJudge
     {
