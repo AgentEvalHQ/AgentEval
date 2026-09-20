@@ -77,6 +77,27 @@ public class SystemOneStrictnessTests
         Assert.Contains(endpoint, ex.Message, StringComparison.Ordinal);
     }
 
+    private sealed class ThrowingHandler(string message) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException(message);
+    }
+
+    [Fact]
+    public async Task HandlerException_ThatEchoesTheKey_IsScrubbedFromTheClientMessage()
+    {
+        const string key = "sk-live-DO-NOT-LEAK-91b3";
+        var client = new SystemOneDecisionClient(
+            SystemOneClientOptions.ForTypeSafe(key),
+            new HttpClient(new ThrowingHandler($"proxy rejected Authorization: Bearer {key}")));
+
+        var ex = await Assert.ThrowsAsync<DecisionClientException>(() => client.DecideAsync(new DecisionRequest("state", OneNoul)));
+
+        Assert.Equal(DecisionFailureKind.Unknown, ex.Kind);
+        Assert.DoesNotContain(key, ex.Message, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class HugeUsageClient : IDecisionClient
     {
         public Task<DecisionResponse> DecideAsync(DecisionRequest request, CancellationToken cancellationToken = default) =>

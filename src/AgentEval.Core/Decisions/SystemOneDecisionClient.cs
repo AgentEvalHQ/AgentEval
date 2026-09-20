@@ -119,9 +119,12 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
         }
         catch (HttpRequestException ex)
         {
+            // The message comes from the handler pipeline, which a caller may have customised; scrub
+            // it before it becomes ours. The inner exception is kept for diagnostics — it is the
+            // handler's own text, not a message this class formats or promises anything about.
             throw new DecisionClientException(
                 DecisionFailureKind.Unknown,
-                $"The decision call to {host} failed before a response: {ex.Message}",
+                $"The decision call to {host} failed before a response: {Scrub(ex.Message)}",
                 innerException: ex);
         }
 
@@ -135,7 +138,7 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
             // string that also occurs inside field names (a "k" key turns "input_tokens" into
             // "input_to[redacted]ens"). A success body is parsed verbatim and never quoted.
             if (!response.IsSuccessStatusCode)
-                throw SystemOneProtocol.ClassifyFailure((int)response.StatusCode, body.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal), host);
+                throw SystemOneProtocol.ClassifyFailure((int)response.StatusCode, Scrub(body), host);
 
             try
             {
@@ -145,14 +148,12 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
             {
                 // A malformed 2xx body is excerpted into the exception. If a provider echoed the
                 // bearer into that body, the excerpt is the one place it could surface; scrub it.
-                throw new DecisionClientException(
-                    ex.Kind,
-                    ex.Message.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal),
-                    ex.StatusCode,
-                    ex.InnerException);
+                throw new DecisionClientException(ex.Kind, Scrub(ex.Message), ex.StatusCode, ex.InnerException);
             }
         }
     }
+
+    private string Scrub(string text) => text.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal);
 
     /// <inheritdoc/>
     public void Dispose()
