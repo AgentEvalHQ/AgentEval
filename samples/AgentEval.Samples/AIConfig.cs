@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.ClientModel;
+using AgentEval.Providers;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -9,129 +10,64 @@ using OpenAI;
 
 namespace AgentEval.Samples;
 
-/// <summary>Which chat provider the samples talk to. Resolved once per process from the environment.</summary>
-public enum SampleProvider
-{
-    /// <summary>No provider has credentials; samples that need a model print a warning and stop.</summary>
-    None,
-
-    /// <summary>Azure OpenAI — <c>AZURE_OPENAI_ENDPOINT</c> + <c>AZURE_OPENAI_API_KEY</c> + <c>AZURE_OPENAI_DEPLOYMENT</c>.</summary>
-    AzureOpenAI,
-
-    /// <summary>Bitdeer AI Model Studio — <c>BITDEER_API_KEY</c>; endpoint and model have defaults.</summary>
-    Bitdeer,
-
-    /// <summary>Any OpenAI-compatible endpoint — <c>OPENAI_COMPATIBLE_ENDPOINT</c> + <c>OPENAI_COMPATIBLE_API_KEY</c> + <c>OPENAI_COMPATIBLE_MODEL</c>.</summary>
-    OpenAICompatible,
-}
-
 /// <summary>
 /// Provider configuration for the samples. Every sample obtains its model through
-/// <see cref="CreateChatClient"/>, so switching the whole catalogue from Azure OpenAI to Bitdeer or
-/// to any OpenAI-compatible endpoint is a matter of environment variables — no sample knows which
-/// provider it is running on.
-///
-/// Selection order when several providers have credentials: <c>AGENTEVAL_SAMPLES_PROVIDER</c>
-/// (or <c>--provider &lt;name&gt;</c> on the command line) wins; otherwise Azure OpenAI, then Bitdeer,
-/// then the generic endpoint.
+/// <see cref="CreateChatClient"/>, so the whole catalogue runs on whichever host
+/// <c>AI_INFERENCE_PROVIDER</c> selects — no sample knows which provider it is on.
 ///
 /// <code>
-/// # Azure OpenAI (the historical default)
-/// $env:AZURE_OPENAI_ENDPOINT   = "https://your-resource.openai.azure.com/"
-/// $env:AZURE_OPENAI_API_KEY    = "..."
-/// $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
+/// AI_INFERENCE_PROVIDER = bitdeer | openai | foundry | azure | openai-compatible
 ///
-/// # Bitdeer — one variable is enough
-/// $env:BITDEER_API_KEY = "..."                       # BITDEER_MODEL defaults to zai-org/GLM-5.3-Flash
-/// dotnet run -- 1 --provider bitdeer                  # or $env:AGENTEVAL_SAMPLES_PROVIDER = "bitdeer"
-///
-/// # Anything OpenAI-compatible (Ollama, Groq, vLLM, Together, LM Studio, ...)
-/// $env:OPENAI_COMPATIBLE_ENDPOINT = "http://localhost:11434/v1"
-/// $env:OPENAI_COMPATIBLE_API_KEY  = "no-key-needed"
-/// $env:OPENAI_COMPATIBLE_MODEL    = "llama3.1"
+/// bitdeer             BITDEER_API_KEY                     (BITDEER_ENDPOINT, BITDEER_MODEL default to Bitdeer's GLM-5.3 Flash)
+/// openai              OPENAI_API_KEY                      (OPENAI_BASE_URL, OPENAI_MODEL default to api.openai.com, gpt-4o-mini)
+/// foundry             FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL   (a Foundry resource's Azure OpenAI-compatible endpoint)
+/// azure               AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT
+/// openai-compatible   OPENAI_COMPATIBLE_ENDPOINT + OPENAI_COMPATIBLE_API_KEY + OPENAI_COMPATIBLE_MODEL   (Ollama, Groq, vLLM, ...)
 /// </code>
 ///
-/// Azure-only features stay Azure-only and say so: embeddings (<see cref="IsEmbeddingConfigured"/>)
-/// and Azure AI Foundry (<see cref="IsFoundryConfigured"/>).
+/// When the selector is unset, the first provider with credentials wins (Azure, Bitdeer, OpenAI,
+/// Foundry, generic). When it names a provider whose variables are missing, nothing is selected
+/// and the banner says why — it never silently spends on a host you did not choose.
+/// <c>--provider &lt;name&gt;</c> on the command line sets the selector for one run.
+///
+/// The resolution itself lives in Core (<see cref="InferenceProviderEnvironment"/>) so the CLI and
+/// any host read the same variable the same way. Two surfaces stay Azure-only and say so:
+/// embeddings (<see cref="IsEmbeddingConfigured"/>) and the hosted-agent Foundry path
+/// (<see cref="IsFoundryConfigured"/>, Entra login), which is not a chat provider.
 /// </summary>
 /// <remarks>
-/// The Azure path uses <c>AzureKeyCredential</c> (API key) for simplicity. For production, use
+/// The Azure-protocol paths use an API key for simplicity. For production, use
 /// <c>ManagedIdentityCredential</c> or another specific <c>TokenCredential</c>. See MAF best practice #2.
 /// </remarks>
 public static class AIConfig
 {
-    public const string BitdeerDefaultEndpoint = "https://api-inference.bitdeer.ai/v1";
-    public const string BitdeerDefaultModel = "zai-org/GLM-5.3-Flash";
+    public const string BitdeerDefaultEndpoint = InferenceProviderEnvironment.BitdeerDefaultEndpoint;
+    public const string BitdeerDefaultModel = InferenceProviderEnvironment.BitdeerDefaultModel;
 
-    private static readonly Lazy<SampleProvider> s_provider = new(Resolve, isThreadSafe: true);
+    private static readonly Lazy<InferenceProviderSettings> s_settings = new(InferenceProviderEnvironment.Resolve, isThreadSafe: true);
 
-    // ── Provider selection ────────────────────────────────────────────────────
+    // ── Selection ─────────────────────────────────────────────────────────────
+
+    /// <summary>The resolved settings for this process.</summary>
+    public static InferenceProviderSettings Settings => s_settings.Value;
 
     /// <summary>The provider in use for this process.</summary>
-    public static SampleProvider Provider => s_provider.Value;
+    public static InferenceProvider Provider => Settings.Provider;
 
-    /// <summary>True when some provider has credentials. Samples that need a model check this first.</summary>
-    public static bool IsConfigured => Provider != SampleProvider.None;
+    /// <summary>True when some provider is selected and credentialed. Samples that need a model check this first.</summary>
+    public static bool IsConfigured => Settings.IsConfigured;
 
     /// <summary>A human-readable provider name for banners.</summary>
-    public static string ProviderName => Provider switch
-    {
-        SampleProvider.AzureOpenAI => "Azure OpenAI",
-        SampleProvider.Bitdeer => "Bitdeer AI Model Studio",
-        SampleProvider.OpenAICompatible => "OpenAI-compatible endpoint",
-        _ => "no provider configured",
-    };
+    public static string ProviderName => Settings.DisplayName;
 
     /// <summary>A short tag for agent identities (<c>model@provider</c>), because the host is part of what was measured.</summary>
-    public static string ProviderTag => Provider switch
-    {
-        SampleProvider.AzureOpenAI => "azure",
-        SampleProvider.Bitdeer => "bitdeer",
-        SampleProvider.OpenAICompatible => "openai-compatible",
-        _ => "none",
-    };
+    public static string ProviderTag => Settings.ProviderTag;
 
-    /// <summary>True when the Azure OpenAI trio is set, whatever provider is selected.</summary>
-    public static bool IsAzureConfigured =>
-        Env("AZURE_OPENAI_ENDPOINT") is not null && Env("AZURE_OPENAI_API_KEY") is not null && Env("AZURE_OPENAI_DEPLOYMENT") is not null;
+    /// <summary>True when the Azure OpenAI trio is set, whatever provider is selected (the Azure-only surfaces need it).</summary>
+    public static bool IsAzureConfigured => InferenceProviderEnvironment.HasCredentials(InferenceProvider.AzureOpenAI, Environment.GetEnvironmentVariable);
 
-    /// <summary>True when <c>BITDEER_API_KEY</c> is set.</summary>
-    public static bool IsBitdeerConfigured => Env("BITDEER_API_KEY") is not null;
-
-    /// <summary>True when the generic OpenAI-compatible trio is set.</summary>
-    public static bool IsOpenAICompatibleConfigured =>
-        Env("OPENAI_COMPATIBLE_ENDPOINT") is not null && Env("OPENAI_COMPATIBLE_API_KEY") is not null && Env("OPENAI_COMPATIBLE_MODEL") is not null;
-
-    private static SampleProvider Resolve()
-    {
-        var forced = Env("AGENTEVAL_SAMPLES_PROVIDER")?.ToLowerInvariant();
-        switch (forced)
-        {
-            case "azure":
-            case "azure-openai":
-            case "azureopenai":
-                return IsAzureConfigured ? SampleProvider.AzureOpenAI : SampleProvider.None;
-            case "bitdeer":
-                return IsBitdeerConfigured ? SampleProvider.Bitdeer : SampleProvider.None;
-            case "openai-compatible":
-            case "openai":
-            case "compatible":
-                return IsOpenAICompatibleConfigured ? SampleProvider.OpenAICompatible : SampleProvider.None;
-            case null:
-            case "":
-                break;
-            default:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"   ⚠️  AGENTEVAL_SAMPLES_PROVIDER='{forced}' is not one of azure | bitdeer | openai-compatible — falling back to auto-detection.");
-                Console.ResetColor();
-                break;
-        }
-
-        if (IsAzureConfigured) return SampleProvider.AzureOpenAI;
-        if (IsBitdeerConfigured) return SampleProvider.Bitdeer;
-        if (IsOpenAICompatibleConfigured) return SampleProvider.OpenAICompatible;
-        return SampleProvider.None;
-    }
+    /// <summary>True when <c>BITDEER_API_KEY</c> is set, whatever provider is selected.</summary>
+    public static bool IsBitdeerConfigured => InferenceProviderEnvironment.HasCredentials(InferenceProvider.Bitdeer, Environment.GetEnvironmentVariable);
 
     // ── The one factory every sample uses ─────────────────────────────────────
 
@@ -142,81 +78,48 @@ public static class AIConfig
     /// </summary>
     public static IChatClient CreateChatClient(string? model = null)
     {
-        var resolved = model ?? ModelDeployment;
-        switch (Provider)
+        var s = Settings;
+        if (!s.IsConfigured)
+            throw new InvalidOperationException(s.Diagnostic ?? "No chat provider is configured.");
+
+        var resolved = model ?? s.Model!;
+        if (s.UsesAzureProtocol)
         {
-            case SampleProvider.AzureOpenAI:
-                return CreateAzureOpenAIClient().GetChatClient(resolved).AsIChatClient();
-
-            case SampleProvider.Bitdeer:
-            case SampleProvider.OpenAICompatible:
-                // The same construction the CLI's EndpointFactory.CreateOpenAICompatible uses for
-                // --endpoint --model --api-key: an OpenAI client pointed at a different base URL.
-                return new OpenAIClient(new ApiKeyCredential(ApiKey), new OpenAIClientOptions { Endpoint = Endpoint })
-                    .GetChatClient(resolved)
-                    .AsIChatClient();
-
-            default:
-                throw new InvalidOperationException(
-                    "No chat provider is configured. Set AZURE_OPENAI_ENDPOINT/API_KEY/DEPLOYMENT, or BITDEER_API_KEY, or OPENAI_COMPATIBLE_ENDPOINT/API_KEY/MODEL.");
+            // Azure OpenAI and a Foundry resource's OpenAI-compatible endpoint speak the same protocol.
+            return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!))
+                .GetChatClient(resolved)
+                .AsIChatClient();
         }
+
+        // Bitdeer, OpenAI and any OpenAI-compatible host: the same construction the CLI's
+        // EndpointFactory.CreateOpenAICompatible uses for --endpoint --model --api-key.
+        return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint })
+            .GetChatClient(resolved)
+            .AsIChatClient();
     }
 
     /// <summary>
-    /// The raw Azure client, for the Azure-only surfaces (embeddings, Foundry). Throws unless the
-    /// Azure trio is set — it does not care which provider is selected for chat.
+    /// The raw Azure OpenAI client, for the Azure-only surfaces (embeddings). Reads the
+    /// <c>AZURE_OPENAI_*</c> trio directly, whichever provider is selected for chat.
     /// </summary>
     public static AzureOpenAIClient CreateAzureOpenAIClient() => new(AzureEndpoint, AzureKeyCredential);
 
-    // ── Endpoint / key / model for the selected provider ─────────────────────
+    // ── Endpoint / model for the selected provider ────────────────────────────
 
-    /// <summary>The selected provider's endpoint (base URL for OpenAI-compatible hosts, resource URL for Azure).</summary>
-    public static Uri Endpoint => Provider switch
-    {
-        SampleProvider.AzureOpenAI => AzureEndpoint,
-        SampleProvider.Bitdeer => new Uri(Env("BITDEER_ENDPOINT") ?? BitdeerDefaultEndpoint),
-        SampleProvider.OpenAICompatible => new Uri(Env("OPENAI_COMPATIBLE_ENDPOINT")!),
-        _ => throw new InvalidOperationException("No chat provider is configured."),
-    };
+    /// <summary>The selected provider's endpoint.</summary>
+    public static Uri Endpoint => Settings.Endpoint ?? throw new InvalidOperationException(Settings.Diagnostic ?? "No chat provider is configured.");
 
-    private static string ApiKey => Provider switch
-    {
-        SampleProvider.AzureOpenAI => Env("AZURE_OPENAI_API_KEY")!,
-        SampleProvider.Bitdeer => Env("BITDEER_API_KEY")!,
-        SampleProvider.OpenAICompatible => Env("OPENAI_COMPATIBLE_API_KEY")!,
-        _ => throw new InvalidOperationException("No chat provider is configured."),
-    };
+    /// <summary>Primary model or deployment name for the selected provider.</summary>
+    public static string ModelDeployment => Settings.Model ?? throw new InvalidOperationException(Settings.Diagnostic ?? "No chat provider is configured.");
 
-    /// <summary>Primary model: the Azure deployment, the Bitdeer model (default GLM-5.3 Flash), or the generic model.</summary>
-    public static string ModelDeployment => Provider switch
-    {
-        SampleProvider.Bitdeer => Env("BITDEER_MODEL") ?? BitdeerDefaultModel,
-        SampleProvider.OpenAICompatible => Env("OPENAI_COMPATIBLE_MODEL") ?? throw new InvalidOperationException("OPENAI_COMPATIBLE_MODEL not configured"),
-        _ => Env("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o",
-    };
+    /// <summary>Secondary model for comparison samples (<c>*_MODEL_2</c> / <c>AZURE_OPENAI_DEPLOYMENT_2</c>); defaults to the primary except on Azure.</summary>
+    public static string SecondaryModelDeployment => Settings.SecondaryModel ?? ModelDeployment;
 
-    /// <summary>
-    /// Secondary model for comparison samples. Azure: <c>AZURE_OPENAI_DEPLOYMENT_2</c> (default gpt-4o-mini).
-    /// Other providers: <c>BITDEER_MODEL_2</c> / <c>OPENAI_COMPATIBLE_MODEL_2</c>, defaulting to the primary
-    /// model — a comparison of a model with itself, which those samples print plainly.
-    /// </summary>
-    public static string SecondaryModelDeployment => Provider switch
-    {
-        SampleProvider.Bitdeer => Env("BITDEER_MODEL_2") ?? ModelDeployment,
-        SampleProvider.OpenAICompatible => Env("OPENAI_COMPATIBLE_MODEL_2") ?? ModelDeployment,
-        _ => Env("AZURE_OPENAI_DEPLOYMENT_2") ?? "gpt-4o-mini",
-    };
-
-    /// <summary>Tertiary model for comparison samples; same convention as <see cref="SecondaryModelDeployment"/> (Azure default gpt-4.1).</summary>
-    public static string TertiaryModelDeployment => Provider switch
-    {
-        SampleProvider.Bitdeer => Env("BITDEER_MODEL_3") ?? ModelDeployment,
-        SampleProvider.OpenAICompatible => Env("OPENAI_COMPATIBLE_MODEL_3") ?? ModelDeployment,
-        _ => Env("AZURE_OPENAI_DEPLOYMENT_3") ?? "gpt-4.1",
-    };
+    /// <summary>Tertiary model for comparison samples (<c>*_MODEL_3</c> / <c>AZURE_OPENAI_DEPLOYMENT_3</c>); defaults to the primary except on Azure.</summary>
+    public static string TertiaryModelDeployment => Settings.TertiaryModel ?? ModelDeployment;
 
     /// <summary>The primary model with the provider in the name, for agent identities and provenance.</summary>
-    public static string ModelIdentity => $"{ModelDeployment}@{ProviderTag}";
+    public static string ModelIdentity => Settings.ModelIdentity;
 
     // ── Azure-only surfaces ───────────────────────────────────────────────────
 
@@ -228,7 +131,7 @@ public static class AIConfig
     public static AzureKeyCredential AzureKeyCredential =>
         new(Env("AZURE_OPENAI_API_KEY") ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY not configured"));
 
-    /// <summary>Kept for the Azure-only call sites (embeddings, Foundry). Same as <see cref="AzureKeyCredential"/>.</summary>
+    /// <summary>Kept for the Azure-only call sites. Same as <see cref="AzureKeyCredential"/>.</summary>
     public static AzureKeyCredential KeyCredential => AzureKeyCredential;
 
     /// <summary>Embedding model deployment (Azure only). Reads <c>AZURE_OPENAI_EMBEDDING_DEPLOYMENT</c>, default text-embedding-ada-002.</summary>
@@ -240,42 +143,43 @@ public static class AIConfig
         IsAzureConfigured && Env("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") is not null;
 
     /// <summary>
-    /// Azure AI Foundry project endpoint. Reads from <c>AZURE_FOUNDRY_ENDPOINT</c>.
-    /// Format: <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c>
-    /// (copy from Azure AI Foundry portal → your project → Settings → Endpoint).
-    /// Authentication uses Azure AD (<c>DefaultAzureCredential</c>); the API key cannot
-    /// authenticate <c>AIProjectClient</c>.
+    /// Azure AI Foundry PROJECT endpoint for the hosted-agent samples (H11, H12). Reads
+    /// <c>AZURE_FOUNDRY_ENDPOINT</c>. Format: <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c>.
+    /// Authenticates with Entra (<c>DefaultAzureCredential</c>; run <c>az login</c>). This is not the
+    /// <c>foundry</c> CHAT provider, which is <c>FOUNDRY_ENDPOINT</c> + <c>FOUNDRY_API_KEY</c> + <c>FOUNDRY_MODEL</c>.
     /// </summary>
     public static Uri? FoundryEndpoint =>
         Env("AZURE_FOUNDRY_ENDPOINT") is { } v && Uri.TryCreate(v, UriKind.Absolute, out var uri) ? uri : null;
 
-    /// <summary>True when the Azure trio and <c>AZURE_FOUNDRY_ENDPOINT</c> are set.</summary>
-    public static bool IsFoundryConfigured => IsAzureConfigured && FoundryEndpoint is not null;
+    /// <summary>True when a chat provider is configured and <c>AZURE_FOUNDRY_ENDPOINT</c> is set (H11/H12 need a judge too).</summary>
+    public static bool IsFoundryConfigured => IsConfigured && FoundryEndpoint is not null;
 
     // ── Banners ──────────────────────────────────────────────────────────────
 
-    /// <summary>One line for sample banners: provider, model, endpoint.</summary>
-    public static string Describe() =>
-        IsConfigured ? $"{ProviderName} · {ModelDeployment} · {Endpoint}" : ProviderName;
+    /// <summary>One line for sample banners: provider, model, endpoint, and how it was chosen.</summary>
+    public static string Describe() => IsConfigured
+        ? $"{ProviderName} · {ModelDeployment} · {Endpoint} ({(Settings.Selection == InferenceProviderSelection.Explicit ? "AI_INFERENCE_PROVIDER" : "auto-detected")})"
+        : ProviderName;
 
     public static void PrintMissingCredentialsWarning()
     {
-        var forced = Env("AGENTEVAL_SAMPLES_PROVIDER");
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  ⚠️  No chat provider configured                                     ║");
-        if (forced is not null)
-            Console.WriteLine($"║     (AGENTEVAL_SAMPLES_PROVIDER = {forced,-8} has no credentials)          ║");
-        Console.WriteLine("║                                                                      ║");
-        Console.WriteLine("║  Set ONE of these:                                                   ║");
-        Console.WriteLine("║   Azure OpenAI   AZURE_OPENAI_ENDPOINT + _API_KEY + _DEPLOYMENT       ║");
-        Console.WriteLine("║   Bitdeer        BITDEER_API_KEY   (model defaults to GLM-5.3 Flash)  ║");
-        Console.WriteLine("║   Any OpenAI-    OPENAI_COMPATIBLE_ENDPOINT + _API_KEY + _MODEL        ║");
-        Console.WriteLine("║   compatible                                                         ║");
-        Console.WriteLine("║                                                                      ║");
-        Console.WriteLine("║  Pick one explicitly with --provider azure|bitdeer|openai-compatible ║");
-        Console.WriteLine("║  Samples that need a model run in MOCK MODE or stop without one.     ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║  ⚠️  No chat provider configured                                             ║");
+        Console.WriteLine("║                                                                              ║");
+        Console.WriteLine("║  AI_INFERENCE_PROVIDER = bitdeer | openai | foundry | azure | openai-compatible ║");
+        Console.WriteLine("║                                                                              ║");
+        Console.WriteLine("║   bitdeer            BITDEER_API_KEY                                          ║");
+        Console.WriteLine("║   openai             OPENAI_API_KEY                                           ║");
+        Console.WriteLine("║   foundry            FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL       ║");
+        Console.WriteLine("║   azure              AZURE_OPENAI_ENDPOINT + _API_KEY + _DEPLOYMENT           ║");
+        Console.WriteLine("║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _API_KEY + _MODEL           ║");
+        Console.WriteLine("║                                                                              ║");
+        Console.WriteLine("║  or pass --provider <name> for one run.                                       ║");
+        Console.WriteLine("║  Samples that need a model run in MOCK MODE or stop without one.              ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        if (Settings.Diagnostic is { } why)
+            Console.WriteLine($"   ↳ {why}");
         Console.ResetColor();
         Console.WriteLine();
     }

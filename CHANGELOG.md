@@ -43,13 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed
 - `samples/AgentEval.Samples` no longer assumes Azure OpenAI. Every sample obtains its model from
-  `AIConfig.CreateChatClient(model?)`, which serves Azure OpenAI, Bitdeer AI Model Studio
-  (`BITDEER_API_KEY`; model defaults to `zai-org/GLM-5.3-Flash`) or any OpenAI-compatible endpoint
-  (`OPENAI_COMPATIBLE_ENDPOINT/_API_KEY/_MODEL`), chosen by `--provider` /
-  `AGENTEVAL_SAMPLES_PROVIDER` or auto-detected (Azure, then Bitdeer, then generic). 66 sample files
-  changed mechanically; no sample knows which provider it runs on. Embeddings (B1) and Azure AI
-  Foundry (H11/H12) remain Azure-only and say so. `AIConfig.Endpoint`/`ModelDeployment` now describe
-  the selected provider; the Azure-specific members are `AzureEndpoint`/`AzureKeyCredential`.
+  `AIConfig.CreateChatClient(model?)`; the host is chosen by **`AI_INFERENCE_PROVIDER`** =
+  `bitdeer` (`BITDEER_API_KEY`; model defaults to `zai-org/GLM-5.3-Flash`) | `openai`
+  (`OPENAI_API_KEY`; `gpt-4o-mini`) | `foundry` (`FOUNDRY_ENDPOINT/_API_KEY/_MODEL`, a Foundry
+  resource's Azure OpenAI-compatible endpoint) | `azure` (`AZURE_OPENAI_*`) | `openai-compatible`
+  (`OPENAI_COMPATIBLE_*`), or `--provider <name>` for one run. Keys for several providers may be set
+  at once; the selector decides. An explicit provider with missing variables, or an unknown name,
+  selects nothing and says why — no silent fallback to a host you did not choose. 66 sample files
+  changed mechanically; no sample knows which provider it runs on. Embeddings (B1) and the
+  hosted-agent Foundry path (H11/H12, `AZURE_FOUNDRY_ENDPOINT` + Entra) remain Azure-only and say so.
+- `AgentEval.Providers.InferenceProviderEnvironment` (Core, no SDK dependency) — the resolver behind
+  that variable (`Resolve()` → `InferenceProviderSettings` with provider, endpoint, key, models,
+  how it was selected, and a diagnostic when nothing is), so the CLI and any host can read the same
+  variable the same way. The CLI does not read it yet; its `bench` commands still expect
+  `AZURE_OPENAI_*` — follow-up.
 
 #### Not done, on purpose
 - No Jev→LLM cascade primitive and no calibration data. `DecisionEval` is uncalibrated on every

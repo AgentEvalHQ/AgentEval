@@ -288,22 +288,28 @@ $env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; uns
 ### Choosing a provider
 
 Every sample obtains its model through one factory, `AIConfig.CreateChatClient()`, so the whole
-catalogue runs on **Azure OpenAI**, on **Bitdeer AI Model Studio**, or on **any OpenAI-compatible
-endpoint** without touching a sample. Set the credentials for one provider; when more than one is
-set, pick with `--provider` or `AGENTEVAL_SAMPLES_PROVIDER` (otherwise Azure wins, then Bitdeer,
-then the generic endpoint).
+catalogue runs on whichever host **`AI_INFERENCE_PROVIDER`** selects, without touching a sample.
+Keys for several providers can be configured at once; the selector decides which one is used.
+
+| `AI_INFERENCE_PROVIDER` | Variables | Defaults |
+|---|---|---|
+| `bitdeer` | `BITDEER_API_KEY` | endpoint `https://api-inference.bitdeer.ai/v1`, model `zai-org/GLM-5.3-Flash`; `BITDEER_MODEL`, `_MODEL_2`, `_MODEL_3` override |
+| `openai` | `OPENAI_API_KEY` | `OPENAI_BASE_URL` = `https://api.openai.com/v1`, `OPENAI_MODEL` = `gpt-4o-mini`; `_MODEL_2`, `_MODEL_3` |
+| `foundry` | `FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY` + `FOUNDRY_MODEL` | a Foundry resource's Azure OpenAI-compatible endpoint (`https://<resource>.openai.azure.com/`); `_MODEL_2`, `_MODEL_3`. Not yet exercised live. |
+| `azure` | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` | `_DEPLOYMENT_2` = `gpt-4o-mini`, `_DEPLOYMENT_3` = `gpt-4.1` |
+| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT` + `OPENAI_COMPATIBLE_API_KEY` + `OPENAI_COMPATIBLE_MODEL` | Ollama, Groq, vLLM, Together, LM Studio, … |
+
+When the selector is unset, the first provider with credentials wins (Azure, Bitdeer, OpenAI, Foundry,
+generic). When it names a provider whose variables are missing, or an unknown name, **nothing** is
+selected and the banner says why — it never silently spends on a host you did not choose.
+`--provider <name>` sets the selector for one run. The resolution lives in Core
+(`AgentEval.Providers.InferenceProviderEnvironment`), so the CLI can read the same variable next.
 
 ```powershell
-# Bitdeer — one variable is enough (model defaults to zai-org/GLM-5.3-Flash, endpoint to api-inference.bitdeer.ai/v1)
+[Environment]::SetEnvironmentVariable("AI_INFERENCE_PROVIDER", "bitdeer", "User")   # once, machine-wide
 $env:BITDEER_API_KEY = "..."
-dotnet run -- 1 --provider bitdeer               # or once: [Environment]::SetEnvironmentVariable("AGENTEVAL_SAMPLES_PROVIDER","bitdeer","User")
-# optional: $env:BITDEER_MODEL, $env:BITDEER_MODEL_2, $env:BITDEER_MODEL_3 (comparison samples default all three to the primary model)
-
-# Any OpenAI-compatible endpoint (Ollama, Groq, vLLM, Together, LM Studio, …)
-$env:OPENAI_COMPATIBLE_ENDPOINT = "http://localhost:11434/v1"
-$env:OPENAI_COMPATIBLE_API_KEY  = "no-key-needed"
-$env:OPENAI_COMPATIBLE_MODEL    = "llama3.1"
-dotnet run -- 1 --provider openai-compatible
+dotnet run -- 1                                   # runs on Bitdeer
+dotnet run -- 1 --provider openai                 # this run on OpenAI instead (needs OPENAI_API_KEY)
 ```
 
 The **Azure?** column in the tables above means "needs a model provider"; any of the three will do.

@@ -247,13 +247,13 @@ public static class Program
         if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
             Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_DRY_RUN", "1");
 
-        // Forward `--provider azure|bitdeer|openai-compatible` into AGENTEVAL_SAMPLES_PROVIDER so
-        // AIConfig.CreateChatClient() — the one factory every sample uses — picks that provider.
+        // Forward `--provider bitdeer|openai|foundry|azure|openai-compatible` into AI_INFERENCE_PROVIDER
+        // so AIConfig.CreateChatClient() — the one factory every sample uses — picks that provider.
         for (var i = 0; i < args.Length - 1; i++)
         {
             if (string.Equals(args[i], "--provider", StringComparison.OrdinalIgnoreCase))
             {
-                Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_PROVIDER", args[i + 1]);
+                Environment.SetEnvironmentVariable(AgentEval.Providers.InferenceProviderEnvironment.SelectorVariable, args[i + 1]);
                 break;
             }
         }
