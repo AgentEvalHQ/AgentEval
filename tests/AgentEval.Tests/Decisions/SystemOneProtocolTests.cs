@@ -290,6 +290,30 @@ public class SystemOneProtocolTests
         Assert.Contains("no probability for level 1", ex.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.5)]
+    public void ParseResponse_ScoreOutsideRequestedScale_ThrowsInvalidResponse(double score)
+    {
+        var body = $$"""{ "model": "m", "answers": { "mood": { "type": "score", "score": {{score.ToString(System.Globalization.CultureInfo.InvariantCulture)}}, "probabilities": { "0": 0.5, "1": 0.5 }, "confidence": 0.5 } } }""";
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.ParseResponse(body, ScoreAsk(), "h"));
+
+        Assert.Contains("outside the requested scale", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void SerializeRequest_BlankModelOverride_ThrowsInvalidRequest(string model)
+    {
+        var request = new DecisionRequest("x", new Dictionary<string, DecisionQuestion> { ["a"] = new BinaryQuestion("?") }, Model: model);
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.SerializeRequest(request, "m"));
+
+        Assert.Equal(DecisionFailureKind.InvalidRequest, ex.Kind);
+    }
+
     [Fact]
     public void ParseResponse_WellFormedChoiceAndScore_StillParse()
     {

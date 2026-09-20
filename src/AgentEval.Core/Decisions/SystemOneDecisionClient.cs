@@ -235,6 +235,8 @@ internal static class SystemOneProtocol
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
+            if (request.Model is not null && string.IsNullOrWhiteSpace(request.Model))
+                throw new DecisionClientException(DecisionFailureKind.InvalidRequest, "A model override must not be blank; pass null to use the transport's default.");
             writer.WriteString("model", request.Model ?? defaultModel);
 
             writer.WritePropertyName("state");
@@ -448,8 +450,12 @@ internal static class SystemOneProtocol
                             throw Invalid($"{host}: answer '{id}' has no probability for level {i}.");
                     }
 
+                    var score = ReadDouble(el, "score", id, host);
+                    if (double.IsNaN(score) || score < 0 || score > scoreQuestion.Criteria.Count - 1)
+                        throw Invalid($"{host}: answer '{id}' has score {score}, outside the requested scale 0..{scoreQuestion.Criteria.Count - 1}.");
+
                     return new ScoreAnswer(
-                        ReadDouble(el, "score", id, host),
+                        score,
                         probabilities,
                         ReadLegend(el),
                         ReadDouble(el, "confidence", id, host));
