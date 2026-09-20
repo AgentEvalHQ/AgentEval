@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 /// 6. Agent-as-tool — agent.AsAIFunction() for multi-agent composition
 /// 7. OpenTelemetry — agent.AsBuilder().UseOpenTelemetry() observability setup
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 10 minutes
 /// ⏱️ Time to run: ~60–120 seconds (real LLM calls)
@@ -43,8 +43,7 @@ public static class AdvancedMAFFeatures
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
         Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // ─── Feature 1: InMemoryChatHistoryProvider ───────────────────────────
         Console.WriteLine("📝 Feature 1: InMemoryChatHistoryProvider\n");
@@ -274,14 +273,14 @@ public static class AdvancedMAFFeatures
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE A7 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE A7 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample demonstrates advanced MAF 1.3.0 features with real LLM calls. │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

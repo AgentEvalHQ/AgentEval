@@ -21,7 +21,7 @@ namespace AgentEval.Samples;
 /// <see cref="ChatClientAgent"/>. That autonomy is where a runaway loop burns budget — so we wrap the harness
 /// agent in <c>RunBudgetGate</c> and let it stop the run when the loop exceeds its tool-call budget.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperAgentHarness
@@ -39,9 +39,7 @@ public static class GatekeeperAgentHarness
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var searches = 0;
         var search = AIFunctionFactory.Create(

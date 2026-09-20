@@ -18,7 +18,7 @@ namespace AgentEval.Samples;
 /// - Comparing single-judge vs. calibrated evaluation outcomes
 ///
 /// ⏱️ Time to understand: 5 minutes
-/// 🔑 Requires: AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY
+/// 🔑 Requires: a model provider (see AIConfig)
 /// </summary>
 public static class CalibratedEvaluatorDemo
 {
@@ -29,8 +29,8 @@ public static class CalibratedEvaluatorDemo
         if (!AIConfig.IsConfigured)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("   ❌ This sample requires Azure OpenAI credentials.");
-            Console.WriteLine("      Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables.");
+            Console.WriteLine("   ❌ This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
+            Console.WriteLine("      Set a provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig).");
             Console.ResetColor();
             return;
         }
@@ -56,17 +56,16 @@ public static class CalibratedEvaluatorDemo
 
     private static async Task RunWithRealModels()
     {
-        Console.WriteLine("📝 Step 2: Creating CalibratedEvaluator with real Azure OpenAI judges...\n");
+        Console.WriteLine($"📝 Step 2: Creating CalibratedEvaluator with real {AIConfig.ProviderName} judges...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
 
         var model1 = AIConfig.ModelDeployment;
         var model2 = !string.IsNullOrEmpty(AIConfig.SecondaryModelDeployment)
             ? AIConfig.SecondaryModelDeployment : model1;
 
-        var client1 = azureClient.GetChatClient(model1).AsIChatClient();
-        var client2 = azureClient.GetChatClient(model2).AsIChatClient();
-        var client3 = azureClient.GetChatClient(model1).AsIChatClient(); // 3rd instance of primary
+        var client1 = AIConfig.CreateChatClient(model1);
+        var client2 = AIConfig.CreateChatClient(model2);
+        var client3 = AIConfig.CreateChatClient(model1); // 3rd instance of primary
 
         var evaluator = new CalibratedEvaluator(
             new (string, IChatClient)[]

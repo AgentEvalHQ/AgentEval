@@ -25,7 +25,7 @@ namespace AgentEval.Samples;
 /// internally, which gives you a fresh session. This is what ISessionResettableAgent
 /// provides — and it's how CrossSessionEvaluator and ConversationRunner work.
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// 
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: ~10–20 seconds (real LLM calls)
@@ -48,8 +48,7 @@ public static class AgentSessionLifecycle
         // Step 1: Create MAF ChatClientAgent with history provider
         Console.WriteLine("📝 Step 1: Creating MAF agent with session management...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var mafAgent = chatClient.AsAIAgent(
             name: "SessionDemo",
@@ -186,14 +185,14 @@ public static class AgentSessionLifecycle
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE A6 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE A6 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample demonstrates AgentSession lifecycle with real LLM calls.       │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 ///   3. <b>Both together</b>          — the realistic attack: a spray of medium-sized refunds. Whichever cap the
 ///      running total crosses first fires — defense in depth, not a single point of failure.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperMonetaryAndPerCallBudget
@@ -38,9 +38,7 @@ public static class GatekeeperMonetaryAndPerCallBudget
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

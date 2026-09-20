@@ -20,7 +20,7 @@ namespace AgentEval.Samples;
 ///
 /// Each run saves with a 2-hour offset so consecutive runs appear distinct on the timeline.
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// </summary>
 public static class RunSingleBenchmark
 {
@@ -31,7 +31,7 @@ public static class RunSingleBenchmark
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.\n");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
             return;
         }
 
@@ -48,8 +48,7 @@ public static class RunSingleBenchmark
 
         Console.WriteLine($"\nRunning {benchmark.Name} benchmark ({benchmark.Categories.Count} categories)...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var benchmarkRunner = MemoryBenchmarkRunner.Create(chatClient);
         var store = new JsonFileBaselineStore();

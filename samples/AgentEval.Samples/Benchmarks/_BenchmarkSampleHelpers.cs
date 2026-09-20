@@ -58,7 +58,7 @@ internal enum SamplePreset
 /// <summary>
 /// Shared helpers for the v0.10.1 <c>Benchmarks/</c> sample suite. Centralises
 /// output-directory resolution, JSON + HTML + PDF rendering, console summary
-/// printing, and gentle "skip if Azure OpenAI is missing" boilerplate so the
+/// printing, and gentle "skip if no model provider is configured" boilerplate so the
 /// per-family samples can stay tight and read like a story.
 /// </summary>
 internal static class BenchmarkSampleHelpers
@@ -527,13 +527,13 @@ internal static class BenchmarkSampleHelpers
         Console.WriteLine();
     }
 
-    /// <summary>Prints the canonical "skipping — Azure OpenAI required" box.</summary>
+    /// <summary>Prints the canonical "skipping — model provider required" box.</summary>
     public static void PrintMissingCredentialsBox(string sampleName)
     {
         Console.WriteLine("+-----------------------------------------------------------------------------+");
         Console.WriteLine($"|  SKIPPING {sampleName,-66}|");
-        Console.WriteLine("|  Azure OpenAI credentials required — set:                                   |");
-        Console.WriteLine("|    AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT     |");
+        Console.WriteLine("|  A model provider is required — set one of:                                   |");
+        Console.WriteLine("|    AZURE_OPENAI_* | BITDEER_API_KEY | OPENAI_COMPATIBLE_*     |");
         Console.WriteLine("+-----------------------------------------------------------------------------+");
     }
 
@@ -795,34 +795,33 @@ internal static class BenchmarkSampleHelpers
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  Real-agent + judge factories (Azure OpenAI–backed)
+    //  Real-agent + judge factories (model-backed)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Builds a real Azure OpenAI–backed <see cref="IStreamableAgent"/> using the
+    /// Builds a real model-backed <see cref="IStreamableAgent"/> using the
     /// repository's <see cref="AIConfig"/> (endpoint / key / deployment env vars).
     /// Call sites should gate on <see cref="AIConfig.IsConfigured"/> before invoking
     /// this — it throws if the credentials are missing.
     /// </summary>
     /// <param name="name">Agent name surfaced in reports.</param>
     /// <param name="systemPrompt">System prompt prepended to every turn.</param>
-    /// <returns>A live agent that talks to Azure OpenAI.</returns>
+    /// <returns>A live agent that talks to the configured provider.</returns>
     public static IStreamableAgent CreateAzureAgent(string name, string? systemPrompt = null)
     {
-        var azure = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chat = azure.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         return chat.AsEvaluableAgent(name: name, systemPrompt: systemPrompt);
     }
 
     /// <summary>
-    /// Builds a real Azure OpenAI–backed <see cref="IEvaluator"/> ("judge") using the
-    /// repository's <see cref="AIConfig"/>. Same deployment as the agent for sample
-    /// simplicity — production audits usually use a stronger judge than the SUT.
+    /// Builds a real model-backed <see cref="IEvaluator"/> ("judge") on whichever provider
+    /// <see cref="AIConfig"/> selected (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint —
+    /// the method name predates that choice). Same model as the agent for sample simplicity —
+    /// production audits usually use a stronger judge than the SUT.
     /// </summary>
     public static IEvaluator CreateAzureJudge()
     {
-        var azure = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chat = azure.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         return new ChatClientEvaluator(chat);
     }
 

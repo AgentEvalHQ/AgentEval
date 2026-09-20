@@ -12,8 +12,8 @@ namespace AgentEval.Samples.Benchmarks;
 ///
 /// The sample is intentionally read-only: it never generates a new run — pick another
 /// sample to populate the output tree first, then come back here to browse the resulting
-/// artefacts. (Registry Discovery runs without Azure credentials; the other running
-/// samples need Azure OpenAI configured.)
+/// artefacts. (Registry Discovery runs without a model provider; the other running
+/// samples need a model provider configured.)
 /// </summary>
 /// <remarks>
 /// <para>

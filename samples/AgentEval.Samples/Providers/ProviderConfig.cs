@@ -32,8 +32,8 @@ namespace AgentEval.Samples.Providers;
 /// </summary>
 internal static class ProviderConfig
 {
-    public const string BitdeerDefaultEndpoint = "https://api-inference.bitdeer.ai/v1";
-    public const string BitdeerDefaultModel = "zai-org/GLM-5.3-Flash";
+    public const string BitdeerDefaultEndpoint = AIConfig.BitdeerDefaultEndpoint;
+    public const string BitdeerDefaultModel = AIConfig.BitdeerDefaultModel;
     public const string BitdeerProviderTag = "bitdeer";
 
     // ── Bitdeer ──────────────────────────────────────────────────────────────

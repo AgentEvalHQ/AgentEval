@@ -25,7 +25,7 @@ namespace AgentEval.Samples;
 /// - Streaming with timing preservation
 /// - Trace serialization to JSON files
 /// 
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 10 minutes
 /// </summary>
 public static class TraceRecordReplay
@@ -156,8 +156,7 @@ public static class TraceRecordReplay
         // Step 1: BUILD a real 2-step MAF workflow (Planner → Writer)
         Console.WriteLine("🏗️  Building real MAF Workflow (Planner → Writer)...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var planner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
@@ -301,8 +300,7 @@ public static class TraceRecordReplay
 
     private static IEvaluableAgent CreateAgent()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "TraceableAgent",
@@ -337,14 +335,14 @@ public static class TraceRecordReplay
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE F3 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F3 - Model Provider Required                         │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample records real agent traces for deterministic replay.            │
    │                                                                             │
    │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
-   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
-   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   │    AZURE_OPENAI_*         - endpoint, api key, deployment                   │
+   │    or BITDEER_API_KEY     - model defaults to GLM-5.3 Flash                 │
+   │    or OPENAI_COMPATIBLE_* - endpoint, api key, model                        │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();

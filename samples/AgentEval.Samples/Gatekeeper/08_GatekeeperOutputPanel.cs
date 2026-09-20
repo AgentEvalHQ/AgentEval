@@ -27,7 +27,7 @@ namespace AgentEval.Samples;
 ///   ④  the utility valve — flags a reasonless refusal, allows a justified one (advisory: never punish honesty)
 /// Every ✅/❌ keys on the real verdict or the trace block count — never a claim without evidence.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 3 minutes
 /// </summary>
 public static class GatekeeperOutputPanel
@@ -43,9 +43,7 @@ public static class GatekeeperOutputPanel
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

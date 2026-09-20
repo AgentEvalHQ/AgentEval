@@ -36,7 +36,7 @@ namespace AgentEval.Samples;
 /// - Download longmemeval_s_cleaned.json from:
 ///   https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/tree/main
 /// - Place it in: src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json
-/// - AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// - AZURE_OPENAI_* | BITDEER_API_KEY | OPENAI_COMPATIBLE_*
 ///
 /// Attribution: LongMemEval by Di Wu et al. (ICLR 2025)
 /// https://github.com/xiaowu0162/LongMemEval
@@ -77,8 +77,7 @@ public static class LongMemEvalBenchmarkDemo
 
         Console.WriteLine("Step 1: Creating LongMemEval runner and agent...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var runner = LongMemEvalBenchmarkRunner.Create(chatClient, DatasetPath);
 

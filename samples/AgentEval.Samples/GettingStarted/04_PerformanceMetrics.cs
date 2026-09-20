@@ -180,10 +180,7 @@ public static class PerformanceMetrics
             return CreateMockAgent();
         }
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
         return chatClient.AsAIAgent(

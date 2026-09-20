@@ -22,7 +22,7 @@ namespace AgentEval.Samples;
 /// For MAF tool-calling agents, see Samples 2–3, 9–10, 12.
 /// For Semantic Kernel integration, see the AgentEval.NuGetConsumer project.
 ///
-/// 🤖 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY)
+/// 🤖 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig)
 /// ⏱️ Time to understand: 3 minutes
 /// </summary>
 public static class CrossFrameworkEvaluation
@@ -34,8 +34,8 @@ public static class CrossFrameworkEvaluation
         if (!AIConfig.IsConfigured)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ This sample requires Azure OpenAI credentials.");
-            Console.WriteLine("   Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables.");
+            Console.WriteLine("❌ This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
+            Console.WriteLine("   Set a provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig).");
             Console.ResetColor();
             return;
         }
@@ -49,9 +49,8 @@ public static class CrossFrameworkEvaluation
         Console.WriteLine("   • LM Studio       → new OpenAIChatClient(...)");
         Console.WriteLine();
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        IChatClient chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
-        Console.WriteLine($"   ✅ Using: Azure OpenAI ({AIConfig.ModelDeployment})\n");
+        IChatClient chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        Console.WriteLine($"   ✅ Using: {AIConfig.ProviderName} ({AIConfig.ModelDeployment})\n");
 
         // ─── Step 2: One-liner adapter ───────────────────────────────
         Console.WriteLine("📝 Step 2: Convert to evaluable agent with AsEvaluableAgent()");

@@ -21,7 +21,7 @@ namespace AgentEval.Samples;
 /// - Using built-in scenario libraries (chatty, priority, updates)
 /// - Interpreting detailed per-fact results
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
@@ -34,16 +34,13 @@ public static class MemoryScenariosDemo
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory evaluators use an LLM judge — they cannot run in mock mode.\n");
             return;
         }
 
         // Create shared components — all backed by a real LLM
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
         var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);

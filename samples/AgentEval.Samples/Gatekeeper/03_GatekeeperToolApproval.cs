@@ -16,7 +16,7 @@ namespace AgentEval.Samples;
 /// refund auto-approves and runs; a large one pauses and surfaces a <see cref="ToolApprovalRequestContent"/> for a
 /// human, who then approves and the run resumes.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperToolApproval
@@ -32,9 +32,7 @@ public static class GatekeeperToolApproval
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

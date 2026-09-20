@@ -19,7 +19,7 @@ namespace AgentEval.Samples;
 /// - Counterfactual testing for bias evaluation
 /// - Enterprise compliance reporting
 /// 
-/// Azure OpenAI credentials are required for LLM-based evaluation.
+/// A model provider is required for LLM-based evaluation.
 /// 
 /// ⏱️ Time to understand: 8 minutes
 /// ⏱️ Time to run: ~30–45 seconds (6+ LLM calls)
@@ -36,8 +36,7 @@ public static class ResponsibleAI
             return;
         }
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         Console.WriteLine("🛡️ Step 1: ToxicityMetric — Detecting Harmful Content\n");
         await DemoToxicityDetection(chatClient);
@@ -297,10 +296,10 @@ public static class ResponsibleAI
     private static void PrintMissingCredentialsBox()
     {
         Console.WriteLine("┌─────────────────────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│  ⚠️  SKIPPING SAMPLE B4 - Azure OpenAI Credentials Required                │");
+        Console.WriteLine("│  ⚠️  SKIPPING SAMPLE B4 - Model Provider Required                │");
         Console.WriteLine("│                                                                             │");
         Console.WriteLine("│  ResponsibleAI metrics require LLM evaluation for nuanced analysis.       │");
-        Console.WriteLine("│  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT  │");
+        Console.WriteLine("│  Set AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_*  │");
         Console.WriteLine("│                                                                             │");
         Console.WriteLine("│  Pattern-based ToxicityMetric works without credentials (basic detection). │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────────────────────┘");

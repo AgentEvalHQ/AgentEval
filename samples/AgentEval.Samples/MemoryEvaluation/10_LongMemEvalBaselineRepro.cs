@@ -40,8 +40,8 @@ namespace AgentEval.Samples;
 /// Prerequisites:
 /// - Download longmemeval_s_cleaned.json from HuggingFace
 /// - Place in: src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json
-/// - AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY
-/// - A "gpt-4o" deployment on your Azure OpenAI resource
+/// - a model provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
+/// - the "gpt-4o" model on that provider (the paper's baseline; another model is a run, not a reproduction)
 ///
 /// Attribution: LongMemEval by Di Wu et al. (ICLR 2025)
 /// https://github.com/xiaowu0162/LongMemEval
@@ -85,8 +85,7 @@ public static class LongMemEvalBaselineRepro
         // Hardcode gpt-4o to match the paper's exact conditions.
         // Change this if your Azure deployment name differs from "gpt-4o".
         const string modelDeployment = "gpt-4o";
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(modelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(modelDeployment);
 
         var runner = LongMemEvalBenchmarkRunner.Create(chatClient, DatasetPath);
 

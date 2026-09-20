@@ -12,7 +12,7 @@
 Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
 needs a separately consented remote A2A endpoint), also run without credentials.
-Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
+Most other samples need a model provider — Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint, selected with `--provider` (see [Choosing a provider](#choosing-a-provider)); check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
 
@@ -285,7 +285,33 @@ $env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; uns
 
 ## Prerequisites
 
-### With Azure OpenAI (full experience)
+### Choosing a provider
+
+Every sample obtains its model through one factory, `AIConfig.CreateChatClient()`, so the whole
+catalogue runs on **Azure OpenAI**, on **Bitdeer AI Model Studio**, or on **any OpenAI-compatible
+endpoint** without touching a sample. Set the credentials for one provider; when more than one is
+set, pick with `--provider` or `AGENTEVAL_SAMPLES_PROVIDER` (otherwise Azure wins, then Bitdeer,
+then the generic endpoint).
+
+```powershell
+# Bitdeer — one variable is enough (model defaults to zai-org/GLM-5.3-Flash, endpoint to api-inference.bitdeer.ai/v1)
+$env:BITDEER_API_KEY = "..."
+dotnet run -- 1 --provider bitdeer               # or once: [Environment]::SetEnvironmentVariable("AGENTEVAL_SAMPLES_PROVIDER","bitdeer","User")
+# optional: $env:BITDEER_MODEL, $env:BITDEER_MODEL_2, $env:BITDEER_MODEL_3 (comparison samples default all three to the primary model)
+
+# Any OpenAI-compatible endpoint (Ollama, Groq, vLLM, Together, LM Studio, …)
+$env:OPENAI_COMPATIBLE_ENDPOINT = "http://localhost:11434/v1"
+$env:OPENAI_COMPATIBLE_API_KEY  = "no-key-needed"
+$env:OPENAI_COMPATIBLE_MODEL    = "llama3.1"
+dotnet run -- 1 --provider openai-compatible
+```
+
+The **Azure?** column in the tables above means "needs a model provider"; any of the three will do.
+Two surfaces stay Azure-only and say so when the Azure trio is absent: embeddings (B1) and Azure AI
+Foundry (H11, H12). A reasoning model such as GLM-5.3 Flash bills its reasoning as output tokens,
+so token counts and latency are higher than a non-reasoning model's for the same prompt.
+
+### With Azure OpenAI
 
 ```powershell
 # PowerShell

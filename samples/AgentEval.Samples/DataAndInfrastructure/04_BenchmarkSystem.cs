@@ -17,7 +17,7 @@ namespace AgentEval.Samples;
 /// Sample F4: Benchmark System — Real Agentic Benchmarking with Preset Factories
 ///
 /// This sample shows how to use AgentEval's agentic preset factory against a real
-/// Azure OpenAI-backed agent, loading test prompts from a JSONL file via
+/// model-backed agent, loading test prompts from a JSONL file via
 /// <see cref="DatasetLoaderFactory"/> (the industry-standard format for AI benchmark
 /// datasets — used by BFCL, GAIA, MMLU, GSM8K, etc.).
 ///
@@ -34,7 +34,7 @@ namespace AgentEval.Samples;
 ///
 ///     agenteval bench agentic --preset tool-call-accuracy --subject MyAgent
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: ~15–30 seconds (depends on model latency)
 /// </summary>
@@ -225,8 +225,7 @@ public static class BenchmarkSystem
 
     private static AIAgent CreateAgentWithTools()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         return chatClient.AsAIAgent(
             name: "BenchmarkAgent",
@@ -243,8 +242,7 @@ public static class BenchmarkSystem
         // The judge is a second LLM call that grades the agent's response against the
         // preset's rubric. Same Azure deployment is used here for simplicity; in production
         // you would typically use a stronger judge model than the system under test.
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var judgeChatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var judgeChatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         return new ChatClientEvaluator(judgeChatClient);
     }
 
@@ -276,10 +274,10 @@ public static class BenchmarkSystem
     private static void PrintMissingCredentialsBox()
     {
         Console.WriteLine("+-----------------------------------------------------------------------------+");
-        Console.WriteLine("|  SKIPPING SAMPLE F4 - Azure OpenAI Credentials Required                     |");
+        Console.WriteLine("|  SKIPPING SAMPLE F4 - Model Provider Required                     |");
         Console.WriteLine("|                                                                             |");
         Console.WriteLine("|  This sample runs REAL benchmarks against a live agent.                     |");
-        Console.WriteLine("|  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT  |");
+        Console.WriteLine("|  Set AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_*  |");
         Console.WriteLine("+-----------------------------------------------------------------------------+");
     }
 

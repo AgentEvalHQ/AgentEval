@@ -23,7 +23,7 @@ namespace AgentEval.Samples;
 ///   • a request that would read customer data then POST it off-box is BLOCKED — the read is allowed, the
 ///     exfiltrating POST is not.
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperMafHarness
@@ -39,9 +39,7 @@ public static class GatekeeperMafHarness
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

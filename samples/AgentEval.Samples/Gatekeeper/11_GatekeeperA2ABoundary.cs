@@ -12,7 +12,7 @@ namespace AgentEval.Samples;
 
 /// <summary>
 /// Resolves a real remote A2A agent and guards both sides of its trust boundary. The exact judge deployment is
-/// calibrated before either judge may enforce inline. Requires Azure OpenAI credentials plus an explicit
+/// calibrated before either judge may enforce inline. Requires a model provider plus an explicit
 /// <c>AGENTEVAL_A2A_BASE_URL</c> for a remote service exposing the standard A2A agent-card endpoint, plus
 /// <c>AGENTEVAL_A2A_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true</c> to opt into the live call.
 /// </summary>
@@ -58,9 +58,7 @@ public static class GatekeeperA2ABoundary
             return;
         }
 
-        var judge = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var judge = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         Console.WriteLine("① Calibrating both inter-agent boundary judges for this deployment…");
         var inbound = await InterAgentBoundaryInjectionGate.CalibrateInboundAsync(judge);

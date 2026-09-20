@@ -45,7 +45,7 @@ public static class JudgeCalibration
         if (!AIConfig.IsConfigured)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  SKIPPING JUDGE CALIBRATION - No Azure credentials configured\n");
+            Console.WriteLine("   ⚠️  SKIPPING JUDGE CALIBRATION - no model provider configured\n");
             Console.ResetColor();
             Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -54,7 +54,7 @@ public static class JudgeCalibration
    │  Judge calibration cannot be meaningfully demonstrated with mocks!          │
    │  Mocking judge scores defeats the entire purpose of multi-model consensus.  │
    │                                                                             │
-   │  With Azure credentials, this sample would demonstrate:                     │
+   │  With a model provider, this sample would demonstrate:                      │
    │                                                                             │
    │  • Running the same evaluation with 3 judge instances                       │
    │  • Real score variance from LLM non-determinism                             │
@@ -63,18 +63,17 @@ public static class JudgeCalibration
    │  • Why consensus matters for reliable AI evaluation                         │
    │                                                                             │
    │  Set these environment variables to enable:                                 │
-   │    AZURE_OPENAI_ENDPOINT                                                    │
-   │    AZURE_OPENAI_API_KEY                                                     │
-   │    AZURE_OPENAI_DEPLOYMENT                                                  │
+   │    AZURE_OPENAI_*  or  BITDEER_API_KEY  or  OPENAI_COMPATIBLE_*             │
+   │    see AIConfig.cs or README: Choosing a provider                           │
+   │    --provider azure|bitdeer|openai-compatible                               │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
             PrintKeyTakeaways();
             return;
         }
 
-        Console.WriteLine("📝 Step 2: Creating real LLM judges using Azure OpenAI...\n");
+        Console.WriteLine($"📝 Step 2: Creating real LLM judges using {AIConfig.ProviderName}...\n");
         
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         
         // Use different models when available, same model otherwise
         var model1 = AIConfig.ModelDeployment;
@@ -85,9 +84,9 @@ public static class JudgeCalibration
                      AIConfig.TertiaryModelDeployment != model1 
             ? AIConfig.TertiaryModelDeployment : model1;
         
-        var judge1Client = azureClient.GetChatClient(model1).AsIChatClient();
-        var judge2Client = azureClient.GetChatClient(model2).AsIChatClient();
-        var judge3Client = azureClient.GetChatClient(model3).AsIChatClient();
+        var judge1Client = AIConfig.CreateChatClient(model1);
+        var judge2Client = AIConfig.CreateChatClient(model2);
+        var judge3Client = AIConfig.CreateChatClient(model3);
         
         // Create named judge dictionary for the factory pattern
         var judges = new Dictionary<string, IChatClient>
@@ -226,10 +225,10 @@ public static class JudgeCalibration
     private static void ShowCodeExample()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(@"   // Production usage with real Azure OpenAI clients:
+        Console.WriteLine(@"   // Production usage with real model clients:
    
    var judge = CalibratedJudge.Create(
-       (""GPT-4o"", azureClient.GetChatClient(""gpt-4o"").AsIChatClient()),
+       (""GPT-4o"", AIConfig.CreateChatClient(""gpt-4o"")),
        (""Claude"", claudeClient),
        (""Gemini"", geminiClient));
    

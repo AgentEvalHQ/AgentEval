@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wire; an identical request repeated at 0.97 / 0.97 / 0.98. Bitdeer's smoke call succeeded and the
   account then returned HTTP 402, so its judged run is still owed.
 
+#### Changed
+- `samples/AgentEval.Samples` no longer assumes Azure OpenAI. Every sample obtains its model from
+  `AIConfig.CreateChatClient(model?)`, which serves Azure OpenAI, Bitdeer AI Model Studio
+  (`BITDEER_API_KEY`; model defaults to `zai-org/GLM-5.3-Flash`) or any OpenAI-compatible endpoint
+  (`OPENAI_COMPATIBLE_ENDPOINT/_API_KEY/_MODEL`), chosen by `--provider` /
+  `AGENTEVAL_SAMPLES_PROVIDER` or auto-detected (Azure, then Bitdeer, then generic). 66 sample files
+  changed mechanically; no sample knows which provider it runs on. Embeddings (B1) and Azure AI
+  Foundry (H11/H12) remain Azure-only and say so. `AIConfig.Endpoint`/`ModelDeployment` now describe
+  the selected provider; the Azure-specific members are `AzureEndpoint`/`AzureKeyCredential`.
+
 #### Not done, on purpose
 - No Jev→LLM cascade primitive and no calibration data. `DecisionEval` is uncalibrated on every
   AgentEval dataset; it is independent evidence beside a judge, not a gate in front of one.

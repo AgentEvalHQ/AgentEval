@@ -98,11 +98,10 @@ public static class ReliabilityRace
             return;
         }
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var arms = new[]
         {
-            CreateLiveArm(azureClient, $"Frontier · {primaryDeployment}", primaryDeployment),
-            CreateLiveArm(azureClient, $"Economy · {secondaryDeployment}", secondaryDeployment),
+            CreateLiveArm($"Frontier · {primaryDeployment}", primaryDeployment),
+            CreateLiveArm($"Economy · {secondaryDeployment}", secondaryDeployment),
         };
 
         Console.WriteLine("   LIVE RUN — shared AIConfig credentials, real model calls, no fallback:");
@@ -145,11 +144,9 @@ public static class ReliabilityRace
         PrintFinalReport(arms);
     }
 
-    private static ModelArm CreateLiveArm(AzureOpenAIClient client, string label, string deployment)
+    private static ModelArm CreateLiveArm(string label, string deployment)
     {
-        var observableClient = client
-            .GetChatClient(deployment)
-            .AsIChatClient()
+        var observableClient = AIConfig.CreateChatClient(deployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: TelemetrySourceName)
             .Build();

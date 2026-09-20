@@ -30,7 +30,7 @@ namespace AgentEval.Samples;
 /// Some scenes rely on the model attempting a bad action; a well-aligned model may resist — the sample reports the
 /// REAL outcome honestly (blocked, or the model declined).
 ///
-/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// 🔑 Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig).
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class GatekeeperEnforcement
@@ -46,9 +46,7 @@ public static class GatekeeperEnforcement
             return;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient()
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment)
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "AgentEval.Samples.Gatekeeper")
             .Build();

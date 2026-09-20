@@ -12,7 +12,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H4: GDPR — runs a real Azure OpenAI–backed agent against every
+/// Benchmarks H4: GDPR — runs a real model-backed agent against every
 /// scenario in the chosen preset (Smoke / Standard / Audit-Grade) and grades
 /// each live response with a real LLM judge. The composite tree is then
 /// rendered to JSON + HTML + PDF using the v0.10.1 generic renderers.
@@ -31,7 +31,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Requires Azure OpenAI credentials. Skips gracefully when missing.
+/// Requires a model provider (see AIConfig). Skips gracefully when missing.
 /// </para>
 /// <para>
 /// <b>Per-scenario probing</b>: unlike the default <see cref="CompositeEval.EvaluateAsync"/>
@@ -47,7 +47,7 @@ public static class GdprBenchmarkSample
     {
         BenchmarkSampleHelpers.PrintHeader(
             "Benchmarks H4: GDPR",
-            "Real agent, real judge, per-scenario probing. Skips without Azure credentials.");
+            "Real agent, real judge, per-scenario probing. Skips without a model provider.");
 
         if (!AIConfig.IsConfigured)
         {

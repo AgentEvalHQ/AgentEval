@@ -20,7 +20,7 @@ namespace AgentEval.Samples;
 /// - Using MemoryJudge for LLM-based fact verification
 /// - Fluent memory assertions with detailed results
 ///
-/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 ///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
@@ -33,18 +33,15 @@ public static class MemoryBasics
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   This sample requires real Azure OpenAI credentials to evaluate memory.");
+            Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint) to evaluate memory.");
             Console.WriteLine("   Memory evaluation uses an LLM judge — it cannot run in mock mode.\n");
             return;
         }
 
-        // Step 1: Create the Azure OpenAI chat client
-        Console.WriteLine("📝 Step 1: Creating Azure OpenAI chat client...\n");
+        // Step 1: Create the chat client (AIConfig.CreateChatClient)
+        Console.WriteLine($"📝 Step 1: Creating the {AIConfig.ProviderName} chat client...\n");
 
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        var chatClient = azureClient
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
         Console.WriteLine($"   Endpoint:   {AIConfig.Endpoint}");
         Console.WriteLine($"   Deployment: {AIConfig.ModelDeployment}\n");

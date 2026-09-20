@@ -15,12 +15,12 @@ namespace AgentEval.Samples;
 
 /// <summary>
 /// Glass Box — Real vs Framework (single travel agent). Runs a REAL MAF <see cref="ChatClientAgent"/> against
-/// Azure OpenAI ONCE, captured two ways from the same run: the framework's own account (MAF
+/// the configured model ONCE, captured two ways from the same run: the framework's own account (MAF
 /// <c>AgentResponse</c>) and the Glass Box chat/tool-boundary trace. Renders the honest MAF-vs-Glass Box diff
 /// table — proving the framework does not lie about totals, but HIDES the per-turn detail an auditor needs.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT). One run ≈ a few
+/// Requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint — see AIConfig). One run ≈ a few
 /// thousand tokens. With no credentials the sample skips cleanly — it never substitutes scripted data, because
 /// a comparison built on a fake run would be exactly the hollowness this sample exists to replace.
 /// </remarks>
@@ -42,9 +42,7 @@ public static class RealVsFrameworkTravelAgent
         //    (the MAF runtime adds its tool loop on top → recorder sits INNER of the loop, one entry per
         //    round-trip), and every tool is wrapped to capture its execution.
         var chatTrace = new AgentTrace { TraceName = "travel-agent" };
-        var rawModel = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+        var rawModel = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         var recordingClient = rawModel.AsBuilder()
             .UseTraceRecording("TravelAgent", chatTrace, SamplePreset.AuditGrade)
             .Build();

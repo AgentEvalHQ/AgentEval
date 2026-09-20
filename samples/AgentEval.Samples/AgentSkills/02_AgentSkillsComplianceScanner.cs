@@ -17,7 +17,7 @@ namespace AgentEval.Samples;
 /// scan itself; a minimal agent is only needed to satisfy MAF's <c>AgentSkillsSourceContext</c>. Renders
 /// the same coverage report Phase 4a's Skill Security Index consumes as its compliance axis.
 ///
-/// 🔑 Requires Azure OpenAI credentials (to construct the minimal scan-context agent; the scan itself is free).
+/// 🔑 Requires a model provider (see AIConfig) (to construct the minimal scan-context agent; the scan itself is free).
 /// ⏱️ Time to understand: 1 minute
 /// </summary>
 public static class AgentSkillsComplianceScanner
@@ -38,7 +38,7 @@ public static class AgentSkillsComplianceScanner
         // ScanFileSkillsAsync needs an AIAgent only to build the AgentSkillsSourceContext MAF's
         // GetSkillsAsync requires; no model call is made by the scan itself (static file inspection).
         var scanAgent = new ChatClientAgent(
-            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            AIConfig.CreateChatClient(AIConfig.ModelDeployment),
             new ChatClientAgentOptions { Name = "ScannerAgent" });
 
         Console.WriteLine($"  Scanning: {skillPath}\n");

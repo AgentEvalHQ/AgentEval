@@ -39,7 +39,7 @@ public static class CombinedStochasticComparison
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            Console.WriteLine("   ⚠️  This sample requires Azure OpenAI credentials.\n");
+            Console.WriteLine("   ⚠️  This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
             return;
         }
         
@@ -165,14 +165,12 @@ public static class CombinedStochasticComparison
     
     private static List<IAgentFactory> CreateFactories()
     {
-        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        
         var factories = new List<IAgentFactory>
         {
             new DelegateAgentFactory(
                 AIConfig.ModelDeployment,
                 AIConfig.ModelDeployment,
-                () => CreateAgentWithTool(azureClient, AIConfig.ModelDeployment))
+                () => CreateAgentWithTool(AIConfig.ModelDeployment))
         };
         
         if (!string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
@@ -181,19 +179,15 @@ public static class CombinedStochasticComparison
             factories.Add(new DelegateAgentFactory(
                 AIConfig.TertiaryModelDeployment,
                 AIConfig.TertiaryModelDeployment,
-                () => CreateAgentWithTool(azureClient, AIConfig.TertiaryModelDeployment)));
+                () => CreateAgentWithTool(AIConfig.TertiaryModelDeployment)));
         }
         
         return factories;
     }
     
-    private static IEvaluableAgent CreateAgentWithTool(
-        AzureOpenAIClient client,
-        string deployment)
+    private static IEvaluableAgent CreateAgentWithTool(string deployment)
     {
-        var chatClient = client
-            .GetChatClient(deployment)
-            .AsIChatClient();
+        var chatClient = AIConfig.CreateChatClient(deployment);
         
         var agent = chatClient.AsAIAgent(
             name: $"Calculator Agent ({deployment})",

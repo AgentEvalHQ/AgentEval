@@ -33,7 +33,7 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need Azure)",
+        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need a model provider)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
@@ -186,7 +186,7 @@ public static class Program
             new("29 Result Behavioral Anomaly", "fixed cap vs per-tool learned result-anomaly baseline", GatekeeperToolResultBehavioralAnomaly.RunAsync),
         ], Progressive: true),
 
-        new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
+        new('K', "Agent Skills", "🔑 real agents (any configured provider) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
         [
             new("Hello World",               "★ start here — a trivial in-memory skill + ONE assertion (HaveLoadedSkill)", AgentSkillsHelloWorld.RunAsync),
             new("Disclosure Efficiency",      "Free structural metric scoring the load->read->run funnel (order, redundancy)", AgentSkillsDisclosureEfficiency.RunAsync),
@@ -246,6 +246,17 @@ public static class Program
         // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
         if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
             Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_DRY_RUN", "1");
+
+        // Forward `--provider azure|bitdeer|openai-compatible` into AGENTEVAL_SAMPLES_PROVIDER so
+        // AIConfig.CreateChatClient() — the one factory every sample uses — picks that provider.
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--provider", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_PROVIDER", args[i + 1]);
+                break;
+            }
+        }
 
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
