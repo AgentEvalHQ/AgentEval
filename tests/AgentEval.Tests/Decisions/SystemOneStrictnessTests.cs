@@ -77,6 +77,21 @@ public class SystemOneStrictnessTests
         Assert.Contains(endpoint, ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task OversizedBody_IsRefused_BeforeItIsBuffered()
+    {
+        // 5 MB of a valid-looking prefix: the cap must trip on size, before any parsing or excerpting.
+        var huge = "{ \"model\": \"m\", \"answers\": { \"q\": { \"type\": \"noul\", \"noul\": 0.5 } }, \"pad\": \"" + new string('x', 5 * 1024 * 1024) + "\" }";
+        var client = new SystemOneDecisionClient(
+            SystemOneClientOptions.ForTypeSafe("k"),
+            new HttpClient(new FixedHandler(HttpStatusCode.OK, huge)));
+
+        var ex = await Assert.ThrowsAsync<DecisionClientException>(() => client.DecideAsync(new DecisionRequest("state", OneNoul)));
+
+        Assert.Equal(DecisionFailureKind.InvalidResponse, ex.Kind);
+        Assert.Contains("refuses anything over", ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ThrowingHandler(string message) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

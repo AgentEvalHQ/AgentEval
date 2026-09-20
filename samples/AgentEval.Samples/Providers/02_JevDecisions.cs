@@ -5,6 +5,7 @@ using System.Diagnostics;
 using AgentEval.Core;
 using AgentEval.Decisions;
 using AgentEval.Evals;
+using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples.Providers;
 
@@ -185,44 +186,46 @@ public static class JevDecisionsDemo
         // ── Stage 5: three evaluator kinds in one composite ─────────────────────────────────
         Console.WriteLine("📝 Stage 5: CompositeEval — deterministic + decision (+ generative when Bitdeer is configured)\n");
 
-        var components = new List<EvalComponent>
-        {
-            new(new NonEmptyResponseEval(), Weight: 0.20),
-            new(grounded, Weight: ProviderConfig.IsBitdeerConfigured ? 0.40 : 0.80),
-        };
-
-        if (ProviderConfig.IsBitdeerConfigured)
-        {
-            var glm = ProviderConfig.CreateBitdeerChatClient();
-            components.Add(new EvalComponent(new AtomicLlmEval(
-                evaluator: new ChatClientEvaluator(glm),
-                key: "faithful_llm",
-                name: "Faithful to the ledger (generative judge)",
-                category: "quality",
-                version: "1.0.0",
-                criteria: ["Every fact in the response appears in the context.", "Nothing in the response contradicts the context."],
-                passThreshold: 0.70,
-                judgeModel: ProviderConfig.BitdeerAgentName,
-                rateResolver: _ => new JudgeCostMap.ModelRate(0, 0)), Weight: 0.40));
-            Console.WriteLine($"   leaves : non_empty (code 0.20) + grounded (decision 0.40) + faithful_llm (llm 0.40 — {ProviderConfig.BitdeerAgentName}, not priced)");
-        }
-        else
-        {
-            Console.WriteLine("   leaves : non_empty (code 0.20) + grounded (decision 0.80)   — set BITDEER_API_KEY to add the GLM generative judge as a third kind");
-        }
+        // The generative judge must SEE the ledger. AtomicLlmEval hands its IEvaluator only the query and
+        // the response, so the GLM leaf is built per case with ContextAwareJudge prepending that case's
+        // context. The Jev leaf needs nothing of the sort: its state projector already sends the context.
+        var withGlm = ProviderConfig.IsBitdeerConfigured;
+        IChatClient? glm = withGlm ? ProviderConfig.CreateBitdeerChatClient() : null;
+        Console.WriteLine(withGlm
+            ? $"   leaves : non_empty (code 0.20) + grounded (decision 0.40) + faithful_llm (llm 0.40 — {ProviderConfig.BitdeerAgentName}, judge shown the ledger, not priced)"
+            : "   leaves : non_empty (code 0.20) + grounded (decision 0.80)   — set BITDEER_API_KEY to add the GLM generative judge as a third kind");
         Console.WriteLine();
-
-        var composite = new CompositeEval(
-            key: "ledger_answer_quality",
-            name: "Ledger answer quality",
-            category: "quality",
-            version: "1.0.0",
-            components: components,
-            aggregation: WeightedSumAggregation.Instance,
-            threshold: 0.75);
 
         foreach (var c in Cases)
         {
+            var components = new List<EvalComponent>
+            {
+                new(new NonEmptyResponseEval(), Weight: 0.20),
+                new(grounded, Weight: withGlm ? 0.40 : 0.80),
+            };
+            if (glm is not null)
+            {
+                components.Add(new EvalComponent(new AtomicLlmEval(
+                    evaluator: new ContextAwareJudge(new ChatClientEvaluator(glm), c.Context),
+                    key: "faithful_llm",
+                    name: "Faithful to the ledger (generative judge)",
+                    category: "quality",
+                    version: "1.0.0",
+                    criteria: ["Every fact in the response appears in the context.", "Nothing in the response contradicts the context."],
+                    passThreshold: 0.70,
+                    judgeModel: ProviderConfig.BitdeerAgentName,
+                    rateResolver: _ => new JudgeCostMap.ModelRate(0, 0)), Weight: 0.40));
+            }
+
+            var composite = new CompositeEval(
+                key: "ledger_answer_quality",
+                name: "Ledger answer quality",
+                category: "quality",
+                version: "1.0.0",
+                components: components,
+                aggregation: WeightedSumAggregation.Instance,
+                threshold: 0.75);
+
             var r = await composite.EvaluateAsync(ToInput(c));
             Console.WriteLine($"   ▶ {c.Id}   composite {r.Score.Value:F3} {r.Score.Label.ToUpperInvariant()}");
             foreach (var leaf in r.Details.SubResults ?? [])

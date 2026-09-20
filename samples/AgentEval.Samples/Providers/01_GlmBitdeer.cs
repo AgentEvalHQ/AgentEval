@@ -129,8 +129,10 @@ public static class GlmBitdeerProviderDemo
         if (price is null)
             Console.WriteLine("   ⚠ Unpriced run: EstimatedCost in the in-memory results is 0 because no rate is known, not because the calls were free. Nothing is persisted.\n");
 
-        var judgeLeaf = new AtomicLlmEval(
-            evaluator: new ChatClientEvaluator(chat),
+        // One judge leaf PER CASE, because the judge must see that case's ledger: AtomicLlmEval passes
+        // the IEvaluator only the query and the response, so ContextAwareJudge prepends the ledger.
+        AtomicLlmEval JudgeLeafFor(string ledger) => new(
+            evaluator: new ContextAwareJudge(new ChatClientEvaluator(chat), ledger),
             key: "faithful_and_brief",
             name: "Faithful to the ledger and brief",
             category: "quality",
@@ -154,7 +156,7 @@ public static class GlmBitdeerProviderDemo
             {
                 Console.WriteLine($"   [dry-run] case {c.Id}");
                 Console.WriteLine($"             subject prompt : \"{c.Query}\"  +  context ({c.Context.Length} chars)");
-                Console.WriteLine($"             judge criteria : 2 criteria over (query, response) — no call made");
+                Console.WriteLine($"             judge criteria : 2 criteria over (query + ledger, response) — no call made");
             }
             Console.WriteLine();
             PrintTakeaways(dryRun: true);
@@ -176,7 +178,7 @@ public static class GlmBitdeerProviderDemo
                 components:
                 [
                     new EvalComponent(new ContainsRequiredTermEval(c.RequiredTerm), Weight: 0.30),
-                    new EvalComponent(judgeLeaf, Weight: 0.70),
+                    new EvalComponent(JudgeLeafFor(c.Context), Weight: 0.70),
                 ],
                 aggregation: WeightedSumAggregation.Instance,
                 threshold: 0.70);

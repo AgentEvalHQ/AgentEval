@@ -103,7 +103,9 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
         HttpResponseMessage response;
         try
         {
-            response = await _http.SendAsync(message, HttpCompletionOption.ResponseContentRead, cancellationToken).ConfigureAwait(false);
+            // Headers first, then a bounded read: a provider or proxy must not be able to make this
+            // client buffer an arbitrarily large body before it is parsed, excerpted or refused.
+            response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -130,7 +132,7 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
 
         using (response)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var body = await ReadBoundedBodyAsync(response, host, cancellationToken).ConfigureAwait(false);
 
             // A provider that echoes the request (some 4xx bodies quote the headers) would otherwise
             // put the bearer into our own exception message. Only error bodies are excerpted, so only
@@ -154,6 +156,34 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
     }
 
     private string Scrub(string text) => text.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The most a reply may weigh. A real System One reply is well under 2 KB; 4 MB leaves room for
+    /// a large batch of score answers with legends and still refuses a body that could exhaust memory.
+    /// </summary>
+    public const int MaxResponseBytes = 4 * 1024 * 1024;
+
+    private static async Task<string> ReadBoundedBodyAsync(HttpResponseMessage response, string host, CancellationToken cancellationToken)
+    {
+        if (response.Content.Headers.ContentLength is { } declared && declared > MaxResponseBytes)
+            throw TooLarge(host, declared);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[16 * 1024];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            if (buffer.Length + read > MaxResponseBytes)
+                throw TooLarge(host, buffer.Length + read);
+            buffer.Write(chunk, 0, read);
+        }
+        return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+    }
+
+    private static DecisionClientException TooLarge(string host, long observed) => new(
+        DecisionFailureKind.InvalidResponse,
+        $"{host} returned a body of at least {observed:N0} bytes; this client refuses anything over {MaxResponseBytes:N0}.");
 
     /// <inheritdoc/>
     public void Dispose()
