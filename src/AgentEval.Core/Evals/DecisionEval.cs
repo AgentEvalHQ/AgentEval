@@ -143,21 +143,21 @@ public sealed class DecisionEval : AtomicEval
             state,
             new Dictionary<string, DecisionQuestion>(StringComparer.Ordinal)
             {
-                [Key] = new NoulQuestion(_instructions, _trueCriteria, _falseCriteria),
+                [Key] = new BinaryQuestion(_instructions, _trueCriteria, _falseCriteria),
             },
             _model);
 
         var response = await _client.DecideAsync(request, ct).ConfigureAwait(false);
 
         // The transport guarantees the pairing; this guards a hand-rolled IDecisionClient that does not.
-        if (!response.Answers.TryGetValue(Key, out var answer) || answer is not NoulAnswer noul)
+        if (!response.Answers.TryGetValue(Key, out var answer) || answer is not BinaryAnswer noul)
         {
             throw new DecisionClientException(
                 DecisionFailureKind.InvalidResponse,
                 $"The decision client returned no yes/no answer for question '{Key}'.");
         }
 
-        var value = noul.ProbabilityYes;
+        var value = noul.TrueProbability;
         var passed = value >= _passThreshold;
         var label = passed ? "pass" : "fail";
         var scoreSeverity = value < 0.40 ? "high" : "medium";

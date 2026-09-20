@@ -46,7 +46,7 @@ public class SystemOneDecisionClientTests
 
     private static DecisionRequest OneQuestion() => new(
         State: new { Query = "q", Response = "r" },
-        Questions: new Dictionary<string, DecisionQuestion> { ["q"] = new NoulQuestion("Is r an answer to q?") });
+        Questions: new Dictionary<string, DecisionQuestion> { ["q"] = new BinaryQuestion("Is r an answer to q?") });
 
     private static (SystemOneDecisionClient Client, RecordingHandler Handler) Make(
         HttpStatusCode status = HttpStatusCode.OK, string body = OkBody, SystemOneClientOptions? options = null)
@@ -78,7 +78,7 @@ public class SystemOneDecisionClientTests
         Assert.Equal("noul", sent.RootElement.GetProperty("questions").GetProperty("q").GetProperty("type").GetString());
 
         Assert.Equal("typesafe/jev-1.13-20260917", response.Model);
-        Assert.Equal(0.75, Assert.IsType<NoulAnswer>(response.Answers["q"]).ProbabilityYes, precision: 6);
+        Assert.Equal(0.75, Assert.IsType<BinaryAnswer>(response.Answers["q"]).TrueProbability, precision: 6);
         Assert.Equal(1, handler.Calls);
     }
 

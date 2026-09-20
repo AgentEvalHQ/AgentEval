@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Added
 - `AgentEval.Decisions.IDecisionClient` (Abstractions) — the decision-model transport:
-  `state + typed questions → typed probabilistic answers`. Three question shapes (`NoulQuestion`
+  `state + typed questions → typed probabilistic answers`. Three question shapes (`BinaryQuestion`
   yes/no, `ChoiceQuestion` one-of-N, `ScoreQuestion` ordered scale) with matching answers
-  (`NoulAnswer.ProbabilityYes`, `ChoiceAnswer`, `ScoreAnswer`). Deliberately not an `IChatClient`.
+  (`BinaryAnswer.TrueProbability`, `ChoiceAnswer`, `ScoreAnswer`). Deliberately not an `IChatClient`.
 - `SystemOneDecisionClient` (Core) — the System One HTTP protocol that TypeSafe's Jev speaks,
   reachable directly (`SystemOneClientOptions.ForTypeSafe`) or through OpenRouter
   (`ForOpenRouter`, model `typesafe/jev-1.13`). Strict parser: a missing answer, a wrong answer

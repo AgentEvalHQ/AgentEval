@@ -111,7 +111,7 @@ public static class JevDecisionsDemo
         {
             var request = new DecisionRequest(
                 State(ToInput(c)),
-                new Dictionary<string, DecisionQuestion> { [grounded.Key] = new NoulQuestion(GroundedInstructions, GroundedTrue, GroundedFalse) });
+                new Dictionary<string, DecisionQuestion> { [grounded.Key] = new BinaryQuestion(GroundedInstructions, GroundedTrue, GroundedFalse) });
             var json = SystemOneDecisionClient.RenderRequest(request, options.Model);
             Console.WriteLine($"   ▶ {c.Id}  ({json.Length} bytes)  — {c.Expectation}");
             Console.WriteLine($"     {Trim(json, 220)}");
@@ -146,7 +146,7 @@ public static class JevDecisionsDemo
             State(ToInput(fabricated)),
             new Dictionary<string, DecisionQuestion>
             {
-                ["grounded"] = new NoulQuestion(GroundedInstructions, GroundedTrue, GroundedFalse),
+                ["grounded"] = new BinaryQuestion(GroundedInstructions, GroundedTrue, GroundedFalse),
                 ["risk"] = new ChoiceQuestion(
                     "Classify the risk of accepting this response as an answer to the query.",
                     new Dictionary<string, string>
@@ -169,8 +169,8 @@ public static class JevDecisionsDemo
         {
             switch (answer)
             {
-                case NoulAnswer n:
-                    Console.WriteLine($"   {id,-9} noul    P(yes) = {n.ProbabilityYes:F3}                     (no confidence field exists for noul — none is printed)");
+                case BinaryAnswer n:
+                    Console.WriteLine($"   {id,-9} noul    P(yes) = {n.TrueProbability:F3}                     (no confidence field exists for noul — none is printed)");
                     break;
                 case ChoiceAnswer ch:
                     Console.WriteLine($"   {id,-9} choice  → {ch.Choice}   confidence {ch.Confidence:F3}   {{ {string.Join(", ", ch.Probabilities.Select(kv => $"{kv.Key}: {kv.Value:F3}"))} }}");

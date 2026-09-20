@@ -218,6 +218,12 @@ internal static class SystemOneProtocol
 {
     private const int BodyExcerptLength = 500;
 
+    /// <summary>The most options a System One choice question accepts (a provider limit, not a contract one).</summary>
+    internal const int MaxChoiceOptions = 255;
+
+    /// <summary>The most levels a System One score question accepts (a provider limit, not a contract one).</summary>
+    internal const int MaxScoreLevels = 10;
+
     private static readonly JsonSerializerOptions s_stateOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
@@ -269,7 +275,7 @@ internal static class SystemOneProtocol
         writer.WriteStartObject();
         switch (question)
         {
-            case NoulQuestion noul:
+            case BinaryQuestion noul:
                 writer.WriteString("type", "noul");
                 writer.WriteString("instructions", noul.Instructions);
                 if (noul.TrueCriteria is not null || noul.FalseCriteria is not null)
@@ -283,6 +289,8 @@ internal static class SystemOneProtocol
                 break;
 
             case ChoiceQuestion choice:
+                if (choice.Criteria.Count > MaxChoiceOptions)
+                    throw new DecisionClientException(DecisionFailureKind.InvalidRequest, $"A System One choice question accepts at most {MaxChoiceOptions} options; {choice.Criteria.Count} were supplied.");
                 writer.WriteString("type", "choice");
                 writer.WriteString("instructions", choice.Instructions);
                 writer.WritePropertyName("criteria");
@@ -293,6 +301,8 @@ internal static class SystemOneProtocol
                 break;
 
             case ScoreQuestion score:
+                if (score.Criteria.Count > MaxScoreLevels)
+                    throw new DecisionClientException(DecisionFailureKind.InvalidRequest, $"A System One score question accepts at most {MaxScoreLevels} levels; {score.Criteria.Count} were supplied.");
                 writer.WriteString("type", "score");
                 writer.WriteString("instructions", score.Instructions);
                 writer.WritePropertyName("criteria");
@@ -381,7 +391,7 @@ internal static class SystemOneProtocol
     {
         var expected = question switch
         {
-            NoulQuestion => "noul",
+            BinaryQuestion => "noul",
             ChoiceQuestion => "choice",
             ScoreQuestion => "score",
             _ => throw new NotSupportedException($"Unknown question shape {question.GetType().Name}."),
@@ -397,8 +407,8 @@ internal static class SystemOneProtocol
         {
             switch (question)
             {
-                case NoulQuestion:
-                    return new NoulAnswer(ReadDouble(el, "noul", id, host));
+                case BinaryQuestion:
+                    return new BinaryAnswer(ReadDouble(el, "noul", id, host));
 
                 case ChoiceQuestion:
                     return new ChoiceAnswer(

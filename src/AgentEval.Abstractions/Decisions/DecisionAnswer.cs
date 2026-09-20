@@ -32,12 +32,12 @@ public abstract record DecisionAnswer
     }
 }
 
-/// <summary>The answer to a <see cref="NoulQuestion"/>: the probability that the answer is yes.</summary>
-/// <param name="ProbabilityYes">P(yes), in [0, 1]. This IS the answer; there is no separate confidence.</param>
-public sealed record NoulAnswer(double ProbabilityYes) : DecisionAnswer
+/// <summary>The answer to a <see cref="BinaryQuestion"/>: the probability that the proposition is true.</summary>
+/// <param name="TrueProbability">P(true), in [0, 1]. This IS the answer; there is no separate confidence.</param>
+public sealed record BinaryAnswer(double TrueProbability) : DecisionAnswer
 {
-    /// <summary>P(yes), finite and within [0, 1].</summary>
-    public double ProbabilityYes { get; } = EnsureUnit(ProbabilityYes, nameof(ProbabilityYes));
+    /// <summary>P(true), finite and within [0, 1].</summary>
+    public double TrueProbability { get; } = EnsureUnit(TrueProbability, nameof(TrueProbability));
 }
 
 /// <summary>The answer to a <see cref="ChoiceQuestion"/>: the winning option, the whole distribution, and a confidence.</summary>

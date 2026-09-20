@@ -51,7 +51,7 @@ state + { id: typed question }  →  { id: typed answer }
 
 - a **noul** question returns `P(yes)`;
 - a **choice** question returns the winning option, the full distribution and a confidence;
-- a **score** question returns a probability-weighted position on a 2–10 level scale, the
+- a **score** question returns a probability-weighted position on an ordered scale (2–10 levels on Jev), the
   distribution and a confidence. Levels are **0-indexed on the wire** (`"0"` is the first criterion)
   — observed, not documented; see the evidence file.
 
@@ -82,9 +82,11 @@ what was paid for. So the transport gets its own interface, and the eval gets it
 ### 4.1 Abstractions (`AgentEval.Abstractions/Decisions/`, namespace `AgentEval.Decisions`)
 
 `IDecisionClient.DecideAsync(DecisionRequest) → DecisionResponse`. Provider-neutral names on purpose:
-`IDecisionClient`, `DecisionQuestion`, `DecisionAnswer` — not `IJevClient`. AgentEval owns the
-concept; a provider package owns a protocol. The records validate at construction (a probability is
-finite and in [0, 1]; a choice has 2–255 options; a score has 2–10 levels; a request has at least
+`IDecisionClient`, `DecisionQuestion`, `DecisionAnswer`, `BinaryQuestion` — not `IJevClient` or
+`NoulQuestion` (renamed 2026-09-20: "noul" is TypeSafe's wire name and stays in the transport). AgentEval owns
+the concept; a provider package owns a protocol. Provider maximums (255 options, 10 levels on Jev) are
+enforced by the transport, not baked into the contract, so the same records can front another provider. The records validate at construction (a probability is
+finite and in [0, 1]; a choice has at least 2 options; a score has at least 2 levels; a request has at least
 one question), so an out-of-range value cannot exist as an object.
 
 ### 4.2 Transport (`AgentEval.Core/Decisions/SystemOneDecisionClient.cs`)

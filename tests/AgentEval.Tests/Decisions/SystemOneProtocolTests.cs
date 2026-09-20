@@ -24,7 +24,7 @@ public class SystemOneProtocolTests
             State: "I was charged twice for my subscription.",
             Questions: new Dictionary<string, DecisionQuestion>
             {
-                ["refund"] = new NoulQuestion("Is the customer asking for money back?"),
+                ["refund"] = new BinaryQuestion("Is the customer asking for money back?"),
             });
 
         var json = SystemOneProtocol.SerializeRequest(request, "typesafe/jev-1.13");
@@ -46,7 +46,7 @@ public class SystemOneProtocolTests
             State: "x",
             Questions: new Dictionary<string, DecisionQuestion>
             {
-                ["grounded"] = new NoulQuestion("Is it grounded?", TrueCriteria: "Every claim is in the context.", FalseCriteria: "A claim is not in the context."),
+                ["grounded"] = new BinaryQuestion("Is it grounded?", TrueCriteria: "Every claim is in the context.", FalseCriteria: "A claim is not in the context."),
             });
 
         using var doc = JsonDocument.Parse(SystemOneProtocol.SerializeRequest(request, "m"));
@@ -88,7 +88,7 @@ public class SystemOneProtocolTests
     {
         var request = new DecisionRequest(
             State: new { Query = "q", Response = "r", Context = (string?)null },
-            Questions: new Dictionary<string, DecisionQuestion> { ["a"] = new NoulQuestion("?") });
+            Questions: new Dictionary<string, DecisionQuestion> { ["a"] = new BinaryQuestion("?") });
 
         using var doc = JsonDocument.Parse(SystemOneProtocol.SerializeRequest(request, "m"));
         var state = doc.RootElement.GetProperty("state");
@@ -100,7 +100,7 @@ public class SystemOneProtocolTests
     [Fact]
     public void SerializeRequest_RequestModel_OverridesDefault()
     {
-        var request = new DecisionRequest("x", new Dictionary<string, DecisionQuestion> { ["a"] = new NoulQuestion("?") }, Model: "typesafe/jev-1.13");
+        var request = new DecisionRequest("x", new Dictionary<string, DecisionQuestion> { ["a"] = new BinaryQuestion("?") }, Model: "typesafe/jev-1.13");
         using var doc = JsonDocument.Parse(SystemOneProtocol.SerializeRequest(request, "~typesafe/jev-latest"));
         Assert.Equal("typesafe/jev-1.13", doc.RootElement.GetProperty("model").GetString());
     }
@@ -108,7 +108,7 @@ public class SystemOneProtocolTests
     // ── Response parsing: the documented shapes ──────────────────────────────
 
     private static readonly IReadOnlyDictionary<string, DecisionQuestion> OneNoul =
-        new Dictionary<string, DecisionQuestion> { ["refund"] = new NoulQuestion("Is the customer asking for money back?") };
+        new Dictionary<string, DecisionQuestion> { ["refund"] = new BinaryQuestion("Is the customer asking for money back?") };
 
     [Fact]
     public void ParseResponse_OpenRouterNoulExample_RoundTrips()
@@ -128,8 +128,8 @@ public class SystemOneProtocolTests
         var response = SystemOneProtocol.ParseResponse(body, OneNoul, "openrouter.ai");
 
         Assert.Equal("typesafe/jev-1.13-20260917", response.Model);
-        var answer = Assert.IsType<NoulAnswer>(response.Answers["refund"]);
-        Assert.Equal(0.98, answer.ProbabilityYes, precision: 6);
+        var answer = Assert.IsType<BinaryAnswer>(response.Answers["refund"]);
+        Assert.Equal(0.98, answer.TrueProbability, precision: 6);
         Assert.NotNull(response.Usage);
         Assert.Equal(275, response.Usage!.InputTokens);
         Assert.Equal(20, response.Usage.OutputTokens);
@@ -147,7 +147,7 @@ public class SystemOneProtocolTests
         var response = SystemOneProtocol.ParseResponse(body, OneNoul, "api.typesafe.ai");
 
         Assert.Null(response.Usage!.Cost);
-        Assert.Equal(0.12, Assert.IsType<NoulAnswer>(response.Answers["refund"]).ProbabilityYes, precision: 6);
+        Assert.Equal(0.12, Assert.IsType<BinaryAnswer>(response.Answers["refund"]).TrueProbability, precision: 6);
     }
 
     [Fact]
@@ -239,6 +239,50 @@ public class SystemOneProtocolTests
         Assert.Equal(transient, ex.IsTransient);
         Assert.Equal(status, ex.StatusCode);
         Assert.Contains($"HTTP {status}", ex.Message, StringComparison.Ordinal);
+    }
+
+    // ── Provider limits live in the transport, not the contract ──────────────
+
+    [Fact]
+    public void SerializeRequest_ChoiceAboveProviderMaximum_ThrowsInvalidRequestBeforeSending()
+    {
+        var options = Enumerable.Range(0, SystemOneProtocol.MaxChoiceOptions + 1).ToDictionary(i => $"o{i}", i => $"option {i}");
+        var request = new DecisionRequest("x", new Dictionary<string, DecisionQuestion> { ["c"] = new ChoiceQuestion("Which?", options) });
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.SerializeRequest(request, "m"));
+
+        Assert.Equal(DecisionFailureKind.InvalidRequest, ex.Kind);
+        Assert.False(ex.IsTransient);
+        Assert.Contains(SystemOneProtocol.MaxChoiceOptions.ToString(), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SerializeRequest_ScoreAboveProviderMaximum_ThrowsInvalidRequestBeforeSending()
+    {
+        var levels = Enumerable.Range(0, SystemOneProtocol.MaxScoreLevels + 1).Select(i => $"level {i}").ToList();
+        var request = new DecisionRequest("x", new Dictionary<string, DecisionQuestion> { ["s"] = new ScoreQuestion("How much?", levels) });
+
+        var ex = Assert.Throws<DecisionClientException>(() => SystemOneProtocol.SerializeRequest(request, "m"));
+
+        Assert.Equal(DecisionFailureKind.InvalidRequest, ex.Kind);
+        Assert.Contains(SystemOneProtocol.MaxScoreLevels.ToString(), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Contract_AcceptsCountsAboveJevLimits_BecauseTheyAreProviderLimits()
+    {
+        var options = Enumerable.Range(0, 300).ToDictionary(i => $"o{i}", i => $"option {i}");
+        var levels = Enumerable.Range(0, 12).Select(i => $"level {i}").ToList();
+
+        _ = new ChoiceQuestion("Which?", options);
+        _ = new ScoreQuestion("How much?", levels);
+    }
+
+    [Fact]
+    public void Contract_StillRejectsFewerThanTwoOptionsOrLevels()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ChoiceQuestion("Which?", new Dictionary<string, string> { ["only"] = "one" }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ScoreQuestion("How much?", new[] { "one" }));
     }
 
     [Fact]

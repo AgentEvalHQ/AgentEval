@@ -20,7 +20,7 @@ public class DecisionEvalTests
 
     private sealed class FakeDecisionClient : IDecisionClient
     {
-        public double ProbabilityYes { get; set; } = 0.5;
+        public double TrueProbability { get; set; } = 0.5;
         public string Model { get; set; } = "typesafe/jev-1.13-20260917";
         public DecisionUsage? Usage { get; set; } = new(200, 10, Cost: null);
         public Exception? Throw { get; set; }
@@ -35,7 +35,7 @@ public class DecisionEvalTests
 
             var answers = request.Questions.Keys.ToDictionary(
                 k => k,
-                _ => (DecisionAnswer)new NoulAnswer(ProbabilityYes),
+                _ => (DecisionAnswer)new BinaryAnswer(TrueProbability),
                 StringComparer.Ordinal);
             return Task.FromResult(new DecisionResponse(Model, answers, Usage));
         }
@@ -71,7 +71,7 @@ public class DecisionEvalTests
     [Fact]
     public async Task EvaluateAsync_ProbabilityAtOrAboveThreshold_PassesWithProbabilityAsScore()
     {
-        var client = new FakeDecisionClient { ProbabilityYes = 0.87 };
+        var client = new FakeDecisionClient { TrueProbability = 0.87 };
         var sut = MakeSut(client, passThreshold: 0.80);
 
         var result = await sut.EvaluateAsync(MakeInput());
@@ -89,7 +89,7 @@ public class DecisionEvalTests
     {
         // 0.69 against 0.70 is a fail — and the 0.69 must survive, because a threshold sweep later
         // needs it. This is the "do not round to fail and discard" rule.
-        var client = new FakeDecisionClient { ProbabilityYes = 0.69 };
+        var client = new FakeDecisionClient { TrueProbability = 0.69 };
         var sut = MakeSut(client, passThreshold: 0.70);
 
         var result = await sut.EvaluateAsync(MakeInput());
@@ -104,7 +104,7 @@ public class DecisionEvalTests
     [Fact]
     public async Task EvaluateAsync_LowProbability_IsHighSeverity_AndFailureSeverityRaisesNotLowers()
     {
-        var client = new FakeDecisionClient { ProbabilityYes = 0.10 };
+        var client = new FakeDecisionClient { TrueProbability = 0.10 };
 
         var plain = await MakeSut(client).EvaluateAsync(MakeInput());
         Assert.Equal("high", plain.Score.Severity);
@@ -117,9 +117,9 @@ public class DecisionEvalTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_ConfidenceIsNull_BecauseANoulAnswerCarriesNone()
+    public async Task EvaluateAsync_ConfidenceIsNull_BecauseABinaryAnswerCarriesNone()
     {
-        var result = await MakeSut(new FakeDecisionClient { ProbabilityYes = 0.99 }).EvaluateAsync(MakeInput());
+        var result = await MakeSut(new FakeDecisionClient { TrueProbability = 0.99 }).EvaluateAsync(MakeInput());
         Assert.Null(result.Score.Confidence);
     }
 
@@ -187,12 +187,12 @@ public class DecisionEvalTests
     // ── What goes on the wire ────────────────────────────────────────────────
 
     [Fact]
-    public async Task EvaluateAsync_AsksOneNoulQuestionKeyedByEvalKey_WithCriteria()
+    public async Task EvaluateAsync_AsksOneBinaryQuestionKeyedByEvalKey_WithCriteria()
     {
         var client = new FakeDecisionClient();
         await MakeSut(client).EvaluateAsync(MakeInput());
 
-        var question = Assert.IsType<NoulQuestion>(Assert.Single(client.LastRequest!.Questions).Value);
+        var question = Assert.IsType<BinaryQuestion>(Assert.Single(client.LastRequest!.Questions).Value);
         Assert.Equal("grounded", Assert.Single(client.LastRequest.Questions).Key);
         Assert.Equal("Every claim is in the context.", question.TrueCriteria);
         Assert.Equal("At least one claim is not.", question.FalseCriteria);
@@ -260,7 +260,7 @@ public class DecisionEvalTests
     [Fact]
     public async Task DecisionEval_IsAnOrdinaryCompositeLeaf()
     {
-        var client = new FakeDecisionClient { ProbabilityYes = 0.90 };
+        var client = new FakeDecisionClient { TrueProbability = 0.90 };
         var composite = new CompositeEval(
             key: "answer_quality", name: "Answer quality", category: "quality", version: "1.0.0",
             components: [new EvalComponent(MakeSut(client, passThreshold: 0.80), Weight: 1.0)],
