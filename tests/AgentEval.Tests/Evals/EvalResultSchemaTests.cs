@@ -301,6 +301,52 @@ public class EvalResultSchemaTests
         Assert.True(result.IsValid, FormatErrors(result));
     }
 
+    // ── ADR-033 surface: atomic-decision provenance enum ─────────────────────
+
+    private const string AtomicDecisionJson = """
+        {
+          "metric": {
+            "key": "grounded",
+            "name": "Grounded in evidence",
+            "category": "quality",
+            "version": "1.0.0"
+          },
+          "score": {
+            "value": 0.87,
+            "label": "pass",
+            "passed": true,
+            "threshold": 0.80,
+            "severity": "none",
+            "confidence": null
+          },
+          "details": {
+            "dimensions": {
+              "decision.probability_yes": 0.87
+            }
+          },
+          "provenance": {
+            "type": "atomic-decision",
+            "judgeModel": "typesafe/jev-1.13-20260917",
+            "promptHash": "3f9c1a7b2e4d5c60",
+            "tokensUsed": 210,
+            "estimatedCost": 0.0000088,
+            "cacheHit": false
+          },
+          "evaluatedAt": "2026-09-20T18:00:00Z"
+        }
+        """;
+
+    [Fact]
+    public void AtomicDecisionResult_ValidatesAgainstSchema()
+    {
+        // ADR-033: DecisionEval emits provenance.type = "atomic-decision". The enum is closed
+        // (additionalProperties=false everywhere), so a leaf of the new kind would have been
+        // refused at persistence time had the value not been added. Lock it in, the way the
+        // multi-judge-adjudicated regression above does.
+        var result = Evaluate(AtomicDecisionJson);
+        Assert.True(result.IsValid, FormatErrors(result));
+    }
+
     [Fact]
     public void Result_WithExtraUnknownProperty_FailsValidation()
     {

@@ -4,6 +4,7 @@
 using System.Text;
 using AgentEval.Samples.Benchmarks;
 using AgentEval.Samples.EvalJoin;
+using AgentEval.Samples.Providers;
 
 namespace AgentEval.Samples;
 
@@ -210,6 +211,13 @@ public static class Program
             new("Eval + Chance Floor",       "A REAL MAF agent run → EvalInput → AddEval(eval, floor) → EvalResult carrying its floor", EvalWithChanceFloor.RunAsync),
             new("Deterministic Benchmark",  "The same eval as a BenchmarkDefinition: 3 cases × 2 arms × 2 reps, scored against its floor AND against a control arm", DeterministicBenchmark.RunAsync),
         ]),
+
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101.
+        new('N', "Providers: Bitdeer GLM + TypeSafe Jev", "🔑 BITDEER_API_KEY · TYPESAFE_API_KEY or OPENROUTER_API_KEY · --dry-run prints every payload, spends nothing",
+        [
+            new("GLM-5.3 Flash @ Bitdeer",   "Subject + judge through the ordinary IChatClient path — no provider code, provider kept in the identity", GlmBitdeerProviderDemo.RunAsync),
+            new("Jev Decisions",             "IDecisionClient + DecisionEval: P(yes) as the score, three question shapes in one request, a third evaluator kind in a composite", JevDecisionsDemo.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────
@@ -234,6 +242,10 @@ public static class Program
                 break;
             }
         }
+
+        // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
+        if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
+            Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_DRY_RUN", "1");
 
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();

@@ -33,6 +33,8 @@ dotnet run -- 45   # Performance benchmark   (H2)
 dotnet run -- 56   # Report Browser          (H13)
 dotnet run -- 61   # Gatekeeper Hello World  (J1)
 dotnet run -- 90   # Agent Skills Hello World (K1)
+dotnet run -- 100  # GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 101  # Jev Decisions           (N2)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -246,6 +248,38 @@ consent-flag rationale, and the honest fidelity-ceiling disclosure (text-only; n
 | 0 | **Hello World** | Build the live connector, send ONE message, ONE assertion (`HaveRespondedWithNonEmptyMessage`) — the on-ramp | No (MCS creds instead) | 1 min |
 | 1 | **Live Walkthrough** | `CopilotStudioAssertions` fluent API, multi-turn conversation continuity, Gatekeeper (`UseEvalGate`) composing over a live MCS agent exactly like any other `IChatClient` | No (MCS creds instead) | 5 min |
 | 2 | **Budget + Red Team** | A tight `--max-credits`-equivalent cap tripping `CopilotStudioBudgetExceededException` for real, `HaveStayedWithinCreditBudget`, `CanResistAsync` red-teaming a live MCS agent (same one-liner as an Azure OpenAI agent), `HaveStartedNewConversation`/`HaveStartedDifferentConversation` | No (MCS creds instead) | 6 min |
+
+### N — Providers: Bitdeer GLM + TypeSafe Jev  🔑 `BITDEER_API_KEY` · `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY`
+
+Two providers that are not Azure OpenAI, exercised the way AgentEval already works — and one that is
+not a chat model at all. See [ADR-033](../../docs/adr/033-decision-evals-third-evaluator-kind.md).
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **GLM-5.3 Flash @ Bitdeer** | An OpenAI-compatible host through the ordinary `IChatClient` path (the same construction as `agenteval eval --endpoint`): the model as **subject** (`AsEvaluableAgent`) and as **judge** (`ChatClientEvaluator` in an `AtomicLlmEval`) inside one `CompositeEval`, provider kept in the identity (`…@bitdeer`), judge==subject stated in the result | No (`BITDEER_API_KEY`) | 3 min |
+| 2 | **Jev Decisions** | `IDecisionClient` + `DecisionEval`: `P(yes)` **is** the score, the raw probability survives in `Dimensions`, provenance names the model the provider echoed; three question shapes (noul / choice / score) in ONE request; `[atomic-decision]` as a third evaluator kind beside `[atomic-code]` and `[atomic-llm]` in a composite | No (`TYPESAFE_API_KEY` or `OPENROUTER_API_KEY`; `BITDEER_API_KEY` adds the GLM judge) | 4 min |
+
+Both samples run in stages — **dry run → one real item → the rest** — and both stop with a warning when
+the key is absent; there is no mock path.
+
+```bash
+dotnet run -- 100 --dry-run   # prints every prompt, sends nothing — GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 100             # …then spend — GLM-5.3 Flash @ Bitdeer (N1)
+dotnet run -- 101 --dry-run   # prints every request body, sends nothing — Jev Decisions (N2)
+dotnet run -- 101             # …then spend — Jev Decisions (N2)
+```
+
+```powershell
+$env:BITDEER_API_KEY    = "..."                       # https://api-inference.bitdeer.ai/v1, zai-org/GLM-5.3-Flash
+$env:TYPESAFE_API_KEY   = "..."                       # direct: https://api.typesafe.ai/v1/systemone, model jev-latest
+$env:OPENROUTER_API_KEY = "..."                       # relay:  https://openrouter.ai/api/v1/systemone, model typesafe/jev-1.13
+# optional
+$env:JEV_TRANSPORT = "typesafe"                       # or "openrouter" — when both keys are set
+$env:JEV_MODEL     = "jev-1.13.0"                     # pin a versioned id for anything reproducible (TypeSafe: jev-1.13.0; OpenRouter: typesafe/jev-1.13)
+$env:AGENTEVAL_SAMPLES_SHOW_RAW = "1"                 # N2: print every request and reply body (the key is never printed)
+$env:BITDEER_PRICE_INPUT_PER_1M  = "0.00"             # Bitdeer's list price was not verifiable from their public
+$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; unset → the run prints "not priced"
+```
 
 ---
 

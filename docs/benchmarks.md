@@ -142,7 +142,7 @@ This combines two presets with custom weights. The result is a standard `Composi
 
 ## See Also
 
-- [Composite Evaluations](composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
+- [Composite Evaluations](composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` / `DecisionEval` primitives.
 - [CLI Reference](cli.md) — `agenteval bench {agentic,gdpr,eu-ai-act}` and their `calibrate` subcommands, plus `{owasp,mitre,nist,longmemeval,memory,perf,trace-fidelity,workflow-trace-fidelity}`.
 - [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical layout, schema versions, audit chain.
 - [Evaluation Guide](evaluation-guide.md) — overall framework concepts.
