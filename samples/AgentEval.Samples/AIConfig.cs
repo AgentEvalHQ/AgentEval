@@ -63,8 +63,13 @@ public static class AIConfig
     /// <summary>A short tag for agent identities (<c>model@provider</c>), because the host is part of what was measured.</summary>
     public static string ProviderTag => Settings.ProviderTag;
 
-    /// <summary>True when the Azure OpenAI trio is set, whatever provider is selected (the Azure-only surfaces need it).</summary>
-    public static bool IsAzureConfigured => InferenceProviderEnvironment.HasCredentials(InferenceProvider.AzureOpenAI, Environment.GetEnvironmentVariable);
+    /// <summary>
+    /// True when the Azure OpenAI trio is set AND the endpoint is one a key may be sent to (https, or
+    /// loopback http), whatever provider is selected — the Azure-only surfaces (embeddings) rely on it.
+    /// </summary>
+    public static bool IsAzureConfigured =>
+        InferenceProviderEnvironment.HasCredentials(InferenceProvider.AzureOpenAI, Environment.GetEnvironmentVariable)
+        && InferenceProviderEnvironment.TryValidateEndpoint(Env("AZURE_OPENAI_ENDPOINT"), out _, out _);
 
     /// <summary>True when <c>BITDEER_API_KEY</c> is set, whatever provider is selected.</summary>
     public static bool IsBitdeerConfigured => InferenceProviderEnvironment.HasCredentials(InferenceProvider.Bitdeer, Environment.GetEnvironmentVariable);
@@ -123,9 +128,15 @@ public static class AIConfig
 
     // ── Azure-only surfaces ───────────────────────────────────────────────────
 
-    /// <summary>The Azure OpenAI resource endpoint. Throws when the Azure trio is not set.</summary>
+    /// <summary>
+    /// The Azure OpenAI resource endpoint, validated the same way as every provider endpoint (absolute
+    /// https, or loopback http). Throws with the reason when it is unset, malformed, or would carry the
+    /// key in cleartext — the Azure-only surfaces must not bypass the check the resolver applies.
+    /// </summary>
     public static Uri AzureEndpoint =>
-        new(Env("AZURE_OPENAI_ENDPOINT") ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT not configured"));
+        InferenceProviderEnvironment.TryValidateEndpoint(Env("AZURE_OPENAI_ENDPOINT"), out var endpoint, out var why)
+            ? endpoint!
+            : throw new InvalidOperationException($"AZURE_OPENAI_ENDPOINT='{Env("AZURE_OPENAI_ENDPOINT")}' {why}");
 
     /// <summary>The Azure OpenAI API key credential. Throws when the Azure trio is not set.</summary>
     public static AzureKeyCredential AzureKeyCredential =>
@@ -149,7 +160,9 @@ public static class AIConfig
     /// <c>foundry</c> CHAT provider, which is <c>FOUNDRY_ENDPOINT</c> + <c>FOUNDRY_API_KEY</c> + <c>FOUNDRY_MODEL</c>.
     /// </summary>
     public static Uri? FoundryEndpoint =>
-        Env("AZURE_FOUNDRY_ENDPOINT") is { } v && Uri.TryCreate(v, UriKind.Absolute, out var uri) ? uri : null;
+        // The project client sends an Entra bearer token here; the same rule applies as for an API key:
+        // https, or loopback http. Anything else is treated as not configured.
+        InferenceProviderEnvironment.TryValidateEndpoint(Env("AZURE_FOUNDRY_ENDPOINT"), out var uri, out _) ? uri : null;
 
     /// <summary>True when a chat provider is configured and <c>AZURE_FOUNDRY_ENDPOINT</c> is set (H11/H12 need a judge too).</summary>
     public static bool IsFoundryConfigured => IsConfigured && FoundryEndpoint is not null;
