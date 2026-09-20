@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
@@ -190,12 +190,12 @@ public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
             // A provider that echoes the request (some 4xx bodies quote the headers) would otherwise
-            // put the bearer into our own exception message. Redact it before anything is excerpted.
-            // A legitimate success body never contains the key, so parsing the redacted text is safe.
-            body = body.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal);
-
+            // put the bearer into our own exception message. Only error bodies are excerpted, so only
+            // they are redacted: redacting a success body would corrupt it when the key is a short
+            // string that also occurs inside field names (a "k" key turns "input_tokens" into
+            // "input_to[redacted]ens"). A success body is parsed verbatim and never quoted.
             if (!response.IsSuccessStatusCode)
-                throw SystemOneProtocol.ClassifyFailure((int)response.StatusCode, body, host);
+                throw SystemOneProtocol.ClassifyFailure((int)response.StatusCode, body.Replace(_options.ApiKey, "[redacted]", StringComparison.Ordinal), host);
 
             return SystemOneProtocol.ParseResponse(body, request.Questions, host);
         }
