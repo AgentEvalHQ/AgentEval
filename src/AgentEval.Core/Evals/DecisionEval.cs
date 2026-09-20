@@ -169,7 +169,11 @@ public sealed class DecisionEval : AtomicEval
         double estimatedCost = 0;
         if (response.Usage is { } usage)
         {
-            var total = usage.InputTokens + usage.OutputTokens;
+            // Saturating add: both counts are non-negative (DecisionUsage guards them), so the only way
+            // the sum can go wrong is to wrap past long.MaxValue — clamp before, not after, the addition.
+            var total = usage.InputTokens > long.MaxValue - usage.OutputTokens
+                ? long.MaxValue
+                : usage.InputTokens + usage.OutputTokens;
             tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
             estimatedCost = usage.Cost ?? EstimateCost(response.Model, usage);
         }

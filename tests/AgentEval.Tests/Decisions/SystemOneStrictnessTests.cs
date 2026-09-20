@@ -65,6 +65,25 @@ public class SystemOneStrictnessTests
         Assert.Contains(endpoint, ex.Message, StringComparison.Ordinal);
     }
 
+    private sealed class HugeUsageClient : IDecisionClient
+    {
+        public Task<DecisionResponse> DecideAsync(DecisionRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DecisionResponse(
+                "m",
+                request.Questions.Keys.ToDictionary(k => k, _ => (DecisionAnswer)new BinaryAnswer(0.9), StringComparer.Ordinal),
+                new DecisionUsage(long.MaxValue - 5, 10, Cost: 0.0)));
+    }
+
+    [Fact]
+    public async Task DecisionEval_TokenSumThatWouldOverflow_SaturatesAtIntMax_NeverNegative()
+    {
+        var eval = new AgentEval.Evals.DecisionEval(new HugeUsageClient(), "k", "n", "c", "1.0.0", "?");
+
+        var result = await eval.EvaluateAsync(new AgentEval.Evals.EvalInput("q", "r"));
+
+        Assert.Equal(int.MaxValue, result.Provenance.TokensUsed);
+    }
+
     private sealed class FixedHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
