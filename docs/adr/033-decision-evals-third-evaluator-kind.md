@@ -2,8 +2,9 @@
 
 - **Status:** **Proposed (2026-09-20).** Proposed is a gate, not a placeholder (the ADR-026 / ADR-030
   precedent). The code in §4 is built and unit-tested. §7 (1) is **met for TypeSafe** the same day —
-  thirteen real calls, every one HTTP 200, requests and replies in
-  [`evidence/033-jev-first-calls-2026-09-20.md`](evidence/033-jev-first-calls-2026-09-20.md) — and
+  five real calls from the N2 sample on 2026-09-20 and seven on 2026-09-21, every one HTTP 200, requests and
+  replies in [`evidence/033-jev-first-calls-2026-09-20.md`](evidence/033-jev-first-calls-2026-09-20.md); eight
+  more direct probes on 2026-09-20 established the wire format and are not from the sample — and
   **met for Bitdeer since 2026-09-21**: one real call answered correctly on 2026-09-20, the account then
   returned HTTP 402 "insufficient balance", and after the top-up N1 step 3 and N2 stage 5 ran clean. §7 (2) and (3) are untouched: no number
   about Jev's behaviour on AgentEval data exists yet, and none is estimated here.

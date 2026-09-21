@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Globalization;
 using AgentEval.Core;
 using AgentEval.Decisions;
@@ -81,9 +82,10 @@ internal static class ProviderConfig
         // BITDEER_ENDPOINT is user-controlled and will carry the key: https only (loopback http for a local proxy).
         if (!AgentEval.Providers.InferenceProviderEnvironment.TryValidateEndpoint(BitdeerEndpoint, out var endpoint, out var why))
             throw new InvalidOperationException($"BITDEER_ENDPOINT='{BitdeerEndpoint}' {why}");
+        // AGENTEVAL_SAMPLES_SHOW_RAW=1 prints this client's requests and replies too, through the same logger as Jev's.
         var client = new OpenAIClient(
             new ApiKeyCredential(key),
-            new OpenAIClientOptions { Endpoint = endpoint });
+            new OpenAIClientOptions { Endpoint = endpoint, Transport = new HttpClientPipelineTransport(CreateWireLoggedHttpClient(key)) });
         return client.GetChatClient(BitdeerModel).AsIChatClient();
     }
 
@@ -166,22 +168,34 @@ internal static class ProviderConfig
     /// asked. The logger is told the key so it can scrub it from anything it prints — a provider or
     /// proxy that echoes the request headers must not put the bearer on the console.
     /// </summary>
-    public static HttpClient CreateJevHttpClient(SystemOneClientOptions options)
+    public static HttpClient CreateJevHttpClient(SystemOneClientOptions options) => CreateWireLoggedHttpClient(options.ApiKey);
+
+    /// <summary>
+    /// An HttpClient that prints every request and reply body when AGENTEVAL_SAMPLES_SHOW_RAW=1 and is a plain
+    /// client otherwise. Used for the Jev transport and, through <c>AIConfig.CreateChatClient</c>, for the chat
+    /// provider's SDK transport — so the wire evidence ADR-033 §7 asks for exists for EVERY provider, not one.
+    /// <paramref name="secret"/> is scrubbed from anything printed.
+    /// </summary>
+    public static HttpClient CreateWireLoggedHttpClient(string secret)
     {
-        HttpMessageHandler handler = ShowRawWire ? new RawWireLoggingHandler(new HttpClientHandler(), options.ApiKey) : new HttpClientHandler();
-        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
+        HttpMessageHandler handler = ShowRawWire ? new RawWireLoggingHandler(new HttpClientHandler(), secret) : new HttpClientHandler();
+        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     private sealed class RawWireLoggingHandler(HttpMessageHandler inner, string secret) : DelegatingHandler(inner)
     {
         private string Scrub(string text) => text.Replace(secret, "[redacted]", StringComparison.Ordinal);
 
+        private static readonly object s_console = new();
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            // One block per call, printed atomically AFTER the reply. A composite evaluates its leaves concurrently,
+            // and printing the request before the await let another call's reply land under this call's request.
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"   ┌─ RAW → {request.Method} {request.RequestUri}   (Authorization header present, not shown)");
-            Console.WriteLine($"   │ {Scrub(body)}");
+            var block = new System.Text.StringBuilder();
+            block.AppendLine($"   ┌─ RAW → {request.Method} {request.RequestUri}   (Authorization header present, not shown)");
+            block.AppendLine($"   │ {Scrub(body)}");
 
             var response = await base.SendAsync(request, cancellationToken);
 
@@ -197,10 +211,15 @@ internal static class ProviderConfig
             {
                 reply = $"[body larger than {SystemOneDecisionClient.MaxResponseBytes:N0} bytes — not shown; the client will refuse it]";
             }
-            Console.WriteLine($"   ├─ RAW ← HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
-            Console.WriteLine($"   │ {Scrub(reply)}");
-            Console.WriteLine("   └─");
-            Console.ResetColor();
+            block.AppendLine($"   ├─ RAW ← HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+            block.AppendLine($"   │ {Scrub(reply)}");
+            block.AppendLine("   └─");
+            lock (s_console)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write(block.ToString());
+                Console.ResetColor();
+            }
             return response;
         }
     }

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 - Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
   `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
+- Samples: `AGENTEVAL_SAMPLES_SHOW_RAW=1` wrapped only N2's Jev transport. It now wraps the chat client the
+  samples build for the selected provider and the Bitdeer client N1/N2 use, through the same logger, so the wire
+  evidence ADR-033 §7 asks for exists for every provider. Each request-and-reply block prints atomically after
+  its reply; a composite evaluates its leaves concurrently and the old two-write logger could put one call's
+  reply under another call's request.
 
 #### Evidence
 - `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released
