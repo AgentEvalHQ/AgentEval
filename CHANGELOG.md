@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Fixed
+- `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
+  0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
+  source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
+  constructor; the regression test forces the ordering through the same internal consumer-starter seam. These
+  were the only two pumps with the pattern.
+
 
 ## [0.40.0-beta] - 2026-09-21
 ### A third evaluator kind, and the samples stop assuming Azure
