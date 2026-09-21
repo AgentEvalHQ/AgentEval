@@ -44,6 +44,12 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal
       env:
+        # Same reason as ci.yml: a solution-wide `dotnet test` starts a host per project per target
+        # framework, and vstest's default 90 s wait for one to CONNECT has been exceeded on a loaded
+        # runner, aborting the run with no failing test named. On this workflow that abort would cost
+        # the NuGet publish, so the budget is raised here too. It governs process startup, before any
+        # test runs, and hides no assertion.
+        VSTEST_CONNECTION_TIMEOUT: '300'
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 

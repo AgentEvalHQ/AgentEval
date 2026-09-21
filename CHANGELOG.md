@@ -81,6 +81,12 @@ provider `AI_INFERENCE_PROVIDER` selects.
   `AZURE_OPENAI_JUDGE_*` override was undocumented and now has its own entry.
 
 #### Fixed
+- **CI and the release workflow raise vstest's testhost connection budget to 300 s.** A solution-wide
+  `dotnet test` starts a host per project per target framework, up to a dozen at once on a two-core runner,
+  and the default 90 s wait for one to *connect* ran out on a Windows leg — reported as `Test Run Aborted`
+  with no failing test, no assertion and no exception. This governs process startup, before any test runs,
+  so it hides no assertion; a host that never comes up still fails the job, with the real reason. Raised in
+  `release.yml` too, where that abort would have cost the NuGet publish.
 - **`AtomicLlmEval` passes `EvalInput.Context` to its judge.** It used to hand over the query and the
   response only, so an eval that set a context — a retrieved passage, a ledger extract, the source document —
   asked "is this grounded?" while withholding the ground, and the judge graded plausibility instead. Samples
