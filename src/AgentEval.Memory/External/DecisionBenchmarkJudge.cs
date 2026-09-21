@@ -123,7 +123,10 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
             "single-session-preference" => PreferenceInstructions,
             // The time-grounded probe's types judge like temporal-reasoning for the same reason: their
             // answers are dates and intervals derived from timestamps.
-            "temporal-reasoning" or "as-of" or "current" or "prospective" => TemporalInstructions,
+            "temporal-reasoning"
+                or LongMemEval.LongMemEvalTimeGroundedCorpus.AsOfQuestionType
+                or LongMemEval.LongMemEvalTimeGroundedCorpus.CurrentQuestionType
+                or LongMemEval.LongMemEvalTimeGroundedCorpus.ProspectiveQuestionType => TemporalInstructions,
             "knowledge-update" => KnowledgeUpdateInstructions,
             _ => Instructions,
         };

@@ -4,6 +4,7 @@
 
 using AgentEval.Decisions;
 using AgentEval.Memory.External;
+using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
 using Xunit;
 
@@ -197,9 +198,11 @@ public class DecisionBenchmarkJudgeTests
 
     [Theory]
     [InlineData("temporal-reasoning")]
-    [InlineData("as-of")]
-    [InlineData("current")]
-    [InlineData("prospective")]
+    // The real ids, taken from the corpus that defines them rather than guessed: a question of a type
+    // spelled wrongly here falls through to the strict rubric and silently loses the off-by-one tolerance.
+    [InlineData("temporal-as-of")]
+    [InlineData("temporal-current")]
+    [InlineData("prospective-memory")]
     public void TimeGroundedQuestions_ToleratetheOffByOneTheShippedJudgeTolerates(string type)
     {
         var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = type, Question = "?", GoldAnswer = "18 days" };
@@ -232,6 +235,23 @@ public class DecisionBenchmarkJudgeTests
 
         var asked = Assert.IsType<BinaryQuestion>(client.Last!.Questions["contains_gold"]);
         Assert.Equal(DecisionBenchmarkJudge.TemporalInstructions, asked.Instructions);
+    }
+
+    [Fact]
+    public void TheTimeGroundedTypeNames_ComeFromTheCorpusThatDefinesThem()
+    {
+        // This pins the names against their source, so a rename in the corpus cannot leave the adapter
+        // quietly judging those questions with the strict rubric.
+        foreach (var type in new[]
+                 {
+                     LongMemEvalTimeGroundedCorpus.AsOfQuestionType,
+                     LongMemEvalTimeGroundedCorpus.CurrentQuestionType,
+                     LongMemEvalTimeGroundedCorpus.ProspectiveQuestionType,
+                 })
+        {
+            var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = type, Question = "?", GoldAnswer = "18 days" };
+            Assert.Equal(DecisionBenchmarkJudge.TemporalInstructions, DecisionBenchmarkJudge.InstructionsFor(q));
+        }
     }
 
 }

@@ -92,6 +92,9 @@ provider `AI_INFERENCE_PROVIDER` selects.
   provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
   run with no provider configured **skips with a notice** instead of erroring, because an optional paid job
   without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
+  The suite itself still runs only under `azure`: its live paths build Azure clients directly and return
+  early without `AZURE_OPENAI_*`, so running it under another provider would report a green that asserted
+  nothing. It now says so and skips instead.
 - `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
   0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
   source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the

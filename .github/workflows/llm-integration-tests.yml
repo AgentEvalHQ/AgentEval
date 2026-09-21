@@ -127,11 +127,17 @@ jobs:
             echo "::error::No inference provider secrets are configured. Add AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY, or BITDEER_API_KEY, or OPENAI_API_KEY."
             exit 1
           fi
-          echo "::notice::No inference provider secrets are configured; skipping the paid integration tests. This is not a failure — add BITDEER_API_KEY (or the Azure pair) to enable them."
+          echo "::notice::No inference provider secrets are configured; skipping the paid integration tests. This is not a failure — add the Azure pair to enable them."
+        fi
+        if [ "$(grep -c . <<< "${AZURE_OPENAI_ENDPOINT:-}")" = "0" ] && [ -n "${BITDEER_API_KEY}${OPENAI_API_KEY}" ]; then
+          echo "::notice::A non-Azure provider is configured, but this suite's live paths build Azure clients directly and would assert nothing. Skipping rather than reporting a green that exercised no provider."
         fi
 
+    # The integration suite's live paths construct Azure clients directly and return early without
+    # AZURE_OPENAI_*, so a run with another provider selected would pass while asserting nothing. A green
+    # that exercises nothing is worse than a skip that says so.
     - name: Run Integration Tests
-      if: steps.provider.outputs.provider != ''
+      if: steps.provider.outputs.provider == 'azure'
       run: |
         echo "🧪 Running LLM Integration Tests"
         echo "   Filter: ${{ inputs.test_filter || 'Category=Integration' }}"
