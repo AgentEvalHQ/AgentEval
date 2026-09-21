@@ -78,6 +78,11 @@ provider `AI_INFERENCE_PROVIDER` selects.
   fragment and the diagnostic reaches stderr.
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
+- **22 release headings in this file rendered as plain text instead of links.** The compare-link section
+  had fallen behind: every version from `0.29.0-beta` to this one was missing, and so were `0.14.0-beta`
+  and `0.16.0-beta`–`0.23.0-beta`. `[Unreleased]` still compared against `v0.28.0-beta`, thirteen releases
+  stale. The links are derived from the real tag order rather than from the version numbers, so a skipped
+  version compares against the tag that actually preceded it.
 - **The docs now describe the provider selector.** `docs/cli.md` gained an `AI_INFERENCE_PROVIDER` section
   with each provider's variables, the auto-detect order and the endpoint policy, and `docs/getting-started.md`
   points at it. The old resolution order in that reference was **wrong as of this release** — it still said a
@@ -6373,7 +6378,29 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.28.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...HEAD
+[0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta
+[0.40.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.39.0-beta...v0.40.0-beta
+[0.39.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.38.0-beta...v0.39.0-beta
+[0.38.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.37.0-beta...v0.38.0-beta
+[0.37.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.36.0-beta...v0.37.0-beta
+[0.36.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.35.0-beta...v0.36.0-beta
+[0.35.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.34.0-beta...v0.35.0-beta
+[0.34.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.33.0-beta...v0.34.0-beta
+[0.33.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.32.0-beta...v0.33.0-beta
+[0.32.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.31.0-beta...v0.32.0-beta
+[0.31.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.30.0-beta...v0.31.0-beta
+[0.30.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.29.0-beta...v0.30.0-beta
+[0.29.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.28.0-beta...v0.29.0-beta
+[0.23.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.22.0-beta...v0.23.0-beta
+[0.22.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.21.0-beta...v0.22.0-beta
+[0.21.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.20.0-beta...v0.21.0-beta
+[0.20.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.19.0-beta...v0.20.0-beta
+[0.19.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.18.0-beta...v0.19.0-beta
+[0.18.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.17.0-beta...v0.18.0-beta
+[0.17.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.16.0-beta...v0.17.0-beta
+[0.16.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.15.0-beta...v0.16.0-beta
+[0.14.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.2-beta...v0.14.0-beta
 [0.28.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.27.0-beta...v0.28.0-beta
 [0.27.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...v0.27.0-beta
 [0.26.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...v0.26.0-beta
