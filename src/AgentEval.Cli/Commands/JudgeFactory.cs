@@ -103,8 +103,9 @@ internal static class JudgeFactory
             catch (Exception ex)
             {
                 Console.Error.WriteLine(
-                    $"✖ Failed to construct Azure OpenAI judge: {ex.Message}\n" +
-                    "  Check AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT values.");
+                    $"✖ Failed to construct the Azure OpenAI judge ({ex.GetType().Name}) for " +
+                    $"endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}.\n" +
+                    "  Check AZURE_OPENAI_JUDGE_ENDPOINT / AZURE_OPENAI_JUDGE_API_KEY / AZURE_OPENAI_JUDGE_DEPLOYMENT values.");
                 return (null, "", ExitCodes.RuntimeError);
             }
         }
