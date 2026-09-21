@@ -74,6 +74,13 @@ internal static class MemoryJudgeVsJudgeDemo
         }
 
         var items = BuildItems(dataset, limit, types);
+        if (items.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   ⚠ No questions matched{(types is { Length: > 0 } ? $" --types {string.Join(",", types)}" : "")}. Known types: knowledge-update, multi-session, single-session-assistant, single-session-preference, single-session-user, temporal-reasoning.");
+            Console.ResetColor();
+            return;
+        }
         Console.WriteLine($"   📁 Dataset    : {dataset}");
         Console.WriteLine($"   🤖 Judge A    : {AIConfig.ModelIdentity}   (generative, LongMemEvalJudge)");
         Console.WriteLine($"   🎯 Judge B    : {jevOptions.Model}@{jevOptions.ProviderName}   (decision, DecisionBenchmarkJudge)");
@@ -274,7 +281,17 @@ internal static class MemoryJudgeVsJudgeDemo
         var items = new List<Item>(chosen.Count * 2);
         foreach (var x in chosen)
         {
-            var question = new ExternalBenchmarkQuestion { QuestionId = x.Id, QuestionType = x.Type, Question = x.Q, GoldAnswer = x.A! };
+            // LongMemEval marks abstention items with an `_abs` question id, and the judges branch on the
+            // flag to a different rubric. Dropping it would send "does this contain the gold answer?" at a
+            // question whose correct answer is "I cannot answer", scoring every right response wrong.
+            var question = new ExternalBenchmarkQuestion
+            {
+                QuestionId = x.Id,
+                QuestionType = x.Type,
+                Question = x.Q,
+                GoldAnswer = x.A!,
+                IsAbstention = x.Id.EndsWith("_abs", StringComparison.Ordinal),
+            };
             items.Add(new Item(question, x.A!, true));
 
             // The distractor is another question's gold answer of the SAME type, so "wrong" cannot be

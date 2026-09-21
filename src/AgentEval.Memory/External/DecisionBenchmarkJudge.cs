@@ -62,27 +62,46 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
         Threshold = threshold;
     }
 
-    /// <summary>The instruction sent for every item. Kept here so a run can record exactly what was asked.</summary>
+    /// <summary>The instruction for an ordinary question. Kept here so a run can record exactly what was asked.</summary>
     public const string Instructions =
         "The QUESTION was asked about a long conversation. GOLD is the correct answer. " +
         "Does the RESPONSE give that same answer? Wording may differ; the fact must match. " +
         "Extra correct detail is fine. A different fact, a contradiction, or a refusal to answer is not a match.";
+
+    /// <summary>
+    /// The instruction for an ABSTENTION question, where the conversation does not contain the answer and
+    /// recognising that IS the correct behaviour. The ordinary rubric above says in so many words that a
+    /// refusal is not a match, so sending it here would score every correct abstention as wrong — the
+    /// shipped <c>LongMemEvalJudge</c> branches on the same flag for the same reason.
+    /// </summary>
+    public const string AbstentionInstructions =
+        "The QUESTION cannot be answered from the conversation, and the correct behaviour is to say so. " +
+        "Does the RESPONSE recognise that it does not know, cannot answer, or lacks the information? " +
+        "Saying so in any wording is a match. Asserting a specific answer anyway is not.";
 
     /// <summary>The exact state a call sends for an item, so a dry run can print it without sending.</summary>
     public static string BuildState(string agentResponse, ExternalBenchmarkQuestion question) =>
         $"QUESTION:\n{question.Question}\n\nGOLD:\n{question.GoldAnswer}\n\nRESPONSE:\n{agentResponse}";
 
     /// <summary>The exact request a call would send.</summary>
-    public DecisionRequest BuildRequest(string agentResponse, ExternalBenchmarkQuestion question) =>
-        new(BuildState(agentResponse, question),
-            new Dictionary<string, DecisionQuestion>(StringComparer.Ordinal)
-            {
-                [QuestionId] = new BinaryQuestion(
-                    Instructions,
-                    "The response gives the gold answer.",
-                    "The response does not give the gold answer."),
-            },
+    public DecisionRequest BuildRequest(string agentResponse, ExternalBenchmarkQuestion question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        var binary = question.IsAbstention
+            ? new BinaryQuestion(
+                AbstentionInstructions,
+                "The response recognises that it cannot answer.",
+                "The response asserts an answer instead of recognising it cannot answer.")
+            : new BinaryQuestion(
+                Instructions,
+                "The response gives the gold answer.",
+                "The response does not give the gold answer.");
+
+        return new DecisionRequest(
+            BuildState(agentResponse, question),
+            new Dictionary<string, DecisionQuestion>(StringComparer.Ordinal) { [QuestionId] = binary },
             _requestedModel);
+    }
 
     /// <inheritdoc/>
     public async Task<ExternalJudgmentResult> JudgeAsync(
@@ -127,7 +146,9 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
             // The probability IS the score, on the 0-100 scale this result type uses. It is kept because a
             // threshold sweep needs the number, not the verdict it was collapsed into.
             RawScore = probability * 100.0,
-            Explanation = $"P(gold answer present) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}",
+            Explanation = question.IsAbstention
+                ? $"P(response recognises it cannot answer) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}"
+                : $"P(gold answer present) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}",
             TokensUsed = (int)Math.Min(int.MaxValue, (response.Usage?.InputTokens ?? 0) + (response.Usage?.OutputTokens ?? 0)),
             // One primary call, no retries: the whole accounting contract, not just the total. A consumer
             // reading PrimaryLlmCallCount would otherwise see no primary attempt for a call that happened.

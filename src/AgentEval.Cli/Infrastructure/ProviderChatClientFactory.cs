@@ -85,7 +85,12 @@ internal static class ProviderChatClientFactory
         catch (Exception ex)
         {
             // The endpoint is validated by the resolver, so this is a malformed key or an SDK-level refusal.
-            return (null, null, $"Failed to construct the {settings.DisplayName} chat client: {ex.Message}");
+            // The SDK's message can quote the configured URI, which may carry user-info, a query or a
+            // fragment — and this diagnostic is printed to stderr. Name the exception type and the sanitised
+            // endpoint; the full message stays out of the log.
+            return (null, null,
+                $"Failed to construct the {settings.DisplayName} chat client ({ex.GetType().Name}) for " +
+                $"endpoint={SafeEndpoint(settings.Endpoint)}. Check the key and the endpoint.");
         }
     }
 

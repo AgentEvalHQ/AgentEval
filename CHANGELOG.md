@@ -21,7 +21,10 @@ provider `AI_INFERENCE_PROVIDER` selects.
 #### Added
 - `AgentEval.Memory.External.DecisionBenchmarkJudge` — a decision model behind the memory benchmarks'
   `IExternalBenchmarkJudge` seam: one binary question per item, P(yes) on `RawScore` so a threshold sweep
-  keeps the number. An empty response is `Empty` and spends no call (a judge that scores silence as "No"
+  keeps the number. An **abstention** question (LongMemEval's `_abs` items, where recognising that the
+  conversation lacks the answer *is* the correct behaviour) gets its own rubric, as the shipped
+  `LongMemEvalJudge` does — the ordinary one says a refusal is not a match and would score every correct
+  abstention wrong. An empty response is `Empty` and spends no call (a judge that scores silence as "No"
   turns an abstention into a wrong answer); a transport failure propagates rather than becoming a verdict.
 - Sample **N4 — Memory Judge vs Judge** (`dotnet run -- 103`): LongMemEval's labelled questions, each
   contributing its gold answer and a same-type distractor, so the comparison has a **50% chance floor**.

@@ -132,4 +132,45 @@ public class DecisionBenchmarkJudgeTests
         Assert.True(lenientResult.Correct);
         Assert.Equal(strictResult.RawScore, lenientResult.RawScore);
     }
+    // ── An abstention question is a different question ───────────────────────────────────
+
+    private static ExternalBenchmarkQuestion AbstentionQuestion() => new()
+    {
+        QuestionId = "q1_abs",
+        QuestionType = "multi-session",
+        Question = "What did my dentist say about the implant?",
+        GoldAnswer = "The conversation does not contain this information.",
+        IsAbstention = true,
+    };
+
+    [Fact]
+    public async Task AbstentionQuestion_AsksWhetherTheResponseRecognisesItCannotAnswer()
+    {
+        // The ordinary rubric says in so many words that a refusal is not a match. Sending it at a question
+        // whose correct behaviour IS to refuse would score every right answer wrong — which is why the
+        // shipped LongMemEvalJudge branches on the same flag.
+        var client = new FixedClient(0.95);
+        var judge = new DecisionBenchmarkJudge(client, "jev-latest");
+
+        var result = await judge.JudgeAsync("I don't have that in our conversations.", AbstentionQuestion());
+
+        var asked = Assert.IsType<BinaryQuestion>(client.Last!.Questions["contains_gold"]);
+        Assert.Equal(DecisionBenchmarkJudge.AbstentionInstructions, asked.Instructions);
+        Assert.DoesNotContain("refusal to answer is not a match", asked.Instructions, StringComparison.Ordinal);
+        Assert.True(result.Correct);
+        Assert.Contains("recognises it cannot answer", result.Explanation!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OrdinaryQuestion_StillGetsTheGoldAnswerRubric()
+    {
+        var client = new FixedClient(0.95);
+        var judge = new DecisionBenchmarkJudge(client, "jev-latest");
+
+        await judge.JudgeAsync("You booked it on 3 May 2026.", Question());
+
+        var asked = Assert.IsType<BinaryQuestion>(client.Last!.Questions["contains_gold"]);
+        Assert.Equal(DecisionBenchmarkJudge.Instructions, asked.Instructions);
+    }
+
 }

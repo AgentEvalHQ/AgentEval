@@ -215,12 +215,20 @@ public sealed class SecurityGraphIngestionPumpTests : IDisposable
     {
         using var store = new HangingStore();
         var failures = new List<SecurityGraphPumpFailure>();
+        // The consumer runs on a DEDICATED thread, not a pool thread. This test waits for it to reach the
+        // hanging store before draining, and on a loaded Windows CI runner a Task.Run consumer has twice
+        // failed to be scheduled inside five seconds — the wait below then times out and the leg goes red on
+        // a test about drain bounding, not about scheduling. LongRunning removes the pool from the question
+        // rather than making the wait more patient.
         await using var pump = new SecurityGraphIngestionPump(
             store,
             failure => failures.Add(failure),
-            drainTimeout: TimeSpan.FromMilliseconds(25));
+            queueCapacity: 128,
+            drainTimeout: TimeSpan.FromMilliseconds(25),
+            consumerStarter: body => Task.Factory.StartNew(
+                body, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap());
         pump.TryEnqueue(Request("event-1"));
-        await store.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await store.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         var drained = await pump.CompleteAndDrainAsync();
 
