@@ -225,7 +225,7 @@ must sample past.
 | | |
 |---|---|
 | **Accepted** | `IDecisionClient` as its own transport; `DecisionEval` as its own leaf; `provenance.type = "atomic-decision"`; `DecisionJudge` as a calibration-and-comparison adapter, never a tree judge |
-| **Measured, per lane** | GDPR 3/6 pillars at the incumbent gate · EU AI Act 2/6 · agentic 79.2% vs 92.3% · red-team and safety false-pass 0 of 53 · memory: see the N4 evidence |
+| **Measured, per lane** | GDPR 3/6 pillars at the incumbent gate · EU AI Act 2/6 · agentic 79.2% vs 92.3% · red-team and safety false-pass 0 of 53 · memory discrimination 100% of 84 clean items vs 96.3%, and 0 unparseable verdicts against the generative judge's 4 |
 | **Not accepted** | any criterion switching from its generative judge to a decision model; any gate, cascade or escalation; any citable score produced by a decision model alone |
 | **Known no-go** | EU AI Act prohibited practices (20% vs an 84% baseline): that pillar grades an agent's *refusal*, and a decision model grades the thing being refused |
 

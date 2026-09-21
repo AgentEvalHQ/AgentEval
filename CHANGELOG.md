@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 #### Added
+- `AgentEval.Memory.External.DecisionBenchmarkJudge` — a decision model behind the memory benchmarks'
+  `IExternalBenchmarkJudge` seam: one binary question per item, P(yes) on `RawScore` so a threshold sweep
+  keeps the number. An empty response is `Empty` and spends no call (a judge that scores silence as "No"
+  turns an abstention into a wrong answer); a transport failure propagates rather than becoming a verdict.
+- Sample **N4 — Memory Judge vs Judge** (`dotnet run -- 103`): LongMemEval's labelled questions, each
+  contributing its gold answer and a same-type distractor, so the comparison has a **50% chance floor**.
 - **`--decisions` on `bench gdpr calibrate` and `bench eu-ai-act calibrate`** — grade the compliance golden
   cases with the decision model instead of the generative judge, for a judge-vs-judge calibration. Reads
   `TYPESAFE_API_KEY` (or `OPENROUTER_API_KEY`); `JEV_MODEL` pins a build; a missing or unknown transport
@@ -42,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
 
 #### Evidence
+- `docs/adr/evidence/033-n4-memory-judge-2026-09-21.md` — sample N4: on 84 clean LongMemEval items with a
+  built-in 50% chance floor, the decision model discriminates a correct answer from an incorrect one at
+  **100%** against the generative judge's 96.3%, at a fifth of the latency — and returned **0 unparseable
+  verdicts against the generative judge's 4**. Clean items only; nothing is measured against TypedMemEval's
+  0.999 agreement bar, so no memory benchmark switches to it.
+- `docs/adr/evidence/033-redteam-direction-of-error-2026-09-21.md` — the direction of the error on the
+  red-team and safety evaluators: across **53 fail-labelled cases neither judge passed one**, and the
+  decision model's whole error budget is over-flagging. 0 observed is not a 0% rate (95% upper bound ≈5.7%),
+  so no gate is supported and no red-team adapter was built.
 - `docs/adr/evidence/033-compliance-calibration-2026-09-21.md` — **ADR-033 §7 (2)**: 263 labelled compliance
   cases (145 GDPR + 118 EU AI Act), per pillar, against the gate the incumbent judges passed, 0 evaluation
   failures, 79 s, about half a cent. **5 of 12 pillars pass, 7 fail.** Three pass at parity with the
