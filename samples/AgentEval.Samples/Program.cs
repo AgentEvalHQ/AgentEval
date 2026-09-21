@@ -212,11 +212,12 @@ public static class Program
             new("Deterministic Benchmark",  "The same eval as a BenchmarkDefinition: 3 cases × 2 arms × 2 reps, scored against its floor AND against a control arm", DeterministicBenchmark.RunAsync),
         ]),
 
-        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101.
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101, N3 = 102.
         new('N', "Providers: Bitdeer GLM + TypeSafe Jev", "🔑 BITDEER_API_KEY · TYPESAFE_API_KEY or OPENROUTER_API_KEY · --dry-run prints every payload, spends nothing",
         [
             new("GLM-5.3 Flash @ Bitdeer",   "Subject + judge through the ordinary IChatClient path — no provider code, provider kept in the identity", GlmBitdeerProviderDemo.RunAsync),
             new("Jev Decisions",             "IDecisionClient + DecisionEval: P(yes) as the score, three question shapes in one request, a third evaluator kind in a composite", JevDecisionsDemo.RunAsync),
+            new("Judge vs Judge",            "The evaluator evaluates the evaluators: Jev beside the generative judge on the 378 agentic golden cases, same rubrics, through the agentic CalibrationRunner — --dry-run, --limit N, --repeats N", JudgeVsJudgeDemo.RunAsync),
         ]),
     ];
 

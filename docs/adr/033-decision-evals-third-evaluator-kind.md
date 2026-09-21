@@ -193,6 +193,10 @@ must sample past.
    see the evidence file's judged-runs section.**
 2. A shadow run of `DecisionEval` beside an existing `AtomicLlmEval` leaf on one composite family
    with labels (GDPR or Agentic), reporting agreement, false-pass rate on high-severity cases, Brier
-   score, latency and cost — per shape, not as a mean.
+   score, latency and cost — per shape, not as a mean. **Agentic half, in substance, 2026-09-21:**
+   sample N3 scored Jev beside GLM-5.3 Flash on 298 labelled cases through the evaluators' own rubrics,
+   every named metric per category — [`evidence/033-n3-judge-vs-judge-2026-09-21.md`](evidence/033-n3-judge-vs-judge-2026-09-21.md).
+   It ran through a judge adapter, not `DecisionEval` leaves in a composite; that form, and the
+   compliance family, are still owed.
 3. Only then: a threshold chosen on held-out data, and a decision on whether an escalation primitive
    is worth building.

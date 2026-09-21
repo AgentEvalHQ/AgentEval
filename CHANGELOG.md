@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Added
+- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
+  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
+  the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
+  `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
+  evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
+  cost; then the seven hypotheses pre-registered in the Jev factsheet, each confirmed, refuted or left open by the
+  numbers. `--dry-run` resolves every key, runs every dispatched case (unknown keys are listed, not run) against a judge that records its criteria and sends
+  nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
+  registry a decision model would carry `atomic-llm` provenance, and the sample says so.
+- `docs/adr/evidence/033-n3-judge-vs-judge-2026-09-21.md` — the first run: 298 comparable cases, Jev 79.2%
+  agreement with the labels against GLM-5.3 Flash's 92.3%, false-pass 6.5% vs 5.6%, 55 of Jev's 62 errors
+  false fails, verdict flips across three repeats 0.3%, p50 296 ms vs 10.6 s. Three pre-registered hypotheses
+  refuted, two confirmed, two open; a go / no-go list per category.
+
 #### Fixed
 - `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
   0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
