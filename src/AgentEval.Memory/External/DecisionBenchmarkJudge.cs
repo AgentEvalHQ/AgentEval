@@ -65,8 +65,10 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
     /// <summary>The instruction for an ordinary question. Kept here so a run can record exactly what was asked.</summary>
     public const string Instructions =
         "The QUESTION was asked about a long conversation. GOLD is the correct answer. " +
-        "Does the RESPONSE give that same answer? Wording may differ; the fact must match. " +
-        "Extra correct detail is fine. A different fact, a contradiction, or a refusal to answer is not a match.";
+        "Does the RESPONSE contain that answer? Wording may differ. " +
+        "A response that is EQUIVALENT to the gold answer, or that contains all the intermediate steps " +
+        "needed to reach it, is also a match. A response that contains only PART of what the gold answer " +
+        "requires is NOT a match. A different fact, a contradiction, or a refusal to answer is not a match.";
 
     /// <summary>
     /// The instruction for an ABSTENTION question, where the conversation does not contain the answer and
@@ -95,7 +97,9 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
     /// </summary>
     public const string TemporalInstructions =
         "The QUESTION was asked about a long conversation. GOLD is the correct answer. " +
-        "Does the RESPONSE give that same answer, or all the steps needed to reach it? " +
+        "Does the RESPONSE contain that answer? A response that is EQUIVALENT to the gold answer, or that " +
+        "contains all the intermediate steps needed to reach it, is also a match; a response containing only " +
+        "PART of what the gold answer requires is not. " +
         "Do NOT penalise an off-by-one count of days, weeks or months — 19 days for a gold answer of 18 " +
         "is still a match. A different fact or a refusal to answer is not.";
 

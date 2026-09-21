@@ -267,6 +267,15 @@ internal static class MemoryJudgeVsJudgeDemo
 
         if (types is { Length: > 0 })
             all = all.Where(x => types.Contains(x.Type, StringComparer.OrdinalIgnoreCase)).ToList();
+        else
+        {
+            // single-session-preference's "gold answer" is a RUBRIC describing what a good personalised
+            // answer does, not an answer. This design feeds the gold back as the correct response, so for
+            // that type the item would ask a judge whether a rubric satisfies itself — which measures
+            // nothing and produced a misleading row in the first run. Ask for it explicitly with --types if
+            // you want to see it; it is not part of the default comparison.
+            all = all.Where(x => x.Type != "single-session-preference").ToList();
+        }
 
         // Deterministic selection, stratified by type. The per-type quota ROUNDS UP: integer division gave
         // 6 per type for --limit 40 across 6 types and returned 36 questions while the banner promised 40.
