@@ -304,9 +304,19 @@ internal static class MemoryJudgeVsJudgeDemo
             items.Add(new Item(question, x.A!, true));
 
             // The distractor is another question's gold answer of the SAME type, so "wrong" cannot be
-            // detected by register or shape alone. Deterministic: the next one of that type, wrapping.
-            var sameType = all.Where(y => y.Type == x.Type && y.Id != x.Id).OrderBy(y => y.Id, StringComparer.Ordinal).ToList();
-            if (sameType.Count == 0) continue;
+            // detected by register or shape alone. Deterministic: chosen by a stable hash, wrapping.
+            //
+            // It must never be another ABSTENTION item's gold text. An abstention question is judged by
+            // "does the response recognise it cannot answer?", and another abstention item's gold is an
+            // explanation of unanswerability — a CORRECT refusal. Using it as the negative half would put
+            // valid answers in the half that must be wrong, and the 50% chance floor would stop holding.
+            // A concrete assertion is unambiguously negative under both rubrics, so the distractor always
+            // comes from the non-abstention pool.
+            var sameType = all
+                .Where(y => y.Type == x.Type && y.Id != x.Id && !y.Id.EndsWith("_abs", StringComparison.Ordinal))
+                .OrderBy(y => y.Id, StringComparer.Ordinal)
+                .ToList();
+            if (sameType.Count == 0) continue;   // no usable negative for this question; its gold item still counts
             // string.GetHashCode is randomised PER PROCESS: it would have picked different distractors on
             // every run while the report claimed a deterministic design, and Math.Abs(int.MinValue) is
             // still negative. A stable hash keeps a rerun comparable with the run already published.
