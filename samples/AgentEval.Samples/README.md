@@ -268,7 +268,7 @@ dotnet run -- 100 --dry-run   # prints every prompt, sends nothing — GLM-5.3 F
 dotnet run -- 100             # …then spend — GLM-5.3 Flash @ Bitdeer (N1)
 dotnet run -- 101 --dry-run   # prints every request body, sends nothing — Jev Decisions (N2)
 dotnet run -- 101             # …then spend — Jev Decisions (N2)
-dotnet run -- 102 --dry-run   # resolves every evaluator key, captures the exact criteria, renders the first Jev request, sends nothing — Judge vs Judge (N3)
+dotnet run -- 102 --dry-run   # resolves every evaluator key, runs the dispatched cases against a recording judge, renders the first Jev request, sends nothing — Judge vs Judge (N3)
 dotnet run -- 102 --limit 1   # …one case per golden file through BOTH judges — Judge vs Judge (N3)
 dotnet run -- 102 --repeats 3 # …all 378 cases, three repeats, the seven pre-registered hypotheses — Judge vs Judge (N3)
 ```

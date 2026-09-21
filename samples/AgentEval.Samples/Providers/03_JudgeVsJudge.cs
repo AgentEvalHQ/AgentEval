@@ -41,7 +41,7 @@ namespace AgentEval.Samples.Providers;
 /// report says so. The persisted kind for a decision model is <c>DecisionEval</c> (<c>atomic-decision</c>).
 /// </para>
 /// <para>
-/// Flags (after the sample number): <c>--dry-run</c> (resolve every key, capture the exact criteria each
+/// Flags (after the sample number): <c>--dry-run</c> (resolve every key, run the dispatched cases, capture the exact criteria each
 /// evaluator sends, render the first Jev request, send nothing), <c>--limit N</c> (cases per file),
 /// <c>--files a,b</c> (file suffixes, e.g. <c>20-process,indirect-attack</c>), <c>--repeats N</c>,
 /// <c>--parallel N</c> (files in flight at once, default 4), <c>--arms A,B</c> (which judges run; default both —
@@ -260,7 +260,7 @@ internal static class JudgeVsJudgeDemo
 
     private static async Task DryRunAsync(IReadOnlyList<CalibrationDataset> datasets, IReadOnlyList<string> keys, SystemOneClientOptions jevOptions)
     {
-        Console.WriteLine("📝 Stage 1: resolve every evaluator key, run every case against a judge that records and sends nothing\n");
+        Console.WriteLine("📝 Stage 1: resolve every evaluator key, run every case whose key the registry dispatches against a judge that records and sends nothing (undispatched keys are listed, not run)\n");
         var criteriaByKey = new ConcurrentDictionary<string, ConcurrentBag<IReadOnlyList<string>>>(StringComparer.OrdinalIgnoreCase);
         var unresolved = new List<string>();
         var noJudge = new List<string>();

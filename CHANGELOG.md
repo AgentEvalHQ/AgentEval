@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
   evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
   cost; then the seven hypotheses pre-registered in the Jev factsheet, each confirmed, refuted or left open by the
-  numbers. `--dry-run` resolves every key, runs every case against a judge that records its criteria and sends
+  numbers. `--dry-run` resolves every key, runs every dispatched case (unknown keys are listed, not run) against a judge that records its criteria and sends
   nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
   registry a decision model would carry `atomic-llm` provenance, and the sample says so.
 - `docs/adr/evidence/033-n3-judge-vs-judge-2026-09-21.md` — the first run: 298 comparable cases, Jev 79.2%

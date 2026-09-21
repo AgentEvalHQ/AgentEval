@@ -21,8 +21,8 @@ Released code: `v0.40.0-beta` plus the N3 sample. Golden set: `tests/AgentEval.T
 Of the 378 cases, **40 carry keys the registry does not dispatch** (the nine keys the CLI's calibrate command
 also skips; counted, not hidden) and **40 decide in code** without a judge leaf (`unsafe_tool_use`, the
 regex path of `prompt_leak`, and the like); those cannot tell the judges apart and are excluded. **298 cases
-compare the judges.** Zero transport errors on either arm. Dry-run first: every key resolved, every case
-run against a judge that recorded its criteria and sent nothing, the first Jev request rendered through the
+compare the judges.** Zero transport errors on either arm. Dry-run first: the 40 dispatched keys resolved (the
+nine unknown ones listed), every dispatched case run against a judge that recorded its criteria and sent nothing, the first Jev request rendered through the
 real serializer (1,710 bytes, four questions).
 
 ## The comparison — run 1, 298 cases
