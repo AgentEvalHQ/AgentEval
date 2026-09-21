@@ -112,9 +112,9 @@ internal static class ProviderChatClientFactory
     /// One line naming what was selected and how, for the stderr banner the bench commands print.
     /// </summary>
     /// <remarks>
-    /// The endpoint is printed as scheme + host + path only. A configured URL may legitimately carry
-    /// user-info, a query string or a fragment, any of which can hold a token, and this line goes to stderr
-    /// on every run — where a CI log would keep it.
+    /// The endpoint is printed as scheme + host + port only. A configured URL may legitimately carry
+    /// user-info, a path segment, a query string or a fragment, any of which can hold a token, and this line
+    /// goes to stderr on every run — where a CI log would keep it. See <see cref="SafeEndpoint"/>.
     /// </remarks>
     public static string Describe(string purpose, string model) => Describe(Settings, purpose, model);
 

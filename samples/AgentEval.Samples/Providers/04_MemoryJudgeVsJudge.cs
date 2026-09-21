@@ -231,7 +231,9 @@ internal static class MemoryJudgeVsJudgeDemo
         Console.WriteLine("💡 Takeaways:");
         Console.WriteLine("   • The memory judge's question is narrow and binary — the shape a decision model is built for.");
         Console.WriteLine("   • A 50% chance floor is built in: a judge that says 'correct' to everything scores exactly 0.500.");
-        Console.WriteLine("   • An empty response is Empty, never wrong: the adapter never spends a call to turn silence into an error.");
+        Console.WriteLine("   • An empty agent response is scored WRONG, locally, without spending a call — silence");
+        Console.WriteLine("     satisfies no rubric. 'Empty' is reserved for a silent JUDGE: it carries no verdict,");
+        Console.WriteLine("     so the scorers would drop the case from the denominator instead of scoring it zero.");
         Console.WriteLine("   • This is judge DISCRIMINATION on clean items, not agreement on a real run's messy answers.");
         Console.WriteLine(dryRun
             ? "   • This WAS a dry run: nothing was sent. Re-run without --dry-run to spend."
