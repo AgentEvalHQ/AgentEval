@@ -57,6 +57,12 @@ provider `AI_INFERENCE_PROVIDER` selects.
   resolver auto-detects Azure and uses the same endpoint, key and deployment as before. `AZURE_OPENAI_JUDGE_*`
   still wins outright, so a capable grader can face a cheap subject in one run. The command help no longer
   tells users to set `AZURE_OPENAI_*`.
+- **The stub judge rescues an unconfigured machine, never a misconfigured one.** A provider that was
+  selected or half-configured but could not be built now fails closed even when
+  `AGENTEVAL_ALLOW_STUB_JUDGE=1` is set; previously `AI_INFERENCE_PROVIDER=foundry` with its variables
+  missing would fall through to the stub and produce stub-graded evidence from a typo.
+  `InferenceProviderEnvironment.AnyConfigurationAttempted` is the new public predicate that separates
+  the two cases.
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
 

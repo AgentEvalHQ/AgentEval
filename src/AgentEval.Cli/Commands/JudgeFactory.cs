@@ -86,7 +86,7 @@ internal static class JudgeFactory
                 IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
                 IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
                 Console.Error.WriteLine(
-                    $"✔ Azure OpenAI judge configured — endpoint={endpoint}, deployment={deployment} ({judgeKind})" +
+                    $"✔ Azure OpenAI judge configured — endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}, deployment={deployment} ({judgeKind})" +
                     (systemPrompt is null ? "." : $" [system prompt: {systemPrompt.Length} chars]."));
                 return (real, deployment!, 0);
             }
@@ -130,7 +130,20 @@ internal static class JudgeFactory
             return (providerJudge, providerModel!, 0);
         }
 
-        // No real-judge config — gate the stub behind an explicit opt-in so CI
+        // A provider WAS named or half-configured and could not be built: that is a typo, not an
+        // unconfigured machine, and the stub must not rescue it. Falling through here would turn
+        // AI_INFERENCE_PROVIDER=foundry with missing variables plus AGENTEVAL_ALLOW_STUB_JUDGE=1 into
+        // stub-graded evidence — the resolver's fail-closed contract undone by the fallback beneath it.
+        if (InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable))
+        {
+            Console.Error.WriteLine(
+                $"✖ A provider is selected or partially configured but could not be used. {diagnostic}\n" +
+                "  Fix it, or unset every provider variable to run with AGENTEVAL_ALLOW_STUB_JUDGE=1.\n" +
+                "  The stub is for a machine with no provider at all, never for a misconfigured one.");
+            return (null, "", ExitCodes.RuntimeError);
+        }
+
+        // No provider configured anywhere — gate the stub behind an explicit opt-in so CI
         // cannot silently produce stub-graded evidence.
         var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
         var stubAllowed =

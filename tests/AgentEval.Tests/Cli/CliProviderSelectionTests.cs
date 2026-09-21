@@ -190,4 +190,59 @@ public class CliProviderSelectionTests
         Assert.DoesNotContain("sekret", printed, StringComparison.Ordinal);
     }
 
+    // ── The stub rescues an unconfigured machine, never a misconfigured one ──────────────
+
+    [Fact]
+    public void Judge_ExplicitSelectorWithMissingVariables_DoesNotFallThroughToTheStub_EvenWhenItIsAllowed()
+    {
+        // The hole this pins: AI_INFERENCE_PROVIDER=foundry with its variables missing, plus the stub
+        // opt-in, used to return a StubEvaluator — turning a typo into stub-graded evidence and undoing
+        // the resolver's fail-closed contract from underneath.
+        using var _ = new ProviderEnvironmentScope(
+            ("AI_INFERENCE_PROVIDER", "foundry"),
+            ("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
+        var stderr = new StringWriter();
+        var previous = Console.Error;
+        Console.SetError(stderr);
+        try
+        {
+            var (judge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride: null);
+
+            Assert.Null(judge);
+            Assert.NotEqual(0, exitCode);
+            Assert.Contains("misconfigured", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Console.SetError(previous);
+        }
+    }
+
+    [Fact]
+    public void Judge_NothingConfiguredAtAll_StillAllowsTheStubWhenItIsExplicitlyEnabled()
+    {
+        // The other side of the same gate: a machine with no provider at all is the stub's legitimate use.
+        using var _ = new ProviderEnvironmentScope(("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
+
+        var (judge, judgeModel, exitCode) = JudgeFactory.Resolve(evaluatorOverride: null);
+
+        Assert.NotNull(judge);
+        Assert.Equal(0, exitCode);
+        Assert.Equal("stub", judgeModel);
+    }
+
+    [Fact]
+    public void AnyConfigurationAttempted_SeparatesAnUnconfiguredMachineFromAMisconfiguredOne()
+    {
+        using (var __ = new ProviderEnvironmentScope())
+            Assert.False(InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable));
+
+        using (var __ = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry")))
+            Assert.True(InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable));
+
+        // One of Azure's three is enough to count as an attempt.
+        using var ___ = new ProviderEnvironmentScope(("AZURE_OPENAI_ENDPOINT", AzureEndpoint));
+        Assert.True(InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable));
+    }
+
 }

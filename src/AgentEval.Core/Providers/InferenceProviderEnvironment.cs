@@ -215,6 +215,32 @@ public static class InferenceProviderEnvironment
         return required > 0 && missing.Count < required;
     }
 
+    /// <summary>
+    /// True when someone tried to configure a provider: the selector is set, or any provider has at least
+    /// one of its variables. The difference matters to a caller that may fall back to a stub — an
+    /// unconfigured machine is a legitimate fallback, a MISCONFIGURED one is a typo that must fail closed,
+    /// or the run silently produces stub-graded evidence from a mistake.
+    /// </summary>
+    public static bool AnyConfigurationAttempted(Func<string, string?> getEnvironmentVariable)
+    {
+        ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
+        bool Set(string n) => !string.IsNullOrWhiteSpace(getEnvironmentVariable(n));
+        if (Set(SelectorVariable)) return true;
+        foreach (var provider in s_autoDetectOrder)
+        {
+            var missing = MissingVariablesOf(provider, getEnvironmentVariable);
+            var required = provider switch
+            {
+                InferenceProvider.AzureOpenAI or InferenceProvider.Foundry => 3,
+                InferenceProvider.OpenAICompatible => 2,
+                InferenceProvider.Bitdeer or InferenceProvider.OpenAI => 1,
+                _ => 0,
+            };
+            if (required > 0 && missing.Count < required) return true;
+        }
+        return false;
+    }
+
     /// <summary>Resolves the settings from the process environment.</summary>
     public static InferenceProviderSettings Resolve() => Resolve(Environment.GetEnvironmentVariable);
 
