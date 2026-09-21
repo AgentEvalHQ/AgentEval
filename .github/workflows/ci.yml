@@ -114,6 +114,12 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage
       env:
+        # `dotnet test` on the solution starts a test host per project per target framework — up to a
+        # dozen at once on a two-core runner. vstest waits 90 s by default for a host process to CONNECT,
+        # and on 2026-09-21 a Windows net10 leg blew that budget and reported `Test Run Aborted` with no
+        # failing test. This governs process startup, before any test runs, so it hides no assertion: a
+        # host that never comes up still fails the job, just with the real reason in the log.
+        VSTEST_CONNECTION_TIMEOUT: '300'
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
@@ -178,6 +184,12 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal
       env:
+        # `dotnet test` on the solution starts a test host per project per target framework — up to a
+        # dozen at once on a two-core runner. vstest waits 90 s by default for a host process to CONNECT,
+        # and on 2026-09-21 a Windows net10 leg blew that budget and reported `Test Run Aborted` with no
+        # failing test. This governs process startup, before any test runs, so it hides no assertion: a
+        # host that never comes up still fails the job, just with the real reason in the log.
+        VSTEST_CONNECTION_TIMEOUT: '300'
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
