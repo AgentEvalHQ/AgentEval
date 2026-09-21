@@ -129,7 +129,11 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
             RawScore = probability * 100.0,
             Explanation = $"P(gold answer present) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}",
             TokensUsed = (int)Math.Min(int.MaxValue, (response.Usage?.InputTokens ?? 0) + (response.Usage?.OutputTokens ?? 0)),
+            // One primary call, no retries: the whole accounting contract, not just the total. A consumer
+            // reading PrimaryLlmCallCount would otherwise see no primary attempt for a call that happened.
             LlmCallCount = 1,
+            PrimaryLlmCallCount = 1,
+            AttemptsUsed = 1,
         };
     }
 }

@@ -211,7 +211,7 @@ must sample past.
    is worth building. **Done 2026-09-21, and the decision is no — for now.**
    *The threshold:* a sweep over the N3 probabilities, with the bar chosen on half the cases and scored on
    the other half, reaches **88.6%** agreement at 0.70 against 79.2% at the evaluators' own thresholds —
-   but it quadruples false passes (6.5% → 13.2%). **The bar is where the error preference is written, not a
+   but it **doubles** false passes (6.5% → 13.2%); the full-set 0.55 bar quadruples them (→ 25.9%). **The bar is where the error preference is written, not a
    tuning knob**, so there is no single number to adopt: a fail-closed second opinion wants the high bar,
    a label-matching study wants 0.55–0.70 —
    [`evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md`](evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md).

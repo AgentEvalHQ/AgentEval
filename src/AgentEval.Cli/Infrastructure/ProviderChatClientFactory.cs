@@ -104,9 +104,13 @@ internal static class ProviderChatClientFactory
     }
 
     /// <summary>
-    /// One line naming what was selected and how, for the stderr banner the bench commands print. Never
-    /// contains the key: the endpoint and model are the parts a user needs to recognise a wrong host.
+    /// One line naming what was selected and how, for the stderr banner the bench commands print.
     /// </summary>
+    /// <remarks>
+    /// The endpoint is printed as scheme + host + path only. A configured URL may legitimately carry
+    /// user-info, a query string or a fragment, any of which can hold a token, and this line goes to stderr
+    /// on every run — where a CI log would keep it.
+    /// </remarks>
     public static string Describe(string purpose, string model) => Describe(Settings, purpose, model);
 
     /// <summary>The same line for settings already in hand, so a caller never resolves twice.</summary>
@@ -118,6 +122,15 @@ internal static class ProviderChatClientFactory
             InferenceProviderSelection.AutoDetected => "auto-detected",
             _ => "unselected",
         };
-        return $"✔ {s.DisplayName} {purpose} configured — endpoint={s.Endpoint}, model={model} ({how}).";
+        return $"✔ {s.DisplayName} {purpose} configured — endpoint={SafeEndpoint(s.Endpoint)}, model={model} ({how}).";
+    }
+
+    /// <summary>Scheme, host, port and path — never user-info, query or fragment, which can carry a token.</summary>
+    internal static string SafeEndpoint(Uri? endpoint)
+    {
+        if (endpoint is null) return "(none)";
+        if (!endpoint.IsAbsoluteUri) return "(relative)";
+        var port = endpoint.IsDefaultPort ? "" : $":{endpoint.Port}";
+        return $"{endpoint.Scheme}://{endpoint.Host}{port}{endpoint.AbsolutePath.TrimEnd('/')}";
     }
 }

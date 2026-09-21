@@ -172,4 +172,22 @@ public class CliProviderSelectionTests
 
         Assert.Equal(InferenceProvider.AzureOpenAI, ProviderChatClientFactory.Settings.Provider);
     }
+    // ── The banner must not echo a credential ───────────────────────────────────────────
+
+    [Theory]
+    [InlineData("https://user:sekret@example.openai.azure.com/v1", "https://example.openai.azure.com/v1")]
+    [InlineData("https://host.example/v1?api-key=sekret", "https://host.example/v1")]
+    [InlineData("https://host.example/v1#sekret", "https://host.example/v1")]
+    [InlineData("https://host.example:8443/v1/", "https://host.example:8443/v1")]
+    [InlineData("https://host.example/", "https://host.example")]
+    public void SafeEndpoint_DropsEveryPartOfAUrlThatCouldCarryAToken(string configured, string expected)
+    {
+        // The banner goes to stderr on every run, and a CI log keeps it. An endpoint is user-configured and
+        // may legitimately carry user-info, a query or a fragment — any of which can hold a key.
+        var printed = ProviderChatClientFactory.SafeEndpoint(new Uri(configured));
+
+        Assert.Equal(expected, printed);
+        Assert.DoesNotContain("sekret", printed, StringComparison.Ordinal);
+    }
+
 }

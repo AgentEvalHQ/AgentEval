@@ -261,9 +261,12 @@ internal static class MemoryJudgeVsJudgeDemo
         if (types is { Length: > 0 })
             all = all.Where(x => types.Contains(x.Type, StringComparer.OrdinalIgnoreCase)).ToList();
 
-        // Deterministic selection: ordered by id, stratified by taking them in dataset order per type.
+        // Deterministic selection, stratified by type. The per-type quota ROUNDS UP: integer division gave
+        // 6 per type for --limit 40 across 6 types and returned 36 questions while the banner promised 40.
+        var typeCount = Math.Max(1, all.Select(y => y.Type).Distinct().Count());
+        var perType = (int)Math.Ceiling((double)limit / typeCount);
         var chosen = all.GroupBy(x => x.Type)
-            .SelectMany(g => g.OrderBy(x => x.Id, StringComparer.Ordinal).Take(Math.Max(1, limit / Math.Max(1, all.Select(y => y.Type).Distinct().Count()))))
+            .SelectMany(g => g.OrderBy(x => x.Id, StringComparer.Ordinal).Take(perType))
             .OrderBy(x => x.Id, StringComparer.Ordinal)
             .Take(limit)
             .ToList();
@@ -278,10 +281,28 @@ internal static class MemoryJudgeVsJudgeDemo
             // detected by register or shape alone. Deterministic: the next one of that type, wrapping.
             var sameType = all.Where(y => y.Type == x.Type && y.Id != x.Id).OrderBy(y => y.Id, StringComparer.Ordinal).ToList();
             if (sameType.Count == 0) continue;
-            var idx = Math.Abs(x.Id.GetHashCode(StringComparison.Ordinal)) % sameType.Count;
+            // string.GetHashCode is randomised PER PROCESS: it would have picked different distractors on
+            // every run while the report claimed a deterministic design, and Math.Abs(int.MinValue) is
+            // still negative. A stable hash keeps a rerun comparable with the run already published.
+            var idx = (int)(StableHash(x.Id) % (uint)sameType.Count);
             items.Add(new Item(question, sameType[idx].A!, false));
         }
         return items;
+    }
+
+    /// <summary>FNV-1a. Stable across processes and runtimes, unlike <see cref="string.GetHashCode()"/>.</summary>
+    private static uint StableHash(string value)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var c in value)
+            {
+                hash ^= c;
+                hash *= 16777619u;
+            }
+            return hash;
+        }
     }
 
     private static string? FindDataset()

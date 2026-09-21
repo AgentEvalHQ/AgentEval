@@ -34,8 +34,9 @@ provider `AI_INFERENCE_PROVIDER` selects.
   one request per judge call. ⚠️ **For calibration and comparison only.** A persisted eval tree that reached
   a decision model through this adapter would carry `provenance.type = "atomic-llm"` naming a judge that is
   not an LLM; the persisted kind is `DecisionEval` (`"atomic-decision"`).
-- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
-  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
+- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through
+  `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call — introduced with
+  this sample and promoted to Core in the same release, see above), beside
   the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
   `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
   evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
@@ -64,9 +65,11 @@ provider `AI_INFERENCE_PROVIDER` selects.
   response only, so an eval that set a context — a retrieved passage, a ledger extract, the source document —
   asked "is this grounded?" while withholding the ground, and the judge graded plausibility instead. Samples
   N1 and N2 carried a wrapper to work around it; the wrapper is deleted. ⚠️ **This changes judge prompts**
-  wherever `Context` was set, and therefore scores and `PromptHash`: any calibration baseline measured on an
-  eval that set `Context` was measured without it and should be re-run. Evals that leave `Context` unset are
-  bit-for-bit unaffected, which a test pins.
+  wherever `Context` was set, and therefore scores: any calibration baseline measured on an eval that set
+  `Context` was measured without it and should be re-run. Evals that leave `Context` unset are bit-for-bit
+  unaffected, which a test pins. (`AtomicLlmEval` emits `PromptHash: null` and always has, so the change is
+  **not** visible in provenance — a reader diffing prompt hashes would see nothing moved. Hashing the real
+  prompt is worth doing and is not in this release.)
 - The tag-triggered LLM integration workflow no longer fails on every release tag. It selects whichever
   provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
   run with no provider configured **skips with a notice** instead of erroring, because an optional paid job
