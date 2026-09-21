@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 #### Fixed
+- `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
+  0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
+  source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
+  constructor; the regression test forces the ordering through the same internal consumer-starter seam. These
+  were the only two pumps with the pattern.
 - Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
   `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
 - Samples: `AGENTEVAL_SAMPLES_SHOW_RAW=1` wrapped only N2's Jev transport. It now wraps the chat client the

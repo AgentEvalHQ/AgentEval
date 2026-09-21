@@ -66,6 +66,7 @@ public sealed class SecurityGraphIngestionPump : IAsyncDisposable
     private readonly Action<SecurityGraphPumpFailure>? _onFailure;
     private readonly Channel<SecurityGraphObservationRequest> _channel;
     private readonly CancellationTokenSource _cts = new();
+    private readonly CancellationToken _token;   // captured in the constructor; the consumer never reads _cts
     private readonly Task _consumer;
     private readonly TimeSpan _drainTimeout;
     private readonly object _writerState = new();
@@ -88,8 +89,25 @@ public sealed class SecurityGraphIngestionPump : IAsyncDisposable
         Action<SecurityGraphPumpFailure>? onFailure = null,
         int queueCapacity = DefaultQueueCapacity,
         TimeSpan? drainTimeout = null)
+        : this(store, onFailure, queueCapacity, drainTimeout, static body => Task.Run(body))
+    {
+    }
+
+    /// <summary>
+    /// Test seam, the same one <c>ShadowJudgePump</c> has: <paramref name="consumerStarter"/> receives the consumer
+    /// body and returns the task that represents it; production always passes <see cref="Task.Run(Func{Task})"/>.
+    /// No public behaviour can make a <see cref="Task.Run(Func{Task})"/> consumer start AFTER <see cref="DisposeAsync"/>
+    /// deterministically, and that ordering used to throw <see cref="ObjectDisposedException"/> off the disposed source.
+    /// </summary>
+    internal SecurityGraphIngestionPump(
+        ISecurityGraphStore store,
+        Action<SecurityGraphPumpFailure>? onFailure,
+        int queueCapacity,
+        TimeSpan? drainTimeout,
+        Func<Func<Task>, Task> consumerStarter)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        ArgumentNullException.ThrowIfNull(consumerStarter);
         if (queueCapacity is < 1 or > MaximumQueueCapacity)
         {
             throw new ArgumentOutOfRangeException(nameof(queueCapacity));
@@ -111,7 +129,11 @@ public sealed class SecurityGraphIngestionPump : IAsyncDisposable
                 FullMode = BoundedChannelFullMode.Wait,
                 AllowSynchronousContinuations = false,
             });
-        _consumer = Task.Run(ConsumeAsync);
+        // Captured HERE, before the consumer is started. DisposeAsync disposes _cts after a bounded drain; a consumer
+        // whose Task.Run had not been scheduled by then (a starved pool) would otherwise throw ObjectDisposedException
+        // at its first line. The token struct stays usable after its source is disposed; the source's property does not.
+        _token = _cts.Token;
+        _consumer = consumerStarter(ConsumeAsync);
     }
 
     /// <summary>Items accepted into the bounded queue.</summary>
@@ -184,7 +206,7 @@ public sealed class SecurityGraphIngestionPump : IAsyncDisposable
 
     private async Task ConsumeAsync()
     {
-        var token = _cts.Token;
+        var token = _token;   // never _cts.Token here: see the constructor
         await foreach (var observation in
             _channel.Reader.ReadAllAsync(token).ConfigureAwait(false))
         {

@@ -451,6 +451,39 @@ public sealed class SecurityGraphIngestionPumpTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task ConsumerThatStartsAfterDispose_EndsByCancellation_NeverObjectDisposed()
+    {
+        // The consumer is a Task.Run queued by the constructor. On a starved pool it can START after DisposeAsync
+        // has drained, given up and disposed _cts (the Windows net8 leg of CI run 35548709982 waited 5 s for this
+        // pump's consumer to start at all). ConsumeAsync used to read _cts.Token as its first line and would have
+        // thrown ObjectDisposedException there, unobserved. The seam hands the body to the test, so "not started
+        // yet" is structural — the same shape as ShadowJudgeTests.ShadowJudge_ConsumerThatStartsAfterDispose_….
+        using var durable = CreateStore();
+        var failures = new List<SecurityGraphPumpFailure>();
+        Func<Task>? consumerBody = null;
+        var pump = new SecurityGraphIngestionPump(
+            durable,
+            failure => { lock (failures) { failures.Add(failure); } },
+            queueCapacity: 8,
+            drainTimeout: TimeSpan.FromMilliseconds(10),
+            consumerStarter: body => { consumerBody = body; return new TaskCompletionSource().Task; });   // never started
+        Assert.True(pump.TryEnqueue(Request("event-1")));
+
+        await pump.DisposeAsync();      // the drain times out twice (the consumer never ran), reports it, cancels, disposes _cts
+        Assert.NotNull(consumerBody);
+        lock (failures)
+        {
+            Assert.Contains(failures, f => f.Kind == SecurityGraphPumpFailureKind.Lifecycle);
+        }
+
+        // NOW the consumer starts, after _cts is gone. It must end the way a cancelled consumer ends, or cleanly —
+        // never with an ObjectDisposedException off the disposed source.
+        var ex = await Record.ExceptionAsync(() => consumerBody!());
+        Assert.IsNotType<ObjectDisposedException>(ex);
+        Assert.True(ex is null or OperationCanceledException, ex?.ToString());
+    }
+
     private sealed class ThrowOnceStore : ISecurityGraphStore
     {
         private int _appendCount;
