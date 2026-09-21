@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Cli.Infrastructure;
+using AgentEval.Providers;
 using AgentEval.Core;
 using Azure;
 using Azure.AI.OpenAI;
@@ -64,16 +65,14 @@ internal static class JudgeFactory
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
 
-        // Judge-specific creds take precedence over the generic AZURE_OPENAI_* set so the judge and
-        // the agent-under-test can point at DIFFERENT endpoints in the same run — e.g. when
-        // AZURE_OPENAI_* drives the SUT agent while AZURE_OPENAI_JUDGE_* points the grader at a
-        // separate, capable judge model. When the JUDGE_* vars are unset this falls back to
-        // AZURE_OPENAI_* (unchanged single-endpoint behaviour).
-        var endpoint   = FirstSet("AZURE_OPENAI_JUDGE_ENDPOINT",   "AZURE_OPENAI_ENDPOINT");
-        var apiKey     = FirstSet("AZURE_OPENAI_JUDGE_API_KEY",    "AZURE_OPENAI_API_KEY");
-        var deployment = FirstSet("AZURE_OPENAI_JUDGE_DEPLOYMENT", "AZURE_OPENAI_DEPLOYMENT");
+        // AZURE_OPENAI_JUDGE_* still wins outright, so the judge and the agent-under-test can point at
+        // DIFFERENT endpoints in the same run — a capable grader against a cheap subject. It is the only
+        // path that still hard-codes a provider, because naming a judge endpoint is the whole point of it.
+        var endpoint   = FirstSet("AZURE_OPENAI_JUDGE_ENDPOINT");
+        var apiKey     = FirstSet("AZURE_OPENAI_JUDGE_API_KEY");
+        var deployment = FirstSet("AZURE_OPENAI_JUDGE_DEPLOYMENT");
 
-        // All three variables required for real Azure OpenAI judging.
+        // All three variables required for a judge-specific Azure OpenAI endpoint.
         var allConfigured =
                !string.IsNullOrWhiteSpace(endpoint)
             && !string.IsNullOrWhiteSpace(apiKey)
@@ -100,8 +99,8 @@ internal static class JudgeFactory
             }
         }
 
-        // Partial config is almost always a misconfiguration; surface it explicitly
-        // so CI doesn't silently fall through to the stub.
+        // A partially-set judge override is almost always a misconfiguration; surface it rather than
+        // silently grading with the general provider the operator did not mean to point the judge at.
         var anyConfigured =
                !string.IsNullOrWhiteSpace(endpoint)
             || !string.IsNullOrWhiteSpace(apiKey)
@@ -110,14 +109,25 @@ internal static class JudgeFactory
         if (anyConfigured)
         {
             var missing = new List<string>();
-            if (string.IsNullOrWhiteSpace(endpoint))   missing.Add("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(apiKey))     missing.Add("AZURE_OPENAI_API_KEY");
-            if (string.IsNullOrWhiteSpace(deployment)) missing.Add("AZURE_OPENAI_DEPLOYMENT");
+            if (string.IsNullOrWhiteSpace(endpoint))   missing.Add("AZURE_OPENAI_JUDGE_ENDPOINT");
+            if (string.IsNullOrWhiteSpace(apiKey))     missing.Add("AZURE_OPENAI_JUDGE_API_KEY");
+            if (string.IsNullOrWhiteSpace(deployment)) missing.Add("AZURE_OPENAI_JUDGE_DEPLOYMENT");
             Console.Error.WriteLine(
-                $"✖ Azure OpenAI judge partially configured — missing: {string.Join(", ", missing)}.\n" +
-                "  Set all three of AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT,\n" +
-                "  or unset all three and use AGENTEVAL_ALLOW_STUB_JUDGE=1 for stub mode.");
+                $"✖ Judge-specific Azure OpenAI endpoint partially configured — missing: {string.Join(", ", missing)}.\n" +
+                "  Set all three AZURE_OPENAI_JUDGE_* variables to point the judge at its own endpoint,\n" +
+                $"  or unset all three to judge with the provider {InferenceProviderEnvironment.SelectorVariable} selects.");
             return (null, "", ExitCodes.RuntimeError);
+        }
+
+        // The general path: whichever provider AI_INFERENCE_PROVIDER selects (Azure included).
+        var (providerClient, providerModel, diagnostic) = ProviderChatClientFactory.TryCreate("judge");
+        if (providerClient is not null)
+        {
+            IEvaluator providerJudge = new ChatClientEvaluator(providerClient, systemPrompt);
+            Console.Error.WriteLine(
+                $"{ProviderChatClientFactory.Describe($"{judgeKind} judge", providerModel!)}" +
+                (systemPrompt is null ? "" : $" [system prompt: {systemPrompt.Length} chars]"));
+            return (providerJudge, providerModel!, 0);
         }
 
         // No real-judge config — gate the stub behind an explicit opt-in so CI
@@ -130,10 +140,9 @@ internal static class JudgeFactory
         if (!stubAllowed)
         {
             Console.Error.WriteLine(
-                "✖ No LLM evaluator configured (AZURE_OPENAI_* unset).\n" +
-                "  Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT\n" +
-                "  to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run with\n" +
-                "  a deterministic stub (results are not meaningful — CI must NOT do this).");
+                $"✖ No LLM evaluator configured. {diagnostic}\n" +
+                "  Configure a provider to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run\n" +
+                "  with a deterministic stub (results are not meaningful — CI must NOT do this).");
             return (null, "", ExitCodes.RuntimeError);
         }
 

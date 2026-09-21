@@ -141,28 +141,11 @@ public class AzureChatAgentFactoryTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Temporarily sets env vars (or removes them when value is null), restoring them
-    /// on dispose. Used to make these tests order-independent and parallel-safe within
-    /// a single test class (xUnit runs tests within a class serially by default).
+    /// Clears EVERY provider variable, then sets the ones this test names, restoring all of them on dispose.
+    /// Setting three variables is no longer enough to describe an environment: since the CLI resolves
+    /// <c>AI_INFERENCE_PROVIDER</c>, an ambient <c>OPENAI_API_KEY</c> on the developer's machine or the CI
+    /// runner would configure a provider a test believed it had removed.
     /// </summary>
     private static IDisposable TempEnvVars(params (string Name, string? Value)[] vars)
-    {
-        var originals = vars
-            .Select(v => (v.Name, Original: Environment.GetEnvironmentVariable(v.Name)))
-            .ToArray();
-        foreach (var v in vars)
-            Environment.SetEnvironmentVariable(v.Name, v.Value);
-        return new EnvVarScope(originals);
-    }
-
-    private sealed class EnvVarScope : IDisposable
-    {
-        private readonly (string Name, string? Original)[] _originals;
-        public EnvVarScope((string Name, string? Original)[] originals) => _originals = originals;
-        public void Dispose()
-        {
-            foreach (var v in _originals)
-                Environment.SetEnvironmentVariable(v.Name, v.Original);
-        }
-    }
+        => new ProviderEnvironmentScope(vars);
 }

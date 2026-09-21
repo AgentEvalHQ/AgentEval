@@ -179,6 +179,42 @@ public static class InferenceProviderEnvironment
         _ => "",
     };
 
+    /// <summary>
+    /// The variables a provider requires that are NOT set, in order. Empty when the provider is fully
+    /// configured. A diagnostic built from this never names a variable the operator has already set, which is
+    /// the difference between "you are missing AZURE_OPENAI_API_KEY" and a wall of every provider's options.
+    /// </summary>
+    public static IReadOnlyList<string> MissingVariablesOf(InferenceProvider provider, Func<string, string?> getEnvironmentVariable)
+    {
+        ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
+        bool NotSet(string n) => string.IsNullOrWhiteSpace(getEnvironmentVariable(n));
+        string[] required = provider switch
+        {
+            InferenceProvider.AzureOpenAI => ["AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT"],
+            InferenceProvider.Bitdeer => ["BITDEER_API_KEY"],
+            InferenceProvider.OpenAI => ["OPENAI_API_KEY"],
+            InferenceProvider.Foundry => ["FOUNDRY_ENDPOINT", "FOUNDRY_API_KEY", "FOUNDRY_MODEL"],
+            InferenceProvider.OpenAICompatible => ["OPENAI_COMPATIBLE_ENDPOINT", "OPENAI_COMPATIBLE_MODEL"],
+            _ => [],
+        };
+        return [.. required.Where(NotSet)];
+    }
+
+    /// <summary>True when a provider has SOME of its variables but not all — almost always a typo or a half-done setup.</summary>
+    private static bool IsPartiallyConfigured(InferenceProvider provider, Func<string, string?> env)
+    {
+        var missing = MissingVariablesOf(provider, env);
+        if (missing.Count == 0) return false;
+        var required = provider switch
+        {
+            InferenceProvider.AzureOpenAI or InferenceProvider.Foundry => 3,
+            InferenceProvider.OpenAICompatible => 2,
+            InferenceProvider.Bitdeer or InferenceProvider.OpenAI => 1,
+            _ => 0,
+        };
+        return required > 0 && missing.Count < required;
+    }
+
     /// <summary>Resolves the settings from the process environment.</summary>
     public static InferenceProviderSettings Resolve() => Resolve(Environment.GetEnvironmentVariable);
 
@@ -205,7 +241,8 @@ public static class InferenceProviderEnvironment
             if (!HasCredentials(parsed.Value, Env))
             {
                 return InferenceProviderSettings.NotConfigured(
-                    $"{SelectorVariable}={TagOf(parsed.Value)}, but its variables are not all set: {RequiredVariablesOf(parsed.Value)}.");
+                    $"{SelectorVariable}={TagOf(parsed.Value)}, but it is missing: " +
+                    $"{string.Join(", ", MissingVariablesOf(parsed.Value, Env))}. It needs {RequiredVariablesOf(parsed.Value)}.");
             }
             return Describe(parsed.Value, Env, InferenceProviderSelection.Explicit);
         }
@@ -214,6 +251,16 @@ public static class InferenceProviderEnvironment
         {
             if (HasCredentials(candidate, Env))
                 return Describe(candidate, Env, InferenceProviderSelection.AutoDetected);
+        }
+
+        // A provider with SOME of its variables set is a half-done setup, not an unchosen one: name exactly what
+        // it lacks. Listing every provider's requirements here would claim variables are missing that are set.
+        var partial = s_autoDetectOrder.Where(p => IsPartiallyConfigured(p, Env)).ToList();
+        if (partial.Count > 0)
+        {
+            return InferenceProviderSettings.NotConfigured(
+                string.Join(" ", partial.Select(p =>
+                    $"{DisplayNameOf(p)} is partially configured — missing: {string.Join(", ", MissingVariablesOf(p, Env))}.")));
         }
 
         return InferenceProviderSettings.NotConfigured(

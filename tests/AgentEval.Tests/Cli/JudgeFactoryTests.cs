@@ -22,34 +22,13 @@ namespace AgentEval.Tests.Cli;
 [Collection("EnvVarTests")]
 public class JudgeFactoryTests : IDisposable
 {
-    private readonly (string? Endpoint, string? Key, string? Deployment, string? Stub) _snapshot;
+    // Clears EVERY provider variable for the duration of each test and restores them afterwards. Scrubbing
+    // the three AZURE_OPENAI_* names was enough while Azure was the only path the CLI knew; it is not enough
+    // now that the CLI resolves AI_INFERENCE_PROVIDER, because an ambient OPENAI_API_KEY or BITDEER_API_KEY
+    // would configure a judge in a test whose whole point is that no judge is configured.
+    private readonly ProviderEnvironmentScope _env = new();
 
-    public JudgeFactoryTests()
-    {
-        // Snapshot the 4 env vars before each test so the .Dispose restore is reliable.
-        _snapshot = (
-            Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT"),
-            Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"),
-            Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT"),
-            Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE"));
-        ScrubEnv();
-    }
-
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT",     _snapshot.Endpoint);
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",      _snapshot.Key);
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT",   _snapshot.Deployment);
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", _snapshot.Stub);
-    }
-
-    private static void ScrubEnv()
-    {
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", null);
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", null);
-        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", null);
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", null);
-    }
+    public void Dispose() => _env.Dispose();
 
     private sealed class FakeEvaluator : IEvaluator
     {
