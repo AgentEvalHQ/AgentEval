@@ -32,34 +32,63 @@ Examples below use the global `agenteval` form. To run from a cloned repo, subst
 
 The CLI honours the following process-level environment variables.
 
-### `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`
+### `AI_INFERENCE_PROVIDER` — which provider the CLI talks to
 
-Real LLM judging requires **all three**. Consumed by:
+Every `bench` and `calibrate` command reaches its model through this selector. Set it to one of
+`azure`, `bitdeer`, `openai`, `foundry` or `openai-compatible`, then set that provider's variables:
 
-- `agenteval bench gdpr` · `bench eu-ai-act` · `bench agentic`
-- `agenteval bench <regulation> calibrate`
+| `AI_INFERENCE_PROVIDER` | Provider | Variables it needs |
+|---|---|---|
+| `azure` | Azure OpenAI | `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` |
+| `bitdeer` | Bitdeer AI Model Studio | `BITDEER_API_KEY` (`BITDEER_ENDPOINT`, `BITDEER_MODEL` have defaults) |
+| `openai` | OpenAI | `OPENAI_API_KEY` (`OPENAI_BASE_URL`, `OPENAI_MODEL` have defaults) |
+| `foundry` | Azure AI Foundry | `FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY` + `FOUNDRY_MODEL` |
+| `openai-compatible` | any OpenAI-compatible host | `OPENAI_COMPATIBLE_ENDPOINT` + `OPENAI_COMPATIBLE_MODEL` (`OPENAI_COMPATIBLE_API_KEY` optional; a keyless local host gets `no-key-needed`) |
 
-If any of the three are set but others are missing, the command exits **2** with a diagnostic listing the missing variable(s). Partial config is **never** silently downgraded to a stub — the resolver refuses to run rather than produce stub-graded evidence under partial-config conditions.
+**Leaving the selector unset is supported and backward compatible.** The resolver then auto-detects, in
+this order: Azure OpenAI, Bitdeer, OpenAI, Foundry, OpenAI-compatible — the first one whose variables are
+all present wins. A machine that has only ever set `AZURE_OPENAI_*` therefore behaves exactly as it did
+before this variable existed.
+
+**Endpoint policy:** an endpoint must be `https`, or `http` to loopback. Diagnostics name the *variable*
+and the reason, never its value, because a configured URL can carry a token in its user-info, query or
+fragment and the diagnostic reaches stderr.
+
+*Provider selection was added in v0.41.0-beta. Before that the CLI assumed Azure OpenAI.*
+
+### `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY`, `AZURE_OPENAI_JUDGE_DEPLOYMENT`
+
+An optional **judge override**, independent of the selector above. When all three are set they win
+outright, so a capable grader can face a cheap subject in a single run. The same endpoint policy applies.
 
 ### `AGENTEVAL_ALLOW_STUB_JUDGE`
 
-Opt-in escape valve for running benchmarks **without** an Azure OpenAI endpoint. Set to `1` or `true` (case-insensitive) to fall back to a deterministic placeholder evaluator that returns score **75/100** and "criterion met" for every criterion.
+Opt-in escape valve for running benchmarks **without any provider configured**. Set to `1` or `true`
+(case-insensitive) to fall back to a deterministic placeholder evaluator that returns score **75/100** and
+"criterion met" for every criterion.
 
-**Do NOT use in CI.** Stub-mode results are not real judgements; the CLI prints a warning to stderr on every run, and the produced evidence is unsuitable for any compliance claim. Use this only for smoke-testing the pipeline end-to-end without LLM cost.
+**Do NOT use in CI.** Stub-mode results are not real judgements; the CLI prints a warning to stderr on
+every run, and the produced evidence is unsuitable for any compliance claim. Use this only for
+smoke-testing the pipeline end-to-end without LLM cost.
 
 | Platform | Set the variable |
 |---|---|
 | Linux / macOS (bash, zsh) | `export AGENTEVAL_ALLOW_STUB_JUDGE=1` |
 | Windows (PowerShell) | `$env:AGENTEVAL_ALLOW_STUB_JUDGE = "1"` |
 | Windows (cmd) | `set AGENTEVAL_ALLOW_STUB_JUDGE=1` |
-| GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set the AZURE_OPENAI_* secrets instead)* |
+| GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set a provider's secrets instead)* |
 
-**Resolution order** (as of v0.8.1-beta; exit codes updated for BUG-22, see [Exit codes](#exit-codes)):
+**Resolution order** (exit codes per [Exit codes](#exit-codes)):
+
 1. Test override (programmatic; not user-visible).
-2. All three `AZURE_OPENAI_*` set → real Azure OpenAI judge.
-3. Any of the three set but not all three → exit 3 (`RuntimeError`) with diagnostic.
-4. None set + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge (with stderr warning).
-5. None set + no opt-in → exit 3 ("Set AZURE_OPENAI_… or AGENTEVAL_ALLOW_STUB_JUDGE=1").
+2. All three `AZURE_OPENAI_JUDGE_*` set → that judge, whatever the selector says.
+3. A provider resolves with credentials → the real judge for that provider.
+4. **Any provider variable or the selector is set, but a provider could not be built → exit 3
+   (`RuntimeError`), even with `AGENTEVAL_ALLOW_STUB_JUDGE=1`.** The stub rescues an *unconfigured*
+   machine, never a *misconfigured* one: before v0.41.0-beta, `AI_INFERENCE_PROVIDER=foundry` with its
+   variables missing would fall through to the stub and produce stub-graded evidence from a typo.
+5. Nothing configured at all + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge, with a stderr warning.
+6. Nothing configured + no opt-in → exit 3, listing each provider and the variables it would need.
 
 ### `AgentEval__Root`
 

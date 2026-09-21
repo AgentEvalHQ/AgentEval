@@ -74,6 +74,11 @@ provider `AI_INFERENCE_PROVIDER` selects.
   fragment and the diagnostic reaches stderr.
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
+- **The docs now describe the provider selector.** `docs/cli.md` gained an `AI_INFERENCE_PROVIDER` section
+  with each provider's variables, the auto-detect order and the endpoint policy, and `docs/getting-started.md`
+  points at it. The old resolution order in that reference was **wrong as of this release** — it still said a
+  stub judge rescues a half-configured machine, which is exactly the behaviour this release removed. The
+  `AZURE_OPENAI_JUDGE_*` override was undocumented and now has its own entry.
 
 #### Fixed
 - **`AtomicLlmEval` passes `EvalInput.Context` to its judge.** It used to hand over the query and the
