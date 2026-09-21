@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
 
+#### Fixed
+- The tag-triggered LLM integration workflow no longer fails on every release tag. It selects whichever
+  provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
+  run with no provider configured **skips with a notice** instead of erroring, because an optional paid job
+  without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
+
 #### Evidence
 - `docs/adr/evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md` — a threshold sweep over the N3
   probabilities (no spend) and a review of the 20 cases both judges got wrong. A uniform 0.55 bar lifts

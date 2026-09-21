@@ -18,8 +18,10 @@ Released code: `v0.40.0-beta` plus the N3 sample. Golden set: `tests/AgentEval.T
 | run 1 (both arms) | 1 repeat, 4 files in parallel, 1,119 s | same run, 26 s of it |
 | run 2 (arm B only) | — | 3 repeats, 80 s, 1,041 requests |
 
-Of the 378 cases, **40 carry keys the registry does not dispatch** (the nine keys the CLI's calibrate command
-also skips; counted, not hidden) and **40 decide in code** without a judge leaf (`unsafe_tool_use`, the
+Of the 378 cases, **40 carry keys the registry does not dispatch** — the nine multi-turn and trace-dependent
+keys that `BenchAgenticCalibrateCommand`'s carve-out list omits **deliberately**, with its reason recorded
+there: their grading semantics do not fit a single-turn calibration entry, so an LLM judge would measure the
+judge rather than the evaluator. Counted here, not hidden and **40 decide in code** without a judge leaf (`unsafe_tool_use`, the
 regex path of `prompt_leak`, and the like); those cannot tell the judges apart and are excluded. **298 cases
 compare the judges.** Zero transport errors on either arm. Dry-run first: the 40 dispatched keys resolved (the
 nine unknown ones listed), every dispatched case run against a judge that recorded its criteria and sent nothing, the first Jev request rendered through the

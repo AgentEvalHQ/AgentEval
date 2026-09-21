@@ -96,15 +96,33 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    - name: Validate API credentials
+    # Which provider has secrets? This workflow fires on every release tag, and a tag is not the place to
+    # discover that an OPTIONAL paid job has no credentials: an automatic run with none configured is
+    # unconfigured, not broken, so it skips and says so. A human who asks for the run explicitly
+    # (workflow_dispatch) gets an error instead, because they asked for something that cannot happen.
+    - name: Select the inference provider
+      id: provider
       run: |
-        if [ -z "${{ secrets.AZURE_OPENAI_ENDPOINT }}" ] || [ -z "${{ secrets.AZURE_OPENAI_API_KEY }}" ]; then
-          echo "::error::Azure OpenAI credentials not configured. Please add AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY secrets."
-          exit 1
+        if [ -n "${{ secrets.AZURE_OPENAI_ENDPOINT }}" ] && [ -n "${{ secrets.AZURE_OPENAI_API_KEY }}" ]; then
+          echo "provider=azure" >> "$GITHUB_OUTPUT"
+          echo "✅ Azure OpenAI credentials present"
+        elif [ -n "${{ secrets.BITDEER_API_KEY }}" ]; then
+          echo "provider=bitdeer" >> "$GITHUB_OUTPUT"
+          echo "✅ Bitdeer credentials present"
+        elif [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
+          echo "provider=openai" >> "$GITHUB_OUTPUT"
+          echo "✅ OpenAI credentials present"
+        else
+          echo "provider=" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::No inference provider secrets are configured. Add AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY, or BITDEER_API_KEY, or OPENAI_API_KEY."
+            exit 1
+          fi
+          echo "::notice::No inference provider secrets are configured; skipping the paid integration tests. This is not a failure — add BITDEER_API_KEY (or the Azure pair) to enable them."
         fi
-        echo "✅ API credentials validated"
 
     - name: Run Integration Tests
+      if: steps.provider.outputs.provider != ''
       run: |
         echo "🧪 Running LLM Integration Tests"
         echo "   Filter: ${{ inputs.test_filter || 'Category=Integration' }}"
@@ -121,15 +139,21 @@ jobs:
           --results-directory ./test-results \
           -- RunConfiguration.MaxCpuCount=${{ inputs.max_parallel_tests || '1' }}
       env:
+        # The CLI and the samples both resolve AI_INFERENCE_PROVIDER; naming it here makes the run's provider
+        # explicit rather than auto-detected, so a half-configured secret set fails closed instead of
+        # silently grading on another host.
+        AI_INFERENCE_PROVIDER: ${{ steps.provider.outputs.provider }}
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
         AZURE_OPENAI_DEPLOYMENT: ${{ inputs.model || 'gpt-5.5' }}
         # Secondary model for comparison tests
         AZURE_OPENAI_DEPLOYMENT_2: ${{ inputs.model == 'gpt-4o' && 'gpt-4o-mini' || 'gpt-4o' }}
+        BITDEER_API_KEY: ${{ secrets.BITDEER_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     - name: Upload Test Results
       uses: actions/upload-artifact@v7
-      if: always()
+      if: always() && steps.provider.outputs.provider != ''
       with:
         name: integration-test-results
         path: |
@@ -140,7 +164,7 @@ jobs:
     - name: Publish Test Summary
       # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag, kept current by Dependabot.
       uses: dorny/test-reporter@a53e41438c2381e621dc719a47a57180e30c7075 # v1
-      if: always()
+      if: always() && steps.provider.outputs.provider != ''
       with:
         name: LLM Integration Test Results
         path: './test-results/**/*.trx'
@@ -148,7 +172,7 @@ jobs:
         fail-on-error: true
 
     - name: Cost Estimation Summary
-      if: always()
+      if: always() && steps.provider.outputs.provider != ''
       run: |
         echo "## 💰 Cost Estimation" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
