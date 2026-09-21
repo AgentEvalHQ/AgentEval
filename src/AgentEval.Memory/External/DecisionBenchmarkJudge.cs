@@ -160,6 +160,16 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
             _requestedModel);
     }
 
+    /// <summary>Input + output, clamped to <see cref="int.MaxValue"/> without wrapping on the way.</summary>
+    private static int SaturatingTotalTokens(DecisionUsage? usage)
+    {
+        if (usage is null) return 0;
+        var input = usage.InputTokens;
+        var output = usage.OutputTokens;
+        var total = input > long.MaxValue - output ? long.MaxValue : input + output;
+        return (int)Math.Min(int.MaxValue, total);
+    }
+
     /// <inheritdoc/>
     public async Task<ExternalJudgmentResult> JudgeAsync(
         string agentResponse, ExternalBenchmarkQuestion question, CancellationToken ct = default)
@@ -206,7 +216,9 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
             Explanation = question.IsAbstention
                 ? $"P(response recognises it cannot answer) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}"
                 : $"P(gold answer present) = {probability:F3} (threshold {Threshold:F2}) — {response.Model}",
-            TokensUsed = (int)Math.Min(int.MaxValue, (response.Usage?.InputTokens ?? 0) + (response.Usage?.OutputTokens ?? 0)),
+            // Saturating, as DecisionEval does for the same contract: DecisionUsage allows each count up to
+            // long.MaxValue, so a plain addition can wrap negative BEFORE Math.Min ever sees it.
+            TokensUsed = SaturatingTotalTokens(response.Usage),
             // One primary call, no retries: the whole accounting contract, not just the total. A consumer
             // reading PrimaryLlmCallCount would otherwise see no primary attempt for a call that happened.
             LlmCallCount = 1,

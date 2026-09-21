@@ -254,4 +254,25 @@ public class DecisionBenchmarkJudgeTests
         }
     }
 
+    private sealed class HugeUsageClient : IDecisionClient
+    {
+        public Task<DecisionResponse> DecideAsync(DecisionRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DecisionResponse(
+                "jev-1.13.0",
+                new Dictionary<string, DecisionAnswer>(StringComparer.Ordinal) { ["contains_gold"] = new BinaryAnswer(0.9) },
+                new DecisionUsage(long.MaxValue - 5, 10)));
+    }
+
+    [Fact]
+    public async Task TokenSumThatWouldOverflow_SaturatesAtIntMax_NeverNegative()
+    {
+        // DecisionUsage allows each count up to long.MaxValue, so a plain addition wraps negative before any
+        // clamp sees it — the same defect DecisionEval already carries a saturating sum for.
+        var judge = new DecisionBenchmarkJudge(new HugeUsageClient(), "jev-latest");
+
+        var result = await judge.JudgeAsync("an answer", Question());
+
+        Assert.Equal(int.MaxValue, result.TokensUsed);
+    }
+
 }
