@@ -117,9 +117,10 @@ step 3  paid-date  subject 1,476 ms (79+66 tok)   contains_required_term 1.000 p
 judge model id  zai-org/GLM-5.3-Flash@bitdeer   (same model as the subject; EvalInput.SubjectModel set, so the result says so)
 ```
 
-No 402 this time. The sample's footer printed `Σ judge tokens: 0` under three leaves of ~800: it summed the
-composite root's provenance, which carries no tokens, instead of the leaves'. Fixed in the same change as this
-section; the leaf figures above are the ones the sample printed per case.
+No 402 this time. The sample's footer printed `Σ judge tokens: 0` under the three leaves above (794 + 819 + 809 =
+2,422): it summed the composite root's provenance, which carries no tokens, instead of the leaves'. Fixed in the
+same change as this section. The verification run after the fix was a NEW run — GLM's reasoning length varies —
+and printed leaves of 909 / 856 / 766 and `Σ judge tokens: 2,531`, which is that run's own sum.
 
 ### N2 — `dotnet run -- 101`, Jev beside the GLM judge (44 s wall-clock)
 
@@ -146,6 +147,6 @@ the question's doing, not the model's. Three cases; still not calibration eviden
 
 | Requirement | State |
 |---|---|
-| (1) one real call per provider, evidence kept | **done for both**: TypeSafe 5 calls on 2026-09-20 + 5 on 2026-09-21; Bitdeer smoke 2026-09-20, then N1 step 3 (3 composites) and N2 stage 5 (3 GLM judge leaves) on 2026-09-21. |
+| (1) one real call per provider, evidence kept | **done for both**: TypeSafe 5 calls on 2026-09-20 + 7 on 2026-09-21 (3 `DecisionEval` calls in stages 2–3, 1 batch request in stage 4, 3 `grounded` leaves in stage 5); Bitdeer smoke 2026-09-20, then N1 step 3 (3 composites) and N2 stage 5 (3 GLM judge leaves) on 2026-09-21. |
 | (2) shadow run on a labelled composite family | not started |
 | (3) threshold on held-out data; escalation decision | not started |
