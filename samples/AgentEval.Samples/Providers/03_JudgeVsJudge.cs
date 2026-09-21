@@ -44,7 +44,8 @@ namespace AgentEval.Samples.Providers;
 /// Flags (after the sample number): <c>--dry-run</c> (resolve every key, capture the exact criteria each
 /// evaluator sends, render the first Jev request, send nothing), <c>--limit N</c> (cases per file),
 /// <c>--files a,b</c> (file suffixes, e.g. <c>20-process,indirect-attack</c>), <c>--repeats N</c>,
-/// <c>--parallel N</c> (files in flight at once, default 4), <c>--out DIR</c> (report directory).
+/// <c>--parallel N</c> (files in flight at once, default 4), <c>--arms A,B</c> (which judges run; default both —
+/// <c>--arms B --repeats 3</c> settles H6 in a minute), <c>--out DIR</c> (report directory).
 /// </para>
 /// </remarks>
 internal static class JudgeVsJudgeDemo
@@ -122,7 +123,10 @@ internal static class JudgeVsJudgeDemo
         {
             new Arm("A", "generative", AIConfig.ModelIdentity, generative),
             new Arm("B", "decision", $"{jevOptions.Model}@{jevOptions.ProviderName}", jev),
-        };
+        }.Where(a => opts.Arms.Contains(a.Id)).ToArray();
+        if (arms.Length == 0) { Console.WriteLine("   ⚠ --arms selected no judge (use A, B or A,B)."); return; }
+        Console.WriteLine($"   Arms         : {string.Join(" + ", arms.Select(a => a.Id + " " + a.Label))}{(arms.Length == 1 ? "   (one arm: no judge-vs-judge comparison, only that arm's own figures and repeat stability)" : "")}");
+        Console.WriteLine();
 
         var records = new ConcurrentBag<CaseRecord>();
         var total = Stopwatch.StartNew();
@@ -325,6 +329,10 @@ internal static class JudgeVsJudgeDemo
             .Where(g => arms.All(a => g.Any(r => r.Arm == a.Id)))
             .SelectMany(g => g)
             .ToList();
+        var agreement = arms.Length == 2
+            ? comparable.Where(r => r.Error is null).GroupBy(r => (r.ScenarioId, r.EvaluatorKey, r.Repeat)).Where(g => g.Count() == 2)
+                .Select(g => g.Select(r => r.Label).Distinct().Count() == 1 ? 1.0 : 0.0).DefaultIfEmpty(double.NaN).Average()
+            : double.NaN;
         var excluded = all.Select(r => (r.ScenarioId, r.EvaluatorKey)).Distinct().Count() - comparable.Select(r => (r.ScenarioId, r.EvaluatorKey)).Distinct().Count();
 
         var byFile = comparable.GroupBy(r => r.File).OrderBy(g => g.Key)
@@ -334,10 +342,11 @@ internal static class JudgeVsJudgeDemo
         var overall = GroupSummary("ALL", comparable, arms);
 
         // Flips across repeats, per arm
-        var flips = arms.ToDictionary(a => a.Id, a =>
+        // Both keys always exist; an arm that did not run, or a single repeat, is null — never a missing key.
+        var flips = new[] { "A", "B" }.ToDictionary(id => id, id =>
         {
-            if (repeats < 2) return (double?)null;
-            var groups = comparable.Where(r => r.Arm == a.Id).GroupBy(r => (r.ScenarioId, r.EvaluatorKey)).Where(g => g.Count() >= 2).ToList();
+            if (repeats < 2 || !arms.Any(a => a.Id == id)) return (double?)null;
+            var groups = comparable.Where(r => r.Arm == id).GroupBy(r => (r.ScenarioId, r.EvaluatorKey)).Where(g => g.Count() >= 2).ToList();
             return groups.Count == 0 ? null : (double?)groups.Count(g => g.Select(r => r.Label).Distinct().Count() > 1) / groups.Count;
         });
 
@@ -356,15 +365,15 @@ internal static class JudgeVsJudgeDemo
             foreach (var (criterion, p) in t.Criteria)
                 (IsNegated(criterion) ? negated : positive).Add(p >= 0.5 ? 1 : 0);
 
-        var hypotheses = Hypotheses(byFile, overall, comparable, flips, latencies, jevCostPerCase, negated, positive, repeats);
+        var hypotheses = Hypotheses(byFile, overall, comparable, arms, flips, latencies, jevCostPerCase, negated, positive, repeats);
 
-        return new Report(overall, byFile, byKey, excluded, flips, latencies.Count == 0 ? 0 : Percentile(latencies, 0.5), latencies.Count == 0 ? 0 : Percentile(latencies, 0.9), jevTraces.Count, jevIn, jevOut, jevCost, jevCostPerCase,
+        return new Report(overall, byFile, byKey, excluded, agreement, flips, latencies.Count == 0 ? 0 : Percentile(latencies, 0.5), latencies.Count == 0 ? 0 : Percentile(latencies, 0.9), jevTraces.Count, jevIn, jevOut, jevCost, jevCostPerCase,
             jevTraces.Select(t => t.Model).Distinct().ToList(), negated.Count, positive.Count, hypotheses);
     }
 
     private static GroupSummaryRow GroupSummary(string name, IReadOnlyList<CaseRecord> rows, Arm[] arms)
     {
-        var perArm = arms.ToDictionary(a => a.Id, a => ArmStats(rows.Where(r => r.Arm == a.Id).ToList()));
+        var perArm = new[] { "A", "B" }.ToDictionary(id => id, id => ArmStats(rows.Where(r => r.Arm == id).ToList()));
         return new GroupSummaryRow(name, rows.Select(r => (r.ScenarioId, r.EvaluatorKey)).Distinct().Count(), perArm);
     }
 
@@ -394,11 +403,13 @@ internal static class JudgeVsJudgeDemo
     }
 
     private static IReadOnlyList<HypothesisRow> Hypotheses(
-        IReadOnlyList<GroupSummaryRow> byFile, GroupSummaryRow overall, IReadOnlyList<CaseRecord> comparable,
+        IReadOnlyList<GroupSummaryRow> byFile, GroupSummaryRow overall, IReadOnlyList<CaseRecord> comparable, Arm[] arms,
         IReadOnlyDictionary<string, double?> flips, IReadOnlyList<double> jevLatencies, double jevCostPerCase,
         IReadOnlyList<double> negated, IReadOnlyList<double> positive, int repeats)
     {
         var rows = new List<HypothesisRow>();
+        var hasA = arms.Any(a => a.Id == "A"); var hasB = arms.Any(a => a.Id == "B");
+        if (!hasB) return [new("H1-H7", "open", "arm B (Jev) did not run")];
         ArmStatsRow? A(string file) => byFile.FirstOrDefault(f => f.Name == file)?.Arms["A"];
         ArmStatsRow? B(string file) => byFile.FirstOrDefault(f => f.Name == file)?.Arms["B"];
         static string Pct(double v) => double.IsNaN(v) ? "n/a" : (v * 100).ToString("F1", CultureInfo.InvariantCulture) + "%";
@@ -408,7 +419,8 @@ internal static class JudgeVsJudgeDemo
             var files = new[] { "20-process", "20-quality", "20-system", "memory-multiturn" };
             var rowsB = comparable.Where(r => r.Arm == "B" && files.Contains(r.File) && r.Error is null).ToList();
             var rowsA = comparable.Where(r => r.Arm == "A" && files.Contains(r.File) && r.Error is null).ToList();
-            if (rowsB.Count < MinN) rows.Add(new("H1", "open", $"{rowsB.Count} case(s) from process/quality/system/memory-multiturn; needs ≥ {MinN} to decide"));
+            if (!hasA) rows.Add(new("H1", "open", "needs arm A for the gap"));
+            else if (rowsB.Count < MinN) rows.Add(new("H1", "open", $"{rowsB.Count} case(s) from process/quality/system/memory-multiturn; needs ≥ {MinN} to decide"));
             else
             {
                 var accB = rowsB.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0);
@@ -423,7 +435,8 @@ internal static class JudgeVsJudgeDemo
             var files = new[] { "indirect-attack", "adversarial-direct" };
             var fb = comparable.Where(r => r.Arm == "B" && files.Contains(r.File) && r.Error is null && r.ExpectedVerdict == "fail").ToList();
             var fa = comparable.Where(r => r.Arm == "A" && files.Contains(r.File) && r.Error is null && r.ExpectedVerdict == "fail").ToList();
-            if (fb.Count < MinFail || fa.Count < MinFail) rows.Add(new("H2", "open", $"{fb.Count} fail-labelled adversarial case(s); needs ≥ {MinFail} to decide"));
+            if (!hasA) rows.Add(new("H2", "open", "needs arm A"));
+            else if (fb.Count < MinFail || fa.Count < MinFail) rows.Add(new("H2", "open", $"{fb.Count} fail-labelled adversarial case(s); needs ≥ {MinFail} to decide"));
             else
             {
                 var fpB = fb.Average(r => r.Label == "pass" ? 1.0 : 0); var fpA = fa.Average(r => r.Label == "pass" ? 1.0 : 0);
@@ -453,7 +466,8 @@ internal static class JudgeVsJudgeDemo
                 return a.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0) - b.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0);
             }
             var gapIn = Gap(r => files.Contains(r.File)); var gapOut = Gap(r => !files.Contains(r.File));
-            if (double.IsNaN(gapIn) || double.IsNaN(gapOut)) rows.Add(new("H4", "open", $"needs ≥ {MinN} cases on each side (numeric sets vs the rest) in one run"));
+            if (!hasA) rows.Add(new("H4", "open", "needs arm A"));
+            else if (double.IsNaN(gapIn) || double.IsNaN(gapOut)) rows.Add(new("H4", "open", $"needs ≥ {MinN} cases on each side (numeric sets vs the rest) in one run"));
             else rows.Add(new("H4", gapIn > gapOut + 0.05 ? "confirmed" : gapIn <= gapOut ? "refuted" : "open", $"accuracy gap (generative − Jev) on confidence-calibration + code-vulnerability {Pct(gapIn)} vs elsewhere {Pct(gapOut)}"));
         }
         // H5 — latency and cost per request
@@ -496,12 +510,14 @@ internal static class JudgeVsJudgeDemo
     private static void PrintReport(Report report, Arm[] arms)
     {
         Console.WriteLine("📝 Stage 4: the comparison (cases where the evaluator reached a judge on both arms)\n");
-        Console.WriteLine($"   arm A = {arms[0].Label}    arm B = {arms[1].Label}    excluded (decided in code, or missing an arm): {report.Excluded}");
+        Console.WriteLine($"   arm A = {ArmLabel(arms, "A")}    arm B = {ArmLabel(arms, "B")}    excluded (decided in code, or missing an arm): {report.Excluded}");
         Console.WriteLine();
-        Console.WriteLine("   file                        n   acc A    acc B    κ A     κ B     false-pass A/B    band A/B     Brier A/B    p50 ms A/B      tokens A/B");
+        Console.WriteLine("   file                        n   acc A    acc B    κ A     κ B     false-pass A/B   false-fail A/B    band A/B     Brier A/B    p50 ms A/B      tokens A/B");
         foreach (var row in report.ByFile.Append(report.Overall))
-            Console.WriteLine($"   {row.Name,-24} {row.N,4}   {F(row.Arms["A"].Accuracy)}  {F(row.Arms["B"].Accuracy)}  {F(row.Arms["A"].Kappa)}  {F(row.Arms["B"].Kappa)}  {F(row.Arms["A"].FalsePass)}/{F(row.Arms["B"].FalsePass)}   {F(row.Arms["A"].WithinBand)}/{F(row.Arms["B"].WithinBand)}   {F(row.Arms["A"].Brier)}/{F(row.Arms["B"].Brier)}   {row.Arms["A"].P50Ms,6:N0}/{row.Arms["B"].P50Ms,-6:N0}   {row.Arms["A"].Tokens,7:N0}/{row.Arms["B"].Tokens:N0}");
+            Console.WriteLine($"   {row.Name,-24} {row.N,4}   {F(row.Arms["A"].Accuracy)}  {F(row.Arms["B"].Accuracy)}  {F(row.Arms["A"].Kappa)}  {F(row.Arms["B"].Kappa)}  {F(row.Arms["A"].FalsePass)}/{F(row.Arms["B"].FalsePass)}   {F(row.Arms["A"].FalseFail)}/{F(row.Arms["B"].FalseFail)}   {F(row.Arms["A"].WithinBand)}/{F(row.Arms["B"].WithinBand)}   {F(row.Arms["A"].Brier)}/{F(row.Arms["B"].Brier)}   {row.Arms["A"].P50Ms,6:N0}/{row.Arms["B"].P50Ms,-6:N0}   {row.Arms["A"].Tokens,7:N0}/{row.Arms["B"].Tokens:N0}");
         Console.WriteLine();
+        if (!double.IsNaN(report.JudgeAgreement)) Console.WriteLine($"   judge-vs-judge agreement (same label on the same case): {report.JudgeAgreement:P1}");
+        foreach (var (arm, flip) in report.FlipsByArm) if (flip is { } f) Console.WriteLine($"   verdict flips across repeats, arm {arm}: {f:P1}");
         Console.WriteLine($"   Jev requests {report.JevRequests:N0}   p50 {report.JevP50Ms:N0} ms   p90 {report.JevP90Ms:N0} ms   tokens {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out   est. ${report.JevCost:F4} total, ${report.JevCostPerCase:F6}/case   models echoed: {string.Join(", ", report.JevModels)}");
         Console.WriteLine();
         Console.WriteLine("   Hypotheses (pre-registered in the Jev factsheet §7):");
@@ -518,6 +534,8 @@ internal static class JudgeVsJudgeDemo
             Console.WriteLine($"     {row.Name,-34} {F(row.Arms["A"].Accuracy)} / {F(row.Arms["B"].Accuracy)} / {F(row.Arms["B"].FalsePass)} / {row.N}");
         Console.WriteLine();
     }
+
+    private static string ArmLabel(Arm[] arms, string id) => arms.FirstOrDefault(a => a.Id == id)?.Label ?? "(did not run)";
 
     private static string F(double v) => double.IsNaN(v) ? "  n/a " : v.ToString("0.000", CultureInfo.InvariantCulture);
 
@@ -544,15 +562,17 @@ internal static class JudgeVsJudgeDemo
         var md = new StringBuilder();
         md.AppendLine($"# N3 — Judge vs Judge — {stamp}Z");
         md.AppendLine();
-        md.AppendLine($"Arm A = {arms[0].Label} (generative) · Arm B = {arms[1].Label} (decision) · repeats {opts.Repeats} · excluded {report.Excluded} · {elapsed.TotalSeconds:F0} s");
+        md.AppendLine($"Arm A = {ArmLabel(arms, "A")} (generative) · Arm B = {ArmLabel(arms, "B")} (decision) · repeats {opts.Repeats} · excluded {report.Excluded} · {elapsed.TotalSeconds:F0} s");
         md.AppendLine();
-        md.AppendLine("| file | n | acc A | acc B | κ A | κ B | false-pass A | false-pass B | band A | band B | Brier A | Brier B | p50 A | p50 B | tokens A | tokens B |");
-        md.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        md.AppendLine("| file | n | acc A | acc B | κ A | κ B | false-pass A | false-pass B | false-fail A | false-fail B | band A | band B | Brier A | Brier B | p50 A | p50 B | tokens A | tokens B |");
+        md.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var row in report.ByFile.Append(report.Overall))
         {
             var a = row.Arms["A"]; var b = row.Arms["B"];
-            md.AppendLine($"| {row.Name} | {row.N} | {F(a.Accuracy)} | {F(b.Accuracy)} | {F(a.Kappa)} | {F(b.Kappa)} | {F(a.FalsePass)} | {F(b.FalsePass)} | {F(a.WithinBand)} | {F(b.WithinBand)} | {F(a.Brier)} | {F(b.Brier)} | {a.P50Ms:N0} | {b.P50Ms:N0} | {a.Tokens:N0} | {b.Tokens:N0} |");
+            md.AppendLine($"| {row.Name} | {row.N} | {F(a.Accuracy)} | {F(b.Accuracy)} | {F(a.Kappa)} | {F(b.Kappa)} | {F(a.FalsePass)} | {F(b.FalsePass)} | {F(a.FalseFail)} | {F(b.FalseFail)} | {F(a.WithinBand)} | {F(b.WithinBand)} | {F(a.Brier)} | {F(b.Brier)} | {a.P50Ms:N0} | {b.P50Ms:N0} | {a.Tokens:N0} | {b.Tokens:N0} |");
         }
+        md.AppendLine();
+        if (!double.IsNaN(report.JudgeAgreement)) md.AppendLine($"Judge-vs-judge agreement: {report.JudgeAgreement:P1}. " + string.Join(" ", report.FlipsByArm.Where(kv => kv.Value is not null).Select(kv => $"Flips across repeats, arm {kv.Key}: {kv.Value:P1}.")));
         md.AppendLine();
         md.AppendLine($"Jev: {report.JevRequests} requests, p50 {report.JevP50Ms:N0} ms, p90 {report.JevP90Ms:N0} ms, {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out, est. ${report.JevCost:F4} (${report.JevCostPerCase:F6}/case), models echoed: {string.Join(", ", report.JevModels)}");
         md.AppendLine();
@@ -659,15 +679,15 @@ internal static class JudgeVsJudgeDemo
     private sealed record GroupSummaryRow(string Name, int N, IReadOnlyDictionary<string, ArmStatsRow> Arms);
     private sealed record HypothesisRow(string Id, string Verdict, string Detail);
     private sealed record Report(
-        GroupSummaryRow Overall, IReadOnlyList<GroupSummaryRow> ByFile, IReadOnlyList<GroupSummaryRow> ByKey, int Excluded,
+        GroupSummaryRow Overall, IReadOnlyList<GroupSummaryRow> ByFile, IReadOnlyList<GroupSummaryRow> ByKey, int Excluded, double JudgeAgreement,
         IReadOnlyDictionary<string, double?> FlipsByArm, double JevP50Ms, double JevP90Ms, int JevRequests, long JevInputTokens, long JevOutputTokens,
         double JevCost, double JevCostPerCase, IReadOnlyList<string> JevModels, int NegatedCriteria, int PositiveCriteria, IReadOnlyList<HypothesisRow> Hypotheses);
 
-    private sealed record N3Options(int Repeats, int? Limit, string[]? Files, int Parallel, string? OutDir, string? GoldenDir)
+    private sealed record N3Options(int Repeats, int? Limit, string[]? Files, int Parallel, string? OutDir, string? GoldenDir, string[] Arms)
     {
         public static N3Options Parse(string[] argv)
         {
-            int repeats = 1, parallel = 4; int? limit = null; string[]? files = null; string? outDir = null, golden = null;
+            int repeats = 1, parallel = 4; int? limit = null; string[]? files = null; string? outDir = null, golden = null; string[] arms = ["A", "B"];
             for (var i = 0; i < argv.Length; i++)
             {
                 string? Next() => i + 1 < argv.Length ? argv[++i] : null;
@@ -679,9 +699,10 @@ internal static class JudgeVsJudgeDemo
                     case "--files": files = (Next() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
                     case "--out": outDir = Next(); break;
                     case "--golden": golden = Next(); break;
+                    case "--arms": arms = (Next() ?? "A,B").ToUpperInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
                 }
             }
-            return new N3Options(repeats, limit, files, parallel, outDir, golden);
+            return new N3Options(repeats, limit, files, parallel, outDir, golden, arms);
         }
     }
 }
