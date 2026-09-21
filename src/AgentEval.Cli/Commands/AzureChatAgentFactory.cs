@@ -50,47 +50,22 @@ internal static class AzureChatAgentFactory
         string subject,
         string? systemPrompt = null)
     {
-        var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey     = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-
-        var allConfigured =
-               !string.IsNullOrWhiteSpace(endpoint)
-            && !string.IsNullOrWhiteSpace(apiKey)
-            && !string.IsNullOrWhiteSpace(deployment);
-
-        if (!allConfigured)
+        var (chatClient, model, diagnostic) = ProviderChatClientFactory.TryCreate("agent", generousTimeout: true);
+        if (chatClient is null)
         {
-            var missing = new List<string>();
-            if (string.IsNullOrWhiteSpace(endpoint))   missing.Add("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(apiKey))     missing.Add("AZURE_OPENAI_API_KEY");
-            if (string.IsNullOrWhiteSpace(deployment)) missing.Add("AZURE_OPENAI_DEPLOYMENT");
             Console.Error.WriteLine(
-                "✖ --azure-from-env was passed but the following env vars are not set: " +
-                string.Join(", ", missing) +
-                "\n  Set all three and retry, or drop --azure-from-env to use the built-in stub agent.");
+                "✖ --azure-from-env was passed but no inference provider is configured.\n" +
+                $"  {diagnostic}\n" +
+                "  Configure one and retry, or drop --azure-from-env to use the built-in stub agent.");
             return (null, ExitCodes.RuntimeError);
         }
 
-        try
-        {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
-            IEvaluableAgent agent = new ChatClientAgentAdapter(
-                chatClient,
-                name: subject,
-                systemPrompt: systemPrompt);
-            Console.Error.WriteLine(
-                $"✔ Azure OpenAI agent configured — endpoint={endpoint}, deployment={deployment}, subject={subject}");
-            return (agent, 0);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine(
-                $"✖ Failed to construct Azure OpenAI agent: {ex.Message}\n" +
-                "  Check AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT values.");
-            return (null, ExitCodes.RuntimeError);
-        }
+        IEvaluableAgent agent = new ChatClientAgentAdapter(
+            chatClient,
+            name: subject,
+            systemPrompt: systemPrompt);
+        Console.Error.WriteLine($"{ProviderChatClientFactory.Describe("agent", model!)} subject={subject}");
+        return (agent, 0);
     }
 
     /// <summary>
@@ -102,48 +77,16 @@ internal static class AzureChatAgentFactory
     /// </summary>
     public static (IChatClient? ChatClient, string? Deployment, int ExitCode) TryBuildChatClientFromEnv()
     {
-        var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey     = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-
-        if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(deployment))
+        var (chatClient, model, diagnostic) = ProviderChatClientFactory.TryCreate("agent", generousTimeout: true);
+        if (chatClient is null)
         {
-            var missing = new List<string>();
-            if (string.IsNullOrWhiteSpace(endpoint))   missing.Add("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(apiKey))     missing.Add("AZURE_OPENAI_API_KEY");
-            if (string.IsNullOrWhiteSpace(deployment)) missing.Add("AZURE_OPENAI_DEPLOYMENT");
             Console.Error.WriteLine(
-                "✖ Azure OpenAI not configured. Missing: " + string.Join(", ", missing) +
-                "\n  This benchmark requires a real LLM and cannot fall back to a stub.");
+                $"✖ No inference provider is configured. {diagnostic}\n" +
+                "  This benchmark requires a real LLM and cannot fall back to a stub.");
             return (null, null, ExitCodes.RuntimeError);
         }
 
-        try
-        {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
-            return (chatClient, deployment, 0);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"✖ Failed to construct Azure OpenAI chat client: {ex.Message}");
-            return (null, null, ExitCodes.RuntimeError);
-        }
-    }
-
-    /// <summary>
-    /// Builds Azure OpenAI client options with a generous network timeout. The default
-    /// per-attempt NetworkTimeout (100s) can fire when the agent under test is a slow real
-    /// agent fronted by an adapter — a deliberate turn plus a model cooldown can exceed it,
-    /// and the resulting "operation was canceled" aborts the whole red-team scan. Allowing
-    /// more time per attempt keeps a single slow probe from failing the entire benchmark.
-    /// Override with <c>AGENTEVAL_AGENT_NETWORK_TIMEOUT_S</c>.
-    /// </summary>
-    private static AzureOpenAIClientOptions BuildClientOptions()
-    {
-        var raw = Environment.GetEnvironmentVariable("AGENTEVAL_AGENT_NETWORK_TIMEOUT_S");
-        var seconds = double.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > 0 ? parsed : 180.0;
-        return new AzureOpenAIClientOptions { NetworkTimeout = TimeSpan.FromSeconds(seconds) };
+        return (chatClient, model, 0);
     }
 
     /// <summary>

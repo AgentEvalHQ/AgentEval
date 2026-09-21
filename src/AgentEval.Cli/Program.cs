@@ -94,7 +94,7 @@ var benchInputOpt = new Option<string?>("--input") { Description = "Agent input 
 var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
-var benchGdprAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live Azure OpenAI agent (from AZURE_OPENAI_*) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first (falling back to AZURE_OPENAI_*) so agent and judge can target different endpoints." };
+var benchGdprAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
 var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
@@ -144,14 +144,28 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 // bench gdpr calibrate
 var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
 var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md)" };
+var calibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
 calibrateCmd.Add(calibrateRootOpt);
 calibrateCmd.Add(calibrateOutOpt);
+calibrateCmd.Add(calibrateDecisionsOpt);
 calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    return await BenchCalibrateCommand.RunAsync(root, outPath, ct: ct);
+    AgentEval.Core.IEvaluator? decisionJudge = null;
+    if (parseResult.GetValue(calibrateDecisionsOpt))
+    {
+        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
+        if (decisionOptions is null)
+        {
+            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+            return AgentEval.Cli.ExitCodes.RuntimeError;
+        }
+        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
+        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
+    }
+    return await BenchCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -165,7 +179,7 @@ var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspa
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED — no default; previously a hard-coded fixture was used." };
 var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
-var benchEuAiActAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live Azure OpenAI agent (from AZURE_OPENAI_*) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first (falling back to AZURE_OPENAI_*) so agent and judge can target different endpoints." };
+var benchEuAiActAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
 var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
@@ -215,14 +229,28 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
 var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/eu-ai-act-calibration-{date}.md)" };
+var euCalibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
 euCalibrateCmd.Add(euCalibrateRootOpt);
 euCalibrateCmd.Add(euCalibrateOutOpt);
+euCalibrateCmd.Add(euCalibrateDecisionsOpt);
 euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, ct: ct);
+    AgentEval.Core.IEvaluator? decisionJudge = null;
+    if (parseResult.GetValue(euCalibrateDecisionsOpt))
+    {
+        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
+        if (decisionOptions is null)
+        {
+            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+            return AgentEval.Cli.ExitCodes.RuntimeError;
+        }
+        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
+        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
+    }
+    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -285,11 +313,11 @@ var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
 var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
@@ -337,11 +365,11 @@ var benchMitrePresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
 var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
@@ -388,11 +416,11 @@ var benchNistPresetOpt = new Option<string?>("--preset") { Description = Presets
 var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
 var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchNistModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
@@ -441,7 +469,7 @@ benchCmd.Add(benchNistCmd);
     var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
     var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
     var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a real Azure OpenAI chat agent built from AZURE_OPENAI_* env vars instead of the built-in EchoAgent stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a real chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of the built-in EchoAgent stub. Requires a configured provider; run with none set to see what is missing." };
 
     // bench longmemeval — T0.6 (v1.1): closes CLI ↔ registry gap.
     {
@@ -449,7 +477,7 @@ benchCmd.Add(benchNistCmd);
         var benchLmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
         var benchLmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 
-        var benchLmeCmd = new Command("longmemeval", "Run the LongMemEval ICLR 2025 memory benchmark. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the runner makes ~2 LLM calls per question; the LLM round-trip IS the correctness signal).");
+        var benchLmeCmd = new Command("longmemeval", "Run the LongMemEval ICLR 2025 memory benchmark. Uses the provider AI_INFERENCE_PROVIDER selects (azure | bitdeer | openai | foundry | openai-compatible) — there is no stub fallback (the runner makes ~2 LLM calls per question; the LLM round-trip IS the correctness signal).");
         benchLmeCmd.Add(benchLmePresetOpt);
         benchLmeCmd.Add(benchLmeSubjectOpt);
         benchLmeCmd.Add(benchLmeRootOpt);
@@ -475,7 +503,7 @@ benchCmd.Add(benchNistCmd);
         var benchTmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
         var benchTmeEvidenceOpt = new Option<string?>("--evidence-detail") { Description = "references (default) | content. 'content' opts in to storing the retrieved TEXT in the result, not just which sessions were retrieved — it answers 'was the needed value actually in the prompt', which identifiers alone cannot. Off by default and loud when engaged: the content is whatever the agent retrieved, so use it only on corpora you control. Credential-shaped and control-byte content is still rejected." };
 
-        var benchTmeCmd = new Command("typedmemeval", $"Run one TypedMemEval {TypedMemEvalVerticalDescriptor.CorpusRevision} (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
+        var benchTmeCmd = new Command("typedmemeval", $"Run one TypedMemEval {TypedMemEvalVerticalDescriptor.CorpusRevision} (AgentEval) vertical — prospective, episodic, arithmetic, working-memory or forgetting memory behaviour, one embedded corpus each. Uses the provider AI_INFERENCE_PROVIDER selects (azure | bitdeer | openai | foundry | openai-compatible) — there is no stub fallback (the judge round-trip IS the correctness signal). Reports a typed outcome vector, never a single percentage; results are not comparable with LongMemEval.");
         benchTmeCmd.Add(benchTmeVerticalOpt);
         benchTmeCmd.Add(benchTmeSubjectOpt);
         benchTmeCmd.Add(benchTmeRootOpt);
@@ -519,7 +547,7 @@ benchCmd.Add(benchNistCmd);
         var benchMemSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
         var benchMemRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 
-        var benchMemCmd = new Command("memory", "Run the AgentEval memory benchmark. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the benchmark needs a real LLM-backed agent under test).");
+        var benchMemCmd = new Command("memory", "Run the AgentEval memory benchmark. Uses the provider AI_INFERENCE_PROVIDER selects (azure | bitdeer | openai | foundry | openai-compatible) — there is no stub fallback (the benchmark needs a real LLM-backed agent under test).");
         benchMemCmd.Add(benchMemPresetOpt);
         benchMemCmd.Add(benchMemSubjectOpt);
         benchMemCmd.Add(benchMemRootOpt);

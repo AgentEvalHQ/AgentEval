@@ -53,6 +53,12 @@ export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 
 > **Tip:** Add these to your `.bashrc`, `.zshrc`, or Windows user environment variables for persistence.
 
+**Azure OpenAI is not the only option.** As of v0.41.0-beta the CLI resolves
+`AI_INFERENCE_PROVIDER`, so `agenteval bench` and `agenteval ... calibrate` also run on Bitdeer,
+OpenAI, Azure AI Foundry or any OpenAI-compatible endpoint. Leaving the selector unset keeps the
+Azure behaviour above exactly as it is. See
+[CLI Reference → Environment variables](cli.md#environment-variables) for each provider's variables.
+
 ### Running Without Credentials (Mock Mode)
 
 If you just want to explore AgentEval's API without Azure credentials:

@@ -1,7 +1,11 @@
 # ADR-033: Decision models are a third evaluator kind, not a chat provider
 
-- **Status:** **Proposed (2026-09-20).** Proposed is a gate, not a placeholder (the ADR-026 / ADR-030
-  precedent). The code in §4 is built and unit-tested. §7 (1) is **met for TypeSafe** the same day —
+- **Status:** **Accepted (2026-09-21).** Proposed was a gate, not a placeholder (the ADR-026 / ADR-030
+  precedent), and §7 is now met: the transport, the leaf and the provenance kind are accepted as designed.
+  **What is accepted is the shape, not a licence to grade with it.** The measurements below say a decision
+  model is a cheap, fail-closed second opinion on some criteria and unusable on others, per lane, and no
+  criterion switches to it on this evidence. The cascade the proposal sketched is **not** built — see §7 (3).
+  The code in §4 is built and unit-tested. §7 (1) is **met for TypeSafe** the same day —
   five real calls from the N2 sample on 2026-09-20 and seven on 2026-09-21, every one HTTP 200, requests and
   replies in [`evidence/033-jev-first-calls-2026-09-20.md`](evidence/033-jev-first-calls-2026-09-20.md); eight
   more direct probes on 2026-09-20 established the wire format and are not from the sample — and
@@ -196,7 +200,32 @@ must sample past.
    score, latency and cost — per shape, not as a mean. **Agentic half, in substance, 2026-09-21:**
    sample N3 scored Jev beside GLM-5.3 Flash on 298 labelled cases through the evaluators' own rubrics,
    every named metric per category — [`evidence/033-n3-judge-vs-judge-2026-09-21.md`](evidence/033-n3-judge-vs-judge-2026-09-21.md).
-   It ran through a judge adapter, not `DecisionEval` leaves in a composite; that form, and the
-   compliance family, are still owed.
+   It ran through a judge adapter, not `DecisionEval` leaves in a composite; that form is still owed.
+   **Compliance half, 2026-09-21: done.** `--decisions` on both compliance `calibrate` commands ran the
+   shipped `CalibrationRunner` with a Jev-backed `IEvaluator` over 263 labelled cases (145 GDPR + 118 EU AI
+   Act), per pillar, against the gate the incumbent judges passed: **5 of 12 pillars pass, 7 fail**, 0
+   evaluation failures — [`evidence/033-compliance-calibration-2026-09-21.md`](evidence/033-compliance-calibration-2026-09-21.md).
+   The direction of the error is recorded too: across 53 fail-labelled adversarial and safety cases neither
+   judge passed one — [`evidence/033-redteam-direction-of-error-2026-09-21.md`](evidence/033-redteam-direction-of-error-2026-09-21.md).
 3. Only then: a threshold chosen on held-out data, and a decision on whether an escalation primitive
-   is worth building.
+   is worth building. **Done 2026-09-21, and the decision is no — for now.**
+   *The threshold:* a sweep over the N3 probabilities, with the bar chosen on half the cases and scored on
+   the other half, reaches **88.6%** agreement at 0.70 against 79.2% at the evaluators' own thresholds —
+   but it **doubles** false passes (6.5% → 13.2%); the full-set 0.55 bar quadruples them (→ 25.9%). **The bar is where the error preference is written, not a
+   tuning knob**, so there is no single number to adopt: a fail-closed second opinion wants the high bar,
+   a label-matching study wants 0.55–0.70 —
+   [`evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md`](evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md).
+   *The escalation primitive:* **not built.** It would need a per-criterion false-pass bound, and the
+   largest fail-labelled sample available here is 53 cases — a 95% upper bound of ~5.7%, which supports no
+   gate worth having. Building it anyway is the defect ADR-028 exists to prevent. It is reconsidered when a
+   lane produces ~300 labelled negative cases, not before.
+
+### What acceptance changes, and what it does not
+
+| | |
+|---|---|
+| **Accepted** | `IDecisionClient` as its own transport; `DecisionEval` as its own leaf; `provenance.type = "atomic-decision"`; `DecisionJudge` as a calibration-and-comparison adapter, never a tree judge |
+| **Measured, per lane** | GDPR 3/6 pillars at the incumbent gate · EU AI Act 2/6 · agentic 79.2% vs 92.3% · red-team and safety false-pass 0 of 53 · memory discrimination 100% of 84 clean items vs 96.3%, and 0 unparseable verdicts against the generative judge's 4 |
+| **Not accepted** | any criterion switching from its generative judge to a decision model; any gate, cascade or escalation; any citable score produced by a decision model alone |
+| **Known no-go** | EU AI Act prohibited practices (20% vs an 84% baseline): that pillar grades an agent's *refusal*, and a decision model grades the thing being refused |
+

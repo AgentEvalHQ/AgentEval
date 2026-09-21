@@ -129,10 +129,11 @@ public static class GlmBitdeerProviderDemo
         if (price is null)
             Console.WriteLine("   ⚠ Unpriced run: EstimatedCost in the in-memory results is 0 because no rate is known, not because the calls were free. Nothing is persisted.\n");
 
-        // One judge leaf PER CASE, because the judge must see that case's ledger: AtomicLlmEval passes
-        // the IEvaluator only the query and the response, so ContextAwareJudge prepends the ledger.
-        AtomicLlmEval JudgeLeafFor(string ledger) => new(
-            evaluator: new ContextAwareJudge(new ChatClientEvaluator(chat), ledger),
+        // One judge leaf for every case: AtomicLlmEval passes EvalInput.Context to its judge, so the ledger
+        // reaches it from the input rather than from a per-case wrapper. (It did not always: this sample used
+        // to build a leaf per case to prepend the ledger itself.)
+        AtomicLlmEval JudgeLeaf() => new(
+            evaluator: new ChatClientEvaluator(chat),
             key: "faithful_and_brief",
             name: "Faithful to the ledger and brief",
             category: "quality",
@@ -178,7 +179,7 @@ public static class GlmBitdeerProviderDemo
                 components:
                 [
                     new EvalComponent(new ContainsRequiredTermEval(c.RequiredTerm), Weight: 0.30),
-                    new EvalComponent(JudgeLeafFor(c.Context), Weight: 0.70),
+                    new EvalComponent(JudgeLeaf(), Weight: 0.70),
                 ],
                 aggregation: WeightedSumAggregation.Instance,
                 threshold: 0.70);

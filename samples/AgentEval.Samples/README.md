@@ -36,6 +36,7 @@ dotnet run -- 90   # Agent Skills Hello World (K1)
 dotnet run -- 100  # GLM-5.3 Flash @ Bitdeer (N1)
 dotnet run -- 101  # Jev Decisions           (N2)
 dotnet run -- 102  # Judge vs Judge          (N3)
+dotnet run -- 103  # Memory Judge vs Judge   (N4)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -271,6 +272,8 @@ dotnet run -- 101             # …then spend — Jev Decisions (N2)
 dotnet run -- 102 --dry-run   # resolves every evaluator key, runs the dispatched cases against a recording judge, renders the first Jev request, sends nothing — Judge vs Judge (N3)
 dotnet run -- 102 --limit 1   # …one case per golden file through BOTH judges — Judge vs Judge (N3)
 dotnet run -- 102 --repeats 3 # …all 378 cases, three repeats, the seven pre-registered hypotheses — Judge vs Judge (N3)
+dotnet run -- 103 --dry-run   # builds every item, renders the first request, sends nothing — Memory Judge vs Judge (N4)
+dotnet run -- 103 --limit 40  # …40 LongMemEval questions x (gold + distractor) through both judges — Memory Judge vs Judge (N4)
 ```
 
 ```powershell

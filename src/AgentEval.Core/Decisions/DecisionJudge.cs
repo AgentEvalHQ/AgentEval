@@ -4,9 +4,8 @@
 
 using System.Diagnostics;
 using AgentEval.Core;
-using AgentEval.Decisions;
 
-namespace AgentEval.Samples.Providers;
+namespace AgentEval.Decisions;
 
 /// <summary>
 /// A decision model behind the judge interface the agentic evaluators already use (<see cref="IEvaluator"/>).
@@ -16,17 +15,21 @@ namespace AgentEval.Samples.Providers;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>For calibration runs and judge comparisons only.</b> An eval tree that reaches this through
-/// <c>AtomicLlmEval</c> carries <c>provenance.type = "atomic-llm"</c> and a judge model that is not an LLM.
-/// The persisted kind for a decision model is <c>DecisionEval</c> (<c>"atomic-decision"</c>). Sample N3 keeps
-/// every result in memory, prints this caveat, and persists nothing through this adapter.
+/// ⚠ <b>For calibration runners and judge comparisons ONLY. Never for a persisted eval tree.</b> This type
+/// exists so a decision model can be scored by a harness whose seam is <see cref="IEvaluator"/> — the
+/// compliance and agentic calibration runners, and sample N3's judge-vs-judge comparison. An eval tree that
+/// reaches a decision model through this adapter and <c>AtomicLlmEval</c> would persist
+/// <c>provenance.type = "atomic-llm"</c> naming a judge model that is not an LLM: the exact
+/// misattribution ADR-032 removed three instances of. The persisted kind for a decision model is
+/// <see cref="AgentEval.Evals.DecisionEval"/> (<c>"atomic-decision"</c>), and a test asserts this adapter is
+/// never registered as a tree judge.
 /// </para>
 /// <para>
 /// The criterion text is the question. Nothing is paraphrased: the generative judge and the decision model
 /// receive the same criteria the evaluator was written with, which is the whole point of the comparison.
 /// </para>
 /// </remarks>
-internal sealed class DecisionJudge : IEvaluator
+public sealed class DecisionJudge : IEvaluator
 {
     /// <summary>One judge call, as it went over the wire — for the comparison's per-criterion analysis.</summary>
     public sealed record Trace(

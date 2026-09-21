@@ -6,9 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.41.0-beta] - 2026-09-21
+### A decision model, measured on every lane that could use one
+
+ADR-033 moves to **Accepted**. What is accepted is the *shape* — a decision model as its own transport, its
+own leaf and its own provenance kind — not a licence to grade with it: **no criterion switches to a decision
+model in this release**, and the escalation primitive the proposal sketched is deliberately not built. The
+release is mostly evidence, and the evidence says *per lane*, with two clear no-gos.
+
+The CLI also stops assuming Azure OpenAI, so every `bench` and `calibrate` command runs on whichever
+provider `AI_INFERENCE_PROVIDER` selects.
+
 #### Added
-- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
-  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
+- `AgentEval.Memory.External.DecisionBenchmarkJudge` — a decision model behind the memory benchmarks'
+  `IExternalBenchmarkJudge` seam: one binary question per item, P(yes) on `RawScore` so a threshold sweep
+  keeps the number. An **abstention** question (LongMemEval's `_abs` items, where recognising that the
+  conversation lacks the answer *is* the correct behaviour) gets its own rubric, as the shipped
+  `LongMemEvalJudge` does — the ordinary one says a refusal is not a match and would score every correct
+  abstention wrong. The other per-type semantics are mirrored too: `single-session-preference` judges against
+  a rubric rather than an exact answer, the time-grounded types tolerate an off-by-one day/week/month, and
+  `knowledge-update` accepts the superseded value alongside the current one. `InstructionsFor` is public so a
+  run can record which rubric each item was judged under. An empty **agent** response is scored `No` / incorrect without spending a call — silence cannot
+  contain the gold answer and does not *recognise* that it cannot answer, which is what the abstention
+  rubric asks. It is deliberately not `JudgeOutcomeStatus.Empty`: that status means the *judge's* provider
+  returned nothing, it carries `Correct = null`, and the scorers count only `Correct.HasValue`, so an agent
+  that answered nothing would have dropped out of its own denominator instead of scoring zero. A transport
+  failure propagates rather than becoming a verdict.
+- Sample **N4 — Memory Judge vs Judge** (`dotnet run -- 103`): LongMemEval's labelled questions, each
+  contributing its gold answer and a same-type distractor, so the comparison has a **50% chance floor**.
+- **`--decisions` on `bench gdpr calibrate` and `bench eu-ai-act calibrate`** — grade the compliance golden
+  cases with the decision model instead of the generative judge, for a judge-vs-judge calibration. Reads
+  `TYPESAFE_API_KEY` (or `OPENROUTER_API_KEY`); `JEV_MODEL` pins a build; a missing or unknown transport
+  fails closed naming what it needs.
+- `AgentEval.Decisions.DecisionJudge` (Core, promoted from the samples) — a decision model behind the
+  `IEvaluator` seam that calibration runners and judge comparisons use: one binary question per criterion,
+  one request per judge call. ⚠️ **For calibration and comparison only.** A persisted eval tree that reached
+  a decision model through this adapter would carry `provenance.type = "atomic-llm"` naming a judge that is
+  not an LLM; the persisted kind is `DecisionEval` (`"atomic-decision"`).
+- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through
+  `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call — introduced with
+  this sample and promoted to Core in the same release, see above), beside
   the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
   `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
   evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
@@ -21,7 +59,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   false fails, verdict flips across three repeats 0.3%, p50 296 ms vs 10.6 s. Three pre-registered hypotheses
   refuted, two confirmed, two open; a go / no-go list per category.
 
+#### Changed
+- **The CLI resolves `AI_INFERENCE_PROVIDER`** instead of assuming Azure OpenAI. Every `bench` and
+  `calibrate` command reaches its model through `AzureChatAgentFactory` or `JudgeFactory`, and both now go
+  through `InferenceProviderEnvironment`, so `agenteval bench gdpr` runs on Bitdeer, OpenAI, Foundry, Azure
+  or any OpenAI-compatible host. Backward compatible: with the selector unset and `AZURE_OPENAI_*` set, the
+  resolver auto-detects Azure and uses the same endpoint, key and deployment as before. `AZURE_OPENAI_JUDGE_*`
+  still wins outright, so a capable grader can face a cheap subject in one run. The command help no longer
+  tells users to set `AZURE_OPENAI_*`.
+- **The stub judge rescues an unconfigured machine, never a misconfigured one.** A provider that was
+  selected or half-configured but could not be built now fails closed even when
+  `AGENTEVAL_ALLOW_STUB_JUDGE=1` is set; previously `AI_INFERENCE_PROVIDER=foundry` with its variables
+  missing would fall through to the stub and produce stub-graded evidence from a typo.
+  `InferenceProviderEnvironment.AnyConfigurationAttempted` is the new public predicate that separates
+  the two cases.
+- Provider diagnostics name the **variable**, never its value: an endpoint that fails validation is
+  reported by name and reason, because a configured URL can carry a token in its user-info, query or
+  fragment and the diagnostic reaches stderr.
+- ⚠️ **`--azure-from-env` is now a misnomer, and keeps its name.** On `bench gdpr`, `eu-ai-act`,
+  `owasp`, `mitre`, `nist` and `perf` it builds the agent from whichever provider `AI_INFERENCE_PROVIDER`
+  selects, not from Azure. The name is unchanged because renaming it would break every script that passes
+  it, and each flag's `--help` now states which provider it uses. An alias is worth adding and is not in
+  this release.
+- Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
+  told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
+- **22 release headings in this file rendered as plain text instead of links.** The compare-link section
+  had fallen behind: every version from `0.29.0-beta` to this one was missing, and so were `0.14.0-beta`
+  and `0.16.0-beta`–`0.23.0-beta`. `[Unreleased]` still compared against `v0.28.0-beta`, thirteen releases
+  stale. The links are derived from the real tag order rather than from the version numbers, so a skipped
+  version compares against the tag that actually preceded it.
+- **The docs now describe the provider selector.** `docs/cli.md` gained an `AI_INFERENCE_PROVIDER` section
+  with each provider's variables, the auto-detect order and the endpoint policy, and `docs/getting-started.md`
+  points at it. The old resolution order in that reference was **wrong as of this release** — it still said a
+  stub judge rescues a half-configured machine, which is exactly the behaviour this release removed. The
+  `AZURE_OPENAI_JUDGE_*` override was undocumented and now has its own entry.
+
 #### Fixed
+- **CI and the release workflow raise vstest's testhost connection budget to 300 s.** A solution-wide
+  `dotnet test` starts a host per project per target framework, up to a dozen at once on a two-core runner,
+  and the default 90 s wait for one to *connect* ran out on a Windows leg — reported as `Test Run Aborted`
+  with no failing test, no assertion and no exception. This governs process startup, before any test runs,
+  so it hides no assertion; a host that never comes up still fails the job, with the real reason. Raised in
+  `release.yml` too, where that abort would have cost the NuGet publish.
+- **`AtomicLlmEval` passes `EvalInput.Context` to its judge.** It used to hand over the query and the
+  response only, so an eval that set a context — a retrieved passage, a ledger extract, the source document —
+  asked "is this grounded?" while withholding the ground, and the judge graded plausibility instead. Samples
+  N1 and N2 carried a wrapper to work around it; the wrapper is deleted. ⚠️ **This changes judge prompts**
+  wherever `Context` was set, and therefore scores: any calibration baseline measured on an eval that set
+  `Context` was measured without it and should be re-run. Evals that leave `Context` unset are bit-for-bit
+  unaffected, which a test pins. (`AtomicLlmEval` emits `PromptHash: null` and always has, so the change is
+  **not** visible in provenance — a reader diffing prompt hashes would see nothing moved. Hashing the real
+  prompt is worth doing and is not in this release.)
+- **The provider banner and diagnostics no longer print the endpoint's path.** They already dropped
+  user-info, query and fragment, but the endpoint validator accepts any path, so `https://host/v1/<token>`
+  is a legal configured value and the path reached stderr and CI logs verbatim. A no-credential guarantee
+  that covers three of the four URI parts that can carry one is not a guarantee. Scheme, host and port only.
+- `AZURE_OPENAI_JUDGE_ENDPOINT` is validated by the same endpoint policy as every other provider (https, or
+  http to loopback). That branch constructed its client directly, so a plain-http remote endpoint was accepted
+  and the judge key went out in cleartext while the generic path refused exactly that.
+- The tag-triggered LLM integration workflow no longer fails on every release tag. It selects whichever
+  provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
+  run with no provider configured **skips with a notice** instead of erroring, because an optional paid job
+  without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
+  The suite itself still runs only under `azure`: its live paths build Azure clients directly and return
+  early without `AZURE_OPENAI_*`, so running it under another provider would report a green that asserted
+  nothing. It now says so and skips instead.
 - `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
   0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
   source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
@@ -38,6 +140,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes streaming replies through unbuffered, so the streaming samples' time-to-first-token is unaffected.
 
 #### Evidence
+- `docs/adr/evidence/033-n4-memory-judge-2026-09-21.md` — sample N4: on 84 clean LongMemEval items with a
+  built-in 50% chance floor, the decision model discriminates a correct answer from an incorrect one at
+  **100%** against the generative judge's 96.3%, at a fifth of the latency — and returned **0 unparseable
+  verdicts against the generative judge's 4**. Clean items only; nothing is measured against TypedMemEval's
+  0.999 agreement bar, so no memory benchmark switches to it.
+- `docs/adr/evidence/033-redteam-direction-of-error-2026-09-21.md` — the direction of the error on the
+  red-team and safety evaluators: across **53 fail-labelled cases neither judge passed one**, and the
+  decision model's whole error budget is over-flagging. 0 observed is not a 0% rate (95% upper bound ≈5.7%),
+  so no gate is supported and no red-team adapter was built.
+- `docs/adr/evidence/033-compliance-calibration-2026-09-21.md` — **ADR-033 §7 (2)**: 263 labelled compliance
+  cases (145 GDPR + 118 EU AI Act), per pillar, against the gate the incumbent judges passed, 0 evaluation
+  failures, 79 s, about half a cent. **5 of 12 pillars pass, 7 fail.** Three pass at parity with the
+  generative baseline; EU AI Act prohibited practices scores **20% against an 84% baseline** because that
+  pillar grades an agent's *refusal* and the decision model grades the thing being refused.
+- `docs/adr/evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md` — a threshold sweep over the N3
+  probabilities (no spend) and a review of the 20 cases both judges got wrong. A uniform 0.55 bar lifts
+  agreement 79.2% → 87.9% and quadruples false passes, so the bar is where the error preference is written,
+  not a tuning knob. It also found **22 cases scored inside their golden band whose recorded verdict
+  disagrees with the golden verdict** — an evaluator threshold and its goldens' bands that contradict each
+  other, which makes calibration accuracy partly a measure of the threshold.
 - `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released
   code: N1 step 3 and N2 stage 5 ran on Bitdeer after the top-up (no 402); Jev answered 0.98 / 0.01 / 0.02 on
   the same three cases as the day before. ADR-033 §7 (1) is closed for both providers.
@@ -6261,7 +6383,29 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.28.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...HEAD
+[0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta
+[0.40.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.39.0-beta...v0.40.0-beta
+[0.39.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.38.0-beta...v0.39.0-beta
+[0.38.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.37.0-beta...v0.38.0-beta
+[0.37.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.36.0-beta...v0.37.0-beta
+[0.36.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.35.0-beta...v0.36.0-beta
+[0.35.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.34.0-beta...v0.35.0-beta
+[0.34.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.33.0-beta...v0.34.0-beta
+[0.33.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.32.0-beta...v0.33.0-beta
+[0.32.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.31.0-beta...v0.32.0-beta
+[0.31.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.30.0-beta...v0.31.0-beta
+[0.30.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.29.0-beta...v0.30.0-beta
+[0.29.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.28.0-beta...v0.29.0-beta
+[0.23.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.22.0-beta...v0.23.0-beta
+[0.22.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.21.0-beta...v0.22.0-beta
+[0.21.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.20.0-beta...v0.21.0-beta
+[0.20.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.19.0-beta...v0.20.0-beta
+[0.19.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.18.0-beta...v0.19.0-beta
+[0.18.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.17.0-beta...v0.18.0-beta
+[0.17.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.16.0-beta...v0.17.0-beta
+[0.16.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.15.0-beta...v0.16.0-beta
+[0.14.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.2-beta...v0.14.0-beta
 [0.28.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.27.0-beta...v0.28.0-beta
 [0.27.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...v0.27.0-beta
 [0.26.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.25.0-beta...v0.26.0-beta
