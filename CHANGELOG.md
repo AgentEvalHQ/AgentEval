@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers. `--dry-run` resolves every key, runs every case against a judge that records its criteria and sends
   nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
   registry a decision model would carry `atomic-llm` provenance, and the sample says so.
+- `docs/adr/evidence/033-n3-judge-vs-judge-2026-09-21.md` — the first run: 298 comparable cases, Jev 79.2%
+  agreement with the labels against GLM-5.3 Flash's 92.3%, false-pass 6.5% vs 5.6%, 55 of Jev's 62 errors
+  false fails, verdict flips across three repeats 0.3%, p50 296 ms vs 10.6 s. Three pre-registered hypotheses
+  refuted, two confirmed, two open; a go / no-go list per category.
 
 
 ## [0.40.0-beta] - 2026-09-21
