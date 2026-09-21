@@ -7,12 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 #### Fixed
+<<<<<<< HEAD
 - `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
   0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
   source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
   constructor; the regression test forces the ordering through the same internal consumer-starter seam. These
   were the only two pumps with the pattern.
 
+=======
+- Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
+  `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
+- Samples: `AGENTEVAL_SAMPLES_SHOW_RAW=1` wrapped only N2's Jev transport. It now wraps the chat client the
+  samples build for the selected provider and the Bitdeer client N1/N2 use, through the same logger, so the wire
+  evidence ADR-033 §7 asks for exists for every provider. Each request-and-reply block prints atomically after
+  its reply; a composite evaluates its leaves concurrently and the old two-write logger could put one call's
+  reply under another call's request.
+  The logger scrubs the request URI as well as the bodies (a user-configured endpoint could carry the key) and
+  passes streaming replies through unbuffered, so the streaming samples' time-to-first-token is unaffected.
+
+#### Evidence
+- `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released
+  code: N1 step 3 and N2 stage 5 ran on Bitdeer after the top-up (no 402); Jev answered 0.98 / 0.01 / 0.02 on
+  the same three cases as the day before. ADR-033 §7 (1) is closed for both providers.
+>>>>>>> origin/main
 
 ## [0.40.0-beta] - 2026-09-21
 ### A third evaluator kind, and the samples stop assuming Azure
