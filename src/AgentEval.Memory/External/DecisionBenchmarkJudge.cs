@@ -79,6 +79,56 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
         "Does the RESPONSE recognise that it does not know, cannot answer, or lacks the information? " +
         "Saying so in any wording is a match. Asserting a specific answer anyway is not.";
 
+    /// <summary>
+    /// <c>single-session-preference</c>: GOLD is a rubric for a personalised answer, not a fact to match.
+    /// The shipped judge accepts a response that recalls and uses the user's preference even when it does
+    /// not cover every point, so matching this strictly would fail correct personalised answers.
+    /// </summary>
+    public const string PreferenceInstructions =
+        "The QUESTION asks for a personalised answer. GOLD is a RUBRIC describing what a good answer does, " +
+        "not a literal answer to match. Does the RESPONSE recall and use the user's own preference or " +
+        "situation correctly? It need not cover every point of the rubric.";
+
+    /// <summary>
+    /// <c>temporal-reasoning</c> and the time-grounded types: answers are dates and intervals derived from
+    /// timestamps, and the shipped judge does not penalise an off-by-one day, week or month.
+    /// </summary>
+    public const string TemporalInstructions =
+        "The QUESTION was asked about a long conversation. GOLD is the correct answer. " +
+        "Does the RESPONSE give that same answer, or all the steps needed to reach it? " +
+        "Do NOT penalise an off-by-one count of days, weeks or months — 19 days for a gold answer of 18 " +
+        "is still a match. A different fact or a refusal to answer is not.";
+
+    /// <summary>
+    /// <c>knowledge-update</c>: the conversation changed a fact, and a response that mentions the old value
+    /// alongside the current one is still correct. The strict rubric would fail it for the extra detail.
+    /// </summary>
+    public const string KnowledgeUpdateInstructions =
+        "The QUESTION is about a fact the conversation UPDATED. GOLD is the current, correct answer. " +
+        "Does the RESPONSE give that current answer? Mentioning the earlier value as well is fine, as long " +
+        "as the current one is given. Giving only the earlier value is not a match.";
+
+    /// <summary>
+    /// The instruction this adapter would send for a question — the shipped judge's dispatch, mirrored.
+    /// Public so a run can record exactly which rubric each item was judged under.
+    /// </summary>
+    public static string InstructionsFor(ExternalBenchmarkQuestion question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        // Abstention first: it is a cross-type concern carried by the question id, not the type.
+        if (question.IsAbstention) return AbstentionInstructions;
+
+        return question.QuestionType switch
+        {
+            "single-session-preference" => PreferenceInstructions,
+            // The time-grounded probe's types judge like temporal-reasoning for the same reason: their
+            // answers are dates and intervals derived from timestamps.
+            "temporal-reasoning" or "as-of" or "current" or "prospective" => TemporalInstructions,
+            "knowledge-update" => KnowledgeUpdateInstructions,
+            _ => Instructions,
+        };
+    }
+
     /// <summary>The exact state a call sends for an item, so a dry run can print it without sending.</summary>
     public static string BuildState(string agentResponse, ExternalBenchmarkQuestion question) =>
         $"QUESTION:\n{question.Question}\n\nGOLD:\n{question.GoldAnswer}\n\nRESPONSE:\n{agentResponse}";
@@ -93,9 +143,9 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
                 "The response recognises that it cannot answer.",
                 "The response asserts an answer instead of recognising it cannot answer.")
             : new BinaryQuestion(
-                Instructions,
-                "The response gives the gold answer.",
-                "The response does not give the gold answer.");
+                InstructionsFor(question),
+                "The response satisfies the criterion above.",
+                "The response does not satisfy the criterion above.");
 
         return new DecisionRequest(
             BuildState(agentResponse, question),

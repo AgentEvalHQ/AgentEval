@@ -173,4 +173,65 @@ public class DecisionBenchmarkJudgeTests
         Assert.Equal(DecisionBenchmarkJudge.Instructions, asked.Instructions);
     }
 
+    // ── Each question type gets the rubric the shipped judge uses ───────────────────────
+
+    [Theory]
+    [InlineData("single-session-user", false)]
+    [InlineData("multi-session", false)]
+    [InlineData("single-session-assistant", false)]
+    public void OrdinaryTypes_GetTheStrictGoldRubric(string type, bool _)
+    {
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = type, Question = "?", GoldAnswer = "a" };
+        Assert.Equal(DecisionBenchmarkJudge.Instructions, DecisionBenchmarkJudge.InstructionsFor(q));
+    }
+
+    [Fact]
+    public void PreferenceQuestions_AreJudgedAgainstARubric_NotAnExactAnswer()
+    {
+        // GOLD is a description of a good personalised answer. Matching it literally would fail correct
+        // responses that recall the user's preference in their own words.
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = "single-session-preference", Question = "?", GoldAnswer = "rubric" };
+        Assert.Equal(DecisionBenchmarkJudge.PreferenceInstructions, DecisionBenchmarkJudge.InstructionsFor(q));
+        Assert.Contains("RUBRIC", DecisionBenchmarkJudge.PreferenceInstructions, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("temporal-reasoning")]
+    [InlineData("as-of")]
+    [InlineData("current")]
+    [InlineData("prospective")]
+    public void TimeGroundedQuestions_ToleratetheOffByOneTheShippedJudgeTolerates(string type)
+    {
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = type, Question = "?", GoldAnswer = "18 days" };
+        Assert.Equal(DecisionBenchmarkJudge.TemporalInstructions, DecisionBenchmarkJudge.InstructionsFor(q));
+        Assert.Contains("off-by-one", DecisionBenchmarkJudge.TemporalInstructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KnowledgeUpdateQuestions_AcceptTheOldValueAlongsideTheCurrentOne()
+    {
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = "knowledge-update", Question = "?", GoldAnswer = "now blue" };
+        Assert.Equal(DecisionBenchmarkJudge.KnowledgeUpdateInstructions, DecisionBenchmarkJudge.InstructionsFor(q));
+    }
+
+    [Fact]
+    public void Abstention_WinsOverTheQuestionType_BecauseItIsCarriedByTheId()
+    {
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q_abs", QuestionType = "knowledge-update", Question = "?", GoldAnswer = "n/a", IsAbstention = true };
+        Assert.Equal(DecisionBenchmarkJudge.AbstentionInstructions, DecisionBenchmarkJudge.InstructionsFor(q));
+    }
+
+    [Fact]
+    public async Task TheRubricChosenForATypeIsTheOneActuallySent()
+    {
+        var client = new FixedClient(0.9);
+        var judge = new DecisionBenchmarkJudge(client, "jev-latest");
+        var q = new ExternalBenchmarkQuestion { QuestionId = "q", QuestionType = "temporal-reasoning", Question = "?", GoldAnswer = "18 days" };
+
+        await judge.JudgeAsync("about 19 days", q);
+
+        var asked = Assert.IsType<BinaryQuestion>(client.Last!.Questions["contains_gold"]);
+        Assert.Equal(DecisionBenchmarkJudge.TemporalInstructions, asked.Instructions);
+    }
+
 }

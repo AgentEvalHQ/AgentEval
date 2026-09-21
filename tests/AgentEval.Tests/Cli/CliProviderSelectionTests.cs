@@ -289,4 +289,30 @@ public class CliProviderSelectionTests
         Assert.True(missing.Count == 0, $"not scrubbed by ProviderEnvironmentScope: {string.Join(", ", missing)}");
     }
 
+    [Fact]
+    public void Judge_OverrideEndpointOverPlainHttp_IsRefused_LikeEveryOtherProviderEndpoint()
+    {
+        // The override branch built its client directly, so a non-loopback http endpoint was accepted here
+        // and the judge key went out in cleartext, while the generic path refused exactly that.
+        using var _ = new ProviderEnvironmentScope(
+            ("AZURE_OPENAI_JUDGE_ENDPOINT", "http://remote.example"),
+            ("AZURE_OPENAI_JUDGE_API_KEY", "az-judge-key"),
+            ("AZURE_OPENAI_JUDGE_DEPLOYMENT", "gpt-4o-judge"));
+        var stderr = new StringWriter();
+        var previous = Console.Error;
+        Console.SetError(stderr);
+        try
+        {
+            var (judge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride: null);
+
+            Assert.Null(judge);
+            Assert.NotEqual(0, exitCode);
+            Assert.Contains("AZURE_OPENAI_JUDGE_ENDPOINT", stderr.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetError(previous);
+        }
+    }
+
 }

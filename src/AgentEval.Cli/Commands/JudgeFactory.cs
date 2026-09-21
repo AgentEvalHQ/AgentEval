@@ -80,6 +80,16 @@ internal static class JudgeFactory
 
         if (allConfigured)
         {
+            // The same endpoint policy as every other provider: https, or http to loopback. This branch used
+            // to construct the client directly, so `http://remote.example` was accepted here and the judge
+            // key went out in cleartext while the generic path refused exactly that.
+            if (!InferenceProviderEnvironment.TryValidateEndpoint(endpoint, out _, out var endpointWhy))
+            {
+                Console.Error.WriteLine(
+                    $"✖ AZURE_OPENAI_JUDGE_ENDPOINT {endpointWhy}");
+                return (null, "", ExitCodes.RuntimeError);
+            }
+
             try
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
