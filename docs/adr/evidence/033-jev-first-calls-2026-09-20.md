@@ -1,4 +1,4 @@
-# ADR-033 evidence — first real calls, 2026-09-20
+# ADR-033 evidence — first real calls, 2026-09-20 (judged runs added 2026-09-21)
 
 What ADR-033 §7 (1) asks for: the rendered request and the raw reply of a real call to each
 provider. Captured by `samples/AgentEval.Samples` N2 (`dotnet run -- 101`) with
@@ -102,10 +102,50 @@ account's balance, not the integration: the endpoint, model id, auth and reply s
 confirmed by the smoke call. N1 step 3 and the three-kind composite in N2 stage 5 remain to be
 run once the Model Studio balance is topped up.
 
+## Judged runs after the top-up — 2026-09-21, both providers, released code (`v0.40.0-beta`, `0acd7f7c`)
+
+Three-stage protocol: `--dry-run` for both samples first (nothing sent; N1 listed its prompts, N2 rendered
+all three request bodies through the real serializer), then each sample's own one-real-item stage, then the rest.
+
+### N1 — `dotnet run -- 100`, GLM-5.3 Flash as subject AND judge (25 s wall-clock)
+
+```text
+step 2  smoke     "ready"   20 in / 16 out   2,047 ms      (16 output tokens this time; 79 on 2026-09-20 — reasoning length varies)
+step 3  paid-date  subject 1,476 ms (79+66 tok)   contains_required_term 1.000 pass [atomic-code]   faithful_and_brief 1.000 pass [atomic-llm] 794 tok   composite 1.000 PASS (judge 4,503 ms)
+        method     subject 1,385 ms (79+56 tok)   1.000 pass                                         1.000 pass 819 tok                               composite 1.000 PASS (judge 3,879 ms)
+        fees       subject 7,581 ms (81+41 tok)   1.000 pass                                         1.000 pass 809 tok                               composite 1.000 PASS (judge 3,802 ms)
+judge model id  zai-org/GLM-5.3-Flash@bitdeer   (same model as the subject; EvalInput.SubjectModel set, so the result says so)
+```
+
+No 402 this time. The sample's footer printed `Σ judge tokens: 0` under three leaves of ~800: it summed the
+composite root's provenance, which carries no tokens, instead of the leaves'. Fixed in the same change as this
+section; the leaf figures above are the ones the sample printed per case.
+
+### N2 — `dotnet run -- 101`, Jev beside the GLM judge (44 s wall-clock)
+
+```text
+stage 2  grounded    P(yes) = 0.980  PASS   991 ms   model=jev-1.13.0  tokens=446  est. $0.0000178
+stage 3  fabricated  P(yes) = 0.010  FAIL   261 ms   model=jev-1.13.0  tokens=452  est. $0.0000180
+         partial     P(yes) = 0.020  FAIL   350 ms   model=jev-1.13.0  tokens=444  est. $0.0000177
+stage 4  one request, three shapes, about the fabricated case   jev-1.13.0   282 ms   593 in / 71 out
+         noul   P(yes) = 0.010
+         choice → high   confidence 1.000   { low 0.000, medium 0.000, high 1.000 }
+         score  = 0 of 0..3   confidence 1.000   { 0: 1.000, 1: 0, 2: 0, 3: 0 }
+stage 5  three evaluator kinds in one composite (GLM judge sees the ledger through the sample's ContextAwareJudge)
+         grounded    composite 0.992 PASS   non_empty 1.000 [atomic-code]   grounded 0.980 [atomic-decision] jev-1.13.0   faithful_llm 1.000 [atomic-llm] GLM-5.3-Flash@bitdeer
+         fabricated  composite 0.224 FAIL   non_empty 1.000                 grounded 0.010                                faithful_llm 0.050
+         partial     composite 0.328 FAIL   non_empty 1.000                 grounded 0.020                                faithful_llm 0.300
+```
+
+Same three probabilities as on 2026-09-20 (0.97 / 0.01 / 0.02 then; 0.98 / 0.01 / 0.02 now), so the ≈0.01 noise
+floor holds across a day and a release. The GLM judge, given the ledger, ranks the three cases in the same order
+(1.00 / 0.05 / 0.30); it is more lenient on the partial case than Jev's strict "every claim" question, which is
+the question's doing, not the model's. Three cases; still not calibration evidence — that is sample N3's job.
+
 ## Status against ADR-033 §7
 
 | Requirement | State |
 |---|---|
-| (1) one real call per provider, evidence kept | TypeSafe: **done** (5 calls). Bitdeer: **one call done**, judged run blocked by 402. |
+| (1) one real call per provider, evidence kept | **done for both**: TypeSafe 5 calls on 2026-09-20 + 5 on 2026-09-21; Bitdeer smoke 2026-09-20, then N1 step 3 (3 composites) and N2 stage 5 (3 GLM judge leaves) on 2026-09-21. |
 | (2) shadow run on a labelled composite family | not started |
 | (3) threshold on held-out data; escalation decision | not started |

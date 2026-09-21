@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Fixed
+- Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
+  `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
+
+#### Evidence
+- `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released
+  code: N1 step 3 and N2 stage 5 ran on Bitdeer after the top-up (no 402); Jev answered 0.98 / 0.01 / 0.02 on
+  the same three cases as the day before. ADR-033 §7 (1) is closed for both providers.
 
 ## [0.40.0-beta] - 2026-09-21
 ### A third evaluator kind, and the samples stop assuming Azure

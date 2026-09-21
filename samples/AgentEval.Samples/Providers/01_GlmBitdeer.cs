@@ -203,8 +203,13 @@ public static class GlmBitdeerProviderDemo
             Console.WriteLine($"     composite    : {result.Score.Value:F3} {result.Score.Label.ToUpperInvariant()}   (judge round-trip {judgeMs:N0} ms)");
             Console.WriteLine();
 
-            totalTokens += result.Provenance.TokensUsed ?? 0;
-            totalCost += result.Provenance.EstimatedCost;
+            // The composite's own provenance carries no tokens; the judge's live on the atomic-llm leaf. Summing the
+            // root printed 'Σ judge tokens: 0' under three leaves of ~800 — a zero that was a wiring fault, not a fact.
+            foreach (var leaf in result.Details.SubResults ?? [])
+            {
+                totalTokens += leaf.Provenance.TokensUsed ?? 0;
+                totalCost += leaf.Provenance.EstimatedCost;
+            }
         }
 
         Console.WriteLine($"   Σ judge tokens: {totalTokens:N0}   Σ judge cost: {(price is null ? "not priced" : $"${totalCost:F6}")}\n");
