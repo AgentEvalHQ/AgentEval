@@ -245,4 +245,48 @@ public class CliProviderSelectionTests
         Assert.True(InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable));
     }
 
+    [Theory]
+    [InlineData("OPENAI_BASE_URL", "https://proxy.example/v1")]
+    [InlineData("OPENAI_MODEL", "gpt-4o-mini")]
+    [InlineData("BITDEER_MODEL", "zai-org/GLM-5.3-Flash")]
+    [InlineData("OPENAI_COMPATIBLE_ENDPOINT", "http://127.0.0.1:11434/v1")]
+    public void AnOptionalVariableAloneStillCountsAsAConfigurationAttempt(string name, string value)
+    {
+        // Someone who set only a base URL or a model has tried to configure a provider and made a mistake.
+        // Counting required credentials alone would let the stub rescue exactly that case.
+        using var _ = new ProviderEnvironmentScope((name, value));
+
+        Assert.True(InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable));
+    }
+
+    [Fact]
+    public void AnInvalidEndpoint_IsDiagnosedByVariableName_NeverByQuotingTheUrl()
+    {
+        // The diagnostic reaches stderr, and a CI log keeps it. An endpoint is user-configured and can carry
+        // a token in its user-info, query or fragment.
+        using var _ = new ProviderEnvironmentScope(
+            ("AI_INFERENCE_PROVIDER", "openai-compatible"),
+            ("OPENAI_COMPATIBLE_ENDPOINT", "ftp://user:sekret@example.test/v1"),
+            ("OPENAI_COMPATIBLE_MODEL", "some-model"));
+
+        var settings = ProviderChatClientFactory.Settings;
+
+        Assert.False(settings.IsConfigured);
+        Assert.Contains("OPENAI_COMPATIBLE_ENDPOINT", settings.Diagnostic!, StringComparison.Ordinal);
+        Assert.DoesNotContain("sekret", settings.Diagnostic!, StringComparison.Ordinal);
+        Assert.DoesNotContain("ftp://", settings.Diagnostic!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheTestScrubList_CoversEveryVariableTheResolverReads()
+    {
+        // A variable added to the resolver but not to the scrub list would let an ambient value leak into
+        // every test in this collection — silently, and only on the machine that has it set.
+        var missing = InferenceProviderEnvironment.AllProviderVariables
+            .Where(v => !ProviderEnvironmentScope.Variables.Contains(v, StringComparer.Ordinal))
+            .ToList();
+
+        Assert.True(missing.Count == 0, $"not scrubbed by ProviderEnvironmentScope: {string.Join(", ", missing)}");
+    }
+
 }

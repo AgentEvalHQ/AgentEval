@@ -226,17 +226,13 @@ public static class InferenceProviderEnvironment
         ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
         bool Set(string n) => !string.IsNullOrWhiteSpace(getEnvironmentVariable(n));
         if (Set(SelectorVariable)) return true;
-        foreach (var provider in s_autoDetectOrder)
+        // EVERY variable a provider reads, not only its required credentials. Someone who set
+        // OPENAI_BASE_URL or BITDEER_MODEL and nothing else has tried to configure a provider and made a
+        // mistake; counting only credentials would let the stub rescue exactly that case, which is the hole
+        // this predicate exists to close.
+        foreach (var name in AllProviderVariables)
         {
-            var missing = MissingVariablesOf(provider, getEnvironmentVariable);
-            var required = provider switch
-            {
-                InferenceProvider.AzureOpenAI or InferenceProvider.Foundry => 3,
-                InferenceProvider.OpenAICompatible => 2,
-                InferenceProvider.Bitdeer or InferenceProvider.OpenAI => 1,
-                _ => 0,
-            };
-            if (required > 0 && missing.Count < required) return true;
+            if (Set(name)) return true;
         }
         return false;
     }
@@ -294,6 +290,22 @@ public static class InferenceProviderEnvironment
             string.Join("; ", s_autoDetectOrder.Select(p => $"{TagOf(p)} → {RequiredVariablesOf(p)}")) + ".");
     }
 
+    /// <summary>
+    /// Every environment variable this resolver reads for any provider — required and optional alike.
+    /// Used by <see cref="AnyConfigurationAttempted"/>; a variable added to the resolver belongs here too,
+    /// and the test fixture that scrubs the environment asserts it stays in step with this list.
+    /// </summary>
+    public static readonly IReadOnlyList<string> AllProviderVariables =
+    [
+        "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT",
+        "AZURE_OPENAI_DEPLOYMENT_2", "AZURE_OPENAI_DEPLOYMENT_3",
+        "BITDEER_API_KEY", "BITDEER_ENDPOINT", "BITDEER_MODEL", "BITDEER_MODEL_2", "BITDEER_MODEL_3",
+        "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "OPENAI_MODEL_2", "OPENAI_MODEL_3",
+        "FOUNDRY_ENDPOINT", "FOUNDRY_API_KEY", "FOUNDRY_MODEL", "FOUNDRY_MODEL_2", "FOUNDRY_MODEL_3",
+        "OPENAI_COMPATIBLE_ENDPOINT", "OPENAI_COMPATIBLE_API_KEY", "OPENAI_COMPATIBLE_MODEL",
+        "OPENAI_COMPATIBLE_MODEL_2", "OPENAI_COMPATIBLE_MODEL_3",
+    ];
+
     /// <summary>True when <paramref name="provider"/> has every variable it requires.</summary>
     public static bool HasCredentials(InferenceProvider provider, Func<string, string?> getEnvironmentVariable)
     {
@@ -329,7 +341,11 @@ public static class InferenceProviderEnvironment
         };
 
         if (!TryValidateEndpoint(endpointValue, out var endpoint, out var why))
-            return InferenceProviderSettings.NotConfigured($"{endpointVariable}='{endpointValue}' {why}");
+        {
+            // Name the variable and the reason, never the value: an endpoint may carry user-info, a query or
+            // a fragment, and this diagnostic is printed to stderr where a CI log keeps it.
+            return InferenceProviderSettings.NotConfigured($"{endpointVariable} {why}");
+        }
 
         switch (provider)
         {

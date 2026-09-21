@@ -63,6 +63,9 @@ provider `AI_INFERENCE_PROVIDER` selects.
   missing would fall through to the stub and produce stub-graded evidence from a typo.
   `InferenceProviderEnvironment.AnyConfigurationAttempted` is the new public predicate that separates
   the two cases.
+- Provider diagnostics name the **variable**, never its value: an endpoint that fails validation is
+  reported by name and reason, because a configured URL can carry a token in its user-info, query or
+  fragment and the diagnostic reaches stderr.
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
 
